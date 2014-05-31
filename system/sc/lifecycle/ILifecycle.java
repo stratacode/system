@@ -1,0 +1,25 @@
+/*
+ * Copyright (c) 2014. Jeffrey Vroom. All Rights Reserved.
+ */
+
+package sc.lifecycle;
+
+public interface ILifecycle  {
+   public void initialize();
+
+   public void start();
+
+   public void validate();
+
+   public void process();
+
+   public boolean isInitialized();
+
+   public boolean isStarted();
+
+   public boolean isValidated();
+
+   public boolean isProcessed();
+
+   public void stop();
+}

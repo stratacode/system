@@ -1,0 +1,186 @@
+/*
+ * Copyright (c) 2014. Jeffrey Vroom. All Rights Reserved.
+ */
+
+package sc.lang.template;
+
+import sc.bind.BindingDirection;
+import sc.bind.ConstantBinding;
+import sc.bind.IBinding;
+import sc.lang.ILanguageModel;
+import sc.lang.SemanticNodeList;
+import sc.lang.TemplateLanguage;
+import sc.lang.html.Element;
+import sc.lang.java.*;
+import sc.parser.IString;
+import sc.parser.PString;
+import sc.parser.ParseUtil;
+
+import java.util.List;
+import java.util.Set;
+
+/**
+ * The cousin to GlueStatement.  This gets produced in the TemplateLanguage grammar by matching %> templateStuff <%.  It turns into one giant out.append(...) call effectively.
+ * We can then insert a GlueExpression into the "primary" choice so it can match any Java expression.  This lets you pass long template strings
+ * as parametrs to a method or compare or initialize variables etc.
+ */
+public class GlueExpression extends Expression {
+   public List<Object> expressions; // IStrings or expressions - all turn into "append" operations onto the StringBuffer
+
+   public ExecResult exec(ExecutionContext ctx) {
+      StringBuilder out = (StringBuilder) ctx.getVariable("out", true, true);
+      ModelUtil.execTemplateDeclarations(out, ctx, expressions);
+      return ExecResult.Next;
+   }
+
+   @Override
+   public boolean isStaticTarget() {
+      for (Object expr:expressions) {
+         if (expr instanceof Expression) {
+            if (!((Expression) expr).isStaticTarget())
+               return false;
+         }
+      }
+      return true;
+   }
+
+   public void refreshBoundTypes() {
+      if (expressions != null) {
+         for (Object expr:expressions)
+            if (expr instanceof Expression)
+               ((Expression) expr).refreshBoundTypes();
+      }
+   }
+
+   public void addDependentTypes(Set<Object> types) {
+      if (expressions != null) {
+         for (Object expr:expressions)
+            if (expr instanceof Expression)
+               ((Expression) expr).addDependentTypes(types);
+      }
+   }
+
+   public Statement transformToJS() {
+      if (expressions != null) {
+         for (Object expr:expressions)
+            if (expr instanceof Expression)
+               ((Expression) expr).transformToJS();
+      }
+      return this;
+   }
+
+   public Object eval(Class expectedType, ExecutionContext ctx) {
+      StringBuilder sb = new StringBuilder();
+      if (bindingDirection != null) {
+         return initBinding(expectedType, ctx);
+      }
+      else {
+         ModelUtil.execTemplateDeclarations(sb, ctx, expressions);
+         if (expectedType == String.class)
+            return sb.toString();
+         else // trying to be efficient...
+            return sb;
+      }
+   }
+
+   public IBinding[] evalTemplateBindingParameters(Class expectedType, ExecutionContext ctx, List<Object> bindingParams) {
+      int sz = bindingParams.size();
+      IBinding[] result = new IBinding[sz];
+      for (int i = 0; i < sz; i++) {
+         Object bparam = bindingParams.get(i);
+         if (bparam instanceof Expression) {
+            result[i] = (IBinding) ((Expression) bparam).evalBinding(expectedType, ctx);
+         }
+         else if (PString.isString(bparam)) {
+            result[i] = new ConstantBinding(bparam.toString());
+         }
+      }
+      return result;
+   }
+
+   public void evalBindingArgs(List<Object> bindArgs, boolean isStatic, Class expectedType, ExecutionContext ctx) {
+      bindArgs.add("+");
+      bindArgs.add(evalTemplateBindingParameters(expectedType, ctx, expressions));
+   }
+
+   public String getBindingTypeName() {
+      return nestedBinding ? "arithP" : "arith";
+   }
+
+   public Object getTypeDeclaration() {
+      return String.class;
+   }
+
+   public CharSequence toStyledString() {
+      return TemplateUtil.glueStyledString(this);
+   }
+
+   public boolean transform(ILanguageModel.RuntimeType type) {
+      transformTemplate(0, type);
+      return true;
+   }
+
+   public int transformTemplate(int ix, boolean statefulContext) {
+      return transformTemplate(ix, null);
+   }
+
+   public int transformTemplate(int ix, ILanguageModel.RuntimeType type) {
+      SemanticNodeList<Expression> exprs = new SemanticNodeList<Expression>(expressions.size());
+      for (Object expr:expressions) {
+         if (expr instanceof IString) {
+            exprs.add(StringLiteral.create(expr.toString()));
+         }
+         else if (expr instanceof Expression) {
+            exprs.add((Expression) expr);
+         }
+         else if (expr instanceof Element) {
+            Element elem = (Element) expr;
+            // TODO: need to extract a sub-method from element.addToOutputMethod that gets the expression from the attributes and body when there's no object (it should be a string concat of the various expressions)
+            // Generate a call to "output" if needsObject is true and a call to this method if it is false.
+            Expression elemExpr = elem.getOutputExpression();
+            if (elemExpr != null)
+               exprs.add(elemExpr);
+         }
+      }
+      Expression res;
+      if (exprs.size() == 1)
+         res = exprs.get(0);
+      else {
+         res = BinaryExpression.createMultiExpression(exprs.toArray(new Expression[exprs.size()]), "+");
+         if (bindingDirection != null)
+            res.setBindingInfo(bindingDirection, bindingStatement, nestedBinding);
+      }
+      if (parentNode.replaceChild(this, res) == -1) {
+         System.err.println("*** - unable to replace glue expreession child");
+      }
+      if (initialized)
+         ParseUtil.initComponent(res);
+      ix = res.transformTemplate(ix, true);
+      if (type != null)
+         res.transform(type);
+      return ix;
+   }
+
+   public void setBindingInfo(BindingDirection dir, Statement dest, boolean nested) {
+      super.setBindingInfo(dir, dest, nested);
+      for (Object expr:expressions) {
+         if (expr instanceof Expression) {
+            Expression exprNode = (Expression) expr;
+            exprNode.setBindingInfo(dir, dest, true);
+         }
+      }
+   }
+
+   public String toGenerateString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append(TemplateLanguage.END_DELIMITER);
+      for (Object expr:expressions) {
+         if (expr instanceof Expression)
+            sb.append(((Expression) expr).toGenerateString());
+         else if (PString.isString(expr))
+            sb.append(expr);
+      }
+      sb.append(TemplateLanguage.START_CODE_DELIMITER);
+      return sb.toString();
+   }
+}

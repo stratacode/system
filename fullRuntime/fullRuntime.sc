@@ -1,0 +1,1 @@
+sc.fullRuntime extends coreRuntime {}

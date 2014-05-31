@@ -1,0 +1,200 @@
+/*
+ * Copyright (c) 2014. Jeffrey Vroom. All Rights Reserved.
+ */
+
+package sc.parser;
+
+import sc.lang.ISemanticNode;
+
+import java.util.IdentityHashMap;
+
+public class ParseNode extends AbstractParseNode {
+   public Object value;
+   public Object semanticValue;
+
+   Parselet parselet;
+
+   public ParseNode() {
+   }
+
+   public ParseNode(Parselet p) {
+      parselet = p;
+   }
+
+   public Parselet getParselet() {
+      return parselet;
+   }
+
+   public void setParselet(Parselet p) {
+      parselet = p;
+   }
+
+   public Object getSemanticValue() {
+      return semanticValue;
+   }
+
+   public void setSemanticValue(Object val) {
+      if (semanticValue != null)
+      {
+         ParseUtil.clearSemanticValue(semanticValue, this);
+         ParseUtil.clearSemanticValue(value, this);
+      }
+      semanticValue = val;
+   }
+
+   public String toString() {
+      return value.toString();
+   }
+
+   public String toDebugString() {
+      if (parselet.getName() != null)
+         return "[" + parselet.getName() + ":" + valueDebugString() + "]";
+      else {
+         return valueDebugString();
+      }
+   }
+
+   private String valueDebugString() {
+      if (value instanceof IParseNode)
+         return (((IParseNode) value).toDebugString());
+      return value.toString();
+   }
+
+   public boolean refersToSemanticValue(Object v) {
+      if (v == semanticValue)
+         return true;
+      if (value instanceof IParseNode)
+         return ((IParseNode)value).refersToSemanticValue(v);
+      return false;
+   }
+
+   public void format(FormatContext ctx) {
+      if (value instanceof IParseNode)
+         ((IParseNode)value).format(ctx);
+      else
+         ctx.append(value.toString());
+   }
+
+   public IParseNode reformat() {
+      if (value instanceof IParseNode)
+         ((IParseNode) value).reformat();
+
+      return super.reformat();
+   }
+
+   public int firstChar() {
+      return ParseUtil.firstCharFromValue(value);
+   }
+
+   public int length() {
+      if (value == null)
+         return 0;
+      if (value instanceof IParseNode)
+         return ((IParseNode) value).length();
+      else if (value instanceof String)
+         return ((String) value).length();
+      else
+         return value.toString().length();
+   }
+
+   public boolean isEmpty() {
+      if (value == null)
+         return true;
+      if (value instanceof IParseNode)
+         return ((IParseNode) value).isEmpty();
+      else if (value instanceof String)
+         return ((String) value).length() == 0;
+      else
+         return value.toString().length() == 0;
+   }
+
+   public CharSequence subSequence(int start, int end) {
+      if (value == null) {
+         if (start == 0 && end == 0)
+            return "";
+         else
+            throw new IndexOutOfBoundsException();
+      }
+      else if (value instanceof IParseNode) {
+         return ((IParseNode) value).subSequence(start, end);
+      }
+      else if (value instanceof String) {
+         return ((String) value).subSequence(start, end);
+      }
+      else if (value instanceof IString) {
+         return ((IString) value).subSequence(start, end);
+      }
+      else
+         return ((value).toString()).subSequence(start, end);
+   }
+
+   public char charAt(int ix) {
+      if (value == null) {
+         throw new IndexOutOfBoundsException();
+      }
+      else if (value instanceof IParseNode) {
+         return ((IParseNode) value).charAt(ix);
+      }
+      else if (value instanceof String) {
+         return ((String) value).charAt(ix);
+      }
+      else if (value instanceof IString) {
+         return ((IString) value).charAt(ix);
+      }
+      else
+         return ((value).toString()).charAt(ix);
+   }
+
+   public CharSequence toStyledString() {
+      CharSequence res;
+      if (value instanceof IParseNode) {
+         IParseNode childParseNode = (IParseNode) value;
+         Object childSV = childParseNode.getSemanticValue();
+         if ((childSV instanceof ISemanticNode)) {
+            ISemanticNode childSVNode = (ISemanticNode) childSV;
+            if (childSVNode.getParseNode() == childParseNode)
+               return (ParseUtil.styleString(childSV, childParseNode.getParselet().styleName, null, false));
+         }
+         res = childParseNode.toStyledString();
+      }
+      else
+         res = value.toString();
+      return ParseUtil.styleString(null, parselet.styleName, res, true);
+   }
+
+   public void formatStyled(FormatContext ctx) {
+      if (value instanceof IParseNode)
+         ((IParseNode)value).formatStyled(ctx);
+      else
+         ctx.append(toStyledString());
+   }
+
+   public void changeLanguage(Language lang) {
+      super.changeLanguage(lang);
+      if (value instanceof IParseNode)
+         ((IParseNode) value).changeLanguage(lang);
+   }
+
+   public void updateSemanticValue(IdentityHashMap<Object, Object> oldNewMap) {
+      if (semanticValue instanceof ISemanticNode) {
+         ISemanticNode oldVal = (ISemanticNode) semanticValue;
+         ISemanticNode newVal = (ISemanticNode) oldNewMap.get(oldVal);
+         if (newVal != null) {
+            newVal.setParseNode(this);
+            semanticValue = newVal;
+         }
+         else
+            System.err.println("*** Unable to find semantic value to update");
+      }
+      if (value instanceof IParseNode)
+         ((IParseNode) value).updateSemanticValue(oldNewMap);
+   }
+
+   public ParseNode deepCopy() {
+      ParseNode res = (ParseNode) super.deepCopy();
+      Object val = res.value;
+      if (val instanceof IParseNode)
+         res.value = ((IParseNode) val).deepCopy();
+      return res;
+   }
+}

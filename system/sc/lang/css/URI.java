@@ -1,0 +1,13 @@
+/*
+ * Copyright (c) 2014. Jeffrey Vroom. All Rights Reserved.
+ */
+
+package sc.lang.css;
+
+/**
+ * Created by rcrittendon on 2/24/14.
+ */
+public class URI extends CSSNode {
+
+    public Object uriLocation; //StringLiteral uriLocation;
+}

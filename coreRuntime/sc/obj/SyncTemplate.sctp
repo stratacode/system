@@ -1,0 +1,8 @@
+<% // This template gets merged into each synchronized type - i.e. with the @Sync annotation or found to be synchronized when automatic sync is enabled.
+   if (syncProperties != null) { %>
+   static {
+   <% for (sc.sync.SyncProperties sp:syncProperties) { %>
+      sc.sync.SyncManager.addSyncType(<%= typeIsDynamic ? "sc.dyn.DynUtil.findType(\"" + typeName + "\")" : typeName + ".class" %>, new sc.sync.SyncProperties(<%=formatString(sp.destName)%>, <%=formatString(sp.syncGroup)%>, <%= formatSyncPropsArray(sp.syncProperties) %>, <%= syncFlags %>));
+   <% } %>
+   }
+<% } %>

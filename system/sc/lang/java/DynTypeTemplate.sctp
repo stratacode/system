@@ -1,0 +1,88 @@
+   public Object invoke(int methodIndex, Object...params) {
+      switch (methodIndex) {
+      <% for (DynMethod meth:compDeclaredInstMethods) { %>
+         case <%= meth.methodIndex %>:
+            return <%= meth.objectPreInvoke %> <%= meth.name %>(<% int pi = 0; for (DynParam param:meth.params) { %><%= pi != 0 ? ", " : ""%><%=param.preInvoke%>params[<%= pi %>]<%= param.postInvoke %><% pi++; } %>);
+      <% } %>
+
+         default:
+         <% if (extendsIsDynType) { %>
+            return super.invoke(methodIndex, params);
+         <% } else if (extendsIsExtDynType) { %>
+                return <%= superTypeExpr %>.invoke(this, methodIndex, params);
+         <% } else { %>
+            throw new IllegalArgumentException("Invalid method index");
+          <% } %>
+      }
+   }
+
+   <% if (!extendsIsDynType || numCompInstProps > 0) { %>
+      public Object getProperty(int propIndex) {
+         switch (propIndex) {
+         <% for (DynProp prop:compDeclaredInstProps) { %>
+            case <%= prop.index %>:
+               return <%= prop.accessor %>;
+        <% } %>
+            default:
+            <% if (extendsIsDynType) { %>
+               return super.getProperty(propIndex);
+            <% } else if (extendsIsExtDynType) { %>
+               return <%= superTypeExpr %>.getProperty(this, propIndex);
+            <% } else { %>
+               throw new IllegalArgumentException("No property at index: " + propIndex);
+            <% } %>
+         }
+      }
+
+      public void setProperty(int propIndex, Object value) {
+         switch (propIndex) {
+         <% for (DynProp prop:compDeclaredInstWritableProps) { %>
+             case <%= prop.index %>:
+                <%= prop.preSetter %>value<%= prop.postSetter %>;
+                break;
+         <% } %>
+            default:
+            <% if (extendsIsDynType) { %>
+                super.setProperty(propIndex, value);
+            <% } else if (extendsIsExtDynType) { %>
+                <%= superTypeExpr %>.setProperty(this, propIndex, value);
+            <% } else  { %>
+               throw new IllegalArgumentException("No property at index: " + propIndex);
+            <% } %>
+         }
+      }
+   <% } %>
+
+<% if (!extendsIsDynType) { %>
+   public Object invoke(String methodName, String paramSig, Object... args) {
+      sc.type.CompMethodMapper mapper = _dynType<%= innerName %>.getMethod(methodName, paramSig);
+      return mapper.invoke(this, args);
+   }
+
+   public Object getProperty(String propName) {
+      return getProperty(_dynType<%= innerName %>.getPropertyIndex(propName));
+   }
+
+   public void setProperty(String propName, Object value) {
+      setProperty(_dynType<%= innerName %>.getPropertyIndex(propName), value);
+   }
+
+   public Object getDynType() {
+      return _dynType<%= innerName %>;
+   }
+   public void setDynType() {
+      throw new UnsupportedOperationException();
+   }
+
+   public <T> T getTypedProperty(String propName, Class<T> propType) {
+      return (T) getProperty(propName);
+   }
+
+   public void addProperty(Object propType, String propName, Object initValue) {
+      throw new UnsupportedOperationException();
+   }
+
+   public void setDynType(Object newType) {
+      throw new UnsupportedOperationException();
+   }
+<% } %>

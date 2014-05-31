@@ -1,0 +1,74 @@
+<% if (!extendsIsDynType) { %>
+    static sc.type.DynType _dynType<%= innerName %>;
+<% } %>
+
+   static {
+      _initType<%= innerName %>();
+   }
+
+   <% if (numCompProps > 0) { %> 
+      public static sc.type.IBeanMapper resolvePropertyMapping<%= innerName %>(String propName) {
+         _initType<%= innerName %>();
+         return sc.dyn.DynUtil.resolvePropertyMapping(<%= runtimeTypeName %>.class, propName);
+      }
+   <% } %>
+
+   <% if (numCompMethods > 0) { %> 
+      public static sc.type.IMethodMapper resolveMethod<%= innerName %>(String methName, String paramSig) {
+         _initType<%= innerName %>();
+         return (sc.type.IMethodMapper) sc.dyn.DynUtil.resolveMethod(<%= runtimeTypeName %>.class, methName, paramSig);
+      }
+   <% } %>
+
+   public static void _initType<%= innerName %>() {
+      if (_dynType<%= innerName %> != null) return;
+
+      _dynType<%= innerName %> = new sc.type.DynType("<%= runtimeTypeName %>", <%= superTypeExpr %>, <%= numCompProps %>, <%= numCompMethods %>) {
+
+         <% if (numCompStaticMethods > 0) { %>
+         public Object invokeStatic(int methodIndex, Object... params) {
+            switch (methodIndex) {
+            <% for (DynMethod meth:compStaticMethods) { %>
+               case <%= meth.methodIndex %>:
+                  return <%= meth.objectPreInvoke %> <%= meth.name %>(<% int pi = 0; for (DynParam param:meth.params) { %><%= pi != 0 ? ", " : ""%><%=param.preInvoke%>params[<%= pi %>]<%= param.postInvoke %><% pi++; } %>);
+            <% } %>
+                 default:
+                     return super.invokeStatic(methodIndex, params);
+              }
+         }
+         <% } %>
+         <% if (numCompStaticProps > 0) { %>
+            public Object getStaticProperty(int propIndex) {
+               switch (propIndex) {
+               <% for (DynProp prop:compStaticProps) { %>
+                  case <%= prop.index %>:
+                     return <%= prop.accessor %>;
+               <% } %>
+                  default:
+                      return super.getStaticProperty(propIndex);
+               }
+            }
+            public void setStaticProperty(int propIndex, Object value) {
+               switch (propIndex) {
+               <% for (DynProp prop:compStaticWritableProps) { %>
+                  case <%= prop.index %>:
+                     <%= prop.preSetter %>value<%= prop.postSetter %>;
+                     break;
+               <% } %>
+                  default:
+                     super.setStaticProperty(propIndex, value);
+               }
+            }
+         <% } %>
+      };
+
+      <% for (DynProp prop:compDeclaredProps) { %>
+      _dynType<%= innerName %>.addProperty("<%= prop.name %>", new sc.type.CompBeanMapper(_dynType<%= innerName %>, "<%= prop.name %>", <%= prop.index %>, <%= prop.isStatic %>,  <%= prop.constant %>));
+      <% } %>
+      <% int mi = 0; for (DynMethod meth:compDeclaredMethods) { sc.type.MethodBindSettings bindSettings = meth.getBindSettings(); %>
+      _dynType<%= innerName %>.addMethod(new sc.type.CompMethodMapper(_dynType<%= innerName %>, <%= meth.methodIndex %>, "<%= meth.name %>", "<%= meth.typeSignature %>", <%= meth.isStatic%><%
+                            if (bindSettings != null) { %>, new sc.type.MethodBindSettings(<%= meth.reverseDynMethod.methodIndex %>, <%= bindSettings.reverseSlot %>, <%= bindSettings.forwardSlot %>, <%= bindSettings.modifyParam%>, <%= bindSettings.oneParamReverse %>, <%= bindSettings.reverseMethodStatic %>) <% } %>), <%= mi %>);
+      <%    mi++; } %>
+
+      sc.type.DynType.addDynType(<%= runtimeTypeName %>.class, _dynType<%= innerName %>);
+   }

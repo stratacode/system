@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Copyright (c) 2014. Jeffrey Vroom. All Rights Reserved.
+  -->
+
+<module rename-to='sc'>
+  <!-- Inherit the core Web Toolkit stuff.                        -->
+  <inherits name='com.google.gwt.user.User'/>
+  <inherits name='java.JavaStub'/>
+
+  <!-- Inherit the default GWT style sheet.  You can change       -->
+  <!-- the theme of your GWT application by uncommenting          -->
+  <!-- any one of the following lines.                            -->
+  <inherits name='com.google.gwt.user.theme.standard.Standard'/>
+  <!-- <inherits name='com.google.gwt.user.theme.chrome.Chrome'/> -->
+  <!-- <inherits name='com.google.gwt.user.theme.dark.Dark'/>     -->
+
+  <!-- Specify the paths for translatable code                    -->
+  <source>
+     <include name="js/**.java"/>
+     <include name="type/**.java"/>
+     <include name="dyn/**.java"/>
+     <include name="binding/**.java"/>
+     <include name="obj/**.java"/>
+     <include name="util/**.java"/>
+     <include name="gwt/**.java"/>
+  </source>
+
+</module>
