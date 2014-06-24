@@ -107,4 +107,12 @@ public class CastExpression extends ChainedExpression {
       sb.append(expression.toGenerateString());
       return sb.toString();
    }
+
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+      if (expression != null)
+         return super.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
+      if (type != null)
+         return type.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
+      return -1;
+   }
 }

@@ -257,8 +257,10 @@ public class Parser implements IString {
       int saveLastStartIndex = -1;
       Object value;
 
+      /*
       if ((language.debug || parselet.trace) && !language.debugSuccessOnly)
          System.out.println(indent(inProgressCount) + "Next: " + getLookahead(8) + " testing rule: " + parselet.toString());
+      */
 
       boolean disableDebug = false;
       if (parselet.negated)
@@ -302,6 +304,7 @@ public class Parser implements IString {
             negatedCt--;
       }
 
+      /*
       if (language.debug || parselet.trace) {
          if (value instanceof ParseError) {
             if (!language.debugSuccessOnly)
@@ -314,6 +317,7 @@ public class Parser implements IString {
                     (parselet.getName() != null ? "<" + parselet.getName() + ">:" : ":") +
                     ParseUtil.escapeObject(value) + " next: " + getLookahead(8));
       }
+      */
       return value;
    }
 
@@ -368,11 +372,14 @@ public class Parser implements IString {
       return parseError(parselet, null, null, errorCode, start, end, args);
    }
 
-   public static boolean isBetterError(int currentStart, int currentEnd, int newStart, int newEnd) {
+   public static boolean isBetterError(int currentStart, int currentEnd, int newStart, int newEnd, boolean replace) {
       if (currentStart == -1)
          return true;
 
-      return newEnd > currentEnd || (newEnd == currentEnd && newStart <= currentStart);
+      if (replace)
+         return newEnd > currentEnd || (newEnd == currentEnd && newStart <= currentStart);
+      else
+         return newEnd > currentEnd || (newEnd == currentEnd && newStart < currentStart);
    }
 
    public ParseError parseError(Parselet parselet, Object partialValue, Parselet childParselet, String errorCode, int start, int end, Object... args) {
@@ -385,7 +392,7 @@ public class Parser implements IString {
       // Keep track of only the errors which made the most progress during the parse.  If the end is greater, that is
       // a better error than the one we have no matter what.  But if they end at the same spot, this error is only better
       // if it consumed more text than the previous one.
-      if (parselet.reportError && isBetterError(currentErrorStartIndex, currentErrorEndIndex, start, end)) {
+      if (parselet.reportError && isBetterError(currentErrorStartIndex, currentErrorEndIndex, start, end, true)) {
          if (end > currentErrorEndIndex || start < currentErrorStartIndex) {
             currentErrors.clear();
             currentErrorEndIndex = end;

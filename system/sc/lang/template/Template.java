@@ -1229,8 +1229,6 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
    }
 
    public boolean needsCompile() {
-      if (getSrcFile() != null && getSrcFile().relFileName.contains("codeSharing"))
-         System.out.println("***");
       // The default action here is to compile this file as .java file source unless the processor for the template says otherwise
       if (templateProcessor == null || !templateProcessor.needsProcessing())
          return true;
@@ -1282,8 +1280,6 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
    }
 
    public List<SrcEntry> getProcessedFiles(Layer buildLayer, String buildDir, boolean generate) {
-      if (getSrcFile() != null && getSrcFile().relFileName.contains("codeSharing"))
-         System.out.println("***");
       if (templateProcessor == null || (!templateProcessor.needsProcessing())) {
          if (needsCompile()) {
             return getCompiledProcessedFiles(buildLayer, buildDir, generate);

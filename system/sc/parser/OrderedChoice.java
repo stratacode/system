@@ -195,7 +195,7 @@ public class OrderedChoice extends NestedParselet  {
    }
 
    public Object parse(Parser parser) {
-      if (trace)
+      if (trace && parser.enablePartialValues)
          System.out.println("*** tracing parse of ordered choice");
 
       if (repeat)
@@ -230,13 +230,19 @@ public class OrderedChoice extends NestedParselet  {
             }
             if (parser.enablePartialValues) {
                ParseError error = (ParseError) nestedValue;
-               if (bestError == null || Parser.isBetterError(bestError.startIndex, bestError.endIndex, error.startIndex, error.endIndex))
+               // Use replace=false for isBetterError because we want the first error which matches the longest text for the partial errors thing
+               if (bestError == null || Parser.isBetterError(bestError.startIndex, bestError.endIndex, error.startIndex, error.endIndex, false))
                   bestError = error;
             }
          }
       }
       if (optional) {
          parser.changeCurrentIndex(startIndex);
+
+         if (parser.enablePartialValues && bestError != null && bestError.partialValue != null) {
+            bestError.optionalContinuation = true;
+            return bestError;
+         }
          return null;
       }
       if (bestError != null)
@@ -250,6 +256,7 @@ public class OrderedChoice extends NestedParselet  {
       ParentParseNode value = null;
       boolean matched;
       ParseError bestError = null;
+      int bestErrorSlotIx = -1;
 
       boolean emptyMatch = false;
 
@@ -278,14 +285,21 @@ public class OrderedChoice extends NestedParselet  {
             }
             else if (parser.enablePartialValues) {
                ParseError error = (ParseError) nestedValue;
-               if (bestError == null || bestError.endIndex < error.endIndex)
+               if (bestError == null || bestError.endIndex < error.endIndex) {
                   bestError = error;
+                  bestErrorSlotIx = matchingParselets instanceof MatchResult ? ((MatchResult) matchingParselets).slotIndexes.get(i) : i;
+               }
             }
          }
       } while (matched && !emptyMatch);
 
       if (value == null) {
          if (optional) {
+            if (parser.enablePartialValues && bestError != null && bestError.partialValue != null/* && bestError.eof */) {
+               value = (ParentParseNode) newParseNode(lastMatchStart);
+               value.add(bestError.partialValue, bestError.parselet, bestErrorSlotIx, false, parser);
+               return parseEOFError(parser, value, bestError,bestError.parselet, "Repeating partial match: {0}", this);
+            }
             parser.changeCurrentIndex(startIndex);
 
             // If we are a repeat optional choice with mappings of '' and we match no elements, we should return an empty string, not null.
@@ -294,11 +308,24 @@ public class OrderedChoice extends NestedParselet  {
             }
             return null;
          }
-         if (bestError != null)
+         if (bestError != null) {
+            if (parser.enablePartialValues && bestError.partialValue != null) {
+               value = (ParentParseNode) newParseNode(lastMatchStart);
+               value.add(bestError.partialValue, bestError.parselet, bestErrorSlotIx, false, parser);
+               return parseEOFError(parser, value, bestError,bestError.parselet, "Repeating partial match: {0}", this);
+            }
+            // NOTE: In this case, we are possibly returning the error from a scalar parselet for a repeating one.  It won't matter unless we have partial values enabled and partialValue
             return bestError;
+         }
          return parseError(parser, "Expecting one or more of: {0}", this);
       }
       else {
+         // If we are doing the partial values case, we might have partially matched one more statement.  if so, this is part of the partial results
+         if (parser.enablePartialValues && bestError != null && /*bestError.eof && */ bestError.partialValue != null && bestError.startIndex == lastMatchStart) {
+            value.add(bestError.partialValue, bestError.parselet, bestErrorSlotIx, false, parser);
+
+            return parseEOFError(parser, value, bestError, bestError.parselet, "Repeating partial match: {0}", this);
+         }
          if (lookahead)
             parser.changeCurrentIndex(startIndex);
          else

@@ -196,17 +196,17 @@ public class LayerUtil implements LayerConstants {
       List<String> args = null;
       File manifestTmp = null;
 
-      // First make directory the file goes in
-      String jarDir = FileUtil.getParentPath(jarName);
-      File jarDirFile = new File(jarDir);
-      jarDirFile.mkdirs();
-
       // When there's a java or js prefix for the src/class files, we still need the files relative to that dir.  This means making
       // the jar name be ../bin/...
       if (prefix != null && prefix.length() > 0)
          jarName = FileUtil.concat("..", jarName);
 
       String classDir = FileUtil.concat(buildDir, prefix);
+
+      // First make directory the file goes in
+      String jarDir = FileUtil.getParentPath(FileUtil.concat(classDir,jarName));
+      File jarDirFile = new File(jarDir);
+      jarDirFile.mkdirs();
 
       try {
          List<String> allClassFiles;
@@ -267,7 +267,6 @@ public class LayerUtil implements LayerConstants {
          while ((len = bis.read(buf, 0, buf.length)) != -1)
             System.out.write(buf, 0, len);
          int stat = p.waitFor();
-         System.out.println("*** Package process exited with: " + stat);
          return stat;
       }
       catch (InterruptedException exc) {

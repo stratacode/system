@@ -58,7 +58,7 @@ public class FloatLiteral extends AbstractLiteral {
 
    public Object getLiteralValue() {
       Object res;
-      if (value.endsWith("f") || value.endsWith("F"))
+      if (value != null && (value.endsWith("f") || value.endsWith("F")))
          res = (float)doubleValue;
       else
          res = doubleValue;

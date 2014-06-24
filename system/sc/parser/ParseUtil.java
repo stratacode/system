@@ -9,6 +9,7 @@ import sc.lang.SemanticNode;
 import sc.lang.ISemanticNode;
 import sc.lang.java.JavaModel;
 import sc.lang.SemanticNodeList;
+import sc.lang.java.JavaSemanticNode;
 import sc.layer.SrcEntry;
 import sc.lifecycle.ILifecycle;
 import sc.layer.LayeredSystem;
@@ -210,6 +211,44 @@ public class ParseUtil  {
             column++;
       }
       return "line: " + lineCt + " column: " + column;
+   }
+
+   /** Given a parse node, returns either that parse node or a child of that parse node. */
+   public static IParseNode findClosestParseNode(IParseNode parent, int offset) {
+      if (parent.getStartIndex() > offset)
+         return null; // We start after the requested offset so just return null.
+
+      // We're the leaf node and we started just before the requested offset so return this node.
+      if (!(parent instanceof ParentParseNode))
+         return parent;
+
+      ParentParseNode parentNode = (ParentParseNode) parent;
+
+      if (parentNode.children == null)
+         return parentNode;
+
+      IParseNode lastChild = null;
+      for (Object child:parentNode.children) {
+         if (child instanceof IParseNode) {
+            IParseNode childNode = (IParseNode) child;
+            // This child starts after the requested offset
+            if (childNode.getStartIndex() > offset) {
+               if (lastChild != null)
+                  return lastChild;
+               else
+                  return parentNode;
+            }
+            // This child still starts before the requested offset
+            lastChild = childNode;
+         }
+      }
+      Object semValue;
+      if (lastChild != null && (semValue = lastChild.getSemanticValue()) instanceof ISemanticNode) {
+         ISemanticNode semNode = (ISemanticNode) semValue;
+         if (semNode.getParentNode() != null)
+            return findClosestParseNode(lastChild, offset);
+      }
+      return parentNode;
    }
 
    public static String getInputString(File file, int startIndex, int i)

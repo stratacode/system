@@ -53,6 +53,14 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
       return toString().charAt(ix);
    }
 
+   public int indexOf(String substr) {
+      return toString().indexOf(substr);
+   }
+
+   public int lastIndexOf(String substr) {
+      return toString().lastIndexOf(substr);
+   }
+
    public CharSequence toStyledString() {
       return ParseUtil.styleString(null, this, toString(), true);
    }

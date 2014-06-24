@@ -31,22 +31,38 @@ public abstract class AbstractInterpreter extends EditorContext {
    StringBuffer pendingInput = new StringBuffer();
 
    public static String USAGE =  "StrataCode Command Line Editor Help:\n" +
-           "The command line interface lets you look at and modify the declarative state of the currently running StrataCode application.  When you run it with the graphical program editor, the two share the same editing state and generally stay in sync with each other.\n" +
-           "The command prompt has two modes:\n" +
-           "  1) The top level mode lets you inspect the top-level types (objects and classes) in the current layer.  You can change layers by typing the layer's path name followed by an open brace ('{').  You can inspect and modify existing types with 'typeName {'.  You can create a new type with 'class newTypeName {' or 'object newTypeName {'.\n" +
-           "  2) When you're in the context of a current type, you can execute expressions in that context, add fields, set property values, just by typing the StrataCode code at the prompt.\n\n" +
-           "Saving: Changes must be explicitly saved with cmd.save().\n\n" +
+           "The command line interface lets you examine and modify your application.  It shares the same current type as the editor if you are running both.\n" +
+           "At the command prompt, like in Java you have one set of commands for when you are not in a current type and another when you are.\n" +
+           "  1) No current type: here you can see which objects and classes are available in the current layer (cmd.list();), change layers by typing the layer's path name followed by an open brace ('{').  Choose a type with 'typeName {'.  Create a new type with 'class newTypeName {' or 'object newTypeName {'.\n" +
+           "  2) With a current type: here you can enter StrataCode, for example:\n" +
+           "        foo = 3;  // set properties\n" +
+           "        foo;      // eval an expression\n" +
+           "        int foo;  // add fields\n" +
+           "To leave the current type use } as in Java.\n" +
+           "\n" +
+           "Saving: Save changes with cmd.save();\n\n" +
            "Use TAB for command-line completion of most identifiers and commands.\n\n" +
-           "The prompt: displays the current layer's name, followed by the current package.  Both names are surrounded by '#' characters for each layer above or below that layer in the stack.  (<n>) is used to represent <n> layers for big stacks of layers.\n\n" +
-
+           "Understanding the prompt:\n" +
+           "  (example.unitConverter.model:sc.example.unitConverter##) ->\n" +
+           "   ^ current layer             ^ current package       ^^ 2 layers below\n\n" +
+           "  (doc.core:sc.doc#(15)#) ->\n" +
+           "                    ^ 15 layers below\n\n" +
+           "Use Java to change:\n" +
            "   packageName {      - Set current context to the package name specified.\n" +
            "   layerName {        - Go to the layer name specified.\n" +
            "   typeName {         - Go to the type specified in the current layer.  If this type does not exist in this layer yet, the type will be added to the layer as needed.\n" +
+
+           "Use Java to create:\n" +
            "   class typeName {   - Define a new class in the current layer.  The package for the class is the layer's package prefix (if any) plus the packageName context.\n" +
            "   object typeName {  - Define a new object.\n" +
-           "   expression;        - Evaluate the expression and prints the output using the Java toString method.\n" +
+
+           "Use Java to 'close':\n" +
            "   }                  - Close the current type - returning to any previous type or the top-level\n\n" +
 
+           "Use Java to evaluate:\n" +
+           "   expression;        - Evaluate the expression and prints the output using the Java toString method.\n" +
+
+           "The cmd object is used to control the interpreter:\n" +
            "   cmd.list();         - Lists the types (if at the top level) or the current objects and properties if inside of a type.\n" +
            "   cmd.listLayers();\n" +
            "   cmd.listObjects();\n" +

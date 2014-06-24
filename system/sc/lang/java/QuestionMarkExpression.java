@@ -99,17 +99,17 @@ public class QuestionMarkExpression extends Expression {
       info.remove(trueChoice);
    }
 
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
       if (falseChoice != null)
-         return falseChoice.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates);
+         return falseChoice.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
       if (command.trim().endsWith(":")) {
          ModelUtil.suggestTypes(getJavaModel(), prefix, "", candidates, true);
          return command.length();
       }
       if (trueChoice != null)
-         return trueChoice.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates);
+         return trueChoice.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
       if (condition != null)
-         return condition.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates);
+         return condition.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
       return -1;
    }
 

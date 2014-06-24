@@ -103,7 +103,7 @@ import java.util.zip.ZipFile;
  * <p>
  * -dyn: treat layers following this option and those they extend as dynamic - i.e. any layers dragged in by this dependency that does not have compiledOnly=true are made dynamic.
  * <p>
- * -dynall: treat layers named on the command line and all layers they include as dynamic even if they are not marked with the dynamic keyword.  Layers with compiledOnly=true are always compiled.
+ * -dynall: treat all layers named on the command line and all layers they include as dynamic even if they are not marked with the dynamic keyword.  Layers with compiledOnly=true are always compiled.
  * <p>
  * -dynone: treat layers named on the command line as dynamic even if they are not marked with the dynamic keyword.
  * <p>
@@ -146,7 +146,7 @@ import java.util.zip.ZipFile;
  * <p>
  * -v, -vb, -vs, -vsa, -vba:  Turn on verbose info globally, for sync, for data binding, and more verbose versions of sync and data binding
  * <p>
- * -vh - verbose HTML
+ * -vh, -vha - verbose HTML and very verbose HTML
  * <p>
  * -vl - show the initial layers as in verbose
  */
@@ -370,6 +370,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public String newLayerDir = null; // Directory for creating new layers
 
+   /** Set to "layers" or "../layers" when we are running in the StrataCode main/bin directories.  In this case we look for and by default install the layers folder next to the bin directory  */
+   public String layersFilePathPrefix = null;
+
    // Set and used after we successfully compile.  It exposes those newly compiled files to the class loader
    // so we can use them during any interpreting we'll do after that.
    private ClassLoader buildClassLoader;
@@ -494,8 +497,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
 
-      if (cmd != null)
-         cmd.currentLayer = lastLayer;
+      // Since we changed the set of layers we need to update the command interpreter
+      if (cmd != null) {
+         cmd.updateLayerState();
+      }
 
       if (useRuntimeProcessor == null) {
          // No layers specified any runtimes.  Default to just the 'java' runtime.
@@ -597,11 +602,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public boolean installSystem() {
+      System.out.println("No layers found in " + (layerPathDirs == null ? "current directory: " + System.getProperty("user.dir") : "layer path: " + layerPathDirs.toString()));
       if (cmd == null) {
-         System.out.println("No layers found - skipping install with no command interpreter");
+         System.err.println("Warning - skipping install with no command interpreter.  Starting with no layers");
       }
       else {
-         String input = cmd.readLine("Enter path for layers directory - existing or new [" + newLayerDir + "]: ");
+         if (layersFilePathPrefix != null) {
+            newLayerDir = FileUtil.concat(newLayerDir, layersFilePathPrefix);
+         }
+         String input = cmd.readLine("Enter path for an existing or new directory for layers: [" + newLayerDir + "]: ");
          if (input.startsWith("cmd.")) { // TODO: fix this up or remove it but for now if we try to install while running a test, we need to catch that right away.
             System.err.println("*** Error - trying to install during test script");
             System.exit(-1);
@@ -621,12 +630,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             RepositorySystem sys = new RepositorySystem(this, newLayerDir);
 
             IRepositoryManager mgr = sys.getRepositoryManager("git");
-            RepositoryPackage pkg = new RepositoryPackage("layers", new RepositorySource(mgr, "ssh://vsgit@stratacode.com/home/git/vs/layers", false));
+            RepositoryPackage pkg = new RepositoryPackage("layers", new RepositorySource(mgr, "https://github.com/stratacode/layers.git", false));
+            //RepositoryPackage pkg = new RepositoryPackage("layers", new RepositorySource(mgr, "ssh://vsgit@stratacode.com/home/git/vs/layers", false));
             pkg.fileName = null; // Just install this package into the packageRoot - don't add the packageName like we do for most packages
             String err = pkg.install();
             if (err != null)
                return false;
             systemInstalled = true;
+            if (layerPath == null) {
+               layerPath = newLayerDir;
+               layerPathDirs = new ArrayList<File>();
+               layerPathDirs.add(new File(layerPath));
+            }
          }
          else if (options.verbose)
             System.out.println("Skipping install - starting with no layers");
@@ -1196,28 +1211,78 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public void findMatchingGlobalNames(Layer fromLayer, Layer refLayer, String prefix, Set<String> candidates) {
-      if (systemClasses != null) {
-         for (String sys:systemClasses)
-            if (sys.startsWith(prefix))
-               candidates.add(sys);
+      String prefixPkg = CTypeUtil.getPackageName(prefix);
+      String prefixBaseName = CTypeUtil.getClassName(prefix);
+
+      findMatchingGlobalNames(fromLayer, refLayer, prefix, prefixPkg, prefixBaseName, candidates);
+   }
+
+   public void findMatchingGlobalNames(Layer fromLayer, Layer refLayer,
+                                       String prefix, String prefixPkg, String prefixBaseName, Set<String> candidates) {
+
+      if (prefixPkg == null) {
+         if (systemClasses != null) {
+            for (String sys:systemClasses)
+               if (sys.startsWith(prefix))
+                  candidates.add(sys);
+         }
+
+
+         if (refLayer.inheritImports) {
+            int startIx = fromLayer == null ? layers.size() - 1 : fromLayer.getLayerPosition();
+            for (int i = startIx; i >= 0; i--) {
+               Layer depLayer = layers.get(i);
+               if (depLayer.exportImports)
+                  depLayer.findMatchingGlobalNames(prefix, candidates);
+            }
+         }
+
+         for (String imp:globalImports.keySet())
+            if (imp.startsWith(prefix))
+               candidates.add(imp);
+
+         for (String prim: Type.getPrimitiveTypeNames())
+             if (prim.startsWith(prefix))
+                candidates.add(prim);
       }
 
-      if (refLayer.inheritImports) {
-         int startIx = fromLayer == null ? layers.size() - 1 : fromLayer.getLayerPosition();
-         for (int i = startIx; i >= 0; i--) {
-            Layer depLayer = layers.get(i);
-            if (depLayer.exportImports)
-               depLayer.findMatchingGlobalNames(prefix, candidates);
+      for (Map.Entry<String,HashMap<String,PackageEntry>> piEnt:packageIndex.entrySet()) {
+         String pkgName = piEnt.getKey();
+         pkgName = pkgName == null ? null : pkgName.replace("/", ".");
+
+         // If there's a pkg name for the prefix, and it matches the package, check the contents against
+         if (pkgName == prefixPkg || (prefixPkg != null && pkgName != null && pkgName.equals(prefixPkg))) {
+            HashMap<String,PackageEntry> pkgTypes = piEnt.getValue();
+            for (Map.Entry<String,PackageEntry> pkgTypeEnt:pkgTypes.entrySet()) {
+               String typeInPkg = pkgTypeEnt.getKey();
+               if (typeInPkg.startsWith(prefixBaseName)) {
+                  //candidates.add(CTypeUtil.prefixPath(prefixPkg, typeInPkg));
+                  candidates.add(typeInPkg);
+               }
+            }
+         }
+
+         // Include the right part of the package name
+         if (pkgName != null && pkgName.startsWith(prefix)) {
+            int len = prefix.length();
+            boolean includeFirst = StringUtil.equalStrings(prefix, prefixPkg);
+            // If we are matching the prefixPkg we include the package name itself.  Otherwise, we skip it
+            int matchEndIx = pkgName.indexOf(".", len + (includeFirst ? 1 : 0));
+            String tailName;
+            if (matchEndIx == -1)
+               tailName = CTypeUtil.getClassName(pkgName);
+            else {
+               String headName = pkgName.substring(0, len);
+               int startIx = headName.lastIndexOf(".");
+               if (startIx == -1)
+                  startIx = includeFirst ? len+1 : 0;
+               tailName = pkgName.substring(startIx, matchEndIx);
+            }
+            if (tailName.length() > 0)
+               candidates.add(tailName);
          }
       }
 
-      for (String imp:globalImports.keySet())
-         if (imp.startsWith(prefix))
-            candidates.add(imp);
-
-      for (String prim: Type.getPrimitiveTypeNames())
-          if (prim.startsWith(prefix))
-             candidates.add(prim);
    }
 
    /**
@@ -3491,13 +3556,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    private static void usage(String[] args) {
-      System.err.println("java LayeredSystem [-a -i -ni -nc -dyn -dynall -cp <classpath> -lp <layerPath> -cd <defaultCommandDir/Path> ] [<includeLayerDir1> ... <includeLayerDirN-1>] <includeLayerDirN> [ -f <file-list> ] [-r <main-class-regex> ...app options...] [-t <test-class-regex>] [-d/-ds/-db buildOrSrcDir] ");
+      System.err.println("sc [-a -i -ni -nc -dyn -cp <classpath> -lp <layerPath>]\n" +
+                        "    [ -cd <defaultCommandDir/Path> ] [<layer1> ... <layerN-1>] <buildLayer>\n" +
+                        "    [ -f <file-list> ] [-r <main-class-regex> ...app options...] [-t <test-class-regex>]\n" +
+                        "    [ -d/-ds/-db buildOrSrcDir]");
       System.err.println("   [ -a ]: build all files\n   [ -i ]: create temporary layer for interpreter\n   [ -nc ]: generate but don't compile java files\n");
-      System.err.println("   <includeLayerDirN>:  You must specify at least one layer name.  The last layer specified is the last layer applied to the system.  Any layers extended by your layers are automatically inserted before the layers you specify preserving the order of any dependencies.\n" +
-                         "   [ -dyn ]: Forces all specified layers to be dynamic, even if the dynamic attribute is not used in the layer definition\n" +
-                         "   [ -dynall ]: Forces all specified layers and those dragged in by dependencies to be dynamic unless compiledOnly=true\n" +
-                         "   [ -dr ]: Forces all subsequent layers to be 'recursively dynamic', that is, the layer and all layers pulled in by that dependency are made dynamic (unless compiledOnly=true on the layer)\n" +
-                         "   [ -c ]: Compile only - do not run any main methods found\n" +
+      System.err.println("   <buildLayer>:  The build layer is the last layer in your stack.\n" +
+                         "   [ -dyn ]: Layers specified after -dyn (and those they extend) are made dynamic unless they are marked: 'compiledOnly'\n" +
+                         "   [ -c ]: Generate and compile only - do not run any main methods\n" +
                          "   [ -v ]: Verbose info about the layered system.  [-vb ] [-vba] Trace data binding (or trace all) [-vs] [-vsa] [-vsv] Trace the sync system (or verbose and trace all)\n" +
                          "   [ -vh ]: verbose html [ -vl ]: display initial layers [ -vp ] turn on performance monitoring " +
                          "   [ -f <file-list>]: Process/compile only these files\n" +
@@ -3509,6 +3575,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                          "   [ -t <test-class-pattern>]: After compilation, run matching tests.\n" +
                          "   [ -o <pattern> ]: Sets the openPattern, used by frameworks to choose which page to open after startup.\n" +
                          "   [ -ta ]: Run all tests.\n" +
+                         "   [ -nw ]: For web frameworks, do not open the default browser window.\n" +
                          "   [ -n ]: Start 'create layer' wizard on startup.\n" +
                          "   [ -ni ]: Disable command interpreter\n" +
                          "   [ -ndbg ]: Do not compile Java files with debug enabled\n" +
@@ -3988,6 +4055,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return layerPathFile.canRead();
    }
 
+   private static String getLayersDirFromBinDir() {
+      String currentDir = System.getProperty("user.dir");
+      if (currentDir != null) {
+         String parentDir = FileUtil.getParentPath(currentDir);
+         File f = new File(parentDir);
+         return FileUtil.concat(parentDir, "layers");
+      }
+      return null;
+   }
+
    private void initLayerPath() {
       if (layerPath != null) {
          String [] dirNames = layerPath.split(FileUtil.PATH_SEPARATOR);
@@ -4034,30 +4111,83 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             systemInstalled = true;
          }
          else {
-            // We may be inside of a layer directory in the layer path.  We'll figure that out later on but for now just
-            // find the .layerPath above us so we do not install incorrectly.
-            String currentDir = System.getProperty("user.dir");
-            if (currentDir != null) {
-               File currentFile = new File(currentDir);
-               String parentName;
-               do {
-                  parentName = currentFile.getParent();
-                  if (parentName != null) {
-                     layerPathFile = new File(FileUtil.concat(parentName, ".layerPath"));
-                     if (layerPathFile.canRead()) {
-                        systemInstalled = true;
-                        // Need to at least install it in the right place
-                        if (layerPath == null) {
-                           newLayerDir = parentName;
-                           layerPath = parentName;
-                           layerPathDirs = new ArrayList<File>();
-                           layerPathDirs.add(new File(layerPath));
+            layerPathFileName = FileUtil.concat("layers", ".layerPath");
+            layerPathFile = new File(layerPathFileName);
+            // This is the case where have installed into the StrataCode dist directory
+            if (layerPathFile.canRead()) {
+               systemInstalled = true;
+               if (layerPath == null) {
+                  String currentDir = System.getProperty("user.dir");
+                  newLayerDir = FileUtil.concat(currentDir, "layers");
+                  layerPath = newLayerDir;
+                  layerPathDirs = new ArrayList<File>();
+                  layerPathDirs.add(new File(layerPath));
+               }
+            }
+            else {
+               layerPathFileName = FileUtil.concat("..", "layers", ".layerPath");
+               layerPathFile = new File(layerPathFileName);
+               if (layerPathFile.canRead()) {
+                  systemInstalled = true;
+                  if (layerPath == null) {
+                     // newLayerDir needs to be absolute
+                     String newDir = getLayersDirFromBinDir();
+                     if (newDir != null) {
+                        newLayerDir = newDir;
+                        layerPath = newLayerDir;
+                        layerPathDirs = new ArrayList<File>();
+                        layerPathDirs.add(new File(layerPath));
+                     }
+                  }
+               }
+               // We may be inside of a layer directory in the layer path.  We'll figure that out later on but for now just
+               // find the .layerPath above us so we do not install incorrectly.
+               String currentDir = System.getProperty("user.dir");
+               if (currentDir != null) {
+                  File currentFile = new File(currentDir);
+                  String parentName;
+                  File binDir = new File(currentFile, "bin");
+                  if (binDir.isDirectory()) {
+                     File scJarFile = new File(binDir, "sc.jar");
+                     // When running from the StrataCode dist directory, we put the results in 'layers' mostly because
+                     // git needs an empty directory to start from.
+                     if (scJarFile.canRead()) {
+                        layersFilePathPrefix = "layers";
+                     }
+                  }
+                  else {
+                     // Perhaps running from the bin directory
+                     String parentDir = FileUtil.getParentPath(currentDir);
+                     if (parentDir != null) {
+                        binDir = new File(parentDir, "bin");
+                        if (binDir.isDirectory()) {
+                           File scJarFile = new File(binDir, "sc.jar");
+                           if (scJarFile.canRead()) {
+                              layersFilePathPrefix = ".." + FileUtil.FILE_SEPARATOR + "layers";
+                           }
                         }
                      }
-                     else
-                        currentFile = new File(parentName);
                   }
-               } while (parentName != null && !systemInstalled);
+
+                  do {
+                     parentName = currentFile.getParent();
+                     if (parentName != null) {
+                        layerPathFile = new File(FileUtil.concat(parentName, ".layerPath"));
+                        if (layerPathFile.canRead()) {
+                           systemInstalled = true;
+                           // Need to at least install it in the right place
+                           if (layerPath == null) {
+                              newLayerDir = parentName;
+                              layerPath = parentName;
+                              layerPathDirs = new ArrayList<File>();
+                              layerPathDirs.add(new File(layerPath));
+                           }
+                        }
+                        else
+                           currentFile = new File(parentName);
+                     }
+                  } while (parentName != null && !systemInstalled);
+               }
             }
          }
       }

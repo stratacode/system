@@ -35,10 +35,11 @@ public abstract class ChainedExpression extends Expression {
    }
 
    /** Try completing the last operand */
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates) {
-      if (expression == null)
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+      if (expression == null) {
          return -1;
-      return expression.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates);
+      }
+      return expression.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
    }
 
    public boolean applyPartialValue(Object partial) {

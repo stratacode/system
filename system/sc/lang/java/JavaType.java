@@ -205,4 +205,5 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
    }
 
    public abstract String toGenerateString();
+
 }

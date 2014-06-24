@@ -427,8 +427,12 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return null;
    }
 
-   // TODO: should we use the Pattern stuff to make this much slower but more flexible?
    public void findMatchingGlobalNames(String prefix, Set<String> candidates) {
+      findMatchingGlobalNames(prefix, CTypeUtil.getPackageName(prefix), CTypeUtil.getClassName(prefix), candidates);
+   }
+
+   // TODO: should we use the Pattern stuff to make this much slower but more flexible?
+   public void findMatchingGlobalNames(String prefix, String prefixPkgName, String prefixBaseName, Set<String> candidates) {
       initTypeInfo();
 
       for (String ent:importsByName.keySet()) {
@@ -448,7 +452,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          }
       }
       if (layeredSystem != null && layer != null) {
-         layeredSystem.findMatchingGlobalNames(null, layer, prefix, candidates);
+         layeredSystem.findMatchingGlobalNames(null, layer, prefix, prefixPkgName, prefixBaseName, candidates);
       }
    }
 

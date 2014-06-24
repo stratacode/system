@@ -67,4 +67,13 @@ public class TypedMethodExpression extends IdentifierExpression {
       sb.append(argsToGenerateString(arguments));
       return sb.toString();
    }
+
+   public boolean applyPartialValue(Object value) {
+      if (typedIdentifier == null) {
+         // Since this extends from identifier expression we pick up it's behavior but if we do not have
+         // an identifier there's nothing to complete
+         return false;
+      }
+      return super.applyPartialValue(value);
+   }
 }

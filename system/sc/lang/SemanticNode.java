@@ -728,14 +728,14 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       }
 
       if ((options & SkipParseNode) == 0) {
-         if (parseNode != null && (p = parseNode.getParselet()) != null) {
-            oldP = parseNode;
-            // Copy a dummy parse node at least to preserve the parselet mapping for this clone.  We can use this to regenerate
-            // the node more easily after the copy.  Otherwise we need to start at a node with a known parselet.
+         oldP = parseNode;
+         if (oldP != null && (p = oldP.getParselet()) != null) {
             if ((options & CopyParseNode) == 0) {
+               // Create a dummy parse node to preserve the parselet mapping for this clone.  We can use this to regenerate
+               // the node more easily after the copy.  Otherwise we need to start at a node with a known parselet.
                copy.parseNode = newPP = new ParentParseNode(p);
                copy.parseNode.setSemanticValue(copy);
-               newPP.setStartIndex(parseNode.getStartIndex());
+               newPP.setStartIndex(oldP.getStartIndex());
                copy.parseNodeInvalid = true;
             }
             else {

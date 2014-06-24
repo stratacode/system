@@ -1880,8 +1880,12 @@ public class ModelUtil {
          prop = ((ParamTypedMember) prop).getMemberObject();
       if (prop instanceof IBeanMapper)
          return ((IBeanMapper) prop).getPropertyType();
-      else if (prop instanceof PropertyAssignment)
-         return getPropertyType(((PropertyAssignment) prop).getPropertyDefinition());
+      else if (prop instanceof PropertyAssignment) {
+         Object propType = ((PropertyAssignment) prop).getPropertyDefinition();
+         if (propType == null)
+            return Object.class; // Unresolved property - for lookupUIIcon just return something generic here
+         return getPropertyType(propType);
+      }
       else if (ModelUtil.isField(prop))
          return getFieldType(prop);
       else if (ModelUtil.isMethod(prop)) {
@@ -2089,7 +2093,7 @@ public class ModelUtil {
                if (def == null)
                   def = mapper.getSetSelector();
             }
-            else if (mtype == JavaSemanticNode.MemberType.SetMethod) {
+            else if (mtype == JavaSemanticNode.MemberType.SetMethod || mtype == JavaSemanticNode.MemberType.Assignment) {
                def = mapper.getSetSelector();
                if (mapper instanceof IBeanIndexMapper)
                   def = ((IBeanIndexMapper) mapper).getIndexedSetSelector();
@@ -4536,8 +4540,26 @@ public class ModelUtil {
             }
          }
       }
-      if (includeGlobals)
-         model.findMatchingGlobalNames(prefix, candidates);
+      if (includeGlobals) {
+         if (lastIdent.equals(""))
+            model.findMatchingGlobalNames(prefix, candidates);
+         model.layeredSystem.findMatchingGlobalNames(null, model.getLayer(), lastIdent, candidates);
+      }
+
+      String absName, pkgName, baseName;
+      if (lastIdent.equals("")) {
+         absName = prefix;
+         pkgName = prefix;
+         baseName = "";
+      }
+      else {
+         absName = CTypeUtil.prefixPath(prefix, lastIdent);
+         pkgName = prefix;
+         baseName = lastIdent;
+      }
+
+      model.findMatchingGlobalNames(absName, pkgName, baseName, candidates);
+      model.layeredSystem.findMatchingGlobalNames(null, model.getLayer(), absName, pkgName, baseName, candidates);
    }
 
    public static Object getReturnType(Object method) {

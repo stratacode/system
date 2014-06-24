@@ -44,6 +44,9 @@ public class SelectorExpression extends ChainedExpression {
 
       super.start();
 
+      if (expression == null)
+         return; // fragment was parsed without an expression
+
       int sz;
 
       if (selectors != null && (sz = selectors.size()) > 0) {
@@ -618,13 +621,19 @@ public class SelectorExpression extends ChainedExpression {
       ParseUtil.restartComponent(this);
    }
 
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
       boolean dotCommand = command.endsWith(".");
 
       if (expression == null)
          return -1;
 
-      Object obj = expression.eval(null, ctx);
+      Object obj = null;
+      try {
+         obj = expression.eval(null, ctx);
+      }
+      catch (RuntimeException exc) {
+         // ignore these completions
+      }
 
       // First path component is not valid so no real completions from here on
       if (obj == null && (selectors == null || selectors.size() > 0 || dotCommand)) {
@@ -646,19 +655,25 @@ public class SelectorExpression extends ChainedExpression {
       }
 
       String lastIdent;
-      int pos;
+      int pos = -1;
       if (dotCommand) {
          lastIdent = "";
          pos = command.length();
       }
       else {
          selector = selectors.get(lastSel);
-         if (selector instanceof VariableSelector)
-            lastIdent = ((VariableSelector) selector).identifier;
-         // TODO: ArraySelector - should we just treat it like dotCommand?
+         if (selector instanceof VariableSelector) {
+            VariableSelector vsel = (VariableSelector) selector;
+            lastIdent = vsel.identifier;
+            // TODO: ArraySelector - should we just treat it like dotCommand?
+            if (vsel.parseNode != null)
+               pos = vsel.parseNode.getStartIndex() + vsel.parseNode.lastIndexOf(lastIdent);
+         }
          else
             return -1;
-         pos = command.lastIndexOf(lastIdent);
+
+         if (pos == -1)
+            pos = command.lastIndexOf(lastIdent);
       }
 
       if (obj != null) {

@@ -342,7 +342,7 @@ public class AssignmentExpression extends TwoOperatorExpression {
          return null;
    }
 
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
       if (rhs == null)
          return -1;
       // Remove the data binding info since that gets in the way here...
@@ -350,7 +350,7 @@ public class AssignmentExpression extends TwoOperatorExpression {
       if (bindingDirection != null)
          rhs.setBindingInfo(null, null, false);
       */
-      return rhs.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates);
+      return rhs.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
    }
 
    public boolean applyPartialValue(Object partial) {

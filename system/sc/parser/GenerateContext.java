@@ -53,10 +53,6 @@ public class GenerateContext {
 
       generateCount++;
 
-      if (parselet.getTrace())
-         System.out.println("*** Tracing generate of child: " + parselet);
-
-
       // Lookaheads do not contribute to the semantic value or generate anything.
       if (parselet.getLookahead())
           return null;
@@ -68,8 +64,10 @@ public class GenerateContext {
       finally {
          levels--;
 
+         /*
          if (debug || parselet.getTrace())
             System.out.println(StringUtil.indent(levels) + resultString(result) + " <= " + valueToString(value) + " generator: " + parselet);
+         */
       }
       return result;
    }
@@ -164,9 +162,11 @@ public class GenerateContext {
          parselet.failedProgressBytes += progress;
       }
 
+      /*
       if (debug || parselet.getTrace()) {
          System.out.println(StringUtil.indent(levels) + ":" + err + " parselet: " + parselet + " value: " + valueToString(value));
       }
+      */
       if (debugError) {
          if (errors == null)
             errors = new ArrayList<GenerateError>();

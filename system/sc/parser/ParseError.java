@@ -14,6 +14,8 @@ public class ParseError {
    public Parselet parselet;
    public Object partialValue;
    public boolean eof;
+   public Object continuationValue; // True for enablePartialValues when this error partially extends the list in the value
+   public boolean optionalContinuation; // True for optional errors which add additional info so we can string together the partial value of a parent
 
    private final boolean debugErrors = false;
 

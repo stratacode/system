@@ -1352,6 +1352,8 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return compiledImpl.toArray(new Object[compiledImpl.size()]);
    }
 
+   private static int maxParentDepth = 64;
+
    public String toString() {
       try {
          String res = typeName;
@@ -1359,10 +1361,19 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
             res = "<no type name>";
          if (parentNode != null) {
             BodyTypeDeclaration encl = getEnclosingType();
-            while (encl != null) {
+            int ct = 0;
+            while (encl != null && ct < maxParentDepth) {
                res = encl.typeName + "." + res;
                if (encl.parentNode != null)
                   encl = encl.getEnclosingType();
+               else {
+                  res = "..null-parent.." + res;
+                  break;
+               }
+               ct++;
+            }
+            if (ct == maxParentDepth) {
+               System.err.println("*** Max class nesting depth in toString for type: ");
             }
          }
          JavaModel model = getJavaModel();

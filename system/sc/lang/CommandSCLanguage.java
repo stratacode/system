@@ -10,7 +10,7 @@ import sc.parser.Sequence;
 import sc.parser.Symbol;
 
 /**
- * This class defines the grammar modifications to V for the command line interpreter.
+ * This class defines the grammar modifications to StrataCode for the command line interpreter and completion grammars
  * For top-level declarations, we want to parse:
  *    package definition - changes the current package - clears any current imports
  *    import definition - queues up current imports

@@ -261,8 +261,13 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    // Note on this definition - we define a result class here and also propagate one.  If identifierSuffix returns
    // null we'll use the result class on this parent node and create a default IdentifierExpression.   If not, we
    // just set the identifiers property on the identifierSuffix object.
-   Sequence identifierExpression = new Sequence("IdentifierExpression(identifiers, .)", 
-        new Sequence("([],[])", varIdentifier, new Sequence("(,[])", REPEAT | OPTIONAL, periodSpace, identifier)),
+   Sequence remainingIdentifiers = new Sequence("(,[])", REPEAT | OPTIONAL, periodSpace, identifier);
+   {
+      // When matching "a." with enablePartialValues we need an empty string in there to tell the difference between "a" and "a."
+      remainingIdentifiers.allowEmptyPartialElements = true;
+   }
+   Sequence identifierExpression = new Sequence("IdentifierExpression(identifiers, .)",
+        new Sequence("([],[])", varIdentifier, remainingIdentifiers),
         identifierSuffix);
 
    Sequence classValueExpression = new Sequence("ClassValueExpression(typeIdentifier, arrayBrackets, )", typeIdentifier, openCloseSqBrackets, new KeywordSpace(".class"));

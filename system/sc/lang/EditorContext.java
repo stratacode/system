@@ -121,7 +121,11 @@ public class EditorContext extends ClientEditorContext {
    public EditorContext(LayeredSystem sys) {
       system = sys;
       execContext.system = sys;
-      currentLayer = sys.lastLayer;
+      updateLayerState();
+   }
+
+   public void updateLayerState() {
+      currentLayer = system.lastLayer;
       layerPrefix = currentLayer != null ? currentLayer.packagePrefix : null;
    }
 
@@ -1069,12 +1073,16 @@ public class EditorContext extends ClientEditorContext {
       }
    }
 
-   public int complete(String command, int cursor, List candidates) {
-      return complete(command, cursor, candidates, cmdlang.completionCommands);
+   public int complete(String command, int cursor, List<String> candidates) {
+      return complete(command, cursor, candidates, cmdlang.completionCommands, null, null);
    }
 
-   public int completeType(String command, List candidates) {
-      int relPos = complete(command, 0, candidates);
+   public int complete(String command, int cursor, List<String> candidates, String ctxText, JavaModel fileModel) {
+      return complete(command, cursor, candidates, cmdlang.completionCommands, ctxText, fileModel);
+   }
+
+   public int completeType(String command, List<String> candidates) {
+      int relPos = complete(command, 0, candidates, null, null);
       if (candidates.size() == 0) {
          List<BodyTypeDeclaration> res = system.findTypesByRootMatchingPrefix(command);
          if (res != null) {
@@ -1092,9 +1100,138 @@ public class EditorContext extends ClientEditorContext {
       return relPos;
    }
 
-   public int complete(String command, int cursor, List candidates, Parselet completeParselet) {
+   public Object completeFullTypeContext(String codeSnippet, Parselet completeParselet, int cursor, List<String> candidates, JavaModel fileModel) {
+      Parser p = new Parser(completeParselet.getLanguage(), new StringReader(codeSnippet));
+      p.enablePartialValues = true;
+      JavaModel model = getModel();
+      model.disableTypeErrors = true;
+      // Turn the command string into a parse-tree using the special "completionCommands" grammar
+      Object parseTree = p.parseStart(completeParselet);
+
+      int completedResPos = -1;
+      Object completedResult = null;
+
+      // We can either fail out right or parse a subset of the grammar... in the latter case, the stored errors
+      // will reflect why we could not parse the rest.
+      if (parseTree instanceof ParseError || !p.atEOF()) {
+         for (int i = 0; i < p.currentErrors.size(); i++) {
+            ParseError err = p.currentErrors.get(i);
+            Object parseNodeValue = err.partialValue;
+            // We can only complete structured parse nodes but there should be some structure in this context object.
+            // The value we want to complete will be the last parse node we retrieve... from there we can properly get the context
+            // of the code to complete
+            if (parseNodeValue instanceof IParseNode) {
+               IParseNode result = ParseUtil.findClosestParseNode((IParseNode) parseNodeValue, codeSnippet.length());
+               Object semValue = result.getSemanticValue();
+               // TODO: since right now we are only using this as a context to find the current type, it should be ok
+               // to just pick the first error and use that parse node.  Long term, we probably should run all of these
+               // semantic values through the suggestCompletion method and collect candidates to fix any error.
+               // That's an easy fix as soon as there's a case that needs it.
+               if (semValue instanceof SemanticNodeList)
+                  semValue = ((SemanticNodeList) semValue).getParentNode();
+               if (semValue instanceof JavaSemanticNode) {
+
+                  int resPos;
+
+                  // First we are going to try and complete the closest parse-node to the complete location
+                  resPos = completeCommand(semValue, codeSnippet, cursor, candidates, getCurrentTypeFromCtxValue(result, fileModel), err.continuationValue);
+
+                  if (resPos != -1)
+                     return resPos;
+
+                  // Here we are picking the first completed result at random
+                  if (completedResult == null && result != null)
+                     completedResult = result;
+               }
+               // else - we are skipping the processing of this error.  It will either match another error or we default to a more primitive code completion that's based on just finding the next identifier
+            }
+         }
+         return completedResult;
+      }
+      return null;
+   }
+
+   public BodyTypeDeclaration getCurrentTypeFromCtxValue(Object ctxValue, JavaModel fileModel) {
+      BodyTypeDeclaration currentType = null;
+      if (ctxValue instanceof IParseNode) {
+         IParseNode pn = (IParseNode) ctxValue;
+         Object semValue = pn.getSemanticValue();
+         if (semValue instanceof SemanticNodeList)
+            semValue = ((SemanticNodeList) semValue).getParentNode();
+         if (semValue instanceof JavaSemanticNode) {
+            JavaSemanticNode javaNode = (JavaSemanticNode) semValue;
+            BodyTypeDeclaration enclFragmentType = javaNode.getEnclosingType();
+            // This is the type name of the parsed fragment.  Convert it to the real type before we use it in the
+            // completion process
+            String typeName = fileModel.getModelTypeName();
+            if (enclFragmentType != null && enclFragmentType.getEnclosingType() != null)
+               typeName = CTypeUtil.prefixPath(typeName, CTypeUtil.getTailType(enclFragmentType.getInnerTypeName()));
+
+            Object enclType = system.getTypeDeclaration(typeName);
+            if (enclType instanceof BodyTypeDeclaration)
+               currentType = (BodyTypeDeclaration) enclType;
+         }
+      }
+      return currentType;
+   }
+
+   public int completeParseNode(Parser p, Object parseTree, String command, int cursor, List<String> candidates, BodyTypeDeclaration currentType) {
+      int resPos = -1;
+      // We can either fail out right or parse a subset of the grammar... in the latter case, the stored errors
+      // will reflect why we could not parse the rest.
+      if (parseTree instanceof ParseError || !p.atEOF()) {
+         for (int i = 0; i < p.currentErrors.size(); i++) {
+            ParseError err = p.currentErrors.get(i);
+            Object sv = ParseUtil.nodeToSemanticValue(err.partialValue);
+            if (sv != null) {
+               // Need to accumulate all of them
+               int newResPos = completeCommand(sv, command, cursor, candidates, currentType, err.continuationValue);
+               if (newResPos != -1)
+                  resPos = newResPos;
+               // -1 nothing matched but we keep going
+            }
+         }
+         // The parser did not complete parsing all of the input.  None of the errors by themselves were
+         // complete enough context to suggest any completions so we'll try one more thing.  Each model
+         // object can implement the applyPartialValue method to merge in the model fragments - i.e.
+         // we can add the trailing "." or argument fragment for the identifier expression.
+         if (!p.atEOF()) {
+            char nextC = p.peekInputChar(0);
+            Object parsedValue = ParseUtil.nodeToSemanticValue(parseTree);
+            if (parsedValue instanceof JavaSemanticNode) {
+               JavaSemanticNode parsedNode = (JavaSemanticNode) parsedValue;
+
+               for (int i = 0; i < p.currentErrors.size(); i++) {
+                  ParseError err = p.currentErrors.get(i);
+                  Object sv = ParseUtil.nodeToSemanticValue(err.partialValue);
+                  if (sv != null) {
+                     if (parsedNode.applyPartialValue(sv)) {
+                        int stat = completeCommand(parsedNode, command, cursor, candidates, currentType, err.continuationValue);
+                        if (stat != -1)  // Any reason we should try all of them?  Could they return different offsets?
+                           return stat;
+                     }
+                  }
+               }
+            }
+         }
+      }
+      else
+         return completeCommand(ParseUtil.nodeToSemanticValue(parseTree), command, cursor, candidates, currentType, false);
+
+      return resPos;
+   }
+
+   public int complete(String command, int cursor, List<String> candidates, Parselet completeParselet, String ctxText, JavaModel fileModel) {
       if (!cmdlang.typeCommands.initialized) {
          ParseUtil.initAndStartComponent(completeParselet);
+      }
+
+      BodyTypeDeclaration currentType = null;
+      if (ctxText != null) {
+         Object ctxValue = completeFullTypeContext(ctxText, fileModel.getLanguage().getStartParselet(), cursor, candidates, fileModel);
+         if (ctxValue instanceof Integer)
+            return (Integer) ctxValue;
+         currentType = getCurrentTypeFromCtxValue(ctxValue, fileModel);
       }
 
       HashSet<String> collector = new HashSet<String>();
@@ -1105,69 +1242,54 @@ public class EditorContext extends ClientEditorContext {
          if (curObj != null) {
             ModelUtil.suggestMembers(getModel(), curObj, "", collector, true, true, true);
             convertCollectorToCandidates(collector, candidates);
-            return command.length();
+            return command.length() + (ctxText != null ? ctxText.length() - command.length() : 0);
          }
       }
 
       Parser p = new Parser(cmdlang, new StringReader(command));
       p.enablePartialValues = true;
       JavaModel model = getModel();
+      int resPos = -1;
       try {
          model.disableTypeErrors = true;
          // Turn the command string into a parse-tree using the special "completionCommands" grammar
          Object parseTree = p.parseStart(completeParselet);
 
-         // We can either fail out right or parse a subset of the grammar... in the latter case, the stored errors
-         // will reflect why we could not parse the rest.
-         if (parseTree instanceof ParseError || !p.atEOF()) {
-            for (int i = 0; i < p.currentErrors.size(); i++) {
-               ParseError err = p.currentErrors.get(i);
-               Object sv = ParseUtil.nodeToSemanticValue(err.partialValue);
-               if (sv != null) {
-                  int stat = completeCommand(sv, command, cursor, candidates);
-                  if (stat != -1)  // Any reason we should try all of them?  Could they return different offsets?
-                     return stat;
-               }
-            }
-            // The parser did not complete parsing all of the input.  None of the errors by themselves were
-            // complete enough context to suggest any completions so we'll try one more thing.  Each model
-            // object can implement the applyPartialValue method to merge in the model fragments - i.e.
-            // we can add the trailing "." or argument fragment for the identifier expression.
-            if (!p.atEOF()) {
-               char nextC = p.peekInputChar(0);
-               Object parsedValue = ParseUtil.nodeToSemanticValue(parseTree);
-               if (parsedValue instanceof JavaSemanticNode) {
-                  JavaSemanticNode parsedNode = (JavaSemanticNode) parsedValue;
+         resPos = completeParseNode(p, parseTree, command, cursor, candidates, currentType);
 
-                  for (int i = 0; i < p.currentErrors.size(); i++) {
-                     ParseError err = p.currentErrors.get(i);
-                     Object sv = ParseUtil.nodeToSemanticValue(err.partialValue);
-                     if (sv != null) {
-                        if (parsedNode.applyPartialValue(sv)) {
-                           int stat = completeCommand(parsedNode, command, cursor, candidates);
-                           if (stat != -1)  // Any reason we should try all of them?  Could they return different offsets?
-                              return stat;
-                        }
-                     }
-                  }
-                  return -1;
-               }
-            }
-         }
-         else
-            return completeCommand(ParseUtil.nodeToSemanticValue(parseTree), command, cursor, candidates);
+         if (resPos != -1)
+            resPos += (ctxText != null ? ctxText.length() - command.length() : 0);
       }
       finally {
          model.disableTypeErrors = false;
       }
-      return -1;
+      return resPos;
    }
 
-   private int completeCommand(Object semanticValue, String command, int cursor, List candidates) {
+   private int completeCommand(Object semanticValue, String command, int cursor, List candidates, BodyTypeDeclaration currentType, Object continuationValue) {
       if (semanticValue instanceof JavaSemanticNode) {
          JavaSemanticNode node = (JavaSemanticNode) semanticValue;
-         node.parentNode = currentTypes.size() == 0 ? getModel() : currentTypes.get(currentTypes.size()-1);
+
+         // We want to set the parent node of the element from the model fragment to point to the
+         // currentType - in case we have a more complete version of that type.  We also need to preserve
+         // as much info as possible - e.g. if a ClassType is inside of a CastExpression or on its own.
+         // so that means picking the highest node in the fragment until we hit a type.
+         ISemanticNode toReparent = node, parentNode;
+         do {
+            parentNode = toReparent.getParentNode();
+            if (parentNode == null || parentNode instanceof BodyTypeDeclaration)
+               break;
+            toReparent = parentNode;
+         }
+         while (true);
+
+         if (currentType == null)
+            toReparent.setParentNode(currentTypes.size() == 0 ? getModel() : currentTypes.get(currentTypes.size()-1));
+         else
+            toReparent.setParentNode(currentType);
          JavaModel theModel = node.getJavaModel();
+         if (theModel == null)
+            theModel = getModel();
 
          // Temporarily turn off error display for this type
          boolean oldTE = theModel.disableTypeErrors;
@@ -1176,7 +1298,7 @@ public class EditorContext extends ClientEditorContext {
          theModel.setDisableTypeErrors(oldTE);
 
          HashSet<String> collector = new HashSet<String>();
-         int res = node.suggestCompletions(getPrefix(), getCurrentType(), execContext, command, cursor, collector);
+         int res = node.suggestCompletions(getPrefix(), currentType == null ? getCurrentType() : currentType, execContext, command, cursor, collector, continuationValue);
          convertCollectorToCandidates(collector, candidates);
          return res;
       }
@@ -1185,6 +1307,11 @@ public class EditorContext extends ClientEditorContext {
       // TODO: more completions!
 
       return -1;
+
+   }
+
+   private int completeCommand(Object semanticValue, String command, int cursor, List candidates) {
+      return completeCommand(semanticValue, command, cursor, candidates, null, false);
    }
 
    public BodyTypeDeclaration getCurrentType() {

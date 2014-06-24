@@ -1317,4 +1317,29 @@ public class ClassDeclaration extends TypeDeclaration {
       }
       return res;
    }
+
+   public boolean applyPartialValue(Object value) {
+      if (value instanceof JavaType) {
+         if (extendsType != null)
+            if (extendsType.applyPartialValue(value))
+               return true;
+         if (implementsTypes != null) {
+            for (JavaType implType:implementsTypes)
+               if (implType.applyPartialValue(value))
+                  return true;
+         }
+      }
+      else if (value instanceof List) {
+         List listVal = (List) value;
+         if (listVal.size() > 0) {
+            Object elem = listVal.get(0);
+            if (elem instanceof ClassType) {
+               if (extendsType != null)
+                  if (extendsType.applyPartialValue(value))
+                     return true;
+            }
+         }
+      }
+      return false;
+   }
 }

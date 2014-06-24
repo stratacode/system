@@ -20,10 +20,10 @@ public class BinaryOperand extends BaseOperand {
       return rhs;
    }
 
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
       if (rhs == null)
          return -1;
-      return rhs.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates);
+      return rhs.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
    }
 
    public boolean applyPartialValue(Object partial) {

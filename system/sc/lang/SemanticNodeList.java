@@ -356,25 +356,26 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       return super.remove(index);
    }
 
-   public boolean add(E element)
-   {
+   public boolean add(E element) {
       add(size(), element, true);
       return true;
    }
 
-   public boolean add(E element, boolean setParent)
-   {
+   public boolean add(E element, boolean setParent) {
       add(size(), element, setParent);
       return true;
    }
 
-   public boolean addAll(Collection<? extends E> c)
-   {
+   public boolean addAll(Collection<? extends E> c) {
       return addAll(size(), c);
    }
 
    public boolean addAll(int index, Collection<? extends E> c)
    {
+      if (c == this) {
+         System.out.println("*** Error - attempt to add a collection to itself");
+         return false;
+      }
       ensureCapacity(size() + c.size());
       int i = 0;
       for (E e:c)
@@ -384,27 +385,22 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
 
    // TODO: set, remove
 
-   public String toHeaderString()
-   {
+   public String toHeaderString() {
       StringBuffer sb = new StringBuffer();
       sb.append("[");
       sb.append(size());
       sb.append("]");
-      if (size() > 0)
-      {
+      if (size() > 0) {
          sb.append("{");
-         if (size() > 5)
-         {
+         if (size() > 5) {
             sb.append(get(0));
             sb.append(",");
             sb.append(get(1));
             sb.append("....");
             sb.append(get(size()-1));
          }
-         else
-         {
-            for (int i = 0; i < size(); i++)
-            {
+         else {
+            for (int i = 0; i < size(); i++) {
                if (i != 0)
                   sb.append(",");
                sb.append(get(i));
@@ -475,10 +471,20 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
    public ISemanticNode deepCopy(int options, IdentityHashMap<Object, Object> oldNewMap) {
       int sz = size();
       SemanticNodeList newList = new SemanticNodeList(sz);
+
+      int propagateOptions = options;
+
+      if ((options & CopyParseNode) != 0) {
+         propagateOptions = (options & ~CopyParseNode) | SkipParseNode;
+         if (oldNewMap != null)
+            throw new IllegalArgumentException("CopyParseNode does not support oldNewMap");
+         oldNewMap = new IdentityHashMap<Object,Object>();
+      }
+
       for (int i = 0; i < sz; i++) {
          Object val = get(i);
          if (val instanceof ISemanticNode)
-            val = ((ISemanticNode) val).deepCopy(options, oldNewMap);
+            val = ((ISemanticNode) val).deepCopy(propagateOptions, oldNewMap);
          newList.add(val);
       }
       Parselet p;
@@ -487,16 +493,23 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
          oldNewMap.put(this, newList);
 
       if ((options & SkipParseNode) == 0) {
+         IParseNode newP, oldP;
+         ParentParseNode newPP;
+         oldP = parseNode;
          // Parsenode does not get copied so this can't be invalid yet.
          if (parseNode != null && (p = parseNode.getParselet()) != null) {
-            newList.parseNode = new ParentParseNode(p);
-            newList.parseNode.setSemanticValue(newList);
 
-            if ((options & CopyParseNode) != 0) {
-               System.err.println("Error - need to support CopyParseNode on lists");
+            if ((options & CopyParseNode) == 0) {
+               newList.parseNode = newPP = new ParentParseNode(p);
+               newList.parseNode.setSemanticValue(newList);
+               newPP.setStartIndex(parseNode.getStartIndex());
+               newList.parseNodeInvalid = true;
             }
             else {
-               newList.parseNodeInvalid = true;
+               newList.parseNode = newP = oldP.deepCopy();
+
+               // This goes and replaces all semantic values in our map so that the new parse nodes point to the new semantic values and vice versa.
+               newP.updateSemanticValue(oldNewMap);
             }
          }
          else {

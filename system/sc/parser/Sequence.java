@@ -4,6 +4,7 @@
 
 package sc.parser;
 
+import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
 import sc.lang.java.JavaSemanticNode;
 
@@ -46,8 +47,20 @@ public class Sequence extends NestedParselet  {
       return " ";
    }
 
+   private ParentParseNode cloneParseNode(ParentParseNode value) {
+      Object semValue = value.getSemanticValue();
+      ParentParseNode errVal;
+      if (semValue != null && semValue instanceof ISemanticNode) {
+         ISemanticNode newNode = ((ISemanticNode) semValue).deepCopy(ISemanticNode.CopyAll, null);
+         errVal = (ParentParseNode) newNode.getParseNode();
+      }
+      else
+         errVal = value.deepCopy();
+      return errVal;
+   }
+
    public Object parse(Parser parser) {
-      if (trace)
+      if (trace && parser.enablePartialValues)
          System.out.println("*** tracing sequence parse");
 
       if (repeat)
@@ -61,6 +74,7 @@ public class Sequence extends NestedParselet  {
       int numParselets = parselets.size();
       for (int i = 0; i < numParselets; i++) {
          Parselet childParselet = parselets.get(i);
+
          Object nestedValue = parser.parseNext(childParselet);
          if (nestedValue instanceof ParseError) {
             if (negated) {
@@ -70,7 +84,7 @@ public class Sequence extends NestedParselet  {
                return null;
             }
 
-            // If we are optional and looking for partial values, this optional error may be helpful
+            // If we are optional and have at least some content that we've matched and looking for partial values, this optional error may be helpful
             // in stitching things together.
             if (optional && (!parser.enablePartialValues || parser.currentIndex != parser.currentErrorStartIndex)) {
                parser.changeCurrentIndex(startIndex);
@@ -79,9 +93,37 @@ public class Sequence extends NestedParselet  {
 
             if (parser.enablePartialValues) {
                ParseError err = (ParseError) nestedValue;
+
                Object pv = err.partialValue;
+
+               if (err.optionalContinuation) {
+                  ParentParseNode errVal;
+                  if (pv != null) {
+                     if (value == null)
+                        errVal = (ParentParseNode) newParseNode(startIndex);
+                     else {
+                        // Here we need to clone the semantic value so we keep track of the state that
+                        // represents this error path separate from the default path which is going to match
+                        // and replace the error slot here with a null
+                        Object semValue = value.getSemanticValue();
+                        if (semValue != null && semValue instanceof ISemanticNode) {
+                           ISemanticNode newNode = ((ISemanticNode) semValue).deepCopy(ISemanticNode.CopyAll, null);
+                           errVal = (ParentParseNode) newNode.getParseNode();
+                        }
+                        else
+                           errVal = value.deepCopy();
+                     }
+                     errVal.add(pv, childParselet, i, false, parser);
+                  }
+                  else
+                     errVal = value;
+                  err.partialValue = errVal;
+                  //err.continuationValue = true;
+                  err.optionalContinuation = false;
+                  nestedValue = null; // Switch this to optional
+               }
                // Always call this to try and extend the current error... also see if we can generate a new error
-               if (!childParselet.getLookahead()) {
+               else if (!childParselet.getLookahead()) {
 
                   // First complete the value with any partial value from this error and nulls for everything
                   // else.
@@ -94,25 +136,30 @@ public class Sequence extends NestedParselet  {
 
                   // Now see if this computed value extends any of our most specific errors.  If so, this error
                   // can be used to itself extend other errors based on the EOF parsing.
-                  if (extendsPartialValue(parser, value) || err.eof || pv != null) {
-                     ParseError newError = parseEOFError(parser, value, err, childParselet, "Partial match: {0} ", this);
-                     if (optional)
-                        return null;
-                     return newError;
+                  if ((extendsPartialValue(parser, childParselet, value, anyContent) && anyContent) || err.eof || pv != null) {
+                     if (!err.eof || !value.isEmpty()) {
+                        ParseError newError = parseEOFError(parser, value, err, childParselet, "Partial match: {0} ", this);
+                        if (optional && value.isEmpty())
+                           return null;
+                        return newError;
+                     }
                   }
                }
             }
 
-            if (optional) {
-               parser.changeCurrentIndex(startIndex);
-               return null;
+            // Unless the error was canclel
+            if (nestedValue != null) {
+               if (optional) {
+                  parser.changeCurrentIndex(startIndex);
+                  return null;
+               }
+
+               if (reportError)
+                  return parseError(parser, childParselet, "Expected: {0}", this);
+               else
+                  parser.changeCurrentIndex(startIndex);
+               return nestedValue;
             }
-            
-            if (reportError)
-               return parseError(parser, childParselet, "Expected: {0}", this);
-            else
-               parser.changeCurrentIndex(startIndex);
-            return nestedValue;
          }
 
          if (value == null)
@@ -148,11 +195,21 @@ public class Sequence extends NestedParselet  {
          return null;
    }
 
-   private boolean extendsPartialValue(Parser parser, ParentParseNode value) {
+   private boolean extendsPartialValue(Parser parser, Parselet childParselet, ParentParseNode value, boolean anyContent) {
       if (value == null)
          return false;
 
-      if (parser.currentIndex == parser.currentErrorStartIndex) {
+      /*
+      if (parser.currentIndex == parser.currentErrorEndIndex && parser.currentErrorEndIndex != parser.currentErrorStartIndex) {
+         return false;
+      }
+
+      if (parser.currentIndex != parser.currentErrorStartIndex) {
+         System.out.println("***");
+      }
+      */
+
+      //if (parser.currentIndex == parser.currentErrorStartIndex) {
          Object nsv = ParseUtil.nodeToSemanticValue(value);
          if (nsv instanceof JavaSemanticNode) {
             JavaSemanticNode node = (JavaSemanticNode) nsv;
@@ -160,22 +217,118 @@ public class Sequence extends NestedParselet  {
                ParseError err = parser.currentErrors.get(i);
                Object esv = ParseUtil.nodeToSemanticValue(err.partialValue);
                if (esv != null) {
-                  if (node.applyPartialValue(esv)) {
+                  if (node == esv || (anyContent && node.applyPartialValue(esv))) {
+                     if (!value.isEmpty()) {
+                        // Reuse the same error with the new value.  This node will also call parseEOF error
+                        // but that error will be ignored caused it does not end as far back as this one.
+                        // One potential benefit of doing it this way is that if more nodes end up with better
+                        // final matches we'll hang onto them.  If we use the new error it would replace any other
+                        // existing errors.
+                        err.startIndex = parser.currentIndex;
+                        err.partialValue = value;
 
-                     // Reuse the same error with the new value.  This node will also call parseEOF error
-                     // but that error will be ignored caused it does not end as far back as this one.
-                     // One potential benefit of doing it this way is that if more nodes end up with better
-                     // final matches we'll hang onto them.  If we use the new error it would replace any other
-                     // existing errors.
-                     err.startIndex = parser.currentIndex;
-                     err.partialValue = value;
-
-                     return true;
+                        return true;
+                     }
                   }
+               }
+               else if (childParselet == err.parselet) {
+                  err.startIndex = parser.currentIndex;
+                  err.partialValue = value;
+                  return true;
                }
             }
          }
-      }
+         // The current value is a list like the return from class body and the error in this case should be the field, member etc. which is inside of it.
+         else if (nsv instanceof SemanticNodeList) {
+            SemanticNodeList snl = (SemanticNodeList) nsv;
+            int snlSize = snl.size();
+            int startIx = snl.getParseNode().getStartIndex();
+            ISemanticNode lastListSemValue = null;
+            for (int i = 0; i < snlSize; i++) {
+               Object elem = snl.get(i);
+               if (elem instanceof ISemanticNode) {
+                  ISemanticNode elemNode = (ISemanticNode) elem;
+                  int newIx = ((ISemanticNode) elem).getParseNode().getStartIndex();
+                  if (newIx > startIx)
+                     startIx = newIx;
+
+                  if (i == snlSize - 1) {
+                     lastListSemValue = elemNode;
+                  }
+               }
+            }
+
+            /** Ideally we can find a node in the list which can be extended with the value from this list */
+            boolean res = false;
+            if (anyContent && lastListSemValue instanceof JavaSemanticNode) {
+               for (int i = 0; i < parser.currentErrors.size(); i++) {
+                  JavaSemanticNode lastListSemNode = (JavaSemanticNode) lastListSemValue;
+                  ParseError err = parser.currentErrors.get(i);
+                  if (err.partialValue instanceof IParseNode) {
+                     IParseNode errParseNode = (IParseNode) err.partialValue;
+                     Object errSemValue = errParseNode.getSemanticValue();
+
+                     if (lastListSemNode.applyPartialValue(errSemValue)) {
+                        res = true;
+                        err.partialValue = value;
+                     }
+                  }
+               }
+            }
+            if (res)
+               return true;
+
+            /**
+             * As another attempt to extend the lists we look for an element that can be added to the list.
+             * TODO: this case should be cleaned up or potentially removed in favor of the above approach?
+             */
+         /*
+            for (int i = 0; i < parser.currentErrors.size(); i++) {
+               ParseError err = parser.currentErrors.get(i);
+               Object esv = ParseUtil.nodeToSemanticValue(err.partialValue);
+               if (esv != null) {
+                  if (esv instanceof ISemanticNode) {
+                     ISemanticNode errSemNode = (ISemanticNode) esv;
+                     IParseNode errParseNode = errSemNode.getParseNode();
+                     if (errSemNode.getParentNode() == null && (errParseNode != null && errParseNode.getStartIndex() > startIx)) {
+                        if (!snl.contains(errSemNode) && errSemNode != snl) {
+                           if (!(errSemNode instanceof List)) {
+                              if (anyContent)
+                                 snl.add(errSemNode);
+                           }
+                        }
+                     }
+                  }
+                  /*
+                  else if (PString.isString(esv)) {
+                     if (lastListVal instanceof JavaSemanticNode) {
+                        JavaSemanticNode lastNode = ((JavaSemanticNode) lastListVal);
+                        if (lastNode.applyPartialValue(esv))
+                           return true;
+                     }
+                  }
+                  */
+                  /*
+                  if (snl.contains(esv))
+                     System.out.println("***");
+                  else
+                     snl.add(esv);
+                  err.startIndex = parser.currentIndex;
+                  */
+                  //err.partialValue = snl;
+                  // TODO: Seems like we should not always be returning true here but instead should have
+                  // a mechanism to be sure this error is extended - like check if the parselet types match and
+                  // if the lists match or overla - like check if the parselet types match or the lists
+                  // are the same or we can tell this is an element of the new list.
+                  //if (anyContent)
+                  //   res = true;
+                  /*
+                  */
+               //}
+           // }
+            return res;
+         }
+      //}
       return false;
    }
 
@@ -185,6 +338,7 @@ public class Sequence extends NestedParselet  {
       int lastMatchIndex;
       boolean matched;
       boolean matchedAny = false;
+      boolean lastPartialSequence = false;
       int i;
       ParseError lastError = null;
       Parselet childParselet = null;
@@ -192,20 +346,20 @@ public class Sequence extends NestedParselet  {
       ArrayList<Object> matchedValues;
       ArrayList<Object> errorValues = null;
 
+      boolean anyContent;
+
       do {
          lastMatchIndex = parser.currentIndex;
 
          matchedValues = null;
 
          matched = true;
-         boolean anyContent = false;
+         anyContent = false;
          numParselets = parselets.size();
-         for (i = 0; i < numParselets; i++)
-         {
+         for (i = 0; i < numParselets; i++) {
             childParselet = parselets.get(i);
             Object nestedValue = parser.parseNext(childParselet);
-            if (nestedValue instanceof ParseError)
-            {
+            if (nestedValue instanceof ParseError) {
                matched = false;
                errorValues = matchedValues;
                matchedValues = null;
@@ -214,25 +368,22 @@ public class Sequence extends NestedParselet  {
             }
 
             if (matchedValues == null)
-               matchedValues = new ArrayList<Object>();
+               matchedValues = new ArrayList<Object>(); // TODO: performance set the init-size here?
 
-            if (nestedValue != null)
+            if (nestedValue != null) {
                anyContent = true;
+            }
 
             matchedValues.add(nestedValue);
          }
-         if (i == numParselets)
-         {
+         if (i == numParselets) {
             // We need at least one non-null slot in a sequence for it to match
-            if (anyContent)
-            {
-               if (matchedValues != null)
-               {
+            if (anyContent) {
+               if (matchedValues != null) {
                   if (value == null)
                      value = (ParentParseNode) newParseNode(lastMatchIndex);
                   int numMatchedValues = matchedValues.size();
-                  for (i = 0; i < numMatchedValues; i++)
-                  {
+                  for (i = 0; i < numMatchedValues; i++) {
                      Object nv = matchedValues.get(i);
                      //if (nv != null) // need an option to preserve nulls?
                      value.add(nv, parselets.get(i), i, false, parser);
@@ -246,16 +397,50 @@ public class Sequence extends NestedParselet  {
          }
       } while (matched);
 
-      if (!matchedAny)
-      {
+      if (!matchedAny) {
+         if (parser.enablePartialValues && !lookahead && lastError != null) {
+            Object pv = lastError.partialValue;
+            if ((pv != null || !optional) && !childParselet.getLookahead()) {
+               if (errorValues == null)
+                  errorValues = new ArrayList<Object>();
+               errorValues.add(pv);
+               // Add these null slots so that we do all of the node processing
+               value = newRepeatSequenceResult(errorValues, value, lastMatchIndex, parser);
+               return parseEOFError(parser, value, lastError, childParselet, "Partial array match: {0} ", this);
+            }
+            if (pv == null && optional && anyContent) {
+               value = newRepeatSequenceResult(errorValues, value, lastMatchIndex, parser);
+               ParseError err = parseEOFError(parser, value, lastError, childParselet, "Optional continuation: {0} ", this);
+               err.optionalContinuation = true;
+               return err;
+            }
+         }
+
          if (optional) {
             parser.changeCurrentIndex(startIndex);
             return null;
          }
-
+         return parseError(parser, "Expecting one or more of {0}", this);
+      }
+      else {
          if (parser.enablePartialValues && !lookahead && lastError != null) {
             Object pv = lastError.partialValue;
-            if (lastError.eof || pv != null && !childParselet.getLookahead()) {
+            // IF we partially matched the next sequence, we need to indicate the partial value
+            // for this error if it's not already set.
+            if (pv == null) {
+               if (errorValues != null) {
+                  ParentParseNode errVal = cloneParseNode(((ParentParseNode) value)) ;
+                  lastError.partialValue = newRepeatSequenceResult(errorValues, errVal, lastMatchIndex, parser);
+               }
+               else
+                   lastError.partialValue = value;
+               // Instead of producing a value for this fragment and messing up the parse node for what might be a valid match
+               // we mark this error as a "continuation".  This flag can then be used in the suggestCompletions
+               // method to take into account the fact that there's an extra '.' at the end (or whatever)
+               lastError.continuationValue = true;
+            }
+            /*
+            if (pv != null && !childParselet.getLookahead()) {
                value = (ParentParseNode) newParseNode(lastMatchIndex);
                if (errorValues == null)
                   errorValues = new ArrayList<Object>();
@@ -271,11 +456,10 @@ public class Sequence extends NestedParselet  {
                }
                return parseEOFError(parser, value, lastError, childParselet, "Partial array match: {0} ", this);
             }
+            */
          }
-         return parseError(parser, "Expecting one or more of {0}", this);
-      }
-      else
          parser.changeCurrentIndex(lastMatchIndex);
+      }
 
       String customError;
       if ((customError = accept(parser.semanticContext, value, startIndex, parser.currentIndex)) != null)
@@ -286,13 +470,28 @@ public class Sequence extends NestedParselet  {
       return value;
    }
 
+   ParentParseNode newRepeatSequenceResult(ArrayList<Object> matchedValues, ParentParseNode value,
+                                           int lastMatchIndex, Parser parser) {
+      if (matchedValues != null) {
+         if (value == null)
+            value = (ParentParseNode) newParseNode(lastMatchIndex);
+         int numMatchedValues = matchedValues.size();
+         int numParselets = parselets.size();
+         for (int i = 0; i < numParselets; i++) {
+            Object nv = i < numMatchedValues ?  matchedValues.get(i) : null;
+            value.add(nv, parselets.get(i), i, false, parser);
+         }
+      }
+      return value;
+   }
+
    protected static final GenerateError INVALID_TYPE_IN_CHAIN = new GenerateError("Chained property - next item in sequence did not match expected item type.");
    protected static final GenerateError MISSING_ARRAY_VALUE = new GenerateError("Missing array value");
    protected static final GenerateError ACCEPT_ERROR = new GenerateError("Accept method failed");
 
    public Object generate(GenerateContext ctx, Object value) {
-      if (trace)
-          System.out.println("*** Generating traced element");
+      //if (trace)
+      //    System.out.println("*** Generating traced element");
 
       if (optional && emptyValue(ctx, value))
           return generateResult(ctx, null);
@@ -500,8 +699,8 @@ public class Sequence extends NestedParselet  {
 
       boolean isValueString = PString.isString(value);
 
-      if (trace)
-         System.out.println("*** Generating a traced element");
+      //if (trace)
+      //   System.out.println("*** Generating a traced element");
 
       ParentParseNode tnode = new ParentParseNode(this);
       int progress = 0;

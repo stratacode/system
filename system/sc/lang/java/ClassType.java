@@ -13,9 +13,7 @@ import sc.type.CTypeUtil;
 import sc.type.Type;
 import sc.util.StringUtil;
 
-import java.util.ArrayList;
-import java.util.IdentityHashMap;
-import java.util.List;
+import java.util.*;
 
 public class ClassType extends JavaType {
    public String typeName;
@@ -121,10 +119,11 @@ public class ClassType extends JavaType {
       StringBuilder sb = new StringBuilder();
 
       sb.append(typeName);
-      for (ClassType t:chainedTypes)
-      {
-         sb.append(".");
-         sb.append(t.typeName);
+      for (ClassType t:chainedTypes) {
+         if (t.typeName != null) {  // Skipping an empty path name - such as when we are suggesting completions for a.
+            sb.append(".");
+            sb.append(t.typeName);
+         }
       }
       return sb.toString();
    }
@@ -317,6 +316,8 @@ public class ClassType extends JavaType {
       String fullTypeName = getFullBaseTypeName();
 
       type = FAILED_TO_INIT_SENTINEL; // prevent recursive calls
+      if (fullTypeName == null)
+         return; // Invalid fragment
       type = node.findType(fullTypeName);
 
       if (type == null) { // not a relative name
@@ -650,5 +651,100 @@ public class ClassType extends JavaType {
          res.compiledTypeName = compiledTypeName;
       }
       return res;
+   }
+
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+      JavaModel model = getJavaModel();
+      if (model == null)
+         return -1;
+
+      String typeName = getFullTypeName();
+      if (typeName == null)
+         return -1;
+
+      String leafName = CTypeUtil.getClassName(typeName);
+
+      int pos = -1;
+      if (parseNode != null) {
+         pos = parseNode.getStartIndex();
+         if (pos != -1) {
+            int offset = parseNode.lastIndexOf(leafName);
+            if (offset == -1)
+               pos = -1;
+            else
+               pos += offset;
+         }
+      }
+
+      if (pos == -1) {
+         pos = command.lastIndexOf(leafName);
+      }
+      if (pos == -1)
+         return -1;
+
+      // When the identifier expression ends with "." so we match everything defined for the prefix only
+      //boolean endsWithDot = continuation != null && continuation instanceof Boolean;
+      boolean endsWithDot = chainedTypes != null && chainedTypes.get(chainedTypes.size()-1).typeName == null;
+
+      if (endsWithDot)
+         pos = pos + leafName.length() + 1;
+
+      String pkgName = endsWithDot ? typeName : CTypeUtil.getPackageName(typeName);
+      if (pkgName != null) {
+         if (endsWithDot)
+            leafName = "";
+         ModelUtil.suggestTypes(model, pkgName, leafName, candidates, false);
+         int csize = candidates.size();
+         if (csize > 0) {
+            /*
+            HashSet<String> absCandidates = new HashSet<String>();
+            for (String cand:candidates) {
+               absCandidates.add(CTypeUtil.prefixPath(pkgName, cand));
+            }
+            candidates.clear();
+            candidates.addAll(absCandidates);
+            */
+            return pos;
+         }
+      }
+
+      if (endsWithDot) {
+         prefix = CTypeUtil.prefixPath(prefix, typeName);
+         typeName = "";
+      }
+
+      boolean includeProps = parentNode instanceof CastExpression;
+
+      ModelUtil.suggestTypes(model, prefix, typeName, candidates, true);
+      if (currentType != null)
+         ModelUtil.suggestMembers(model, currentType, typeName, candidates, true, includeProps, includeProps);
+      if (candidates.size() > 0)
+         return pos;
+
+      return -1;
+   }
+
+   public boolean applyPartialValue(Object value) {
+      if (value instanceof ClassType) {
+         ClassType other = (ClassType) value;
+
+         if (typeName == null && other.typeName != null) {
+            setProperty("typeName", other.typeName);
+            return true;
+         }
+         if (typeName != null && other.typeName != null) {
+            if (typeName.equals(other.typeName) && other.chainedTypes != null) {
+               if (chainedTypes == null) {
+                  setProperty("chainedTypes", other.chainedTypes);
+                  return true;
+               }
+               // TODO: any more cases here?
+            }
+         }
+      }
+      else if (value instanceof List) {
+         setProperty("chainedTypes", value);
+      }
+      return false;
    }
 }

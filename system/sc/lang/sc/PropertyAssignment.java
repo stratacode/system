@@ -846,4 +846,53 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       // Unique ids - MD = "metadata"
       return DynUtil.getObjectId(this, null, "MD_" + typeName + "_" + propertyName);
    }
+
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+      if (initializer != null) {
+         return initializer.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
+      }
+
+      Object obj = ctx.getCurrentObject();
+
+      if (obj == null)
+         obj = currentType;
+
+      if (!(obj instanceof Class) && !(obj instanceof ITypeDeclaration)) {
+         if (obj != null)
+            obj = DynUtil.getType(obj);
+      }
+
+      String lastIdent = propertyName;
+      if (lastIdent == null)
+         lastIdent = "";
+      // We don't end up with an identifier for the "foo." case.  Just look for all under foo in that case.
+      int pos = -1;
+
+      if (parseNode != null) {
+         pos = parseNode.getStartIndex();
+         if (pos != -1)
+            pos += parseNode.lastIndexOf(lastIdent);
+      }
+
+      if (pos == -1)
+         pos = command.lastIndexOf(lastIdent);
+
+      JavaModel model = getJavaModel();
+      if (obj != null)
+         ModelUtil.suggestMembers(model, obj, lastIdent, candidates, false, true, true);
+
+      return pos;
+   }
+
+   public boolean applyPartialValue(Object value) {
+      if (value instanceof Expression) {
+         if (initializer == null)
+            setProperty("initializer", value);
+         else {
+            return initializer.applyPartialValue(value);
+         }
+      }
+      return false;
+   }
+
 }

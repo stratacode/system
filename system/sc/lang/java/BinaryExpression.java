@@ -136,8 +136,10 @@ public class BinaryExpression extends Expression {
 
       initExprTree();
 
-      lhs.initialize();
-      rhs.initialize();
+      if (lhs != null)
+         lhs.initialize();
+      if (rhs != null)
+         rhs.initialize();
       super.initialize();
 
       // If we get restarted, we need to reset all of this stuff
@@ -156,7 +158,7 @@ public class BinaryExpression extends Expression {
       super.start();
 
       if (lhs == null || rhs == null)
-         System.out.println("*** Uninitialized binary expression");
+         return; // Partial values might not be initialized during fragment parsing
 
       lhs.start();
       rhs.start();
@@ -583,10 +585,10 @@ public class BinaryExpression extends Expression {
    }
 
    /** Try completing the last operand */
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
       if (operands.size() == 0)
          return -1;
-      return operands.get(operands.size()-1).suggestCompletions(prefix, currentType, ctx, command, cursor, candidates);
+      return operands.get(operands.size()-1).suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
    }
 
    public boolean applyPartialValue(Object partial) {

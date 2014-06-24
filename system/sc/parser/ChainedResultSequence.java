@@ -14,6 +14,8 @@ import java.util.List;
  * This class alters the behavior of how the result is produced for this sequence.  If the second value
  * in the sequence is null, we use the first value.  If both values are defined, we choose the default
  * production for a sequence using the mappings.
+ * During the parsing process, the addResultToParent method will select the semantic value of the first slot if
+ * the second slot is null.
  */
 public class ChainedResultSequence extends Sequence {
    Class slotResultClass;
@@ -120,9 +122,6 @@ public class ChainedResultSequence extends Sequence {
    private final static GenerateError NO_MATCH_ERROR = new GenerateError("No semantic value to required element");
 
    public Object generate(GenerateContext ctx, Object value) {
-      if (trace)
-          System.out.println("*** tracing chained result sequence");
-
       if (value == null) {
          if (optional)
             return null;

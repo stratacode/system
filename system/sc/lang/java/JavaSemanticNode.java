@@ -378,7 +378,7 @@ public abstract class JavaSemanticNode extends SemanticNode {
       return false;
    }
 
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
       return -1;
    }
 

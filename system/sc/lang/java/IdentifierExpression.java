@@ -370,21 +370,24 @@ public class IdentifierExpression extends ArgumentsExpression {
                idTypes[0] = IdentifierType.UnboundName;
                String ident;
                int pathIx;
+               IString lastIdent;
                // Fully qualified object refs are ok if we are in sc
                if (useExtensions || allowClassBinding()) {
                   // For methods, don't try to resolve the method name as a type
                   // to save on false lookups - which are the most expensive
                   int nix = arguments == null ? 0 : 1;
-                  int last = identifiers.size() - nix - 1;
+                  int last = sz - nix - 1;
+                  lastIdent = identifiers.get(last);
                   // Don't search for paths that end with 'this' as it's expensive to look for something that does not exist
-                  if (identifiers.get(last).equals("this") && last > 0)
+                  if (lastIdent != null && lastIdent.equals("this") && last > 0)
                      nix++;
-                  ident = getIdentifierPathName(identifiers.size()-nix);
+                  ident = getIdentifierPathName(sz-nix);
                   pathIx = nix;
                }
                else {
-                  int last = identifiers.size() - 1;
-                  if (identifiers.get(last).equals("this")) {
+                  int last = sz - 1;
+                  lastIdent = identifiers.get(last);
+                  if (lastIdent != null && lastIdent.equals("this")) {
                      ident = getIdentifierPathName(last - 1);
                      pathIx = 2;
                   }
@@ -427,7 +430,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                         break;
                      }
                      else {
-                        if (ident.indexOf(".") == -1) {
+                        if (ident != null && ident.indexOf(".") == -1) {
                            displayTypeError("No type: " + ident + " in ");
                            break;
                         }
@@ -3628,31 +3631,38 @@ public class IdentifierExpression extends ArgumentsExpression {
       }
    }
 
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
       if (identifiers == null)
          return -1;
 
       if (arguments != null) {
          if (arguments.size() > 0) {
             // TODO: fill in the expected type here based on the argument type?
-            return arguments.get(arguments.size()-1).suggestCompletions(prefix, currentType, ctx, command, cursor, candidates);
+            return arguments.get(arguments.size()-1).suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
          }
          return -1;
       }
 
-      boolean dotCommand = false; //TODO: REMOVE ME command.endsWith(".");
       Object obj;
 
+      int idSize = identifiers.size();
+
+      //boolean emptyDotName = continuation != null && continuation instanceof Boolean;
+      IString lastIdentIstr = identifiers.get(idSize-1);
+      boolean emptyDotName = lastIdentIstr == null || lastIdentIstr.toString().length() == 0;
+
       try {
-         obj = dotCommand ? eval(null, ctx) : evalRootValue(ctx);
+         obj = emptyDotName ? eval(null, ctx) : evalRootValue(ctx);
       }
       catch (RuntimeException exc) {
-         System.err.println("*** exception trying to eval node to get completions");
+         // Just won't show completions against this object if we don't resolve but try falling back to the type
          obj = null;
-      }
-      // First path component is not valid so no real completions
-      if (obj == null && (identifiers.size() > 1 || dotCommand)) {
-         return -1;
+
+         // For "a.b" we complete 'b' using the type of a
+         if (idSize > 1) {
+            if (boundTypes != null)
+               obj = getTypeForIdentifier(idSize-2);
+         }
       }
 
       if (obj == null)
@@ -3666,18 +3676,26 @@ public class IdentifierExpression extends ArgumentsExpression {
             obj = DynUtil.getType(obj);
       }
 
-      String lastIdent = identifiers.size() == 0 ? "" : identifiers.get(identifiers.size()-1).toString();
+      String lastIdent = idSize == 0 ? "" : identifiers.get(idSize-1).toString();
       // We don't end up with an identifier for the "foo." case.  Just look for all under foo in that case.
-      int pos;
-      if (dotCommand) {
-         lastIdent = "";
-         pos = command.length();
+      int pos = -1;
+
+      if (lastIdent.equals("")) {
+         pos = parseNode.getStartIndex() + parseNode.length();
       }
-      else
-         pos = command.lastIndexOf(lastIdent);
+      else {
+         if (parseNode != null) {
+            pos = parseNode.getStartIndex();
+            if (pos != -1)
+               pos += parseNode.lastIndexOf(lastIdent);
+         }
+
+         if (pos == -1)
+            pos = command.lastIndexOf(lastIdent);
+      }
 
       JavaModel model = getJavaModel();
-      boolean includeGlobals = identifiers.size() == 1 && !dotCommand;
+      boolean includeGlobals = idSize == 1 && !emptyDotName;
       if (obj != null)
          ModelUtil.suggestMembers(model, obj, lastIdent, candidates, includeGlobals, true, true);
       else {
@@ -3705,8 +3723,51 @@ public class IdentifierExpression extends ArgumentsExpression {
             return true;
          }
          if (partial.identifiers != null) {
-            identifiers.addAll(partial.identifiers);
+            if (partial.identifiers != identifiers) {
+               if (identifiers == null) {
+                  setProperty("identifiers", partial.identifiers);
+               }
+               else
+                  identifiers.addAll(partial.identifiers);
+            }
             return true;
+         }
+      }
+      if (value instanceof SemanticNodeList) {
+         if (value == arguments)
+            return true;
+         else {
+            SemanticNodeList valList = (SemanticNodeList) value;
+            boolean isString = true;
+            for (Object elem:valList) {
+               if (!PString.isString(elem))
+                  isString = false;
+            }
+            if (isString) {
+               if (identifiers == null) {
+                  /* Not sure we need this case and it was getting hit to extend TypedMethodExpression before
+                    we overrode it there to be sure we at least matched the typed identifer.
+                  setProperty("identifiers", valList);
+                  return true;
+                  */
+               }
+               else {
+                  int i;
+                  for (i = 0; i < identifiers.size(); i++) {
+                     IString ident = identifiers.get(i);
+                     if (valList.size() <= i)
+                        return false;
+                     if (ident == null || !ident.equals(valList.get(i)))
+                        return false;
+                  }
+                  boolean any = false;
+                  for (; i < valList.size(); i++) {
+                     identifiers.add(PString.toIString(valList.get(i)));
+                     any = true;
+                  }
+                  return any;
+               }
+            }
          }
       }
       return false;

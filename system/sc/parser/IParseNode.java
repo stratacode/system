@@ -36,6 +36,11 @@ public interface IParseNode extends CharSequence {
 
    void setStartIndex(int s);
 
+   /** Returns the index of the string relative to the start of this parse node */
+   int indexOf(String subtr);
+
+   int lastIndexOf(String subtr);
+
    /** If you take a language string and reparse it this lets you advance the start index to where it originally existed in the file (e.g. for HTML attribute expressions which are not parsed as part of the original grammar) */
    void advanceStartIndex(int s);
 

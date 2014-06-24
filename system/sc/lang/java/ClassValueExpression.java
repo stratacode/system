@@ -163,12 +163,44 @@ public class ClassValueExpression extends Expression {
       return true;
    }
 
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates) {
-      if (typeIdentifier == null || typeIdentifier.length() == 0 || arrayBrackets != null)
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+      String typeName = typeIdentifier;
+      if (typeName == null || typeName.length() == 0 || arrayBrackets != null)
          return -1;
 
-      ModelUtil.suggestTypes(getJavaModel(), prefix, typeIdentifier, candidates, true);
-      return command.lastIndexOf(typeIdentifier);
+      JavaModel model = getJavaModel();
+      if (model == null)
+         return -1;
+
+      String pkgName = CTypeUtil.getPackageName(typeName);
+      String leafName = typeName;
+      if (pkgName != null) {
+         leafName = CTypeUtil.getClassName(leafName);
+         ModelUtil.suggestTypes(model, pkgName, leafName, candidates, false);
+      }
+
+      boolean endsWithDot = continuation != null && continuation instanceof Boolean;
+
+      // For a.b. completions
+      if (endsWithDot) {
+         ModelUtil.suggestTypes(model, typeName, "", candidates, true);
+
+         prefix = CTypeUtil.prefixPath(prefix, typeName);
+         typeName = "";
+      }
+
+      ModelUtil.suggestTypes(model, prefix, typeName, candidates, true);
+
+      int relPos = -1;
+
+      if (parseNode != null && parseNode.getStartIndex() != -1)
+         relPos = parseNode.getStartIndex() + parseNode.lastIndexOf(leafName);
+      else
+         relPos = command.lastIndexOf(leafName);
+
+      if (endsWithDot)
+         relPos += prefix.length() + 1;
+      return relPos;
    }
 
    public void refreshBoundTypes() {

@@ -51,9 +51,9 @@ public class ParenExpression extends ChainedExpression {
       return expression.evalBinding(expectedType, ctx);
    }
 
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
       if (expression != null)
-         return expression.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates);
+         return expression.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
       return -1;
    }
 
