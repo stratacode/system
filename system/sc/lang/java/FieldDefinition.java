@@ -280,7 +280,7 @@ public class FieldDefinition extends TypedDefinition {
       res.add(this);
    }
 
-   public Definition modifyDefinition(BodyTypeDeclaration base, boolean doMerge) {
+   public Definition modifyDefinition(BodyTypeDeclaration base, boolean doMerge, boolean inTransformed) {
       for (int i = 0; i < variableDefinitions.size(); i++) {
          VariableDefinition v = variableDefinitions.get(i);
          Object oldVar;

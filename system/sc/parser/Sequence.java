@@ -84,15 +84,28 @@ public class Sequence extends NestedParselet  {
                return null;
             }
 
+            ParseError err = (ParseError) nestedValue;
+            boolean isBetterError = false;
             // If we are optional and have at least some content that we've matched and looking for partial values, this optional error may be helpful
             // in stitching things together.
             if (optional && (!parser.enablePartialValues || parser.currentIndex != parser.currentErrorStartIndex)) {
-               parser.changeCurrentIndex(startIndex);
-               return null;
+               if (parser.enablePartialValues) {
+                  int errEndIx = Math.max(parser.currentIndex, err.endIndex);
+                  if (!Parser.isBetterError(parser.currentErrorStartIndex, parser.currentErrorEndIndex, startIndex, errEndIx, true)) {
+                     parser.changeCurrentIndex(startIndex);
+                     return null;
+                  }
+                  else {
+                     isBetterError = true;
+                  }
+               }
+               else {
+                  parser.changeCurrentIndex(startIndex);
+                  return null;
+               }
             }
 
             if (parser.enablePartialValues) {
-               ParseError err = (ParseError) nestedValue;
 
                Object pv = err.partialValue;
 
@@ -136,7 +149,7 @@ public class Sequence extends NestedParselet  {
 
                   // Now see if this computed value extends any of our most specific errors.  If so, this error
                   // can be used to itself extend other errors based on the EOF parsing.
-                  if ((extendsPartialValue(parser, childParselet, value, anyContent) && anyContent) || err.eof || pv != null) {
+                  if ((extendsPartialValue(parser, childParselet, value, anyContent) && anyContent) || err.eof || pv != null || isBetterError) {
                      if (!err.eof || !value.isEmpty()) {
                         ParseError newError = parseEOFError(parser, value, err, childParselet, "Partial match: {0} ", this);
                         if (optional && value.isEmpty())

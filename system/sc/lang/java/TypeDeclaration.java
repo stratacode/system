@@ -619,7 +619,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       }
    }
 
-   public Definition modifyDefinition(BodyTypeDeclaration base, boolean doMerge) {
+   public Definition modifyDefinition(BodyTypeDeclaration base, boolean doMerge, boolean inTransformed) {
       TypeDeclaration otherType = (TypeDeclaration) base.getInnerType(typeName, null, true, false);
       Object annotObj;
       if (otherType != null) {

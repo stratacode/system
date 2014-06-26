@@ -640,5 +640,11 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          return JSUtil.ShadowedPropertyPrefix + variableName;
       return variableName;
    }
+
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+      if (initializer != null)
+         return initializer.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
+      return -1;
+   }
 }
 

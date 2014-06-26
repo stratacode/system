@@ -65,7 +65,7 @@ public class Attr extends Node {
             if (attStr.charAt(1) == '=') {
                if (attStr.length() > 2 && attStr.charAt(2) == ':')
                   opStr = ":=:";
-               else if (attStr.charAt(2) == ' ')
+               else
                   opStr = ":=";
             }
          }

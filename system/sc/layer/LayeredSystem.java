@@ -3557,9 +3557,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    private static void usage(String[] args) {
       System.err.println("sc [-a -i -ni -nc -dyn -cp <classpath> -lp <layerPath>]\n" +
-                        "    [ -cd <defaultCommandDir/Path> ] [<layer1> ... <layerN-1>] <buildLayer>\n" +
-                        "    [ -f <file-list> ] [-r <main-class-regex> ...app options...] [-t <test-class-regex>]\n" +
-                        "    [ -d/-ds/-db buildOrSrcDir]");
+                         "   [ -cd <defaultCommandDir/Path> ] [<layer1> ... <layerN-1>] <buildLayer>\n" +
+                         "   [ -f <file-list> ] [-r <main-class-regex> ...app options...] [-t <test-class-regex>]\n" +
+                         "   [ -d/-ds/-db buildOrSrcDir]");
       System.err.println("   [ -a ]: build all files\n   [ -i ]: create temporary layer for interpreter\n   [ -nc ]: generate but don't compile java files\n");
       System.err.println("   <buildLayer>:  The build layer is the last layer in your stack.\n" +
                          "   [ -dyn ]: Layers specified after -dyn (and those they extend) are made dynamic unless they are marked: 'compiledOnly'\n" +
@@ -3581,6 +3581,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                          "   [ -ndbg ]: Do not compile Java files with debug enabled\n" +
                          "   [ -dt ]: Enable the liveDynamicTypes option - so that you can modify types at runtime.  This is turned when the editor is enabled by default but you can turn it on with this option.\n" +
                          "   [ -nd ]: Disable the liveDynamicTypes option - so that you cannot modify types at runtime.  This is turned when the editor is enabled by default but you can turn it on with this option.\n" +
+                         "   [ -ee ]: Edit the editor itself - when including the program editor, do not exclude it's source from editing.\n" +
                          "   [ -cd <default-interpreter-type>]: For -i, sets the root-type the interpreter can access\n\n" +
                          StringUtil.insertLinebreaks(AbstractInterpreter.USAGE, 80));
       System.exit(-1);

@@ -752,8 +752,9 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          if (tagName.equalsIgnoreCase("a") && getAttribute("href") == null && (getAttribute("clickCount") != null || getAttribute("clickEvent") != null))
             tagSpecial = " href=\"#\"";
          // Convenience - if you are handling events don't do the default submission.  TODO: It may be better here to call event.preventDefault rather than return false.  We don't want to navigate but should not disable all other event handlers.
-         else if (tagName.equalsIgnoreCase("form") && (getAttribute("submitCount") != null || getAttribute("submitEvent") != null) && getAttribute("onsubmit") == null)
-            tagSpecial = " onSubmit=\"return false;\"";
+         // TODO: this is done for submitEvent below
+         else if (tagName.equalsIgnoreCase("form") && getAttribute("submitCount") != null && getAttribute("onsubmit") == null)
+            tagSpecial = " onsubmit=\"return false;\"";
          // A convenient for the programmer - if they omit the type, default it to css
          else if (tagName.equalsIgnoreCase("style") && getAttribute("type") == null)
             tagSpecial = " type=\"text/css\"";

@@ -209,8 +209,15 @@ public class SyncHandler {
          return sb.toString();
       }
       else {
-         Class literalClass = changedObj.getClass();
-         Type literalType = Type.get(literalClass);
+         Type literalType;
+         if (changedObj instanceof String) {
+            literalType = Type.String;
+         }
+         else {
+            Class literalClass;
+            literalClass = changedObj.getClass();
+            literalType = Type.get(literalClass);
+         }
          switch (literalType) {
             case Boolean:
                return ((Boolean) changedObj) ? "true" : "false";

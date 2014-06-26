@@ -3864,7 +3864,9 @@ public class IdentifierExpression extends ArgumentsExpression {
 
 
    private boolean needsClassInitConversion(Object srcType) {
-       return arguments == null && !(parentNode instanceof SelectorExpression) && !(parentNode instanceof AssignmentExpression) && ModelUtil.needsClassInit(srcType) && !ModelUtil.isAssignableFrom(srcType, getEnclosingType()) && !(parentNode instanceof SwitchLabel);
+      // The children of AssignmentExpressions used to be excluded here as well but for an enum variable reference
+      // we definitely need this.
+      return arguments == null && !(parentNode instanceof SelectorExpression) && ModelUtil.needsClassInit(srcType) && !ModelUtil.isAssignableFrom(srcType, getEnclosingType()) && !(parentNode instanceof SwitchLabel);
    }
 
    /*

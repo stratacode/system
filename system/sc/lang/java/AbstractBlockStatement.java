@@ -116,7 +116,7 @@ public abstract class AbstractBlockStatement extends Statement  {
    }
 
    /** Just append this definition to the base type */
-   public Definition modifyDefinition(BodyTypeDeclaration base, boolean doMerge) {
+   public Definition modifyDefinition(BodyTypeDeclaration base, boolean doMerge, boolean inTransformed) {
       base.body.add(this);
       return this;
    }

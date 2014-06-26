@@ -35,7 +35,8 @@ public class QuestionMarkExpression extends Expression {
    }
 
    public Object getTypeDeclaration() {
-      Object trueType = trueChoice.getGenericType(), falseType = falseChoice.getGenericType();
+      Object trueType = trueChoice == null ? null : trueChoice.getGenericType(),
+            falseType = falseChoice == null ? null : falseChoice.getGenericType();
       try {
          // Not resolved
          if (trueType == null || falseType == null)
@@ -181,5 +182,9 @@ public class QuestionMarkExpression extends Expression {
       sb.append(" : ");
       sb.append(falseChoice.toGenerateString());
       return sb.toString();
+   }
+
+   public boolean applyPartialValue(Object value) {
+      return super.applyPartialValue(value);
    }
 }

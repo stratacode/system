@@ -351,11 +351,11 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       return ((BodyTypeDeclaration) base).definesMember(propertyName, MemberType.PropertyAnySet, null, null);
    }
 
-   public JavaSemanticNode modifyDefinition(BodyTypeDeclaration base, boolean doMerge) {
+   public JavaSemanticNode modifyDefinition(BodyTypeDeclaration base, boolean doMerge, boolean inTransformed) {
       Object var;
       TypeContext ctx = new TypeContext();
       ctx.transformed = true;
-      if ((var = base.definesMember(propertyName, MemberType.PropertyAnySet, null, ctx, false, true)) != null) {
+      if ((var = base.definesMember(propertyName, MemberType.PropertyAnySet, null, ctx, false, inTransformed)) != null) {
 
          // Reverse-only bindings do not replace the underlying assignment, they append to it.  So just add this statement to the base type.
          if (bindingDirection == BindingDirection.REVERSE) {

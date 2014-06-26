@@ -1280,7 +1280,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       throw new UnsupportedOperationException();
    }
 
-   public Definition modifyDefinition(BodyTypeDeclaration base, boolean doMerge) {
+   public Definition modifyDefinition(BodyTypeDeclaration base, boolean doMerge, boolean inTransformed) {
       Object otherTypeObj = base.getInnerType(typeName, null, true, false);
       Object annotObj;
       if (otherTypeObj instanceof BodyTypeDeclaration) {
@@ -4750,7 +4750,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       assign.parentNode = model;
       // This property assignment modifies any existing definition we might have for this property
       // Can return a VariableDefinition here
-      JavaSemanticNode overriddenAssign = assign.modifyDefinition(this, false);
+      JavaSemanticNode overriddenAssign = assign.modifyDefinition(this, false, false);
 
       if (!model.hasErrors) {
          // If this is a method, we need to use this assignment to do the update.  Otherwise, use the overridden assignment

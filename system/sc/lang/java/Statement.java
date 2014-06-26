@@ -67,7 +67,7 @@ public abstract class Statement extends Definition {
       return null;
    }
 
-   public JavaSemanticNode modifyDefinition(BodyTypeDeclaration other, boolean doMerge) {
+   public JavaSemanticNode modifyDefinition(BodyTypeDeclaration other, boolean doMerge, boolean inTransformed) {
       throw new UnsupportedOperationException();
    }
 

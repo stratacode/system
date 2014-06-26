@@ -586,7 +586,10 @@ public class SyncManager {
       }
 
       public CharSequence expressionToString(Object value, ArrayList<String> currentObjNames, String currentPackageName, StringBuilder preBlockCode, StringBuilder postBlockCode, String varName, boolean inBlock, String uniqueId, List<SyncLayer.SyncChange> depChanges, SyncLayer syncLayer) {
-         return value == null ? "null" : getSyncHandler(value).expressionToString(currentObjNames, currentPackageName, preBlockCode, postBlockCode, varName, inBlock, uniqueId, depChanges, syncLayer);
+         if (value == null)
+            return "null";
+         SyncHandler syncHandler = getSyncHandler(value);
+         return syncHandler.expressionToString(currentObjNames, currentPackageName, preBlockCode, postBlockCode, varName, inBlock, uniqueId, depChanges, syncLayer);
       }
 
       public String getObjectName(Object changedObj, List<SyncLayer.SyncChange> depChanges, SyncLayer syncLayer) {
@@ -805,6 +808,10 @@ public class SyncManager {
       }
 
       public SyncHandler getSyncHandler(Object obj) {
+         // Workaround Javascript problems on chrome using String's class?
+         if (obj instanceof String)
+            return new SyncHandler(obj, this);
+
          Object type = DynUtil.isType(obj) ? obj.getClass() : DynUtil.getType(obj);
          Class handlerClass = syncHandlerRegistry.get(type);
          if (handlerClass == null)

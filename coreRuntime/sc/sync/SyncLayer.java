@@ -832,7 +832,6 @@ public class SyncLayer {
                // care of that now but currently we are registering the names at the session level which causes the problem.
                // What changes must be made at the global level?  Any initSyncInsts which are not on-demand and are on global scoped components.  We don't have a session scope then.
                SyncHandler valSyncHandler = parentContext.getSyncHandler(propValue);
-               //SyncHandler valSyncHandler = syncContext.getSyncHandler(propValue);
                statement.append(valSyncHandler.getPropertyUpdateCode(changedObj, propName, propValue, parentContext.getPreviousValue(changedObj, propName), newObjNames, newLastPackageName, preBlockCode, postBlockCode, depChanges, this));
             }
             else {

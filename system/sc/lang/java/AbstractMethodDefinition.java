@@ -140,7 +140,7 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       return super.findType(typeName, refType, ctx);
    }
 
-   public Definition modifyDefinition(BodyTypeDeclaration base, boolean doMerge) {
+   public Definition modifyDefinition(BodyTypeDeclaration base, boolean doMerge, boolean inTransformed) {
       assert origName != null;
 
       // Use origName here - if we were overridden, we still want to find and override the same method

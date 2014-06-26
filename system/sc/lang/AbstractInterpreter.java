@@ -354,7 +354,7 @@ public abstract class AbstractInterpreter extends EditorContext {
                   // system.
                   modType.temporaryType = true;
                   ParseUtil.initAndStartComponent(type);
-                  if (modType.mergeDefinitionsInto(currentDef))
+                  if (modType.mergeDefinitionsInto(currentDef, false))
                      addChangedModel(currentDef.getJavaModel());
                }
                else {

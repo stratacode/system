@@ -780,7 +780,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       return true;
    }
 
-   public boolean mergeDefinitionsInto(BodyTypeDeclaration baseType) {
+   public boolean mergeDefinitionsInto(BodyTypeDeclaration baseType, boolean inTransformed) {
       boolean any = false;
 
       if (baseType.dependentTypes != null) {
@@ -824,7 +824,7 @@ public class ModifyDeclaration extends TypeDeclaration {
          for (int i = 0; i < body.size(); i++) {
             Statement statement = body.get(i);
 
-            statement.modifyDefinition(baseType, true);
+            statement.modifyDefinition(baseType, true, inTransformed);
             any = true;
          }
       }
@@ -1041,7 +1041,7 @@ public class ModifyDeclaration extends TypeDeclaration {
                if (typeParameters != null)
                   modType.setProperty("typeParameters", typeParameters);
 
-               mergeDefinitionsInto(modType);
+               mergeDefinitionsInto(modType, true);
 
                modType.transformDefaultModifier();
             }
@@ -1265,7 +1265,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       if (newType)
          subType.setProperty("body", body);
       else
-         mergeDefinitionsInto(subType);
+         mergeDefinitionsInto(subType, true);
 
       if (finishTransform) {
          if (replaceNode)
@@ -1333,7 +1333,7 @@ public class ModifyDeclaration extends TypeDeclaration {
 
    // We don't have to do anything here except add us to our output - while the parent is being transformed...
    // we'll do it in the transform method later
-   public Definition modifyDefinition(BodyTypeDeclaration base, boolean doMerge) {
+   public Definition modifyDefinition(BodyTypeDeclaration base, boolean doMerge, boolean inTransformed) {
       TypeDeclaration outer = getEnclosingType();
       if (outer != null) {
          // If this modify is overriding a definition in the same type we need to replace it here

@@ -359,7 +359,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
    }
 
    public ParseError parseError(Parser parser, Object partialValue, ParseError chain, Parselet childParselet, String errorCode, Object... args) {
-      int endIx = chain == null ? parser.currentIndex : Math.max(chain.endIndex,parser.currentIndex);
+      int endIx = chain == null ? parser.currentIndex : Math.max(chain.endIndex, parser.currentIndex);
       int startIx = parser.getLastStartIndex();
       if (parser.semanticContext != null)
          parser.semanticContext.resetToIndex(startIx);
