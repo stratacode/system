@@ -75,4 +75,10 @@ public class IfStatement extends NonIndentedStatement {
          ix = falseStatement.transformTemplate(ix, statefulContext);
       return ix;
    }
+
+   public boolean applyPartialValue(Object value) {
+      if (value == expression || value == trueStatement || value == falseStatement)
+         return true;
+      return false;
+   }
 }

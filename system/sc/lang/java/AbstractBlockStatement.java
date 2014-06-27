@@ -12,7 +12,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
 
-public abstract class AbstractBlockStatement extends Statement  {
+public abstract class AbstractBlockStatement extends Statement implements IBlockStatement {
    public SemanticNodeList<Statement> statements;
    public boolean staticEnabled;
    public boolean visible;
@@ -302,5 +302,9 @@ public abstract class AbstractBlockStatement extends Statement  {
          res.frameSize = frameSize;
       }
       return res;
+   }
+
+   public List<Statement> getBlockStatements() {
+      return statements;
    }
 }

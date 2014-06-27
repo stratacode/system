@@ -4562,6 +4562,28 @@ public class ModelUtil {
       model.layeredSystem.findMatchingGlobalNames(null, model.getLayer(), absName, pkgName, baseName, candidates);
    }
 
+   public static void suggestVariables(IBlockStatement enclBlock, String prefix, Set<String> candidates) {
+      List<Statement> statements = enclBlock.getBlockStatements();
+      if (statements != null) {
+         for (Statement st:statements) {
+            if (st instanceof VariableStatement) {
+               VariableStatement varSt = (VariableStatement) st;
+               if (varSt.definitions != null) {
+                  for (VariableDefinition varDef:varSt.definitions) {
+                     String varName = varDef.variableName;
+                     if (varName != null && varName.startsWith(prefix)) {
+                        candidates.add(varName);
+                     }
+                  }
+               }
+            }
+         }
+      }
+      enclBlock = enclBlock.getEnclosingBlockStatement();
+      if (enclBlock != null)
+         suggestVariables(enclBlock, prefix, candidates);
+   }
+
    public static Object getReturnType(Object method) {
       if (method instanceof IMethodDefinition)
          return ((IMethodDefinition) method).getReturnType();

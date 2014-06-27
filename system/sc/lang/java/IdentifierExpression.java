@@ -3702,6 +3702,10 @@ public class IdentifierExpression extends ArgumentsExpression {
          ModelUtil.suggestTypes(model, prefix, lastIdent, candidates, includeGlobals);
       }
 
+      IBlockStatement enclBlock = getEnclosingBlockStatement();
+      if (enclBlock != null)
+         ModelUtil.suggestVariables(enclBlock, lastIdent, candidates);
+
       return pos;
    }
 

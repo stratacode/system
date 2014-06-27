@@ -275,6 +275,14 @@ public abstract class JavaSemanticNode extends SemanticNode {
       return null;
    }
 
+   /** Will retrieve the node which holds the list of statements, for searching for variables, etc. */
+   public IBlockStatement getEnclosingBlockStatement() {
+      for (ISemanticNode pnode = parentNode; pnode != null; pnode = pnode.getParentNode())
+         if (pnode instanceof IBlockStatement)
+            return (IBlockStatement) pnode;
+      return null;
+   }
+
    public Statement getEnclosingStatement() {
       for (ISemanticNode pnode = parentNode; pnode != null; pnode = pnode.getParentNode())
          if (pnode instanceof Statement)

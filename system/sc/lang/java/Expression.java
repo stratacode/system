@@ -26,6 +26,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Set;
 
 public abstract class Expression extends Statement implements IValueNode, ITypedObject {
    transient public BindingDirection bindingDirection;

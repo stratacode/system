@@ -8,7 +8,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
-public class TryStatement extends Statement {
+public class TryStatement extends Statement implements IBlockStatement {
    public List<Statement> statements;
    public List<CatchStatement> catchStatements;
    public FinallyStatement finallyStatement;
@@ -131,6 +131,10 @@ public class TryStatement extends Statement {
       if (finallyStatement != null)
          finallyStatement.transformToJS();
       return this;
+   }
+
+   public List<Statement> getBlockStatements() {
+      return statements;
    }
 
 }

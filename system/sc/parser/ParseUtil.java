@@ -243,10 +243,23 @@ public class ParseUtil  {
          }
       }
       Object semValue;
-      if (lastChild != null && (semValue = lastChild.getSemanticValue()) instanceof ISemanticNode) {
-         ISemanticNode semNode = (ISemanticNode) semValue;
-         if (semNode.getParentNode() != null)
-            return findClosestParseNode(lastChild, offset);
+      if (lastChild != null) {
+         semValue = lastChild.getSemanticValue();
+         if (semValue instanceof ISemanticNode) {
+            ISemanticNode semNode = (ISemanticNode) semValue;
+            if (semNode.getParentNode() != null)
+               return findClosestParseNode(lastChild, offset);
+         }
+         // The value is null on this node but may not be null on one of the children.
+         else {
+            IParseNode res = findClosestParseNode(lastChild, offset);
+            Object resVal = res.getSemanticValue();
+            if (resVal instanceof ISemanticNode) {
+               ISemanticNode childNode = (ISemanticNode) resVal;
+               if (childNode.getParentNode() != null)
+                  return res;
+            }
+         }
       }
       return parentNode;
    }

@@ -4,8 +4,7 @@
 
 package sc.lang.java;
 
-public abstract class NonIndentedStatement extends Statement
-{
+public abstract class NonIndentedStatement extends Statement {
    public int getChildNestingDepth() {
       if (childNestingDepth != -1)
          return childNestingDepth;

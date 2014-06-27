@@ -7,7 +7,7 @@ package sc.lang.java;
 import java.util.List;
 import java.util.Set;
 
-public class FinallyStatement extends NonIndentedStatement {
+public class FinallyStatement extends NonIndentedStatement implements IBlockStatement {
    public List<Statement> statements;
    public transient int frameSize;
 
@@ -57,5 +57,9 @@ public class FinallyStatement extends NonIndentedStatement {
       finally {
          ctx.popFrame();
       }
+   }
+
+   public List<Statement> getBlockStatements() {
+      return statements;
    }
 }

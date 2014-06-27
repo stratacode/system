@@ -718,6 +718,11 @@ public class ClassType extends JavaType {
       ModelUtil.suggestTypes(model, prefix, typeName, candidates, true);
       if (currentType != null)
          ModelUtil.suggestMembers(model, currentType, typeName, candidates, true, includeProps, includeProps);
+
+      IBlockStatement enclBlock = getEnclosingBlockStatement();
+      if (enclBlock != null)
+         ModelUtil.suggestVariables(enclBlock, typeName, candidates);
+
       if (candidates.size() > 0)
          return pos;
 
