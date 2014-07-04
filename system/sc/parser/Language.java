@@ -82,9 +82,18 @@ public abstract class Language implements IFileProcessor {
       }
    }
 
-   public Object parse(String fileName) {
+   public Object parse(String fileName, boolean enablePartialValues) {
       try {
-         return parse(new FileReader(fileName));
+         return parse(new FileReader(fileName), startParselet, enablePartialValues);
+      }
+      catch (FileNotFoundException exc) {
+         throw new IllegalArgumentException(exc.toString());
+      }
+   }
+
+   public Object parse(String fileName, Parselet parselet, boolean enablePartialValues) {
+      try {
+         return parse(new FileReader(fileName), parselet, enablePartialValues);
       }
       catch (FileNotFoundException exc) {
          throw new IllegalArgumentException(exc.toString());
@@ -405,19 +414,19 @@ public abstract class Language implements IFileProcessor {
    }
 
    /** Hook into the LayeredSystem's build process */
-   public Object process(SrcEntry file) {
+   public Object process(SrcEntry file, boolean enablePartialValues) {
       if (file.isZip()) {
          InputStream input = file.getInputStream();
          if (input == null) {
             throw new IllegalArgumentException("Unable to open zip file: " + file);
          }
          else
-            return parse(new BufferedReader(new InputStreamReader(input)));
+            return parse(new BufferedReader(new InputStreamReader(input)), startParselet, enablePartialValues);
       }
       else {
          try {
             PerfMon.start("parse", false);
-            return parse(file.absFileName);
+            return parse(file.absFileName, startParselet, enablePartialValues);
          }
          finally {
             PerfMon.end("parse");
@@ -534,7 +543,7 @@ public abstract class Language implements IFileProcessor {
 
    public Map<String,Parselet> parseletsByName = new HashMap<String,Parselet>();
 
-   public String convertNameToKey(String name) {
+   public static String convertNameToKey(String name) {
       // Remove the parameters so it makes it easier to match parselets from different languages
       int six = name.indexOf("(");
       if (six != -1)

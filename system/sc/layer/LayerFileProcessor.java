@@ -54,7 +54,7 @@ public class LayerFileProcessor implements IFileProcessor {
 
    private boolean producesTypes = false;
 
-   public Object process(SrcEntry srcEnt) {
+   public Object process(SrcEntry srcEnt, boolean enablePartialValues) {
       LayerFileProcessorResult res = null;
       LayerFileProcessorResult current = fileIndex.get(srcEnt.relFileName);
       int cpos, spos;

@@ -20,7 +20,6 @@ public class GitRepositoryManager extends AbstractRepositoryManager {
       ArrayList<String> args = new ArrayList<String>();
       args.add("git");
       args.add("clone");
-      args.add("--depth=1");
       args.add(src.url);
       String resDir = src.pkg.installedRoot;
       args.add(resDir);

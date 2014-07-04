@@ -298,7 +298,7 @@ public class OrderedChoice extends NestedParselet  {
             if (parser.enablePartialValues && bestError != null && bestError.partialValue != null/* && bestError.eof */) {
                value = (ParentParseNode) newParseNode(lastMatchStart);
                value.add(bestError.partialValue, bestError.parselet, bestErrorSlotIx, false, parser);
-               return parseEOFError(parser, value, bestError,bestError.parselet, "Repeating partial match: {0}", this);
+               return parseEOFError(parser, value, bestError,bestError.parselet, bestError.errorCode, bestError.errorArgs);
             }
             parser.changeCurrentIndex(startIndex);
 
@@ -312,7 +312,7 @@ public class OrderedChoice extends NestedParselet  {
             if (parser.enablePartialValues && bestError.partialValue != null) {
                value = (ParentParseNode) newParseNode(lastMatchStart);
                value.add(bestError.partialValue, bestError.parselet, bestErrorSlotIx, false, parser);
-               return parseEOFError(parser, value, bestError,bestError.parselet, "Repeating partial match: {0}", this);
+               return parseEOFError(parser, value, bestError, bestError.parselet, bestError.errorCode, bestError.errorArgs);
             }
             // NOTE: In this case, we are possibly returning the error from a scalar parselet for a repeating one.  It won't matter unless we have partial values enabled and partialValue
             return bestError;
@@ -324,7 +324,7 @@ public class OrderedChoice extends NestedParselet  {
          if (parser.enablePartialValues && bestError != null && /*bestError.eof && */ bestError.partialValue != null && bestError.startIndex == lastMatchStart) {
             value.add(bestError.partialValue, bestError.parselet, bestErrorSlotIx, false, parser);
 
-            return parseEOFError(parser, value, bestError, bestError.parselet, "Repeating partial match: {0}", this);
+            return parseEOFError(parser, value, bestError, bestError.parselet, bestError.errorCode, bestError.errorArgs);
          }
          if (lookahead)
             parser.changeCurrentIndex(startIndex);

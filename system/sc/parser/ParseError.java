@@ -19,6 +19,8 @@ public class ParseError {
 
    private final boolean debugErrors = false;
 
+   public final static String MULTI_ERROR_CODE = "multipleErrors";
+
    public ParseError(String ec, Object[] a, int sp, int ep) {
       this(null, ec, a, sp, ep);
    }
@@ -59,7 +61,28 @@ public class ParseError {
    public String errorString() {
       if (errorCode == null)
          return "Syntax error ";
-      MessageFormat formatter = new MessageFormat(errorCode);
-      return formatter.format(errorArgs) + " ";
+      if (errorCode.equals(ParseError.MULTI_ERROR_CODE)) {
+         StringBuilder sb = new StringBuilder();
+         sb.append("Multiple errors:\n");
+         int i = 0;
+         for (Object arg:errorArgs) {
+            if (i > 3)
+               break;
+            sb.append("   ");
+            sb.append(arg);
+            sb.append("\n");
+            i++;
+         }
+         sb.append("\n");
+         return sb.toString();
+      }
+      else {
+         MessageFormat formatter = new MessageFormat(errorCode);
+         return formatter.format(errorArgs) + " ";
+      }
+   }
+
+   public boolean isMultiError() {
+      return errorCode != null && errorCode.equals(MULTI_ERROR_CODE);
    }
 }

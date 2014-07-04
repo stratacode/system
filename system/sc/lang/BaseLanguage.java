@@ -281,24 +281,21 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
        * @param options Any options
        * @param delim The deliminator
        */
-      public SymbolSpace(String symbol, String delim, int options)
-      {
-         super("('',):(.," + delim + ")", options | NOERROR);
+      public SymbolSpace(String symbol, String delim, int options) {
+         // We used to include NOERROR here but need errors for ; and in general these seem to be important parselets
+         super("('',):(.," + delim + ")", options);
          add(new Symbol(NOERROR, symbol), spacing);
       }
-      public SymbolSpace(String symbol, int options)
-      {
-         super("('',)", options | NOERROR);
+      public SymbolSpace(String symbol, int options) {
+         super("('',)", options);
          add(new Symbol(NOERROR, symbol), spacing);
       }
 
-      public SymbolSpace(String symbol, String delim)
-      {
+      public SymbolSpace(String symbol, String delim) {
          this(symbol, delim, 0);
       }
 
-      public SymbolSpace(String symbol)
-      {
+      public SymbolSpace(String symbol) {
          this(symbol, 0);
       }
 

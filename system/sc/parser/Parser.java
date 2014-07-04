@@ -224,18 +224,13 @@ public class Parser implements IString {
       if (currentErrors.size() == 1)
          return currentErrors.get(0);
       else {
-         if (currentErrors.size() < 3)
-            return new ParseError("Multiple errors: {0}", ParseUtil.wrapArg(getErrorStrings(currentErrors)), currentErrorStartIndex, currentErrorEndIndex);
-         else
-            return new ParseError(null, null, currentErrorStartIndex, currentErrorEndIndex);
+         return new ParseError(ParseError.MULTI_ERROR_CODE, currentErrors.toArray(), currentErrorStartIndex, currentErrorEndIndex);
       }
    }
 
-   private String getErrorStrings(List<ParseError> currentErrors)
-   {
+   private String getErrorStrings(List<ParseError> currentErrors) {
       StringBuffer sb = new StringBuffer();
-      for (int i = 0; i < currentErrors.size(); i++)
-      {
+      for (int i = 0; i < currentErrors.size(); i++) {
          ParseError pe = currentErrors.get(i);
          // Always pull at least one error in
          if (pe.parselet != null && !pe.parselet.getReportError() && (sb.length() >= 0 || i != currentErrors.size()-1))

@@ -1,8 +1,0 @@
-#!/bin/sh
-
-set -e
-
-rm -rf /jjv/StrataCode
-cp -r /jjv/vbuild /jjv/StrataCode
-cd /jjv/
-zip StrataCode.zip StrataCode/bin/* StrataCode/README.txt

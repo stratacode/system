@@ -63,6 +63,12 @@ public class Sequence extends NestedParselet  {
       if (trace && parser.enablePartialValues)
          System.out.println("*** tracing sequence parse");
 
+      if (parser.enablePartialValues && this.toString().equals("<methodDeclaration>"))
+         System.out.println("***");
+
+      if (parser.enablePartialValues && this.toString().contains("ieldDeclaration"))
+         System.out.println("***");
+
       if (repeat)
          return parseRepeatingSequence(parser);
 
@@ -149,11 +155,12 @@ public class Sequence extends NestedParselet  {
 
                   // Now see if this computed value extends any of our most specific errors.  If so, this error
                   // can be used to itself extend other errors based on the EOF parsing.
-                  if ((extendsPartialValue(parser, childParselet, value, anyContent) && anyContent) || err.eof || pv != null || isBetterError) {
+                  if ((extendsPartialValue(parser, childParselet, value, anyContent, startIndex, err) && anyContent) || err.eof || pv != null || isBetterError) {
                      if (!err.eof || !value.isEmpty()) {
-                        ParseError newError = parseEOFError(parser, value, err, childParselet, "Partial match: {0} ", this);
                         if (optional && value.isEmpty())
                            return null;
+                        // Keep the origin error description so the right info is in the error presented to the user
+                        ParseError newError = parseEOFError(parser, value, err, childParselet, err.errorCode, err.errorArgs);
                         return newError;
                      }
                   }
@@ -208,7 +215,7 @@ public class Sequence extends NestedParselet  {
          return null;
    }
 
-   private boolean extendsPartialValue(Parser parser, Parselet childParselet, ParentParseNode value, boolean anyContent) {
+   private boolean extendsPartialValue(Parser parser, Parselet childParselet, ParentParseNode value, boolean anyContent, int startIndex, ParseError childError) {
       if (value == null)
          return false;
 
@@ -341,6 +348,17 @@ public class Sequence extends NestedParselet  {
            // }
             return res;
          }
+         else if (parameterType == ParameterType.INHERIT) {
+            if (parser.currentIndex <= parser.currentErrorStartIndex && anyContent) {
+               return true;
+            }
+         }
+
+      // If the combination of this new error and the child error ends up being equal to or better than the current match, we extend
+      if (anyContent && Parser.isBetterError(parser.currentErrorStartIndex, parser.currentErrorEndIndex, startIndex, childError.endIndex, true)) {
+         return true;
+      }
+
       //}
       return false;
    }

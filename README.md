@@ -6,14 +6,8 @@ Defines three layers used to build the coreRuntime and StrataCode distributions.
 
 * system contains the LayeredSystem, parsing and language framework.
 
-Build instructions.  Using StrataCode itself:
+* To build StrataCode run makeSC.sh
 
-mkdir /tmp/scbuild
-sc -c -a coreRuntime -d /tmp/scbuild
-sc -c -a system -d /tmp/scbuild
-zip /tmp/sc.zip /tmp/scbuild
+* To build the Javadoc run makeDoc.sh
 
-Find the 'sc' command in yourBuildDir.
-
-StrataCode is written in java so you can build it without itself. From your IDE, run the main method of the sc.layer.LayeredSystem with those same arguments.
-
+StrataCode is written in java so you can also build it without itself.  See http://www.stratacode.com/ideConfig.html

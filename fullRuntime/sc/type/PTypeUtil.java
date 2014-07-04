@@ -30,6 +30,7 @@ public class PTypeUtil {
    public static int numInterfacePropsCached = 0;
    public static int numPropsInherited = 0;
 
+
    public static IBeanMapper getListConverter(BeanMapper mapper, Class propertyClass, Class valueClass) {
       // Converts List<?> to List<String>
       if (propertyClass == String.class) {
