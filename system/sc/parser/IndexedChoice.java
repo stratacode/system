@@ -13,46 +13,36 @@ public class IndexedChoice extends OrderedChoice {
 
    public IndexedChoice() { super(); }
 
-   public IndexedChoice(int options)
-   {
+   public IndexedChoice(int options) {
       super(options);
    }
 
-   public IndexedChoice(String id, int options)
-   {
+   public IndexedChoice(String id, int options) {
       super(id, options);
    }
 
-   public IndexedChoice(Parselet... toAdd)
-   {
+   public IndexedChoice(Parselet... toAdd) {
       super(toAdd);
    }
 
-   public IndexedChoice(String id, Parselet... toAdd)
-   {
+   public IndexedChoice(String id, Parselet... toAdd) {
       super(id, toAdd);
    }
 
-   public IndexedChoice(String id, int options, Parselet... toAdd)
-   {
+   public IndexedChoice(String id, int options, Parselet... toAdd) {
       super(id, options, toAdd);
    }
 
-   public IndexedChoice(int options, Parselet... toAdd)
-   {
+   public IndexedChoice(int options, Parselet... toAdd) {
       super(options, toAdd);
    }
 
-   public void initialize()
-   {
-      if (!initialized)
-      {
+   public void initialize() {
+      if (!initialized) {
          super.initialize();
          indexedKeys.initialize();
-         for (List<Parselet> l: indexedParselets.values())
-         {
-            for (Parselet p:l)
-            {
+         for (List<Parselet> l: indexedParselets.values()) {
+            for (Parselet p:l) {
                p.setLanguage(getLanguage());
                p.initialize();
             }
@@ -60,10 +50,8 @@ public class IndexedChoice extends OrderedChoice {
       }
    }
 
-   public void start()
-   {
-      if (!started)
-      {
+   public void start() {
+      if (!started) {
          super.start();
          indexedKeys.start();
          for (List<Parselet> l: indexedParselets.values())

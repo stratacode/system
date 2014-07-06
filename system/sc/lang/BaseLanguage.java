@@ -115,7 +115,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
 
    public SymbolSpace periodSpace = new SymbolSpace(".");
    public Symbol period = new Symbol(".");
-   public SymbolSpace semicolonEOL = new SymbolSpace(";");
+   public SymbolSpace semicolonEOL = new SymbolSpace(";", SKIP_ON_ERROR);
    {
       semicolonEOL.generateParseNode = new NewlineParseNode(";");
    }
@@ -134,12 +134,13 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
       openBraceEOL.pushIndent = true;
    }
    public SymbolSpace closeBrace = new SymbolSpace("}");
-   public SymbolSpace closeBraceEOL = new SymbolSpace("}");
+   public SymbolSpace closeBraceEOL = new SymbolSpace("}", SKIP_ON_ERROR);
    {
       closeBraceEOL.generateParseNode = new NewlineParseNode("}");
       closeBraceEOL.popIndent = true;
    }
    public SymbolSpace openParen = new SymbolSpace("(");
+   public SymbolSpace closeParenSkipOnError = new SymbolSpace(")", SKIP_ON_ERROR);
    public SymbolSpace closeParen = new SymbolSpace(")");
    // Use this one for annotations
    public SymbolSpace closeParenEOL = new SymbolSpace(")");
@@ -184,6 +185,21 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
 
    };
 
+   public Symbol alphaNumChar = new Symbol("<alphaNumChar>", 0, Symbol.ANYCHAR) {
+      protected String accept(SemanticContext ctx, Object value, int startIx, int endIx) {
+         IString str = PString.toIString(value);
+         if (str == null)
+            return "Identifiers must be non null";
+         if (str.length() == 1) {
+            char c = str.charAt(0);
+            if (Character.isLetterOrDigit(c))
+               return null;
+         }
+         return "Not alpha numeric";
+      }
+
+   };
+
    public Sequence identifier = new Sequence("<identifier>('','',)", startIdentifierChar,
                                              new Sequence("('')", REPEAT | OPTIONAL, identifierChar), spacing) {
       /** Assumes we have validated the start and other chars already */
@@ -193,6 +209,8 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
 
          if (value != null && !(value instanceof StringToken))
             value = value.toString();
+         if (getLanguage() == null)
+            throw new IllegalArgumentException("*** No language defined for parselet: " + this);
          if (!(value instanceof NonKeywordString) && !((BaseLanguage) getLanguage()).getKeywords().contains(value))
             return null;
          return "Identifiers cannot be keywords";

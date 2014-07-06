@@ -47,6 +47,9 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
    // the parentNode type.
    public boolean skip = false;
 
+   // Set this to true for children of a sequence like ; or ) which are needed for the syntax but not to disambiguate the text we've already parsed.  An error will be flagged but if we can parse by skipping it, we'll do that.
+   public boolean skipOnError = false;
+
    // Set this to true to discard the results from this parselet and all sub-parselets from
    // the output.
    public boolean discard = false;
@@ -211,6 +214,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       discard = (options & DISCARD) != 0;
       reportError = (options & NOERROR) == 0;
       trace = (options & TRACE) != 0;
+      skipOnError = (options & SKIP_ON_ERROR) != 0;
       if (name == null || name.startsWith("<"))
          skip = true;
    }
@@ -368,7 +372,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       return parser.parseError(this, partialValue, childParselet, errorCode, startIx, endIx, args);
    }
 
-   public ParseError parseEOFError(Parser parser, Object partialValue, ParseError chain, Parselet childParselet, String errorCode, Object... args) {
+   public ParseError parsePartialError(Parser parser, Object partialValue, ParseError chain, Parselet childParselet, String errorCode, Object... args) {
       ParseError error = parseError(parser, partialValue, chain, childParselet, errorCode, args);
       error.eof = true;
       return error;
@@ -470,6 +474,24 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
    }
 
    abstract public Object parse(Parser p);
+
+   /** An optional method for parsing a repeating parselet.  Used in the context when we know there are errors in the file and
+    * we know the parent parselet failed to parse the exit parselet in the current context.  The parselet previous to exit parselet is called
+    * with this method.   It will basically reparse itself, trying to skip over error text, making sure not to skip over the exit parselet.
+    * If we do match the exit parselet, we return the newly extended node.
+    *
+    * @return null if we cannot extend our value.  In this case, the parent parselet just uses the value it already has for this match.
+    */
+   public Object parseExtendedErrors(Parser p, Parselet exitParselet) {
+      return null;
+   }
+
+   public boolean peek(Parser p) {
+      int startIndex = p.currentIndex;
+      Object value = parse(p);
+      p.changeCurrentIndex(startIndex);
+      return value != null && !(value instanceof ParseError);
+   }
 
    abstract public Object generate(GenerateContext ctx, Object semanticValue);
 

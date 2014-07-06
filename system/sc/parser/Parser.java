@@ -52,6 +52,9 @@ public class Parser implements IString {
    // the index is advanced past the point in which the error occurred.
    public List<ParseError> currentErrors = new ArrayList<ParseError>();
 
+   /** Nodes in the parse tree like ; and ) can be marked as errors and then skipped in the actual parse.  */
+   public List<ParseError> skippedErrors = new ArrayList<ParseError>();
+
    int inProgressCount = 0;
 
    // Stack of parselet states which are being processed on the parse stack
@@ -187,14 +190,14 @@ public class Parser implements IString {
       return true;
    }
 
-   public int length() {
+   public final int length() {
       while (!eof)
          growBuffer();
 
       return currentBufferPos + bufSize;
    }
 
-   public Object parseStart(Parselet parselet) {
+   public final Object parseStart(Parselet parselet) {
       currentErrors.clear();
       currentErrorStartIndex = currentErrorEndIndex = -1;
       currentIndex = 0;
@@ -220,7 +223,7 @@ public class Parser implements IString {
       return result;
    }
 
-   public ParseError wrapErrors() {
+   public final ParseError wrapErrors() {
       if (currentErrors.size() == 1)
          return currentErrors.get(0);
       else {
@@ -228,7 +231,7 @@ public class Parser implements IString {
       }
    }
 
-   private String getErrorStrings(List<ParseError> currentErrors) {
+   private final String getErrorStrings(List<ParseError> currentErrors) {
       StringBuffer sb = new StringBuffer();
       for (int i = 0; i < currentErrors.size(); i++) {
          ParseError pe = currentErrors.get(i);
@@ -247,7 +250,7 @@ public class Parser implements IString {
     * (i.e. rolling back changes if there are errors, dealing with the parse error
     * returned - add it to the parser).
     */
-   public Object parseNext(Parselet parselet) {
+   public final Object parseNext(Parselet parselet) {
       Parselet saveParselet = null;
       int saveLastStartIndex = -1;
       Object value;
@@ -316,7 +319,7 @@ public class Parser implements IString {
       return value;
    }
 
-   private String getLookahead(int num) {
+   private final String getLookahead(int num) {
       String lookahead = ParseUtil.escapeString(substring(currentIndex, currentIndex + num));
       if (lookahead == null)
          lookahead = "<EOF>";
@@ -333,37 +336,34 @@ public class Parser implements IString {
       return sb.toString();
    }
 
-   /** Called when we need to unwind the parser to an earlier or later state */
-   public void changeCurrentIndex(int ix) {
+   /** Called when we need to unwind the parser to an earlier or later state -
+    * TODO:performance - try changing the callers of this in the inner loop here to just set the field.  */
+   public final void changeCurrentIndex(int ix) {
       currentIndex = ix;
    }
 
-   public int getCurrentIndex() {
+   public final int getCurrentIndex() {
       return currentIndex;
    }
 
    /** Returns the starting position for the active expression */
-   public int getLastStartIndex() {
+   public final int getLastStartIndex() {
       return lastStartIndex;
    }
 
-   public ParseError parseError(String errorCode)
-   {
+   public final ParseError parseError(String errorCode) {
       return parseError(currentParselet, errorCode, (Object[])null);
    }
 
-   public ParseError parseError(Parselet parselet, String errorCode, Object... args)
-   {
+   public final ParseError parseError(Parselet parselet, String errorCode, Object... args) {
       return parseError(parselet, errorCode, currentIndex, currentIndex, args);
    }
 
-   public ParseError parseError(Parselet parselet, Parselet childParselet, String errorCode, Object... args)
-   {
+   public final ParseError parseError(Parselet parselet, Parselet childParselet, String errorCode, Object... args) {
       return parseError(parselet, childParselet, errorCode, currentIndex, currentIndex, args);
    }
 
-   public ParseError parseError(Parselet parselet, String errorCode, int start, int end, Object... args)
-   {
+   public final ParseError parseError(Parselet parselet, String errorCode, int start, int end, Object... args) {
       return parseError(parselet, null, null, errorCode, start, end, args);
    }
 
@@ -420,6 +420,16 @@ public class Parser implements IString {
 
    private void addError(ParseError newError) {
       currentErrors.add(newError);
+   }
+
+   /**
+    * When it's convenient to parse a document being lenient on errors, skipped errors are enabled.  You can parse
+    * a document even when it's missing a ; etc.  Those errors are recorded and we move on.
+    */
+   public void addSkippedError(ParseError skippedError) {
+      if (skippedErrors == null)
+         skippedErrors = new ArrayList<ParseError>();
+      skippedErrors.add(skippedError);
    }
 
    public Object parseResult(Parselet parselet, Object value, boolean skipSemanticValue) {

@@ -17,10 +17,6 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
       return null;
    }
 
-   public String toOldSemanticString() {
-      return toString();
-   }
-
    public CharSequence toSemanticString() {
       return this;
    }

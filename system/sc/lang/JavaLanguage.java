@@ -117,6 +117,11 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    }
 
    public Sequence optExpression = new Sequence("(.)", OPTIONAL, expression);
+
+   Sequence alphaNumString = new Sequence("<anyName>('','',)", alphaNumChar,
+           new Sequence("('')", REPEAT | OPTIONAL, alphaNumChar), spacing);
+   OrderedChoice skipBodyError = new OrderedChoice("<skipBodyError>(.,.)", alphaNumString, new Sequence(new SymbolChoice(NOT, "}", Symbol.EOF), spacing));
+
    public Sequence classBody = new Sequence("<classBody>(,[],)");
    OrderedChoice classDeclarationWithoutModifiers = new OrderedChoice();
    Sequence classDeclaration = new Sequence("<class>(modifiers,.)");
@@ -132,7 +137,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    public Sequence expressionList = new Sequence("([],[])", expression,
                                           new Sequence("(,[])", OPTIONAL | REPEAT, comma, expression));
    Sequence optExpressionList = new Sequence("(.)", OPTIONAL, expressionList);
-   Sequence arguments = new SemanticSequence("<arguments>(,[],)", openParen, new Sequence("([])", OPTIONAL, expressionList), closeParen);
+   Sequence arguments = new SemanticSequence("<arguments>(,[],)", openParen, new Sequence("([])", OPTIONAL, expressionList), closeParenSkipOnError);
    Sequence optArguments = new Sequence("(.)", OPTIONAL, arguments);
    {
       // If there are no arguments here, we still need to generate output for the "arguments" sequence so we do not
@@ -153,7 +158,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
          new Sequence("TypedMethodExpression(,typeArguments,typedIdentifier,arguments)", periodSpace, simpleTypeArguments, identifier, arguments),
          new Sequence("(,,.)", periodSpace, newKeyword, innerCreator));
 
-   Sequence parenExpression = new Sequence("ParenExpression(,expression,)", openParen, expression, closeParen);
+   Sequence parenExpression = new Sequence("ParenExpression(,expression,)", openParen, expression, closeParenSkipOnError);
    Sequence parenExpressionEOL = new Sequence("ParenExpression(,expression,)", openParen, expression, closeParenEOLIndent);
 
    KeywordChoice booleanLiteral = new KeywordChoice("BooleanLiteral(value,,)", 0, true, "true", "false");
@@ -406,7 +411,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    {
       formalParameterDecls.add(variableModifiers, type, formalParameterDeclRest);
    }
-   Sequence formalParameters = new Sequence("<parameters>(,.,)", openParen, formalParameterDecls, closeParen);
+   Sequence formalParameters = new Sequence("<parameters>(,.,)", openParen, formalParameterDecls, closeParenSkipOnError);
    {
       formalParameters.ignoreEmptyList = false;
    }
@@ -502,6 +507,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
       blockStatements.set(localVariableDeclarationStatement, classDeclaration, statement);
       block.set(openBraceEOL, blockStatements, closeBraceEOL);
+      blockStatements.skipOnErrorParselet = skipBodyError;
    }
 
    /* methodBody = block */
@@ -565,6 +571,10 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    {
       // One of the switch points from HTML spacing context to Java
       classBodyDeclarations.disableTagMode = true;
+
+      // If can't parse an element, try skipping "alphaNumChar " or any other non } character, until we can parse and complete the
+      // class definition by parsing statements.
+      classBodyDeclarations.skipOnErrorParselet = skipBodyError;
 
       // Turn back on spacing for inner class definitions
       classBody.enableSpacing = true;

@@ -63,12 +63,6 @@ public class Sequence extends NestedParselet  {
       if (trace && parser.enablePartialValues)
          System.out.println("*** tracing sequence parse");
 
-      if (parser.enablePartialValues && this.toString().equals("<methodDeclaration>"))
-         System.out.println("***");
-
-      if (parser.enablePartialValues && this.toString().contains("ieldDeclaration"))
-         System.out.println("***");
-
       if (repeat)
          return parseRepeatingSequence(parser);
 
@@ -112,63 +106,102 @@ public class Sequence extends NestedParselet  {
             }
 
             if (parser.enablePartialValues) {
-
                Object pv = err.partialValue;
 
-               if (err.optionalContinuation) {
-                  ParentParseNode errVal;
-                  if (pv != null) {
-                     if (value == null)
-                        errVal = (ParentParseNode) newParseNode(startIndex);
-                     else {
-                        // Here we need to clone the semantic value so we keep track of the state that
-                        // represents this error path separate from the default path which is going to match
-                        // and replace the error slot here with a null
-                        Object semValue = value.getSemanticValue();
-                        if (semValue != null && semValue instanceof ISemanticNode) {
-                           ISemanticNode newNode = ((ISemanticNode) semValue).deepCopy(ISemanticNode.CopyAll, null);
-                           errVal = (ParentParseNode) newNode.getParseNode();
-                        }
-                        else
-                           errVal = value.deepCopy();
-                     }
-                     errVal.add(pv, childParselet, i, false, parser);
+               // If we failed to complete this sequence, and we are in "error handling" mode, try to re-parse the previous sequence by extending it.
+               if (i > 0) {
+                  int prevIx = i - 1;
+                  Parselet prevParselet = parselets.get(prevIx);
+                  Object oldValue = value.children.get(prevIx);
+                  int saveIndex = parser.currentIndex;
+                  if (oldValue instanceof IParseNode) {
+                     parser.changeCurrentIndex(((IParseNode) oldValue).getStartIndex());
+                  }
+                  Object newPrevValue = prevParselet.parseExtendedErrors(parser, childParselet);
+                  if (newPrevValue != null) {
+                     value.children.set(prevIx, newPrevValue);
+
+                     // Go back and retry the current child parselet now that we've parsed the previous one again successfully... we know it should match because we just peeked it in the previous parselet.
+                     i = i - 1;
+                     continue;
                   }
                   else
-                     errVal = value;
-                  err.partialValue = errVal;
-                  //err.continuationValue = true;
-                  err.optionalContinuation = false;
-                  nestedValue = null; // Switch this to optional
+                     parser.changeCurrentIndex(saveIndex);
                }
-               // Always call this to try and extend the current error... also see if we can generate a new error
-               else if (!childParselet.getLookahead()) {
+               else if (i < parselets.size() - 1) {
+                  Object extendedValue = childParselet.parseExtendedErrors(parser, parselets.get(i+1));
+                  if (extendedValue != null) {
+                     nestedValue = extendedValue;
+                     err = nestedValue instanceof ParseError ? (ParseError) nestedValue : null;
+                  }
+               }
 
-                  // First complete the value with any partial value from this error and nulls for everything
-                  // else.
-                  if (value == null)
-                     value = (ParentParseNode) newParseNode(startIndex);
-                  value.add(pv, childParselet, i, false, parser);
-                  // Add these null slots so that we do all of the node processing
-                  for (int k = i+1; k < numParselets; k++)
-                     value.add(null, parselets.get(k), k, false, parser);
+               // TODO: should we always do this - not just on enablePartialValues?   It could in general give more complete syntax errors
+               if (err != null) {
+                  if (childParselet.skipOnError) {
+                     parser.addSkippedError(err);
+                     // Record the error but move on
+                     nestedValue = new ErrorParseNode(err, "");
+                     err = null;
+                  }
+                  else {
+                     if (err.optionalContinuation) {
+                        ParentParseNode errVal;
+                        if (pv != null) {
+                           if (value == null)
+                              errVal = (ParentParseNode) newParseNode(startIndex);
+                           else {
+                              // Here we need to clone the semantic value so we keep track of the state that
+                              // represents this error path separate from the default path which is going to match
+                              // and replace the error slot here with a null
+                              Object semValue = value.getSemanticValue();
+                              if (semValue != null && semValue instanceof ISemanticNode) {
+                                 ISemanticNode newNode = ((ISemanticNode) semValue).deepCopy(ISemanticNode.CopyAll, null);
+                                 errVal = (ParentParseNode) newNode.getParseNode();
+                              }
+                              else
+                                 errVal = value.deepCopy();
+                           }
+                           errVal.add(pv, childParselet, i, false, parser);
+                        }
+                        else
+                           errVal = value;
+                        err.partialValue = errVal;
+                        //err.continuationValue = true;
+                        err.optionalContinuation = false;
+                        nestedValue = null; // Switch this to optional
+                        err = null; // cancel the error
+                     }
+                     // Always call this to try and extend the current error... also see if we can generate a new error
+                     else if (!childParselet.getLookahead()) {
 
-                  // Now see if this computed value extends any of our most specific errors.  If so, this error
-                  // can be used to itself extend other errors based on the EOF parsing.
-                  if ((extendsPartialValue(parser, childParselet, value, anyContent, startIndex, err) && anyContent) || err.eof || pv != null || isBetterError) {
-                     if (!err.eof || !value.isEmpty()) {
-                        if (optional && value.isEmpty())
-                           return null;
-                        // Keep the origin error description so the right info is in the error presented to the user
-                        ParseError newError = parseEOFError(parser, value, err, childParselet, err.errorCode, err.errorArgs);
-                        return newError;
+                        // First complete the value with any partial value from this error and nulls for everything
+                        // else.
+                        if (value == null)
+                           value = (ParentParseNode) newParseNode(startIndex);
+                        value.add(pv, childParselet, i, false, parser);
+                        // Add these null slots so that we do all of the node processing
+                        for (int k = i+1; k < numParselets; k++)
+                           value.add(null, parselets.get(k), k, false, parser);
+
+                        // Now see if this computed value extends any of our most specific errors.  If so, this error
+                        // can be used to itself extend other errors based on the EOF parsing.
+                        if ((extendsPartialValue(parser, childParselet, value, anyContent, startIndex, err) && anyContent) || err.eof || pv != null || isBetterError) {
+                           if (!err.eof || !value.isEmpty()) {
+                              if (optional && value.isEmpty())
+                                 return null;
+                              // Keep the origin error description so the right info is in the error presented to the user
+                              ParseError newError = parsePartialError(parser, value, err, childParselet, err.errorCode, err.errorArgs);
+                              return newError;
+                           }
+                        }
                      }
                   }
                }
             }
 
-            // Unless the error was canclel
-            if (nestedValue != null) {
+            // Unless the error was cancelled or skip-on-error was true, i.e. so we logged the error and are moving on.
+            if (err != null) {
                if (optional) {
                   parser.changeCurrentIndex(startIndex);
                   return null;
@@ -437,11 +470,11 @@ public class Sequence extends NestedParselet  {
                errorValues.add(pv);
                // Add these null slots so that we do all of the node processing
                value = newRepeatSequenceResult(errorValues, value, lastMatchIndex, parser);
-               return parseEOFError(parser, value, lastError, childParselet, "Partial array match: {0} ", this);
+               return parsePartialError(parser, value, lastError, childParselet, "Partial array match: {0} ", this);
             }
             if (pv == null && optional && anyContent) {
                value = newRepeatSequenceResult(errorValues, value, lastMatchIndex, parser);
-               ParseError err = parseEOFError(parser, value, lastError, childParselet, "Optional continuation: {0} ", this);
+               ParseError err = parsePartialError(parser, value, lastError, childParselet, "Optional continuation: {0} ", this);
                err.optionalContinuation = true;
                return err;
             }
@@ -485,7 +518,7 @@ public class Sequence extends NestedParselet  {
                      nv = null;
                   value.add(nv, parselets.get(k), k, false, parser);
                }
-               return parseEOFError(parser, value, lastError, childParselet, "Partial array match: {0} ", this);
+               return parsePartialError(parser, value, lastError, childParselet, "Partial array match: {0} ", this);
             }
             */
          }

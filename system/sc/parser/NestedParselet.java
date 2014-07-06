@@ -180,8 +180,11 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       if (resultClass == null)
          resultClass = UNDEFINED_CLASS;
 
-      for (Parselet p: parselets)
-         p.setLanguage(getLanguage()); // Propagate the language property down to the child
+      for (Parselet p: parselets) {
+         Language l = getLanguage();
+         if (l != null)
+            p.setLanguage(l); // Propagate the language property down to the child
+      }
 
       initParameterMapping();
 
