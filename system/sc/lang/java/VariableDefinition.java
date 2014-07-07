@@ -69,7 +69,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
             def.displayError("Data binding operator only valid for field definitions: ");
             bindingDirection = null;
          }
-         if (initializer == null) {
+         else if (initializer == null) {
             displayError("Invalid empty binding expression: ");
             bindingDirection = null;
          }

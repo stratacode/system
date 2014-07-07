@@ -141,14 +141,15 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
    }
    public SymbolSpace openParen = new SymbolSpace("(");
    public SymbolSpace closeParenSkipOnError = new SymbolSpace(")", SKIP_ON_ERROR);
+   // TODO: should all closeParen's have skip on error?  Right now for cast expressions, we'll terminate those with the ; there's a chance the "skip on error" will lead to ambiguities when the body of the construct we are skipping has not enough info to differentiate it
    public SymbolSpace closeParen = new SymbolSpace(")");
    // Use this one for annotations
-   public SymbolSpace closeParenEOL = new SymbolSpace(")");
+   public SymbolSpace closeParenEOL = new SymbolSpace(")", SKIP_ON_ERROR);
    {
       closeParenEOL.generateParseNode = new NewlineParseNode(")");
    }
    // and this one for if statements where we need to indent
-   public SymbolSpace closeParenEOLIndent = new SymbolSpace(")");
+   public SymbolSpace closeParenEOLIndent = new SymbolSpace(")", SKIP_ON_ERROR);
    {
       NewlineParseNode pn = new NewlineParseNode(")");
       pn.needsIndent = true;
@@ -158,6 +159,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
    public SymbolSpace closeSqBracket = new SymbolSpace("]");
    public SymbolSpace lessThan = new SymbolSpace("<");
    public SymbolSpace greaterThan = new SymbolSpace(">");
+   public SymbolSpace greaterThanSkipOnError = new SymbolSpace(">", SKIP_ON_ERROR);
    public SymbolSpace equalSign = new SymbolSpace("=");
    public SymbolSpace asterix = new SymbolSpace("*");
    public SymbolSpace questionMark = new SymbolSpace("?");

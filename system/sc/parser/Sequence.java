@@ -109,7 +109,8 @@ public class Sequence extends NestedParselet  {
                Object pv = err.partialValue;
 
                // If we failed to complete this sequence, and we are in "error handling" mode, try to re-parse the previous sequence by extending it.
-               if (i > 0) {
+               // Some sequences collapse all values into a single child (e.g. blockComment).  For those, we can't support this optimization.
+               if (i > 0 && value != null && value.children.size() >= i) {
                   int prevIx = i - 1;
                   Parselet prevParselet = parselets.get(prevIx);
                   Object oldValue = value.children.get(prevIx);
@@ -128,7 +129,8 @@ public class Sequence extends NestedParselet  {
                   else
                      parser.changeCurrentIndex(saveIndex);
                }
-               else if (i < parselets.size() - 1) {
+
+               if (i < parselets.size() - 1) {
                   Object extendedValue = childParselet.parseExtendedErrors(parser, parselets.get(i+1));
                   if (extendedValue != null) {
                      nestedValue = extendedValue;

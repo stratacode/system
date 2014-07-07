@@ -22,7 +22,7 @@ public class ErrorParseNode extends AbstractParseNode {
    }
 
    public Object getSemanticValue() {
-      return error;
+      return error == null || !(error.partialValue instanceof IParseNode) ? null : ((IParseNode) error.partialValue).getSemanticValue();
    }
 
    public void setSemanticValue(Object value) {

@@ -72,7 +72,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    public Sequence type = new Sequence("<type>(.,arrayDimensions)");
 
-   Sequence argType = new Sequence("(.)", type) {
+   Sequence argType = new Sequence("(.)", SKIP_ON_ERROR, type) {
       protected String acceptSemanticValue(Object value) {
          if (value instanceof ClassType)
              ((ClassType) value).typeArgument = true;
@@ -86,7 +86,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
                              new Sequence("(operator,typeArgument)", OPTIONAL, new SemanticTokenChoice("extends", "super"), argType)));
 
    Sequence typeArguments = new Sequence("<typeArguments>(,[],[],)", lessThan, typeArgument,
-                                         new Sequence("(,[])", OPTIONAL | REPEAT, comma, typeArgument), greaterThan);
+                                         new Sequence("(,[])", OPTIONAL | REPEAT, comma, typeArgument), greaterThanSkipOnError);
    public Sequence optTypeArguments = new Sequence("(.)", OPTIONAL, typeArguments);
 
    Sequence classOrInterfaceType =
@@ -96,8 +96,8 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       type.set(new OrderedChoice(classOrInterfaceType, primitiveType), openCloseSqBrackets);
    }
 
-   Sequence typeBound = new Sequence("BoundType(baseType, boundTypes)", type, new Sequence("(,[])", OPTIONAL, new SymbolSpace("&"), type));
-   Sequence typeList = new Sequence("([],[])", type, new Sequence("(,[])",OPTIONAL | REPEAT, comma, type));
+   Sequence typeBound = new Sequence("BoundType(baseType, boundTypes)", SKIP_ON_ERROR, type, new Sequence("(,[])", OPTIONAL, new SymbolSpace("&"), type));
+   Sequence typeList = new Sequence("([],[])", type, new Sequence("(,[])", OPTIONAL | REPEAT, comma, type));
 
    // Forward declarations see below for definition
    public Sequence expression = new ChainedResultSequence("<expression>(lhs,.)") {
@@ -148,7 +148,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    OrderedChoice typeOrQuestion = new OrderedChoice(argType,questionMark);
    Sequence simpleTypeArguments = new Sequence("(,[],)", OPTIONAL, lessThan,
            new Sequence("([],[])", typeOrQuestion, new Sequence("(,[])",OPTIONAL | REPEAT, comma, typeOrQuestion))
-           , greaterThan);
+           , greaterThanSkipOnError);
    Sequence innerCreator =
            new Sequence("NewExpression(typeArguments, typeIdentifier, *)", simpleTypeArguments, identifier, classCreatorRest);
 
@@ -199,7 +199,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    public Parselet escapedSingleQuoteString = new OrderedChoice("('','')", OPTIONAL | REPEAT, escapeSequence, new SymbolChoice(NOT, "\\", "\'", EOF));
 
-   Sequence stringLiteral = new Sequence("StringLiteral(,value,)", doubleQuote, escapedString, doubleQuote);
+   public Sequence stringLiteral = new Sequence("StringLiteral(,value,)", doubleQuote, escapedString, doubleQuote);
    {
       stringLiteral.styleName = "string";
    }
@@ -456,7 +456,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
                         new Sequence("ForControlStatement(forInit,,condition,,repeat)", 
                                      forInit, semicolon, optExpression, semicolon, optExpressionList));
    Sequence forStatement =
-       new Sequence("(,,.,,statement)", new KeywordSpace("for"), openParen, forControl, closeParen, statement);
+       new Sequence("(,,.,,statement)", new KeywordSpace("for"), openParen, forControl, closeParenSkipOnError, statement);
 
    OrderedChoice switchLabel = new OrderedChoice("<switchLabel>",
          new Sequence("SwitchLabel(operator, expression,)", new KeywordSpace("case"), expression, colonEOL),
@@ -525,7 +525,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
                                           new Sequence("(,.)", OPTIONAL, new KeywordSpace("extends"), typeBound));
    Sequence typeParameters =
        new Sequence("<typeParameters>(,[],[],)", lessThan, typeParameter,
-                    new Sequence("(,[])", OPTIONAL | REPEAT, comma, typeParameter), greaterThan);
+                    new Sequence("(,[])", OPTIONAL | REPEAT, comma, typeParameter), greaterThanSkipOnError);
    Sequence optTypeParameters = new Sequence("([])", OPTIONAL, typeParameters);
 
 
@@ -627,7 +627,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    }
 
    OrderedChoice annotationMethodOrConstantRest = new OrderedChoice(
-         new Sequence("AnnotationMethodDefinition(name,,,defaultValue)", identifier, openParen, closeParen,
+         new Sequence("AnnotationMethodDefinition(name,,,defaultValue)", identifier, openParen, closeParenSkipOnError,
                       annotationDefault),
          new Sequence("AnnotationConstantDefinition(variableDefinitions)", variableDeclarators));
 
