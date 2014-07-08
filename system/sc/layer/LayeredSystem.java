@@ -6429,12 +6429,29 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * should not alter the runtime code model
     */
    public Object parseSrcBuffer(SrcEntry srcEnt, boolean enablePartialValues, String buffer) {
+      long modTimeStart = srcEnt.getLastModified();
       IFileProcessor processor = getFileProcessorForFileName(srcEnt.relFileName, srcEnt.layer, null);
       if (processor instanceof Language) {
          Language lang = (Language) processor;
-         return lang.parseString(buffer, enablePartialValues);
+         Object result = lang.parseString(buffer, enablePartialValues);
+         if (result instanceof ParseError)
+            return result;
+         else {
+            Object modelObj = ParseUtil.nodeToSemanticValue(result);
+
+            if (!(modelObj instanceof IFileProcessorResult))
+               return modelObj;
+
+            IFileProcessorResult res = (IFileProcessorResult) modelObj;
+            res.addSrcFile(srcEnt);
+
+            if (res instanceof ILanguageModel)
+               initModel(srcEnt.layer, modTimeStart, (ILanguageModel) res, false, false);
+
+            return res;
+         }
       }
-      return null;
+      throw new IllegalArgumentException(("No language processor for file: " + srcEnt.relFileName));
    }
 
    public Object parseSrcFile(SrcEntry srcEnt, boolean isLayer, boolean checkPeers, boolean enablePartialValues, boolean reportErrors) {

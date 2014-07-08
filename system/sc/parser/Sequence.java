@@ -16,10 +16,11 @@ public class Sequence extends NestedParselet  {
     * return null as the value for the sequence, the default. */
    boolean acceptNoContent = false;
 
+   public int skipOnErrorSlot = -1;
+
    public Sequence() { super(); }
 
-   public Sequence(String id, int options)
-   {
+   public Sequence(String id, int options) {
       super(id, options);
    }
 
@@ -138,9 +139,12 @@ public class Sequence extends NestedParselet  {
                   }
                }
 
-               // TODO: should we always do this - not just on enablePartialValues?   It could in general give more complete syntax errors
+               // Question: should we always do the skipOnError processing - not just on enablePartialValues?   It could in general give more complete syntax errors
+               // For now, I think the answer is no.  If we need better errors, we should parse files with syntax errors again with this mode.
+               // Otherwise, it's possible we'll introduce strange ambiguities into the successfully parsed files.
                if (err != null) {
-                  if (childParselet.skipOnError) {
+                  // Skip on error can either be set on the child or as a slot index on the parent
+                  if (childParselet.skipOnError || (skipOnErrorSlot != -1 && i >= skipOnErrorSlot)) {
                      parser.addSkippedError(err);
                      // Record the error but move on
                      nestedValue = new ErrorParseNode(err, "");

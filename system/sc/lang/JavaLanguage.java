@@ -597,8 +597,16 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    KeywordChoice classOperators = new KeywordChoice("class");
 
    Sequence extendsType = new Sequence("<extends>(,.)", OPTIONAL, new KeywordSpace("extends"), type);
+   {
+      // If we match the 'extends' but get an error matching the type, in error checking mode this will parse but marking that slot as an error
+      extendsType.skipOnErrorSlot = 1;
+   }
    Sequence extendsTypes = new Sequence("(,[])", OPTIONAL, new KeywordSpace("extends"), typeList);
    Sequence implementsTypes = new Sequence("<implements>(,[])", OPTIONAL, new KeywordSpace("implements"), typeList);
+   {
+      extendsTypes.skipOnErrorSlot = 1;
+      implementsTypes.skipOnErrorSlot = 1;
+   }
    Sequence normalClassDeclaration =
        new Sequence("ClassDeclaration(operator,,typeName,typeParameters,extendsType,implementsTypes,body)",
                     classOperators, spacing, identifierSp, optTypeParameters, extendsType, implementsTypes, classBody);

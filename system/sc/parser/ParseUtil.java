@@ -219,8 +219,20 @@ public class ParseUtil  {
          return null; // We start after the requested offset so just return null.
 
       // We're the leaf node and we started just before the requested offset so return this node.
-      if (!(parent instanceof ParentParseNode))
+      if (!(parent instanceof ParentParseNode)) {
+
+         if (parent instanceof ParseNode) {
+            ParseNode parentParseNode = (ParseNode) parent;
+            Object child = parentParseNode.value;
+            if (!(child instanceof IParseNode))
+               return parent;
+            IParseNode childNode = (IParseNode) child;
+            if (childNode.getStartIndex() > offset)
+               return parent;
+            return findClosestParseNodeOnChild(parentParseNode, childNode, offset);
+         }
          return parent;
+      }
 
       ParentParseNode parentNode = (ParentParseNode) parent;
 
@@ -230,6 +242,9 @@ public class ParseUtil  {
       IParseNode lastChild = null;
       for (Object child:parentNode.children) {
          if (child instanceof IParseNode) {
+            if (child instanceof ErrorParseNode)
+               continue;
+
             IParseNode childNode = (IParseNode) child;
             // This child starts after the requested offset
             if (childNode.getStartIndex() > offset) {
@@ -243,8 +258,12 @@ public class ParseUtil  {
          }
       }
       Object semValue;
+      return findClosestParseNodeOnChild(parentNode, lastChild, offset);
+   }
+
+   private static IParseNode findClosestParseNodeOnChild(IParseNode parentNode, IParseNode lastChild, int offset) {
       if (lastChild != null) {
-         semValue = lastChild.getSemanticValue();
+         Object semValue = lastChild.getSemanticValue();
          if (semValue instanceof ISemanticNode) {
             ISemanticNode semNode = (ISemanticNode) semValue;
             if (semNode.getParentNode() != null)
