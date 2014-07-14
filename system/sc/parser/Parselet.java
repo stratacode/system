@@ -249,6 +249,26 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
    }
 
    /**
+    * This method replicates the functionality of addResultToParent for the special case where we are parsing errors
+    * and we've reparsed the value of a node and need to replace it in it's parent before returning.  It only handles
+    * a few of the samentic value mappings so far... another approach would be to throw away and rebuild the parent's value
+    * entirely.   The key here is that when we update the parse node for a child, we also update the semantic value so
+    * the two are consistent.
+    */
+   public boolean setResultOnParent(Object node, ParentParseNode parent, int index, Parser parser) {
+      // Exclude this entirely from the result
+      if (getDiscard() || getLookahead())
+         return false;
+
+      if (getSkip()) {
+         parent.set(((ParseNode) node).value, this, index, true, parser);
+         return false;
+      }
+
+      return true;
+   }
+
+   /**
     * Overridden in ChainResultSequence to do post-processing that would ordinarily be done in addResultToParent for
     * a nested sequence
     */

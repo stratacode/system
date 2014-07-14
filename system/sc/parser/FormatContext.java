@@ -11,6 +11,13 @@ import sc.util.IntStack;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Handles spacing, indentation, and newlines for 'generated' parse nodes.  When you parse a grammar, spacing is turned into
+ * literal string nodes.  When you generate language elements, they turn into SpacingParseNode, and NewlineParseNode instances
+ * which initially do not have a string value.  It makes sense to do this on a separate pass - after the tree is fully formed.
+ * This is the formatting phase and the FormatContext stores the state of the formatting process - where we are in the both the
+ * ParseNode and SemanticValue trees.
+ */
 public class FormatContext {
    public final static String INDENT_STR = "   ";
 
@@ -28,13 +35,25 @@ public class FormatContext {
 
    private Object nextValue;
 
-   public FormatContext(int initIndent, Object lastNextValue) {
+   public FormatContext(ParentParseNode curParent, int curChildIndex, int initIndent, Object lastNextValue) {
+      if (curParent != null) {
+         Entry ent = new Entry();
+         ent.currentIndex = curChildIndex;
+         ent.parent = curParent;
+         pendingParents.add(ent);
+      }
       savedIndentLevels.push(initIndent);
       nextValue = lastNextValue;
    }
 
+   /**
+    * During the formatting process, we walk the parse node tree using these Entries as breadcrumbs to point to
+    * where we are in the tree at any given moment.  From the format context, we can find the next character, the previous character
+    * and next and previous semantic nodes to determine what to do with regards to spacing, indentation and newlines.
+    */
    public static class Entry {
       ParentParseNode parent;
+      /** The current index of the child we are processing in this current parent. */
       int currentIndex;
    }
 

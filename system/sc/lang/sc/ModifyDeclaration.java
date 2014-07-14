@@ -399,7 +399,7 @@ public class ModifyDeclaration extends TypeDeclaration {
                parentPrefix = enclosingType.getFullTypeName();
             Object newRoot = thisModel.findTypeDeclaration(CTypeUtil.prefixPath(parentPrefix, rootName), false, true);
             if (newRoot == null) {
-               if (!isLayerType && !hasError && thisModel.layer != null && !thisModel.isLayerModel)
+               if (!isLayerType && errorArgs == null && thisModel.layer != null && !thisModel.isLayerModel)
                   displayTypeError("Unable to lookup root for modify: " + rootName + " ");
             }
             else

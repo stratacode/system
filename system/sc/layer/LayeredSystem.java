@@ -289,7 +289,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    LinkedHashSet<String> viewedErrors = new LinkedHashSet<String>();
 
+   public boolean disableCommandLineErrors = false;
+
    public boolean isErrorViewed(String error) {
+      if (disableCommandLineErrors)
+         return true;
       if (viewedErrors == null)
          return false;
       if (viewedErrors.size() == 50) {
@@ -1241,7 +1245,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
 
 
-         if (refLayer.inheritImports) {
+         if (refLayer != null && refLayer.inheritImports) {
             int startIx = fromLayer == null ? layers.size() - 1 : fromLayer.getLayerPosition();
             for (int i = startIx; i >= 0; i--) {
                Layer depLayer = layers.get(i);

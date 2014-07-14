@@ -7,7 +7,7 @@ package sc.lang.java;
 import sc.bind.Bind;
 import sc.bind.BindingDirection;
 import sc.dyn.DynUtil;
-import sc.lang.JavaLanguage;
+import sc.lang.*;
 import sc.lang.js.JSUtil;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
@@ -15,8 +15,6 @@ import sc.parser.ParentParseNode;
 import sc.parser.ParseUtil;
 import sc.type.IBeanMapper;
 import sc.type.Type;
-import sc.lang.ILanguageModel;
-import sc.lang.SemanticNodeList;
 import sc.util.StringUtil;
 
 import java.lang.reflect.Field;
@@ -350,7 +348,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          LayeredSystem sys = model.getLayeredSystem();
          // Only start checking after the current buildLayer is compiled.  Otherwise, this touches runtime classes
          // during the normal build which can suck in a version that will be replaced later on.
-         if (sys != null && sys.buildLayer.compiled) {
+         if (sys != null && sys.buildLayer != null && sys.buildLayer.compiled) {
             Object field = getRuntimePropertyMapping();
             // If field is null, it means we have not compiled a compiled class yet
             if (field != null && (!ModelUtil.isDynamicType(field) && !ModelUtil.isBindable(field)) && canMakeBindable() && !ModelUtil.isConstant(field))
@@ -375,22 +373,44 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       return (!isStatic() || getEnclosingType().getDeclarationType() != DeclarationType.INTERFACE);
    }
 
-   public String toDeclarationString() {
+   public String toListDisplayString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append(variableName);
+      sb.append(": ");
+      sb.append(getTypeNameString());
+      if (operator != null) {
+         sb.append(" ");
+         sb.append(operator);
+         if (initializer != null) {
+            sb.append(" ");
+            sb.append(initializer.toLanguageString());
+         }
+      }
+      return sb.toString();
+   }
+
+   private CharSequence getTypeNameString() {
       Statement def = getDefinition();
       StringBuilder sb = new StringBuilder();
       if (def != null) {
          SemanticNodeList mods = def.modifiers;
-         sb.append((mods == null ? "" : mods.toLanguageString(JavaLanguage.getJavaLanguage().modifiers) + " ") + getTypeName() + " " + variableName);
+         sb.append((mods == null ? "" : mods.toLanguageString(JavaLanguage.getJavaLanguage().modifiers) + " ") + getTypeName());
       }
       else {
          if (frozenTypeDecl != null)
             sb.append(ModelUtil.getTypeName(frozenTypeDecl));
          else
-            sb.append("<no def>");
-
-         sb.append(" ");
-         sb.append(variableName);
+            sb.append("<no type>");
       }
+      return sb;
+   }
+
+   public String toDeclarationString() {
+      Statement def = getDefinition();
+      StringBuilder sb = new StringBuilder();
+      sb.append(getTypeNameString());
+      sb.append(" ");
+      sb.append(variableName);
 
       // Include the initializer if it is there
       if (operator != null && initializer != null) {

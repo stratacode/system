@@ -6,6 +6,7 @@ package sc.lang.java;
 
 import sc.dyn.DynUtil;
 import sc.lang.ILanguageModel;
+import sc.lang.INamedNode;
 import sc.lang.SemanticNodeList;
 import sc.lang.template.Template;
 import sc.layer.LayeredSystem;
@@ -15,9 +16,7 @@ import sc.type.PropertyMethodType;
 import sc.util.FileUtil;
 
 import java.io.File;
-import java.util.EnumSet;
-import java.util.IdentityHashMap;
-import java.util.List;
+import java.util.*;
 
 /**
  * A regular Java method definition (not a constructor).  This implements IVariable for the case where
@@ -28,6 +27,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
   
    public transient String propertyName = null;
    public transient PropertyMethodType propertyMethodType;
+   public transient Object superMethod; // A reference to the method we override if any
    public transient boolean isMain;
    public transient boolean dynamicType;
    public transient boolean overridesCompiled;
@@ -82,17 +82,22 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
    public void validate() {
       if (validated) return;
 
+      TypeDeclaration methodType = getEnclosingType();
+      Object extendsType = methodType.getExtendsTypeDeclaration();
+      Object modType = methodType.getDerivedTypeDeclaration();
+      if (extendsType == null)
+         extendsType = Object.class;
+      Object overridden = ModelUtil.definesMethod(extendsType, name, getParameterList(), null, null, false);
+      superMethod = overridden;
+      if (overridden instanceof MethodDefinition) {
+         MethodDefinition superMeth = (MethodDefinition) overridden;
+      }
+
       /* Dynamic methods need to find any overridden method and make sure calls to that one are also made dynamic.
        * This is here in the validate because the isDynamic method on our parents is not valid until we've propagated
        * the dyanmicType flag through the type hierarchy.
        */
       if (isDynamicType()) {
-         TypeDeclaration methodType = getEnclosingType();
-         Object extendsType = methodType.getExtendsTypeDeclaration();
-         Object modType = methodType.getDerivedTypeDeclaration();
-         if (extendsType == null)
-            extendsType = Object.class;
-         Object overridden = ModelUtil.definesMethod(extendsType, name, getParameterList(), null, null, false);
          if (overridden != null) {
             if (ModelUtil.isCompiledMethod(overridden)) {
                methodType.setNeedsDynamicStub(true);
@@ -511,5 +516,29 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          res.needsDynAccess = needsDynAccess;
       }
       return res;
+   }
+
+   public List<Object> findOverridingMethods() {
+      ArrayList<Object> res = new ArrayList<Object>();
+      TypeDeclaration enclType = getEnclosingType();
+      LayeredSystem sys = getLayeredSystem();
+      List<?> parameterTypes = getParameterList();
+
+      addOverridingMethods(sys, enclType, res, parameterTypes);
+
+      return res;
+   }
+
+   private void addOverridingMethods(LayeredSystem sys, TypeDeclaration enclType, ArrayList<Object> res, List<? extends Object> ptypes) {
+      Iterator<TypeDeclaration> subTypes = sys.getSubTypesOfType(enclType);
+      while (subTypes.hasNext()) {
+         TypeDeclaration subType = subTypes.next();
+
+         Object result = subType.declaresMethod(name, ptypes, null, enclType);
+         if (result instanceof MethodDefinition)
+            res.add(result);
+
+         addOverridingMethods(sys, subType, res, ptypes);
+      }
    }
 }

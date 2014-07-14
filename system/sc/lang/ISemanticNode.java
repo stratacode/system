@@ -56,6 +56,8 @@ public interface ISemanticNode {
 
    public int removeChild(Object toRemove);
 
+   /** Returns null or an error string for this node */
+   public String getErrorText();
 
    /** Options for the deepCopy method - OR'd together as bit flags.  Copy the complete parse node tree */
    public static final int CopyParseNode = 1;
@@ -93,6 +95,8 @@ public interface ISemanticNode {
    public ISemanticNode deepCopy(int options, IdentityHashMap<Object, Object> oldNewMap);
 
    public boolean getTransformed();
+
+   public boolean isValidated();
 
    /** Regenerates the parsed description for this node */
    public boolean regenerate(boolean finalGen);

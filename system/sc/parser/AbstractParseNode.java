@@ -73,24 +73,26 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
     * When we are formatting a node incrementally, we need to supply a way to find the next semantic value
     * following this one in the stream.  We use that to determine indentation and spacing.
     */
-   Object getNextSemanticValue() {
+   Object getNextSemanticValue(Object parent) {
       Object ourVal = getSemanticValue();
-      if (ourVal instanceof ISemanticNode) {
-         ISemanticNode parVal = ((ISemanticNode) ourVal).getParentNode();
-         if (parVal instanceof List) {
-            List l = (List) parVal;
-            int ix = l.indexOf(ourVal);
-            if (ix == -1)
-               return null;
-            ix++;
-            if (ix == l.size())
-               return parVal.getParentNode();
-            else
-               return l.get(ix);
-         }
-         return parVal;
+      ISemanticNode parVal = null;
+      if (ourVal instanceof ISemanticNode)
+         parVal = ((ISemanticNode) ourVal).getParentNode();
+      else if (parent instanceof ISemanticNode)
+         parVal = (ISemanticNode) parent;
+
+      if (parVal instanceof List) {
+         List l = (List) parVal;
+         int ix = l.indexOf(ourVal);
+         if (ix == -1)
+            return null;
+         ix++;
+         if (ix == l.size())
+            return parVal.getParentNode();
+         else
+            return l.get(ix);
       }
-      return null;
+      return parVal;
    }
 
    public void changeLanguage(Language newLanguage) {
@@ -128,5 +130,9 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
 
    public boolean isCompressedNode() {
       return false;
+   }
+
+   public String formatString(Object parentSemVal, ParentParseNode parParseNode, int curChildIndex) {
+      return toString();
    }
 }

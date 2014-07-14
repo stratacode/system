@@ -662,7 +662,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
             }
             else if (staticContentOnly || inactive) {
                if (decl instanceof Expression)
-                  ((Expression) decl).hasError = true;
+                  ((Expression) decl).errorArgs = new Object[0]; // TODO: is this reached?  It's probably for the exec="process" which is not used anymore.
             }
          }
       }

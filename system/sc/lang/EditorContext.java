@@ -1100,11 +1100,38 @@ public class EditorContext extends ClientEditorContext {
       return relPos;
    }
 
+   static String getStatementCompleteStart(String input) {
+      for (int i = input.length()-1; i >= 0; i--) {
+         switch (input.charAt(i)) {
+            case ';':
+            case ' ':
+            case ':':
+            case '}':
+            case '{':
+            case '=':
+               return input.substring(i+1).trim();
+         }
+      }
+      return input.trim();
+   }
+
    public int completeTextInFile(String codeText, int cursor, List<String> candidates, JavaModel fileModel) {
       String codeSnippet = codeText.substring(0, cursor);
+
+      // First we try to complete by parsing the fragment from the start of the file till the cursor
       Object res = completeFullTypeContext(codeSnippet, fileModel.getLanguage().getStartParselet(), cursor, candidates, fileModel);
-      if (!(res instanceof Integer))
-         return -1;
+      // This method returns an integer if it completed something meaningful or the best context value it could find... used to find the current type.
+      if (!(res instanceof Integer)) {
+         String command = getStatementCompleteStart(codeSnippet);
+         if (command == null || command.length() == 0)
+            return -1;
+
+         BodyTypeDeclaration currentType = getCurrentTypeFromCtxValue(res, fileModel);
+
+         // Sometimes, there's not enough context for us to match a completable element e.g. when you are starting a new statement at the class body level,
+         // In this cases, we take a simpler approach - just complete the last identifier as an expression (e.g. a.bc will parse into an identifier expression)
+         return completePartialContext(command, cursor, candidates, cmdlang.completionCommands, codeSnippet, fileModel, currentType);
+      }
 
       return (Integer) res;
    }
@@ -1244,19 +1271,10 @@ public class EditorContext extends ClientEditorContext {
       return resPos;
    }
 
-   public int complete(String command, int cursor, List<String> candidates, Parselet completeParselet, String ctxText, JavaModel fileModel) {
+   public int completePartialContext(String command, int cursor, List<String> candidates, Parselet completeParselet, String ctxText, JavaModel fileModel, BodyTypeDeclaration currentType) {
       if (!cmdlang.typeCommands.initialized) {
          ParseUtil.initAndStartComponent(completeParselet);
       }
-
-      BodyTypeDeclaration currentType = null;
-      if (ctxText != null) {
-         Object ctxValue = completeFullTypeContext(ctxText, fileModel.getLanguage().getStartParselet(), cursor, candidates, fileModel);
-         if (ctxValue instanceof Integer)
-            return (Integer) ctxValue;
-         currentType = getCurrentTypeFromCtxValue(ctxValue, fileModel);
-      }
-
       HashSet<String> collector = new HashSet<String>();
 
       // Empty string is a special case - suggest all names available here
@@ -1287,6 +1305,23 @@ public class EditorContext extends ClientEditorContext {
          model.disableTypeErrors = false;
       }
       return resPos;
+
+   }
+
+   public int complete(String command, int cursor, List<String> candidates, Parselet completeParselet, String ctxText, JavaModel fileModel) {
+      if (!cmdlang.typeCommands.initialized) {
+         ParseUtil.initAndStartComponent(completeParselet);
+      }
+
+      BodyTypeDeclaration currentType = null;
+      if (ctxText != null) {
+         Object ctxValue = completeFullTypeContext(ctxText, fileModel.getLanguage().getStartParselet(), cursor, candidates, fileModel);
+         if (ctxValue instanceof Integer)
+            return (Integer) ctxValue;
+         currentType = getCurrentTypeFromCtxValue(ctxValue, fileModel);
+      }
+
+      return completePartialContext(command, cursor, candidates, completeParselet, ctxText, fileModel, currentType);
    }
 
    public int completeCommand(String defaultPackage, Object semanticValue, String command, int cursor, List candidates, BodyTypeDeclaration currentType, Object continuationValue) {
@@ -1324,6 +1359,10 @@ public class EditorContext extends ClientEditorContext {
 
          JavaModel theModel = node.getJavaModel();
          if (theModel != null) {
+            if (theModel.layeredSystem == null && currentType != null) {
+               theModel.layeredSystem = currentType.getLayeredSystem();
+               theModel.layer = currentType.getLayer();
+            }
             // Temporarily turn off error display for this type
             boolean oldTE = theModel.disableTypeErrors;
             theModel.setDisableTypeErrors(true);

@@ -121,7 +121,7 @@ public class Sequence extends NestedParselet  {
                   }
                   Object newPrevValue = prevParselet.parseExtendedErrors(parser, childParselet);
                   if (newPrevValue != null) {
-                     value.children.set(prevIx, newPrevValue);
+                     value.set(newPrevValue, childParselet, prevIx, false, parser);
 
                      // Go back and retry the current child parselet now that we've parsed the previous one again successfully... we know it should match because we just peeked it in the previous parselet.
                      i = i - 1;

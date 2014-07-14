@@ -5,6 +5,7 @@
 package sc.lang.java;
 
 import sc.dyn.DynUtil;
+import sc.lang.INamedNode;
 import sc.lang.SCLanguage;
 import sc.lang.SemanticNodeList;
 import sc.lang.template.GlueStatement;
@@ -13,7 +14,7 @@ import sc.parser.ParseUtil;
 
 import java.util.*;
 
-public abstract class AbstractMethodDefinition extends TypedDefinition implements IMethodDefinition {
+public abstract class AbstractMethodDefinition extends TypedDefinition implements IMethodDefinition, INamedNode {
    public String name;
    public Parameter parameters;
    public String arrayDimensions;
@@ -32,7 +33,7 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
 
    /** A method to be used in place of the previous method - either because it was modified (replaced=false) or a type was reloaded (replaced=true) */
    public transient AbstractMethodDefinition replacedByMethod;
-   public transient AbstractMethodDefinition overriddenMethod;
+   public transient AbstractMethodDefinition overriddenMethod; // TODO: rename this to "modifiedMethod"
    /** Goes along with replacedByMethod when that is used to indicate a method which actually replaces this instance in this layer */
    public transient boolean replaced;
 
@@ -335,7 +336,31 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
 
    /** Turn this on unless we are in an interface or annotation type */
    public boolean useDefaultModifier() {
-      return getEnclosingType().useDefaultModifier();
+      TypeDeclaration enclType = getEnclosingType();
+      return enclType != null && enclType.useDefaultModifier();
+   }
+
+   public String toListDisplayString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append(toMethodDeclString());
+      if (type != null) {
+         sb.append(": ");
+         sb.append(type.toLanguageString(SCLanguage.getSCLanguage().type));
+      }
+      return sb.toString();
+   }
+
+   private CharSequence toMethodDeclString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append(name);
+      if (parameters != null && parameters.getNumParameters() > 0) {
+         sb.append("(");
+         sb.append(parameters.toLanguageString(SCLanguage.getSCLanguage().parameters));
+         sb.append(")");
+      }
+      else
+         sb.append("()");
+      return sb;
    }
 
    public String toDeclarationString() {
@@ -346,14 +371,7 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       if (type != null) {
          sb.append(type.toLanguageString(SCLanguage.getSCLanguage().type));
       }
-      sb.append(name);
-      if (parameters != null && parameters.getNumParameters() > 0) {
-         sb.append("(");
-         sb.append(parameters.toLanguageString(SCLanguage.getSCLanguage().parameters));
-         sb.append(")");
-      }
-      else
-         sb.append("()");
+      sb.append(toMethodDeclString());
       TypeDeclaration enclType = getEnclosingType();
       if (enclType != null) {
          sb.append(" in " );
@@ -576,5 +594,13 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
          res.templateBody = templateBody;
       }
       return res;
+   }
+
+   public void setNodeName(String newName) {
+      setProperty("name", newName);
+   }
+
+   public String getNodeName() {
+      return this.name;
    }
 }

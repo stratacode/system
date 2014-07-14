@@ -1339,7 +1339,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       return RTypeUtil.createInstance(theClass);
    }
 
-   public void setSemanticValue(ParentParseNode parent, Object node, int index, boolean skipSemanticValue, Parser parser) {
+   public void setSemanticValue(ParentParseNode parent, Object node, int index, boolean skipSemanticValue, Parser parser, boolean replaceValue) {
       if (trace && parser.enablePartialValues)
          System.out.println("*** setting semantic value of traced element");
 
@@ -1375,8 +1375,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
                   // We are propagating the node's value - override the node we store for 
                   // this semantic node's parse node.
-                  if (parent.value instanceof ISemanticNode && node instanceof ISemanticNode)
-                  {
+                  if (parent.value instanceof ISemanticNode && node instanceof ISemanticNode) {
                      ((ISemanticNode) node).setParentNode((ISemanticNode)parent.value);
                   }
                   break;
@@ -1418,6 +1417,8 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                       if (sv instanceof List) {
                          if (parent.value == null)
                              parent.setSemanticValue(sv);
+                         else if (replaceValue)
+                            parent.value = sv;
                          else
                             ((List)parent.value).addAll((List) sv);
                       }
@@ -1710,6 +1711,35 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          */
       }
 
+      return true;
+   }
+
+   public boolean setResultOnParent(Object node, ParentParseNode parent, int index, Parser parser) {
+      // Exclude this entirely from the result
+      if (getDiscard() || getLookahead())
+         return false;
+
+      NestedParselet parentParselet = parent.parselet;
+
+      if (getSkip() && node instanceof ParentParseNode) {
+         ParentParseNode ppnode = (ParentParseNode) node;
+
+         // We have no information to preserve in this level of the hierarchy so we merge
+         // it into the parentNode.
+         if (parentParselet.parameterMapping == null) {
+            ArrayList<Object> children = ppnode.children;
+            int childSz = children.size();
+            for (int i = 0; i < childSz; i++) {
+               Object c = children.get(i);
+
+               // We are adding a nested child which is marked as being skipped.  At this
+               // point we add its children directly to the parentNode node - we'll throw away
+               // this temporary parentNode node.  At this point, the value is the semantic value
+               parent.set(c, this, index, false, parser);
+            }
+            return false; // Do not add to the parentNode node
+         }
+      }
       return true;
    }
 

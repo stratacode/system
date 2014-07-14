@@ -83,7 +83,7 @@ public class ParentParseNode extends AbstractParseNode {
          if (p.skip && !(parselet.needsChildren())) {
             if (children.size() == 1)  {
                Object child = children.get(0);
-               if (child instanceof String) {
+               if (child instanceof String) { // TODO: should this be PString.isString?  See issue#24 where we are not collapsing string tokens into a single parse node
                   // this is n*n - the need to avoid the Strings...
                   children.set(0, ((String) child) + ((String) node));
                   addChild = false;
@@ -103,7 +103,56 @@ public class ParentParseNode extends AbstractParseNode {
          children.add(node);
 
       // Only nested parselets should be using the ParentParseNode
-      parselet.setSemanticValue(this, node, index, skipSemanticValue, parser);
+      parselet.setSemanticValue(this, node, index, skipSemanticValue, parser, false);
+   }
+
+   public void set(Object node, Parselet p, int index, boolean skipSemanticValue, Parser parser) {
+      boolean setChild = true;
+
+      // Special case for adding a string to an "omitted" node.  In this case,
+      // we'll just accumulate one string as our value.  When this guy gets
+      // added to its parentNode, it will get removed and the string goes on to represent
+      // all of this element's children.
+      if (node instanceof StringToken) {
+         if (p.getDiscard() || p.getLookahead())
+            return;
+         if (p.skip && !(parselet.needsChildren())) {
+            if (children.size() == 1) {
+               Object child = children.get(0);
+               if (child instanceof StringToken) {
+                  children.set(0, StringToken.concatTokens((StringToken)child, (StringToken)node));
+                  setChild = false;
+               }
+            }
+         }
+      }
+      else if (node instanceof String) {
+         if (p.discard || p.lookahead)
+            return;
+         if (p.skip && !(parselet.needsChildren())) {
+            if (children.size() == 1)  {
+               Object child = children.get(0);
+               if (child instanceof String) { // TODO: should this be PString.isString?  See issue#24 where we are not collapsing string tokens into a single parse node
+                  // this is n*n - the need to avoid the Strings...
+                  children.set(0, ((String) child) + ((String) node));
+                  setChild = false;
+               }
+            }
+         }
+      }
+      else if (node instanceof IParseNode) {
+         IParseNode pnode = (IParseNode) node;
+         Parselet childParselet = pnode.getParselet();
+
+         if (!childParselet.addResultToParent(pnode, this, index, parser))
+            return;
+      }
+
+      if (setChild)
+         children.set(index, node);
+
+      // Only nested parselets should be using the ParentParseNode
+      parselet.setSemanticValue(this, node, index, skipSemanticValue, parser, true);
    }
 
    public void addGeneratedNode(Object node) {
@@ -171,10 +220,18 @@ public class ParentParseNode extends AbstractParseNode {
       }
       return len;
    }
-
    public String toString() {
+      return formatString(null, null, -1);
+   }
+
+   /**
+    * Formats the parse node - turning it into a String.  Parent should specify the semantic node parent of this parse node.
+    * If null is specified, it's no problem as long as this parse-node's semantic value has a parent.  Some primitive parse nodes have a string
+    * semantic value with no ref to their parent.  For the spacing to be computed properly we need this context (for FormatContext.getNextSemanticValue())
+    */
+   public String formatString(Object parSemVal, ParentParseNode curParseNode, int curChildIndex) {
       // If the parse node is generated, we need to use the formatting process to add in
-      // the property spacing.  If the parse node was parsed, we toString it just as it
+      // the spacing.  If the parse node was parsed, we toString it just as it
       // was parsed so we get back the identical input strings.
       // TODO: REMOVE THE EXTRA UNCOMMENTED CODE HERE.
       // For non-generated parse nodes, the child.toString() should have all of the formatting already.  But we may have invalidated some children.
@@ -189,7 +246,7 @@ public class ParentParseNode extends AbstractParseNode {
          }
          else
             initIndent = 0;
-         FormatContext ctx = new FormatContext(initIndent, getNextSemanticValue());
+         FormatContext ctx = new FormatContext(curParseNode, curChildIndex, initIndent, getNextSemanticValue(parSemVal));
          //ctx.append(FormatContext.INDENT_STR);
          PerfMon.start("format", false);
          format(ctx);
@@ -230,7 +287,7 @@ public class ParentParseNode extends AbstractParseNode {
          }
          else
             initIndent = 0;
-         FormatContext ctx = new FormatContext(initIndent, getNextSemanticValue());
+         FormatContext ctx = new FormatContext(null, -1, initIndent, getNextSemanticValue(null));
          //ctx.append(FormatContext.INDENT_STR);
          formatStyled(ctx);
          return ctx.getResult().toString();
@@ -269,6 +326,10 @@ public class ParentParseNode extends AbstractParseNode {
          }
          return ParseUtil.styleString(parselet.styleName, sb.toString(), false);
       }
+   }
+
+   public void addParent(ParentParseNode par, int currentChildIndex) {
+
    }
 
    public void format(FormatContext ctx) {

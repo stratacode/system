@@ -29,7 +29,7 @@ import java.util.*;
 /**
  * The base type of TypeDeclaration and EnumConstant.  Because EnumConstants have the bulk of the functionality of a class, this class maintains most of the core functionality of a type.
  */
-public abstract class BodyTypeDeclaration extends Statement implements ITypeDeclaration {
+public abstract class BodyTypeDeclaration extends Statement implements ITypeDeclaration, INamedNode {
    public final static String INNER_STUB_SEPARATOR = "__";
 
    @Constant
@@ -7928,5 +7928,21 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public void setExistsInJSRuntime(boolean b) {
       throw new UnsupportedOperationException(); // Here for client/server sync cause JavaModel gets used in it's compiled form, even when compiling the client we need this method to exist for it to compile in this mode
+   }
+
+   public void updateTypeName(String newTypeName) {
+      setProperty("typeName", newTypeName);
+   }
+
+   public void setNodeName(String newNodeName) {
+      updateTypeName(newNodeName);
+   }
+
+   public String getNodeName() {
+      return typeName;
+   }
+
+   public String toListDisplayString() {
+      return typeName + ": " + getDeclarationType().toString();
    }
 }

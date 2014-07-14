@@ -56,6 +56,17 @@ public class ChainedResultSequence extends Sequence {
          return super.addResultToParent(node, parent, index, parser);
    }
 
+   public boolean setResultOnParent(Object node, ParentParseNode parent, int index, Parser parser) {
+      ParentParseNode pnode = (ParentParseNode) node;
+      if (pnode.children.get(1) == null) {
+         parent.set(pnode.children.get(0), this, index, false, parser);
+
+         return false;
+      }
+      else
+         return super.setResultOnParent(node, parent, index, parser);
+   }
+
    public Object propagateResult(Object node) {
       ParentParseNode pnode = (ParentParseNode) node;
       if (pnode.children.get(1) == null)

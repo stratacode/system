@@ -1958,7 +1958,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       LayeredSystem sys = getLayeredSystem();
       Layer thisLayer = getLayer();
 
-      if (sys == null || thisLayer == null)
+      if (sys == null || thisLayer == null || sys.buildLayer == null)
          return null;
 
       // First approach is to use the buildSrcIndex to find the most specific file for this guy.

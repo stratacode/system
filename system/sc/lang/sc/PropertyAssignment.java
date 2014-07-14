@@ -8,6 +8,7 @@ import sc.bind.Bind;
 import sc.bind.BindingDirection;
 import sc.dyn.DynUtil;
 import sc.lang.ILanguageModel;
+import sc.lang.INamedNode;
 import sc.lang.SemanticNodeList;
 import sc.lang.html.Attr;
 import sc.layer.Layer;
@@ -21,7 +22,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
 
-public class PropertyAssignment extends Statement implements IVariableInitializer, IObjectId {
+public class PropertyAssignment extends Statement implements IVariableInitializer, IObjectId, INamedNode {
    public String propertyName;
    public String operator;
    public Expression initializer;
@@ -895,4 +896,26 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       return false;
    }
 
+   public void setNodeName(String newName) {
+      setProperty("propertyName", newName);
+   }
+
+   public String getNodeName() {
+      return propertyName;
+   }
+
+   public String toListDisplayString() {
+      StringBuilder res = new StringBuilder();
+      res.append(propertyName);
+      if (operator != null) {
+         res.append(" ");
+         res.append(operator);
+
+         if (initializer != null) {
+            res.append(" ");
+            res.append(initializer.toLanguageString());
+         }
+      }
+      return res.toString();
+   }
 }

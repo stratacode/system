@@ -89,7 +89,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
                                          new Sequence("(,[])", OPTIONAL | REPEAT, comma, typeArgument), greaterThanSkipOnError);
    public Sequence optTypeArguments = new Sequence("(.)", OPTIONAL, typeArguments);
 
-   Sequence classOrInterfaceType =
+   public Sequence classOrInterfaceType =
            new Sequence("ClassType(typeName, typeArguments, chainedTypes)", identifier, optTypeArguments,
                     new Sequence("ClassType(, typeName, typeArguments)", OPTIONAL | REPEAT, periodSpace, identifier, optTypeArguments));
    {
@@ -123,8 +123,8 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    OrderedChoice skipBodyError = new OrderedChoice("<skipBodyError>(.,.)", alphaNumString, new Sequence(new SymbolChoice(NOT, "}", Symbol.EOF), spacing));
 
    public Sequence classBody = new Sequence("<classBody>(,[],)");
-   OrderedChoice classDeclarationWithoutModifiers = new OrderedChoice();
-   Sequence classDeclaration = new Sequence("<class>(modifiers,.)");
+   public OrderedChoice classDeclarationWithoutModifiers = new OrderedChoice();
+   public Sequence classDeclaration = new Sequence("<classDeclaration>(modifiers,.)");
    Sequence block = new Sequence("BlockStatement(,statements,)");
    public OrderedChoice blockStatements = new OrderedChoice("([],[],[])", REPEAT | OPTIONAL);
    {
@@ -271,7 +271,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       // When matching "a." with enablePartialValues we need an empty string in there to tell the difference between "a" and "a."
       remainingIdentifiers.allowEmptyPartialElements = true;
    }
-   Sequence identifierExpression = new Sequence("IdentifierExpression(identifiers, .)",
+   public Sequence identifierExpression = new Sequence("IdentifierExpression(identifiers, .)",
         new Sequence("([],[])", varIdentifier, remainingIdentifiers),
         identifierSuffix);
 
@@ -395,7 +395,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    Sequence variableDeclaratorId = new Sequence("(variableName,arrayDimensions)", identifier, openCloseSqBrackets);
 
-   Sequence qualifiedType =
+   public Sequence qualifiedType =
          new Sequence("ClassType(typeName, chainedTypes)", identifier,
                       new Sequence("ClassType(,typeName)", OPTIONAL | REPEAT, period, identifier));
    Sequence qualifiedTypeList =
@@ -434,7 +434,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       variableInitializer.set(arrayInitializer, expression);
    }
 
-   Sequence variableDeclarator =
+   public Sequence variableDeclarator =
        new Sequence("VariableDefinition(*,*)", 
                     variableDeclaratorId, new Sequence("(operator,initializer)", OPTIONAL, variableInitializerOperators, variableInitializer));
    Sequence variableDeclarators =
@@ -519,7 +519,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    Sequence constructorDeclaratorRest = new Sequence("ConstructorDefinition(parameters,throwsTypes,body)",
                                                      formalParameters, throwsNames, block);
 
-   Sequence methodDeclaration = new Sequence("(name,.)", identifier, methodDeclaratorRest);
+   public Sequence methodDeclaration = new Sequence("(name,.)", identifier, methodDeclaratorRest);
 
    Sequence typeParameter = new Sequence("TypeParameter(name,extendsType)", identifier,
                                           new Sequence("(,.)", OPTIONAL, new KeywordSpace("extends"), typeBound));
@@ -552,7 +552,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    Sequence typedMemberDeclaration =
          new Sequence("(type,.)", type, new OrderedChoice(methodDeclaration, fieldDeclaration));
 
-   IndexedChoice memberDeclaration = new IndexedChoice("<memberDeclaration>");
+   public IndexedChoice memberDeclaration = new IndexedChoice("<memberDeclaration>");
    {
       memberDeclaration.put("class", classDeclarationWithoutModifiers); // Class is first because it's the most common
       memberDeclaration.put("interface",  interfaceDeclarationWithoutModifiers);
@@ -563,9 +563,11 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
                                    new Sequence("(name, .)", identifier, constructorDeclaratorRest));
    }
 
+   public Sequence memberDeclarationWithModifiers = new Sequence("(modifiers,.)", modifiers, memberDeclaration);
+
    /** exposed as a hook point for parsing class member definitions */
    public OrderedChoice classBodyDeclarations = new OrderedChoice("<classBodyDeclarations>([],[],)", OPTIONAL | REPEAT,
-                new Sequence("(modifiers,.)", modifiers, memberDeclaration),
+                memberDeclarationWithModifiers,
                 new Sequence("(staticEnabled,.)", new SemanticToken("static", OPTIONAL), block), semicolonEOL);
 
    {
@@ -594,7 +596,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    KeywordChoice classModifierKeywords = new KeywordChoice(true, "public", "protected", "private", "abstract", "static", "final", "strictfp");
    public OrderedChoice classModifiers = new OrderedChoice("([],[])", OPTIONAL | REPEAT, annotation, classModifierKeywords);
 
-   KeywordChoice classOperators = new KeywordChoice("class");
+   public KeywordChoice classOperators = new KeywordChoice("class");
 
    Sequence extendsType = new Sequence("<extends>(,.)", OPTIONAL, new KeywordSpace("extends"), type);
    {

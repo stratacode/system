@@ -553,7 +553,7 @@ public abstract class AbstractInterpreter extends EditorContext {
          ParseUtil.initAndStartComponent(model);
          ParseUtil.initAndStartComponent(expr);
 
-         if (!expr.hasError && !model.hasErrors) {
+         if (expr.errorArgs == null && !model.hasErrors) {
             if (!expr.isStaticTarget() && autoObjectSelect) {
                if (!hasCurrentObject() || (curObj = getCurrentObject()) == null) {
                   Object res;
@@ -655,7 +655,7 @@ public abstract class AbstractInterpreter extends EditorContext {
          model.addTypeDeclaration((TypeDeclaration) type);
 
          // If this is a ModifyDeclaration which could not find it's type, do not add it as it is bogus anyway
-         if (type instanceof ModifyDeclaration && type.hasError)
+         if (type instanceof ModifyDeclaration && type.errorArgs != null)
             return null;
 
          // Need to generate the model the first time around so it knows its parse node.  It would be faster

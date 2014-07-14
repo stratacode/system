@@ -85,12 +85,14 @@ public class ClassDeclaration extends TypeDeclaration {
                      dynamicNew = false;
                   }
 
-                  m.layeredSystem.addSubType(extendsTD, this);
+                  if (m.layeredSystem != null) {
+                     m.layeredSystem.addSubType(extendsTD, this);
+                  }
                   startExtendedType(extendsTD, "extended");
                }
             }
             else if (extendsTypeDecl == null)
-               displayTypeError("Extends class not found: ", extendsType.getFullTypeName(), " for ");
+               extendsType.displayTypeError("Extends class not found: ", extendsType.getFullTypeName(), " for ");
          }
       }
       super.start();

@@ -16,10 +16,10 @@ public class ReturnStatement extends ExpressionStatement {
       super.start();
 
       Object returnType;
-      AbstractMethodDefinition method;
+      AbstractMethodDefinition method = getEnclosingMethod();
       Object methodReturnType;
 
-      if (expression != null && (returnType = expression.getGenericType()) != null && (method = getEnclosingMethod()) != null &&
+      if (expression != null && (returnType = expression.getGenericType()) != null && method != null &&
           (methodReturnType = method.type.getTypeDeclaration()) != null &&
           // Verified at least that non-assignmentSemantics are too strict, i.e. method declared as char returning 0.
          !ModelUtil.isAssignableFrom(methodReturnType, returnType, true, null)) {
@@ -28,6 +28,12 @@ public class ReturnStatement extends ExpressionStatement {
             returnType = expression.getGenericType();
             ModelUtil.isAssignableFrom((methodReturnType = method.type.getTypeDeclaration()), returnType, true, null);
          }
+      }
+
+      if (expression == null && method != null) {
+         JavaType retType = method.getReturnJavaType();
+         if (retType != null && !retType.isVoid())
+            displayError("Method: ", method.name, " ", " must return type: ", retType.toString());
       }
    }
 

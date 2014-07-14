@@ -93,8 +93,8 @@ public class SpacingParseNode extends AbstractParseNode {
 
          }
 
-         int nextInt = (char) ctx.nextChar();
-         if (nextInt != -1) { // Is this even possible?
+         int nextInt = ctx.nextChar();
+         if (nextInt != -1) {  // This can happen if
             char nextChar = (char) nextInt;
             switch (nextChar) {
                case '/':
@@ -206,7 +206,8 @@ public class SpacingParseNode extends AbstractParseNode {
             }
          }
          else {
-            //System.err.println("*** Unreached case in spacing parse node");
+            // This correlates to end of file, or end of the token's format context at least.  No need for a space here...
+            return;
          }
       }
       // beginning of file, no space needed

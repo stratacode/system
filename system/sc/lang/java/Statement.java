@@ -5,6 +5,7 @@
 package sc.lang.java;
 
 import sc.lang.ISemanticNode;
+import sc.lang.IUserDataNode;
 import sc.lang.SemanticNodeList;
 import sc.lang.js.JSFormatMode;
 import sc.lang.js.JSLanguage;
@@ -18,13 +19,15 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
 
-public abstract class Statement extends Definition {
-   public transient boolean hasError;
+public abstract class Statement extends Definition implements IUserDataNode {
+   public transient Object[] errorArgs;
    public transient int childNestingDepth = -1;
 
    // During code-generation, one statement may be generated from another, e.g. for templates we clone statements that are children of a template declaration.  This
    // stores that references so we can find the original source Statement.
    public transient Statement fromStatement;
+
+   transient Object userData = null;  // A hook for user data - specifically for an IDE to store its instance for this node
 
    public int getNestingDepth() {
       if (parentNode != null)
@@ -87,23 +90,23 @@ public abstract class Statement extends Definition {
    }
 
    public void displayTypeError(String...args) {
-      if (!hasError) {
+      if (errorArgs == null) {
          super.displayTypeError(args);
-         hasError = true;
+         errorArgs = args;
       }
    }
 
    public void displayError(String...args) {
-      if (!hasError) {
+      if (errorArgs == null) {
          super.displayError(args);
-         hasError = true;
+         errorArgs = args;
       }
    }
 
    public void displayFormatatedError(String arg) {
-      if (!hasError) {
+      if (errorArgs == null) {
          super.displayFormattedError(arg);
-         hasError = true;
+         errorArgs = new Object[] {arg};
       }
    }
 
@@ -113,7 +116,7 @@ public abstract class Statement extends Definition {
 
    /** Returns true if there are errors in this node or any child node of this node */
    public boolean anyError() {
-      if (hasError)
+      if (errorArgs != null)
          return true;
 
       IBeanMapper[] props = TypeUtil.getProperties(getClass());
@@ -196,5 +199,24 @@ public abstract class Statement extends Definition {
       Statement res = (Statement) super.deepCopy(options, oldNewMap);
       res.fromStatement = this;
       return res;
+   }
+
+   public String getErrorText() {
+      if (errorArgs != null) {
+         StringBuilder sb = new StringBuilder();
+         for (Object arg:errorArgs)
+            sb.append(arg.toString());
+         sb.append(this.toString());
+         return sb.toString();
+      }
+      return null;
+   }
+
+   public void setUserData(Object v)  {
+      userData = v;
+   }
+
+   public Object getUserData() {
+      return userData;
    }
 }

@@ -25,6 +25,10 @@ public class FormattedParseNode extends ParseNode {
    }
 
    public String toString() {
+      return formatString(null, null, -1);
+   }
+
+   public String formatString(Object parSemVal, ParentParseNode parParseNode, int curChildIndex) {
       if (generated) {
          int initIndent;
 
@@ -34,7 +38,7 @@ public class FormattedParseNode extends ParseNode {
          }
          else
             initIndent = 0;
-         FormatContext ctx = new FormatContext(initIndent, getNextSemanticValue());
+         FormatContext ctx = new FormatContext(parParseNode, curChildIndex, initIndent, getNextSemanticValue(parSemVal));
          //ctx.append(FormatContext.INDENT_STR);
          format(ctx);
          return ctx.getResult().toString();

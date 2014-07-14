@@ -52,6 +52,8 @@ public class ModelUtil {
    private static Object mapClassToType(Class t, JavaModel model) {
       String name = t.getName();
       name = name.replace("$", ".");
+      if (model == null)
+         return t;
       return model.findTypeDeclaration(name, false);
    }
 

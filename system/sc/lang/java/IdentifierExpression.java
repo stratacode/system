@@ -9,7 +9,7 @@ import sc.bind.ConstantBinding;
 import sc.classfile.CFClass;
 import sc.dyn.DynUtil;
 import sc.dyn.IDynObject;
-import sc.lang.ILanguageModel;
+import sc.lang.*;
 import sc.lang.js.JSRuntimeProcessor;
 import sc.lang.js.JSUtil;
 import sc.lang.sc.PropertyAssignment;
@@ -25,9 +25,6 @@ import sc.util.PerfMon;
 import sc.util.StringUtil;
 import sc.bind.BindingDirection;
 import sc.bind.IBinding;
-import sc.lang.DynObject;
-import sc.lang.ISemanticNode;
-import sc.lang.SemanticNodeList;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -37,8 +34,9 @@ public class IdentifierExpression extends ArgumentsExpression {
    public List<IString> identifiers;
    public NewExpression innerCreator;
 
+
    // One identifier type in each slot of the idTypes array.  This corresponds to one element in the "a.b" expression
-   enum IdentifierType {
+   public enum IdentifierType {
       BoundName,        // Used in interprete mode - referencedObject is "the" value to return
       PackageName,      // This identifier is a component in a package name.  Preceded either BoundType or BoundObjectName
       BoundTypeName,    // This slot refers to an actual type - referencedObject is either a type declaration or class.
@@ -220,7 +218,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                if (boundTypes[0] == null) {
                   checkRemoteMethod(this, null, firstIdentifier, 0, idTypes, boundTypes, arguments);
                }
-               if (boundTypes[0] == null && !model.disableTypeErrors) {
+               if (boundTypes[0] == null && model != null && !model.disableTypeErrors) {
                   String otherMethods = enclType == null ? "" : getOtherMethodsMessage(enclType, firstIdentifier);
                   displayTypeError("No method named: ", firstIdentifier, ModelUtil.argumentsToString(arguments), otherMethods, " for: ");
                   foundMeth = findMethod(firstIdentifier, arguments, this, enclType);
@@ -691,6 +689,10 @@ public class IdentifierExpression extends ArgumentsExpression {
       return null;
    }
 
+   public Object getBoundType(int ix) {
+      return boundTypes == null || boundTypes.length <= ix ? null : boundTypes[ix];
+   }
+
    /** Returns true for a static field or method at the specific location in the indentifiers list */
    private boolean isStaticTarget(int ix) {
       if (idTypes == null || idTypes[ix] == null)
@@ -847,7 +849,8 @@ public class IdentifierExpression extends ArgumentsExpression {
                   if (referenceType instanceof TypeDeclaration) {
                      TypeDeclaration toType = varDef.getEnclosingType();
                      JavaModel toModel = toType.getJavaModel();
-                     toModel.addBindDependency(toType, propertyName, fromModel.getModelTypeDeclaration(), referenceOnly);
+                     if (toModel != null)
+                        toModel.addBindDependency(toType, propertyName, fromModel.getModelTypeDeclaration(), referenceOnly);
                   }
                   else if (referenceType != null)
                      System.err.println("*** Compiled type used to inject binding dependency?");

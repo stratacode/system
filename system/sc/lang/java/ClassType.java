@@ -27,6 +27,7 @@ public class ClassType extends JavaType {
    transient Object runtimeClass;
    transient Object type;
    private transient String compiledTypeName;
+   transient Object[] errorArgs;
 
    private final static Object FAILED_TO_INIT_SENTINEL = "Invalid type sentinel";
 
@@ -297,8 +298,14 @@ public class ClassType extends JavaType {
       return typeArgs.get(ix);
    }
 
+   public void displayError(String...args) {
+      errorArgs = args;
+      super.displayError(args);
+   }
+
    public void displayTypeError(String...args) {
       Statement st;
+      errorArgs = args;
       if ((st = getEnclosingStatement()) != null)
          st.displayTypeError(args);
       else
@@ -751,5 +758,16 @@ public class ClassType extends JavaType {
          setProperty("chainedTypes", value);
       }
       return false;
+   }
+
+   public String getErrorText() {
+      if (errorArgs != null) {
+         StringBuilder sb = new StringBuilder();
+         for (Object arg:errorArgs)
+            sb.append(arg.toString());
+         sb.append(this.toString());
+         return sb.toString();
+      }
+      return null;
    }
 }
