@@ -737,4 +737,8 @@ public class ParseUtil  {
       }
       return sb.toString();
    }
+
+   public static boolean isCollapsibleNode(Object currentParent) {
+      return currentParent instanceof JavaSemanticNode && ((JavaSemanticNode) currentParent).isCollapsibleNode();
+   }
 }

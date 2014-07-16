@@ -35,7 +35,24 @@ public class FormatContext {
 
    private Object nextValue;
 
-   public FormatContext(ParentParseNode curParent, int curChildIndex, int initIndent, Object lastNextValue) {
+   public FormatContext(ParentParseNode curParent, int curChildIndex, int initIndent, Object lastNextValue, Object curSemVal) {
+      // If the semantic value is the node above the curParent parse node, we add it first
+      // This is a bit of a hack because it only gives us one more level... we could try to find the path to the curParent if there's
+      // a case where that's needed and add all of the levels in between.
+      if (curSemVal instanceof ISemanticNode) {
+         Object parseNode = ((ISemanticNode) curSemVal).getParseNode();
+         if (parseNode != curParent && parseNode instanceof ParentParseNode) {
+            ParentParseNode pp = (ParentParseNode) parseNode;
+            int curValIndex;
+            if (pp.children != null && (curValIndex = pp.children.indexOf(curParent)) != -1) {
+               Entry ent = new Entry();
+               ent.currentIndex = curValIndex;
+               ent.parent = pp;
+               pendingParents.add(ent);
+            }
+         }
+      }
+      // Then add the current parent
       if (curParent != null) {
          Entry ent = new Entry();
          ent.currentIndex = curChildIndex;

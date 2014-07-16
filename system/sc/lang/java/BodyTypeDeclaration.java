@@ -1082,8 +1082,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          SemanticNodeList<Statement> theBody = i == 0 ? body : hiddenBody;
          if (theBody != null && !skipBody)
             for (Statement s:theBody) {
-               if (s instanceof TypeDeclaration && ((TypeDeclaration) s).typeName.equals(name)) {
-                  return s;
+               if (s instanceof TypeDeclaration) {
+                  TypeDeclaration st = (TypeDeclaration) s;
+                  if (st.typeName == null)
+                     System.out.println("*** Error - missing type name");
+                  else if (st.typeName.equals(name)) {
+                     return s;
+                  }
                }
                // Check for transformed inner types - make sure to exclude the outer type's name.
                /*
@@ -1766,7 +1771,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public Object findTypeDeclaration(String typeName, boolean addExternalReference) {
-      return getJavaModel().findTypeDeclaration(typeName, addExternalReference);
+      JavaModel model = getJavaModel();
+      if (model != null)
+         return model.findTypeDeclaration(typeName, addExternalReference);
+      return null;
    }
 
    public LayeredSystem getLayeredSystem() {
@@ -3188,9 +3196,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             Thread.currentThread().setContextClassLoader(sysLoader);
          }
          else {
-            if (sys.options.verbose)
-               System.out.println("Updating system class loader for thread: " + Thread.currentThread().getName());
-            sys.setSystemClassLoader(ctxLoader);
+            sys.setAutoSystemClassLoader(ctxLoader);
          }
       }
 

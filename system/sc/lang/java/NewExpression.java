@@ -63,9 +63,11 @@ public class NewExpression extends IdentifierExpression {
    public void initialize() {
       if (initialized) return;
 
+      LayeredSystem sys = getLayeredSystem();
+
       // First assign the anonId before we get into things so that if any children start creating anonymous types which
       // ends up copying around NewExpressions, we have a consistnt anonId for the original and the copy.
-      if (anonId == -1 && classBody != null && getLayeredSystem().getNeedsAnonymousConversion()) {
+      if (anonId == -1 && classBody != null && sys != null && sys.getNeedsAnonymousConversion()) {
          BodyTypeDeclaration enclType = getEnclosingType();
          if (enclType != null) {
             // Need to create this up front so we can return it in getEnclosingType for any children of the class body

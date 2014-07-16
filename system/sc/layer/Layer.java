@@ -186,6 +186,9 @@ public class Layer implements ILifecycle, LayerConstants {
    /** Set to true when this layer is removed from the system */
    public boolean removed = false;
 
+   /** Set to false for layers which are not part of the running application */
+   public boolean activated = true;
+
    public List<String> excludeRuntimes = null;
    public List<String> includeRuntimes = null;
 
@@ -278,6 +281,51 @@ public class Layer implements ILifecycle, LayerConstants {
    /** Use this method to decide whether to build a given assets.  The build layer accumulates all assets but when we do intermediate builds, we only include the layers which are directly in the extension graph. */
    public boolean buildsLayer(Layer layer) {
       return this == layeredSystem.buildLayer || this == layer || extendsLayer(layer);
+   }
+
+   public SrcEntry getInheritedSrcFileFromTypeName(String typeName, boolean srcOnly, boolean prependPackage, String subPath) {
+      SrcEntry res = getSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath);
+      if (res != null)
+         return res;
+      if (baseLayers != null) {
+         for (Layer base:baseLayers) {
+            res = base.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath);
+            if (res != null)
+               return res;
+         }
+      }
+      return null;
+   }
+
+   public SrcEntry getSrcFileFromTypeName(String typeName, boolean srcOnly, boolean prependPackage, String subPath) {
+      String packagePrefix = prependPackage ? this.packagePrefix : null;
+      String relFilePath = subPath;
+      if (packagePrefix != null /*&& packagePrefix.length() < relFilePath.length()*/) {
+         if (!typeName.startsWith(packagePrefix))
+            return null;
+
+         // If this layer has a prefix
+         if (packagePrefix.length() > 0) {
+
+            // Too short to be a valid name in this namespace
+            if (relFilePath.length() <= packagePrefix.length())
+               return null;
+
+            // Convert from absolute to relative names for this layer
+            relFilePath = relFilePath.substring(packagePrefix.length()+1);
+         }
+      }
+
+      SrcEntry srcEnt = findSrcEntry(relFilePath, prependPackage);
+      if (srcEnt != null)
+         return srcEnt;
+      else if (!srcOnly) {
+         relFilePath = subPath + ".class";
+         File res = findClassFile(relFilePath, false);
+         if (res != null)
+            return new SrcEntry(this, res.getPath(), relFilePath, prependPackage);
+      }
+      return null;
    }
 
    public enum RuntimeEnabledState {
@@ -462,6 +510,25 @@ public class Layer implements ILifecycle, LayerConstants {
       if (layeredSystem.layeredClassPaths && dynamic)
          buildLayer = true;
 
+      // Create a map from class name to the full imported name
+      if (imports != null) {
+         importsByName = new HashMap<String,ImportDeclaration>();
+         for (ImportDeclaration imp:imports) {
+            if (!imp.staticImport) {
+               String impStr = imp.identifier;
+               String className = CTypeUtil.getClassName(impStr);
+               if (className.equals("*")) {
+                  String pkgName = CTypeUtil.getPackageName(impStr);
+                  if (globalPackages == null)
+                     globalPackages = new ArrayList<String>();
+                  globalPackages.add(pkgName);
+               }
+               else {
+                  importsByName.put(className, imp);
+               }
+            }
+         }
+      }
    }
 
    public String getDefaultBuildDir() {
@@ -720,25 +787,6 @@ public class Layer implements ILifecycle, LayerConstants {
       else {
          String [] srcList = srcPath.split(FileUtil.PATH_SEPARATOR);
          topLevelSrcDirs = Arrays.asList(srcList);
-      }
-      // Create a map from class name to the full imported name
-      if (imports != null) {
-         importsByName = new HashMap<String,ImportDeclaration>();
-         for (ImportDeclaration imp:imports) {
-            if (!imp.staticImport) {
-               String impStr = imp.identifier;
-               String className = CTypeUtil.getClassName(impStr);
-               if (className.equals("*")) {
-                  String pkgName = CTypeUtil.getPackageName(impStr);
-                  if (globalPackages == null)
-                     globalPackages = new ArrayList<String>();
-                  globalPackages.add(pkgName);
-               }
-               else {
-                  importsByName.put(className, imp);
-               }
-            }
-         }
       }
       if (excludedFiles != null) {
          excludedPatterns = new ArrayList<Pattern>(excludedFiles.size());
@@ -1244,6 +1292,8 @@ public class Layer implements ILifecycle, LayerConstants {
    }
 
    public File findSrcFile(String srcName) {
+      if (!isStarted())
+         ParseUtil.realInitAndStartComponent(this);
       return srcDirCache.get(srcName);
    }
 
@@ -1478,13 +1528,26 @@ public class Layer implements ILifecycle, LayerConstants {
       return getCFClass(classFileName);
    }
 
-   public ImportDeclaration getImportDecl(String name) {
+   public ImportDeclaration getImportDecl(String name, boolean checkBaseLayers) {
       if (importsByName == null)
          return null;
       ImportDeclaration res = importsByName.get(name);
       if (res != null)
          return res;
+      if (checkBaseLayers && baseLayers != null) {
+         for (Layer base:baseLayers) {
+            if (base.exportImportsTo(this)) {
+               ImportDeclaration baseRes = base.getImportDecl(name, true);
+               if (baseRes != null)
+                  return baseRes;
+            }
+         }
+      }
       return null;
+   }
+
+   public boolean exportImportsTo(Layer refLayer) {
+      return exportImports && (refLayer == null || refLayer == this || refLayer.useGlobalImports || refLayer.extendsLayer(this));
    }
 
    public void findMatchingGlobalNames(String prefix, Set<String> candidates) {
@@ -2244,5 +2307,54 @@ public class Layer implements ILifecycle, LayerConstants {
       return null;
    }
 
+   public SrcEntry getSrcFileFromRelativeTypeName(String relDir, String subPath, String pkgPrefix, boolean srcOnly, boolean checkBaseLayers) {
+      String relFilePath = relDir == null ? subPath : FileUtil.concat(relDir, subPath);
+      boolean packageMatches;
+
+      if (packagePrefix.length() > 0) {
+         if (pkgPrefix == null || !pkgPrefix.startsWith(packagePrefix)) {
+            relFilePath = subPath; // go back to non-prefixed version
+            packageMatches = false;
+         }
+         else {
+            relFilePath = relFilePath.substring(packagePrefix.length() + 1);
+            packageMatches = true;
+         }
+      }
+      else
+         packageMatches = true;
+
+      File res = findSrcFile(relFilePath);
+      LayeredSystem sys = getLayeredSystem();
+      if (res != null) {
+         String path = res.getPath();
+         IFileProcessor proc = sys.getFileProcessorForFileName(path, this, BuildPhase.Process);
+         // Some file types (i.e. web.xml, vdoc) do not prepend the package.  We still want to look up these
+         // types by their name in the layer path tree, but only return them if the type name should match
+         // If the package happens to match, it is also a viable match
+         if ((proc == null && packageMatches) || proc.getPrependLayerPackage() == packageMatches || packageMatches) {
+            SrcEntry ent = new SrcEntry(this, path, relFilePath + "." + FileUtil.getExtension(path));
+            ent.prependPackage = proc.getPrependLayerPackage();
+            return ent;
+         }
+      }
+      else if (!srcOnly && packageMatches) {
+         relFilePath = subPath + ".class";
+         res = findClassFile(relFilePath, false);
+         if (res != null)
+            return new SrcEntry(this, res.getPath(), relFilePath);
+      }
+
+      if (checkBaseLayers) {
+         if (baseLayers != null) {
+            for (Layer baseLayer:baseLayers) {
+               SrcEntry baseEnt = baseLayer.getSrcFileFromRelativeTypeName(relDir, subPath, pkgPrefix, srcOnly, true);
+               if (baseEnt != null)
+                  return baseEnt;
+            }
+         }
+      }
+      return null;
+   }
 }
 

@@ -236,7 +236,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       // Need to start the extends type as we need to dig into it
       Object extendsTypeDecl = extendsType.getTypeDeclaration();
       if (extendsTypeDecl == null)
-         displayTypeError("Implemented class not found: ", extendsType.getFullTypeName(), " for ");
+         extendsType.displayTypeError("Implemented class not found: ", extendsType.getFullTypeName(), " for ");
       return extendsTypeDecl;
    }
 
@@ -702,7 +702,8 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       assert isClassOrObjectType();
 
       Layer lyr = getLayer();
-      if (lyr != null && lyr.getLayeredSystem().buildLayer.compiled && !referenceOnly) {
+      LayeredSystem sys = lyr != null ? lyr.getLayeredSystem() : null;
+      if (sys != null && sys.buildLayer != null && sys.buildLayer.compiled && !referenceOnly) {
          Object field;
          // First check if the model has a known bindable property.  If this is a dynamic type, all sets should throw the property change even through the wrapper.  Not entirely sure
          // May need to also mark this property as a dynamic property though?  Or do we need a new type of dynamic property which just wraps data binding around the setX method of the
@@ -712,7 +713,6 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
             // If not, we want to still check the compiled definition.  That's cause we physically add get/set methods
             // to make properties bindable - so they are not in the TypeDeclaration.
             Class rtClass = getCompiledClass();
-            LayeredSystem sys = getJavaModel().layeredSystem;
             if (rtClass != null) {
                Object rtField = PTypeUtil.getPropertyMapping(rtClass, propertyName);
                if (rtField == null || !ModelUtil.isBindable(rtField)) {

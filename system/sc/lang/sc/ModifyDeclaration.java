@@ -350,8 +350,16 @@ public class ModifyDeclaration extends TypeDeclaration {
                      modifyClass = obj.getClass();
                      isLayerType = true;
                   }
+                  // Not an active layer but maybe an inactive one?
                   else {
-                     if (!thisModel.temporary)
+                     if (thisModel.isLayerModel) {
+                        isLayerType = true;
+                        obj = getLayeredSystem().lookupInactiveLayer(fullTypeName);
+                        if (obj != null) {
+                           modifyClass = obj.getClass();
+                        }
+                     }
+                     else if (!thisModel.temporary)
                         displayError("Layer definition file: " + thisModel.getSrcFile() + " has: " + fullTypeName + " expected: " + thisModel.getSrcFile().layer.layerDirName + ": ");
                   }
                }

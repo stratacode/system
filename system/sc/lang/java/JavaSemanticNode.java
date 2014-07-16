@@ -256,6 +256,21 @@ public abstract class JavaSemanticNode extends SemanticNode {
       return null;
    }
 
+   /** Like the regular getEnclosingType but does not try to initialize an anonymous type from a new expression */
+   public BodyTypeDeclaration getStructuralEnclosingType() {
+      for (ISemanticNode pnode = parentNode; pnode != null; pnode = pnode.getParentNode()) {
+         if (pnode instanceof TypeDeclaration) {
+            TypeDeclaration td = (TypeDeclaration) pnode;
+            // Skip TemplateDeclarations which are not real
+            if (td.isRealType())
+               return (TypeDeclaration) pnode;
+            else
+               return td.getEnclosingType();
+         }
+      }
+      return null;
+   }
+
    public TypeDeclaration getEnclosingType() {
       for (ISemanticNode pnode = parentNode; pnode != null; pnode = pnode.getParentNode()) {
          if (pnode instanceof TypeDeclaration) {
@@ -504,4 +519,9 @@ public abstract class JavaSemanticNode extends SemanticNode {
       }
       return null;
    }
+
+   public boolean isCollapsibleNode() {
+      return false;
+   }
+
 }

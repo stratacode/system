@@ -117,4 +117,8 @@ public class SrcEntry {
    public boolean isZip() {
       return false;
    }
+
+   public boolean isLayerFile() {
+      return relFileName != null && layer != null && relFileName.equals(layer.layerBaseName);
+   }
 }

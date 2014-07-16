@@ -291,6 +291,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public boolean disableCommandLineErrors = false;
 
+   /** Should we pick up the current class loader from the dynamic type system or used a fixed class loader (like in the plugin environment) */
+   private boolean autoClassLoader = true;
+
    public boolean isErrorViewed(String error) {
       if (disableCommandLineErrors)
          return true;
@@ -310,7 +313,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       return true;
    }
-
 
    public enum BuildCommandTypes {
       Pre, Post, Run, Test
@@ -347,6 +349,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    // The globally scoped objects which have been defined.
    Map<String,Object> globalObjects = new HashMap<String,Object>();
+
+   // Index for layers which are not part of the actively executing layers list
+   Map<String,Object> inactiveLayers = new HashMap<String,Object>();
 
    // Global dependencies - used to store things like jar files, the set of mains, the set of tests, etc.
    public BuildInfo buildInfo;
@@ -3892,6 +3897,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
          ParseUtil.initComponent(layer);
       }
+      else {
+         registerInactiveLayer(layer);
+      }
 
       return layer;
    }
@@ -3924,6 +3932,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       if (newLayers != null)
          newLayers.add(layer);
+   }
+
+   public void registerInactiveLayer(Layer layer) {
+      inactiveLayers.put(layer.layerUniqueName, layer);
+   }
+
+   public Object lookupInactiveLayer(String fullTypeName) {
+      return inactiveLayers.get(fullTypeName);
    }
 
    public void deregisterLayer(Layer layer, boolean removeFromSpecified) {
@@ -6080,6 +6096,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       systemClassLoader = loader;
    }
 
+   public void setFixedSystemClassLoader(ClassLoader loader) {
+      autoClassLoader = false;
+      setSystemClassLoader(loader);
+   }
+
+   public void setAutoSystemClassLoader(ClassLoader loader) {
+      if (autoClassLoader) {
+         if (options.verbose)
+            System.out.println("Updating auto system class loader for thread: " + Thread.currentThread().getName());
+
+         setSystemClassLoader(loader);
+      }
+   }
+
    public IBeanMapper getConstantPropertyMapping(Object type, String dstPropName) {
       return ModelUtil.getConstantPropertyMapping(type, dstPropName);
    }
@@ -6425,7 +6455,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Object parseSrcFile(SrcEntry srcEnt, boolean reportErrors) {
-      return parseSrcFile(srcEnt, false, true, false, reportErrors);
+      return parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, reportErrors);
    }
 
    /**
@@ -6450,7 +6480,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             res.addSrcFile(srcEnt);
 
             if (res instanceof ILanguageModel)
-               initModel(srcEnt.layer, modTimeStart, (ILanguageModel) res, false, false);
+               initModel(srcEnt.layer, modTimeStart, (ILanguageModel) res, srcEnt.isLayerFile(), false);
 
             return res;
          }
@@ -7451,8 +7481,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return buildLayer != null && !buildLayer.isDynamicType(typeName) && getUseCompiledForFinal() && changedModels.get(typeName) == null && isCompiledFinalLayerType(typeName);
    }
 
-   /** This is an optimization on top of getSrcTypeDeclaration - if the model is not changed and we are not going from a layer use the compiled version */
    public Object getTypeForCompile(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden, boolean srcOnly) {
+      return getTypeForCompile(typeName, fromLayer, prependPackage, notHidden, srcOnly, null);
+   }
+
+   /** This is an optimization on top of getSrcTypeDeclaration - if the model is not changed and we are not going from a layer use the compiled version */
+   public Object getTypeForCompile(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden, boolean srcOnly, Layer refLayer) {
       if (getUseCompiledForFinal() && fromLayer == null) {
          // First if we've loaded the src we need to return that.
          TypeDeclaration decl = getCachedTypeDeclaration(typeName, null, null, true, false);
@@ -7467,7 +7501,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (cl != null)
             return cl;
       }
-      return getSrcTypeDeclaration(typeName, fromLayer, prependPackage, notHidden, srcOnly);
+      return getSrcTypeDeclaration(typeName, fromLayer, prependPackage, notHidden, srcOnly, refLayer);
    }
 
    public static int nestLevel = 0;
@@ -7477,7 +7511,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public TypeDeclaration getSrcTypeDeclaration(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden) {
-      return (TypeDeclaration) getSrcTypeDeclaration(typeName, fromLayer, prependPackage, notHidden, true);
+      return (TypeDeclaration) getSrcTypeDeclaration(typeName, fromLayer, prependPackage, notHidden, true, null);
+   }
+
+   public TypeDeclaration getSrcTypeDeclaration(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden, boolean srcOnly) {
+      return (TypeDeclaration) getSrcTypeDeclaration(typeName, fromLayer, prependPackage, notHidden, srcOnly, null);
    }
 
    /** Retrieves a type declaration, usually the source definition with a given type name.  If fromLayer != null, it retrieves only types
@@ -7488,7 +7526,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     *
     * The srcOnly flag is true if you need a TypeDeclaration - and cannot deal with a final class.
     */
-   public Object getSrcTypeDeclaration(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden, boolean srcOnly) {
+   public Object getSrcTypeDeclaration(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden, boolean srcOnly, Layer refLayer) {
       TypeDeclaration decl = getCachedTypeDeclaration(typeName, fromLayer, null, true, false);
       SrcEntry srcFile = null;
       if (decl != null) {
@@ -7511,7 +7549,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (srcFile == null)
-         srcFile = getSrcFileFromTypeName(typeName, true, fromLayer, prependPackage, null);
+         srcFile = getSrcFileFromTypeName(typeName, true, fromLayer, prependPackage, null, refLayer);
 
       if (srcFile != null) {
          // When notHidden is set, we do not load types which are in hidden layers
@@ -7869,9 +7907,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
-   public Object getRelativeTypeDeclaration(String typeName, String packagePrefix, Layer fromLayer, boolean prependPackage) {
+   public Object getRelativeTypeDeclaration(String typeName, String packagePrefix, Layer fromLayer, boolean prependPackage, Layer refLayer) {
       // TODO: Should we first be trying packagePrefix+typeName in the global cache?
-      SrcEntry srcFile = getSrcFileFromRelativeTypeName(typeName, packagePrefix, true, fromLayer, prependPackage);
+      SrcEntry srcFile = getSrcFileFromRelativeTypeName(typeName, packagePrefix, true, fromLayer, prependPackage, refLayer);
       
       if (srcFile != null) {
          // When prependLayerPackage is false, lookup the type without the layer's package (e.g. doc/util.vdoc)
@@ -7899,7 +7937,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             TypeDeclaration loadedModelType = loading.getModelTypeDeclaration();
             if (loadedModelType != null)
                return loadedModelType;
-            return getRelativeTypeDeclaration(typeName, packagePrefix, srcFile.layer, prependPackage);
+            return getRelativeTypeDeclaration(typeName, packagePrefix, srcFile.layer, prependPackage, refLayer);
          }
 
          TypeDeclarationCacheEntry decls;
@@ -7923,21 +7961,24 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    /** Auto imports are resolved by searching through the layer hierarchy from the layer which originates the reference */
    public ImportDeclaration getImportDecl(Layer fromLayer, Layer refLayer, String typeName) {
+      if (refLayer != null && !refLayer.activated) {
+         return refLayer.getImportDecl(typeName, true);
+      }
       if (refLayer == null || refLayer.inheritImports) {
          int startIx = fromLayer == null ? layers.size() - 1 : fromLayer.getLayerPosition();
          ImportDeclaration importDecl = null;
          for (int i = startIx; i >= 0; i--) {
             Layer depLayer = layers.get(i);
             // We only inherit imports from a layer which we directly extend.
-            if (depLayer.exportImports && (refLayer == null || refLayer == depLayer || refLayer.useGlobalImports || refLayer.extendsLayer(depLayer)))
-               importDecl = depLayer.getImportDecl(typeName);
+            if (depLayer.exportImportsTo(refLayer))
+               importDecl = depLayer.getImportDecl(typeName, false);
             if (importDecl != null)
                return importDecl;
          }
       }
       // When inheritImports is false, we only use this layer's imports and don't allow overriding of imports
       else {
-         return refLayer.getImportDecl(typeName);
+         return refLayer.getImportDecl(typeName, false);
       }
 
       return globalImports.get(typeName);
@@ -8006,15 +8047,23 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return decls.autoImports;
    }
 
+   public SrcEntry getSrcFileFromTypeName(String typeName, boolean srcOnly, Layer fromLayer, boolean prependPackage, String suffix) {
+      return getSrcFileFromTypeName(typeName, srcOnly, fromLayer, prependPackage, suffix, null);
+   }
+
    /**
     * Returns the Java file that defines this type.  If srcOnly is false, it will also look for the file
     * which defines the class if no Java file is found.  You can use that mode to get the file which
     * defines the type for dependency purposes.
     */
-   public SrcEntry getSrcFileFromTypeName(String typeName, boolean srcOnly, Layer fromLayer, boolean prependPackage, String suffix) {
+   public SrcEntry getSrcFileFromTypeName(String typeName, boolean srcOnly, Layer fromLayer, boolean prependPackage, String suffix, Layer refLayer) {
       String subPath = typeName.replace(".", FileUtil.FILE_SEPARATOR);
       if (suffix != null)
          subPath = FileUtil.addExtension(subPath, suffix);
+
+      if (refLayer != null && !refLayer.activated) {
+         return refLayer.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath);
+      }
 
       // In general we search from most recent to original
       int startIx = layers.size() - 1;
@@ -8025,33 +8074,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       for (int i = startIx; i >= 0; i--) {
          Layer layer = layers.get(i);
 
-         String packagePrefix = prependPackage ? layer.packagePrefix : null;
-         String relFilePath = subPath;
-         if (packagePrefix != null /*&& packagePrefix.length() < relFilePath.length()*/) {
-            if (!typeName.startsWith(packagePrefix))
-               continue;
-
-            // If this layer has a prefix
-            if (packagePrefix.length() > 0) {
-
-               // Too short to be a valid name in this namespace
-               if (relFilePath.length() <= packagePrefix.length())
-                  continue;
-
-               // Convert from absolute to relative names for this layer
-               relFilePath = relFilePath.substring(packagePrefix.length()+1);
-            }
-         }
-
-         SrcEntry srcEnt = layer.findSrcEntry(relFilePath, prependPackage);
-         if (srcEnt != null)
-            return srcEnt;
-         else if (!srcOnly) {
-            relFilePath = subPath + ".class";
-            File res = layer.findClassFile(relFilePath, false);
-            if (res != null)
-               return new SrcEntry(layer, res.getPath(), relFilePath, prependPackage);
-         }
+         SrcEntry res = layer.getSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath);
+         if (res != null)
+            return res;
       }
       return null;
    }
@@ -8061,9 +8086,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * which defines the class if no Java file is found.  You can use that mode to get the file which
     * defines the type for dependency purposes.
     */
-   public SrcEntry getSrcFileFromRelativeTypeName(String typeName, String packagePrefix, boolean srcOnly, Layer fromLayer, boolean prependPackage) {
+   public SrcEntry getSrcFileFromRelativeTypeName(String typeName, String packagePrefix, boolean srcOnly, Layer fromLayer, boolean prependPackage, Layer refLayer) {
       String relDir = packagePrefix != null ? packagePrefix.replace(".", FileUtil.FILE_SEPARATOR) : null;
       String subPath = typeName.replace(".", FileUtil.FILE_SEPARATOR);
+
+      if (refLayer != null && !refLayer.activated) {
+         SrcEntry srcEnt = refLayer.getSrcFileFromRelativeTypeName(relDir, subPath, packagePrefix, srcOnly, true);
+         if (srcEnt != null)
+            return srcEnt;
+      }
 
       // In general we search from most recent to original
       int startIx = layers.size() - 1;
@@ -8071,45 +8102,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // Only look at layers which precede the supplied layer
       if (fromLayer != null)
          startIx = fromLayer.layerPosition - 1;
-      boolean packageMatches;
       for (int i = startIx; i >= 0; i--) {
          Layer layer = layers.get(i);
 
-         String relFilePath = relDir == null ? subPath : FileUtil.concat(relDir, subPath);
-
-         if (layer.packagePrefix.length() > 0) {
-            if (packagePrefix == null || !packagePrefix.startsWith(layer.packagePrefix)) {
-               relFilePath = subPath; // go back to non-prefixed version
-               packageMatches = false;
-            }
-            else {
-               relFilePath = relFilePath.substring(layer.packagePrefix.length() + 1);
-               packageMatches = true;
-            }
-         }
-         else
-            packageMatches = true;
-
-         File res = layer.findSrcFile(relFilePath);
-         if (res != null) {
-            String path = res.getPath();
-            String fileName = FileUtil.getFileName(path);
-            IFileProcessor proc = getFileProcessorForFileName(path, layer, BuildPhase.Process);
-            // Some file types (i.e. web.xml, vdoc) do not prepend the package.  We still want to look up these
-            // types by their name in the layer path tree, but only return them if the type name should match
-            // If the package happens to match, it is also a viable match
-            if ((proc == null && packageMatches) || proc.getPrependLayerPackage() == packageMatches || packageMatches) {
-               SrcEntry ent = new SrcEntry(layer, path, relFilePath + "." + FileUtil.getExtension(path));
-               ent.prependPackage = proc.getPrependLayerPackage();
-               return ent;
-            }
-         }
-         else if (!srcOnly && packageMatches) {
-            relFilePath = subPath + ".class";
-            res = layer.findClassFile(relFilePath, false);
-            if (res != null)
-               return new SrcEntry(layer, res.getPath(), relFilePath);
-         }
+         SrcEntry layerEnt = layer.getSrcFileFromRelativeTypeName(relDir, subPath, packagePrefix, srcOnly, false);
+         if (layerEnt != null)
+            return layerEnt;
       }
       return null;
    }
@@ -8541,7 +8539,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       TypeDeclaration modelType = model.getModelTypeDeclaration();
       if (modelType == null) {
-         throw new IllegalArgumentException("Layer definition: " + defFile + " did not define type: " + expectedName);
+         model.displayError("Layer definition: " + defFile + " did not define type: " + expectedName);
       }
 
       // Layer models behave a little differently in terms of how they are initialized so mark this up front
@@ -8568,6 +8566,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // There's a layer definition file that cannot be parsed - just create a stub layer that represents that file
          if (!lpi.activate && defFile.canRead()) {
             Layer stubLayer = new Layer();
+            stubLayer.activated = false;
             stubLayer.layeredSystem = this;
             stubLayer.layerPathName = expectedName;
             //stubLayer.layerBaseName = ...
@@ -8577,6 +8576,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return null;
       }
       TypeDeclaration modelType = model.getModelTypeDeclaration();
+      if (modelType == null) {
+         // Just fill in a stub if one can't be created
+         modelType = new ModifyDeclaration();
+         modelType.typeName = expectedName;
+         modelType.isLayerType = true;
+      }
 
       String prefix = model.getPackagePrefix();
 
@@ -8717,6 +8722,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       try {
          Layer layer = ((ModifyDeclaration)decl).createLayerInstance(prefix, inheritedPrefix);
 
+         layer.activated = lpi.activate;
          layer.imports = model.getImports();
          layer.initFailed = initFailed;
          layer.model = model;
@@ -8744,6 +8750,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       catch (RuntimeException exc) {
          if (!lpi.activate) {
             Layer stubLayer = new Layer();
+            stubLayer.activated = false;
             stubLayer.layeredSystem = this;
             stubLayer.layerPathName = expectedName;
             //stubLayer.layerBaseName = ...
@@ -9661,7 +9668,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                            // TODO: validate that we found this layer under the right root?
                            return new SrcEntry(layer, pathName, fileName);
                         }
-                        layerAndFileName = nextPart;
+                        layerAndFileName = fileName;
                      }
                      else
                         break;
@@ -9673,4 +9680,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       System.err.println("*** Warning - unable to find layer for path name: " + pathName);
       return new SrcEntry(null, pathName, FileUtil.getFileName(pathName));
    }
+
+
 }

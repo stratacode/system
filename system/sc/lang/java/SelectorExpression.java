@@ -108,8 +108,13 @@ public class SelectorExpression extends ChainedExpression {
                      referenceType = expression.getTypeDeclaration();
                   else
                      referenceType = getTypeDeclaration(i-1);
-                  IdentifierExpression.makeBindable(this,
-                      vsel.identifier, idTypes[i], boundTypes[i], getTypeDeclaration(i), referenceType, !bindingDirection.doForward(), true);
+                  if (idTypes != null && boundTypes != null) {
+                     IdentifierExpression.makeBindable(this,
+                         vsel.identifier, idTypes[i], boundTypes[i], getTypeDeclaration(i), referenceType, !bindingDirection.doForward(), true);
+                  }
+                  else {
+                     System.out.println("*** Selector expression not started yet");
+                  }
                }
             }
          }

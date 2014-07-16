@@ -246,7 +246,7 @@ public class ParentParseNode extends AbstractParseNode {
          }
          else
             initIndent = 0;
-         FormatContext ctx = new FormatContext(curParseNode, curChildIndex, initIndent, getNextSemanticValue(parSemVal));
+         FormatContext ctx = new FormatContext(curParseNode, curChildIndex, initIndent, getNextSemanticValue(parSemVal), parSemVal);
          //ctx.append(FormatContext.INDENT_STR);
          PerfMon.start("format", false);
          format(ctx);
@@ -287,7 +287,7 @@ public class ParentParseNode extends AbstractParseNode {
          }
          else
             initIndent = 0;
-         FormatContext ctx = new FormatContext(null, -1, initIndent, getNextSemanticValue(null));
+         FormatContext ctx = new FormatContext(null, -1, initIndent, getNextSemanticValue(null), null);
          //ctx.append(FormatContext.INDENT_STR);
          formatStyled(ctx);
          return ctx.getResult().toString();

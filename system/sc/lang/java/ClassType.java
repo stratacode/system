@@ -703,14 +703,12 @@ public class ClassType extends JavaType {
          ModelUtil.suggestTypes(model, pkgName, leafName, candidates, false);
          int csize = candidates.size();
          if (csize > 0) {
-            /*
             HashSet<String> absCandidates = new HashSet<String>();
             for (String cand:candidates) {
                absCandidates.add(CTypeUtil.prefixPath(pkgName, cand));
             }
             candidates.clear();
             candidates.addAll(absCandidates);
-            */
             return pos;
          }
       }
@@ -769,5 +767,14 @@ public class ClassType extends JavaType {
          return sb.toString();
       }
       return null;
+   }
+
+   public boolean isCollapsibleNode() {
+      if (chainedTypes == null)
+         return true;
+      for (ClassType chained:chainedTypes)
+         if (chained.typeArguments != null)
+            return false;
+      return true;
    }
 }

@@ -1203,7 +1203,7 @@ public class EditorContext extends ClientEditorContext {
             semValue = ((SemanticNodeList) semValue).getParentNode();
          if (semValue instanceof JavaSemanticNode) {
             JavaSemanticNode javaNode = (JavaSemanticNode) semValue;
-            BodyTypeDeclaration enclFragmentType = javaNode.getEnclosingType();
+            BodyTypeDeclaration enclFragmentType = javaNode.getStructuralEnclosingType();
             // This is the type name of the parsed fragment.  Convert it to the real type before we use it in the
             // completion process
             String typeName = fileModel.getModelTypeName();

@@ -25,7 +25,7 @@ import sc.parser.*;
 import java.io.*;
 import java.util.*;
 
-public class JavaModel extends JavaSemanticNode implements ILanguageModel, INameContext, IChangeable {
+public class JavaModel extends JavaSemanticNode implements ILanguageModel, INameContext, IChangeable, IUserDataNode {
    public Package packageDef;
    public SemanticNodeList<ImportDeclaration> imports;
    public SemanticNodeList<TypeDeclaration> types;  // populated from grammar
@@ -51,6 +51,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    transient Map<String,TypeParameter> typeParameters = new HashMap<String,TypeParameter>();
 
    transient public LayeredSystem layeredSystem;
+
+   transient Object userData;
 
    @Constant
    transient public Layer layer;
@@ -567,7 +569,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       // Need to check relative references in this package before we do the imports cause that's
       // how Java does it.
       if (sys != null && !skipSrc) {
-         td = sys.getRelativeTypeDeclaration(typeName, getPackagePrefix(), null, prependLayerPackage);
+         td = sys.getRelativeTypeDeclaration(typeName, getPackagePrefix(), null, prependLayerPackage, layer);
       }
 
       boolean imported;
@@ -607,11 +609,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (layeredSystem != null) {
          // Look for a name relative to this path prefix
          if (importedName != typeName && !skipSrc) // intending to use != here to avoid the equals method
-            td = layeredSystem.getRelativeTypeDeclaration(importedName, getPackagePrefix(), null, true);
+            td = layeredSystem.getRelativeTypeDeclaration(importedName, getPackagePrefix(), null, true, layer);
          if (td == null) {
             if (!skipSrc) {
                // Look for an absolute name in both source and class form
-               td = layeredSystem.getTypeForCompile(importedName, null, true, false, srcOnly);
+               td = layeredSystem.getTypeForCompile(importedName, null, true, false, srcOnly, layer);
 
                // Check for the inner class source def before looking for compiled definitions
                if (td == null) {
@@ -636,7 +638,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                   for (String gpkg:globalTypes) {
                      String globalName = CTypeUtil.prefixPath(gpkg, typeName);
                      if (!skipSrc) {
-                        if ((td = layeredSystem.getTypeForCompile(globalName, null, true, false, srcOnly)) != null) {
+                        if ((td = layeredSystem.getTypeForCompile(globalName, null, true, false, srcOnly, layer)) != null) {
                            typeName = globalName;
                            break;
                         }
@@ -730,6 +732,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public void addTypeDeclaration(String typeName, TypeDeclaration type) {
+      if (typeName == null)
+         return;
       if (!isLayerModel && !typeName.equals("BuildInfo") && (types == null || types.size() == 0)) {
          SrcEntry srcFile = getSrcFile();
          if (srcFile != null) {
@@ -2501,6 +2505,14 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             return true;
       }
       return false;
+   }
+
+   public void setUserData(Object v)  {
+      userData = v;
+   }
+
+   public Object getUserData() {
+      return userData;
    }
 }
 
