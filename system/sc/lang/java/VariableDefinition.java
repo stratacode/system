@@ -666,5 +666,26 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          return initializer.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
       return -1;
    }
+
+   public VariableDefinition refreshNode() {
+      JavaModel oldModel = getJavaModel();
+      if (!oldModel.removed)
+         return this; // We are still valid
+      Statement def = getDefinition();
+      if (def instanceof FieldDefinition) {
+         Object res = oldModel.layeredSystem.getSrcTypeDeclaration(getEnclosingType().getFullTypeName(), null, true,  false, false, oldModel.layer);
+         if (res instanceof BodyTypeDeclaration) {
+            Object newField = ((BodyTypeDeclaration) res).declaresMember(variableName, MemberType.FieldSet, null, null);
+            if (newField instanceof VariableDefinition)
+               return (VariableDefinition) newField;
+            displayError("Field removed ", variableName);
+         }
+      }
+      if (def instanceof VariableStatement) {
+         // Don't think we need these references outside of the file
+         return null;
+      }
+      return null;
+   }
 }
 

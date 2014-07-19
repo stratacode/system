@@ -261,6 +261,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    JLineInterpreter cmd;
 
+   public IExternalModelIndex externalModelIndex = null;
+
    /** Enable extra info in debugging why files are recompiled */
    private static boolean traceNeedsGenerate = false;
 
@@ -351,7 +353,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    Map<String,Object> globalObjects = new HashMap<String,Object>();
 
    // Index for layers which are not part of the actively executing layers list
-   Map<String,Object> inactiveLayers = new HashMap<String,Object>();
+   Map<String,Layer> inactiveLayers = new HashMap<String,Layer>();
 
    // Global dependencies - used to store things like jar files, the set of mains, the set of tests, etc.
    public BuildInfo buildInfo;
@@ -491,8 +493,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       if (!isPeer) {
          if (!systemInstalled) {
-            if (!installSystem())
-               System.exit(-1);
+            if (initLayerNames != null) {
+               // If at least one of the specified layers exist from the current directory consider this a valid layer directory
+               // and don't try to install the system.
+               for (int i = 0; i < initLayerNames.size(); i++) {
+                  String layerDefFile = findLayerDefFileInPath(initLayerNames.get(i), null, null);
+                  if (layerDefFile != null)
+                     systemInstalled = true;
+               }
+            }
+            if (!systemInstalled) {
+               if (!installSystem())
+                  System.exit(-1);
+            }
          }
       }
 
@@ -806,7 +819,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          else
             lpi.explicitDynLayers.addAll(lpi.recursiveDynLayers);
       }
-      if (initLayers(initLayerNames, null, null, dynamicByDefault, lpi, specifiedLayers) == null) {
+      List<Layer> resLayers = initLayers(initLayerNames, null, null, dynamicByDefault, lpi, specifiedLayers);
+      if (resLayers == null || resLayers.contains(null)) {
          throw new IllegalArgumentException("Can't initialize init layers: " + initLayerNames);
       }
       PerfMon.end("initLayers");
@@ -3553,11 +3567,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             buildBaseLayers = true;
 
          if (baseLayers != null) {
+            int li = 0;
             for (Layer l:baseLayers) {
                // Add any base layers that are new... probably not reached?  Doesn't initLayers already add them?
-               if (!layers.contains(l)) {
+               if (l != null && !layers.contains(l)) {
                   addLayer(l, null, false, false, false, false, false);
                }
+               else {
+                  System.err.println("*** No base layer: " + layer.baseLayerNames.get(li));
+               }
+               li++;
             }
          }
       }
@@ -3662,10 +3681,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       try {
          for (String layerName:layerNames) {
             Layer l = initLayer(layerName, relDir, relPath, markDynamic, lpi);
-            if (l == null)
-               return null;
             layers.add(l);
-            if (specified && !specifiedLayers.contains(l))
+            if (specified && !specifiedLayers.contains(l) && l != null)
                specifiedLayers.add(l);
          }
       }
@@ -3681,9 +3698,23 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return findLayer(relDir == null ? "." : relDir, layerPathName, relDir, relPath, markDynamic, lpi);
 
       for (File pathDir:layerPathDirs) {
-         Layer l = findLayer(pathDir.getPath(), layerPathName, relDir, relPath, markDynamic, lpi);
+         Layer l = findLayer(pathDir.getPath(), layerPathName, null, relPath, markDynamic, lpi);
          if (l != null)
             return l;
+      }
+      return null;
+   }
+
+   /** This works like findLayerInPath but only returns the path name of a valid layerDef file. */
+   public String findLayerDefFileInPath(String layerPathName, String relDir, String relPath) {
+      // defaults to using paths relative to the current directory
+      if (layerPathDirs == null || relDir != null)
+         return findLayerDefFile(relDir == null ? "." : relDir, layerPathName, relDir, relPath);
+
+      for (File pathDir:layerPathDirs) {
+         String path = findLayerDefFile(pathDir.getPath(), layerPathName, null, relPath);
+         if (path != null)
+            return path;
       }
       return null;
    }
@@ -3717,6 +3748,39 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          layerDir = makeAbsolute(layerDir);
       }
       return layerDir;
+   }
+
+   /** This uses the same algorithm as findLayer but only computes and validates the layerDefFile's path name. */
+   private String findLayerDefFile(String layerDir, String layerPathName, String relDir, String layerPrefix) {
+      String layerFileName;
+      String layerTypeName;
+
+      layerDir = mapLayerDirName(layerDir);
+
+      if (layerPathName.equals(".")) {
+         layerFileName = System.getProperty("user.dir");
+         layerTypeName = FileUtil.getFileName(layerFileName);
+      }
+      else if (FileUtil.isAbsolutePath(layerPathName)) {
+         return null;
+      }
+      else {
+         // Trim trailing slashes
+         while (layerPathName.endsWith(FileUtil.FILE_SEPARATOR))
+            layerPathName = layerPathName.substring(0, layerPathName.length()-1);
+
+         layerTypeName = CTypeUtil.prefixPath(layerPrefix, layerPathName);
+         String layerPathNamePath;
+         layerFileName = FileUtil.concat(layerDir, layerPathNamePath = LayerUtil.fixLayerPathName(layerPathName));
+      }
+
+      String layerBaseName = CTypeUtil.getClassName(layerTypeName) + SCLanguage.STRATACODE_SUFFIX;
+
+      String layerDefFile = FileUtil.concat(layerFileName, layerBaseName);
+
+      if (new File(layerDefFile).canRead())
+         return layerDefFile;
+      return null;
    }
 
    private Layer findLayer(String layerDir, String layerPathName, String relDir, String layerPrefix, boolean markDynamic, LayerParamInfo lpi) {
@@ -3786,13 +3850,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                throw new IllegalArgumentException("Component/layer name conflict: " + layerTypeName + " : " + existingLayerObj + " and " + layerDefFile);
          }
       }
+      else {
+         Layer inactiveLayer = lookupInactiveLayer(layerPathName.replace("/", "."));
+         if (inactiveLayer != null)
+            return inactiveLayer;
+      }
 
       File defFile = new File(layerDefFile);
       if (defFile.canRead()) {
-         if (lpi.activate) {
-            // Initially register the global object under its type name before parsing
-            globalObjects.put(layerTypeName, layer);
-         }
+         // Initially register the global object under its type name before parsing
+         // Do this for de-activated objects as well because it's needed for the 'resolveName' instance made
+         // in the modify declaration when initializing the instance.
+         globalObjects.put(layerTypeName, layer);
 
          SrcEntry defSrcEnt = new SrcEntry(layer, layerDefFile, FileUtil.concat(layerGroup, layerBaseName));
 
@@ -3935,10 +4004,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public void registerInactiveLayer(Layer layer) {
-      inactiveLayers.put(layer.layerUniqueName, layer);
+      inactiveLayers.put(layer.getLayerName(), layer);
    }
 
-   public Object lookupInactiveLayer(String fullTypeName) {
+   public Layer lookupInactiveLayer(String fullTypeName) {
       return inactiveLayers.get(fullTypeName);
    }
 
@@ -4004,7 +4073,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (layer == null) {
-         String layerBaseName = FileUtil.getFileName(origLayerPathName) + ".sc";
+         origLayerPathName = origLayerPathName.replace(".",FileUtil.FILE_SEPARATOR);
+         String layerBaseName = FileUtil.addExtension(FileUtil.getFileName(origLayerPathName), SCLanguage.STRATACODE_SUFFIX.substring(1));
          String layerFileName = FileUtil.concat(origLayerPathName, layerBaseName);
          File layerPathFile = new File(layerFileName);
          if (lpi.activate)
@@ -4116,6 +4186,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          for (String d:dirNames) {
             if (d.equals("."))
                d = System.getProperty("user.dir");
+            if (d.length() == 0) {
+               if (dirNames.length == 0)
+                  throw new IllegalArgumentException("Invalid empty layer path specified");
+               else {
+                  System.err.println("*** Ignoring empty directory name in layer path: " + layerPath);
+                  continue;
+               }
+            }
             File f = new File(d);
             if (!f.exists() || !f.isDirectory())
                throw new IllegalArgumentException("*** Invalid layer path - Each path entry should be a directory: " + f);
@@ -7521,10 +7599,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** Retrieves a type declaration, usually the source definition with a given type name.  If fromLayer != null, it retrieves only types
     * defines below fromLayer (not including fromLayer).  If prependPackage is true, the name is resolved like a Java type name.  If
     * it is false, it is resolved like a file system path - where the type's package is not used in the type name.  If not hidden is true,
-    * do not return any types which are marked as hidden - i.e. not visible in the editor.  Use this mode for the addDyn calls so that
+    * do not return any types which are marked as hidden - i.e. not visible in the editor.  In some configurations this mode is used for the addDyn calls so that
     * we do not bother loading for source you are not going to change.
     *
     * The srcOnly flag is true if you need a TypeDeclaration - and cannot deal with a final class.
+    *
+    * If refLayer is supplied, it refers to the referring layer.  It's not ordinarily used in an active application but for an inactive layer, it
+    * changes how the lookup is performed.
     */
    public Object getSrcTypeDeclaration(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden, boolean srcOnly, Layer refLayer) {
       TypeDeclaration decl = getCachedTypeDeclaration(typeName, fromLayer, null, true, false);
@@ -7556,6 +7637,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (notHidden && !srcFile.layer.getVisibleInEditor())
             return null;
 
+         if (srcFile.layer != null && !srcFile.layer.activated)
+            return getInactiveTypeDeclaration(srcFile);
+
          if (!srcOnly) {
             // Now since the model is not changed, we'll use the class.  If at some point we need to change the compiled version - ie. to make a property bindable, we'll load the src at that time.
             Object cl = getCompiledType(typeName);
@@ -7575,7 +7659,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
 
          Object modelObj = getLanguageModel(srcFile);
-         if (modelObj == null) {
+         if (modelObj == null && (srcFile.layer == null || srcFile.layer.activated)) {
             nestLevel++;
             //System.out.println(StringUtil.indent(nestLevel) + "resolving " + typeName);
             try {
@@ -7591,6 +7675,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          decl = getCachedTypeDeclaration(typeName, fromLayer, fromLayer == null ? srcFile.layer : null, false, false);
          if (decl == INVALID_TYPE_DECLARATION_SENTINEL)
             return null;
+         // If this model is in an inactivated layer, it does not get put into the type cache so we need to find it
+         // from the model itself.
+         if (decl == null && srcFile.layer != null && !srcFile.layer.activated && modelObj instanceof JavaModel) {
+            JavaModel javaModel = (JavaModel) modelObj;
+            if (javaModel.getModelTypeName().equals(typeName))
+               return javaModel.getModelTypeDeclaration();
+         }
          return decl;
          // else - we found this file in the model index but did not find it from this type name.  This happens
          // when the type name matches, but the package prefix does not.
@@ -7940,6 +8031,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             return getRelativeTypeDeclaration(typeName, packagePrefix, srcFile.layer, prependPackage, refLayer);
          }
 
+         if (srcFile.layer != null && !srcFile.layer.activated)
+            return getInactiveTypeDeclaration(srcFile);
+
          TypeDeclarationCacheEntry decls;
 
          // May have parsed this file as a different type name, i.e. a layer object.  If so, just return null since
@@ -7957,6 +8051,38 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return null;
       }
       return getInnerClassDeclaration(typeName, fromLayer, false, false);
+   }
+
+   public Object parseInactiveFile(SrcEntry srcEnt) {
+      // First try to find the JavaModel cached outside of the system.
+      if (externalModelIndex != null) {
+         ILanguageModel model = externalModelIndex.lookupJavaModel(srcEnt);
+         if (model != null)
+            return model;
+      }
+      return parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, true);
+   }
+
+   public JavaModel parseInactiveModel(SrcEntry srcEnt) {
+      Object res = parseInactiveFile(srcEnt);
+      if (res instanceof JavaModel)
+         return ((JavaModel) res);
+      else
+         System.err.println("*** srcEnt is not a JavaModel: " + res);
+      return null;
+   }
+
+   public TypeDeclaration getInactiveTypeDeclaration(SrcEntry srcEnt) {
+      // First try to find the JavaModel cached outside of the system.
+      if (externalModelIndex != null) {
+         ILanguageModel model = externalModelIndex.lookupJavaModel(srcEnt);
+         if (model instanceof JavaModel)
+            return ((JavaModel) model).getModelTypeDeclaration();
+      }
+      Object result = parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, true);
+      if (result instanceof JavaModel)
+         return ((JavaModel) result).getModelTypeDeclaration();
+      return null;
    }
 
    /** Auto imports are resolved by searching through the layer hierarchy from the layer which originates the reference */
@@ -8060,6 +8186,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       String subPath = typeName.replace(".", FileUtil.FILE_SEPARATOR);
       if (suffix != null)
          subPath = FileUtil.addExtension(subPath, suffix);
+
+      // If we are looking for the first entry not in this layer but referenced by this layer
+      if (fromLayer != null && !fromLayer.activated) {
+         if (fromLayer.baseLayers == null)
+            return null;
+         for (Layer fromBase:fromLayer.baseLayers) {
+            SrcEntry resBaseEnt = fromBase.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath);
+            if (resBaseEnt != null)
+               return resBaseEnt;
+         }
+         return null;
+      }
 
       if (refLayer != null && !refLayer.activated) {
          return refLayer.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath);
@@ -8582,6 +8720,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          modelType.typeName = expectedName;
          modelType.isLayerType = true;
       }
+      else
+         modelType.isLayerType = true;
 
       String prefix = model.getPackagePrefix();
 
@@ -8653,9 +8793,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       TypeDeclaration decl = modelType;
 
       List<String> baseLayerNames = null;
+      List<JavaType> extendLayerTypes = null;
 
       if (decl instanceof ModifyDeclaration) {
-         List<JavaType> extendLayerTypes = ((ModifyDeclaration) decl).extendsTypes;
+         extendLayerTypes = ((ModifyDeclaration) decl).extendsTypes;
          if (extendLayerTypes != null) {
             baseLayerNames = new ArrayList<String>(extendLayerTypes.size());
             for (JavaType extType:extendLayerTypes)
@@ -8680,8 +8821,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
          lpi.markExtendsDynamic = (lpi.recursiveDynLayers != null && lpi.recursiveDynLayers.contains(layerDirName)) || lpi.markExtendsDynamic;
 
-         if (!lpi.explicitLayers)
+         if (!lpi.explicitLayers) {
             defFile.layer.baseLayers = baseLayers = initLayers(baseLayerNames, relDir, relPath, lpi.markExtendsDynamic, lpi, false);
+         }
          else {
             // When we are processing only the explicit layers do not recursively init the layers.  Just init the layers specified.
             baseLayers = new ArrayList<Layer>();
@@ -8690,12 +8832,31 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                Layer bl = findLayerByName(relPath, baseLayerName);
                if (bl != null)
                   baseLayers.add(bl);
+               else {
+                  baseLayers.add(null);
+               }
             }
          }
+         /*
+         if (baseLayers != null) {
+            int li = 0;
+            for (Layer bl:baseLayers) {
+               if (bl == null) {
+                  if (extendLayerTypes != null && extendLayerTypes.size() > li) {
+                     extendLayerTypes.get(li).displayError("No layer named: ", baseLayerNames.get(li), " in layer path: ", layerPath);
+                  }
+               }
+               li++;
+            }
+         }
+         */
 
          // One of our base layers failed so we fail too
-         if (baseLayers == null)
+         if (baseLayers == null || baseLayers.contains(null))
             initFailed = true;
+
+         while (baseLayers.contains(null))
+            baseLayers.remove(null);
       }
 
       /* Now that we have defined the base layers, we'll inherit the package prefix and dynamic state */
@@ -8755,6 +8916,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             stubLayer.layerPathName = expectedName;
             //stubLayer.layerBaseName = ...
             stubLayer.layerDirName = layerDirName;
+            System.err.println("*** failed to initialize inactive layer: ");
+            exc.printStackTrace();
             return stubLayer;
          }
          System.err.println("*** Failed to initialize layer: " + expectedName + " due to runtime error: " + exc);
@@ -9410,6 +9573,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Layer getInactiveLayer(String layerPath) {
+      Layer inactiveLayer = lookupInactiveLayer(layerPath.replace("/", "."));
+      if (inactiveLayer != null)
+         return inactiveLayer;
       LayerParamInfo lpi = new LayerParamInfo();
       lpi.activate = false;
       if (layerPathDirs != null) {
@@ -9424,13 +9590,35 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
-   public Layer getActiveOrInactiveLayerByPath(String layerPath) {
-      Layer layer = getLayerByPath(layerPath);
-      if (layer == null) {
-         // Layer does not have to be active here - this lets us parse the code in the layer but not really start, transform or run the modules because the layer itself is not started
-         layer = getInactiveLayer(layerPath);
-      }
+   public Layer getActiveOrInactiveLayerByPath(String layerPath, String prefix) {
+      Layer layer;
+      String usePath = layerPath;
+      do {
+         layer = getLayerByPath(usePath);
+         if (layer == null) {
+            // Layer does not have to be active here - this lets us parse the code in the layer but not really start, transform or run the modules because the layer itself is not started
+            layer = getInactiveLayer(usePath);
+         }
+
+         if (prefix != null) {
+            usePath = CTypeUtil.prefixPath(prefix, layerPath);
+            prefix = CTypeUtil.getPackageName(prefix);
+         }
+         else
+            break;
+      } while (layer == null);
+
       return layer;
+   }
+
+   public JavaModel getAnnotatedLayerModel(String layerPath, String prefix) {
+      if (externalModelIndex != null) {
+
+         Layer layer = getActiveOrInactiveLayerByPath(layerPath, prefix);
+         if (layer != null && layer.model != null)
+            return parseInactiveModel(layer.model.getSrcFile());
+      }
+      return null;
    }
 
    public Map<String,LayerIndexInfo> getAllLayerIndex() {
@@ -9663,7 +9851,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         String nextPart = layerAndFileName.substring(0, slashIx);
                         fileName = layerAndFileName.substring(slashIx+1);
                         layerName = FileUtil.concat(layerName, nextPart);
-                        Layer layer = getActiveOrInactiveLayerByPath(layerName);
+                        Layer layer = getActiveOrInactiveLayerByPath(layerName, null);
                         if (layer != null) {
                            // TODO: validate that we found this layer under the right root?
                            return new SrcEntry(layer, pathName, fileName);
@@ -9680,6 +9868,5 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       System.err.println("*** Warning - unable to find layer for path name: " + pathName);
       return new SrcEntry(null, pathName, FileUtil.getFileName(pathName));
    }
-
 
 }

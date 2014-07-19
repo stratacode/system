@@ -165,7 +165,7 @@ public class ModifyDeclaration extends TypeDeclaration {
             dynamicNew = false;
          }
 
-         boolean modifiedFinalLayer = layer != null && !layer.annotationLayer && modifyTypeDecl.layer != null && modifyTypeDecl.layer.finalLayer;
+         boolean modifiedFinalLayer = !isLayerType && layer != null && !layer.annotationLayer && modifyTypeDecl.layer != null && modifyTypeDecl.layer.finalLayer;
          if (modifiedFinalLayer) {
             displayError("Unable to modify type: " + typeName + " in final layer: " + modifyTypeDecl.layer + " for: ");
          }
@@ -354,10 +354,7 @@ public class ModifyDeclaration extends TypeDeclaration {
                   else {
                      if (thisModel.isLayerModel) {
                         isLayerType = true;
-                        obj = getLayeredSystem().lookupInactiveLayer(fullTypeName);
-                        if (obj != null) {
-                           modifyClass = obj.getClass();
-                        }
+                        modifyClass = Layer.class;
                      }
                      else if (!thisModel.temporary)
                         displayError("Layer definition file: " + thisModel.getSrcFile() + " has: " + fullTypeName + " expected: " + thisModel.getSrcFile().layer.layerDirName + ": ");
@@ -433,13 +430,23 @@ public class ModifyDeclaration extends TypeDeclaration {
             JavaSemanticNode resolver = getEnclosingType();
             if (resolver == null)
                resolver = getJavaModel();
-            extendsType.initType(this, resolver, false);
+            extendsType.initType(this, resolver, false, isLayerType);
 
             // Need to start the extends type as we need to dig into it
             Object extendsTypeDecl = extendsBoundTypes[i++] = extendsType.getTypeDeclaration();
-            if (extendsTypeDecl == null && !isLayerType) {
-               displayTypeError("Extended class not found: ", extendsType.getFullTypeName(), " for ");
-               extendsInvalid = true;
+            if (extendsTypeDecl == null) {
+               if (!isLayerType) {
+                  extendsType.displayTypeError("Extended class not found for type: ", getFullTypeName(), ": ");
+                  extendsInvalid = true;
+               }
+               else if (layer != null) {
+                  String layerTypeName = extendsType.getFullTypeName();
+                  LayeredSystem sys = layer.layeredSystem;
+                  // Do errors for the layer def file when it gets started
+                  if (sys.getActiveOrInactiveLayerByPath(layerTypeName, CTypeUtil.getPackageName(layer.getLayerName())) == null) {
+                     extendsType.displayTypeError("No layer: ");
+                  }
+               }
             }
             if (extendsTypeDecl != null && ModelUtil.sameTypes(this, extendsTypeDecl)) {
                displayTypeError("Cycle found in extends - class extends itself: ", extendsType.getFullTypeName(), " for ");

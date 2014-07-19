@@ -97,7 +97,7 @@ public class PrimitiveType extends JavaType {
       return getRuntimeClass();
    }
 
-   public void initType(ITypeDeclaration itd, JavaSemanticNode node, boolean displayError) {}
+   public void initType(ITypeDeclaration itd, JavaSemanticNode node, boolean displayError, boolean isLayer) {}
 
    public String getBaseSignature() {
       return getSignatureCode();

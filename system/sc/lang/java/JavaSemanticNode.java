@@ -524,4 +524,12 @@ public abstract class JavaSemanticNode extends SemanticNode {
       return false;
    }
 
+   /**
+    * Needs to be implemented for IDE support on nodes which can be referenced outside of the same file.  If the model
+    * in which this references lives has been removed (or really replaced by another version of the same model), we need
+    * to find the node in the other model that corresponds to this node and return it.
+    */
+   public JavaSemanticNode refreshNode() {
+      return this;
+   }
 }

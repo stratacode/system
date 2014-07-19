@@ -230,7 +230,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       JavaSemanticNode resolver = getEnclosingType();
       if (resolver == null)
          resolver = getJavaModel();
-      extendsType.initType(this, resolver, false);
+      extendsType.initType(this, resolver, false, isLayerType);
 
 
       // Need to start the extends type as we need to dig into it
@@ -1733,4 +1733,5 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
             return true;
       return false;
    }
+
 }

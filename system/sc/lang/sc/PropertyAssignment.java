@@ -918,4 +918,18 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       }
       return res.toString();
    }
+
+   public PropertyAssignment refreshNode() {
+      JavaModel oldModel = getJavaModel();
+      if (!oldModel.removed)
+         return this; // We are still valid
+      Object res = oldModel.layeredSystem.getSrcTypeDeclaration(getEnclosingType().getFullTypeName(), null, true,  false, false, oldModel.layer);
+      if (res instanceof BodyTypeDeclaration) {
+         Object newAssign = ((BodyTypeDeclaration) res).declaresMember(propertyName, MemberType.AssignmentSet, null, null);
+         if (newAssign instanceof PropertyAssignment)
+            return (PropertyAssignment) newAssign;
+         displayError("Property removed ", propertyName);
+      }
+      return null;
+   }
 }

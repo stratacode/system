@@ -8,6 +8,7 @@ import sc.lang.ILanguageModel;
 import sc.lang.JavaLanguage;
 import sc.lang.SemanticNodeList;
 import sc.lang.js.JSUtil;
+import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.type.CTypeUtil;
 import sc.type.Type;
@@ -108,7 +109,7 @@ public class ClassType extends JavaType {
       // pre-init of the "type" will have fixed that already a different way).
       ITypeDeclaration itype = getEnclosingIType();
       if (itype != null && type == null)
-         initType(itype, this, true);
+         initType(itype, this, true, false);
       super.start();
    }
 
@@ -230,7 +231,7 @@ public class ClassType extends JavaType {
       if (type == null) {
          ITypeDeclaration itd = getEnclosingIType();
          if (itd != null) {
-            initType(itd, this, true);
+            initType(itd, this, true, false);
          }
       }
       if (type == FAILED_TO_INIT_SENTINEL)
@@ -306,25 +307,47 @@ public class ClassType extends JavaType {
    public void displayTypeError(String...args) {
       Statement st;
       errorArgs = args;
+      super.displayTypeError(args);
+      /*
       if ((st = getEnclosingStatement()) != null)
          st.displayTypeError(args);
       else
          super.displayTypeError(args);
+      */
    }
 
    /**
     * Initializes this type from the model and node specified.  The ClassDeclaration needs to resolve the type
     * name using itself, so that it will not recursively check the type that is being initialized.
     */
-   public void initType(ITypeDeclaration it, JavaSemanticNode node, boolean displayError) {
+   public void initType(ITypeDeclaration it, JavaSemanticNode node, boolean displayError, boolean isLayer) {
       if (chained)
          return; // Don't need to init if we are just part of someone else's type
 
       String fullTypeName = getFullBaseTypeName();
 
       type = FAILED_TO_INIT_SENTINEL; // prevent recursive calls
+
       if (fullTypeName == null)
          return; // Invalid fragment
+
+      if (isLayer) {
+         LayeredSystem sys = it.getLayeredSystem();
+         if (sys != null){
+            // If this is a reference from an annotated layer model we need to annotate the type so we cna make the layer
+            // references work like normal types.
+            if (it instanceof TypeDeclaration) {
+               JavaModel curModel = it.getJavaModel();
+               if (curModel != null && curModel.getUserData() != null) {
+                  JavaModel layerModel = sys.getAnnotatedLayerModel(fullTypeName, CTypeUtil.getPackageName(curModel.getLayer().getLayerName()));
+                  if (layerModel != null)
+                     type = layerModel.getModelTypeDeclaration();
+               }
+            }
+         }
+         return;
+      }
+
       type = node.findType(fullTypeName);
 
       if (type == null) { // not a relative name
@@ -703,13 +726,15 @@ public class ClassType extends JavaType {
          ModelUtil.suggestTypes(model, pkgName, leafName, candidates, false);
          int csize = candidates.size();
          if (csize > 0) {
+            // TODO: we had this code commented out for the rtext thing but now need it for IntelliJ
+            // Need to test that "pos - pkgName.length()" is right for rtext now.
             HashSet<String> absCandidates = new HashSet<String>();
             for (String cand:candidates) {
                absCandidates.add(CTypeUtil.prefixPath(pkgName, cand));
             }
             candidates.clear();
             candidates.addAll(absCandidates);
-            return pos;
+            return pos - pkgName.length();
          }
       }
 
@@ -770,11 +795,13 @@ public class ClassType extends JavaType {
    }
 
    public boolean isCollapsibleNode() {
-      if (chainedTypes == null)
-         return true;
-      for (ClassType chained:chainedTypes)
-         if (chained.typeArguments != null)
-            return false;
+      if (typeArguments != null)
+         return false;
+      if (chainedTypes != null) {
+         for (ClassType chained:chainedTypes)
+            if (!chained.isCollapsibleNode())
+               return false;
+      }
       return true;
    }
 }

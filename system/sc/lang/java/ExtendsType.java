@@ -77,8 +77,8 @@ public class ExtendsType extends JavaType {
       return typeArgument.getTypeDeclaration();
    }
 
-   public void initType(ITypeDeclaration itd, JavaSemanticNode node, boolean displayError) {
-      typeArgument.initType(itd, node, displayError);
+   public void initType(ITypeDeclaration itd, JavaSemanticNode node, boolean displayError, boolean isLayer) {
+      typeArgument.initType(itd, node, displayError, isLayer);
    }
 
    public String getBaseSignature() {

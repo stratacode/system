@@ -76,7 +76,7 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
       return null;
    }
 
-   abstract public void initType(ITypeDeclaration definedInType, JavaSemanticNode node, boolean displayError);
+   abstract public void initType(ITypeDeclaration definedInType, JavaSemanticNode node, boolean displayError, boolean isLayer);
 
    public static JavaType createJavaType(Object typeDeclaration) {
       String modelTypeName = ModelUtil.getTypeName(typeDeclaration);

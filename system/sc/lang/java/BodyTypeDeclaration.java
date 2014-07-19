@@ -7951,4 +7951,18 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public String toListDisplayString() {
       return typeName + ": " + getDeclarationType().toString();
    }
+
+   public BodyTypeDeclaration refreshNode() {
+      JavaModel oldModel = getJavaModel();
+      if (!oldModel.removed)
+         return this; // We are still valid
+      if (removed) // For live types we have a ref to the replacement
+         return (TypeDeclaration) replacedByType.refreshNode();
+      // Or we can look our replacement up...
+      Object res = oldModel.layeredSystem.getSrcTypeDeclaration(getFullTypeName(), null, true,  false, false, layer);
+      if (res instanceof TypeDeclaration)
+         return (TypeDeclaration) res;
+      displayError("Type removed: ", getFullTypeName(), " for ");
+      return null;
+   }
 }

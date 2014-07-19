@@ -603,4 +603,19 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
    public String getNodeName() {
       return this.name;
    }
+
+   public AbstractMethodDefinition refreshNode() {
+      JavaModel oldModel = getJavaModel();
+      if (!oldModel.removed)
+         return this; // We are still valid
+      if (replaced)
+         return replacedByMethod.refreshNode();
+      // Or we can look our replacement up...
+      Object newType = oldModel.layeredSystem.getSrcTypeDeclaration(getEnclosingType().getFullTypeName(), null, true,  false, false, oldModel.getLayer());
+      if (newType instanceof BodyTypeDeclaration) {
+         return ((BodyTypeDeclaration) newType).declaresMethodDef(name, getParameterList());
+      }
+      displayError("Method ", name, " removed for ");
+      return null;
+   }
 }

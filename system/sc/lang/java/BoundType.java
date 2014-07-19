@@ -63,8 +63,8 @@ public class BoundType extends JavaType {
       return getFirstType().getTypeDeclaration();
    }
 
-   public void initType(ITypeDeclaration itd, JavaSemanticNode node, boolean displayError) {
-      getFirstType().initType(itd, node, displayError);
+   public void initType(ITypeDeclaration itd, JavaSemanticNode node, boolean displayError, boolean isLayer) {
+      getFirstType().initType(itd, node, displayError, isLayer);
    }
 
    public String getBaseSignature() {

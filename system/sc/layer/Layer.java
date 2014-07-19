@@ -502,6 +502,11 @@ public class Layer implements ILifecycle, LayerConstants {
 
       initialized = true;
 
+      if (baseLayers != null && !activated) {
+         for (Layer baseLayer:baseLayers)
+            baseLayer.initialize();
+      }
+
       callLayerMethod("initialize");
 
       if (liveDynamicTypes && compiledOnly)
@@ -751,6 +756,11 @@ public class Layer implements ILifecycle, LayerConstants {
       if (started)
          return;
       started = true;
+
+      if (baseLayers != null && !activated) {
+         for (Layer baseLayer:baseLayers)
+            baseLayer.start();
+      }
 
       if (isBuildLayer()) {
          loadBuildInfo();
@@ -1423,14 +1433,14 @@ public class Layer implements ILifecycle, LayerConstants {
    /** Returns the layer after this one in the list, i.e. the one that overrides this layer */
    public Layer getNextLayer() {
       int size = layeredSystem.layers.size();
-      if (layerPosition == size-1)
+      if (layerPosition == size-1 || !activated)
          return null;
       return layeredSystem.layers.get(layerPosition+1);
    }
 
    /** Returns the layer just before this one in the list, i.e. the one this layer overrides */
    public Layer getPreviousLayer() {
-      if (layerPosition == 0)
+      if (layerPosition == 0 || !activated)
          return null;
       return layeredSystem.layers.get(layerPosition - 1);
    }
@@ -1529,11 +1539,11 @@ public class Layer implements ILifecycle, LayerConstants {
    }
 
    public ImportDeclaration getImportDecl(String name, boolean checkBaseLayers) {
-      if (importsByName == null)
-         return null;
-      ImportDeclaration res = importsByName.get(name);
-      if (res != null)
-         return res;
+      if (importsByName != null) {
+         ImportDeclaration res = importsByName.get(name);
+         if (res != null)
+            return res;
+      }
       if (checkBaseLayers && baseLayers != null) {
          for (Layer base:baseLayers) {
             if (base.exportImportsTo(this)) {

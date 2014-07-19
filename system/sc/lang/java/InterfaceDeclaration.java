@@ -76,7 +76,7 @@ public class InterfaceDeclaration extends TypeDeclaration {
             JavaSemanticNode resolver = getEnclosingType();
             if (resolver == null)
                resolver = getJavaModel();
-            extendsType.initType(this, resolver, false);
+            extendsType.initType(this, resolver, false, isLayerType);
 
             // Need to start the extends type as we need to dig into it
             Object extendsTypeDecl = extendsBoundTypes[i++] = extendsType.getTypeDeclaration();
