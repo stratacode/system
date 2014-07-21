@@ -201,8 +201,8 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
     */
    public boolean statefulPages = true;
 
-   public Object parse(String file, boolean enablePartialValues) {
-      Object templateObj = super.parse(file, enablePartialValues);
+   public Object parse(String file, Parselet startParselet, boolean enablePartialValues) {
+      Object templateObj = super.parse(file, startParselet, enablePartialValues);
       if (templateObj instanceof ParseError)
          return templateObj;
       Template temp = (Template) ParseUtil.nodeToSemanticValue(templateObj);

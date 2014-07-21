@@ -1157,7 +1157,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
             // Avoid rewriting unchanged files
             if (srcIndex == null || !Arrays.equals(srcIndex.hash, hash)) {
-               FileUtil.saveStringAsFile(absPath, f.fileBody, true);
+               FileUtil.saveStringAsReadOnlyFile(absPath, f.fileBody, true);
                buildLayer.addSrcFileIndex(f.relFilePath, hash, null);
             }
 
@@ -1250,7 +1250,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             // If there's a previous entry which is the same, we'll skip saving altogether.
             if ((prevEntry == null || !Arrays.equals(prevEntry.hash, mainSrcEnt.hash))) {
                if (isChanged)
-                  FileUtil.saveStringAsFile(newFile, transformedResult, true);
+                  FileUtil.saveStringAsReadOnlyFile(newFile, transformedResult, true);
                else {
                   File classFile = LayerUtil.getClassFile(buildLayer, mainSrcEnt);
                   // As long as the class file is up to date before, we'll make sure it stays up to date after.

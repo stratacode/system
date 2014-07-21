@@ -25,6 +25,13 @@ public class FileUtil {
       FileUtil.saveStringAsFile(new File(fileName), data, mkdirs);
    }
 
+   /** For files wwe generate, mark them as 'read only' to avoid accidentally modifying them e.g. a signal to the editor and IDE */
+   public static void saveStringAsReadOnlyFile(String fileName, String data, boolean mkdirs) {
+      File file = new File(fileName);
+      FileUtil.saveStringAsFile(file, data, mkdirs);
+      file.setReadOnly();
+   }
+
    public static void saveStringAsFile(File theFile, String data, boolean mkdirs) {
       FileWriter f = null;
       PerfMon.start("saveStringAsFile");

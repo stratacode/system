@@ -316,6 +316,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return true;
    }
 
+   public void activateLayer(String layerName) {
+      Layer activeLayer = getLayerByName(layerName);
+      // This layer is already in the active layers set so we don't have any work to do.
+      if (activeLayer == null) {
+      }
+   }
+
    public enum BuildCommandTypes {
       Pre, Post, Run, Test
    }
@@ -534,64 +541,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (useRuntimeProcessor == null) {
-         // No layers specified any runtimes.  Default to just the 'java' runtime.
-         if (runtimes == null)
-            addRuntime(null);
-
-         // Create a new LayeredSystem for each additional runtime we need.  Then purge any layers from this LayeredSystem which should not be here.
-         if (runtimes.size() > 1) {
-
-            // We want all of the layered systems to use the same buildDir so pass it through options as though you had used the -d option.  Of course if you use -d, it will happen automatically.
-            if (options.buildDir == null)
-               options.buildDir = lastLayer.getDefaultBuildDir();
-
-            int ix = 1;
-            ArrayList<LayeredSystem> newPeers = new ArrayList<LayeredSystem>();
-            do {
-               IRuntimeProcessor proc = runtimes.get(ix);
-               ArrayList<String> procLayerNames = new ArrayList<String>();
-               for (int i = 0; i < layers.size(); i++) {
-                  Layer layer = layers.get(i);
-                  Layer.RuntimeEnabledState layerState = layer.isExplicitlyEnabledForRuntime(proc);
-                  if (layerState == Layer.RuntimeEnabledState.Enabled || (layerState == Layer.RuntimeEnabledState.NotSet && layer.getAllowedInAnyLayer())) {
-                     procLayerNames.add(layer.getLayerName());
-                  }
-               }
-
-               // When you run in the layer directory, the other runtime defines the root layer dir which we need as the layer path here since we specify all of the layers using absolute paths
-               if (layerPathNames == null && newLayerDir != null)
-                  layerPathNames = newLayerDir;
-               LayeredSystem sys = new LayeredSystem(null, procLayerNames, explicitDynLayers, layerPathNames, rootClassPath, options, proc, true, false);
-               sys.repositorySystem = repositorySystem;
-               newPeers.add(sys);
-               ix++;
-            } while (ix < runtimes.size());
-
-            peerSystems = newPeers;
-
-            // Each layered system gets a list of the other systems
-            for (LayeredSystem peer:peerSystems) {
-               ArrayList<LayeredSystem> peerPeers = (ArrayList<LayeredSystem>) peerSystems.clone();
-               peerPeers.remove(peer);
-               peerPeers.add(this);
-               peer.peerSystems = peerPeers;
-            }
-
-            for (int i = 0; i < layers.size(); i++) {
-               Layer layer = layers.get(i);
-               Layer.RuntimeEnabledState layerState = layer.isExplicitlyEnabledForRuntime(null);
-               if (layerState == Layer.RuntimeEnabledState.Disabled || (layerState == Layer.RuntimeEnabledState.NotSet && !layer.getAllowedInAnyLayer())) {
-                  layers.remove(i);
-                  deregisterLayer(layer, false);
-                  i--;
-               }
-               else
-                  layer.layerPosition = i;
-            }
-         }
-         // If there's only one runtime, we'll use this layered system for it.
-         else
-            runtimeProcessor = runtimes.get(0);
+         initRuntimes(explicitDynLayers);
       }
       else {
          runtimeProcessor = useRuntimeProcessor;
@@ -630,6 +580,91 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          for (int i = 0; i < excludedFiles.size(); i++)
             excludedPatterns.add(Pattern.compile(excludedFiles.get(i)));
       }
+   }
+
+   private void initRuntimes(List<String> explicitDynLayers) {
+      // If we have activated some layers and still don't have any runtimes, we create the default runtime
+      if (runtimes == null && layers.size() != 0)
+         addRuntime(null);
+
+      // Create a new LayeredSystem for each additional runtime we need to satisfy the active set of layers.
+      // Then purge any layers from this LayeredSystem which should not be here.
+      if (runtimes.size() > 1 && (peerSystems == null || peerSystems.size() < runtimes.size()-1)) {
+
+         // We want all of the layered systems to use the same buildDir so pass it through options as though you had used the -d option.  Of course if you use -d, it will happen automatically.
+         if (options.buildDir == null)
+            options.buildDir = lastLayer.getDefaultBuildDir();
+
+         ArrayList<LayeredSystem> newPeers = new ArrayList<LayeredSystem>();
+
+         for (int ix = 0; ix < runtimes.size(); ix++) {
+            IRuntimeProcessor proc = runtimes.get(ix);
+
+            // Skip the runtime processor associated with the main layered system
+            if (proc == runtimeProcessor)
+               continue;
+
+            // If we have any peer systems, see if we have already created one for this runtime
+            if (peerSystems != null) {
+               boolean found = false;
+               for (LayeredSystem peer:peerSystems) {
+                  if (peer.runtimeProcessor == proc) {
+                     found = true;
+                     break;
+                  }
+               }
+
+               if (found)
+                  continue;
+            }
+
+            // Now create the new peer layeredSystem for this runtime.
+            ArrayList<String> procLayerNames = new ArrayList<String>();
+            for (int i = 0; i < layers.size(); i++) {
+               Layer layer = layers.get(i);
+               Layer.RuntimeEnabledState layerState = layer.isExplicitlyEnabledForRuntime(proc);
+               if (layerState == Layer.RuntimeEnabledState.Enabled || (layerState == Layer.RuntimeEnabledState.NotSet && layer.getAllowedInAnyLayer())) {
+                  procLayerNames.add(layer.getLayerName());
+               }
+            }
+
+            String peerLayerPath = layerPath;
+            // When you run in the layer directory, the other runtime defines the root layer dir which we need as the layer path here since we specify all of the layers using absolute paths
+            if (peerLayerPath == null && newLayerDir != null)
+               peerLayerPath = newLayerDir;
+            LayeredSystem sys = new LayeredSystem(null, procLayerNames, explicitDynLayers, peerLayerPath, rootClassPath, options, proc, true, false);
+            sys.repositorySystem = repositorySystem;
+            newPeers.add(sys);
+         }
+
+         if (peerSystems == null)
+            peerSystems = newPeers;
+         else
+            peerSystems.addAll(newPeers);
+
+         // Each layered system gets a list of the other systems
+         for (LayeredSystem peer:peerSystems) {
+            ArrayList<LayeredSystem> peerPeers = (ArrayList<LayeredSystem>) peerSystems.clone();
+            peerPeers.remove(peer);
+            peerPeers.add(this);
+            peer.peerSystems = peerPeers;
+         }
+
+         for (int i = 0; i < layers.size(); i++) {
+            Layer layer = layers.get(i);
+            Layer.RuntimeEnabledState layerState = layer.isExplicitlyEnabledForRuntime(null);
+            if (layerState == Layer.RuntimeEnabledState.Disabled || (layerState == Layer.RuntimeEnabledState.NotSet && !layer.getAllowedInAnyLayer())) {
+               layers.remove(i);
+               deregisterLayer(layer, false);
+               i--;
+            }
+            else
+               layer.layerPosition = i;
+         }
+      }
+      else // If there's only one runtime, we'll use this layered system for it.
+         runtimeProcessor = runtimes.size() > 0 ? runtimes.get(0) : null;
+
    }
 
    public boolean installSystem() {
@@ -7592,8 +7627,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return (TypeDeclaration) getSrcTypeDeclaration(typeName, fromLayer, prependPackage, notHidden, true, null);
    }
 
-   public TypeDeclaration getSrcTypeDeclaration(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden, boolean srcOnly) {
-      return (TypeDeclaration) getSrcTypeDeclaration(typeName, fromLayer, prependPackage, notHidden, srcOnly, null);
+   public Object getSrcTypeDeclaration(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden, boolean srcOnly) {
+      return getSrcTypeDeclaration(typeName, fromLayer, prependPackage, notHidden, srcOnly, null);
    }
 
    /** Retrieves a type declaration, usually the source definition with a given type name.  If fromLayer != null, it retrieves only types
@@ -8833,7 +8868,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                if (bl != null)
                   baseLayers.add(bl);
                else {
-                  baseLayers.add(null);
+                  // For this case we may be in the JS runtime and this layer is server specific...
+                  //baseLayers.add(null);
                }
             }
          }
