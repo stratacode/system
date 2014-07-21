@@ -2155,7 +2155,7 @@ public class Layer implements ILifecycle, LayerConstants {
       return (codeTypes == null || codeTypes.contains(codeType)) && (codeFunctions == null || codeFunctions.contains(codeFunction));
    }
 
-   public final static String BUILD_STATUS_FILE = "buildStatus.txt";
+   public final static String BUILD_STATUS_FILE_BASE = "buildStatus.txt";
 
    public final static String COMPLETE_STATUS = "Build completed:";
 
@@ -2165,9 +2165,9 @@ public class Layer implements ILifecycle, LayerConstants {
     */
    public void updateBuildInProgress(boolean start) {
       String rtName = layeredSystem.getRuntimeName();
-      String fileBase = BUILD_STATUS_FILE;
+      String fileBase = BUILD_STATUS_FILE_BASE;
       if (rtName != null)
-         fileBase = rtName + "_" + fileBase;
+         fileBase = "." + rtName + "_" + fileBase;
       String buildInProgressFile = FileUtil.concat(buildDir, fileBase);
 
       if (start) {

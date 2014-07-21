@@ -1051,7 +1051,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             System.err.println("*** Unable to build scrt.jar file from standard build configuration yet");
          }
          else {
-            if (LayerUtil.buildJarFile(info.buildDirName, getRuntimePrefix(), outJarName, null,  runtimePackages, /* userClassPath */ null, LayerUtil.CLASSES_JAR_FILTER) != 0)
+            if (LayerUtil.buildJarFile(info.buildDirName, getRuntimePrefix(), outJarName, null,  runtimePackages, /* userClassPath */ null, LayerUtil.CLASSES_JAR_FILTER, options.verbose) != 0)
                System.err.println("*** Unable to jar up sc runtime files into: " + outJarName + " from buildDir: " + info.buildDirName);
 
          }
@@ -1880,7 +1880,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   editLayer = false;
                   break;
                case 'h':
-                  usage("StrataCode command option help:", args);
+                  usage("", args);
                   break;
                case 'n':
                   if (opt.equals("nc")) {
@@ -3627,16 +3627,17 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
 
    private static void usage(String reason, String[] args) {
-      System.err.println(reason);
+      if (reason.length() > 0)
+         System.err.println(reason);
       usage(args);
    }
 
    private static void usage(String[] args) {
-      System.err.println("sc [-a -i -ni -nc -dyn -cp <classpath> -lp <layerPath>]\n" +
+      System.err.println("Command line overview:\n" + "sc [-a -i -ni -nc -dyn -cp <classpath> -lp <layerPath>]\n" +
                          "   [ -cd <defaultCommandDir/Path> ] [<layer1> ... <layerN-1>] <buildLayer>\n" +
                          "   [ -f <file-list> ] [-r <main-class-regex> ...app options...] [-t <test-class-regex>]\n" +
-                         "   [ -d/-ds/-db buildOrSrcDir]");
-      System.err.println("   [ -a ]: build all files\n   [ -i ]: create temporary layer for interpreter\n   [ -nc ]: generate but don't compile java files\n");
+                         "   [ -d/-ds/-db buildOrSrcDir]\n\nOption details:");
+      System.err.println("   [ -a ]: build all files\n   [ -i ]: create temporary layer for interpreter\n   [ -nc ]: generate but don't compile java files");
       System.err.println("   <buildLayer>:  The build layer is the last layer in your stack.\n" +
                          "   [ -dyn ]: Layers specified after -dyn (and those they extend) are made dynamic unless they are marked: 'compiledOnly'\n" +
                          "   [ -c ]: Generate and compile only - do not run any main methods\n" +

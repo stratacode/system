@@ -30,37 +30,32 @@ public abstract class AbstractInterpreter extends EditorContext {
 
    StringBuffer pendingInput = new StringBuffer();
 
-   public static String USAGE =  "StrataCode Command Line Editor Help:\n" +
-           "The command line interface lets you examine and modify your application.  It shares the same current type as the editor if you are running both.\n" +
-           "At the command prompt, like in Java you have one set of commands for when you are not in a current type and another when you are.\n" +
-           "  1) No current type: here you can see which objects and classes are available in the current layer (cmd.list();), change layers by typing the layer's path name followed by an open brace ('{').  Choose a type with 'typeName {'.  Create a new type with 'class newTypeName {' or 'object newTypeName {'.\n" +
-           "  2) With a current type: here you can enter StrataCode, for example:\n" +
-           "        foo = 3;  // set properties\n" +
-           "        foo;      // eval an expression\n" +
-           "        int foo;  // add fields\n" +
-           "To leave the current type use } as in Java.\n" +
-           "\n" +
-           "Saving: Save changes with cmd.save();\n\n" +
-           "Use TAB for command-line completion of most identifiers and commands.\n\n" +
-           "Understanding the prompt:\n" +
+   public static String USAGE =  "Command Line Interface Help:\n\n" +
+           "In the command line editor, you can examine and modify your application like an ordinarily REPL (read-eval-print-loop). Most REPLs start with commands but for the StrataCode REPL imagine that you are editing a Java file from the command line.  You do have commands but those are implemented by calling methods on a special 'cmd' object.  Because you already know Java, you can learn the StrataCode REPL quickly, without having to learn the details of each command.\n" +
+           "You have one context in which you navigate layers, set your package, define imports, and find or create your current Java class or SC object.  Once you have a current class or instance, or method you need to complete that operation to return to the previous context.\n\n" +
+           "No Current Type:\n" +
+           "   layerName {                Change context to layerName.  \n" +
+           "   typeName {                 Change context to the typeName specified.  If the type is defined in this layer, you are at this point editing that file from the command line incrementally.  Be careful!  If there is no definition of that type in this layer, a 'modify defineition' is automatically created and your changes are recorded in the new layer.\n" +
+           "   packageName {              Set current context to the package name specified.\n" +
+           "   class newClassName {\n" +
+           "   object newInstanceName {   Define/replace a new top-level class or object with the current package in the current layer.  If this class is defined in a previous layer, you are replacing that definition.  Be careful!\n" +
+           "   package newPackageName;    Change the current package\n" +
+           "   import newImportName;      Add an import.  level.  \n\n" +
+           "With a Current Type:\n" +
+           "   foo = 3;                  Set a property\n" +
+           "   foo;                      Eval an expression\n" +
+           "   int foo; void foo() {}    Add/replace fields or methods\n\n" +
+           "At any time:\n" +
+           "   }                         To exit a type and return to the previous type or to the top-level with no type.\n" +
+           "   cmd.save();               To save your changes\n" +
+           "   cmd.list();               Display current objects, classes, field, methods etc. in the current context\n" +
+           "   <TAB>                     Comamnd line completion with terminals supported by JLine\n" +
+           "\n\n" +
+           "The Prompt                   Displays your current context - layer, package, and where you are in the layer stack using # before or after the layer name:\n\nExamples:\n" +
            "  (example.unitConverter.model:sc.example.unitConverter##) ->\n" +
-           "   ^ current layer             ^ current package       ^^ 2 layers below\n\n" +
+           "   ^ current layer             ^ current package       ^^ 2 layers below this layer in the stack\n\n" +
            "  (doc.core:sc.doc#(15)#) ->\n" +
            "                    ^ 15 layers below\n\n" +
-           "Use Java to change:\n" +
-           "   packageName {      - Set current context to the package name specified.\n" +
-           "   layerName {        - Go to the layer name specified.\n" +
-           "   typeName {         - Go to the type specified in the current layer.  If this type does not exist in this layer yet, the type will be added to the layer as needed.\n" +
-
-           "Use Java to create:\n" +
-           "   class typeName {   - Define a new class in the current layer.  The package for the class is the layer's package prefix (if any) plus the packageName context.\n" +
-           "   object typeName {  - Define a new object.\n" +
-
-           "Use Java to 'close':\n" +
-           "   }                  - Close the current type - returning to any previous type or the top-level\n\n" +
-
-           "Use Java to evaluate:\n" +
-           "   expression;        - Evaluate the expression and prints the output using the Java toString method.\n" +
 
            "The cmd object is used to control the interpreter:\n" +
            "   cmd.list();         - Lists the types (if at the top level) or the current objects and properties if inside of a type.\n" +
@@ -80,7 +75,8 @@ public abstract class AbstractInterpreter extends EditorContext {
            "   cmd.down();        - Move down the current layer stack for the given type.\n" +
            "   cmd.rebuild();     - Rebuild the system after you've made code changes.\n" +
            "   cmd.rebuildAll();  - Rebuild the system from scratch.\n" +
-           "   cmd.restart();     - Restart the process.\n\n";
+           "   cmd.restart();     - Restart the process.\n" +
+           "   cmd.<TAB>          - list the remaining properties and methods\n\n";
 
    /** For commands like createLayer, we add a wizard which processes input temporarily */
    CommandWizard currentWizard = null;

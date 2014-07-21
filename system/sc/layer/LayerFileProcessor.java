@@ -20,13 +20,21 @@ public class LayerFileProcessor implements IFileProcessor {
 
    public String outputDir;
 
-   public boolean prependLayerPackage = true;  // If true, prepend the layer's package name to the file.
+   /** If true, add the layer's package prefix onto the path name of the file in the layer to get the generated/copied file. */
+   public boolean prependLayerPackage = true;
 
+   /** Consider the resulting file part of the generated source and store it in the buildSrcDir of the layer. */
    public boolean useSrcDir = true;
 
-   public boolean useClassesDir = false;  // If true, store the file in the directory used for java classes
+   /** If true, store the file in the directory used for java classes */
+   public boolean useClassesDir = false;
 
-   public Layer definedInLayer;  // The layer which defines this processor
+   /**
+    * The layer which defines this processor.  Only layers which extend the definedInLayer can use this processor.
+    * This lets you use the same suffix in different ways based on the layers you include.  Not necessarily
+    * recommended but nice when you need it.
+    */
+   public Layer definedInLayer;
 
    public BuildPhase buildPhase = BuildPhase.Process;
 

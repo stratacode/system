@@ -25,9 +25,19 @@ public class FileUtil {
       FileUtil.saveStringAsFile(new File(fileName), data, mkdirs);
    }
 
-   /** For files wwe generate, mark them as 'read only' to avoid accidentally modifying them e.g. a signal to the editor and IDE */
+   /**
+    * For files we generate, mark them as 'read only' to avoid accidentally modifying them and as a signal to the editor and IDE.
+    * We also can use this flag as another hint as to whether the file has been edited accidentally.
+    */
    public static void saveStringAsReadOnlyFile(String fileName, String data, boolean mkdirs) {
       File file = new File(fileName);
+      if (file.canRead()) {
+         if (file.canWrite()) {
+            file.renameTo(new File(fileName + "_savedEdits"));
+         }
+         else
+            file.setWritable(true);
+      }
       FileUtil.saveStringAsFile(file, data, mkdirs);
       file.setReadOnly();
    }

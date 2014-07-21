@@ -192,7 +192,7 @@ public class LayerUtil implements LayerConstants {
    public static final FilenameFilter CLASSES_JAR_FILTER = new ExtensionFilenameFilter(Arrays.asList(new String[]{"class", "properties", "sctp"}), true);
    public static final FilenameFilter SRC_JAR_FILTER = new ExtensionFilenameFilter(Arrays.asList(new String[]{"java", "properties", "sctp", "xml"}), true);
 
-   public static int buildJarFile(String buildDir, String prefix, String jarName, String typeName, String[] pkgs, String classPath, FilenameFilter jarFilter) {
+   public static int buildJarFile(String buildDir, String prefix, String jarName, String typeName, String[] pkgs, String classPath, FilenameFilter jarFilter, boolean verbose) {
       List<String> args = null;
       File manifestTmp = null;
 
@@ -257,7 +257,10 @@ public class LayerUtil implements LayerConstants {
          pb.directory(new File(classDir));
          pb.redirectErrorStream(true);
 
-         System.out.println("Packaging: " + StringUtil.argsToString(args));
+         if (verbose)
+            System.out.println("Packaging: " + jarName + " with files: " + StringUtil.argsToString(args));
+         else
+            System.out.println("Packaging: " + args.size() + " files into: " + jarName);
 
          Process p = pb.start();
 
