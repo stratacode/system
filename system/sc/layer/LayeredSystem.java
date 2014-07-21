@@ -320,6 +320,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       Layer activeLayer = getLayerByName(layerName);
       // This layer is already in the active layers set so we don't have any work to do.
       if (activeLayer == null) {
+         ArrayList<String> layerNames = new ArrayList<String>();
+         layerNames.add(layerName);
+         initLayersWithNames(layerNames, false, false, null, false, false);
+         initRuntimes(null);
+         initBuildSystem();
       }
    }
 
@@ -552,6 +557,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       setCurrent(this);
 
+      initBuildSystem();
+
+      this.rootClassPath = rootClassPath;
+
+      if (excludedFiles != null) {
+         excludedPatterns = new ArrayList<Pattern>(excludedFiles.size());
+         for (int i = 0; i < excludedFiles.size(); i++)
+            excludedPatterns.add(Pattern.compile(excludedFiles.get(i)));
+      }
+   }
+
+   private void initBuildSystem() {
       initBuildDir();
 
       Layer lastCompiled = lastLayer;
@@ -573,13 +590,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       origBuildDir = buildDir;
       if (buildLayer != null)
          buildInfo = buildLayer.loadBuildInfo();
-      this.rootClassPath = rootClassPath;
 
-      if (excludedFiles != null) {
-         excludedPatterns = new ArrayList<Pattern>(excludedFiles.size());
-         for (int i = 0; i < excludedFiles.size(); i++)
-            excludedPatterns.add(Pattern.compile(excludedFiles.get(i)));
-      }
    }
 
    private void initRuntimes(List<String> explicitDynLayers) {
@@ -589,7 +600,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       // Create a new LayeredSystem for each additional runtime we need to satisfy the active set of layers.
       // Then purge any layers from this LayeredSystem which should not be here.
-      if (runtimes.size() > 1 && (peerSystems == null || peerSystems.size() < runtimes.size()-1)) {
+      if (runtimes != null && runtimes.size() > 1 && (peerSystems == null || peerSystems.size() < runtimes.size()-1)) {
 
          // We want all of the layered systems to use the same buildDir so pass it through options as though you had used the -d option.  Of course if you use -d, it will happen automatically.
          if (options.buildDir == null)
@@ -663,7 +674,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       else // If there's only one runtime, we'll use this layered system for it.
-         runtimeProcessor = runtimes.size() > 0 ? runtimes.get(0) : null;
+         runtimeProcessor = runtimes != null && runtimes.size() > 0 ? runtimes.get(0) : null;
 
    }
 

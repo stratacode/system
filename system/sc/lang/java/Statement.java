@@ -201,7 +201,7 @@ public abstract class Statement extends Definition implements IUserDataNode {
       return res;
    }
 
-   public String getErrorText() {
+   public String getNodeErrorText() {
       if (errorArgs != null) {
          StringBuilder sb = new StringBuilder();
          for (Object arg:errorArgs)

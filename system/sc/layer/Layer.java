@@ -1303,7 +1303,7 @@ public class Layer implements ILifecycle, LayerConstants {
 
    public File findSrcFile(String srcName) {
       if (!isStarted() && !activated)
-         System.out.println("***");
+         ParseUtil.realInitAndStartComponent(this);
       return srcDirCache.get(srcName);
    }
 

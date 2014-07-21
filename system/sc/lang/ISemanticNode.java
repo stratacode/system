@@ -57,7 +57,7 @@ public interface ISemanticNode {
    public int removeChild(Object toRemove);
 
    /** Returns null or an error string for this node */
-   public String getErrorText();
+   public String getNodeErrorText();
 
    /** Options for the deepCopy method - OR'd together as bit flags.  Copy the complete parse node tree */
    public static final int CopyParseNode = 1;

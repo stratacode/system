@@ -886,7 +886,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
    }
 
    /** Override to provide easy-per-node error support */
-   public String getErrorText() {
+   public String getNodeErrorText() {
       return null;
    }
 }

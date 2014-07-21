@@ -783,7 +783,7 @@ public class ClassType extends JavaType {
       return false;
    }
 
-   public String getErrorText() {
+   public String getNodeErrorText() {
       if (errorArgs != null) {
          StringBuilder sb = new StringBuilder();
          for (Object arg:errorArgs)
