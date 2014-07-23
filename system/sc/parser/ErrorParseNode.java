@@ -38,6 +38,8 @@ public class ErrorParseNode extends AbstractParseNode {
    }
 
    public void format(FormatContext ctx) {
+      // This ensures we render the document the way it was originally... including the error text.
+      ctx.append(errorText);
    }
 
    public int firstChar() {

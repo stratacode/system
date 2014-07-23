@@ -1140,7 +1140,6 @@ public class Layer implements ILifecycle, LayerConstants {
       File buildSrcDirFile = new File(buildSrcDir);
       if (buildSrcDir.contains("clientServer") && layeredSystem.getRuntimeName().contains("java")) {
          if (dynTypeIndex != null && !dynTypeIndex.contains("sc.html.index") && dynamic) {
-            System.out.println("***");
             System.err.println("*** Error - saving clientServer index without a dynamic sc.html.index page!");
          }
       }
@@ -1302,8 +1301,13 @@ public class Layer implements ILifecycle, LayerConstants {
    }
 
    public File findSrcFile(String srcName) {
-      if (!isStarted() && !activated)
-         ParseUtil.realInitAndStartComponent(this);
+      if (!isStarted() && !activated) {
+         if (initialized)
+            ParseUtil.realInitAndStartComponent(this);
+         else {
+            return null;
+         }
+      }
       return srcDirCache.get(srcName);
    }
 

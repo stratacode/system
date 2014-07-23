@@ -139,6 +139,7 @@ public class TestUtil {
       boolean enableStyle = false;
       boolean finalGenerate = true;
       List<String> buildList = null;
+      boolean enablePartialValues = false;
 
       for (int i = 0; i < args.length; i++) {
          if (args[i].length() == 0)
@@ -166,6 +167,9 @@ public class TestUtil {
                case 'f':
                   finalGenerate = false;
                   break;
+               case 'p':
+                  enablePartialValues = true;
+                  break;
             }
          }
          else {
@@ -175,7 +179,7 @@ public class TestUtil {
          }
       }
 
-      parseTestFiles(buildList == null ? inputFileNames : buildList.toArray(new String[0]), enableModelToString, enableStyle, finalGenerate);
+      parseTestFiles(buildList == null ? inputFileNames : buildList.toArray(new String[0]), enableModelToString, enableStyle, finalGenerate, enablePartialValues);
 
       if (dumpStats) {
          System.out.println("*** Stats:");
@@ -193,7 +197,7 @@ public class TestUtil {
    static boolean verifyResults = true;
    static boolean dumpStats = false;
 
-   public static void parseTestFiles(Object[] inputFiles, boolean enableModelToString, boolean enableStyle, boolean finalGenerate) {
+   public static void parseTestFiles(Object[] inputFiles, boolean enableModelToString, boolean enableStyle, boolean finalGenerate, boolean enablePartialValues) {
       JavaLanguage.register();
       SCLanguage.register();
       
@@ -220,7 +224,7 @@ public class TestUtil {
             if (files == null)
                System.err.println("**** Unable to read directory: " + file);
             else
-               parseTestFiles(files, enableModelToString, enableStyle, finalGenerate);
+               parseTestFiles(files, enableModelToString, enableStyle, finalGenerate, enablePartialValues);
             continue;
          }
          String input = ParseUtil.readFileString(file);
@@ -232,7 +236,7 @@ public class TestUtil {
          if (lang == null)
             throw new IllegalArgumentException("No language for: " + file.getPath());
          long startTime = System.currentTimeMillis();
-         Object result = lang.parse(new StringReader(input));
+         Object result = lang.parse(new StringReader(input), lang.getStartParselet(), enablePartialValues);
          long parseResultTime = System.currentTimeMillis();
 
          System.out.println("*** parsed: " + fileName + " in: " + rangeToSecs(startTime, parseResultTime));

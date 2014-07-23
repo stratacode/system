@@ -479,6 +479,19 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return null;
    }
 
+   public Statement findFromStatement(Statement srcStatement) {
+      if (fromStatement == srcStatement)
+         return this;
+      if (body != null) {
+         for (Statement st:body) {
+            Statement res = st.findFromStatement(srcStatement);
+            if (res != null)
+               return res;
+         }
+      }
+      return null;
+   }
+
    public static enum InitStatementMode {
       All, SimpleOnly, RefsOnly;
 

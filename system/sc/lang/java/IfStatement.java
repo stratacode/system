@@ -81,4 +81,18 @@ public class IfStatement extends NonIndentedStatement {
          return true;
       return false;
    }
+
+   public Statement findFromStatement(Statement toFind) {
+      if (toFind == this)
+         return this;
+      if (trueStatement != null) {
+         Statement res = trueStatement.findFromStatement(toFind);
+            if (res != null)
+               return res;
+         res = falseStatement.findFromStatement(toFind);
+         if (res != null)
+            return res;
+      }
+      return null;
+   }
 }

@@ -40,4 +40,13 @@ public class ForStatement extends Statement {
          ix = statement.transformTemplate(ix, statefulContext);
       return ix;
    }
+
+   public Statement findFromStatement(Statement toFind) {
+      Statement res = super.findFromStatement(toFind);
+      if (res != null)
+         return res;
+      if (statement != null)
+         res = statement.findFromStatement(toFind);
+      return res;
+   }
 }

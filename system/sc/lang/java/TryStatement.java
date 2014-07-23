@@ -137,4 +137,24 @@ public class TryStatement extends Statement implements IBlockStatement {
       return statements;
    }
 
+   public Statement findFromStatement(Statement toFind) {
+      if (toFind == this)
+         return this;
+      Statement res = AbstractBlockStatement.findFromBlockStatement(this, toFind);
+      if (res != null)
+         return res;
+      if (catchStatements != null) {
+         for (Statement st:catchStatements) {
+            res = st.findFromStatement(toFind);
+            if (res != null)
+               return res;
+         }
+      }
+      if (finallyStatement != null) {
+         res = finallyStatement.findFromStatement(toFind);
+         if (res != null)
+            return res;
+      }
+      return null;
+   }
 }

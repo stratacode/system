@@ -1090,6 +1090,32 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
       PerfMon.end("transform");
       return didTransform;
+
+   }
+
+   /** Returns the transformed model for this model. */
+   public JavaModel getTransformedModel() {
+      // We are the transformed model...
+      if (nonTransformedModel != null || getTransformed())
+         return this;
+      if (transformedModel != null)
+         return transformedModel;
+
+      if (!isProcessed()) {
+         ParseUtil.initAndStartComponent(this);
+         ParseUtil.processComponent(this);
+      }
+
+      if (!needsTransform())
+         return this;
+
+      boolean didTransform = transformModel();
+      if (didTransform) {
+         if (transformedModel != null)
+            transformedModel.validateParseNode(true);
+         return transformedModel;
+      }
+      return this;
    }
 
    /** Hook to reinitiaze any state after one of your base types gets modified after this type has been processed. */
@@ -1109,6 +1135,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
          ParseUtil.initAndStartComponent(this);
       }
+   }
+
+   public Statement findFromStatement(Statement srcStatement) {
+      TypeDeclaration modelType = getUnresolvedModelTypeDeclaration();
+      return modelType.findFromStatement(srcStatement);
    }
 
    private class ExtraFile {
@@ -1887,7 +1918,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    public void addBindDependency(TypeDeclaration toType, String property, TypeDeclaration fromType, boolean referenceOnly) {
       if (reverseDeps == null) {
-         if (reverseDepsInited || !readReverseDeps(getBuildLayer()))
+         Layer myBuildLayer = getBuildLayer();
+         if (myBuildLayer == null || getSrcFile() == null)
+            return;
+         if (reverseDepsInited || !readReverseDeps(myBuildLayer))
             reverseDeps = new ReverseDependencies();
       }
 
@@ -2101,6 +2135,16 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (transformed)
          return this;
       BodyTypeDeclaration modelType = getLayerTypeDeclaration();
+      if (modelType == null)
+         return this;
+      return modelType.getJavaModel();
+   }
+
+   public JavaModel resolveLastModel() {
+      // Once we've been transformed, the parentNode of the type becomes the transformed model so this logic no longer works.
+      if (transformed)
+         return this;
+      BodyTypeDeclaration modelType = getModelTypeDeclaration();
       if (modelType == null)
          return this;
       return modelType.getJavaModel();

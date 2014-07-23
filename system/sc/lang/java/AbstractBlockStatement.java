@@ -307,4 +307,22 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
    public List<Statement> getBlockStatements() {
       return statements;
    }
+
+   public Statement findFromStatement(Statement st) {
+      return findFromBlockStatement(this, st);
+   }
+
+   public static Statement findFromBlockStatement(IBlockStatement bst, Statement toFind) {
+      if (toFind == bst)
+         return (Statement) bst;
+      List<Statement> sts = bst.getBlockStatements();
+      if (sts != null) {
+         for (Statement st:sts) {
+            Statement res = st.findFromStatement(toFind);
+            if (res != null)
+               return res;
+         }
+      }
+      return null;
+   }
 }

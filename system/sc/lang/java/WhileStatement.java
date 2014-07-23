@@ -79,4 +79,12 @@ public class WhileStatement extends ExpressionStatement {
       return this;
    }
 
+   public Statement findFromStatement(Statement toFind) {
+      Statement res = super.findFromStatement(toFind);
+      if (res != null)
+         return res;
+      if (statement != null)
+         res = statement.findFromStatement(toFind);
+      return res;
+   }
 }

@@ -103,8 +103,8 @@ public class BuildInfo {
    }
 
    public void addMainCommand(JavaModel model, String execName, String[] args) {
-      changed = true;
       Layer modelLayer = model.getLayer();
+      changed = true;
       String typeName = model.getModelTypeName();
 
       addMainCommand(modelLayer, typeName, execName, args);

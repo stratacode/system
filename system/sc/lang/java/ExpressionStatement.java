@@ -37,4 +37,13 @@ public abstract class ExpressionStatement extends Statement {
          expression.transformToJS();
       return this;
    }
+
+   public Statement findFromStatement(Statement toFind) {
+      Statement res = super.findFromStatement(toFind);
+      if (res != null)
+         return res;
+      if (expression != null)
+         res = expression.findFromStatement(toFind);
+      return res;
+   }
 }

@@ -62,4 +62,8 @@ public class FinallyStatement extends NonIndentedStatement implements IBlockStat
    public List<Statement> getBlockStatements() {
       return statements;
    }
+
+   public Statement findFromStatement(Statement st) {
+      return AbstractBlockStatement.findFromBlockStatement(this, st);
+   }
 }

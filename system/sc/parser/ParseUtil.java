@@ -741,4 +741,131 @@ public class ParseUtil  {
    public static boolean isCollapsibleNode(Object currentParent) {
       return currentParent instanceof JavaSemanticNode && ((JavaSemanticNode) currentParent).isCollapsibleNode();
    }
+
+   public static int getLineNumberForNode(IParseNode rootParseNode, IParseNode toFindPN) {
+      LineForNodeCtx ctx = new LineForNodeCtx();
+      ctx.computeLineNumberForNode(rootParseNode, toFindPN);
+      if (ctx.found)
+         return ctx.curLines;
+      return -1;
+   }
+
+   static class LineForNodeCtx {
+      boolean found = false;
+      int curLines = 1; // The first line starts at 1
+
+      private void computeLineNumberForNode(IParseNode rootParseNode, IParseNode toFindPN) {
+         if (rootParseNode instanceof ParentParseNode) {
+            ParentParseNode pn = (ParentParseNode) rootParseNode;
+            if (pn.children == null)
+               return;
+            for (int i = 0; i < pn.children.size(); i++) {
+               Object childNode = pn.children.get(i);
+               if (childNode == toFindPN) {
+                  found = true;
+                  return;
+               }
+               else if (childNode instanceof IParseNode) {
+                  computeLineNumberForNode((IParseNode) childNode, toFindPN);
+                  if (found)
+                     return;
+               }
+               else if (childNode instanceof CharSequence) {
+                  curLines += countLinesInNode((CharSequence) childNode);
+               }
+            }
+         }
+         else if (rootParseNode instanceof ParseNode) {
+            ParseNode pn = (ParseNode) rootParseNode;
+            Object pnVal = pn.value;
+            if (pnVal == toFindPN)
+               found = true;
+            else if (pnVal instanceof IParseNode)
+               computeLineNumberForNode((IParseNode) pnVal, toFindPN);
+            else if (pnVal instanceof CharSequence)
+               curLines += countLinesInNode((CharSequence) pnVal);
+         }
+         else {
+            // Newline or spacing node - just treat it as a string
+            curLines += countLinesInNode(rootParseNode);
+         }
+      }
+   }
+
+   static class NodeAtLineCtx {
+      int curNumLines = 0;
+      ISemanticNode lastVal;
+   }
+
+   private static int countLinesInNode(CharSequence nodeStr) {
+      int numLines = 0;
+      for (int i = 0; i < nodeStr.length(); i++) {
+         char c = nodeStr.charAt(i);
+         if (c == '\n')
+            numLines++;
+      }
+      return numLines;
+   }
+
+   public static ISemanticNode getNodeAtLine(IParseNode parseNode, int requiredLineNum, NodeAtLineCtx ctx) {
+      if (ctx == null)
+         ctx = new NodeAtLineCtx();
+
+      if (parseNode == null)
+         return null;
+
+      ISemanticNode parentVal = ctx.lastVal;
+
+      // Keep track of the last semantic node we past in the hierarchy
+      Object val = parseNode.getSemanticValue();
+      if (val instanceof ISemanticNode)
+         ctx.lastVal = (ISemanticNode) val;
+
+      if (parseNode instanceof ParentParseNode) {
+         ParentParseNode par = (ParentParseNode) parseNode;
+
+         if (par.children == null)
+            return null;
+
+         for (Object childNode:par.children) {
+            if (PString.isString(childNode)) {
+               CharSequence nodeStr = (CharSequence) childNode;
+               ctx.curNumLines += countLinesInNode(nodeStr);
+               if (ctx.curNumLines >= requiredLineNum)
+                  return ctx.lastVal;
+            }
+            else if (childNode != null) {
+               ISemanticNode res = getNodeAtLine((IParseNode) childNode, requiredLineNum, ctx);
+               if (res != null || ctx.curNumLines > requiredLineNum)
+                  return res;
+
+               ctx.lastVal = parentVal;
+            }
+         }
+      }
+      else if (parseNode instanceof ParseNode) {
+         ParseNode pn = (ParseNode) parseNode;
+         Object childVal = pn.value;
+         if (childVal == null)
+            return null;
+         if (PString.isString(childVal)) {
+            CharSequence nodeStr = (CharSequence) childVal;
+            ctx.curNumLines += countLinesInNode(nodeStr);
+            if (ctx.curNumLines >= requiredLineNum)
+               return ctx.lastVal;
+         }
+         else {
+            ISemanticNode res = getNodeAtLine((IParseNode) childVal, requiredLineNum, ctx);
+            if (res != null)
+               return res;
+            ctx.lastVal = parentVal;
+         }
+      }
+      else {
+         ctx.curNumLines += countLinesInNode(parseNode);
+         if (ctx.curNumLines >= requiredLineNum)
+            return ctx.lastVal;
+      }
+      return null;
+   }
 }

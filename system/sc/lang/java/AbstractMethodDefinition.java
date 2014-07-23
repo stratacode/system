@@ -618,4 +618,12 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       displayError("Method ", name, " removed for ");
       return null;
    }
+
+   public Statement findFromStatement(Statement toFind) {
+      if (fromStatement == toFind)
+         return this;
+      if (body != null)
+         return body.findFromStatement(toFind);
+      return null;
+   }
 }

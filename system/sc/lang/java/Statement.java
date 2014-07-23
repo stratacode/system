@@ -219,4 +219,10 @@ public abstract class Statement extends Definition implements IUserDataNode {
    public Object getUserData() {
       return userData;
    }
+
+   public Statement findFromStatement (Statement st) {
+      if (fromStatement == st)
+         return this;
+      return null;
+   }
 }
