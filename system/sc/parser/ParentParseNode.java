@@ -5,6 +5,7 @@
 package sc.parser;
 
 import sc.lang.ISemanticNode;
+import sc.lang.java.IfStatement;
 import sc.util.PerfMon;
 
 import java.util.ArrayList;
@@ -224,6 +225,18 @@ public class ParentParseNode extends AbstractParseNode {
       return formatString(null, null, -1);
    }
 
+   private FormatContext createFormatContext(Object parSemVal, ParentParseNode curParseNode, int curChildIndex) {
+      int initIndent;
+
+      if (value instanceof ISemanticNode) {
+         ISemanticNode sv = (ISemanticNode) value;
+         initIndent = sv.getNestingDepth();
+      }
+      else
+         initIndent = 0;
+      return new FormatContext(curParseNode, curChildIndex, initIndent, getNextSemanticValue(parSemVal), parSemVal);
+   }
+
    /**
     * Formats the parse node - turning it into a String.  Parent should specify the semantic node parent of this parse node.
     * If null is specified, it's no problem as long as this parse-node's semantic value has a parent.  Some primitive parse nodes have a string
@@ -238,15 +251,7 @@ public class ParentParseNode extends AbstractParseNode {
       // To get the proper spacing for those children, we need the parent parse nodes in the FormatContext - so they can find the prev/next chars to do proper spacing.
       // If there's overhead here, we could still optimize the case where there are no invalidated children nodes
       //if (generated) {
-         int initIndent;
-
-         if (value instanceof ISemanticNode) {
-            ISemanticNode sv = (ISemanticNode) value;
-            initIndent = sv.getNestingDepth();
-         }
-         else
-            initIndent = 0;
-         FormatContext ctx = new FormatContext(curParseNode, curChildIndex, initIndent, getNextSemanticValue(parSemVal), parSemVal);
+         FormatContext ctx = createFormatContext(parSemVal, curParseNode, curChildIndex);
          //ctx.append(FormatContext.INDENT_STR);
          PerfMon.start("format", false);
          format(ctx);
@@ -279,15 +284,7 @@ public class ParentParseNode extends AbstractParseNode {
       // the property spacing.  If the parse node was parsed, we toString it just as it
       // was parsed so we get back the identical input strings.
       if (generated) {
-         int initIndent;
-
-         if (value instanceof ISemanticNode) {
-            ISemanticNode sv = (ISemanticNode) value;
-            initIndent = sv.getNestingDepth();
-         }
-         else
-            initIndent = 0;
-         FormatContext ctx = new FormatContext(null, -1, initIndent, getNextSemanticValue(null), null);
+         FormatContext ctx = createFormatContext(null, null, -1);
          //ctx.append(FormatContext.INDENT_STR);
          formatStyled(ctx);
          return ctx.getResult().toString();
@@ -298,7 +295,6 @@ public class ParentParseNode extends AbstractParseNode {
          StringBuffer sb = new StringBuffer();
          Parselet childParselet;
          int sz = children.size();
-         int numParselets = parselet.parselets.size();
          for (int i = 0; i < sz; i++) {
             Object childNode = children.get(i);
             childParselet = parselet.getChildParselet(childNode, i);
@@ -332,15 +328,25 @@ public class ParentParseNode extends AbstractParseNode {
 
    }
 
-   public void format(FormatContext ctx) {
-      if (children == null || children.size() == 0)
-         return;
-
+   private FormatContext.Entry visitForFormat(FormatContext ctx) {
       FormatContext.Entry ent = new FormatContext.Entry();
       List<FormatContext.Entry> pp = ctx.pendingParents;
       ent.parent = this;
       ent.currentIndex = 0;
       pp.add(ent);
+      return ent;
+   }
+
+   private void endVisitForFormat(FormatContext ctx) {
+      List<FormatContext.Entry> pp = ctx.pendingParents;
+      pp.remove(pp.size()-1);
+   }
+
+   public void format(FormatContext ctx) {
+      if (children == null || children.size() == 0)
+         return;
+
+      FormatContext.Entry ent = visitForFormat(ctx);
       try {
          for (Object p:children) {
             if (p instanceof IParseNode) {
@@ -358,9 +364,8 @@ public class ParentParseNode extends AbstractParseNode {
          }
       }
       finally {
-         pp.remove(pp.size()-1);
+         endVisitForFormat(ctx);
       }
-      return;
    }
 
    public IParseNode reformat() {
@@ -417,6 +422,36 @@ public class ParentParseNode extends AbstractParseNode {
          ctx.pendingParents.remove(ctx.pendingParents.size()-1);
       }
    }
+
+   public void computeLineNumberForNode(LineFormatContext ctx, IParseNode toFindPN) {
+      if (children == null)
+         return;
+
+      FormatContext.Entry ent = visitForFormat(ctx);
+      try {
+         for (int i = 0; i < children.size(); i++) {
+            Object childNode = children.get(i);
+            if (childNode == toFindPN) {
+               ctx.found = true;
+               return;
+            }
+            else if (childNode instanceof IParseNode) {
+               ((IParseNode) childNode).computeLineNumberForNode(ctx, toFindPN);
+               if (ctx.found)
+                  return;
+            }
+            else if (childNode instanceof CharSequence) {
+               CharSequence childSeq = (CharSequence) childNode;
+               ctx.append(childSeq);
+            }
+            ent.currentIndex++;
+         }
+      }
+      finally {
+         endVisitForFormat(ctx);
+      }
+   }
+
 
    public String toDebugString() {
       StringBuffer sb = new StringBuffer();
@@ -618,6 +653,58 @@ public class ParentParseNode extends AbstractParseNode {
    /** Some semantic nodes compress the parse-tree and so cannot listen for changes on their children.  */
    public boolean isCompressedNode() {
       return children != null && children.size() == 1 && children.get(0) instanceof FormattedParseNode;
+   }
+
+   public ISemanticNode getNodeAtLine( NodeAtLineCtx ctx, int lineNum) {
+      ISemanticNode res = super.getNodeAtLine(ctx, lineNum);
+      if (res != null)
+         return res;
+
+      if (children == null)
+         return null;
+
+      List listVal = null;
+      boolean isList = value instanceof List;
+      if (isList)
+         listVal = (List) value;
+      int listIx = 0;
+
+      FormatContext.Entry ent = visitForFormat(ctx);
+      try {
+         int childIx = 0;
+         for (Object childNode:children) {
+            // For repeat nodes, as we walk past each significant value, update the lastVal
+            if (isList && (childIx % parselet.parselets.size()) == 0 && listVal.size() > listIx) {
+               Object elemObj = listVal.get(listIx++);
+               if (elemObj instanceof ISemanticNode) {
+                  ISemanticNode node = (ISemanticNode) elemObj;
+                  if (node.getParentNode() != null)
+                     ctx.lastVal = node;
+               }
+            }
+            if (PString.isString(childNode)) {
+               CharSequence nodeStr = (CharSequence) childNode;
+               ctx.append(nodeStr);
+               if (ctx.curLines >= lineNum)
+                  return ctx.lastVal;
+            }
+            else if (childNode != null) {
+               res = ((IParseNode) childNode).getNodeAtLine(ctx, lineNum);
+               if (res != null || ctx.curLines > lineNum)
+                  return res;
+
+               // We take the most specific value which has a parent, then walk up the parent hierarchy till we find
+               // a statement at the right level.  So no resetting the current value here.
+               //ctx.lastVal = parentVal;
+            }
+            childIx++;
+            ent.currentIndex++;
+         }
+      }
+      finally {
+         endVisitForFormat(ctx);
+      }
+      return null;
    }
 }
 

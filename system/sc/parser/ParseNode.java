@@ -197,4 +197,46 @@ public class ParseNode extends AbstractParseNode {
          res.value = ((IParseNode) val).deepCopy();
       return res;
    }
+
+   public void computeLineNumberForNode(LineFormatContext ctx, IParseNode toFindPN) {
+      Object pnVal = value;
+      if (pnVal == toFindPN)
+         ctx.found = true;
+      else if (pnVal instanceof IParseNode) {
+         IParseNode pn = (IParseNode) pnVal;
+         pn.computeLineNumberForNode(ctx, toFindPN);
+      }
+      else if (pnVal instanceof CharSequence) {
+         CharSequence pnSeq = (CharSequence) pnVal;
+         ctx.append(pnSeq);
+         ctx.curLines += ParseUtil.countLinesInNode(pnSeq);
+      }
+   }
+
+   public ISemanticNode getNodeAtLine(NodeAtLineCtx ctx, int lineNum) {
+      ISemanticNode res = super.getNodeAtLine(ctx, lineNum);
+      if (res != null)
+         return res;
+
+      Object childVal = value;
+      if (childVal == null)
+         return null;
+      if (PString.isString(childVal)) {
+         CharSequence nodeStr = (CharSequence) childVal;
+         ctx.curLines += ParseUtil.countLinesInNode(nodeStr);
+         if (ctx.curLines >= lineNum)
+            return ctx.lastVal;
+      }
+      else {
+         res = ((IParseNode) childVal).getNodeAtLine(ctx, lineNum);
+         if (res != null)
+            return res;
+         // Returning the lowest level match that has a parent.  That seems more reliable than this approach of trying to hit it on the way up
+         // If you think about it we need to include the node which contains the newline and use that as the context node to find the 'real statement'
+         // to use.
+         //ctx.lastVal = parentVal;
+      }
+      return null;
+   }
+
 }

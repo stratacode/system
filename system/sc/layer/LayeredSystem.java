@@ -331,14 +331,22 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public JavaModel getTransformedModelForType(String typeName) {
-      TypeDeclaration origType = (TypeDeclaration) getSrcTypeDeclaration(typeName, null, true, false, true);
-      if (origType == null)
-         return null;
+      try {
+         // This gets set normally during the generateAndCompile method but needs also to be defined during the transformation process if we need a transformedModel
+         // say for debugging.
+         currentBuildLayer = buildLayer;
+         TypeDeclaration origType = (TypeDeclaration) getSrcTypeDeclaration(typeName, null, true, false, true);
+         if (origType == null)
+            return null;
 
-      JavaModel origModel = origType.getJavaModel();
-      if (origModel == null)
-         return null;
-      return origModel.getTransformedModel();
+         JavaModel origModel = origType.getJavaModel();
+         if (origModel == null)
+            return null;
+         return origModel.getTransformedModel();
+      }
+      finally {
+         currentBuildLayer = null;
+      }
    }
 
    public enum BuildCommandTypes {
@@ -6308,9 +6316,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (transformed)
                break;
          }
-         if (k != tdEnt.size() || tdEnt.size() == 0) {
-            if (options.clonedTransform && tdEnt.size() > 0)
-               System.err.println("*** Flush type cache found transformed model with clonedTransform");
+         // For cloned transform with the IDE we'll have autoImports in here so do not go and remove this entry even if there are not registered types.
+         // It's because we have not loaded the type in the type cache if it's not in an active layer.
+         if (k != tdEnt.size() || (tdEnt.size() == 0 && !options.clonedTransform)) {
             tdEnt.reloaded = true;
             for (k = 0; k < tdEnt.size(); k++) {
                TypeDeclaration td = tdEnt.get(k);
@@ -8134,15 +8142,21 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
          // May have parsed this file as a different type name, i.e. a layer object.  If so, just return null since
          // in any case, its type did not get added to the cache.
-         Object modelObj = getLanguageModel(srcFile);
-         if (modelObj == null) {
-            modelObj = parseSrcType(srcFile, fromLayer, false, true);
+         ILanguageModel langModel = getLanguageModel(srcFile);
+         if (langModel == null) {
+            Object modelObj = parseSrcType(srcFile, fromLayer, false, true);
             if (modelObj instanceof ILanguageModel) {
                decls = typesByName.get(fullTypeName);
                if (decls == null || decls.size() == 0)
                   return null;
                return decls.get(0);
             }
+         }
+         else {
+            // When we load the model through the IDE, it does not get put into the type cache reliably
+            ITypeDeclaration modelType = langModel.getModelTypeDeclaration();
+            if (modelType != null && modelType.getFullTypeName().equals(fullTypeName))
+               return modelType;
          }
          return null;
       }
@@ -8175,7 +8189,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (model instanceof JavaModel)
             return ((JavaModel) model).getModelTypeDeclaration();
       }
-      Object result = parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, true);
+      Object result = parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, !disableCommandLineErrors);
       if (result instanceof JavaModel)
          return ((JavaModel) result).getModelTypeDeclaration();
       return null;
@@ -8183,26 +8197,29 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    /** Auto imports are resolved by searching through the layer hierarchy from the layer which originates the reference */
    public ImportDeclaration getImportDecl(Layer fromLayer, Layer refLayer, String typeName) {
+      ImportDeclaration importDecl = null;
       if (refLayer != null && !refLayer.activated) {
-         return refLayer.getImportDecl(typeName, true);
+         importDecl = refLayer.getImportDecl(typeName, true);
+         if (importDecl != null)
+            return importDecl;
       }
-      if (refLayer == null || refLayer.inheritImports) {
-         int startIx = fromLayer == null ? layers.size() - 1 : fromLayer.getLayerPosition();
-         ImportDeclaration importDecl = null;
-         for (int i = startIx; i >= 0; i--) {
-            Layer depLayer = layers.get(i);
-            // We only inherit imports from a layer which we directly extend.
-            if (depLayer.exportImportsTo(refLayer))
-               importDecl = depLayer.getImportDecl(typeName, false);
-            if (importDecl != null)
-               return importDecl;
+      else {
+         if (refLayer == null || refLayer.inheritImports) {
+            int startIx = fromLayer == null ? layers.size() - 1 : fromLayer.getLayerPosition();
+            for (int i = startIx; i >= 0; i--) {
+               Layer depLayer = layers.get(i);
+               // We only inherit imports from a layer which we directly extend.
+               if (depLayer.exportImportsTo(refLayer))
+                  importDecl = depLayer.getImportDecl(typeName, false);
+               if (importDecl != null)
+                  return importDecl;
+            }
+         }
+         // When inheritImports is false, we only use this layer's imports and don't allow overriding of imports
+         else {
+            return refLayer.getImportDecl(typeName, false);
          }
       }
-      // When inheritImports is false, we only use this layer's imports and don't allow overriding of imports
-      else {
-         return refLayer.getImportDecl(typeName, false);
-      }
-
       return globalImports.get(typeName);
    }
 
@@ -9968,7 +9985,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       finally {
          releaseDynLock(false);
       }
-      System.err.println("*** Warning - unable to find layer for path name: " + pathName);
+      // The BuildInfo.sc file is the only SC file that should be in the buildSrc directory - not in a layer.
+      if (!(pathName.endsWith("BuildInfo.sc")))
+         System.err.println("*** Warning - unable to find layer for path name: " + pathName);
       return new SrcEntry(null, pathName, FileUtil.getFileName(pathName));
    }
 

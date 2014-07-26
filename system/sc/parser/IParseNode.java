@@ -4,8 +4,22 @@
 
 package sc.parser;
 
+import sc.lang.ISemanticNode;
+
 import java.util.IdentityHashMap;
 
+/**
+ * The core interface for the parse-tree which is built by the parselets.  This tree maps one-to-one to productions
+ * from the parselets tree and retains pointers back into the grammar so you can update the tree incrementally.
+ * Each parse node also may have a semantic value - the AST or behavioral tree that's created from the parse tree.
+ * There are fewer nodes in the semantic value tree and that's usually what the program manipulates.  The semantic value
+ * points to it's top-level parse node if it implements the ISemanticNode interface (which is required for the bi-directional
+ * and incremental updates).
+ * <p>We do occasionally compress the leaf-nodes of the parse-node tree for speed and probably should do more of that</p>
+ *
+ * TODO: for performance - maybe this should only be an abstract class.  Also we should use final methods for things which are not overridden
+ * as this is a high-bandwidth set of classes.
+ * */
 public interface IParseNode extends CharSequence {
    Parselet getParselet();
 
@@ -63,6 +77,11 @@ public interface IParseNode extends CharSequence {
    void updateSemanticValue(IdentityHashMap<Object,Object> oldNewMap);
 
    boolean isCompressedNode();
+
+   /** Internal method used to walk the parse tree to find the line number for a given parse node (which must be in the tree). */
+   void computeLineNumberForNode(LineFormatContext ctx, IParseNode toFindPN);
+
+   ISemanticNode getNodeAtLine(NodeAtLineCtx ctx, int requiredLineNum);
 }
 
 

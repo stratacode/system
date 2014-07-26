@@ -17,6 +17,7 @@ public class Annotation extends JavaSemanticNode implements IAnnotation {
    public Object elementValue;
 
    public transient Object boundType;
+   transient Object[] errorArgs;
 
    public static Annotation create(String typeName) {
       Annotation annot = new Annotation();
@@ -256,5 +257,22 @@ public class Annotation extends JavaSemanticNode implements IAnnotation {
          return sb.toString();
       }
       return super.toSafeLanguageString();
+   }
+
+   public void displayTypeError(String...args) {
+      Statement st;
+      errorArgs = args;
+      super.displayTypeError(args);
+   }
+
+   public String getNodeErrorText() {
+      if (errorArgs != null) {
+         StringBuilder sb = new StringBuilder();
+         for (Object arg:errorArgs)
+            sb.append(arg.toString());
+         sb.append(this.toString());
+         return sb.toString();
+      }
+      return null;
    }
 }

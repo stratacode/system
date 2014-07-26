@@ -79,4 +79,12 @@ public abstract class TwoOperatorExpression extends Expression {
          rhs.transformToJS();
       return this;
    }
+
+   public boolean matchesStatement(Statement other) {
+      return deepEquals(other);
+   }
+
+   public boolean updateFromStatementRef(Statement fromSt) {
+      return checkFromStatementRef(this, fromSt);
+   }
 }

@@ -31,4 +31,8 @@ public class ImportDeclaration extends JavaSemanticNode {
       id.staticImport = true;
       return id;
    }
+
+   public String toString() {
+      return staticImport ? "static " : "" + "import " + identifier;
+   }
 }

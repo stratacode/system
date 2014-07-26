@@ -479,12 +479,13 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return null;
    }
 
-   public Statement findFromStatement(Statement srcStatement) {
-      if (fromStatement == srcStatement)
-         return this;
+   public ISrcStatement findFromStatement(ISrcStatement srcStatement) {
+      ISrcStatement res = super.findFromStatement(srcStatement);
+      if (res != null)
+         return res;
       if (body != null) {
          for (Statement st:body) {
-            Statement res = st.findFromStatement(srcStatement);
+            res = st.findFromStatement(srcStatement);
             if (res != null)
                return res;
          }

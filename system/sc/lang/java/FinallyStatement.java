@@ -4,6 +4,8 @@
 
 package sc.lang.java;
 
+import sc.lang.ISrcStatement;
+
 import java.util.List;
 import java.util.Set;
 
@@ -63,7 +65,7 @@ public class FinallyStatement extends NonIndentedStatement implements IBlockStat
       return statements;
    }
 
-   public Statement findFromStatement(Statement st) {
+   public ISrcStatement findFromStatement(ISrcStatement st) {
       return AbstractBlockStatement.findFromBlockStatement(this, st);
    }
 }

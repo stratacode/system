@@ -6,6 +6,7 @@ package sc.lang.java;
 
 import sc.dyn.DynUtil;
 import sc.lang.ILanguageModel;
+import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
 import sc.lang.js.JSFormatMode;
 import sc.lang.js.JSRuntimeProcessor;
@@ -666,5 +667,16 @@ public class FieldDefinition extends TypedDefinition {
          ix = varDef.transformTemplate(ix, statefulContext);
       }
       return ix;
+   }
+
+   public boolean getNodeContainsPart(ISrcStatement fromSt) {
+      if (fromSt == this)
+         return true;
+      if (variableDefinitions != null) {
+         for (VariableDefinition varDef:variableDefinitions)
+            if (varDef == fromSt)
+               return true;
+      }
+      return false;
    }
 }

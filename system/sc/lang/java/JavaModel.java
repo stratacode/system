@@ -1137,7 +1137,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       }
    }
 
-   public Statement findFromStatement(Statement srcStatement) {
+   public ISrcStatement findFromStatement(ISrcStatement srcStatement) {
       TypeDeclaration modelType = getUnresolvedModelTypeDeclaration();
       return modelType.findFromStatement(srcStatement);
    }
@@ -2147,6 +2147,14 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       BodyTypeDeclaration modelType = getModelTypeDeclaration();
       if (modelType == null)
          return this;
+
+      // In the IDE context, we do not always load the types in reverse order like we during the build.  So from the IDE, we may need
+      // to find and populate the most specific type here.
+      String fullTypeName = modelType.getFullTypeName();
+      TypeDeclaration lastType = (TypeDeclaration) layeredSystem.getSrcTypeDeclaration(fullTypeName, null, true, false, true);
+      if (lastType != null)
+         return lastType.getJavaModel();
+
       return modelType.getJavaModel();
    }
 

@@ -17,7 +17,7 @@ import sc.util.FileUtil;
 
 import java.util.IdentityHashMap;
 
-public class SpacingParseNode extends AbstractParseNode {
+public class SpacingParseNode extends FormattingParseNode {
    Parselet parselet;
    boolean newline = false;
 
@@ -32,20 +32,6 @@ public class SpacingParseNode extends AbstractParseNode {
    
    public int firstChar() {
       return (int) ' ';
-   }
-
-   public boolean refersToSemanticValue(Object obj) {
-      return false;
-   }
-
-   public Object getSemanticValue() {
-      return null;
-   }
-
-   public void setSemanticValue(Object obj) {
-      if (obj == null)
-         return;
-      throw new UnsupportedOperationException();
    }
 
    public String toDebugString() {
@@ -135,14 +121,12 @@ public class SpacingParseNode extends AbstractParseNode {
                               SemanticNode node = ctx.getNextSemanticNode();
                               if (node == null) {
                                  node = ctx.getPrevSemanticNode();
-                                 if (node != null && (newLine || indent)) // last tag
+                                 if (node != null) // last tag
                                     ctx.append("\n");
                               }
-                              else if (node != null) {
-                                 if (newLine || indent) {
-                                    ctx.append("\n");
-                                    ctx.indent(node.getNestingDepth());
-                                 }
+                              else {
+                                 ctx.append("\n");
+                                 ctx.indent(node.getNestingDepth());
                               }
                            }
                         }
@@ -215,17 +199,5 @@ public class SpacingParseNode extends AbstractParseNode {
          return;
       if (!ctx.suppressSpacing)
          ctx.append(" ");
-   }
-
-   public CharSequence toSemanticString() {
-      return "";
-   }
-
-   // No state in this parse nodes so do not copy them
-   public SpacingParseNode deepCopy() {
-      return this;
-   }
-
-   public void updateSemanticValue(IdentityHashMap<Object, Object> oldNewMap) {
    }
 }

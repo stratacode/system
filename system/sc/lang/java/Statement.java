@@ -5,11 +5,13 @@
 package sc.lang.java;
 
 import sc.lang.ISemanticNode;
+import sc.lang.ISrcStatement;
 import sc.lang.IUserDataNode;
 import sc.lang.SemanticNodeList;
 import sc.lang.js.JSFormatMode;
 import sc.lang.js.JSLanguage;
 import sc.parser.FormatContext;
+import sc.parser.Language;
 import sc.parser.ParentParseNode;
 import sc.parser.ParseUtil;
 import sc.type.IBeanMapper;
@@ -19,13 +21,13 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
 
-public abstract class Statement extends Definition implements IUserDataNode {
+public abstract class Statement extends Definition implements IUserDataNode, ISrcStatement {
    public transient Object[] errorArgs;
    public transient int childNestingDepth = -1;
 
    // During code-generation, one statement may be generated from another, e.g. for templates we clone statements that are children of a template declaration.  This
    // stores that references so we can find the original source Statement.
-   public transient Statement fromStatement;
+   public transient ISrcStatement fromStatement;
 
    transient Object userData = null;  // A hook for user data - specifically for an IDE to store its instance for this node
 
@@ -220,9 +222,45 @@ public abstract class Statement extends Definition implements IUserDataNode {
       return userData;
    }
 
-   public Statement findFromStatement (Statement st) {
+   public boolean getNodeContainsPart(ISrcStatement partNode) {
+      return partNode == this;
+   }
+
+   public ISrcStatement findFromStatement (ISrcStatement st) {
+      if (st.getNodeContainsPart(this.getFromStatement()))
+         return this;
       if (fromStatement == st)
          return this;
+      // Note we return the first reference even after following the chain - since we want the resulting generated source
+      // as mapped to the original source.
+      if (fromStatement != null && fromStatement.findFromStatement(st) != null)
+         return this;
       return null;
+   }
+
+   public boolean updateFromStatementRef(Statement fromSt) {
+      return false;
+   }
+
+   public boolean matchesStatement(Statement other) {
+      return false;
+   }
+
+   public static boolean checkFromStatementRef(Statement toUpdate, Statement fromSt) {
+      if (toUpdate.fromStatement == null && toUpdate.matchesStatement(fromSt)) {
+         toUpdate.fromStatement = fromSt;
+         return true;
+      }
+      return false;
+   }
+
+   public ISrcStatement getSrcStatement(Language lang) {
+      if (fromStatement == null || (parseNode != null && parseNode.getParselet().getLanguage() == lang))
+         return this;
+      return fromStatement.getSrcStatement(lang);
+   }
+
+   public ISrcStatement getFromStatement() {
+      return fromStatement;
    }
 }

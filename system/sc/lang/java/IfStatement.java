@@ -4,6 +4,8 @@
 
 package sc.lang.java;
 
+import sc.lang.ISrcStatement;
+
 import java.util.List;
 import java.util.Set;
 
@@ -82,17 +84,28 @@ public class IfStatement extends NonIndentedStatement {
       return false;
    }
 
-   public Statement findFromStatement(Statement toFind) {
+   public ISrcStatement findFromStatement(ISrcStatement toFind) {
       if (toFind == this)
          return this;
+      ISrcStatement res;
       if (trueStatement != null) {
-         Statement res = trueStatement.findFromStatement(toFind);
-            if (res != null)
-               return res;
+         res = trueStatement.findFromStatement(toFind);
+         if (res != null)
+            return res;
+      }
+      if (falseStatement != null) {
          res = falseStatement.findFromStatement(toFind);
          if (res != null)
             return res;
       }
       return null;
+   }
+
+   public boolean updateFromStatementRef(Statement fromSt) {
+      if (trueStatement != null && trueStatement.updateFromStatementRef(fromSt))
+         return true;
+      if (falseStatement != null && falseStatement.updateFromStatementRef(fromSt))
+         return true;
+      return false;
    }
 }

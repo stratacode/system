@@ -1916,9 +1916,6 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (replacedByStatement != null)
          return true;
 
-      if (idTypes == null)
-         System.out.println("***");
-
       int sz = identifiers.size();
       for (int i = 0; i < sz; i++) {
          switch (idTypes[i]) {

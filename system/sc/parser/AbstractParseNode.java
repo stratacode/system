@@ -135,4 +135,15 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
    public String formatString(Object parentSemVal, ParentParseNode parParseNode, int curChildIndex) {
       return toString();
    }
+
+   public ISemanticNode getNodeAtLine(NodeAtLineCtx ctx, int lineNum) {
+      // Keep track of the last semantic node we past in the hierarchy
+      Object val = getSemanticValue();
+      if (val instanceof ISemanticNode) {
+         ISemanticNode valNode = (ISemanticNode) val;
+         if (valNode.getParentNode() != null)
+            ctx.lastVal = valNode;
+      }
+      return null;
+   }
 }

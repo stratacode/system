@@ -8,8 +8,10 @@ import sc.bind.BindingDirection;
 import sc.dyn.DynUtil;
 import sc.lang.ILanguageModel;
 import sc.lang.ISemanticNode;
+import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
 import sc.lang.sc.PropertyAssignment;
+import sc.parser.Language;
 
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -18,6 +20,7 @@ import java.util.Set;
 public class AssignmentExpression extends TwoOperatorExpression {
    public transient String selfOperator;
 
+   // TODO performance: investigate if we can use fromStatement for this to save on the field
    public transient JavaSemanticNode fromDefinition; // Either a VariableDefinition or a PropertyAssignment when this is a convert of a field or property
 
    public transient Object assignedProperty;  // Reference to the field or set method involved in the assignment if this is to a field
@@ -179,7 +182,7 @@ public class AssignmentExpression extends TwoOperatorExpression {
                rhsExpr = ((ParenExpression) rhsExpr).getChainedExpression();
             }
          }
-         parentNode.replaceChild(this, rhsExpr);
+         replaceStatementChild(rhsExpr);
          return true;
       }
 
@@ -207,8 +210,7 @@ public class AssignmentExpression extends TwoOperatorExpression {
             // In some cases, the super transform process will remove this statement entirely, for example when you have
             // an =: assignmnet expression.  In those cases, just skip these last steps as we are done.
             if (parentNode.containsChild(this)) {
-               lhs.convertToSetMethod(rhs);
-               parentNode.replaceChild(this, lhs);
+               convertAssignmentToSetMethod(lhs, rhs);
             }
             return true;
          }
@@ -220,13 +222,13 @@ public class AssignmentExpression extends TwoOperatorExpression {
             AbstractBlockStatement newParent = (AbstractBlockStatement) parentExpr.getEnclosingStatement();
             newParent.insertStatementBefore(parentExpr, lhsCopy);
             lhsCopy.transform(runtime);
+            markReplacedFromStatement(lhsCopy);
          }
          else if (canInsertBefore) {
             // Need to do the binding stuff here
             super.transform(runtime);
 
-            lhs.convertToSetMethod(rhs);
-            parentNode.replaceChild(this, lhs);
+            convertAssignmentToSetMethod(lhs, rhs);
             removed = true;
          }
          else {
@@ -257,6 +259,7 @@ public class AssignmentExpression extends TwoOperatorExpression {
             castExpr.setProperty("expression", call);
             parentNode.replaceChild(replacedByStatement == null ? this : replacedByStatement, castExpr);
             castExpr.transform(runtime);
+            markReplacedFromStatement(castExpr);
             removed = true;
          }
       }
@@ -272,6 +275,24 @@ public class AssignmentExpression extends TwoOperatorExpression {
          any = true;
       }
       return any;
+   }
+
+   private void convertAssignmentToSetMethod(Expression lhsExpr, Expression rhsExpr) {
+      lhsExpr.convertToSetMethod(rhsExpr);
+      replaceStatementChild(lhsExpr);
+   }
+
+   private void replaceStatementChild(Statement newChild) {
+      parentNode.replaceChild(this, newChild);
+      markReplacedFromStatement(newChild);
+   }
+
+   private void markReplacedFromStatement(Statement newSt) {
+      // Propagate our fromDefinition if we were generated.  Probably fromDefinition and fromStatement should be combiend
+      if (fromDefinition instanceof Statement)
+         newSt.fromStatement = (Statement) fromDefinition;
+      else
+         newSt.fromStatement = this;
    }
 
    public void transformBindingArgs(SemanticNodeList<Expression> bindArgs, BindDescriptor bd) {
@@ -379,5 +400,17 @@ public class AssignmentExpression extends TwoOperatorExpression {
       sb.append(" ");
       sb.append(rhs.toGenerateString());
       return sb.toString();
+   }
+
+   public ISrcStatement findFromStatement (ISrcStatement st) {
+      if (fromDefinition instanceof ISrcStatement && ((ISrcStatement) fromDefinition).findFromStatement(st) != null)
+         return this;
+      return super.findFromStatement(st);
+   }
+
+   public ISrcStatement getSrcStatement(Language lang) {
+      if (fromDefinition instanceof ISrcStatement)
+         return ((ISrcStatement) fromDefinition).getSrcStatement(lang);
+      return super.getSrcStatement(lang);
    }
 }

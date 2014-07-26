@@ -889,4 +889,16 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
    public String getNodeErrorText() {
       return null;
    }
+
+   /** Returns the statement which is aligned to the source for debugging purposes that contains this node. */
+   public ISrcStatement getEnclosingSrcStatement() {
+      for (ISemanticNode pnode = parentNode; pnode != null; pnode = pnode.getParentNode())
+         if (pnode instanceof ISrcStatement)
+            return (ISrcStatement) pnode;
+      return null;
+   }
+
+   public ISemanticNode refreshNode() {
+      return this;
+   }
 }

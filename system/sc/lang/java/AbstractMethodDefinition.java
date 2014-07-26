@@ -6,6 +6,7 @@ package sc.lang.java;
 
 import sc.dyn.DynUtil;
 import sc.lang.INamedNode;
+import sc.lang.ISrcStatement;
 import sc.lang.SCLanguage;
 import sc.lang.SemanticNodeList;
 import sc.lang.template.GlueStatement;
@@ -369,8 +370,12 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
          sb.append(modifiers.toLanguageString(SCLanguage.getSCLanguage().modifiers));
       }
       if (type != null) {
+         if (sb.length() != 0 && sb.charAt(sb.length()-1) != ' ')
+            sb.append(" ");
          sb.append(type.toLanguageString(SCLanguage.getSCLanguage().type));
       }
+      if (sb.length() != 0 && sb.charAt(sb.length()-1) != ' ')
+         sb.append(" ");
       sb.append(toMethodDeclString());
       TypeDeclaration enclType = getEnclosingType();
       if (enclType != null) {
@@ -619,11 +624,18 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       return null;
    }
 
-   public Statement findFromStatement(Statement toFind) {
-      if (fromStatement == toFind)
+   public ISrcStatement findFromStatement(ISrcStatement toFind) {
+      ISrcStatement res = super.findFromStatement(toFind);
+      if (res != null)
          return this;
       if (body != null)
          return body.findFromStatement(toFind);
       return null;
+   }
+
+   public boolean updateFromStatementRef(Statement fromSt) {
+      if (body == null)
+         return false;
+      return body.updateFromStatementRef(fromSt);
    }
 }

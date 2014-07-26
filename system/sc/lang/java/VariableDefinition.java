@@ -11,6 +11,7 @@ import sc.lang.*;
 import sc.lang.js.JSUtil;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
+import sc.parser.Language;
 import sc.parser.ParentParseNode;
 import sc.parser.ParseUtil;
 import sc.type.IBeanMapper;
@@ -22,7 +23,7 @@ import java.util.Collection;
 import java.util.IdentityHashMap;
 import java.util.Set;
 
-public class VariableDefinition extends AbstractVariable implements IVariableInitializer {
+public class VariableDefinition extends AbstractVariable implements IVariableInitializer, ISrcStatement {
    public Expression initializer;
    public String operator;        // Usually '=' - used for data binding initializes
 
@@ -42,6 +43,8 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
 
    // When doing conversions to other languages, may need to freeze the type
    public transient Object frozenTypeDecl;
+
+   public transient ISrcStatement fromStatement;
 
    private static boolean wasBound = false;
 
@@ -686,6 +689,40 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          return null;
       }
       return null;
+   }
+
+   public ISrcStatement getSrcStatement(Language lang) {
+      if (lang != null && (parseNode != null && parseNode.getParselet().getLanguage() == lang))
+         return this;
+      if (fromStatement == null) {
+         Statement def = getDefinition();
+         if (def.fromStatement != null)
+            return def.fromStatement.getSrcStatement(lang);
+         return this;
+      }
+      return fromStatement.getSrcStatement(lang);
+   }
+
+   public ISrcStatement findFromStatement (ISrcStatement st) {
+      if (fromStatement == st)
+         return this;
+      // Note we return the first reference even after following the chain - since we want the resulting generated source
+      // as mapped to the original source.
+      if (fromStatement != null && fromStatement.findFromStatement(st) != null)
+         return this;
+      Statement def = getDefinition();
+      if (def != null && def.findFromStatement(st) != null) {
+         return this;
+      }
+      return null;
+   }
+
+   public ISrcStatement getFromStatement() {
+      return fromStatement;
+   }
+
+   public boolean getNodeContainsPart(ISrcStatement partNode) {
+      return this == partNode;
    }
 }
 

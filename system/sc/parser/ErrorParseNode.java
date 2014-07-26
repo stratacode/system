@@ -49,6 +49,13 @@ public class ErrorParseNode extends AbstractParseNode {
    public void updateSemanticValue(IdentityHashMap<Object, Object> oldNewMap) {
    }
 
+   public void computeLineNumberForNode(LineFormatContext ctx, IParseNode toFindPN) {
+      if (errorText != null) {
+         ctx.append(errorText);
+         ctx.curLines += ParseUtil.countLinesInNode(errorText);
+      }
+   }
+
    public String toString() {
       return errorText == null ? "" : errorText;
    }

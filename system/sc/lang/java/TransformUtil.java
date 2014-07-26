@@ -341,7 +341,7 @@ public class TransformUtil {
    }
    */
 
-   public static int parseClassBodySnippet(TypeDeclaration accessClass, String codeToInsert, boolean applyToHiddenBody, int insertPos) {
+   public static int parseClassBodySnippet(TypeDeclaration accessClass, String codeToInsert, boolean applyToHiddenBody, int insertPos, SemanticNodeList<Statement> fromStatements) {
       if (codeToInsert == null || codeToInsert.trim().length() == 0)
           return 0;
       Object result = SCLanguage.INSTANCE.parseString(codeToInsert, SCLanguage.INSTANCE.classBodySnippet);
@@ -372,6 +372,10 @@ public class TransformUtil {
                else
                   accessClass.hiddenBody.addAll(insertPos, list);
             }
+
+            // For debugging registration, we need to walk the generated code and re-stablishe the links to the assignment expressions from which these were generated.
+            if (fromStatements != null)
+               ModelUtil.updateFromStatementRefs(list, fromStatements);
 
             // Need to init/start these after they have been added to the hierarchy so they can resolve etc.
             ParseUtil.initAndStartComponent(list);
@@ -425,7 +429,7 @@ public class TransformUtil {
 
          objType.incrVersion();
          PerfMon.start("parseClassSnippet");
-         parseClassBodySnippet(accessClass, codeToInsert, applyToHiddenBody, -1);
+         parseClassBodySnippet(accessClass, codeToInsert, applyToHiddenBody, -1, assignments);
          PerfMon.end("parseClassSnippet");
       }
       // This is the case where it's not a component or an object so we do not use a templste to redefine the creation semantics of the type.
@@ -476,7 +480,7 @@ public class TransformUtil {
          if (objType.declaresMethod("getObjChildren", objChildrenParameters, null, null) == null) {
             String getObjCodeToInsert = evalTemplate(parameters, getObjChildrenDefinitionTemplate());
 
-            parseClassBodySnippet(objType, getObjCodeToInsert, applyToHiddenBody, -1);
+            parseClassBodySnippet(objType, getObjCodeToInsert, applyToHiddenBody, -1, assignments);
          }
       }
 
@@ -599,7 +603,7 @@ public class TransformUtil {
 
    public static int parseClassBodySnippetTemplate(TypeDeclaration typeDeclaration, String templateResourcePath, Object params, boolean hiddenBody, int insertPos) {
       String res = evalTemplateResource(templateResourcePath, params, typeDeclaration.getLayeredSystem().getSysClassLoader());
-      return TransformUtil.parseClassBodySnippet(typeDeclaration, res, hiddenBody, insertPos);
+      return TransformUtil.parseClassBodySnippet(typeDeclaration, res, hiddenBody, insertPos, null);
    }
 
    private final static String PROPERTY_DEFINITION =
@@ -861,7 +865,7 @@ public class TransformUtil {
             vix = -1;
       }
 
-      applyPropertyTemplate(typeDeclaration, ix, params, typeDeclaration, ModelUtil.isInterface(typeDeclaration));
+      applyPropertyTemplate(typeDeclaration, ix, params, typeDeclaration, ModelUtil.isInterface(typeDeclaration), variableDefinition);
 
       // Need to transform the next guy in the list if there is one since the parent call won't anymore
       if (vix != -1)
@@ -881,7 +885,7 @@ public class TransformUtil {
       return paramBindings;
    }
 
-   private static void applyPropertyTemplate(TypeDeclaration propType, int ix, PropertyDefinitionParameters params, TypeDeclaration fieldType, boolean isInterface) {
+   private static void applyPropertyTemplate(TypeDeclaration propType, int ix, PropertyDefinitionParameters params, TypeDeclaration fieldType, boolean isInterface, ISrcStatement srcStatement) {
       PerfMon.start("applyPropertyTemplate");
       TypeDeclaration enclosingType = propType.getRootType();
       if (enclosingType == null)
@@ -939,6 +943,36 @@ public class TransformUtil {
          // responsibility of the previous node.
          //appendIndentIfNecessary((SemanticNodeList) propType.body, ix);
          SemanticNodeList list = (SemanticNodeList) ParseUtil.nodeToSemanticValue(node);
+
+         if (srcStatement != null) {
+            boolean found = false;
+            for (Object l:list) {
+               String setName = "set" + params.upperPropertyName;
+               if (l instanceof MethodDefinition) {
+                  MethodDefinition methDef = (MethodDefinition) l;
+                  if (methDef.name.equals(setName)) {
+                     BlockStatement body = methDef.body;
+                     if (body != null && body.statements != null) {
+                        for (Statement bodySt:body.statements) {
+                           if (bodySt instanceof AssignmentExpression) {
+                              AssignmentExpression assignExpr = (AssignmentExpression) bodySt;
+                              if (assignExpr.lhs instanceof IdentifierExpression) {
+                                 IdentifierExpression iex = (IdentifierExpression) assignExpr.lhs;
+                                 if (iex.identifiers != null && iex.identifiers.size() == 1 && iex.identifiers.get(0).equals(params.lowerPropertyName)) {
+                                    assignExpr.fromStatement = srcStatement;
+                                    found = true;
+                                    break;
+                                 }
+                              }
+                           }
+                        }
+                     }
+                  }
+               }
+            }
+            if (!found)
+               System.err.println("*** Warning unable to assign registration between source and generated code for debugging");
+         }
 
          propType.body.addAll(ix, list);
 
@@ -1044,7 +1078,7 @@ public class TransformUtil {
 
       params.omitField = params.overrideField || params.overrideGetSet;
 
-      applyPropertyTemplate(typeDeclaration, ix, params, typeDeclaration, false);
+      applyPropertyTemplate(typeDeclaration, ix, params, typeDeclaration, false, null);
    }
 
    public static AbstractMethodDefinition defineRedirectMethod(TypeDeclaration td, String name, Object meth, boolean isConstructor, boolean needsSuper) {

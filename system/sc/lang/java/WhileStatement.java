@@ -4,6 +4,8 @@
 
 package sc.lang.java;
 
+import sc.lang.ISrcStatement;
+
 import java.util.List;
 import java.util.Set;
 
@@ -79,8 +81,8 @@ public class WhileStatement extends ExpressionStatement {
       return this;
    }
 
-   public Statement findFromStatement(Statement toFind) {
-      Statement res = super.findFromStatement(toFind);
+   public ISrcStatement findFromStatement(ISrcStatement toFind) {
+      ISrcStatement res = super.findFromStatement(toFind);
       if (res != null)
          return res;
       if (statement != null)

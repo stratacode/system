@@ -675,4 +675,8 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
    public String getNodeErrorText() {
       return null;
    }
+
+   public SemanticNodeList refreshNode() {
+      return this;
+   }
 }

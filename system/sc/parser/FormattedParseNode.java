@@ -6,7 +6,11 @@ package sc.parser;
 
 import sc.lang.ISemanticNode;
 
-/** Generated parse nodes used for performance.  The value is a String which matches its input.  We must store any spacing, newline parse nodes as well */
+/**
+ * Generated parse nodes used for performance that collapse a tree of parse-nodes into a String.
+ * This String will match its input.  It also collects spacing and newline parse nodes that follow the matched string
+ * adopting the convention used by parselets to store whitespace after the matched node.
+ */
 public class FormattedParseNode extends ParseNode {
    IParseNode[] formattingParseNodes;
    boolean generated = false;
@@ -22,6 +26,30 @@ public class FormattedParseNode extends ParseNode {
             pn.format(ctx);
          }
       }
+   }
+
+   public void computeLineNumberForNode(LineFormatContext ctx, IParseNode toFindPN) {
+      super.computeLineNumberForNode(ctx, toFindPN);
+      if (formattingParseNodes != null) {
+         for (IParseNode pn:formattingParseNodes) {
+            pn.computeLineNumberForNode(ctx, toFindPN);
+         }
+      }
+   }
+
+   public ISemanticNode getNodeAtLine(NodeAtLineCtx ctx, int lineNum) {
+      ISemanticNode res = super.getNodeAtLine(ctx, lineNum);
+      if (res != null)
+         return res;
+
+      if (formattingParseNodes != null) {
+         for (IParseNode pn:formattingParseNodes) {
+            res = pn.getNodeAtLine(ctx, lineNum);
+            if (res != null)
+               return res;
+         }
+      }
+      return null;
    }
 
    public String toString() {

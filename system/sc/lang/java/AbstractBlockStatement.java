@@ -5,6 +5,7 @@
 package sc.lang.java;
 
 import sc.lang.ISemanticNode;
+import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
 
 import java.util.EnumSet;
@@ -308,21 +309,36 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
       return statements;
    }
 
-   public Statement findFromStatement(Statement st) {
+   public ISrcStatement findFromStatement(ISrcStatement st) {
       return findFromBlockStatement(this, st);
    }
 
-   public static Statement findFromBlockStatement(IBlockStatement bst, Statement toFind) {
+   public static ISrcStatement findFromBlockStatement(IBlockStatement bst, ISrcStatement toFind) {
       if (toFind == bst)
-         return (Statement) bst;
+         return (ISrcStatement) bst;
       List<Statement> sts = bst.getBlockStatements();
       if (sts != null) {
          for (Statement st:sts) {
-            Statement res = st.findFromStatement(toFind);
+            ISrcStatement res = st.findFromStatement(toFind);
             if (res != null)
                return res;
          }
       }
       return null;
+   }
+
+   public boolean updateFromStatementRef(Statement fromSt) {
+      return blockUpdateFromStatementRef(this, fromSt);
+   }
+
+   public static boolean blockUpdateFromStatementRef(IBlockStatement bst, Statement fromSt) {
+      List<Statement> sts = bst.getBlockStatements();
+      if (sts != null) {
+         for (Statement st:sts) {
+            if (st.updateFromStatementRef(fromSt))
+               return true;
+         }
+      }
+      return false;
    }
 }

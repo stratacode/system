@@ -4,6 +4,8 @@
 
 package sc.lang.java;
 
+import sc.lang.ISrcStatement;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -137,10 +139,10 @@ public class TryStatement extends Statement implements IBlockStatement {
       return statements;
    }
 
-   public Statement findFromStatement(Statement toFind) {
+   public ISrcStatement findFromStatement(ISrcStatement toFind) {
       if (toFind == this)
          return this;
-      Statement res = AbstractBlockStatement.findFromBlockStatement(this, toFind);
+      ISrcStatement res = AbstractBlockStatement.findFromBlockStatement(this, toFind);
       if (res != null)
          return res;
       if (catchStatements != null) {

@@ -2416,8 +2416,8 @@ public class ModifyDeclaration extends TypeDeclaration {
       return res;
    }
 
-   public Statement findFromStatement(Statement srcStatement) {
-      Statement res = super.findFromStatement(srcStatement);
+   public ISrcStatement findFromStatement(ISrcStatement srcStatement) {
+      ISrcStatement res = super.findFromStatement(srcStatement);
       if (res == null) {
          if (modifyTypeDecl != null)
             res = modifyTypeDecl.findFromStatement(srcStatement);

@@ -4266,7 +4266,7 @@ public class ModelUtil {
                   else if (node instanceof VariableDefinition) {
                      VariableDefinition updateVar = (VariableDefinition) node;
                      Statement updateDef = updateVar.getDefinition();
-                     Statement fromStatement = updateDef.fromStatement;
+                     ISrcStatement fromStatement = updateDef.fromStatement;
                      if (fromStatement != null) {
                         if (fromStatement instanceof FieldDefinition) {
                            FieldDefinition otherField = (FieldDefinition) fromStatement;
@@ -5895,4 +5895,36 @@ public class ModelUtil {
          return true;
    }
 
+   public static Statement getTopLevelStatement(ISemanticNode node) {
+      Statement st = node instanceof Statement ? (Statement) node : ((JavaSemanticNode) node).getEnclosingStatement();
+      ISemanticNode parent = st.parentNode;
+      if (parent instanceof SemanticNodeList)
+         parent = parent.getParentNode();
+      if (parent == null)
+         return st;
+      if (parent instanceof IBlockStatement || parent instanceof TypeDeclaration || parent instanceof IfStatement || parent instanceof ForStatement || parent instanceof WhileStatement || parent instanceof ExpressionStatement) {
+         return st;
+      }
+      else {
+         return getTopLevelStatement(parent);
+      }
+   }
+
+   public static void updateFromStatementRefs(SemanticNodeList list, SemanticNodeList<Statement> fromStatements) {
+      for (int fromIx = 0; fromIx < fromStatements.size(); fromIx++) {
+         Statement fromSt = fromStatements.get(fromIx);
+         boolean found = false;
+         for (Object newSemNode:list) {
+            if (newSemNode instanceof Statement) {
+               Statement st = (Statement) newSemNode;
+               if (st.updateFromStatementRef(fromSt)) {
+                  found = true;
+                  break;
+               }
+            }
+         }
+         if (!found)
+            System.err.println("*** Warning - some statements not matched up with the generated source: " + fromSt);
+      }
+   }
 }

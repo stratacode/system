@@ -4,6 +4,8 @@
 
 package sc.lang.java;
 
+import sc.lang.ISrcStatement;
+
 import java.util.Set;
 
 public abstract class ExpressionStatement extends Statement {
@@ -38,8 +40,8 @@ public abstract class ExpressionStatement extends Statement {
       return this;
    }
 
-   public Statement findFromStatement(Statement toFind) {
-      Statement res = super.findFromStatement(toFind);
+   public ISrcStatement findFromStatement(ISrcStatement toFind) {
+      ISrcStatement res = super.findFromStatement(toFind);
       if (res != null)
          return res;
       if (expression != null)

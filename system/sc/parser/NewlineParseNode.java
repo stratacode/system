@@ -10,7 +10,7 @@ import sc.util.FileUtil;
 
 import java.util.IdentityHashMap;
 
-public class NewlineParseNode extends AbstractParseNode {
+public class NewlineParseNode extends FormattingParseNode {
    private String terminator;
    public boolean needsIndent = false;
 
@@ -20,19 +20,6 @@ public class NewlineParseNode extends AbstractParseNode {
 
    public int firstChar() {
       return (int) terminator.charAt(0);
-   }
-
-   public boolean refersToSemanticValue(Object obj) {
-      return false;
-   }
-
-   public Object getSemanticValue() {
-      return null;
-   }
-
-   public void setSemanticValue(Object obj) {
-      if (obj != null)
-         throw new UnsupportedOperationException();
    }
 
    public String toDebugString() {
@@ -140,18 +127,5 @@ public class NewlineParseNode extends AbstractParseNode {
          ctx.indent(indent + indentIncr);
       else
          ctx.append(" ");
-   }
-
-
-   public CharSequence toSemanticString() {
-      return "";
-   }
-
-   // No state in this parse nodes so do not copy them
-   public NewlineParseNode deepCopy() {
-      return this;
-   }
-
-   public void updateSemanticValue(IdentityHashMap<Object, Object> oldNewMap) {
    }
 }
