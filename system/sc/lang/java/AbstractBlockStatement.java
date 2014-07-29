@@ -309,33 +309,31 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
       return statements;
    }
 
-   public ISrcStatement findFromStatement(ISrcStatement st) {
-      return findFromBlockStatement(this, st);
+   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement st) {
+      addBlockGeneratedFromNodes(this, res, st);
    }
 
-   public static ISrcStatement findFromBlockStatement(IBlockStatement bst, ISrcStatement toFind) {
+   public static ISrcStatement addBlockGeneratedFromNodes(IBlockStatement bst, List<ISrcStatement> res,  ISrcStatement toFind) {
       if (toFind == bst)
          return (ISrcStatement) bst;
       List<Statement> sts = bst.getBlockStatements();
       if (sts != null) {
          for (Statement st:sts) {
-            ISrcStatement res = st.findFromStatement(toFind);
-            if (res != null)
-               return res;
+            st.addGeneratedFromNodes(res, toFind);
          }
       }
       return null;
    }
 
-   public boolean updateFromStatementRef(Statement fromSt) {
-      return blockUpdateFromStatementRef(this, fromSt);
+   public boolean updateFromStatementRef(Statement fromSt, ISrcStatement defaultSt) {
+      return blockUpdateFromStatementRef(this, fromSt, defaultSt);
    }
 
-   public static boolean blockUpdateFromStatementRef(IBlockStatement bst, Statement fromSt) {
+   public static boolean blockUpdateFromStatementRef(IBlockStatement bst, Statement fromSt, ISrcStatement defaultSt) {
       List<Statement> sts = bst.getBlockStatements();
       if (sts != null) {
          for (Statement st:sts) {
-            if (st.updateFromStatementRef(fromSt))
+            if (st.updateFromStatementRef(fromSt, defaultSt))
                return true;
          }
       }

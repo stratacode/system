@@ -26,7 +26,8 @@ public class ErrorParseNode extends AbstractParseNode {
    }
 
    public void setSemanticValue(Object value) {
-      throw new UnsupportedOperationException();
+      if (value != null)
+         throw new UnsupportedOperationException();
    }
 
    public String toDebugString() {

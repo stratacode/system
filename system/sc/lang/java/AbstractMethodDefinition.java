@@ -624,18 +624,15 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       return null;
    }
 
-   public ISrcStatement findFromStatement(ISrcStatement toFind) {
-      ISrcStatement res = super.findFromStatement(toFind);
-      if (res != null)
-         return this;
+   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement toFind) {
+      super.addGeneratedFromNodes(res, toFind);
       if (body != null)
-         return body.findFromStatement(toFind);
-      return null;
+         body.addGeneratedFromNodes(res, toFind);
    }
 
-   public boolean updateFromStatementRef(Statement fromSt) {
+   public boolean updateFromStatementRef(Statement fromSt, ISrcStatement defaultSt) {
       if (body == null)
          return false;
-      return body.updateFromStatementRef(fromSt);
+      return body.updateFromStatementRef(fromSt, defaultSt);
    }
 }

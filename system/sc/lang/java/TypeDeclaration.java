@@ -479,18 +479,13 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return null;
    }
 
-   public ISrcStatement findFromStatement(ISrcStatement srcStatement) {
-      ISrcStatement res = super.findFromStatement(srcStatement);
-      if (res != null)
-         return res;
+   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      super.addGeneratedFromNodes(res, srcStatement);
       if (body != null) {
          for (Statement st:body) {
-            res = st.findFromStatement(srcStatement);
-            if (res != null)
-               return res;
+            st.addGeneratedFromNodes(res, srcStatement);
          }
       }
-      return null;
    }
 
    public static enum InitStatementMode {

@@ -5182,6 +5182,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          // this is a "modifyInherited" case, it is not actually replacing the type, but extending it so
          // do not do the update in that case.
          if (this instanceof TypeDeclaration) {
+            // TODO: this is probably not needed at all now that we store the sub-types table by type name.
             if (!(newType instanceof ModifyDeclaration) || !((ModifyDeclaration) newType).modifyInherited)
                 sys.replaceSubTypes((TypeDeclaration) this, (TypeDeclaration) newType);
          }

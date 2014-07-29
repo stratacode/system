@@ -1203,7 +1203,9 @@ public class EditorContext extends ClientEditorContext {
             semValue = ((SemanticNodeList) semValue).getParentNode();
          if (semValue instanceof JavaSemanticNode) {
             JavaSemanticNode javaNode = (JavaSemanticNode) semValue;
-            BodyTypeDeclaration enclFragmentType = javaNode.getStructuralEnclosingType();
+            BodyTypeDeclaration enclFragmentType =
+                    javaNode instanceof BodyTypeDeclaration ? (BodyTypeDeclaration) javaNode :
+                                                               javaNode.getStructuralEnclosingType();
             // This is the type name of the parsed fragment.  Convert it to the real type before we use it in the
             // completion process
             String typeName = fileModel.getModelTypeName();
@@ -1337,6 +1339,10 @@ public class EditorContext extends ClientEditorContext {
       if (semanticValue instanceof JavaSemanticNode) {
          JavaSemanticNode node = (JavaSemanticNode) semanticValue;
 
+         // Because node has not been attached to a model only it's innerTypeName is accurate
+         boolean nodeIsCurrentType = node instanceof BodyTypeDeclaration && currentType != null &&
+                 StringUtil.equalStrings(currentType.getInnerTypeName(), ((BodyTypeDeclaration) node).getInnerTypeName());
+
          // We want to set the parent node of the element from the model fragment to point to the
          // currentType - in case we have a more complete version of that type.  We also need to preserve
          // as much info as possible - e.g. if a ClassType is inside of a CastExpression or on its own.
@@ -1353,8 +1359,18 @@ public class EditorContext extends ClientEditorContext {
          if (!(toReparent instanceof JavaModel)) {
             if (currentType == null)
                toReparent.setParentNode(defaultParent);
-            else
-               toReparent.setParentNode(currentType);
+            else {
+               // The node we completed is the current type - need to reparent it up one-level
+               if (nodeIsCurrentType) {
+                  BodyTypeDeclaration nextType = currentType.getEnclosingType();
+                  if (nextType != null)
+                     toReparent.setParentNode(nextType);
+                  else
+                     toReparent.setParentNode(currentType.getJavaModel());
+               }
+               else
+                  toReparent.setParentNode(currentType);
+            }
          }
 
          JavaModel theModel = node.getJavaModel();

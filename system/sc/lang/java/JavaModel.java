@@ -454,7 +454,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          }
       }
       if (layeredSystem != null && layer != null) {
-         layeredSystem.findMatchingGlobalNames(null, layer, prefix, prefixPkgName, prefixBaseName, candidates);
+         layeredSystem.findMatchingGlobalNames(null, layer, prefix, prefixPkgName, prefixBaseName, candidates, false, false);
       }
    }
 
@@ -1137,9 +1137,13 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       }
    }
 
-   public ISrcStatement findFromStatement(ISrcStatement srcStatement) {
+   public List<ISrcStatement> findGeneratedFromNodes(ISrcStatement srcStatement) {
+      ArrayList<ISrcStatement> res = new ArrayList<ISrcStatement>();
       TypeDeclaration modelType = getUnresolvedModelTypeDeclaration();
-      return modelType.findFromStatement(srcStatement);
+      modelType.addGeneratedFromNodes(res, srcStatement);
+      if (res.size() == 0)
+         return null;
+      return res;
    }
 
    private class ExtraFile {

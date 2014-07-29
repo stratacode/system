@@ -734,7 +734,7 @@ public class ClassType extends JavaType {
             }
             candidates.clear();
             candidates.addAll(absCandidates);
-            return pos - pkgName.length();
+            return pos - pkgName.length() - 1;
          }
       }
 

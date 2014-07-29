@@ -43,12 +43,9 @@ public class ForStatement extends Statement {
       return ix;
    }
 
-   public ISrcStatement findFromStatement(ISrcStatement toFind) {
-      ISrcStatement res = super.findFromStatement(toFind);
-      if (res != null)
-         return res;
+   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement toFind) {
+      super.addGeneratedFromNodes(res, toFind);
       if (statement != null)
-         res = statement.findFromStatement(toFind);
-      return res;
+         statement.addGeneratedFromNodes(res, toFind);
    }
 }

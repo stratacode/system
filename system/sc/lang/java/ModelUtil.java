@@ -4545,7 +4545,8 @@ public class ModelUtil {
       if (includeGlobals) {
          if (lastIdent.equals(""))
             model.findMatchingGlobalNames(prefix, candidates);
-         model.layeredSystem.findMatchingGlobalNames(null, model.getLayer(), lastIdent, candidates);
+         else
+            model.layeredSystem.findMatchingGlobalNames(null, model.getLayer(), lastIdent, candidates, false, false);
       }
 
       String absName, pkgName, baseName;
@@ -4561,7 +4562,7 @@ public class ModelUtil {
       }
 
       model.findMatchingGlobalNames(absName, pkgName, baseName, candidates);
-      model.layeredSystem.findMatchingGlobalNames(null, model.getLayer(), absName, pkgName, baseName, candidates);
+      model.layeredSystem.findMatchingGlobalNames(null, model.getLayer(), absName, pkgName, baseName, candidates, false, false);
    }
 
    public static void suggestVariables(IBlockStatement enclBlock, String prefix, Set<String> candidates) {
@@ -5910,21 +5911,31 @@ public class ModelUtil {
       }
    }
 
-   public static void updateFromStatementRefs(SemanticNodeList list, SemanticNodeList<Statement> fromStatements) {
-      for (int fromIx = 0; fromIx < fromStatements.size(); fromIx++) {
-         Statement fromSt = fromStatements.get(fromIx);
-         boolean found = false;
+   public static void updateFromStatementRefs(SemanticNodeList list, SemanticNodeList<Statement> fromStatements, ISrcStatement defaultSt) {
+      if (fromStatements != null) {
+         for (int fromIx = 0; fromIx < fromStatements.size(); fromIx++) {
+            Statement fromSt = fromStatements.get(fromIx);
+            boolean found = false;
+            for (Object newSemNode:list) {
+               if (newSemNode instanceof Statement) {
+                  Statement st = (Statement) newSemNode;
+                  if (st.updateFromStatementRef(fromSt, defaultSt)) {
+                     found = true;
+                     break;
+                  }
+               }
+            }
+            if (!found)
+               System.err.println("*** Warning - some statements not matched up with the generated source: " + fromSt);
+         }
+      }
+      else if (defaultSt != null) {
          for (Object newSemNode:list) {
             if (newSemNode instanceof Statement) {
                Statement st = (Statement) newSemNode;
-               if (st.updateFromStatementRef(fromSt)) {
-                  found = true;
-                  break;
-               }
+               st.fromStatement = defaultSt;
             }
          }
-         if (!found)
-            System.err.println("*** Warning - some statements not matched up with the generated source: " + fromSt);
       }
    }
 }

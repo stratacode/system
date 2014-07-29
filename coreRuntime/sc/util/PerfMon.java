@@ -14,7 +14,7 @@ public class PerfMon {
    static ThreadLocal<ArrayList<PerfOp>> currentOp = new ThreadLocal<ArrayList<PerfOp>>();
 
    static ArrayList<String> statOrder = new ArrayList<String>();
-   static ConcurrentHashMap<String,PerfStat> statTable = new ConcurrentHashMap<String,PerfStat>();
+   final static ConcurrentHashMap<String,PerfStat> statTable = new ConcurrentHashMap<String,PerfStat>();
 
    static ConcurrentHashMap<NestedPair,Boolean> nestedPairs = new ConcurrentHashMap<NestedPair,Boolean>();
 

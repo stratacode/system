@@ -6,6 +6,8 @@ package sc.lang;
 
 import sc.parser.Language;
 
+import java.util.List;
+
 /**
  * Represents nodes in the tree that are matched up in the original and generated source.
  * For Java this is implemented by both Statement and VariableDefinition since different VariableDefinitions in
@@ -18,8 +20,14 @@ public interface ISrcStatement extends ISemanticNode {
     */
    ISrcStatement getSrcStatement(Language lang);
 
-   /** Search the node hierarchy for the node which produced this srcStatement. */
+   /** Search this statement for the srcStatement that produced it.  Return the last generated statement that matches */
    ISrcStatement findFromStatement (ISrcStatement st);
+
+   /**
+    * Adds all of the generated statements to the resulting list, for the case where more than one fromStatement points
+    * to the same src statement.
+    */
+   void addGeneratedFromNodes (List<ISrcStatement> result, ISrcStatement st);
 
    /** Returns the value of the 'fromStatement' field stored on this node to represent a link from a generated node from
     * an original source one. */

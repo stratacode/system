@@ -1272,18 +1272,22 @@ public class ClassDeclaration extends TypeDeclaration {
          extendsType.refreshBoundType();
    }
 
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
       if (extendsType != null) {
          String extName = extendsType.getFullTypeName();
-         JavaModel model = getJavaModel();
-         if (currentType != null)
-            ModelUtil.suggestMembers(model, currentType, extName, candidates, true, false, false);
-         ModelUtil.suggestTypes(model, extName, "", candidates, true);
-         ModelUtil.suggestTypes(model, prefix, extName, candidates, true);
-         if (extName.equals(""))
-            return command.length();
-         else
-            return command.lastIndexOf(extName);
+         // We may have completed a fragment inside of the body so extName is not the proper completion to use.  Instead we bail on completing this node
+         // and do a more primitive way to do the completion.
+         if (parseNode != null && parseNode.toString().endsWith(extName)) {
+            JavaModel model = getJavaModel();
+            if (currentType != null)
+               ModelUtil.suggestMembers(model, currentType, extName, candidates, true, false, false);
+            ModelUtil.suggestTypes(model, extName, "", candidates, true);
+            ModelUtil.suggestTypes(model, prefix, extName, candidates, true);
+            if (extName.equals(""))
+               return command.length();
+            else
+               return command.lastIndexOf(extName);
+         }
       }
       return -1;
    }

@@ -251,7 +251,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       }
    };
 
-   Sequence arrayDims = new Sequence("(,[],)", REPEAT, openSqBracket, optExpression, closeSqBracket);
+   public Sequence arrayDims = new Sequence("(,[],)", REPEAT, openSqBracket, optExpression, closeSqBracket);
    {
       arrayDims.allowNullElements = true; // Here we want to count [] as [1] = {null}.  For params () though that's [0]
    }

@@ -1564,19 +1564,51 @@ public class Layer implements ILifecycle, LayerConstants {
       return exportImports && (refLayer == null || refLayer == this || refLayer.useGlobalImports || refLayer.extendsLayer(this));
    }
 
-   public void findMatchingGlobalNames(String prefix, Set<String> candidates) {
+   public void findMatchingSrcNames(String prefix, Set<String> candidates, boolean retFullTypeName) {
+      for (Iterator<String> srcFiles = getSrcFiles(); srcFiles.hasNext(); )  {
+         String srcFile = srcFiles.next();
+         if (srcFile.startsWith(prefix)) {
+            IFileProcessor depProc = layeredSystem.getFileProcessorForFileName(srcFile, this, BuildPhase.Process);
+            // srcFile entries come back without suffixes... just ignore them.
+            if (depProc != null) {
+               String fullTypeName;
+               if (!depProc.getPrependLayerPackage()) {
+                  fullTypeName = FileUtil.removeExtension(srcFile).replace(FileUtil.FILE_SEPARATOR, ".");
+               }
+               else
+                  fullTypeName = CTypeUtil.prefixPath(packagePrefix, FileUtil.removeExtension(srcFile).replace(FileUtil.FILE_SEPARATOR, "."));
+               layeredSystem.addMatchingCandidate(candidates, CTypeUtil.getPackageName(fullTypeName), CTypeUtil.getClassName(fullTypeName), retFullTypeName);
+            }
+         }
+      }
+   }
+
+   public void findMatchingGlobalNames(String prefix, Set<String> candidates, boolean retFullTypeName, boolean checkBaseLayers) {
       if (!exportImports)
          return;
 
       if (importsByName != null) {
-         for (String str:importsByName.keySet())
-            if (str.startsWith(prefix))
-               candidates.add(str);
+         for (Map.Entry<String,ImportDeclaration> ent:importsByName.entrySet()) {
+            String baseName = ent.getKey();
+            ImportDeclaration decl = ent.getValue();
+            if (baseName.startsWith(prefix))
+               layeredSystem.addMatchingCandidate(candidates, CTypeUtil.getPackageName(decl.identifier), baseName, retFullTypeName);
+         }
       }
       if (staticImportTypes != null) {
-         for (String str:staticImportTypes.keySet())
-            if (str.startsWith(prefix))
-               candidates.add(str);
+         for (Map.Entry<String,Object> ent:staticImportTypes.entrySet()) {
+            String baseName = ent.getKey();
+            if (baseName.startsWith(prefix)) {
+               layeredSystem.addMatchingCandidate(candidates, ModelUtil.getPackageName(ent.getValue()), baseName, retFullTypeName);
+            }
+         }
+      }
+      if (checkBaseLayers) {
+         if (baseLayers != null) {
+            for (Layer baseLayer:baseLayers) {
+               baseLayer.findMatchingGlobalNames(prefix, candidates, retFullTypeName, checkBaseLayers);
+            }
+         }
       }
    }
 

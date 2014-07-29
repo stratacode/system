@@ -226,7 +226,7 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       return partNode == this;
    }
 
-   public ISrcStatement findFromStatement (ISrcStatement st) {
+   public ISrcStatement findFromStatement(ISrcStatement st) {
       if (st.getNodeContainsPart(this.getFromStatement()))
          return this;
       if (fromStatement == st)
@@ -238,7 +238,13 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       return null;
    }
 
-   public boolean updateFromStatementRef(Statement fromSt) {
+   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement st) {
+      ISrcStatement fromSt = findFromStatement(st);
+      if (fromSt != null)
+         res.add(fromSt);
+   }
+
+   public boolean updateFromStatementRef(Statement fromSt, ISrcStatement srcSt) {
       return false;
    }
 
@@ -246,11 +252,13 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       return false;
    }
 
-   public static boolean checkFromStatementRef(Statement toUpdate, Statement fromSt) {
+   public static boolean checkFromStatementRef(Statement toUpdate, Statement fromSt, ISrcStatement defaultSt) {
       if (toUpdate.fromStatement == null && toUpdate.matchesStatement(fromSt)) {
          toUpdate.fromStatement = fromSt;
          return true;
       }
+      else if (toUpdate.fromStatement == null)
+         toUpdate.fromStatement = defaultSt;
       return false;
    }
 

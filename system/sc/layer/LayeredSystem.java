@@ -444,7 +444,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public WeakIdentityHashMap<Object, String> objectNameIndex = new WeakIdentityHashMap<Object, String>();
 
-   public WeakIdentityHashMap<TypeDeclaration,WeakIdentityHashMap<TypeDeclaration,Boolean>> subTypesByType = new WeakIdentityHashMap<TypeDeclaration, WeakIdentityHashMap<TypeDeclaration, Boolean>>();
+   public HashMap<String,HashMap<String,Boolean>> subTypesByType = new HashMap<String, HashMap<String, Boolean>>();
 
    /** At least one change has been made to the compiled types since the system was recompiled - essentially means you need to restart to pick up those changes */
    public boolean staleCompiledModel;
@@ -1313,76 +1313,127 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return systemClasses.contains(name) ? "java.lang." + name : null;
    }
 
-   public void findMatchingGlobalNames(Layer fromLayer, Layer refLayer, String prefix, Set<String> candidates) {
+
+   public void findMatchingGlobalNames(Layer fromLayer, Layer refLayer, String prefix, Set<String> candidates, boolean retFullTypeName, boolean srcOnly) {
       String prefixPkg = CTypeUtil.getPackageName(prefix);
       String prefixBaseName = CTypeUtil.getClassName(prefix);
 
-      findMatchingGlobalNames(fromLayer, refLayer, prefix, prefixPkg, prefixBaseName, candidates);
+      findMatchingGlobalNames(fromLayer, refLayer, prefix, prefixPkg, prefixBaseName, candidates, retFullTypeName, srcOnly);
+   }
+
+   void addMatchingCandidate(Set<String> candidates, String pkgName, String baseName, boolean retFullTypeName) {
+      if (retFullTypeName)
+         candidates.add(CTypeUtil.prefixPath(pkgName, baseName));
+      else
+         candidates.add(baseName);
+   }
+
+   void addMatchingImportMap(Map<String,ImportDeclaration> importsByName, String prefix, Set<String> candidates, boolean retFullTypeName) {
+      if (importsByName != null) {
+         for (Map.Entry<String,ImportDeclaration> ent:importsByName.entrySet()) {
+            String baseName = ent.getKey();
+            ImportDeclaration decl = ent.getValue();
+            if (baseName.startsWith(prefix))
+               addMatchingCandidate(candidates, CTypeUtil.getPackageName(decl.identifier), baseName, retFullTypeName);
+         }
+      }
    }
 
    public void findMatchingGlobalNames(Layer fromLayer, Layer refLayer,
-                                       String prefix, String prefixPkg, String prefixBaseName, Set<String> candidates) {
-
+                                       String prefix, String prefixPkg, String prefixBaseName, Set<String> candidates, boolean retFullTypeName, boolean srcOnly) {
       if (prefixPkg == null) {
-         if (systemClasses != null) {
-            for (String sys:systemClasses)
-               if (sys.startsWith(prefix))
-                  candidates.add(sys);
+         if (systemClasses != null && !srcOnly) {
+            for (String sysClass:systemClasses)
+               if (sysClass.startsWith(prefix))
+                  addMatchingCandidate(candidates, "java.lang", sysClass, retFullTypeName);
          }
 
+         // For global lookups if no layers have been activated, just search all of the inactive layers.  This will
+         // currently only correspond to the layers in files we've loaded so far.  Once an app has been run, we'll just
+         // use the current app's layers.
+         if (refLayer == null) {
+            if (buildLayer == null) {
+               for (Layer inactiveLayer:inactiveLayers.values()) {
+                  if (inactiveLayer.exportImports)
+                     inactiveLayer.findMatchingGlobalNames(prefix, candidates, retFullTypeName, true);
 
-         if (refLayer != null && refLayer.inheritImports) {
-            int startIx = fromLayer == null ? layers.size() - 1 : fromLayer.getLayerPosition();
-            for (int i = startIx; i >= 0; i--) {
-               Layer depLayer = layers.get(i);
-               if (depLayer.exportImports)
-                  depLayer.findMatchingGlobalNames(prefix, candidates);
+                  // When we do not have any active layers, we cannot rely on the type cache for finding src file names.
+                  // Instead, we go to the srcDir index in the layers.
+                  inactiveLayer.findMatchingSrcNames(prefix, candidates, retFullTypeName);
+               }
             }
-         }
-
-         for (String imp:globalImports.keySet())
-            if (imp.startsWith(prefix))
-               candidates.add(imp);
-
-         for (String prim: Type.getPrimitiveTypeNames())
-             if (prim.startsWith(prefix))
-                candidates.add(prim);
-      }
-
-      for (Map.Entry<String,HashMap<String,PackageEntry>> piEnt:packageIndex.entrySet()) {
-         String pkgName = piEnt.getKey();
-         pkgName = pkgName == null ? null : pkgName.replace("/", ".");
-
-         // If there's a pkg name for the prefix, and it matches the package, check the contents against
-         if (pkgName == prefixPkg || (prefixPkg != null && pkgName != null && pkgName.equals(prefixPkg))) {
-            HashMap<String,PackageEntry> pkgTypes = piEnt.getValue();
-            for (Map.Entry<String,PackageEntry> pkgTypeEnt:pkgTypes.entrySet()) {
-               String typeInPkg = pkgTypeEnt.getKey();
-               if (typeInPkg.startsWith(prefixBaseName)) {
-                  //candidates.add(CTypeUtil.prefixPath(prefixPkg, typeInPkg));
-                  candidates.add(typeInPkg);
+            else {
+               refLayer = buildLayer;
+               int startIx = fromLayer == null ? layers.size() - 1 : fromLayer.getLayerPosition();
+               for (int i = startIx; i >= 0; i--) {
+                  Layer appLayer = layers.get(i);
+                  appLayer.findMatchingSrcNames(prefix, candidates, retFullTypeName);
                }
             }
          }
 
-         // Include the right part of the package name
-         if (pkgName != null && pkgName.startsWith(prefix)) {
-            int len = prefix.length();
-            boolean includeFirst = StringUtil.equalStrings(prefix, prefixPkg);
-            // If we are matching the prefixPkg we include the package name itself.  Otherwise, we skip it
-            int matchEndIx = pkgName.indexOf(".", len + (includeFirst ? 1 : 0));
-            String tailName;
-            if (matchEndIx == -1)
-               tailName = CTypeUtil.getClassName(pkgName);
-            else {
-               String headName = pkgName.substring(0, len);
-               int startIx = headName.lastIndexOf(".");
-               if (startIx == -1)
-                  startIx = includeFirst ? len+1 : 0;
-               tailName = pkgName.substring(startIx, matchEndIx);
+         if (!srcOnly) {
+            if (refLayer != null && refLayer.inheritImports) {
+               refLayer.findMatchingGlobalNames(prefix, candidates, retFullTypeName, true);
             }
-            if (tailName.length() > 0)
-               candidates.add(tailName);
+
+               // TODO - remove this part?  We definitely need the above for when are inactive but any reason to include these other names other times?
+               int startIx = fromLayer == null ? layers.size() - 1 : fromLayer.getLayerPosition();
+               for (int i = startIx; i >= 0; i--) {
+                  Layer depLayer = layers.get(i);
+                  if (depLayer.exportImports)
+                     depLayer.findMatchingGlobalNames(prefix, candidates, retFullTypeName, false);
+               }
+
+               addMatchingImportMap(globalImports, prefix, candidates, retFullTypeName);
+
+               for (String prim: Type.getPrimitiveTypeNames())
+                   if (prim.startsWith(prefix))
+                      candidates.add(prim);
+         }
+      }
+
+      if (!srcOnly) {
+         for (Map.Entry<String,HashMap<String,PackageEntry>> piEnt:packageIndex.entrySet()) {
+            String pkgName = piEnt.getKey();
+            pkgName = pkgName == null ? null : pkgName.replace("/", ".");
+
+            // If there's a pkg name for the prefix, and it matches the package, check the contents against
+            if (pkgName == prefixPkg || (prefixPkg != null && pkgName != null && pkgName.equals(prefixPkg))) {
+               HashMap<String,PackageEntry> pkgTypes = piEnt.getValue();
+               for (Map.Entry<String,PackageEntry> pkgTypeEnt:pkgTypes.entrySet()) {
+                  String typeInPkg = pkgTypeEnt.getKey();
+                  if (typeInPkg.startsWith(prefixBaseName)) {
+                     addMatchingCandidate(candidates, prefixPkg, typeInPkg, retFullTypeName);
+                     //candidates.add(CTypeUtil.prefixPath(prefixPkg, typeInPkg));
+                     //candidates.add(typeInPkg);
+                  }
+               }
+            }
+
+            // Include the right part of the package name
+            if (pkgName != null && pkgName.startsWith(prefix)) {
+               int len = prefix.length();
+               boolean includeFirst = StringUtil.equalStrings(prefix, prefixPkg);
+               // If we are matching the prefixPkg we include the package name itself.  Otherwise, we skip it
+               int matchEndIx = pkgName.indexOf(".", len + (includeFirst ? 1 : 0));
+               String headName;
+               String tailName;
+               if (matchEndIx == -1) {
+                  headName = CTypeUtil.getPackageName(pkgName);
+                  tailName = CTypeUtil.getClassName(pkgName);
+               }
+               else {
+                  headName = pkgName.substring(0, len);
+                  int startIx = headName.lastIndexOf(".");
+                  if (startIx == -1)
+                     startIx = includeFirst ? len+1 : 0;
+                  tailName = pkgName.substring(startIx, matchEndIx);
+               }
+               if (tailName.length() > 0) {
+                  addMatchingCandidate(candidates, headName, tailName, retFullTypeName);
+               }
+            }
          }
       }
 
@@ -1764,6 +1815,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       /** Controls debug level verbose messages */
       @Constant public boolean verbose = false;
       @Constant public boolean verboseLayers = false;
+      @Constant public boolean verboseLocks = false;
       @Constant public boolean info = true;
       /** Controls whether java files compiled by this system debuggable */
       @Constant public boolean debug = true;
@@ -2090,6 +2142,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      Element.trace = true;
                   else if (opt.equals("vs"))
                      SyncManager.trace = true;
+                  else if (opt.equals("vlck"))
+                     options.verboseLocks = true;
                   else if (opt.equals("vsa")) {
                      SyncManager.trace = true;
                      SyncManager.traceAll = true;
@@ -6322,7 +6376,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             tdEnt.reloaded = true;
             for (k = 0; k < tdEnt.size(); k++) {
                TypeDeclaration td = tdEnt.get(k);
-               subTypesByType.remove(td);
+               subTypesByType.remove(td.getFullTypeName());
             }
             if (options.buildAllFiles)
                tdEnt.clear(); // Need to leave this around in this case so that we track the state of the reverseDeps "reloaded" flag
@@ -7495,7 +7549,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             TypeDeclaration inList = tds.get(i);
             if (inList == toRem) {
                tds.remove(i);
-               subTypesByType.remove(toRem);
+               subTypesByType.remove(toRem.getFullTypeName());
                if (tds.size() == 0)
                   typesByName.remove(fullTypeName);
                return;
@@ -7530,21 +7584,24 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public void replaceSubTypes(TypeDeclaration oldType, TypeDeclaration newType) {
+      String oldTypeName = oldType.getFullTypeName();
+      String newTypeName = newType.getFullTypeName();
+      if (oldTypeName.equals(newTypeName))
+         return;
       // This may not get called in order when we add more than one layer at the same time.  To workaround that, we find the entry we need to replace and
       // replace it.  The next call then won't find anything to replace.
-      WeakIdentityHashMap<TypeDeclaration,Boolean> subTypeMap;
+      HashMap<String,Boolean> subTypeMap;
       do {
-         subTypeMap = subTypesByType.get(oldType);
+         subTypeMap = subTypesByType.get(oldTypeName);
          if (subTypeMap == null) {
             oldType = (TypeDeclaration) oldType.getPureModifiedType();
          }
       } while (subTypeMap == null && oldType != null);
 
       if (subTypeMap != null) {
-         subTypesByType.put(newType, subTypeMap);
+         subTypesByType.put(newTypeName, subTypeMap);
          // Note: we have already updated the sub-types for the new super-type in TypeDeclaration.updateBaseType
-         subTypesByType.remove(oldType);
-
+         subTypesByType.remove(oldTypeName);
       }
    }
 
@@ -8183,15 +8240,28 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public TypeDeclaration getInactiveTypeDeclaration(SrcEntry srcEnt) {
+      ILanguageModel model;
       // First try to find the JavaModel cached outside of the system.
       if (externalModelIndex != null) {
-         ILanguageModel model = externalModelIndex.lookupJavaModel(srcEnt);
+         model = externalModelIndex.lookupJavaModel(srcEnt);
+         if (model != null) {
+            modelIndex.put(srcEnt.absFileName, model);
+         }
          if (model instanceof JavaModel)
             return ((JavaModel) model).getModelTypeDeclaration();
       }
-      Object result = parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, !disableCommandLineErrors);
-      if (result instanceof JavaModel)
-         return ((JavaModel) result).getModelTypeDeclaration();
+      model = modelIndex.get(srcEnt.absFileName);
+      if (model == null) {
+         Object result = parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, !disableCommandLineErrors);
+         // We might have to load files for inactive types which the IDE is not maintaining.  So we always cache these
+         // models in the local index so we avoid loading them over and over again.
+         if (result instanceof ILanguageModel) {
+            model = (ILanguageModel) result;
+            modelIndex.put(srcEnt.absFileName, model);
+         }
+      }
+      if (model instanceof JavaModel)
+         return ((JavaModel) model).getModelTypeDeclaration();
       return null;
    }
 
@@ -8315,6 +8385,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (refLayer != null && !refLayer.activated) {
          return refLayer.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath);
       }
+      else if (buildLayer == null) {
+         for (Layer inactiveLayer:inactiveLayers.values()) {
+            SrcEntry ent = inactiveLayer.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath);
+            if (ent != null)
+               return ent;
+         }
+      }
 
       // In general we search from most recent to original
       int startIx = layers.size() - 1;
@@ -8345,6 +8422,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          SrcEntry srcEnt = refLayer.getSrcFileFromRelativeTypeName(relDir, subPath, packagePrefix, srcOnly, true);
          if (srcEnt != null)
             return srcEnt;
+      }
+      else if (buildLayer == null) {
+         for (Layer inactiveLayer:inactiveLayers.values()) {
+            SrcEntry ent = inactiveLayer.getSrcFileFromRelativeTypeName(relDir, subPath, packagePrefix, srcOnly, true);
+            if (ent != null)
+               return ent;
+         }
       }
 
       // In general we search from most recent to original
@@ -9087,6 +9171,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public void acquireDynLock(boolean readOnly) {
+      if (options.verboseLocks)
+         System.out.println("Acquiring system dyn lock for read-only: " + readOnly + " thread: " + Thread.currentThread().getName() + ": runtime: " + getRuntimeName());
       if (!readOnly)
          globalDynLock.writeLock().lock();
       else
@@ -9094,6 +9180,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public void releaseDynLock(boolean readOnly) {
+      if (options.verboseLocks)
+         System.out.println("Releasing system dyn lock for read-only: " + readOnly + " thread: " + Thread.currentThread().getName() + ": runtime: " + getRuntimeName());
       if (!readOnly)
          globalDynLock.writeLock().unlock();
       else
@@ -9271,10 +9359,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       TypeDeclaration type = getSrcTypeDeclaration(typeName, null, true, true);
       if (type != null) {
          do {
-            Iterator<TypeDeclaration> subTypes = getSubTypesOfType(type);
+            Iterator<String> subTypes = getSubTypeNamesOfType(type);
             while (subTypes.hasNext()) {
-               TypeDeclaration subType = subTypes.next();
-               String subTypeName = subType.getFullTypeName();
+               String subTypeName = subTypes.next();
                // Only check new types, not modified versions of the same type to avoid a recursive loop
                if (!subTypeName.equals(typeName) && hasInstancesOfType(subTypeName))
                   return true;
@@ -9318,7 +9405,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (subTypes != null) {
          while (subTypes.hasNext()) {
             TypeDeclaration subType = subTypes.next();
-            subType = (TypeDeclaration) subType.resolve(true);
 
             WeakIdentityHashMap<Object,Boolean> subInsts = instancesByType.get(subType.getFullTypeName());
             if (subInsts != null) {
@@ -9351,23 +9437,24 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    private static final EmptyIterator<TypeDeclaration> NO_TYPES = new EmptyIterator<TypeDeclaration>();
+   private static final EmptyIterator<String> NO_TYPE_NAMES = new EmptyIterator<String>();
 
    public void addSubType(TypeDeclaration superType, TypeDeclaration subType) {
       if (options.liveDynamicTypes) {
-         WeakIdentityHashMap<TypeDeclaration,Boolean> subTypeMap = subTypesByType.get(superType);
+         HashMap<String,Boolean> subTypeMap = subTypesByType.get(superType);
          if (subTypeMap == null) {
-            subTypeMap = new WeakIdentityHashMap<TypeDeclaration, Boolean>();
-            subTypesByType.put(superType, subTypeMap);
+            subTypeMap = new HashMap<String, Boolean>();
+            subTypesByType.put(superType.getFullTypeName(), subTypeMap);
          }
-         subTypeMap.put(subType, Boolean.TRUE);
+         subTypeMap.put(subType.getFullTypeName(), Boolean.TRUE);
       }
    }
 
    public boolean removeSubType(TypeDeclaration superType, TypeDeclaration subType) {
       if (options.liveDynamicTypes) {
-         WeakIdentityHashMap<TypeDeclaration,Boolean> subTypeMap = subTypesByType.get(superType);
+         HashMap<String,Boolean> subTypeMap = subTypesByType.get(superType.getFullTypeName());
          if (subTypeMap != null) {
-            Boolean res = subTypeMap.remove(subType);
+            Boolean res = subTypeMap.remove(subType.getFullTypeName());
             if (res == null)
                return false;
             return res;
@@ -9376,11 +9463,24 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return false;
    }
 
+   public Iterator<String> getSubTypeNamesOfType(TypeDeclaration type) {
+      HashMap<String,Boolean> subTypesMap = subTypesByType.get(type.getFullTypeName());
+      if (subTypesMap == null)
+         return NO_TYPE_NAMES;
+      return subTypesMap.keySet().iterator();
+   }
+
    public Iterator<TypeDeclaration> getSubTypesOfType(TypeDeclaration type) {
-      WeakIdentityHashMap<TypeDeclaration,Boolean> subTypesMap = subTypesByType.get(type);
+      HashMap<String,Boolean> subTypesMap = subTypesByType.get(type.getFullTypeName());
       if (subTypesMap == null)
          return NO_TYPES;
-      return subTypesMap.keySet().iterator();
+      ArrayList<TypeDeclaration> result = new ArrayList<TypeDeclaration>(subTypesMap.size());
+      for (String subTypeName:subTypesMap.keySet()) {
+         TypeDeclaration res = (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, null);
+         if (res != null)
+            result.add(res);
+      }
+      return result.iterator();
    }
 
    private static class TypeDeclarationCacheEntry extends ArrayList<TypeDeclaration> {

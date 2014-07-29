@@ -395,6 +395,8 @@ public class Sequence extends NestedParselet  {
 
       // If the combination of this new error and the child error ends up being equal to or better than the current match, we extend
       if (anyContent && Parser.isBetterError(parser.currentErrorStartIndex, parser.currentErrorEndIndex, startIndex, childError.endIndex, true)) {
+         if (optional)
+            return false;
          return true;
       }
 

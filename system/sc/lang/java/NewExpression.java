@@ -55,6 +55,8 @@ public class NewExpression extends IdentifierExpression {
       // this is not used... oops
       //newExpr.setIdentifiersFromArgs(identifier);
       newExpr.typeIdentifier = identifier;
+      if (arrayDimensions != null && arrayDimensions.size() == 0)
+         arrayDimensions.add(null); // To be consistent with the parsed version which stores a null here
       newExpr.setProperty("arrayDimensions", arrayDimensions);
       newExpr.setProperty("arrayInitializer", init);
       return newExpr;

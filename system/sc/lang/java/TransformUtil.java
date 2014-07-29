@@ -341,7 +341,7 @@ public class TransformUtil {
    }
    */
 
-   public static int parseClassBodySnippet(TypeDeclaration accessClass, String codeToInsert, boolean applyToHiddenBody, int insertPos, SemanticNodeList<Statement> fromStatements) {
+   public static int parseClassBodySnippet(TypeDeclaration accessClass, String codeToInsert, boolean applyToHiddenBody, int insertPos, SemanticNodeList<Statement> fromStatements, Statement globalFromStatement) {
       if (codeToInsert == null || codeToInsert.trim().length() == 0)
           return 0;
       Object result = SCLanguage.INSTANCE.parseString(codeToInsert, SCLanguage.INSTANCE.classBodySnippet);
@@ -373,9 +373,16 @@ public class TransformUtil {
                   accessClass.hiddenBody.addAll(insertPos, list);
             }
 
+            if (globalFromStatement != null) {
+               for (Object st:list) {
+                  if (st instanceof Statement)
+                     ((Statement) st).fromStatement = globalFromStatement;
+               }
+            }
+
             // For debugging registration, we need to walk the generated code and re-stablishe the links to the assignment expressions from which these were generated.
-            if (fromStatements != null)
-               ModelUtil.updateFromStatementRefs(list, fromStatements);
+            if (fromStatements != null || globalFromStatement != null)
+               ModelUtil.updateFromStatementRefs(list, fromStatements, globalFromStatement);
 
             // Need to init/start these after they have been added to the hierarchy so they can resolve etc.
             ParseUtil.initAndStartComponent(list);
@@ -429,7 +436,7 @@ public class TransformUtil {
 
          objType.incrVersion();
          PerfMon.start("parseClassSnippet");
-         parseClassBodySnippet(accessClass, codeToInsert, applyToHiddenBody, -1, assignments);
+         parseClassBodySnippet(accessClass, codeToInsert, applyToHiddenBody, -1, assignments, null);
          PerfMon.end("parseClassSnippet");
       }
       // This is the case where it's not a component or an object so we do not use a templste to redefine the creation semantics of the type.
@@ -480,7 +487,7 @@ public class TransformUtil {
          if (objType.declaresMethod("getObjChildren", objChildrenParameters, null, null) == null) {
             String getObjCodeToInsert = evalTemplate(parameters, getObjChildrenDefinitionTemplate());
 
-            parseClassBodySnippet(objType, getObjCodeToInsert, applyToHiddenBody, -1, assignments);
+            parseClassBodySnippet(objType, getObjCodeToInsert, applyToHiddenBody, -1, null, objType);
          }
       }
 
@@ -603,7 +610,7 @@ public class TransformUtil {
 
    public static int parseClassBodySnippetTemplate(TypeDeclaration typeDeclaration, String templateResourcePath, Object params, boolean hiddenBody, int insertPos) {
       String res = evalTemplateResource(templateResourcePath, params, typeDeclaration.getLayeredSystem().getSysClassLoader());
-      return TransformUtil.parseClassBodySnippet(typeDeclaration, res, hiddenBody, insertPos, null);
+      return TransformUtil.parseClassBodySnippet(typeDeclaration, res, hiddenBody, insertPos, null, null);
    }
 
    private final static String PROPERTY_DEFINITION =
@@ -875,11 +882,7 @@ public class TransformUtil {
    public static Expression convertToNewExpression(String arrayTypeName, ArrayInitializer arrayInit, String arrayDimensions) {
       NewExpression paramBindings = new NewExpression();
       paramBindings.typeIdentifier = arrayTypeName;
-      SemanticNodeList list = new SemanticNodeList(0);
-      /*
-      for (int i = 0; i < arrayDimensions.length() >> 1; i++)
-         list.add(null);
-      */
+      SemanticNodeList list = (SemanticNodeList) ParseUtil.nodeToSemanticValue(JavaLanguage.INSTANCE.parseString(arrayDimensions, JavaLanguage.INSTANCE.arrayDims));
       paramBindings.setProperty("arrayDimensions", list);
       paramBindings.setProperty("arrayInitializer", arrayInit);
       return paramBindings;
@@ -944,7 +947,7 @@ public class TransformUtil {
          //appendIndentIfNecessary((SemanticNodeList) propType.body, ix);
          SemanticNodeList list = (SemanticNodeList) ParseUtil.nodeToSemanticValue(node);
 
-         if (srcStatement != null) {
+         if (srcStatement != null && !isInterface) {
             boolean found = false;
             for (Object l:list) {
                String setName = "set" + params.upperPropertyName;
@@ -953,7 +956,12 @@ public class TransformUtil {
                   if (methDef.name.equals(setName)) {
                      BlockStatement body = methDef.body;
                      if (body != null && body.statements != null) {
+                        // Now matching all statements in the setX method
                         for (Statement bodySt:body.statements) {
+                           bodySt.fromStatement = srcStatement;
+                           found = true;
+
+                           /*
                            if (bodySt instanceof AssignmentExpression) {
                               AssignmentExpression assignExpr = (AssignmentExpression) bodySt;
                               if (assignExpr.lhs instanceof IdentifierExpression) {
@@ -965,6 +973,7 @@ public class TransformUtil {
                                  }
                               }
                            }
+                           */
                         }
                      }
                   }

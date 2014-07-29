@@ -84,27 +84,21 @@ public class IfStatement extends NonIndentedStatement {
       return false;
    }
 
-   public ISrcStatement findFromStatement(ISrcStatement toFind) {
+   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement toFind) {
       if (toFind == this)
-         return this;
-      ISrcStatement res;
+         res.add(this);
       if (trueStatement != null) {
-         res = trueStatement.findFromStatement(toFind);
-         if (res != null)
-            return res;
+         trueStatement.addGeneratedFromNodes(res, toFind);
       }
       if (falseStatement != null) {
-         res = falseStatement.findFromStatement(toFind);
-         if (res != null)
-            return res;
+         falseStatement.addGeneratedFromNodes(res, toFind);
       }
-      return null;
    }
 
-   public boolean updateFromStatementRef(Statement fromSt) {
-      if (trueStatement != null && trueStatement.updateFromStatementRef(fromSt))
+   public boolean updateFromStatementRef(Statement fromSt, ISrcStatement defaultSt) {
+      if (trueStatement != null && trueStatement.updateFromStatementRef(fromSt, defaultSt))
          return true;
-      if (falseStatement != null && falseStatement.updateFromStatementRef(fromSt))
+      if (falseStatement != null && falseStatement.updateFromStatementRef(fromSt, defaultSt))
          return true;
       return false;
    }

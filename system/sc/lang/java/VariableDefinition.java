@@ -21,6 +21,7 @@ import sc.util.StringUtil;
 import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Set;
 
 public class VariableDefinition extends AbstractVariable implements IVariableInitializer, ISrcStatement {
@@ -723,6 +724,12 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
 
    public boolean getNodeContainsPart(ISrcStatement partNode) {
       return this == partNode;
+   }
+
+   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement st) {
+      ISrcStatement fromSt = findFromStatement(st);
+      if (fromSt != null)
+         res.add(fromSt);
    }
 }
 

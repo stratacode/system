@@ -5,6 +5,7 @@
 package sc.lang.java;
 
 import sc.bind.BindingDirection;
+import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
 
 import java.util.List;
@@ -81,10 +82,18 @@ public abstract class TwoOperatorExpression extends Expression {
    }
 
    public boolean matchesStatement(Statement other) {
+      if (this instanceof AssignmentExpression) {
+         AssignmentExpression ae = (AssignmentExpression) this;
+         if (ae.lhs instanceof IdentifierExpression) {
+            IdentifierExpression lhs = (IdentifierExpression) ae.lhs;
+            if (lhs.identifiers.size() == 2 && lhs.identifiers.get(0).equals("layerModeChoice"))
+               System.out.println("***");
+         }
+      }
       return deepEquals(other);
    }
 
-   public boolean updateFromStatementRef(Statement fromSt) {
-      return checkFromStatementRef(this, fromSt);
+   public boolean updateFromStatementRef(Statement fromSt, ISrcStatement defaultSt) {
+      return checkFromStatementRef(this, fromSt, defaultSt);
    }
 }

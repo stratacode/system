@@ -139,24 +139,17 @@ public class TryStatement extends Statement implements IBlockStatement {
       return statements;
    }
 
-   public ISrcStatement findFromStatement(ISrcStatement toFind) {
+   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement toFind) {
       if (toFind == this)
-         return this;
-      ISrcStatement res = AbstractBlockStatement.findFromBlockStatement(this, toFind);
-      if (res != null)
-         return res;
+         res.add(this);
+      AbstractBlockStatement.addBlockGeneratedFromNodes(this, res, toFind);
       if (catchStatements != null) {
          for (Statement st:catchStatements) {
-            res = st.findFromStatement(toFind);
-            if (res != null)
-               return res;
+            st.addGeneratedFromNodes(res, toFind);
          }
       }
       if (finallyStatement != null) {
-         res = finallyStatement.findFromStatement(toFind);
-         if (res != null)
-            return res;
+         finallyStatement.addGeneratedFromNodes(res, toFind);
       }
-      return null;
    }
 }

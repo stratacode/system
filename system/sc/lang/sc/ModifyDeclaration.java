@@ -51,8 +51,13 @@ public class ModifyDeclaration extends TypeDeclaration {
          initTypeInfo();
       }
 
-      if (modifyTypeDecl != null)
+      if (modifyTypeDecl != null) {
+         if (modifyTypeDecl == this || modifyTypeDecl.getUnresolvedModifiedType() == this) {
+            System.err.println("*** type modfies itself!");
+            return null;
+         }
          return modifyTypeDecl;
+      }
 
       if (enumConstant)
          return getEnclosingType();
@@ -2423,5 +2428,25 @@ public class ModifyDeclaration extends TypeDeclaration {
             res = modifyTypeDecl.findFromStatement(srcStatement);
       }
       return res;
+   }
+
+   /** Complete the modified type */
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+      if (currentType == null)
+         return -1;
+      String currentTypeName = ModelUtil.getTypeName(currentType);
+      if (currentTypeName != null) {
+         if (prefix != null) {
+            int prefixLen = prefix.length();
+            if (!currentTypeName.startsWith(prefix) || currentTypeName.length() == prefixLen || currentTypeName.charAt(prefixLen) != '.')
+               return -1;
+            String currentBase = currentTypeName.substring(prefix.length() + 1);
+            if (currentBase.startsWith(command)) {
+               candidates.add(currentBase);
+               return 0;
+            }
+         }
+      }
+      return -1;
    }
 }
