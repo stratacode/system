@@ -57,15 +57,15 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
       return toString().lastIndexOf(substr);
    }
 
-   public CharSequence toStyledString() {
-      return ParseUtil.styleString(null, this, toString(), true);
+   public void styleNode(IStyleAdapter adapter) {
+      ParseUtil.styleString(adapter, null, this, toString(), true);
    }
 
    public int toSemanticStringLength() {
       return toSemanticString().length();
    }
 
-   public void formatStyled(FormatContext ctx) {
+   public void formatStyled(FormatContext ctx, IStyleAdapter adapter) {
       format(ctx);
    }
 

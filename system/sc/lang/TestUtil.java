@@ -269,7 +269,7 @@ public class TestUtil {
 
                //((JavaLanguage) lang).identifierExpression.trace = true;
                if (enableStyle)
-                  System.out.println("Styled output: " + ((ISemanticNode)modelObj).toStyledString());
+                  System.out.println("Styled output: " + ParseUtil.styleSemanticValue(modelObj, result));
 
                if (modelObj instanceof JavaModel) {
                   JavaModel m = (JavaModel) modelObj;

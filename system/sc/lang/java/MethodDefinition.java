@@ -83,6 +83,11 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       if (validated) return;
 
       TypeDeclaration methodType = getEnclosingType();
+
+      // We are probably just a fragment so none of this stuff is required.
+      if (methodType == null) {
+         return;
+      }
       Object extendsType = methodType.getExtendsTypeDeclaration();
       Object modType = methodType.getDerivedTypeDeclaration();
       if (extendsType == null)

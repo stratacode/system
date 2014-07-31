@@ -10,6 +10,7 @@ import sc.lang.html.Element;
 import sc.lifecycle.ILifecycle;
 import sc.parser.IString;
 import sc.lang.java.*;
+import sc.parser.IStyleAdapter;
 
 import java.util.EnumSet;
 import java.util.List;
@@ -57,8 +58,8 @@ public class GlueStatement extends Statement {
       return ExecResult.Next;
    }
 
-   public CharSequence toStyledString() {
-      return TemplateUtil.glueStyledString(this);
+   public void styleNode(IStyleAdapter adapter) {
+      TemplateUtil.glueStyledString(adapter, this);
    }
 
    public boolean transform(ILanguageModel.RuntimeType type) {

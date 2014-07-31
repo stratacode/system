@@ -835,15 +835,15 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       return true;
    }
 
-   public CharSequence toStyledString() {
-      return toStyledString(null);
+   public void styleNode(IStyleAdapter adapter) {
+      styleNode(adapter, null);
    }
 
-   public CharSequence toStyledString(Parselet parselet) {
+   public void styleNode(IStyleAdapter adapter, Parselet parselet) {
       if (parseNode != null) {
          if (parseNodeInvalid)
             validateParseNode(false);
-         return parseNode.toStyledString();
+         parseNode.styleNode(adapter);
       }
       // For this case unless it is a rootless node, we could walk up to the root node, use the start parselet from that language and generate it.
       // then presumably we'd have a parse node we could use.
@@ -853,12 +853,11 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
          Object result = parselet.generate(newGenerateContext(parselet), this);
          if (result instanceof ParseError) {
             System.err.println("*** Error styling generated model: " + this);
-            return "Error translating";
+            adapter.styleString("Error translating", false, null, null);
          }
-         return result.toString();
+         adapter.styleString(result.toString(), false, null, null);
       }
    }
-
 
    public void changeLanguage(Language l) {
       DynType type = TypeUtil.getPropertyCache(getClass());

@@ -489,8 +489,8 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       node.format(ctx);
    }
 
-   public void formatStyled(FormatContext ctx, IParseNode node) {
-      node.formatStyled(ctx);
+   public void formatStyled(FormatContext ctx, IParseNode node, IStyleAdapter adapter) {
+      node.formatStyled(ctx, adapter);
    }
 
    abstract public Object parse(Parser p);

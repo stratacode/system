@@ -57,7 +57,7 @@ public class ParentParseNode extends AbstractParseNode {
 
    public void add(Object node, Parselet p, int index, boolean skipSemanticValue, Parser parser) {
       if (children == null)
-         children = new ArrayList<Object>();
+         children = new ArrayList<Object>(parselet.parselets.size());
 
       boolean addChild = true;
 
@@ -279,48 +279,49 @@ public class ParentParseNode extends AbstractParseNode {
       */
    }
 
-   public CharSequence toStyledString() {
+   public void styleNode(IStyleAdapter adapter) {
       // If the parse node is generated, we need to use the formatting process to add in
       // the property spacing.  If the parse node was parsed, we toString it just as it
       // was parsed so we get back the identical input strings.
       if (generated) {
          FormatContext ctx = createFormatContext(null, null, -1);
+         adapter.setFormatContext(ctx);
          //ctx.append(FormatContext.INDENT_STR);
-         formatStyled(ctx);
-         return ctx.getResult().toString();
+         formatStyled(ctx, adapter);
+         adapter.setFormatContext(null);
       }
       else {
          if (children == null)
-            return "";
-         StringBuffer sb = new StringBuffer();
+            return;
          Parselet childParselet;
          int sz = children.size();
+         if (parselet.styleName != null)
+            adapter.styleStart(parselet.styleName);
          for (int i = 0; i < sz; i++) {
             Object childNode = children.get(i);
             childParselet = parselet.getChildParselet(childNode, i);
             if (childNode != null) {
                Object childSV;
-               CharSequence childStr;
                if (childNode instanceof IParseNode) {
                   IParseNode childParseNode = (IParseNode) childNode;
                   childSV = childParseNode.getSemanticValue();
                   if (!(childSV instanceof ISemanticNode))
-                      sb.append(childParseNode.toStyledString());
+                      childParseNode.styleNode(adapter);
                   else {
                      ISemanticNode childSVNode = (ISemanticNode) childSV;
                      if (childSVNode.getParseNode() == childNode)
-                        sb.append(ParseUtil.styleString(childSV, childParselet.styleName, null, false));
+                        ParseUtil.styleString(adapter, childSV, childParselet.styleName, null, false);
                      else
-                        sb.append(childParseNode.toStyledString());
+                        childParseNode.styleNode(adapter);
                   }
                }
                else {
-                  childStr = ParseUtil.styleString(childParselet.styleName, childNode.toString(), true);
-                  sb.append(childStr);
+                  ParseUtil.styleString(adapter, childParselet.styleName, childNode.toString(), true);
                }
             }
          }
-         return ParseUtil.styleString(parselet.styleName, sb.toString(), false);
+         if (parselet.styleName != null)
+            adapter.styleEnd(parselet.styleName);
       }
    }
 
@@ -383,7 +384,7 @@ public class ParentParseNode extends AbstractParseNode {
       return super.reformat();
    }
 
-   public void formatStyled(FormatContext ctx) {
+   public void formatStyled(FormatContext ctx, IStyleAdapter adapter) {
       if (children == null || children.size() == 0)
          return;
 
@@ -401,19 +402,19 @@ public class ParentParseNode extends AbstractParseNode {
                IParseNode node = (IParseNode) p;
                Parselet parselet = node.getParselet();
                if (parselet == null)
-                  node.formatStyled(ctx);
+                  node.formatStyled(ctx, adapter);
                else {
                   String styleName = parselet.styleName;
                   if (styleName != null)
-                     ctx.append(ParseUtil.getStyleStart(styleName));
-                  parselet.formatStyled(ctx, node);
+                     adapter.styleStart(styleName);
+                  parselet.formatStyled(ctx, node, adapter);
                   if (parselet.styleName != null)
-                     ctx.append(ParseUtil.getStyleEnd());
+                     adapter.styleEnd(styleName);
                }
             }
             else if (p != null) {
                childParselet = parselet.parselets.get(i % numChildren);
-               ctx.append(ParseUtil.styleString(null, childParselet.styleName, (CharSequence) p, true));
+               ParseUtil.styleString(adapter, null, childParselet.styleName, (CharSequence) p, true);
             }
             ent.currentIndex++;
          }
@@ -616,7 +617,7 @@ public class ParentParseNode extends AbstractParseNode {
       ParentParseNode res = (ParentParseNode) super.deepCopy();
       ArrayList<Object> newChildren;
       if (children != null) {
-         res.children = newChildren = new ArrayList<Object>();
+         res.children = newChildren = new ArrayList<Object>(children.size());
          for (Object child:children) {
             if (child instanceof IParseNode)
                newChildren.add(((IParseNode) child).deepCopy());

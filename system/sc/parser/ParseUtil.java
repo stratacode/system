@@ -488,17 +488,20 @@ public class ParseUtil  {
       ParseUtil.initAndStartComponent(obj);
    }
 
-   public static CharSequence styleString(Object semanticValue, IParseNode node, String strVal, boolean escape) {
+   public static void styleString(IStyleAdapter adapter, Object semanticValue, IParseNode node, String strVal, boolean escape) {
       if (node == null || node.getParselet() == null)
-         return strVal;
-      String styleName = node.getParselet().styleName;
-      return styleString(semanticValue, styleName, strVal, escape);
+         adapter.styleString(strVal, false, null, null);
+      else {
+         String styleName = node.getParselet().styleName;
+         styleString(adapter, semanticValue, styleName, strVal, escape);
+      }
    }
 
-   public static CharSequence styleString(Object semanticValue, String styleName, CharSequence strVal, boolean escape) {
+   public static void styleString(IStyleAdapter adapter, Object semanticValue, String styleName, CharSequence strVal, boolean escape) {
       if (semanticValue instanceof ISemanticNode)
-          return ((ISemanticNode) semanticValue).toStyledString();
-      return styleString(styleName, strVal, escape);
+          ((ISemanticNode) semanticValue).styleNode(adapter);
+      else
+         adapter.styleString(strVal, escape, styleName, null);
    }
 
    public static CharSequence getStyleStart(String styleName) {
@@ -513,39 +516,84 @@ public class ParseUtil  {
       return "</span>";
    }
 
-   public static CharSequence styleString(String styleName, CharSequence strVal, boolean escape) {
-      if (styleName != null) {
-         StringBuilder sb = new StringBuilder();
-         sb.append(getStyleStart(styleName));
-         if (escape)
-            sb.append(StringUtil.escapeHTML(strVal, false));
-         else
-            sb.append(strVal);
-         sb.append(getStyleEnd());
-         return sb;
+   public static class HTMLStyleAdapter implements IStyleAdapter {
+      StringBuilder currentResult = new StringBuilder();
+      FormatContext ctx;
+
+      public HTMLStyleAdapter() {
       }
-      if (escape)
-         return StringUtil.escapeHTML(strVal, false);
-      else
-         return strVal;
+
+      public boolean getNeedsFormattedString() {
+         return true;
+      }
+
+      public void setFormatContext(FormatContext ctx) {
+         this.ctx = ctx;
+         if (ctx != null)
+            ctx.setStyleBuffer(currentResult);
+      }
+
+      public void styleStart(String styleName) {
+         currentResult.append(getStyleStart(styleName));
+      }
+
+      public void styleEnd(String styleName) {
+         currentResult.append(getStyleEnd());
+      }
+
+      public void styleString(CharSequence codeOut, boolean escape, String styleName, String styleDesc) {
+         StringBuilder sb = currentResult;
+
+         if (ctx != null)
+            ctx.appendNoStyle(codeOut);
+         if (styleName != null) {
+            sb.append(getStyleStart(styleName));
+            if (escape)
+               sb.append(StringUtil.escapeHTML(codeOut, false));
+            else
+               sb.append(codeOut);
+            sb.append(getStyleEnd());
+         }
+         else {
+            if (escape)
+               sb.append(StringUtil.escapeHTML(codeOut, false));
+            else
+               sb.append(codeOut);
+         }
+      }
+
+      public CharSequence getResult() {
+         return currentResult;
+      }
    }
 
-   public static Object toStyledString(Object parseNode) {
+   public static void styleString(IStyleAdapter adapter, String styleName, CharSequence strVal, boolean escape) {
+      adapter.styleString(strVal, escape, styleName, null);
+   }
+
+   public static void toStyledString(IStyleAdapter adapter, Object parseNode) {
       if (parseNode instanceof IParseNode)
-         return ((IParseNode) parseNode).toStyledString();
-      else if (parseNode == null)
-         return "";
-      else
-         return StringUtil.escapeHTML(parseNode.toString(), false);
+         ((IParseNode) parseNode).styleNode(adapter);
+      else if (parseNode != null)
+         adapter.styleString(parseNode.toString(), true, null, null);
+   }
+
+   public static CharSequence styleSemanticValue(Object semanticValue, Parselet p) {
+      HTMLStyleAdapter adapter = new HTMLStyleAdapter();
+      if (semanticValue instanceof SemanticNode)
+         ((SemanticNode) semanticValue).styleNode(adapter, p);
+      return adapter.getResult();
    }
 
    public static CharSequence styleSemanticValue(Object semanticValue, Object result) {
+      HTMLStyleAdapter adapter = new HTMLStyleAdapter();
       if (semanticValue instanceof ISemanticNode)
-         return ((ISemanticNode) semanticValue).toStyledString();
+         ((ISemanticNode) semanticValue).styleNode(adapter);
       else if (result instanceof IParseNode)
-         return ((IParseNode) result).toStyledString();
+         ((IParseNode) result).styleNode(adapter);
       else
-         return result.toString();
+         adapter.styleString(result.toString(), false, null, null);
+      return adapter.getResult();
    }
 
    public static Object styleParseResult(String layerPath, String dispLayerPath, String fileName, boolean displayErrors, boolean isLayer, Object result) {

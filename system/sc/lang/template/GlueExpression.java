@@ -13,6 +13,7 @@ import sc.lang.TemplateLanguage;
 import sc.lang.html.Element;
 import sc.lang.java.*;
 import sc.parser.IString;
+import sc.parser.IStyleAdapter;
 import sc.parser.PString;
 import sc.parser.ParseUtil;
 
@@ -111,8 +112,8 @@ public class GlueExpression extends Expression {
       return String.class;
    }
 
-   public CharSequence toStyledString() {
-      return TemplateUtil.glueStyledString(this);
+   public void styleNode(IStyleAdapter adapter) {
+      TemplateUtil.glueStyledString(adapter, this);
    }
 
    public boolean transform(ILanguageModel.RuntimeType type) {

@@ -8,15 +8,16 @@ import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
 import sc.lang.java.Statement;
 import sc.parser.IString;
+import sc.parser.IStyleAdapter;
 import sc.parser.ParentParseNode;
 import sc.parser.ParseUtil;
 
 public class TemplateUtil {
 
-   public static CharSequence glueStyledString(Statement glueExpression) {
+   public static void glueStyledString(IStyleAdapter adapter, Statement glueExpression) {
       ParentParseNode node = (ParentParseNode) glueExpression.parseNode;
       if (node.children == null)
-         return "";
+         return;
       StringBuffer sb = new StringBuffer();
       int sz = node.children.size();
       for (int i = 0; i < sz; i++) {
@@ -27,19 +28,20 @@ public class TemplateUtil {
             SemanticNodeList list = (SemanticNodeList) childNode;
             for (int j = 0; j < list.size(); j++) {
                Object childElement = list.get(j);
-               if (childElement instanceof IString)
-                  sb.append(ParseUtil.styleString("templateString", (IString) childElement, true));
+               if (childElement instanceof IString) {
+                  ParseUtil.styleString(adapter, "templateString", (IString) childElement, true);
+               }
                else {
                   ISemanticNode element = (ISemanticNode) childElement;
-                  sb.append(element.toStyledString());
+                  element.styleNode(adapter);
                }
             }
          }
          else
-            sb.append(ParseUtil.toStyledString(node.children.get(i)));
+            ParseUtil.toStyledString(adapter, node.children.get(i));
       }
       // Do not escape here - we do need to escape above for the values but can't escape the HTML style tags we
       // insert around the individual strings.
-      return ParseUtil.styleString(node.getParselet().styleName, sb, false);
+      ParseUtil.styleString(adapter, node.getParselet().styleName, sb, false);
    }
 }

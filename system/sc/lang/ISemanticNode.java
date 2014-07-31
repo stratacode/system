@@ -6,6 +6,7 @@ package sc.lang;
 
 import sc.js.JSSettings;
 import sc.parser.IParseNode;
+import sc.parser.IStyleAdapter;
 import sc.parser.Language;
 import sc.parser.Parselet;
 
@@ -105,7 +106,7 @@ public interface ISemanticNode {
 
    public void validateParseNode(boolean finalGen);
 
-   public CharSequence toStyledString();
+   public void styleNode(IStyleAdapter adapter);
 
    public CharSequence toModelString();
 

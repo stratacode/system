@@ -4,6 +4,8 @@
 
 package sc.lang.java;
 
+import sc.parser.IStyleAdapter;
+
 import java.util.List;
 
 /**
@@ -24,11 +26,11 @@ public class TypedMethodExpression extends IdentifierExpression {
       return false;
    }
 
-   // TODO: this should do the work in IdentifierExpression's toStyledString but prepend the typeIdentifier
+   // TODO: this should do the work in IdentifierExpression's styleNode but prepend the typeIdentifier
    // and rearrange how the child parse nodes are organized.
-   public CharSequence toStyledString() {
+   public void styleNode(IStyleAdapter adapter) {
       if (parseNode != null) {
-         return parseNode.toStyledString();
+         parseNode.styleNode(adapter);
       }
       else
          throw new IllegalArgumentException("No parse tree new expression's semantic node");

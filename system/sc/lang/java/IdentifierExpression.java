@@ -17,9 +17,7 @@ import sc.lang.template.Template;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.obj.ComponentImpl;
-import sc.parser.IString;
-import sc.parser.PString;
-import sc.parser.ParseUtil;
+import sc.parser.*;
 import sc.type.*;
 import sc.util.PerfMon;
 import sc.util.StringUtil;
@@ -3780,31 +3778,125 @@ public class IdentifierExpression extends ArgumentsExpression {
       return false;
    }
 
-   public CharSequence toStyledString() {
-      if (idTypes == null)
-         return super.toStyledString();
+   /**
+    * Styling for identifier expressions is complicated because the information we need to do the styling is
+    * at this level, but the elements we are styling are buried down in the parse-tree of this node.  So far
+    * this is the only problematic case for Java so we are living with it but adding some features at the
+    * parselets level would help.
+    *
+    * One problem is that the parseNode for the IdentifierExpression may be expression, optExpression or exprStatement.
+    * We optionally need to 'drill down' to get the parse-node for the IdentifierExpression, then wrap the output with
+    * any parse nodes we skipped before or after.  To handle this at the parselet level, we could skip those levels
+    * automatically.
+    *
+    * Another problem is that the path name is split into the first name, then "." followed by each subsequent name
+    * so there's an extra bump in the hierarchy to deal with the second and subsequent path-names.
+    *
+    * We could add a method called - childStyleHandler which is called for each child parse node that produces an array
+    * value (in this case, the identifiers array).  It would return null for parse nodes which are ignored in styling
+    * or 'member' or 'staticMember' as necessary for each segment in the identifiers array.  That method would
+    * be passed the current parent parse node, the child-index, and the current parse-node so it could go back into the identifier expression and find the right style for that segment
+    * of the path-name.  It could probaby just unmap the value array and deal with the hierarchy skip so maybe we don't need
+    * that much context in that method.
+    */
+   public void styleNode(IStyleAdapter adapter) {
+      if (idTypes == null) {
+         super.styleNode(adapter);
+         return;
+      }
 
       int sz = identifiers.size();
-      String rep = parseNode.toStyledString().toString();
-      for (int i = 0; i < sz; i++) {
-         if (idTypes[i] == null)
-            break;
-         switch (idTypes[i]) {
-            case SetVariable:
-               if (!ModelUtil.isField(boundTypes[i]))
-                   break;
-            case FieldName:
-            case GetVariable:
-            case BoundObjectName:
-               String ident = identifiers.get(i).toString();
-               // TODO: use a regex after the first one to skip the right number of "."'s
-               rep = rep.replaceFirst(ident, ParseUtil.styleString("member", ident, false).toString());
+      //String rep = ParseUtil.styleParseNode(parseNode);
+      ParentParseNode pp = (ParentParseNode) parseNode;
+      Parselet topParselet = pp.getParselet();
+      ArrayList<IParseNode> remaining = null;
+
+      Parselet idExParselet = ((JavaLanguage) topParselet.getLanguage()).identifierExpression;
+      // TODO: here we are dealing with the fact that the IdentifierExpression could be wrapped in
+      // an expressionStatement, or optExpression.   In those cases, the IdentifierExpression is down 1-level
+      // and we have the ; we need to handle in 'remaining'  This could be handled more generically in the grammar.
+      // See comment for this method.
+      if (topParselet != idExParselet) {
+         for (int i = 0; i < pp.children.size(); i++) {
+            Object child = pp.children.get(i);
+            if (child instanceof ParentParseNode && ((ParentParseNode) child).getParselet() == idExParselet) {
+               pp = (ParentParseNode) child;
+               remaining = new ArrayList<IParseNode>();
+               while (++i < pp.children.size()) {
+                  IParseNode remainingNode = (IParseNode) pp.children.get(i);
+                  if (remainingNode != null)
+                     remaining.add(remainingNode);
+               }
                break;
-            default:
-               break;
+            }
+            else
+               ParseUtil.toStyledString(adapter, child);
          }
       }
-      return rep;
+      if (pp.children.get(0) instanceof IString)
+         System.out.println("***");
+      ParentParseNode identsNode = (ParentParseNode) pp.children.get(0);
+      ParentParseNode argsNode;
+      if (pp.children.size() > 1)
+         argsNode = (ParentParseNode) pp.children.get(1);
+      else
+         argsNode = null;
+
+      if (identsNode == null) {
+         super.styleNode(adapter);
+         return;
+      }
+
+      for (int i = 0; i < sz; i++) {
+         IParseNode child;
+         // TODO: Here we are unwrapping the grammar rule for creating the identifiers property - this could be solved in parselets more generically (see comment above)
+         if (i == 0)
+            child = (IParseNode) identsNode.children.get(0);
+         else {
+            ParentParseNode nextChildren = (ParentParseNode) identsNode.children.get(1);
+            int childIx = (i - 1) * 2;
+            if (nextChildren.children.size() > childIx) {
+               // First do the '.'
+               ParseUtil.toStyledString(adapter, nextChildren.children.get(childIx));
+               // Then the next identifier
+               child = (IParseNode) nextChildren.children.get(childIx+1);
+            }
+            else {
+               System.out.println("***");
+               child = null;
+               continue;
+            }
+         }
+         boolean handled = false;
+         if (idTypes[i] != null) {
+            switch (idTypes[i]) {
+               case SetVariable:
+                  if (!ModelUtil.isField(boundTypes[i]))
+                      break;
+               case FieldName:
+               case EnumName:
+               case GetVariable:
+               case BoundObjectName:
+                  String styleName = isStaticTarget(i) ? "staticMember" : "member";
+                  adapter.styleStart(styleName);
+                  child.styleNode(adapter);
+                  adapter.styleEnd(styleName);
+                  handled = true;
+                  break;
+               default:
+                  break;
+            }
+         }
+         if (!handled) {
+            child.styleNode(adapter);
+         }
+      }
+      if (argsNode != null)
+         argsNode.styleNode(adapter);
+      if (remaining != null) {
+         for (IParseNode node:remaining)
+            node.styleNode(adapter);
+      }
    }
 
 

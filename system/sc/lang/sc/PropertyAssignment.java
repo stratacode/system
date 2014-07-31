@@ -644,18 +644,16 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       return thisAnnot;
    }
 
-   public CharSequence toStyledString() {
-      StringBuilder sb = new StringBuilder();
+   public void styleNode(IStyleAdapter adapter) {
       ParentParseNode pnode = (ParentParseNode) parseNode;
-      sb.append(ParseUtil.styleString("member", pnode.children.get(0).toString(), false));
+      ParseUtil.styleString(adapter, "member", pnode.children.get(0).toString(), false);
       for (int i = 1; i < pnode.children.size(); i++) {
          Object childNode = pnode.children.get(i);
          if (childNode instanceof IParseNode && ((IParseNode) childNode).getSemanticValue() == initializer)
-            sb.append(initializer.toStyledString());
+            initializer.styleNode(adapter);
          else
-            sb.append(ParseUtil.toStyledString(pnode.children.get(i)));
+            ParseUtil.toStyledString(adapter, pnode.children.get(i));
       }
-      return sb;
    }
 
    public static PropertyAssignment create(String pname, Expression expr, String op) {

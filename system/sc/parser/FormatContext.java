@@ -23,7 +23,9 @@ public class FormatContext {
 
    List<Entry> pendingParents = new ArrayList<Entry>();
 
-   StringBuffer currentBuffer = new StringBuffer();
+   StringBuilder currentBuffer = new StringBuilder();
+
+   StringBuilder styleBuffer = null;
 
    boolean semanticValueOnly = false;
    boolean suppressSpacing = false;
@@ -77,6 +79,17 @@ public class FormatContext {
    public void append(CharSequence seq) {
       if (seq != null)
          currentBuffer.append(seq);
+      if (styleBuffer != null)
+         styleBuffer.append(seq);
+   }
+
+   public void appendNoStyle(CharSequence seq) {
+      if (seq != null)
+         currentBuffer.append(seq);
+   }
+
+   public void setStyleBuffer(StringBuilder styleBuffer) {
+      this.styleBuffer = styleBuffer;
    }
 
    public CharSequence getResult() {

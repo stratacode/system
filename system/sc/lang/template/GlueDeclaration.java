@@ -6,6 +6,7 @@ package sc.lang.template;
 
 import sc.lang.ILanguageModel;
 import sc.lang.java.Statement;
+import sc.parser.IStyleAdapter;
 
 import java.util.List;
 import java.util.Set;
@@ -19,8 +20,8 @@ import java.util.Set;
 public class GlueDeclaration extends Statement {
    public List<Object> declarations; // any template body declaration
 
-   public CharSequence toStyledString() {
-      return TemplateUtil.glueStyledString(this);
+   public void styleNode(IStyleAdapter adapter) {
+      TemplateUtil.glueStyledString(adapter, this);
    }
 
    public boolean transform(ILanguageModel.RuntimeType type) {

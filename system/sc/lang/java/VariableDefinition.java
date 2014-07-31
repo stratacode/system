@@ -11,6 +11,7 @@ import sc.lang.*;
 import sc.lang.js.JSUtil;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
+import sc.parser.IStyleAdapter;
 import sc.parser.Language;
 import sc.parser.ParentParseNode;
 import sc.parser.ParseUtil;
@@ -517,16 +518,16 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       return res;
    }
 
-   public CharSequence toStyledString() {
-      if (!(getDefinition() instanceof FieldDefinition)) // Field members only
-         return super.toStyledString();
+   public void styleNode(IStyleAdapter adapter) {
+      if (!(getDefinition() instanceof FieldDefinition)) { // Field members only
+         super.styleNode(adapter);
+         return;
+      }
 
-      StringBuilder sb = new StringBuilder();
       ParentParseNode pnode = (ParentParseNode) parseNode;
-      sb.append(ParseUtil.styleString("member", (ParentParseNode) pnode.children.get(0), false));
+      ParseUtil.styleString(adapter, "member", (ParentParseNode) pnode.children.get(0), false);
       for (int i = 1; i < pnode.children.size(); i++)
-         return sb.append(ParseUtil.toStyledString(pnode.children.get(i)));
-      return sb;
+         ParseUtil.toStyledString(adapter, pnode.children.get(i));
    }
 
    public Expression getInitializerExpr() {

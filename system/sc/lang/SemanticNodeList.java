@@ -593,12 +593,12 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       }
    }
 
-   public CharSequence toStyledString() {
+   public void styleNode(IStyleAdapter adapter) {
       if (parseNode != null) {
          if (parseNodeInvalid) {
             validateParseNode(false);
          }
-         return parseNode.toStyledString();
+         parseNode.styleNode(adapter);
       }
       // For this case unless it is a rootless node, we could walk up to the root node, use the start parselet from that language and generate it.
       // then presumably we'd have a parse node we could use.

@@ -10,6 +10,7 @@ import sc.bind.IListener;
 import sc.dyn.DynUtil;
 import sc.lang.SemanticNodeList;
 import sc.parser.IString;
+import sc.parser.IStyleAdapter;
 import sc.type.IBeanMapper;
 import sc.parser.PString;
 import sc.parser.ParseUtil;
@@ -196,11 +197,9 @@ public class ArrayElementExpression extends IdentifierExpression {
       super.visitTypeReferences(info, ctx);
    }
 
-   public CharSequence toStyledString() {
-      StringBuilder sb = new StringBuilder();
-      sb.append(super.toStyledString());
-      sb.append(arrayDimensions.toStyledString());
-      return sb;
+   public void styleNode(IStyleAdapter adapter) {
+      super.styleNode(adapter);
+      arrayDimensions.styleNode(adapter);
    }
 
    public void refreshBoundTypes() {

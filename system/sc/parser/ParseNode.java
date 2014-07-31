@@ -145,28 +145,31 @@ public class ParseNode extends AbstractParseNode {
          return ((value).toString()).charAt(ix);
    }
 
-   public CharSequence toStyledString() {
+   public void styleNode(IStyleAdapter adapter) {
       CharSequence res;
       if (value instanceof IParseNode) {
          IParseNode childParseNode = (IParseNode) value;
          Object childSV = childParseNode.getSemanticValue();
          if ((childSV instanceof ISemanticNode)) {
             ISemanticNode childSVNode = (ISemanticNode) childSV;
-            if (childSVNode.getParseNode() == childParseNode)
-               return (ParseUtil.styleString(childSV, childParseNode.getParselet().styleName, null, false));
+            if (childSVNode.getParseNode() == childParseNode) {
+               ParseUtil.styleString(adapter, childSV, childParseNode.getParselet().styleName, null, false);
+               return;
+            }
          }
-         res = childParseNode.toStyledString();
+         res = childParseNode.toString();
       }
       else
          res = value.toString();
-      return ParseUtil.styleString(null, parselet.styleName, res, true);
+      ParseUtil.styleString(adapter, null, parselet.styleName, res, true);
    }
 
-   public void formatStyled(FormatContext ctx) {
+   public void formatStyled(FormatContext ctx, IStyleAdapter adapter) {
       if (value instanceof IParseNode)
-         ((IParseNode)value).formatStyled(ctx);
-      else
-         ctx.append(toStyledString());
+         ((IParseNode)value).formatStyled(ctx, adapter);
+      else {
+         adapter.styleString(toString(), false, null, null);
+      }
    }
 
    public void changeLanguage(Language lang) {

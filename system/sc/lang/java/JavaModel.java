@@ -2386,7 +2386,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    @Bindable(manual=true)
    public String getHTMLModelText() {
-      return toStyledString((getLanguage()).getStartParselet()).toString();
+      return ParseUtil.styleSemanticValue(this, ((getLanguage()).getStartParselet())).toString();
    }
 
    @Bindable(manual=true)
