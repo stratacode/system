@@ -47,6 +47,7 @@ public class CommandSCLanguage extends SCLanguage {
       reqImport.optional = false;
       reqClassBodyDeclaration.setName(reqClassBodyDeclaration.getName().replace("<classBodyDeclarations>", "<reqClassBodyDeclaration>"));
       reqClassBodyDeclaration.repeat = false;
+      reqClassBodyDeclaration.skipOnErrorParselet = null;
       reqClassBodyDeclaration.optional = false;
       optOpenBraceEOL.optional = true;
    }
