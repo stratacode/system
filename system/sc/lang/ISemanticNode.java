@@ -60,6 +60,8 @@ public interface ISemanticNode {
    /** Returns null or an error string for this node */
    public String getNodeErrorText();
 
+   public String getNodeWarningText();
+
    /** Options for the deepCopy method - OR'd together as bit flags.  Copy the complete parse node tree */
    public static final int CopyParseNode = 1;
 

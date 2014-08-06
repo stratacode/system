@@ -73,6 +73,8 @@ public abstract class Language implements IFileProcessor {
 
    public boolean useCommonBuildDir = false;
 
+   public String defaultExtension = null;
+
    public Object parse(File file) {
       try {
          return parse(new FileReader(file));
@@ -376,8 +378,12 @@ public abstract class Language implements IFileProcessor {
 
    public static Map<String,Language> languages = new HashMap<String,Language>();
 
+   public String languageName;
+
    public static void registerLanguage(Language l, String extension) {
       initLanguage(l);
+      if (l.defaultExtension == null)
+         l.defaultExtension = extension;
       languages.put(extension, l);
    }
 

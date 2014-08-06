@@ -123,10 +123,11 @@ public class SCLanguage extends JavaLanguage {
       return INSTANCE;
    }
 
-   public SCLanguage()
-   {
+   public SCLanguage() {
       super();
       addToSemanticValueClassPath("sc.lang.sc");
+      languageName = "StrataCode";
+      defaultExtension = "sc";
    }
 
    public static void main(String[] args)

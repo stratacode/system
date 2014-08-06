@@ -6,4 +6,5 @@ package sc.lang;
 
 public interface IErrorHandler {
    void reportError(String error);
+   void reportWarning(String warning);
 }

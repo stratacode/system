@@ -291,6 +291,8 @@ public class AssignmentExpression extends TwoOperatorExpression {
       // Propagate our fromDefinition if we were generated.  Probably fromDefinition and fromStatement should be combiend
       if (fromDefinition instanceof Statement)
          newSt.fromStatement = (Statement) fromDefinition;
+      else if (fromStatement != null)
+         newSt.fromStatement = fromStatement;
       else
          newSt.fromStatement = this;
    }

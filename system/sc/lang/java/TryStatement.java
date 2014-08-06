@@ -152,4 +152,8 @@ public class TryStatement extends Statement implements IBlockStatement {
          finallyStatement.addGeneratedFromNodes(res, toFind);
       }
    }
+
+   public boolean childIsTopLevelStatement(Statement child) {
+      return true;
+   }
 }

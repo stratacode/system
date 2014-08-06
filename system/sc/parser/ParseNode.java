@@ -242,4 +242,9 @@ public class ParseNode extends AbstractParseNode {
       return null;
    }
 
+
+   public Object getSkippedValue() {
+      return value;
+   }
 }
+

@@ -20,10 +20,6 @@ import java.util.List;
 public class OrderedChoice extends NestedParselet  {
    public OrderedChoice() { super(); }
 
-   /** Set this to a parselet to use when we want to try and reparse an element after skipping over error text.  This
-    * parselet is applied whenever we encounter an error.  As long as it matches */
-   public Parselet skipOnErrorParselet = null;
-
    public OrderedChoice(int options) {
       this(null, options);
    }
@@ -50,24 +46,6 @@ public class OrderedChoice extends NestedParselet  {
 
    public String getSeparatorSymbol() {
       return " / ";
-   }
-
-   public void initialize() {
-      if (initialized)
-         return;
-      super.initialize();
-      if (skipOnErrorParselet != null) {
-         skipOnErrorParselet.setLanguage(getLanguage());
-         skipOnErrorParselet.initialize();
-      }
-   }
-
-   public void start() {
-      if (started)
-         return;
-      super.start();
-      if (skipOnErrorParselet != null)
-         skipOnErrorParselet.start();
    }
 
    public Class getSemanticValueClass() {
@@ -457,6 +435,7 @@ public class OrderedChoice extends NestedParselet  {
          }
          if (lookahead)
             parser.changeCurrentIndex(startIndex);
+
          else
             parser.changeCurrentIndex(lastMatchStart);
          return parseResult(parser, value, false);

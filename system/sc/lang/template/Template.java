@@ -1117,6 +1117,8 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
          for (Object td:templateDeclarations) {
             if (td instanceof Element) {
                Element childTag = (Element) td;
+               if (childTag.tagName == null) // Error parsing this tag on incomplete models if we get here
+                  continue;
                if (childTag.getRawObjectName().equals(rawObjName)) {
                   if (res == null)
                      res = new ArrayList<Element>();

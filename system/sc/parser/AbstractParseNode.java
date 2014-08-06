@@ -146,4 +146,10 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
       }
       return null;
    }
+
+   public abstract Object getSkippedValue();
+
+   public boolean canSkip() {
+      return true;
+   }
 }

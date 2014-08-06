@@ -727,6 +727,10 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       return this == partNode;
    }
 
+   public boolean childIsTopLevelStatement(ISrcStatement st) {
+      return false;
+   }
+
    public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement st) {
       ISrcStatement fromSt = findFromStatement(st);
       if (fromSt != null)

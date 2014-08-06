@@ -68,4 +68,8 @@ public class FinallyStatement extends NonIndentedStatement implements IBlockStat
    public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement st) {
       AbstractBlockStatement.addBlockGeneratedFromNodes(this, res, st);
    }
+
+   public boolean childIsTopLevelStatement(Statement child) {
+      return true;
+   }
 }

@@ -5896,19 +5896,22 @@ public class ModelUtil {
          return true;
    }
 
-   public static Statement getTopLevelStatement(ISemanticNode node) {
+   public static ISemanticNode getTopLevelStatement(ISemanticNode node) {
       Statement st = node instanceof Statement ? (Statement) node : ((JavaSemanticNode) node).getEnclosingStatement();
-      ISemanticNode parent = st.parentNode;
+      ISemanticNode parent = st.getParentNode();
       if (parent instanceof SemanticNodeList)
          parent = parent.getParentNode();
-      if (parent == null)
+      if (parent == null || parent instanceof ILanguageModel)
          return st;
-      if (parent instanceof IBlockStatement || parent instanceof TypeDeclaration || parent instanceof IfStatement || parent instanceof ForStatement || parent instanceof WhileStatement || parent instanceof ExpressionStatement) {
-         return st;
+
+      if (parent instanceof Statement) {
+         Statement parentStatement = (Statement) parent;
+         if (parentStatement.childIsTopLevelStatement(st))
+            return st;
       }
-      else {
-         return getTopLevelStatement(parent);
-      }
+
+      // TODO: what about variable definitions and fields?  Shouldn't the variable definition be the top-level statement?
+      return getTopLevelStatement(parent);
    }
 
    public static void updateFromStatementRefs(SemanticNodeList list, SemanticNodeList<Statement> fromStatements, ISrcStatement defaultSt) {
@@ -5929,11 +5932,13 @@ public class ModelUtil {
                System.err.println("*** Warning - some statements not matched up with the generated source: " + fromSt);
          }
       }
-      else if (defaultSt != null) {
+      // Do this even if there are no assignments - any statement which does not have a fromStatement will be set to
+      // the default statement.
+      if (defaultSt != null) {
          for (Object newSemNode:list) {
             if (newSemNode instanceof Statement) {
                Statement st = (Statement) newSemNode;
-               st.fromStatement = defaultSt;
+               st.updateFromStatementRef(null, defaultSt);
             }
          }
       }

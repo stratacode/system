@@ -96,10 +96,15 @@ public class IfStatement extends NonIndentedStatement {
    }
 
    public boolean updateFromStatementRef(Statement fromSt, ISrcStatement defaultSt) {
+      super.updateFromStatementRef(null, defaultSt);
       if (trueStatement != null && trueStatement.updateFromStatementRef(fromSt, defaultSt))
          return true;
       if (falseStatement != null && falseStatement.updateFromStatementRef(fromSt, defaultSt))
          return true;
       return false;
+   }
+
+   public boolean childIsTopLevelStatement(Statement child) {
+      return child == trueStatement || child == falseStatement;
    }
 }

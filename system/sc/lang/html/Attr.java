@@ -23,6 +23,7 @@ public class Attr extends Node {
    public transient Expression valueExpr, valueExprClone;
    public transient Object valueProp;
    public transient String op;
+   public transient boolean unknown = false;
 
    // The Element tag which defined this attribute
    public transient Element declaringTag;
@@ -193,5 +194,9 @@ public class Attr extends Node {
 
    public boolean isReverseOnly() {
       return op != null && op.equals("=:");
+   }
+
+   public String getNodeWarningText() {
+      return unknown ? "Unknown attribute: " + name : null;
    }
 }

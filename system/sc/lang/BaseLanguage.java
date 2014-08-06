@@ -191,7 +191,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
       protected String accept(SemanticContext ctx, Object value, int startIx, int endIx) {
          IString str = PString.toIString(value);
          if (str == null)
-            return "Identifiers must be non null";
+            return "AlphaNum char must not non null";
          if (str.length() == 1) {
             char c = str.charAt(0);
             if (Character.isLetterOrDigit(c))
@@ -218,6 +218,15 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
          return "Identifiers cannot be keywords";
       }
    };
+
+   Sequence alphaNumString = new Sequence("<anyName>('','',)", alphaNumChar,
+           new Sequence("('')", REPEAT | OPTIONAL, alphaNumChar), spacing);
+
+   /** Use this to create a parselet for your repeating parselets skipOnError parselet.  It's used to consume the next error token while trying to skip out
+    * of the body of something which is incomplete.  It must consume all text except for the text which would ordinarily complete the parent. */
+   public Parselet createSkipOnErrorParselet(String... exitSymbols) {
+      return new OrderedChoice("<skipBodyError>(.,.)", alphaNumString, new Sequence(new SymbolChoice(NOT, exitSymbols), spacing));
+   }
 
    Sequence identifierSp = (Sequence) identifier.copy();
    {

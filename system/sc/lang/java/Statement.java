@@ -244,8 +244,23 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
          res.add(fromSt);
    }
 
+   /*
    public boolean updateFromStatementRef(Statement fromSt, ISrcStatement srcSt) {
       return false;
+   }
+   */
+
+   /** During code-transformation, sometimes we end up parsing dynamically generated code which is derived from
+    * some source objects - e.g. during the object and property transformation.  This method registers the generated
+    * code.  You can provide a 'fromStatement' and a default statement.  If the from statement matches, this node is
+    * updated.  If the fromStatement is null the defaultStatement is used.
+    * <p>
+    * To determine whether the fromStatement matches this statememtn, we call matchesStatement.  For assignment expressions
+    * right now, that allows us to match the right assignment statement in the list to the source from which it was generated from.
+    * </p>
+    */
+   public boolean updateFromStatementRef(Statement fromSt, ISrcStatement defaultSt) {
+      return checkFromStatementRef(this, fromSt, defaultSt);
    }
 
    public boolean matchesStatement(Statement other) {
@@ -253,11 +268,11 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
    }
 
    public static boolean checkFromStatementRef(Statement toUpdate, Statement fromSt, ISrcStatement defaultSt) {
-      if (toUpdate.fromStatement == null && toUpdate.matchesStatement(fromSt)) {
+      if (fromSt != null && toUpdate.fromStatement == null && toUpdate.matchesStatement(fromSt)) {
          toUpdate.fromStatement = fromSt;
          return true;
       }
-      else if (toUpdate.fromStatement == null)
+      else if (toUpdate.fromStatement == null && defaultSt != null)
          toUpdate.fromStatement = defaultSt;
       return false;
    }
@@ -270,5 +285,9 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
 
    public ISrcStatement getFromStatement() {
       return fromStatement;
+   }
+
+   public boolean childIsTopLevelStatement(Statement child) {
+      return false;
    }
 }

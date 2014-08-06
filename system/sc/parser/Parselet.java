@@ -241,8 +241,11 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
          return false;
 
       if (getSkip()) {
-         parent.add(((ParseNode)node).value, this, index, true, parser);
-         return false;
+         AbstractParseNode pn = (AbstractParseNode) node;
+         if (pn.canSkip()) {
+            parent.add(pn.getSkippedValue(), this, index, true, parser);
+            return false;
+         }
       }
 
       return true;
@@ -385,10 +388,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
    public ParseError parseError(Parser parser, Object partialValue, ParseError chain, Parselet childParselet, String errorCode, Object... args) {
       int endIx = chain == null ? parser.currentIndex : Math.max(chain.endIndex, parser.currentIndex);
       int startIx = parser.getLastStartIndex();
-      if (parser.semanticContext != null)
-         parser.semanticContext.resetToIndex(startIx);
-      parser.changeCurrentIndex(startIx);
-
+      parser.resetCurrentIndex(startIx);
       return parser.parseError(this, partialValue, childParselet, errorCode, startIx, endIx, args);
    }
 
@@ -508,8 +508,8 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
 
    public boolean peek(Parser p) {
       int startIndex = p.currentIndex;
-      Object value = parse(p);
-      p.changeCurrentIndex(startIndex);
+      Object value = p.parseNext(this);
+      p.resetCurrentIndex(startIndex);
       return value != null && !(value instanceof ParseError);
    }
 

@@ -436,7 +436,7 @@ public class TransformUtil {
 
          objType.incrVersion();
          PerfMon.start("parseClassSnippet");
-         parseClassBodySnippet(accessClass, codeToInsert, applyToHiddenBody, -1, assignments, null);
+         parseClassBodySnippet(accessClass, codeToInsert, applyToHiddenBody, -1, assignments, objType);
          PerfMon.end("parseClassSnippet");
       }
       // This is the case where it's not a component or an object so we do not use a templste to redefine the creation semantics of the type.
@@ -948,6 +948,13 @@ public class TransformUtil {
          SemanticNodeList list = (SemanticNodeList) ParseUtil.nodeToSemanticValue(node);
 
          if (srcStatement != null && !isInterface) {
+            // Now register the debugging registration - mark statements generated here with the source statement.
+            for (Object l:list) {
+               // TODO: should we have an option to skip the contents of the getX method
+               if (l instanceof Statement)
+                  ((Statement) l).updateFromStatementRef(null, srcStatement);
+            }
+                           /*
             boolean found = false;
             for (Object l:list) {
                String setName = "set" + params.upperPropertyName;
@@ -960,20 +967,6 @@ public class TransformUtil {
                         for (Statement bodySt:body.statements) {
                            bodySt.fromStatement = srcStatement;
                            found = true;
-
-                           /*
-                           if (bodySt instanceof AssignmentExpression) {
-                              AssignmentExpression assignExpr = (AssignmentExpression) bodySt;
-                              if (assignExpr.lhs instanceof IdentifierExpression) {
-                                 IdentifierExpression iex = (IdentifierExpression) assignExpr.lhs;
-                                 if (iex.identifiers != null && iex.identifiers.size() == 1 && iex.identifiers.get(0).equals(params.lowerPropertyName)) {
-                                    assignExpr.fromStatement = srcStatement;
-                                    found = true;
-                                    break;
-                                 }
-                              }
-                           }
-                           */
                         }
                      }
                   }
@@ -981,6 +974,7 @@ public class TransformUtil {
             }
             if (!found)
                System.err.println("*** Warning unable to assign registration between source and generated code for debugging");
+                           */
          }
 
          propType.body.addAll(ix, list);

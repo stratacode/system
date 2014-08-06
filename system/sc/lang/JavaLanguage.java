@@ -118,9 +118,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    public Sequence optExpression = new Sequence("(.)", OPTIONAL, expression);
 
-   Sequence alphaNumString = new Sequence("<anyName>('','',)", alphaNumChar,
-           new Sequence("('')", REPEAT | OPTIONAL, alphaNumChar), spacing);
-   OrderedChoice skipBodyError = new OrderedChoice("<skipBodyError>(.,.)", alphaNumString, new Sequence(new SymbolChoice(NOT, "}", Symbol.EOF), spacing));
+   Parselet skipBodyError = createSkipOnErrorParselet("}", Symbol.EOF);
 
    public Sequence classBody = new Sequence("<classBody>(,[],)");
    public OrderedChoice classDeclarationWithoutModifiers = new OrderedChoice();
@@ -195,9 +193,9 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    Symbol singleQuote = new Symbol("'");
    Symbol doubleQuote = new Symbol("\"");
 
-   public Parselet escapedString = new OrderedChoice("('','')", OPTIONAL | REPEAT, escapeSequence, new SymbolChoice(NOT, "\\", "\"", EOF));
+   public Parselet escapedString = new OrderedChoice("('','')", OPTIONAL | REPEAT, escapeSequence, new SymbolChoice(NOT, "\\", "\"", "\n", EOF));
 
-   public Parselet escapedSingleQuoteString = new OrderedChoice("('','')", OPTIONAL | REPEAT, escapeSequence, new SymbolChoice(NOT, "\\", "\'", EOF));
+   public Parselet escapedSingleQuoteString = new OrderedChoice("('','')", OPTIONAL | REPEAT, escapeSequence, new SymbolChoice(NOT, "\\", "\'", "\n", EOF));
 
    public Sequence stringLiteral = new Sequence("StringLiteral(,value,)", doubleQuote, escapedString, doubleQuote);
    {
@@ -693,6 +691,8 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    public JavaLanguage() {
       setSemanticValueClassPath("sc.lang.java");
       setStartParselet(compilationUnit);
+      languageName = "Java";
+      defaultExtension = "java";
    }
 
    public String getJavaFileName(String fileName) {

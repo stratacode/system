@@ -5,5 +5,6 @@
 package sc.parser;
 
 public abstract class SemanticContext {
-   public abstract void resetToIndex(int ix);
+   public abstract Object resetToIndex(int ix);
+   public abstract void restoreToIndex(int ix, Object resetReturnValue);
 }

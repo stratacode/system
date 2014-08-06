@@ -86,4 +86,15 @@ public class WhileStatement extends ExpressionStatement {
       if (statement != null)
          statement.addGeneratedFromNodes(res, toFind);
    }
+
+   public boolean updateFromStatementRef(Statement fromSt, ISrcStatement defaultSt) {
+      boolean res = super.updateFromStatementRef(null, defaultSt);
+      if (statement != null)
+         return statement.updateFromStatementRef(fromSt, defaultSt);
+      return res;
+   }
+
+   public boolean childIsTopLevelStatement(Statement child) {
+      return child == statement;
+   }
 }

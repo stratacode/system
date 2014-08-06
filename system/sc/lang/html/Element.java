@@ -399,7 +399,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          return true;
 
       Template template = getEnclosingTemplate();
-      if (template == null)
+      if (template == null || tagName == null)
          return false;
 
       // When we are generating the server, if this says only put this tag on the client, we just omit the object.
@@ -1031,6 +1031,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                         ((Expression) att.value).inactive = true;
                   }
                   else if (att.valueProp == null && !isBehaviorAttribute(att.name)) {
+                     att.unknown = true;
                      displayWarning("Unknown attribute: ", att.name, " for tag: ");
                   }
                }
@@ -1962,10 +1963,11 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       Object extTypeDecl = getExtendsTypeDeclaration();
       boolean canProcess = true;
       boolean canInherit = true;
-      Layer tagLayer = getJavaModel().getLayer();
+      JavaModel javaModel = getJavaModel();
+      Layer tagLayer = javaModel.getLayer();
 
       if (extTypeDecl instanceof Class) {
-         Object newExtTypeDecl = ModelUtil.resolveSrcTypeDeclaration(tagLayer.layeredSystem, extTypeDecl);
+         Object newExtTypeDecl = ModelUtil.resolveSrcTypeDeclaration(javaModel.getLayeredSystem(), extTypeDecl);
          if (newExtTypeDecl instanceof BodyTypeDeclaration)
             extTypeDecl = newExtTypeDecl;
       }

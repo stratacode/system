@@ -884,8 +884,13 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       return toLanguageString();
    }
 
-   /** Override to provide easy-per-node error support */
+   /** Override to provide per-node error support */
    public String getNodeErrorText() {
+      return null;
+   }
+
+   /** Override for per-node warning support */
+   public String getNodeWarningText() {
       return null;
    }
 

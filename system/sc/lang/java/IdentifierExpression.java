@@ -2484,8 +2484,9 @@ public class IdentifierExpression extends ArgumentsExpression {
          }
          else {
             se = new SelectorExpression();
-
             se.setProperty("selectors", new SemanticNodeList<Selector>(sz));
+            if (fromStatement != null)
+               se.fromStatement = fromStatement; // Track for debugging line number registration
          }
 
          boolean xformThis = false;
@@ -2550,6 +2551,8 @@ public class IdentifierExpression extends ArgumentsExpression {
                      else {
                         SelectorExpression subSel = new SelectorExpression();
                         subSel.setProperty("expression", subExpr);
+                        if (fromStatement != null)
+                           subSel.fromStatement = fromStatement;
                         se = subSel;
                      }
                   }
@@ -3809,7 +3812,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       //String rep = ParseUtil.styleParseNode(parseNode);
       ParentParseNode pp = (ParentParseNode) parseNode;
       Parselet topParselet = pp.getParselet();
-      ArrayList<IParseNode> remaining = null;
+      ArrayList<Object> remaining = null;
 
       Parselet idExParselet = ((JavaLanguage) topParselet.getLanguage()).identifierExpression;
       // TODO: here we are dealing with the fact that the IdentifierExpression could be wrapped in
@@ -3820,21 +3823,19 @@ public class IdentifierExpression extends ArgumentsExpression {
          for (int i = 0; i < pp.children.size(); i++) {
             Object child = pp.children.get(i);
             if (child instanceof ParentParseNode && ((ParentParseNode) child).getParselet() == idExParselet) {
-               pp = (ParentParseNode) child;
-               remaining = new ArrayList<IParseNode>();
+               remaining = new ArrayList<Object>();
                while (++i < pp.children.size()) {
-                  IParseNode remainingNode = (IParseNode) pp.children.get(i);
+                  Object remainingNode = pp.children.get(i);
                   if (remainingNode != null)
                      remaining.add(remainingNode);
                }
+               pp = (ParentParseNode) child;
                break;
             }
             else
                ParseUtil.toStyledString(adapter, child);
          }
       }
-      if (pp.children.get(0) instanceof IString)
-         System.out.println("***");
       ParentParseNode identsNode = (ParentParseNode) pp.children.get(0);
       ParentParseNode argsNode;
       if (pp.children.size() > 1)
@@ -3862,7 +3863,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                child = (IParseNode) nextChildren.children.get(childIx+1);
             }
             else {
-               System.out.println("***");
+               System.out.println("*** error styling identifier expression");
                child = null;
                continue;
             }
@@ -3894,8 +3895,10 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (argsNode != null)
          argsNode.styleNode(adapter);
       if (remaining != null) {
-         for (IParseNode node:remaining)
-            node.styleNode(adapter);
+         for (Object node:remaining) {
+            if (node != argsNode)
+               ParseUtil.toStyledString(adapter, node);
+         }
       }
    }
 

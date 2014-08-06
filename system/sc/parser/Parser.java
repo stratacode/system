@@ -342,6 +342,20 @@ public class Parser implements IString {
       currentIndex = ix;
    }
 
+   public final Object resetCurrentIndex(int ix) {
+      Object res = null;
+      if (semanticContext != null)
+         res = semanticContext.resetToIndex(ix);
+      currentIndex = ix;
+      return res;
+   }
+
+   public final void restoreCurrentIndex(int ix, Object res) {
+      if (semanticContext != null)
+         semanticContext.restoreToIndex(ix, res);
+      currentIndex = ix;
+   }
+
    public final int getCurrentIndex() {
       return currentIndex;
    }

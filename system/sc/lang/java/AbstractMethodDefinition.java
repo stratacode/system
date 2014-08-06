@@ -631,6 +631,7 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
    }
 
    public boolean updateFromStatementRef(Statement fromSt, ISrcStatement defaultSt) {
+      super.updateFromStatementRef(null, defaultSt);
       if (body == null)
          return false;
       return body.updateFromStatementRef(fromSt, defaultSt);

@@ -53,4 +53,7 @@ public abstract class FormattingParseNode extends AbstractParseNode {
       throw new UnsupportedOperationException();
    }
 
+   public Object getSkippedValue() {
+      return null;
+   }
 }

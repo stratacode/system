@@ -536,6 +536,20 @@ public class Layer implements ILifecycle, LayerConstants {
       }
    }
 
+   public void ensureInitialized(boolean checkBaseLayers) {
+      if (!isInitialized()) {
+         initialize();
+         layeredSystem.initSysClassLoader(this, LayeredSystem.ClassLoaderMode.LIBS);
+      }
+      if (checkBaseLayers) {
+         if (baseLayers != null) {
+            for (Layer baseLayer:baseLayers) {
+               baseLayer.ensureInitialized(true);
+            }
+         }
+      }
+   }
+
    public String getDefaultBuildDir() {
       return LayerUtil.getLayerClassFileDirectory(this, layerPathName);
    }
@@ -829,6 +843,20 @@ public class Layer implements ILifecycle, LayerConstants {
 
       if (isBuildLayer())
          makeBuildLayer();
+   }
+
+   public void ensureStarted(boolean checkBaseLayers) {
+      if (!isStarted()) {
+         start();
+         layeredSystem.initSysClassLoader(this, LayeredSystem.ClassLoaderMode.LIBS);
+      }
+      if (checkBaseLayers) {
+         if (baseLayers != null) {
+            for (Layer baseLayer:baseLayers) {
+               baseLayer.ensureStarted(true);
+            }
+         }
+      }
    }
 
    public boolean isBuildLayer() {
@@ -2402,5 +2430,6 @@ public class Layer implements ILifecycle, LayerConstants {
       }
       return null;
    }
+
 }
 

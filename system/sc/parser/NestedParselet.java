@@ -75,6 +75,10 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
    /** The indexes used for any "*" (aka INHERIT) slots */
    List<Integer> inheritSlots = null;
 
+   /** Set this to a parselet to use when we want to try and reparse an element after skipping over error text.  This
+    * parselet is applied whenever we encounter an error.  As long as it matches */
+   public Parselet skipOnErrorParselet = null;
+
    public NestedParselet() {
       super();
    }
@@ -199,6 +203,16 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          resultClass = null;
       if (resultComponentClass == UNDEFINED_CLASS)
          resultComponentClass = null;
+
+      if (skipOnErrorParselet != null) {
+         if (!repeat) {
+            System.err.println("*** Error in parselet configuration for: " + this + " skipOnErrorParselet only valid when REPEAT flag is used.");
+            skipOnErrorParselet = null;
+         }
+
+         skipOnErrorParselet.setLanguage(getLanguage());
+         skipOnErrorParselet.initialize();
+      }
 
       if (trace) {
          if (parameterMapping == null)
@@ -491,6 +505,9 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          p.start();
 
       resolveParameterMapping();
+
+      if (skipOnErrorParselet != null)
+         skipOnErrorParselet.start();
    }
 
    public void stop() {

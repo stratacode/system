@@ -707,6 +707,10 @@ public class ParentParseNode extends AbstractParseNode {
       }
       return null;
    }
+
+   public Object getSkippedValue() {
+      return value;
+   }
 }
 
 

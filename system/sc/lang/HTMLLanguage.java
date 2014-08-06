@@ -50,15 +50,27 @@ public class HTMLLanguage extends TemplateLanguage {
          return tagStack.get(sz-1).tagName;
       }
 
-      public void resetToIndex(int ix) {
+      public Object resetToIndex(int ix) {
+         ArrayList<HTMLContextEntry> removed = null;
          for (int i = tagStack.size() - 1; i >= 0; i--) {
             if (tagStack.get(i).startIx >= ix) {
-               tagStack.remove(i);
+               if (removed == null)
+                  removed = new ArrayList<HTMLContextEntry>();
+               removed.add(tagStack.remove(i));
                i--;
             }
             else {
                break;
             }
+         }
+         return removed;
+      }
+
+      public void restoreToIndex(int ix, Object retVal) {
+         if (retVal != null) {
+            ArrayList<HTMLContextEntry> toRestore = (ArrayList<HTMLContextEntry>) retVal;
+            for (int i = 0; i < toRestore.size(); i++)
+               tagStack.add(toRestore.get(i));
          }
       }
 
@@ -96,7 +108,7 @@ public class HTMLLanguage extends TemplateLanguage {
 
    Symbol closeTagChar = new Symbol("/");
    Symbol beginTagChar = new Symbol("<");
-   Symbol endTagChar = new Symbol(">");
+   Symbol endTagChar = new Symbol(SKIP_ON_ERROR, ">");
 
    public static boolean validTagChar(char c) {
       return Character.isLetterOrDigit(c) || c == '-' || c == ':';
@@ -268,17 +280,30 @@ public class HTMLLanguage extends TemplateLanguage {
 
    Sequence tagAttribute = new Sequence("Attr(name, *,)", 0, anyTagName, new Sequence ("(,value)", OPTIONAL, equalSign, attributeValue), htmlSpacing);
    Sequence tagAttributes = new Sequence("([])", OPTIONAL | REPEAT, tagAttribute);
+   {
+      // Here we are skipping any incomplete attributes (e.g. id=) till we hit the end of close tag or the start of the next tag
+      // It's important that we do not consume part or all of the next tag in the body of this tag if for some reason we decide to put this back in.
+      tagAttributes.skipOnErrorParselet = createSkipOnErrorParselet("/", "<", ">", Symbol.EOF);
+   }
    // TODO: how do we deal with appending newlines after the start tag?  Used to having htmlSpacingEOL here but that ate up the space in the content.  Need features of htmlSpacingEOL perhaps when processing the endTagChar?
    Sequence simpleTag = new Sequence("Element(,tagName,attributeList,selfClose,)", beginTagChar, anyTagName, tagAttributes, new Sequence("('')", OPTIONAL, closeTagChar), endTagChar);
    {
       simpleTag.enableTagMode = true;
+      // If an error occurs after we parse the name we can skip it (enablePartialValues only)
+      simpleTag.skipOnErrorSlot = 2;
    }
    Sequence closeTag = new Sequence("(,,'',)", beginTagChar, closeTagChar, closeTagName, endTagChar);
+   {
+      closeTag.skipOnErrorSlot = 3;
+   }
 
    public class TagStartSequence extends Sequence {
       public TagStartSequence(Parselet tagName, Parselet tagBody) {
          super("Element(,tagName,attributeList,,children,closeTagName)", beginTagChar, tagName, tagAttributes, endTagChar, tagBody, closeTag);
          enableTagMode = true;
+         // Do not consider a match of just the beginTagChar as content when doing partial values extension.
+         // There are other parselets that will match that character
+         minContentSlot = 1;
       }
    }
 
@@ -302,6 +327,8 @@ public class HTMLLanguage extends TemplateLanguage {
    Sequence controlTag = new Sequence("ControlTag(,docTypeName,docTypeValue,)", controlStart, anyTagName, anyTagName, endTagChar);
 
    // For now try to parse it as a tree, if you can't then assume it's a simple node.
+   // TODO: this is not efficient from a performance perspective.  Ideas for speeding it up: add in optional caching of
+   // specific parselets.  tagName, templateBodyDeclarations, htmlTag?
    OrderedChoice htmlTag = new OrderedChoice(treeTag, unescapedTreeTag, simpleTag, controlTag);
    {
       templateString.add("<");
@@ -318,6 +345,8 @@ public class HTMLLanguage extends TemplateLanguage {
    public HTMLLanguage() {
       setStartParselet(template);
       addToSemanticValueClassPath("sc.lang.html");
+      languageName = "SCHtml";
+      defaultExtension = "schtml";
    }
 
    public static HTMLLanguage getHTMLLanguage() {

@@ -318,6 +318,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return true;
    }
 
+   public boolean isWarningViewed(String error) {
+      if (disableCommandLineErrors)
+         return true;
+      // TODO: do we need viewedWarnings here?
+      return false;
+   }
+
    public void activateLayer(String layerName) {
       Layer activeLayer = getLayerByDirName(layerName);
       // This layer is already in the active layers set so we don't have any work to do.
@@ -1178,7 +1185,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       Thread.currentThread().setContextClassLoader(buildClassLoader);
    }
 
-   private void initSysClassLoader(Layer sysLayer, ClassLoaderMode mode) {
+   void initSysClassLoader(Layer sysLayer, ClassLoaderMode mode) {
       int lastPos = 0;
 
       // We've reset the class loader so pick up everything before we start the runtime
@@ -3329,7 +3336,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       updateBuildDir(oldBuildLayer);
 
       // Start these before we update them
-      startLayers(layersToInit);
+      startLayers(layersToInit, false);
 
       // Needs to be done before the build loads the files.  Needs to be done after the layer itself has been initialized.
       // The layer needs to be initialized after we've called initSysClassLoader
@@ -3841,6 +3848,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
+   private String makeCanonical(String layerDir) throws IOException {
+      File layerDirFile = new File(layerDir);
+      layerDir = layerDirFile.getCanonicalPath();
+      return layerDir;
+   }
+
    private String makeAbsolute(String layerDir) {
       File layerDirFile = new File(layerDir);
       if (!layerDirFile.isAbsolute()) {
@@ -4126,6 +4139,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public void registerInactiveLayer(Layer layer) {
+      // TODO: should we store these in dependent order to make lookups faster?
       inactiveLayers.put(layer.getLayerName(), layer);
    }
 
@@ -6237,10 +6251,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       */
          for (int i = 0; i <= genLayer.layerPosition; i++) {
             Layer l = layers.get(i);
-            if (!l.isStarted()) {
-               l.start();
-               initSysClassLoader(l, ClassLoaderMode.LIBS);
-            }
+            l.ensureStarted(false);
          }
          for (int i = 0; i <= genLayer.layerPosition; i++) {
             Layer l = layers.get(i);
@@ -6250,13 +6261,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       PerfMon.end("startLayers");
    }
 
-   private void startLayers(List<Layer> theLayers) {
+   private void startLayers(List<Layer> theLayers, boolean checkBaseLayers) {
       for (int i = 0; i < theLayers.size(); i++) {
          Layer l = theLayers.get(i);
-         if (!l.isStarted()) {
-            l.start();
-            initSysClassLoader(l, ClassLoaderMode.LIBS);
-         }
+         l.ensureStarted(false);
       }
       for (int i = 0; i < theLayers.size(); i++) {
          Layer l = theLayers.get(i);
@@ -6567,8 +6575,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public void registerPatternFileProcessor(String pattern, IFileProcessor processor) {
-      int layerIx = processor.getLayerPosition();
-      registerPatternFileProcessor(pattern, processor, layerIx == -1 ? null : layers.get(layerIx));
+      Layer layer = processor.getDefinedInLayer();
+      registerPatternFileProcessor(pattern, processor, layer);
    }
 
    public void removeFileProcessor(String ext, Layer fromLayer) {
@@ -6792,6 +6800,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       return null;
+   }
+
+   public ILanguageModel getCachedModel(SrcEntry srcEnt) {
+      return modelIndex.get(srcEnt.absFileName);
+   }
+
+   public void addCachedModel(ILanguageModel model) {
+      SrcEntry srcFile = model.getSrcFile();
+      if (srcFile != null)
+         modelIndex.put(srcFile.absFileName, model);
+      else
+         System.out.println("*** no src file for model");
    }
 
    boolean isModelLoaded(String absFileName) {
@@ -7798,9 +7818,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (notHidden && !srcFile.layer.getVisibleInEditor())
             return null;
 
-         if (srcFile.layer != null && !srcFile.layer.activated)
-            return getInactiveTypeDeclaration(srcFile);
-
          if (!srcOnly) {
             // Now since the model is not changed, we'll use the class.  If at some point we need to change the compiled version - ie. to make a property bindable, we'll load the src at that time.
             Object cl = getCompiledType(typeName);
@@ -7820,6 +7837,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
 
          Object modelObj = getLanguageModel(srcFile);
+
+         if (modelObj == null && srcFile.layer != null && !srcFile.layer.activated)
+            return getInactiveTypeDeclaration(srcFile);
+
          if (modelObj == null && (srcFile.layer == null || srcFile.layer.activated)) {
             nestLevel++;
             //System.out.println(StringUtil.indent(nestLevel) + "resolving " + typeName);
@@ -8386,11 +8407,17 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return refLayer.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath);
       }
       else if (buildLayer == null) {
+         SrcEntry lastEnt = null;
          for (Layer inactiveLayer:inactiveLayers.values()) {
             SrcEntry ent = inactiveLayer.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath);
-            if (ent != null)
-               return ent;
+            if (ent != null) {
+               if (lastEnt == null || (ent.layer != null && lastEnt.layer != null && ent.layer.extendsLayer(lastEnt.layer))) {
+                  lastEnt = ent;
+               }
+            }
          }
+         if (lastEnt != null)
+            return lastEnt;
       }
 
       // In general we search from most recent to original
@@ -8424,11 +8451,17 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             return srcEnt;
       }
       else if (buildLayer == null) {
+         SrcEntry lastEnt = null;
          for (Layer inactiveLayer:inactiveLayers.values()) {
             SrcEntry ent = inactiveLayer.getSrcFileFromRelativeTypeName(relDir, subPath, packagePrefix, srcOnly, true);
-            if (ent != null)
-               return ent;
+            if (ent != null) {
+               if (lastEnt == null || (ent.layer != null && lastEnt.layer != null && ent.layer.extendsLayer(lastEnt.layer))) {
+                  lastEnt = ent;
+               }
+            }
          }
+         if (lastEnt != null)
+            return lastEnt;
       }
 
       // In general we search from most recent to original
@@ -8483,11 +8516,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public ClassLoader getSysClassLoader() {
-      if (systemClassLoader != null)
+      // This is the servlet web-app class loader case - at runtime with a class loader that will include our buildDir
+      if (systemClassLoader != null && !autoClassLoader)
          return systemClassLoader;
 
-      if (buildClassLoader == null)
+      if (buildClassLoader == null) {
+         if (systemClassLoader != null)
+            return systemClassLoader;
          return getClass().getClassLoader();
+      }
       else
          return buildClassLoader;
    }
@@ -9138,32 +9175,52 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return dir;
    }
 
-   URL[] getLayerClassURLs(Layer startLayer, int endPos, ClassLoaderMode mode) {
-      int startPos = startLayer.layerPosition;
-      List<URL> urls = new ArrayList<URL>();
-      for (int i = startPos; i > endPos; i--) {
-         Layer layer = layers.get(i);
-         List<String> classDirs = layer.classDirs;
-         if (mode.doBuild()) {
-            // Only include the buildDir for build layers that have been compiled.  If the startLayer
-            // uses "buildSeparate", we only include this build layer if it is directly extended by
-            // the buildSeparate layer.
-            if (layer.buildDir != null && layer.isBuildLayer() && layer.compiled &&
-                (!startLayer.buildSeparate || layer == startLayer || startLayer.extendsLayer(layer))) {
-
-               if (layer == buildLayer || !options.buildAllLayers) {
-                  urls.add(FileUtil.newFileURL(appendSlashIfNecessary(layer.getBuildClassesDir())));
-                  layer.compiledInClassPath = true;
-                  if (!layer.buildDir.equals(layer.buildSrcDir) && includeSrcInClassPath)
-                     urls.add(FileUtil.newFileURL(appendSlashIfNecessary(layer.buildSrcDir)));
-               }
+   private void addClassURLs(List<URL> urls, Layer layer, boolean checkBaseLayers) {
+      List<String> classDirs = layer.classDirs;
+      if (classDirs != null) {
+         for (int j = 0; j < classDirs.size(); j++) {
+            urls.add(FileUtil.newFileURL(appendSlashIfNecessary(classDirs.get(j))));
+         }
+      }
+      if (checkBaseLayers) {
+         List<Layer> baseLayers = layer.baseLayers;
+         if (baseLayers != null) {
+            for (Layer baseLayer:baseLayers) {
+               addClassURLs(urls, baseLayer, true);
             }
          }
-         if (mode.doLibs()) {
-            if (classDirs != null) {
-               for (int j = 0; j < classDirs.size(); j++) {
-                  urls.add(FileUtil.newFileURL(appendSlashIfNecessary(classDirs.get(j))));
+      }
+   }
+
+   URL[] getLayerClassURLs(Layer startLayer, int endPos, ClassLoaderMode mode) {
+      List<URL> urls = new ArrayList<URL>();
+      if (!startLayer.activated) {
+         if (mode.doBuild())
+            return null;
+         addClassURLs(urls, startLayer, true);
+      }
+      else {
+         int startPos = startLayer.layerPosition;
+         for (int i = startPos; i > endPos; i--) {
+            Layer layer = layers.get(i);
+            List<String> classDirs = layer.classDirs;
+            if (mode.doBuild()) {
+               // Only include the buildDir for build layers that have been compiled.  If the startLayer
+               // uses "buildSeparate", we only include this build layer if it is directly extended by
+               // the buildSeparate layer.
+               if (layer.buildDir != null && layer.isBuildLayer() && layer.compiled &&
+                   (!startLayer.buildSeparate || layer == startLayer || startLayer.extendsLayer(layer))) {
+
+                  if (layer == buildLayer || !options.buildAllLayers) {
+                     urls.add(FileUtil.newFileURL(appendSlashIfNecessary(layer.getBuildClassesDir())));
+                     layer.compiledInClassPath = true;
+                     if (!layer.buildDir.equals(layer.buildSrcDir) && includeSrcInClassPath)
+                        urls.add(FileUtil.newFileURL(appendSlashIfNecessary(layer.buildSrcDir)));
+                  }
                }
+            }
+            if (mode.doLibs()) {
+               addClassURLs(urls, layer, false);
             }
          }
       }
@@ -9795,12 +9852,17 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (layerPathDirs != null) {
          for (File layerDir:layerPathDirs) {
             Layer layer = initLayer(layerPath, layerDir.getPath(), null, false, lpi);
-            if (layer != null)
+            if (layer != null) {
+               layer.ensureInitialized(true);
                return layer;
+            }
          }
       }
-      else if (getNewLayerDir() != null)
-         return initLayer(layerPath, getNewLayerDir(), null, false, lpi);
+      else if (getNewLayerDir() != null) {
+         Layer res = initLayer(layerPath, getNewLayerDir(), null, false, lpi);
+         res.ensureInitialized(true);
+         return res;
+      }
       return null;
    }
 
@@ -10046,38 +10108,64 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return false;
    }
 
+   private SrcEntry getSrcEntryForPathDir(String layerPath, String pathName) {
+      String layerAndFileName = pathName.substring(layerPath.length());
+      while (layerAndFileName.startsWith(FileUtil.FILE_SEPARATOR))
+         layerAndFileName = layerAndFileName.substring(FileUtil.FILE_SEPARATOR.length());
+
+      // TODO: can we support parsing a file if it's not in a layer?
+      if (layerAndFileName.length() > 0) {
+         String layerName = null;
+         String fileName;
+         do {
+            int slashIx = layerAndFileName.indexOf(FileUtil.FILE_SEPARATOR);
+            if (slashIx != -1) {
+               String nextPart = layerAndFileName.substring(0, slashIx);
+               fileName = layerAndFileName.substring(slashIx+1);
+               layerName = FileUtil.concat(layerName, nextPart);
+               Layer layer = getActiveOrInactiveLayerByPath(layerName, null);
+               if (layer != null) {
+                  // TODO: validate that we found this layer under the right root?
+                  return new SrcEntry(layer, pathName, fileName);
+               }
+               layerAndFileName = fileName;
+            }
+            else
+               break;
+         } while(true);
+      }
+      return null;
+   }
+
    public SrcEntry getSrcEntryForPath(String pathName) {
       acquireDynLock(false);
+
       try {
          if (layerPathDirs != null) {
             for (File layerPathDir:layerPathDirs) {
                String layerPath = layerPathDir.getPath();
                if (pathName.startsWith(layerPath)) {
-                  String layerAndFileName = pathName.substring(layerPath.length());
-                  while (layerAndFileName.startsWith(FileUtil.FILE_SEPARATOR))
-                     layerAndFileName = layerAndFileName.substring(FileUtil.FILE_SEPARATOR.length());
+                  SrcEntry ent = getSrcEntryForPathDir(layerPath, pathName);
+                  if (ent != null)
+                     return ent;
+               }
 
-                  // TODO: can we support parsing a file if it's not in a layer?
-                  if (layerAndFileName.length() > 0) {
-                     String layerName = null;
-                     String fileName;
-                     do {
-                        int slashIx = layerAndFileName.indexOf(FileUtil.FILE_SEPARATOR);
-                        if (slashIx != -1) {
-                           String nextPart = layerAndFileName.substring(0, slashIx);
-                           fileName = layerAndFileName.substring(slashIx+1);
-                           layerName = FileUtil.concat(layerName, nextPart);
-                           Layer layer = getActiveOrInactiveLayerByPath(layerName, null);
-                           if (layer != null) {
-                              // TODO: validate that we found this layer under the right root?
-                              return new SrcEntry(layer, pathName, fileName);
-                           }
-                           layerAndFileName = fileName;
-                        }
-                        else
-                           break;
-                     } while(true);
+               // In case we crossed over a sym-link, try it as absolute since we often canonicalize the layerPathDirs
+               String origPathName = pathName;
+               try {
+                  pathName = makeCanonical(pathName);
+                  if (pathName.startsWith(layerPath)) {
+                     SrcEntry ent = getSrcEntryForPathDir(layerPath, pathName);
+                     if (ent != null)
+                        return ent;
                   }
+               }
+               catch (IOException exc) {
+                  System.err.println("*** Warning unable to map layer path name: " + origPathName + " error: " + exc);
+               }
+               catch (RuntimeException exc) {
+                  System.err.println("*** failed with: " + exc);
+                  exc.printStackTrace();
                }
             }
          }

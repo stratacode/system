@@ -7966,4 +7966,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       displayError("Type removed: ", getFullTypeName(), " for ");
       return null;
    }
+
+   public boolean childIsTopLevelStatement(Statement child) {
+      return true;
+   }
 }

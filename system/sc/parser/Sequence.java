@@ -18,6 +18,8 @@ public class Sequence extends NestedParselet  {
 
    public int skipOnErrorSlot = -1;
 
+   public int minContentSlot = 0;
+
    public Sequence() { super(); }
 
    public Sequence(String id, int options) {
@@ -65,7 +67,7 @@ public class Sequence extends NestedParselet  {
          System.out.println("*** tracing sequence parse");
 
       if (repeat)
-         return parseRepeatingSequence(parser);
+         return parseRepeatingSequence(parser, false, null);
 
       ParentParseNode value = null;
       int startIndex = parser.currentIndex;
@@ -116,8 +118,9 @@ public class Sequence extends NestedParselet  {
                   Parselet prevParselet = parselets.get(prevIx);
                   Object oldValue = value.children.get(prevIx);
                   int saveIndex = parser.currentIndex;
+                  Object ctxState = null;
                   if (oldValue instanceof IParseNode) {
-                     parser.changeCurrentIndex(((IParseNode) oldValue).getStartIndex());
+                     ctxState = parser.resetCurrentIndex(((IParseNode) oldValue).getStartIndex());
                   }
                   Object newPrevValue = prevParselet.parseExtendedErrors(parser, childParselet);
                   if (newPrevValue != null) {
@@ -128,14 +131,20 @@ public class Sequence extends NestedParselet  {
                      continue;
                   }
                   else
-                     parser.changeCurrentIndex(saveIndex);
+                     parser.restoreCurrentIndex(saveIndex, ctxState);
                }
 
                if (i < parselets.size() - 1) {
-                  Object extendedValue = childParselet.parseExtendedErrors(parser, parselets.get(i+1));
-                  if (extendedValue != null) {
-                     nestedValue = extendedValue;
-                     err = nestedValue instanceof ParseError ? (ParseError) nestedValue : null;
+                  Parselet exitParselet = parselets.get(i+1);
+                  // TODO: for the simpleTag case where we are completing tagAttributes, we have / and > as following parselets where
+                  // the immediate one afterwards is optional.  To handle this we can take the list of parselets following in the sequence
+                  // and pass them all then peek them as a list.
+                  if (!exitParselet.optional) {
+                     Object extendedValue = childParselet.parseExtendedErrors(parser, exitParselet);
+                     if (extendedValue != null) {
+                        nestedValue = extendedValue;
+                        err = nestedValue instanceof ParseError ? (ParseError) nestedValue : null;
+                     }
                   }
                }
 
@@ -230,7 +239,7 @@ public class Sequence extends NestedParselet  {
             value.add(null, childParselet, i, true, parser);
 
          if (nestedValue != null || childParselet.isNullValid())
-            anyContent = true;
+            anyContent = minContentSlot <= i;
       }
 
       if (lookahead) {
@@ -404,13 +413,12 @@ public class Sequence extends NestedParselet  {
       return false;
    }
 
-   private Object parseRepeatingSequence(Parser parser) {
+   private Object parseRepeatingSequence(Parser parser, boolean extendedErrors, Parselet exitParselet) {
       ParentParseNode value = null;
       int startIndex = parser.currentIndex;
       int lastMatchIndex;
       boolean matched;
       boolean matchedAny = false;
-      boolean lastPartialSequence = false;
       int i;
       ParseError lastError = null;
       Parselet childParselet = null;
@@ -419,6 +427,7 @@ public class Sequence extends NestedParselet  {
       ArrayList<Object> errorValues = null;
 
       boolean anyContent;
+      boolean extendedErrorMatches = false;
 
       do {
          lastMatchIndex = parser.currentIndex;
@@ -466,6 +475,37 @@ public class Sequence extends NestedParselet  {
             }
             else
                matched = false;
+         }
+         else if (!matched) {
+            if (extendedErrors) {
+               // Restore the current index back to the lastMatchIndex - back track over any partial matches in the sequence for this entry
+               parser.changeCurrentIndex(lastMatchIndex);
+               lastError = null;
+
+               // Consume the next skip token if we have not hit the exit, then retry
+               if (!exitParselet.peek(parser)) {
+                  int errorStart = parser.currentIndex;
+                  // This will consume whatever it is that we can't parse until we get to the next statement.  We have to be careful with the
+                  // design of the skipOnErrorParselet so that it leaves us in the state for the next match on this choice.  It should not breakup
+                  // an identifier for example.
+                  Object errorRes = parser.parseNext(skipOnErrorParselet);
+                  if (errorRes instanceof ParseError) {
+                     // We never found the exitParselet - i.e. > so the parent sequence will fail just like it did before.
+                     // When this method returns null, we go with the result we produced in the first call to parseRepeatingSequence method.
+                     return null;
+                  }
+
+                  if (value == null)
+                     value = (ParentParseNode) newParseNode(lastMatchIndex);
+                  value.add(new ErrorParseNode(new ParseError(skipOnErrorParselet, "Expected {0}", new Object[]{this}, errorStart, parser.currentIndex), errorRes.toString()), skipOnErrorParselet, -1, true, parser);
+                  extendedErrorMatches = true;
+                  matched = true;
+               }
+               else {   // Found the exit parselet is next in the stream so we successfully consumed some error nodes so reset the lastMatchIndex to include them
+                  lastMatchIndex = parser.currentIndex;
+                  matchedAny = extendedErrorMatches;
+               }
+            }
          }
       } while (matched);
 
@@ -540,6 +580,12 @@ public class Sequence extends NestedParselet  {
       if (lookahead)
          parser.changeCurrentIndex(startIndex);
       return value;
+   }
+
+   public Object parseExtendedErrors(Parser parser, Parselet exitParselet) {
+      if (skipOnErrorParselet == null)
+         return null;
+      return parseRepeatingSequence(parser, true, exitParselet);
    }
 
    ParentParseNode newRepeatSequenceResult(ArrayList<Object> matchedValues, ParentParseNode value,
@@ -1112,6 +1158,11 @@ public class Sequence extends NestedParselet  {
          return true;
 
       Class svClass = getSemanticValueClass();
+
+      // Already verified that other is not a String - the default type in super.dataTypeMatches
+      if (svClass == null) {
+         return false;
+      }
 
       // Could not be a match - the data types do not match
       if (!svClass.isInstance(other))

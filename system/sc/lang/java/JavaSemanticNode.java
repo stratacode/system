@@ -14,8 +14,12 @@ import sc.lang.SemanticNode;
 
 import java.util.*;
 
-/** This is the basic class for all major Java program elements, types, statements, expressions, etc.  They are organized into
+/**
+ * This is the basic class for all major Java program elements, types, statements, expressions, etc.  They are organized into
  * a tree so this method abstracts many of the tree-based "find" operations and core node information.
+ *
+ * TODO: As we add more languages it may make sense to split out LanguageNode and LanguageModel base classes from JavaSemanticNode and JavaModel
+ * to hold features that are shared between Java and the rest of the major languages without picking up features that are definitely specific to Java.
  */
 public abstract class JavaSemanticNode extends SemanticNode {
 
@@ -355,8 +359,8 @@ public abstract class JavaSemanticNode extends SemanticNode {
 
    public void displayWarning(String...args) {
       JavaModel model = getJavaModel();
-      if (model != null && !model.disableTypeErrors) {
-         System.out.println(getMessageString(args));
+      if (model != null) {
+         model.reportWarning(getMessageString(args));
       }
    }
 

@@ -1094,6 +1094,7 @@ public class ClassDeclaration extends TypeDeclaration {
          initStatement = SelectorExpression.create(ParenExpression.create(CastExpression.create(useAltComponent ? "sc.obj.IAltComponent" : "sc.obj.IComponent",
                                                                                                 IdentifierExpression.create(variableName))), vsel);
       }
+      initStatement.fromStatement = this;
       return initStatement;
    }
 

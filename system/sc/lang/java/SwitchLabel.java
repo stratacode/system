@@ -44,4 +44,8 @@ public class SwitchLabel extends ExpressionStatement {
       }
       return super.transformToJS();
    }
+
+   public boolean childIsTopLevelStatement(Statement st) {
+      return true;
+   }
 }

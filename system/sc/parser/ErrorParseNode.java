@@ -72,4 +72,12 @@ public class ErrorParseNode extends AbstractParseNode {
    public String getErrorText() {
       return errorText;
    }
+
+   public Object getSkippedValue() {
+      return this;
+   }
+
+   public boolean canSkip() {
+      return false;
+   }
 }

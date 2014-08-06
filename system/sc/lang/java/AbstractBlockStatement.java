@@ -326,6 +326,7 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
    }
 
    public boolean updateFromStatementRef(Statement fromSt, ISrcStatement defaultSt) {
+      super.updateFromStatementRef(null, defaultSt);
       return blockUpdateFromStatementRef(this, fromSt, defaultSt);
    }
 
@@ -338,5 +339,9 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
          }
       }
       return false;
+   }
+
+   public boolean childIsTopLevelStatement(Statement child) {
+      return true;
    }
 }

@@ -2179,6 +2179,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    transient IErrorHandler errorHandler = null;
    public transient StringBuilder errorMessages = null;
+   public transient StringBuilder warningMessages = null;
 
    public void setErrorHandler(IErrorHandler errorHandler) {
       this.errorHandler = errorHandler;
@@ -2205,6 +2206,25 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          }
       }
       System.err.println(error);
+   }
+
+   public void reportWarning(String error) {
+      if (errorHandler != null) {
+         errorHandler.reportWarning(error);
+      }
+      else {
+         if (warningMessages == null)
+            warningMessages = new StringBuilder();
+         warningMessages.append(error);
+      }
+      hasErrors = true;
+      if (layeredSystem != null) {
+         // Already seen this error in this build
+         if (layeredSystem.isWarningViewed(error)) {
+            return;
+         }
+      }
+      System.out.println(error);
    }
 
    public void clearTransformed() {
