@@ -3962,6 +3962,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if ((layer = layerPathIndex.get(layerPathName)) != null)
          return layer;
 
+      if (!lpi.activate) {
+         layer = lookupInactiveLayer(layerPathName);
+         if (layer != null)
+            return layer;
+      }
+
       String layerBaseName = CTypeUtil.getClassName(layerTypeName) + SCLanguage.STRATACODE_SUFFIX;
 
       String layerDefFile = FileUtil.concat(layerFileName, layerBaseName);
@@ -6592,8 +6598,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public void registerFileProcessor(String ext, IFileProcessor processor, Layer fromLayer) {
-      if (ext != null && ext.equals("css"))
-         System.out.println("***");
       processor.setDefinedInLayer(fromLayer);
       IFileProcessor[] procs = fileProcessors.get(ext);
       if (procs == null || fromLayer == null) {
@@ -6619,8 +6623,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public IFileProcessor getFileProcessorForExtension(String ext) {
-      if (ext != null && ext.equals("css"))
-         System.out.println("***");
       return getFileProcessorForExtension(ext, null, null);
    }
 
@@ -6758,7 +6760,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (modelObj instanceof ILanguageModel) {
                ILanguageModel model = (ILanguageModel) modelObj;
 
-               beingLoaded.put(srcEnt.absFileName, model);
+               markBeingLoadedModel(srcEnt, model);
 
                ILanguageModel oldModel = modelIndex.get(srcEnt.absFileName);
                if (oldModel instanceof JavaModel && oldModel != model && model instanceof JavaModel) {
@@ -6810,10 +6812,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return modelIndex.get(srcEnt.absFileName);
    }
 
+   public void markBeingLoadedModel(SrcEntry srcEnt, ILanguageModel model) {
+      beingLoaded.put(srcEnt.absFileName, model);
+   }
+
    public void addCachedModel(ILanguageModel model) {
       SrcEntry srcFile = model.getSrcFile();
-      if (srcFile != null)
+      if (srcFile != null) {
+         beingLoaded.remove(srcFile.absFileName);
          modelIndex.put(srcFile.absFileName, model);
+      }
       else
          System.out.println("*** no src file for model");
    }
@@ -7866,7 +7874,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (decl == null && srcFile.layer != null && modelObj instanceof JavaModel) {
             JavaModel javaModel = (JavaModel) modelObj;
             if (javaModel.getModelTypeName().equals(typeName))
-               return javaModel.getModelTypeDeclaration();
+               return javaModel.getLayerTypeDeclaration();
          }
          return decl;
          // else - we found this file in the model index but did not find it from this type name.  This happens
@@ -8268,9 +8276,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       ILanguageModel model;
       // First try to find the JavaModel cached outside of the system.
       if (externalModelIndex != null) {
-         model = externalModelIndex.lookupJavaModel(srcEnt);
-         if (model != null) {
-            modelIndex.put(srcEnt.absFileName, model);
+         // If we are loading it don't try to load it again
+         model = beingLoaded.get(srcEnt.absFileName);
+         if (model == null) {
+            model = externalModelIndex.lookupJavaModel(srcEnt);
+            if (model != null) {
+               modelIndex.put(srcEnt.absFileName, model);
+            }
          }
          if (model instanceof JavaModel)
             return ((JavaModel) model).getModelTypeDeclaration();
@@ -9871,13 +9883,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
-   public Layer getActiveOrInactiveLayerByPath(String layerPath, String prefix, boolean omitInactiveLayers, boolean checkPeers) {
+   public Layer getActiveOrInactiveLayerByPath(String layerPath, String prefix) {
       Layer layer;
       String origPrefix = prefix;
       String usePath = layerPath;
       do {
          layer = getLayerByPath(usePath);
-         if (layer == null && !omitInactiveLayers) {
+         if (layer == null) {
             // Layer does not have to be active here - this lets us parse the code in the layer but not really start, transform or run the modules because the layer itself is not started
             layer = getInactiveLayer(usePath);
          }
@@ -9890,21 +9902,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             break;
       } while (layer == null);
 
-      if (layer == null && checkPeers && peerSystems != null) {
-         for (LayeredSystem peer:peerSystems) {
-            Layer l = peer.getActiveOrInactiveLayerByPath(layerPath, origPrefix, omitInactiveLayers, false);
-            if (l != null)
-               return l;
-         }
-      }
-
       return layer;
    }
 
    public JavaModel getAnnotatedLayerModel(String layerPath, String prefix) {
       if (externalModelIndex != null) {
 
-         Layer layer = getActiveOrInactiveLayerByPath(layerPath, prefix, false, false);
+         Layer layer = getActiveOrInactiveLayerByPath(layerPath, prefix);
          if (layer != null && layer.model != null)
             return parseInactiveModel(layer.model.getSrcFile());
       }
@@ -10137,7 +10141,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                String nextPart = layerAndFileName.substring(0, slashIx);
                fileName = layerAndFileName.substring(slashIx+1);
                layerName = FileUtil.concat(layerName, nextPart);
-               Layer layer = getActiveOrInactiveLayerByPath(layerName, null, false, false);
+               Layer layer = getActiveOrInactiveLayerByPath(layerName, null);
                if (layer != null) {
                   // TODO: validate that we found this layer under the right root?
                   return new SrcEntry(layer, pathName, fileName);

@@ -19,7 +19,7 @@ public class ReturnStatement extends ExpressionStatement {
       AbstractMethodDefinition method = getEnclosingMethod();
       Object methodReturnType;
 
-      if (expression != null && (returnType = expression.getGenericType()) != null && method != null &&
+      if (expression != null && (returnType = expression.getGenericType()) != null && method != null && method.type != null &&
           (methodReturnType = method.type.getTypeDeclaration()) != null &&
           // Verified at least that non-assignmentSemantics are too strict, i.e. method declared as char returning 0.
          !ModelUtil.isAssignableFrom(methodReturnType, returnType, true, null)) {

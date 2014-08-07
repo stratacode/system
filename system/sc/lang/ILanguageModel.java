@@ -71,4 +71,6 @@ public interface ILanguageModel extends IFileProcessorResult {
     * the subclass depends on the code in the base class or if the subclass failed to compile and we need to retry things again.
     */
    void reinitialize();
+
+   Object getUserData();
 }
