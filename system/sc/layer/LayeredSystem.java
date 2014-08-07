@@ -6592,6 +6592,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public void registerFileProcessor(String ext, IFileProcessor processor, Layer fromLayer) {
+      if (ext != null && ext.equals("css"))
+         System.out.println("***");
       processor.setDefinedInLayer(fromLayer);
       IFileProcessor[] procs = fileProcessors.get(ext);
       if (procs == null || fromLayer == null) {
@@ -6617,6 +6619,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public IFileProcessor getFileProcessorForExtension(String ext) {
+      if (ext != null && ext.equals("css"))
+         System.out.println("***");
       return getFileProcessorForExtension(ext, null, null);
    }
 
@@ -9860,18 +9864,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       else if (getNewLayerDir() != null) {
          Layer res = initLayer(layerPath, getNewLayerDir(), null, false, lpi);
-         res.ensureInitialized(true);
+         if (res != null)
+            res.ensureInitialized(true);
          return res;
       }
       return null;
    }
 
-   public Layer getActiveOrInactiveLayerByPath(String layerPath, String prefix) {
+   public Layer getActiveOrInactiveLayerByPath(String layerPath, String prefix, boolean omitInactiveLayers, boolean checkPeers) {
       Layer layer;
+      String origPrefix = prefix;
       String usePath = layerPath;
       do {
          layer = getLayerByPath(usePath);
-         if (layer == null) {
+         if (layer == null && !omitInactiveLayers) {
             // Layer does not have to be active here - this lets us parse the code in the layer but not really start, transform or run the modules because the layer itself is not started
             layer = getInactiveLayer(usePath);
          }
@@ -9884,13 +9890,21 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             break;
       } while (layer == null);
 
+      if (layer == null && checkPeers && peerSystems != null) {
+         for (LayeredSystem peer:peerSystems) {
+            Layer l = peer.getActiveOrInactiveLayerByPath(layerPath, origPrefix, omitInactiveLayers, false);
+            if (l != null)
+               return l;
+         }
+      }
+
       return layer;
    }
 
    public JavaModel getAnnotatedLayerModel(String layerPath, String prefix) {
       if (externalModelIndex != null) {
 
-         Layer layer = getActiveOrInactiveLayerByPath(layerPath, prefix);
+         Layer layer = getActiveOrInactiveLayerByPath(layerPath, prefix, false, false);
          if (layer != null && layer.model != null)
             return parseInactiveModel(layer.model.getSrcFile());
       }
@@ -10123,7 +10137,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                String nextPart = layerAndFileName.substring(0, slashIx);
                fileName = layerAndFileName.substring(slashIx+1);
                layerName = FileUtil.concat(layerName, nextPart);
-               Layer layer = getActiveOrInactiveLayerByPath(layerName, null);
+               Layer layer = getActiveOrInactiveLayerByPath(layerName, null, false, false);
                if (layer != null) {
                   // TODO: validate that we found this layer under the right root?
                   return new SrcEntry(layer, pathName, fileName);

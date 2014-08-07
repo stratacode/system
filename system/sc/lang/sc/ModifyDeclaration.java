@@ -447,8 +447,10 @@ public class ModifyDeclaration extends TypeDeclaration {
                else if (layer != null) {
                   String layerTypeName = extendsType.getFullTypeName();
                   LayeredSystem sys = layer.layeredSystem;
-                  // Do errors for the layer def file when it gets started
-                  if (sys.getActiveOrInactiveLayerByPath(layerTypeName, CTypeUtil.getPackageName(layer.getLayerName())) == null) {
+
+                  // Do errors for the layer def file when it gets started - skip this for peerMode.  The checkPeers flag here does not work because we only set them
+                  // after we've initialized the layers so this is too late.
+                  if (!sys.peerMode && sys.getActiveOrInactiveLayerByPath(layerTypeName, CTypeUtil.getPackageName(layer.getLayerName()), layer.activated, true) == null) {
                      extendsType.displayTypeError("No layer: ");
                   }
                }

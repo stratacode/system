@@ -99,7 +99,7 @@ public class JSRuntimeProcessor implements IRuntimeProcessor {
 
    /** Used to generate the JS code snippet to instantiate a type, to implement MainInit */
    public String instanceTemplate =
-          "<%= needsSync ? \"sc_SyncManager_c.beginSyncQueue();\n\" : \"\" %>" + // The sync queue is here because we need the children sync-insts to be registered with their parent's names.
+          "<%= needsSync ? \"sc_SyncManager_c.beginSyncQueue();\\n\" : \"\" %>" + // The sync queue is here because we need the children sync-insts to be registered with their parent's names.
           "<% if (objectType) { %>" +
              "var _inst = <%= accessorTypeName %>" + prototypeSuffix + ".get<%= upperBaseTypeName %>();\n<% " +
           "} " +

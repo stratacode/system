@@ -129,7 +129,7 @@ public class TransformUtil {
 
    private final static String OBJECT_DEFINITION =
            "<% if (!overrideField) { %><%=fieldModifiers%> <%=variableTypeName%> <%=lowerClassName%>;<% } %>\n" +
-                   "<%= needsTypeSettings ? \"@sc.obj.TypeSettings(objectType=true)\n\" : \"\"%>" +
+                   "<%= needsTypeSettings ? \"@sc.obj.TypeSettings(objectType=true)\\n\" : \"\"%>" +
                    "<%=getModifiers%> <%=variableTypeName%> get<%=upperClassName%>() {\n" +
                    "   return (<%=variableTypeName%>) (<%=lowerClassName%> == null ? <%=lowerClassName%> = new <%=typeName%>() : <%=lowerClassName%>);\n" +
                    "}\n";
@@ -165,7 +165,7 @@ public class TransformUtil {
 
    private final static String COMPLEX_OBJECT_DEFINITION =
        "<% if (needsField) { %><%=fieldModifiers%> <%=variableTypeName%> <%=lowerClassName%>;\n<% } %>" +
-       "<%= needsTypeSettings ? \"@sc.obj.TypeSettings(objectType=true)\n\" : \"\"%>" +
+       "<%= needsTypeSettings ? \"@sc.obj.TypeSettings(objectType=true)\\n\" : \"\"%>" +
        "<%=getModifiers%> <%=variableTypeName%> get<%=upperClassName%>() {\n" +
        "<% if (needsCustomResolver) { %>\n" +
           "<%= customResolver %>" +
@@ -221,7 +221,7 @@ public class TransformUtil {
                    "   else return <%=returnCast%><%=lowerClassName%>;\n" +
                    "}\n" +
                    "\n" +
-                   "<%= needsTypeSettings ? \"@sc.obj.TypeSettings(objectType=true)\n\" : \"\"%>" +
+                   "<%= needsTypeSettings ? \"@sc.obj.TypeSettings(objectType=true)\\n\" : \"\"%>" +
                    "<%=getModifiers%> <%=variableTypeName%> get<%=upperClassName%>() { return get<%=upperClassName%>(true); }\n";
 
    private static Template componentObjectDefinitionTemplate;

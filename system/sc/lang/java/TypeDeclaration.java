@@ -101,10 +101,12 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
       initDynamicType();
 
-      m.addTypeDeclaration(getFileRelativeTypeName(), this);
-      if (typeParameters != null)
-         for (TypeParameter tp:typeParameters)
-            m.addTypeParameter(tp.name, tp);
+      if (m != null) {
+         m.addTypeDeclaration(getFileRelativeTypeName(), this);
+         if (typeParameters != null)
+            for (TypeParameter tp:typeParameters)
+               m.addTypeParameter(tp.name, tp);
+      }
 
       super.initialize();
    }
