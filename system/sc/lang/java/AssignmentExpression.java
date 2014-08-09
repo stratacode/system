@@ -210,7 +210,7 @@ public class AssignmentExpression extends TwoOperatorExpression {
             // In some cases, the super transform process will remove this statement entirely, for example when you have
             // an =: assignmnet expression.  In those cases, just skip these last steps as we are done.
             if (parentNode.containsChild(this)) {
-               convertAssignmentToSetMethod(lhs, rhs);
+               convertAssignmentToSetMethod();
             }
             return true;
          }
@@ -228,7 +228,7 @@ public class AssignmentExpression extends TwoOperatorExpression {
             // Need to do the binding stuff here
             super.transform(runtime);
 
-            convertAssignmentToSetMethod(lhs, rhs);
+            convertAssignmentToSetMethod();
             removed = true;
          }
          else {
@@ -277,9 +277,9 @@ public class AssignmentExpression extends TwoOperatorExpression {
       return any;
    }
 
-   private void convertAssignmentToSetMethod(Expression lhsExpr, Expression rhsExpr) {
-      lhsExpr.convertToSetMethod(rhsExpr);
-      replaceStatementChild(lhsExpr);
+   private void convertAssignmentToSetMethod() {
+      lhs.convertToSetMethod(rhs);
+      replaceStatementChild(lhs);
    }
 
    private void replaceStatementChild(Statement newChild) {

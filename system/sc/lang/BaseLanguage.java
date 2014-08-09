@@ -175,17 +175,36 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
       }
    };
 
-   public Symbol identifierChar = new Symbol("<idChar>", 0, Symbol.ANYCHAR) {
+   public static class IdentSymbol extends Symbol {
+      public IdentSymbol(String id, int options, String ev) {
+         super(id, options, ev);
+      }
+
       protected String accept(SemanticContext ctx, Object value, int startIx, int endIx) {
          IString str = PString.toIString(value);
          if (str == null)
             return "Identifiers must be non null";
-         if (str.length() == 1 && Character.isJavaIdentifierPart(str.charAt(0)))
-            return null;
+         if (!repeat) {
+            if (str.length() == 1 && Character.isJavaIdentifierPart(str.charAt(0)))
+               return null;
+         }
+         else {
+            int len = str.length();
+            int i;
+            for (i = 0; i < len; i++) {
+               if (!Character.isJavaIdentifierPart(str.charAt(i)))
+                  break;
+            }
+            if (i == len) {
+               return null;
+            }
+         }
          return "Not a valid character for the inside of an identifier";
       }
+   }
 
-   };
+   public Symbol identifierChar = new IdentSymbol("<idChar>", 0, Symbol.ANYCHAR);
+   public Symbol nextIdentChars = new IdentSymbol("<nextIdChars>", OPTIONAL | REPEAT, Symbol.ANYCHAR);
 
    public Symbol alphaNumChar = new Symbol("<alphaNumChar>", 0, Symbol.ANYCHAR) {
       protected String accept(SemanticContext ctx, Object value, int startIx, int endIx) {
@@ -202,8 +221,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
 
    };
 
-   public Sequence identifier = new Sequence("<identifier>('','',)", startIdentifierChar,
-                                             new Sequence("('')", REPEAT | OPTIONAL, identifierChar), spacing) {
+   public Sequence identifier = new Sequence("<identifier>('','',)", startIdentifierChar, nextIdentChars, spacing) {
       /** Assumes we have validated the start and other chars already */
       protected String accept(SemanticContext ctx, Object value, int startIx, int endIx) {
          if (value instanceof IParseNode)

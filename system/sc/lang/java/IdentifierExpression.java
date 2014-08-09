@@ -951,7 +951,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             }
             // else - no need to do runtime reflection for this type
          }
-         else if (!sys.useRuntimeReflection) {
+         else if (sys != null && !sys.useRuntimeReflection) {
             sys.buildInfo.addExternalDynMethod(referenceTypeObj, methodType, expr.getJavaModel());
          }
       }

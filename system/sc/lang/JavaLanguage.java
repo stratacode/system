@@ -228,9 +228,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    OrderedChoice typeIdentifier = new OrderedChoice(primitiveType, qualifiedIdentifier);
 
-   Sequence varIdentifier = new Sequence("('','',)",startIdentifierChar,
-           new Sequence("('')", REPEAT | OPTIONAL, identifierChar),
-           spacing) {
+   Sequence varIdentifier = new Sequence("('','',)",startIdentifierChar, nextIdentChars, spacing) {
       /** Assumes we have validated the start and other chars already */
       protected String accept(SemanticContext ctx, Object value, int star) {
          if (value instanceof IParseNode)

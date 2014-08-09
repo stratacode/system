@@ -140,6 +140,7 @@ public class TestUtil {
       boolean finalGenerate = true;
       List<String> buildList = null;
       boolean enablePartialValues = false;
+      int repeatCount = 1;
 
       for (int i = 0; i < args.length; i++) {
          if (args[i].length() == 0)
@@ -170,6 +171,19 @@ public class TestUtil {
                case 'p':
                   enablePartialValues = true;
                   break;
+               case 'r':
+                  try {
+                     if (args.length < i + 1)
+                        System.err.println("*** No count argument to -r option for repeating the parse <n> times. ");
+                     else {
+                        i++;
+                        repeatCount = Integer.parseInt(args[i]);
+                     }
+                  }
+                  catch (NumberFormatException exc) {
+                     System.err.println("*** bad value to repeat count");
+                  }
+                  break;
             }
          }
          else {
@@ -179,7 +193,7 @@ public class TestUtil {
          }
       }
 
-      parseTestFiles(buildList == null ? inputFileNames : buildList.toArray(new String[0]), enableModelToString, enableStyle, finalGenerate, enablePartialValues);
+      parseTestFiles(buildList == null ? inputFileNames : buildList.toArray(new String[0]), enableModelToString, enableStyle, finalGenerate, enablePartialValues, repeatCount);
 
       if (dumpStats) {
          System.out.println("*** Stats:");
@@ -197,7 +211,7 @@ public class TestUtil {
    static boolean verifyResults = true;
    static boolean dumpStats = false;
 
-   public static void parseTestFiles(Object[] inputFiles, boolean enableModelToString, boolean enableStyle, boolean finalGenerate, boolean enablePartialValues) {
+   public static void parseTestFiles(Object[] inputFiles, boolean enableModelToString, boolean enableStyle, boolean finalGenerate, boolean enablePartialValues, int repeatCount) {
       JavaLanguage.register();
       SCLanguage.register();
       
@@ -224,7 +238,7 @@ public class TestUtil {
             if (files == null)
                System.err.println("**** Unable to read directory: " + file);
             else
-               parseTestFiles(files, enableModelToString, enableStyle, finalGenerate, enablePartialValues);
+               parseTestFiles(files, enableModelToString, enableStyle, finalGenerate, enablePartialValues, repeatCount);
             continue;
          }
          String input = ParseUtil.readFileString(file);
@@ -236,10 +250,15 @@ public class TestUtil {
          if (lang == null)
             throw new IllegalArgumentException("No language for: " + file.getPath());
          long startTime = System.currentTimeMillis();
-         Object result = lang.parse(new StringReader(input), lang.getStartParselet(), enablePartialValues);
+         Object result;
+         int ct = repeatCount;
+         do {
+            result = lang.parse(new StringReader(input), lang.getStartParselet(), enablePartialValues);
+         } while (--ct > 0);
+
          long parseResultTime = System.currentTimeMillis();
 
-         System.out.println("*** parsed: " + fileName + " in: " + rangeToSecs(startTime, parseResultTime));
+         System.out.println("*** parsed: " + fileName + " " + repeatCount + (repeatCount == 1 ? " time" : " times") + " in: " + rangeToSecs(startTime, parseResultTime));
 
          if (verifyResults) {
             if (result == null || !input.equals(result.toString())) {

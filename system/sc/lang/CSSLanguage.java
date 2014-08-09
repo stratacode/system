@@ -28,7 +28,7 @@ public class CSSLanguage extends TemplateLanguage {
     public CSSLanguage() {
         if (enableCSSParser) {
             templateBodyDeclarations.setName("([],[],[],[],[],[])");
-            templateBodyDeclarations.add(4, cssStyleSheet);
+            templateBodyDeclarations.addDefault(cssStyleSheet);
             setStartParselet(template);
             addToSemanticValueClassPath("sc.lang.css");
         }

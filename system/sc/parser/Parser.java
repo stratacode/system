@@ -58,7 +58,7 @@ public class Parser implements IString {
    int inProgressCount = 0;
 
    // Stack of parselet states which are being processed on the parse stack
-   Stack<ParseletState> inProgress = new Stack<ParseletState>();
+   //Stack<ParseletState> inProgress = new Stack<ParseletState>();
 
    public static int testedNodes = 0;
    public static int matchedNodes = 0;
@@ -76,6 +76,8 @@ public class Parser implements IString {
 
    // When this is true, we do not produce a semantic value - just perform the match part.
    public boolean matchOnly = false;
+
+   HashMap<Integer,ParseletState> resultCache = null;
 
    public Parser(Language l, Reader reader, int bufSize) {
       inputBuffer = new char[bufSize];
@@ -211,14 +213,17 @@ public class Parser implements IString {
 
       // Always return the error which occurred furthers into the stream.  Probably should return the whole
       // list of these errors if there is more than one.
-      if ((result == null || result instanceof ParseError) && currentErrors != null)
-      {
-         if (language.debug)
-         {
+      if ((result == null || result instanceof ParseError) && currentErrors != null) {
+         if (language.debug) {
             for (int i = 0; i < currentErrors.size(); i++)
                System.out.println("Errors: " + i + ": " + currentErrors.get(i));
          }
          return wrapErrors();
+      }
+
+      if (ENABLE_STATS) {
+         System.out.println("*** cache stats:");
+         System.out.println(getCacheStats());
       }
       return result;
    }
@@ -244,6 +249,22 @@ public class Parser implements IString {
       return sb.toString();
    }
 
+   private static final Object NO_MATCHED_RESULT = new Object();
+
+   static class ParsedState {
+      Parselet parselet;
+      Object value;
+      ParsedState next;
+   }
+
+   private ParseletState findMatchingState(ParseletState state, Parselet parselet) {
+      if (state.parselet == parselet)
+         return state;
+      else if (state.next != null)
+         return findMatchingState(state.next, parselet);
+      return null;
+   }
+
    /**
     * This method is called by recognizers which are nested.
     * it will do all of the work necessary before/after calling the recognizer.recognize method
@@ -254,6 +275,26 @@ public class Parser implements IString {
       Parselet saveParselet = null;
       int saveLastStartIndex = -1;
       Object value;
+      boolean doCache = false;
+
+      if (parselet.cacheResults || ENABLE_STATS) {
+         doCache = true;
+         if (resultCache != null) {
+            ParseletState state = resultCache.get(currentIndex);
+            if (state != null) {
+               ParseletState res = findMatchingState(state, parselet);
+               if (res != null) {
+                  if (parselet.cacheResults) {
+                     if (parselet.accept(semanticContext, res.value, currentIndex, res.endIx) == null) {
+                        currentIndex = res.endIx;
+                        return res.value;
+                     }
+                  }
+                  res.cacheHits++;
+               }
+            }
+         }
+      }
 
       /*
       if ((language.debug || parselet.trace) && !language.debugSuccessOnly)
@@ -278,6 +319,26 @@ public class Parser implements IString {
          currentParselet = parselet;
 
          value = parselet.parse(this);
+
+         if (doCache) {
+            if (resultCache == null)
+               resultCache = new HashMap<Integer,ParseletState>();
+            ParseletState newState = new ParseletState(parselet, value, currentIndex);
+            ParseletState currentState;
+            if (ENABLE_STATS) {
+               currentState = resultCache.get(lastStartIndex);
+               if (currentState != null)
+                  currentState = findMatchingState(currentState, parselet);
+            }
+            else
+               currentState = null;
+            if (currentState == null) {
+               currentState = resultCache.put(lastStartIndex, newState);
+               if (currentState != null) {
+                  newState.next = currentState;
+               }
+            }
+         }
 
          if (ENABLE_STATS) {
             parselet.attemptCount++;
@@ -319,7 +380,7 @@ public class Parser implements IString {
       return value;
    }
 
-   private final String getLookahead(int num) {
+   private String getLookahead(int num) {
       String lookahead = ParseUtil.escapeString(substring(currentIndex, currentIndex + num));
       if (lookahead == null)
          lookahead = "<EOF>";
@@ -371,10 +432,6 @@ public class Parser implements IString {
 
    public final ParseError parseError(Parselet parselet, String errorCode, Object... args) {
       return parseError(parselet, errorCode, currentIndex, currentIndex, args);
-   }
-
-   public final ParseError parseError(Parselet parselet, Parselet childParselet, String errorCode, Object... args) {
-      return parseError(parselet, childParselet, errorCode, currentIndex, currentIndex, args);
    }
 
    public final ParseError parseError(Parselet parselet, String errorCode, int start, int end, Object... args) {
@@ -463,7 +520,6 @@ public class Parser implements IString {
       return node;
    }
 
-   static final ParseletState STATE_PENDING = new ParseletState(-1, null, new ParseError("Expression's value is pending resolution of other rules", null, -1, -1));
    static final ParseError PARSE_ERROR_OVERRIDDEN = new ParseError("Error less specific than previous error", null, -1, -1);
    static final ParseError PARSE_NEGATED_ERROR = new ParseError("Match failed while negated", null, -1, -1);
 
@@ -506,65 +562,35 @@ public class Parser implements IString {
       }
    }
 
-   /** 
-    * Created when we encounter a left-recursion rule - i.e. we need to evaluate 
-    * an expression as the first step in evaluating itself.  We handle this by recording
-    * the value of everything we can compute on the first pass, then keep re-evaluating it
-    * each time replacing the old value of the expression by its new value in the next pass.
-    * eventually we stop making progress and we know we are done. 
-    */
-   private static class LeftRecursionState {
-     LeftRecursionState(ParseletState ps) {
-        rootParselet = ps.parselet;
-     }
-     Object seedValue;
-     boolean seedValueSet = false;
-     // The first parselet where we notice a left recursion
-     Parselet rootParselet;
-     // The list of all parselet states in the path from the head node to the point of recursion.
-     // When trying to choose the value for a left-recursed node, we need to regenerate the
-     // values of all of these nodes. 
-     Set<Parselet> involved = new HashSet<Parselet>(); // TODO TreeSet with Identity comparator
-     // When we are resolving the values of left-recursed nodes, we want to evaluate each involved
-     // node at most once.   
-     Set<Parselet> toEval;
-   }
-
-   private static class ParseletState
-   {
-      ParseletState(int ix, Parselet p, Object v)
-      {
-         index = ix;
+   private static class ParseletState {
+      ParseletState(Parselet p, Object v, int endIx) {
          parselet = p;
-         leftRecursion = null;
          value = v;
+         this.endIx = endIx;
       }
 
-      ParseletState(int ix, Parselet p)
-      {
-         index = ix;
-         parselet = p;
-         leftRecursion = null;
-         value = this; // Using this as a sentinel value so we recognize recursive calls
-      }
-
-      int index;
-      int endIndex;
       Object value;
       Parselet parselet;
-      LeftRecursionState leftRecursion;
+      int endIx;
+
+      // ifdef ENABLE_STATS
+      int cacheHits;
 
       // Used for the states we put into the resultCache.  We store a linked list
       // of the states... this is a way to implement what hopefully is a small set of
       // parselet states for each position in the file.
       ParseletState next;
+
+      public String toString() {
+         return parselet.toString() + " ends at: " + endIx + (next == null ? "" : next.toString());
+      }
    }
 
    // TODO: ifdef ENABLE_STATS
 
    public static String getStatInfo(Parselet startParselet) {
       StringBuilder sb = new StringBuilder();
-      internalGetStatInfo(startParselet, 0, startParselet.name, new HashMap<Parselet,String>(), sb);
+      internalGetStatInfo(startParselet, 0, startParselet.name, new HashMap<Parselet, String>(), sb);
       return sb.toString();
    }
 
@@ -627,5 +653,24 @@ public class Parser implements IString {
 
    public boolean atEOF() {
       return peekInputChar(0) == '\0';
+   }
+
+   public String getCacheStats() {
+      ArrayList<String> res = new ArrayList<String>();
+      for (Map.Entry<Integer,ParseletState> ent:resultCache.entrySet()) {
+         Integer pos = ent.getKey();
+         ParseletState val = ent.getValue();
+
+         if (val.cacheHits > 1) {
+            res.add(val.cacheHits + " : " + pos + ": " + val.parselet);
+         }
+      }
+      Collections.sort(res);
+      StringBuilder out = new StringBuilder();
+      for (String str:res) {
+         out.append(str);
+         out.append("\n");
+      }
+      return out.toString();
    }
 }

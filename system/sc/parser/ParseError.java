@@ -7,7 +7,7 @@ package sc.parser;
 import java.io.File;
 import java.text.MessageFormat;
 
-public class ParseError {
+public class ParseError implements Cloneable, IParseResult {
    public String errorCode;
    public Object[] errorArgs;
    public int startIndex, endIndex;
@@ -35,6 +35,10 @@ public class ParseError {
 
    public String toString() {
       return errorString() + "at character: " + endIndex + (debugErrors && endIndex != startIndex ? " (ending at:" + endIndex : "");
+   }
+
+   public Parselet getParselet() {
+      return parselet;
    }
 
    private String errorStringWithLineNumbers(String startStr, String endStr, String nearStr) {
@@ -84,5 +88,14 @@ public class ParseError {
 
    public boolean isMultiError() {
       return errorCode != null && errorCode.equals(MULTI_ERROR_CODE);
+   }
+
+   public ParseError clone() {
+      try {
+         ParseError res = (ParseError) super.clone();
+         return res;
+      }
+      catch (CloneNotSupportedException exc) {}
+      return null;
    }
 }

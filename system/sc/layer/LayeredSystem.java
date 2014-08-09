@@ -4262,8 +4262,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return layerPathIndex.get(layerPath);
    }
 
+   private void addQuotedPath(StringBuilder sb, String path) {
+      sb.append(FileUtil.PATH_SEPARATOR);
+      if (path.indexOf(' ') != -1) {
+         sb.append('"');
+         sb.append(path);
+         sb.append('"');
+      } else
+         sb.append(path);
+   }
+
    public String getClassPathForLayer(Layer startLayer, String useBuildDir) {
-      StringBuffer sb = new StringBuffer();
+      StringBuilder sb = new StringBuilder();
       boolean addOrigBuild = true;
       sb.append(useBuildDir); // Our build dir overrides all other directories
       for (int i = startLayer.layerPosition; i >= 0; i--) {
@@ -4271,21 +4281,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (layer.classPath != null) {
             for (int j = 0; j < layer.classDirs.size(); j++) {
                String dir = layer.classDirs.get(j);
-               sb.append(FileUtil.PATH_SEPARATOR);
-               sb.append(dir);
+               addQuotedPath(sb, dir);
             }
          }
          String layerClasses = layer.getBuildClassesDir();
          if (!layerClasses.equals(useBuildDir) && layer.isBuildLayer()) {
-            sb.append(FileUtil.PATH_SEPARATOR);
-            sb.append(layerClasses);
+            addQuotedPath(sb, layerClasses);
             if (layerClasses.equals(origBuildDir))
                addOrigBuild = false;
          }
       }
       if (addOrigBuild) {
-         sb.append(FileUtil.PATH_SEPARATOR);
-         sb.append(origBuildDir);
+         addQuotedPath(sb, origBuildDir);
       }
       return sb.toString() + FileUtil.PATH_SEPARATOR + rootClassPath;
       /*

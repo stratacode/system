@@ -90,7 +90,7 @@ public class HTMLLanguage extends TemplateLanguage {
     */
    static final String[] UNESCAPED_TAGS = {"script"};
 
-   static Set<String> UNESCAPED_SET = new HashSet<String>(Arrays.asList(UNESCAPED_TAGS));
+   static HashSet<String> UNESCAPED_SET = new HashSet<String>(Arrays.asList(UNESCAPED_TAGS));
 
    /** Some HTML tags imply indentation - those are matched by a separate parselet so that we can generate nicely formatted HTML from the model */
    static final String[] INDENTED_TAGS = {"html", "head", "body", "table", "tr", "td", "script"};
@@ -102,7 +102,7 @@ public class HTMLLanguage extends TemplateLanguage {
 
    public static Set<String> NEWLINE_SET = new HashSet<String>(Arrays.asList(NEWLINE_TAGS));
 
-   public Set getUnescapedTags() {
+   public HashSet getUnescapedTags() {
       return UNESCAPED_SET;
    }
 
@@ -192,6 +192,13 @@ public class HTMLLanguage extends TemplateLanguage {
       EscapedOpen, UnescapedOpen, CloseTag, AnyTagName
    }
 
+   // This is broken out so that we can cache it efficiently between the different types of tagName sequences.
+   public Sequence tagName = new Sequence("('','',)", tagNameChar, new Sequence("('')", REPEAT | OPTIONAL, tagNameChar), htmlSpacing);
+   {
+      tagName.cacheResults = true;
+      identifier.cacheResults = true;
+   }
+
    /**
     * This class extends the parser's core Sequence(list of parselets) class to add all of the logic necessary to
     * parse the quirky HTML syntax.  It's used in the grammar definition for various types of HTML tags, configured
@@ -202,10 +209,15 @@ public class HTMLLanguage extends TemplateLanguage {
     */
    public class TagNameSequence extends Sequence {
       TagNameMatchType matchType;
+      HashSet<String> unescapedTags;
       public TagNameSequence(TagNameMatchType mt) {
-         super("('','',)", tagNameChar, new Sequence("('')", REPEAT | OPTIONAL, tagNameChar), htmlSpacing);
+         super("('')", tagName);
          matchType = mt;
          styleName = "keyword";
+      }
+      public void start() {
+         super.start();
+         unescapedTags = ((HTMLLanguage) getLanguage()).getUnescapedTags();
       }
       protected String accept(SemanticContext ctx, Object value, int startIx, int endIx) {
          String res = super.accept(ctx, value, startIx, endIx);
@@ -224,11 +236,11 @@ public class HTMLLanguage extends TemplateLanguage {
             case AnyTagName:
                break;
             case UnescapedOpen:
-               if (!((HTMLLanguage) getLanguage()).getUnescapedTags().contains(strValue))
+               if (!unescapedTags.contains(strValue))
                   return "Tag name is not unescaped";
                break;
             case EscapedOpen:
-               if (((HTMLLanguage) getLanguage()).getUnescapedTags().contains(strValue))
+               if (unescapedTags.contains(strValue))
                   return "Tag name is unescaped";
                break;
             case CloseTag:
@@ -241,7 +253,7 @@ public class HTMLLanguage extends TemplateLanguage {
                String openTagName = hctx.getCurrentTagName();
                if (openTagName == null)
                   return "No open tag for close tag: " + strValue;
-               if (!openTagName.equals(strValue.toLowerCase()))
+               if (!openTagName.equalsIgnoreCase(strValue))
                   return "Mismatching close tag name: " + value + " does not match open: " + openTagName;
                hctx.popTagName();
                break;
@@ -284,6 +296,7 @@ public class HTMLLanguage extends TemplateLanguage {
       // Here we are skipping any incomplete attributes (e.g. id=) till we hit the end of close tag or the start of the next tag
       // It's important that we do not consume part or all of the next tag in the body of this tag if for some reason we decide to put this back in.
       tagAttributes.skipOnErrorParselet = createSkipOnErrorParselet("/", "<", ">", Symbol.EOF);
+      tagAttributes.cacheResults = true;
    }
    // TODO: how do we deal with appending newlines after the start tag?  Used to having htmlSpacingEOL here but that ate up the space in the content.  Need features of htmlSpacingEOL perhaps when processing the endTagChar?
    Sequence simpleTag = new Sequence("Element(,tagName,attributeList,selfClose,)", beginTagChar, anyTagName, tagAttributes, new Sequence("('')", OPTIONAL, closeTagChar), endTagChar);
@@ -326,17 +339,30 @@ public class HTMLLanguage extends TemplateLanguage {
 
    Sequence controlTag = new Sequence("ControlTag(,docTypeName,docTypeValue,)", controlStart, anyTagName, anyTagName, endTagChar);
 
-   // For now try to parse it as a tree, if you can't then assume it's a simple node.
-   // TODO: this is not efficient from a performance perspective.  Ideas for speeding it up: add in optional caching of
-   // specific parselets.  tagName, templateBodyDeclarations, htmlTag?
-   OrderedChoice htmlTag = new OrderedChoice(treeTag, unescapedTreeTag, simpleTag, controlTag);
+   OrderedChoice htmlTag = new OrderedChoice(treeTag, unescapedTreeTag, simpleTag, controlTag) {
+      /** For a performance tuning, reject this match quickly if there's no < sign. */
+      public Object parse(Parser parser) {
+         if (parser.peekInputChar(0) != '<')
+            return parseError(parser, this, "Tag must start with <");
+         else
+            return super.parse(parser);
+      }
+   };
    {
+      templateStatement.cacheResults = true;
+      templateExpression.cacheResults = true;
+      templateDeclaration.cacheResults = true;
+      templateString.cacheResults = true;
+      htmlComment.cacheResults = true;
+      htmlTag.cacheResults = true;
+      unescapedTemplateString.cacheResults = true;
+
       templateString.add("<");
       templateString.add(">");
 
       // Insert the HTML specific declarations - an html tag
       templateBodyDeclarations.setName("([],[],[],[],[],[])");
-      templateBodyDeclarations.add(4, htmlTag);
+      templateBodyDeclarations.put("<", htmlTag);
 
       simpleTemplateDeclarations.setName("([],[],[])");
       simpleTemplateDeclarations.add(1, htmlTag);

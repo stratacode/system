@@ -3439,9 +3439,11 @@ public class ModelUtil {
          type = ((ParamTypeDeclaration) type).getBaseType();
       if (type instanceof Class || type instanceof ParameterizedType) {
          String typeName = ModelUtil.getTypeName(type);
-         Object res = cachedOnly ? sys.getCachedTypeDeclaration(typeName, null, null, false, true) : sys.getSrcTypeDeclaration(typeName, null, true, false, srcOnly);
-         if (res != null)
-            return res;
+         if (sys != null) {
+            Object res = cachedOnly ? sys.getCachedTypeDeclaration(typeName, null, null, false, true) : sys.getSrcTypeDeclaration(typeName, null, true, false, srcOnly);
+            if (res != null)
+               return res;
+         }
       }
       return type;
    }

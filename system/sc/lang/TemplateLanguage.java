@@ -95,7 +95,14 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
    Sequence glueExpression = new Sequence("GlueExpression(,expressions,)", endDelimiter, simpleTemplateDeclarations, startCodeDelimiter);
    Sequence glueStatement = new Sequence("GlueStatement(,declarations,)", endDelimiter, simpleTemplateDeclarations, startCodeDelimiter);
    // In terms of order here - need templateDeclaration <%! ahead of templateStatement <% - otherwise risk matching <% !foo := bar %> before we match <%! foo := bar %>
-   public OrderedChoice templateBodyDeclarations = new OrderedChoice("([],[],[],[],[])", OPTIONAL | REPEAT, htmlComment, templateExpression, templateDeclaration, templateStatement, templateString);
+   public IndexedChoice templateBodyDeclarations = new IndexedChoice("([],[],[],[],[])", OPTIONAL | REPEAT);
+   {
+      templateBodyDeclarations.put(START_HTML_COMMENT, htmlComment);
+      templateBodyDeclarations.put(START_EXP_DELIMITER, templateExpression);
+      templateBodyDeclarations.put(START_DECL_DELIMITER, templateDeclaration);
+      templateBodyDeclarations.put(START_CODE_DELIMITER, templateStatement);
+      templateBodyDeclarations.addDefault(templateString);
+   }
    Sequence glueDeclaration = new Sequence("GlueDeclaration(,declarations,)", endDelimiter, templateBodyDeclarations, startCodeDelimiter);
    Sequence templateAnnotations = new Sequence("(,,imports, templateModifiers,)", OPTIONAL, new Symbol(START_IMPORT_DELIMITER), spacing, imports, modifiers, endDelimiter);
    Sequence template = new Sequence("Template(, *, templateDeclarations,)", spacing, templateAnnotations, templateBodyDeclarations, new Symbol(EOF));

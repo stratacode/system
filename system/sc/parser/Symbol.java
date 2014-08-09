@@ -68,7 +68,7 @@ public class Symbol extends Parselet {
             input.hc = -333;
 
             if (input.charAt(0) == '\0') {
-               return parseEOFError(parser, matchedValue, "ANY symbol does not match EOF");
+               break;
             }
 
             if ((customError = accept(parser.semanticContext, input, input.startIndex, input.startIndex + 1)) != null)
@@ -82,6 +82,7 @@ public class Symbol extends Parselet {
                matchedValue.len += input.len;
                matchedValue.hc = -333;
             }
+            parser.changeCurrentIndex(parser.currentIndex + 1);
          }
          else {
             char lastChar = '\1';

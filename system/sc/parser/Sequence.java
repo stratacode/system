@@ -6,6 +6,7 @@ package sc.parser;
 
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
+import sc.lang.java.ClassDeclaration;
 import sc.lang.java.JavaSemanticNode;
 
 import java.util.ArrayList;

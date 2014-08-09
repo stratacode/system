@@ -64,6 +64,8 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
 
    public boolean started = false;
 
+   public boolean cacheResults = false;
+
    // TODO: Ifdef "STATS_ENABLED"
    public int attemptCount, successCount;
    public int generatedBytes, failedProgressBytes;

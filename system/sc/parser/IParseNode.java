@@ -20,9 +20,7 @@ import java.util.IdentityHashMap;
  * TODO: for performance - maybe this should only be an abstract class.  Also we should use final methods for things which are not overridden
  * as this is a high-bandwidth set of classes.
  * */
-public interface IParseNode extends CharSequence {
-   Parselet getParselet();
-
+public interface IParseNode extends CharSequence, IParseResult {
    void setParselet(Parselet p);
 
    Object getSemanticValue();
