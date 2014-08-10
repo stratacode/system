@@ -1328,14 +1328,20 @@ public class Layer implements ILifecycle, LayerConstants {
       return layerPosition;
    }
 
-   public File findSrcFile(String srcName) {
+   private boolean checkIfStarted() {
       if (!isStarted() && !activated) {
          if (initialized)
             ParseUtil.realInitAndStartComponent(this);
          else {
-            return null;
+            return false;
          }
       }
+      return true;
+   }
+
+   public File findSrcFile(String srcName) {
+      if (!checkIfStarted())
+         return null;
       return srcDirCache.get(srcName);
    }
 
@@ -1343,6 +1349,7 @@ public class Layer implements ILifecycle, LayerConstants {
    private final String[] zipSrcSuffixes = {"java"};
 
    public SrcEntry findSrcEntry(String srcName, boolean prependPackage) {
+      checkIfStarted();
       File f = srcDirCache.get(srcName);
       if (f != null) {
          String path = f.getPath();
@@ -1365,6 +1372,7 @@ public class Layer implements ILifecycle, LayerConstants {
    }
 
    public Iterator<String> getSrcFiles() {
+      checkIfStarted();
       return srcDirCache.keySet().iterator();
    }
 

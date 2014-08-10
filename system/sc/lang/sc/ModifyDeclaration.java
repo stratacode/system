@@ -144,7 +144,9 @@ public class ModifyDeclaration extends TypeDeclaration {
                   else if (modifyTypeDecl.replacedByType.getLayer() != getLayer()) {
                      if (modifyTypeDecl.replacedByType.removed)
                         modifyTypeDecl.replacedByType = null;
-                     System.err.println("**** Error - modifying type already modified!");
+                     // TODO: we should accumulate all of these layers into an index.  It's quite possible in the IDE context for us to
+                     // find the same type modified by different layers... in that case representing the different possible stackings.
+                     System.out.println("**** Warning - changing modified from layer to: " + modifyTypeDecl.replacedByType.getLayer() + " to: " + getLayer());
                   }
                }
 
@@ -155,7 +157,7 @@ public class ModifyDeclaration extends TypeDeclaration {
          }
          startExtendedType(modifyTypeDecl, "modified");
 
-         if (modifyTypeDecl.getJavaModel().isStarted() == false)
+         if (modifyTypeDecl.getJavaModel().isStarted())
             System.out.println("*** Model not started!");
 
          // First, if our modified type picks up the dynamic behavior because it extends a class which is dynamic,
@@ -170,12 +172,17 @@ public class ModifyDeclaration extends TypeDeclaration {
             dynamicNew = false;
          }
 
-         boolean modifiedFinalLayer = !isLayerType && layer != null && !layer.annotationLayer && modifyTypeDecl.layer != null && modifyTypeDecl.layer.finalLayer;
-         if (modifiedFinalLayer) {
-            displayError("Unable to modify type: " + typeName + " in final layer: " + modifyTypeDecl.layer + " for: ");
-         }
+         boolean modifiedCompiledClassLoaded = false;
+         Layer modLayer = modifyTypeDecl.layer;
+         if (layer != null && modLayer != null) {
 
-         boolean modifiedCompiledClassLoaded = layer != null && !modifyTypeDecl.isDynamicType() && modifyTypeDecl.getLayer().compiledInClassPath && layer.layeredSystem.isClassLoaded(modifyTypeDecl.getCompiledClassName());
+            boolean modifiedFinalLayer = !isLayerType && !layer.annotationLayer && modLayer.finalLayer;
+            if (modifiedFinalLayer) {
+               displayError("Unable to modify type: " + typeName + " in final layer: " + modifyTypeDecl.layer + " for: ");
+            }
+
+            modifiedCompiledClassLoaded = !modifyTypeDecl.isDynamicType() && modLayer.compiledInClassPath && layer.layeredSystem.isClassLoaded(modifyTypeDecl.getCompiledClassName());
+         }
 
          if (isDynamicType()) {
             if (modifiedCompiledClassLoaded) {

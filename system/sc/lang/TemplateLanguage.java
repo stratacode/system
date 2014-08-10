@@ -18,6 +18,7 @@ import sc.util.FileUtil;
 import sc.util.StringUtil;
 
 import java.io.File;
+import java.io.Reader;
 import java.util.Collections;
 import java.util.List;
 
@@ -210,37 +211,44 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
     */
    public boolean statefulPages = true;
 
-   public Object parse(String file, Parselet startParselet, boolean enablePartialValues) {
-      Object templateObj = super.parse(file, startParselet, enablePartialValues);
+   public Object parse(String fileName, Reader reader, Parselet start, boolean enablePartialValues, boolean matchOnly, Object toPopulateInst, int bufSize) {
+      Object templateObj = super.parse(fileName, reader, start, enablePartialValues, matchOnly, toPopulateInst, bufSize);
       if (templateObj instanceof ParseError)
          return templateObj;
-      Template temp = (Template) ParseUtil.nodeToSemanticValue(templateObj);
-      if (processTemplate) {
-         if (!staticTemplate)
-            temp.createInstance = true;
-         if (!compiledTemplate)
-            temp.dynamicType = true;
-         // Some interpreted templates, such as web.scxml depend on the output method template etc.
-         temp.generateOutputMethod = true;
-         if (!prependLayerPackage)
-            temp.prependLayerPackage = false;
+      Object semValue = ParseUtil.nodeToSemanticValue(templateObj);
+      if (semValue instanceof Template) {
+         Template temp = (Template) semValue;
+         if (processTemplate) {
+            if (!staticTemplate)
+               temp.createInstance = true;
+            if (!compiledTemplate)
+               temp.dynamicType = true;
+            // Some interpreted templates, such as web.scxml depend on the output method template etc.
+            temp.generateOutputMethod = true;
+            if (!prependLayerPackage)
+               temp.prependLayerPackage = false;
+         }
+
+         if (postBuildTemplate)
+            temp.generateOutputMethod = true;
+
+         if (needsOutputMethod)
+            temp.generateOutputMethod = true;
+
+         // We need some type of base-type whih implements the invalidate method to be a stateful page.
+         Object defaultExtendsClass;
+         if (defaultExtendsType == null || statefulPages == false)
+            temp.statefulPage = false;
+
+         // Lots of properties are propagated through the template processor from the template so we need to set it even if not processing the template
+         temp.templateProcessor = new TemplateResultProcessor(temp, fileName, null);
+
+         return templateObj;
       }
-
-      if (postBuildTemplate)
-         temp.generateOutputMethod = true;
-
-      if (needsOutputMethod)
-         temp.generateOutputMethod = true;
-
-      // We need some type of base-type whih implements the invalidate method to be a stateful page.
-      Object defaultExtendsClass;
-      if (defaultExtendsType == null || statefulPages == false)
-         temp.statefulPage = false;
-
-      // Lots of properties are propagated through the template processor from the template so we need to set it even if not processing the template
-      temp.templateProcessor = new TemplateResultProcessor(temp, file, null);
-
-      return templateObj;
+      else {
+         // We might not be parsing the startParselet
+         return templateObj;
+      }
    }
 
    public class TemplateResultProcessor implements ITemplateProcessor, INameContext {

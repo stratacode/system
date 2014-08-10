@@ -6685,9 +6685,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       IFileProcessor processor = getFileProcessorForFileName(srcEnt.relFileName, srcEnt.layer, null);
       if (processor instanceof Language) {
          Language lang = (Language) processor;
-         Object result = lang.parseString(buffer, enablePartialValues);
-         if (result instanceof ParseError)
+         Object result = lang.parseString(srcEnt.absFileName, buffer, enablePartialValues);
+         if (result instanceof ParseError) {
+            if (enablePartialValues) {
+               Object val = ((ParseError) result).getRootPartialValue();
+               if (val instanceof ILanguageModel)
+                  initModel(srcEnt.layer, modTimeStart, (ILanguageModel) val, srcEnt.isLayerFile(), false);
+            }
             return result;
+         }
          else {
             Object modelObj = ParseUtil.nodeToSemanticValue(result);
 
@@ -8134,7 +8140,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      // Replace this type if it has been modified by a component in a subsequent layer
                      if (decl.replacedByType != null)
                         decl = (TypeDeclaration) decl.replacedByType;
-                     addTypeByName(decl.getJavaModel().getLayer(), CTypeUtil.prefixPath(rootTypeActualName, subTypeName), decl, fromLayer);
+                     // For type declarations that are in templates, the layer may not be initialized so do it here before
+                     // we put it into the type system.
+                     Layer declLayer = decl.getJavaModel().getLayer();
+                     if (declLayer == null)
+                        System.out.println("*** Warning - adding inner type without a layer");
+                     addTypeByName(declLayer, CTypeUtil.prefixPath(rootTypeActualName, subTypeName), decl, fromLayer);
                   }
                   if (fromLayer == null)
                      innerTypeCache.put(typeName, decl);

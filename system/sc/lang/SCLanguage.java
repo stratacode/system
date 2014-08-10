@@ -175,7 +175,7 @@ public class SCLanguage extends JavaLanguage {
             System.out.println("*** Can't open file: " + fileName);
             continue;
          }
-         Object result = c.parse(new StringReader(input));
+         Object result = c.parse(fileName, new StringReader(input));
          if (result == null || !input.equals(result.toString()))
          {
             if (result instanceof ParseError)

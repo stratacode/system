@@ -4,6 +4,9 @@
 
 package sc.parser;
 
+import sc.lang.ISemanticNode;
+import sc.layer.SrcEntry;
+
 import java.io.File;
 import java.text.MessageFormat;
 
@@ -97,5 +100,24 @@ public class ParseError implements Cloneable, IParseResult {
       }
       catch (CloneNotSupportedException exc) {}
       return null;
+   }
+
+   private static Object getRootValue(Object val) {
+      if (val instanceof ISemanticNode) {
+         return ((ISemanticNode) val).getRootNode();
+      }
+      return val;
+   }
+
+   /** Currently the partial value may not be the root node of the semantic value so we need to convert it. */
+   public Object getRootPartialValue() {
+      Object val = partialValue;
+      if (val instanceof ParentParseNode) {
+         val = ((ParentParseNode) val).getSemanticValue();
+         if (val != null) {
+            val = getRootValue(val);
+         }
+      }
+      return val;
    }
 }

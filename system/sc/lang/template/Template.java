@@ -629,11 +629,19 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
                if (tdecl.body != null) {
                   for (Statement s:tdecl.body) {
                      if (parentType != null) {
-                        // If we are reinitializing the template, we may have already started the template.  Do not copy the state here - the types which are bound or we may get references to types in the TemplateDeclaration copied over and used
-                        parentType.addBodyStatement(s.deepCopy(0, null));
-
                         if (s instanceof TypeDeclaration) {
-                           ((TypeDeclaration) s).inactiveType = true;
+                           TypeDeclaration innerType = (TypeDeclaration) s;
+                           innerType.layer = layer;
+
+                           TypeDeclaration innerCopy = (TypeDeclaration) innerType.deepCopy(0, null);
+                           innerCopy.layer = layer;
+                           parentType.addBodyStatement(innerCopy);
+
+                           innerType.inactiveType = true;
+                        }
+                        else {
+                           // If we are reinitializing the template, we may have already started the template.  Do not copy the state here - the types which are bound or we may get references to types in the TemplateDeclaration copied over and used
+                           parentType.addBodyStatement(s.deepCopy(0, null));
                         }
                      }
                      // else - from the language tests, parsing an schtml file but no layered system
@@ -975,6 +983,8 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
                      assert childDecl == rootType;
 
                      TypeDeclaration childTD = (TypeDeclaration) childDecl;
+                     if (childTD.layer == null)
+                        childTD.layer = layer;
                      if (childTD.body != null) {
                         for (Statement childTypeDecl:childTD.body) {
                            if (childTypeDecl instanceof GlueDeclaration)

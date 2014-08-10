@@ -727,7 +727,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    }
 
    private Object styleSnippet(String rootType, boolean errors, String input, boolean codeSnippet) {
-      Object result = parseString(input, codeSnippet ? blockStatements : classBodySnippet, true);
+      Object result = parseString(null, input, codeSnippet ? blockStatements : classBodySnippet, true);
       if (result instanceof ParseError) {
          System.err.println("*** Syntax error: " + result + " unable to style snippet: " + input);
          return input;

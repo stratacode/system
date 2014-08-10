@@ -253,7 +253,7 @@ public class TestUtil {
          Object result;
          int ct = repeatCount;
          do {
-            result = lang.parse(new StringReader(input), lang.getStartParselet(), enablePartialValues);
+            result = lang.parse(fileName, new StringReader(input), lang.getStartParselet(), enablePartialValues);
          } while (--ct > 0);
 
          long parseResultTime = System.currentTimeMillis();

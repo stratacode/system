@@ -86,7 +86,7 @@ public abstract class Language implements IFileProcessor {
 
    public Object parse(String fileName, boolean enablePartialValues) {
       try {
-         return parse(new FileReader(fileName), startParselet, enablePartialValues);
+         return parse(fileName, new FileReader(fileName), startParselet, enablePartialValues);
       }
       catch (FileNotFoundException exc) {
          throw new IllegalArgumentException(exc.toString());
@@ -95,7 +95,7 @@ public abstract class Language implements IFileProcessor {
 
    public Object parse(String fileName, Parselet parselet, boolean enablePartialValues) {
       try {
-         return parse(new FileReader(fileName), parselet, enablePartialValues);
+         return parse(fileName, new FileReader(fileName), parselet, enablePartialValues);
       }
       catch (FileNotFoundException exc) {
          throw new IllegalArgumentException(exc.toString());
@@ -104,30 +104,38 @@ public abstract class Language implements IFileProcessor {
 
    /** Parses the string using the given parselet but instead of creating a new instance, populates the instance specified - which must match the type used to produce the grammar */
    public Object parseIntoInstance(String string, Parselet start, Object populateInst) {
-      return parse(new StringReader(string), start, false, false, populateInst, string.length());
+      return parse(null, new StringReader(string), start, false, false, populateInst, string.length());
    }
 
    public boolean matchString(String string, Parselet start) {
-      Object res = parse(new StringReader(string), start, false, true, null, string.length());
+      Object res = parse(null, new StringReader(string), start, false, true, null, string.length());
       if (res instanceof ParseError || res == null)
          return false;
       return true;
    }
 
    public Object parseString(String string) {
-      return parse(new StringReader(string), startParselet, false, false, null, string.length());
+      return parse(null, new StringReader(string), startParselet, false, false, null, string.length());
    }
 
    public Object parseString(String string, boolean enablePartialValues) {
-      return parse(new StringReader(string), startParselet, enablePartialValues, false, null, string.length());
+      return parse(null, new StringReader(string), startParselet, enablePartialValues, false, null, string.length());
    }
 
-   public Object parseString(String string, Parselet start, boolean enablePartialValues) {
-      return parse(new StringReader(string), start, enablePartialValues, false, null, string.length());
+   public Object parseString(String fileName, String string, boolean enablePartialValues) {
+      return parse(fileName, new StringReader(string), startParselet, enablePartialValues, false, null, string.length());
+   }
+
+   public Object parseString(String fileName, String string, Parselet start, boolean enablePartialValues) {
+      return parse(fileName, new StringReader(string), start, enablePartialValues, false, null, string.length());
    }
 
    public Object parseString(String string, Parselet start) {
-      return parse(new StringReader(string), start, false, false, null, string.length());
+      return parse(null, new StringReader(string), start, false, false, null, string.length());
+   }
+
+   public Object parse(String fileName, Reader reader) {
+      return parse(fileName, reader, startParselet, false);
    }
 
    public Object parse(Reader reader) {
@@ -146,11 +154,17 @@ public abstract class Language implements IFileProcessor {
     * @return  This method returns the parse tree generated  If your grammar defines a semantic value, you can retrieve
     * that using the @see ParseUtil.nodeToSemanticValue method passing in the return value if the parse method.
     */
-   public Object parse(Reader reader, Parselet start, boolean enablePartialValues) {
-      return parse(reader, start, enablePartialValues, false, null, Parser.DEFAULT_BUFFER_SIZE);
+   public Object parse(String fileName, Reader reader, Parselet start, boolean enablePartialValues) {
+      return parse(fileName, reader, start, enablePartialValues, false, null, Parser.DEFAULT_BUFFER_SIZE);
    }
 
-   public Object parse(Reader reader, Parselet start, boolean enablePartialValues, boolean matchOnly, Object toPopulateInst, int bufSize) {
+   /**
+    * This is the variant you can safely override because all calls go through here.  The fileName argument may be null but helps the TemplateLanguage do its
+    * processing of the file.  The matchOnly just returns a true/false if this is parseable without doing all of the work of parsing it.  You can provide an
+    * instance in the rare case you want to use it as the default semantic node object for the parser to work on.  The bufSize is a tunable parameter to
+    * choose the size of the buffer, useful if you are parsing a small string or something.
+    */
+   public Object parse(String fileName, Reader reader, Parselet start, boolean enablePartialValues, boolean matchOnly, Object toPopulateInst, int bufSize) {
       if (!start.initialized) {
          ParseUtil.initAndStartComponent(start);
       }
@@ -167,7 +181,7 @@ public abstract class Language implements IFileProcessor {
    }
 
    public Object parse(Reader reader, Parselet start) {
-      return parse(reader, start, false);
+      return parse(null, reader, start, false);
    }
 
    @sc.obj.HTMLSettings(returnsHTML=true)
@@ -427,7 +441,7 @@ public abstract class Language implements IFileProcessor {
             throw new IllegalArgumentException("Unable to open zip file: " + file);
          }
          else
-            return parse(new BufferedReader(new InputStreamReader(input)), startParselet, enablePartialValues);
+            return parse(file.absFileName, new BufferedReader(new InputStreamReader(input)), startParselet, enablePartialValues);
       }
       else {
          try {
