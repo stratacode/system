@@ -108,6 +108,10 @@ public interface ISemanticNode {
 
    public void validateParseNode(boolean finalGen);
 
+   /**
+    * By default, you configure styles using the parselet's styleName property.  When you need to alter the syntax highlighting rules
+    * for a given node, you can override this method.
+    */
    public void styleNode(IStyleAdapter adapter);
 
    public CharSequence toModelString();

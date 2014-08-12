@@ -7,16 +7,13 @@ package sc.lang.html;
 import sc.lang.ISemanticNode;
 import sc.lang.SCLanguage;
 import sc.lang.java.*;
-import sc.parser.IParseNode;
-import sc.parser.PString;
-import sc.parser.ParseError;
-import sc.parser.ParseUtil;
+import sc.parser.*;
 
 import java.util.IdentityHashMap;
 
 public class Attr extends Node {
    public String name;
-   // Can be either a String or a TemplateExpression
+   // Can be either a String, TemplateExpression, or AttrExpr - which holds the op and expression
    public Object value;
 
    // The expression which should be used to compute the attribute's value
@@ -151,6 +148,7 @@ public class Attr extends Node {
             else
                displayWarning("Found string for attribute that needs an expression.  Using: " + name + "=\"= " + attStr + "\" for: ");
          }
+         // TODO: this should no longer be needed
          else {
             op = opStr;
             attStr = attStr.substring(opStr.length()).trim();
@@ -176,9 +174,16 @@ public class Attr extends Node {
       else if (attValue instanceof Expression) {
          init = (Expression) ((Expression) attValue).deepCopy(ISemanticNode.CopyNormal, null);
          // When the string value is an expression and there's a property use data binding to keep it in sync.
-         // TODO: should this only happen when the page is stateful?
+         // TODO: should we use := only when the page is stateful and "=" otherwise?
          if (prop != null)
             op = ":=";
+      }
+      else if (attValue instanceof AttrExpr) {
+         if (name.equals("value"))
+            System.out.println("***");
+         AttrExpr attExpr = (AttrExpr) attValue;
+         this.op = attExpr.op;
+         this.valueExpr = attExpr.expr;
       }
       if (init != null) {
          init.parentNode = this;

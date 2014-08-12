@@ -283,13 +283,15 @@ public class Layer implements ILifecycle, LayerConstants {
       return this == layeredSystem.buildLayer || this == layer || extendsLayer(layer);
    }
 
-   public SrcEntry getInheritedSrcFileFromTypeName(String typeName, boolean srcOnly, boolean prependPackage, String subPath) {
-      SrcEntry res = getSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath);
+   public SrcEntry getInheritedSrcFileFromTypeName(String typeName, boolean srcOnly, boolean prependPackage, String subPath, IRuntimeProcessor runtime, boolean layerResolve) {
+      if (excludeForProcessor(runtime))
+         return null;
+      SrcEntry res = getSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, layerResolve);
       if (res != null)
          return res;
       if (baseLayers != null) {
          for (Layer base:baseLayers) {
-            res = base.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath);
+            res = base.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, runtime, layerResolve);
             if (res != null)
                return res;
          }
@@ -297,7 +299,7 @@ public class Layer implements ILifecycle, LayerConstants {
       return null;
    }
 
-   public SrcEntry getSrcFileFromTypeName(String typeName, boolean srcOnly, boolean prependPackage, String subPath) {
+   public SrcEntry getSrcFileFromTypeName(String typeName, boolean srcOnly, boolean prependPackage, String subPath, boolean layerResolve) {
       String packagePrefix = prependPackage ? this.packagePrefix : null;
       String relFilePath = subPath;
       if (packagePrefix != null /*&& packagePrefix.length() < relFilePath.length()*/) {
@@ -316,7 +318,7 @@ public class Layer implements ILifecycle, LayerConstants {
          }
       }
 
-      SrcEntry srcEnt = findSrcEntry(relFilePath, prependPackage);
+      SrcEntry srcEnt = findSrcEntry(relFilePath, prependPackage, layerResolve);
       if (srcEnt != null)
          return srcEnt;
       else if (!srcOnly) {
@@ -326,6 +328,22 @@ public class Layer implements ILifecycle, LayerConstants {
             return new SrcEntry(this, res.getPath(), relFilePath, prependPackage);
       }
       return null;
+   }
+
+   public boolean excludeForProcessor(IRuntimeProcessor proc) {
+      Layer.RuntimeEnabledState layerState = isExplicitlyEnabledForRuntime(null);
+      if (layerState == Layer.RuntimeEnabledState.Disabled || (layerState == Layer.RuntimeEnabledState.NotSet && !getAllowedInAnyLayer())) {
+         return true;
+      }
+      return false;
+   }
+
+   public boolean includeForProcessor(IRuntimeProcessor proc) {
+      Layer.RuntimeEnabledState layerState = isExplicitlyEnabledForRuntime(proc);
+      if (layerState == Layer.RuntimeEnabledState.Enabled || (layerState == Layer.RuntimeEnabledState.NotSet && getAllowedInAnyLayer())) {
+         return true;
+      }
+      return false;
    }
 
    public enum RuntimeEnabledState {
@@ -507,6 +525,9 @@ public class Layer implements ILifecycle, LayerConstants {
             baseLayer.initialize();
       }
 
+      if (layerDirName.contains("html.core"))
+         System.out.println("***");
+
       callLayerMethod("initialize");
 
       if (liveDynamicTypes && compiledOnly)
@@ -630,7 +651,7 @@ public class Layer implements ILifecycle, LayerConstants {
       return lastModified;
    }
 
-   void initSrcCache() {
+   void initSrcCache(ArrayList<ReplacedType> replacedTypes) {
       for (String dir: topLevelSrcDirs) {
          if (dir.indexOf("${buildDir}") == -1)
             dir = FileUtil.getRelativeFile(layerPathName, dir);
@@ -639,7 +660,7 @@ public class Layer implements ILifecycle, LayerConstants {
          if (dir.indexOf("${") != -1)
             System.err.println("Unrecognized variable in srcPath: " + dir);
          File dirFile = new File(dir);
-         addSrcFilesToCache(dirFile, "");
+         addSrcFilesToCache(dirFile, "", replacedTypes);
       }
       if (globalPackages != null) {
          for (String pkg:globalPackages) {
@@ -677,7 +698,7 @@ public class Layer implements ILifecycle, LayerConstants {
                if (!f.isDirectory())
                   System.err.println("*** Unable to open preCompiledSrcPath directory: " + preCompiledDir);
                else
-                  addSrcFilesToCache(f, "");
+                  addSrcFilesToCache(f, "", replacedTypes);
             }
          }
       }
@@ -693,7 +714,7 @@ public class Layer implements ILifecycle, LayerConstants {
       System.err.println(sb.toString());
    }
 
-   private void addSrcFilesToCache(File dir, String prefix) {
+   private void addSrcFilesToCache(File dir, String prefix, ArrayList<ReplacedType> replacedTypes) {
       String srcDirPath = dir.getPath();
       if (!srcDirs.contains(srcDirPath))
          srcDirs.add(srcDirPath);
@@ -709,14 +730,23 @@ public class Layer implements ILifecycle, LayerConstants {
       }
 
       TreeSet<String> dirIndex = getDirIndex(prefix);
-
       String absPrefix = FileUtil.concat(packagePrefix.replace('.', '/'), prefix);
       for (String fn:files) {
          File f = new File(dir, fn);
+
+         if (fn.contains("ModelEditor"))
+            System.out.println("***");
          // Do not index the layer file itself.  otherwise, it shows up in the SC type system as a parent type in some weird cases
          if (prefix.equals("") && fn.equals(layerBaseName))
             continue;
-         if (Language.isParseable(fn)) {
+         String ext = FileUtil.getExtension(fn);
+         IFileProcessor proc = ext == null ? null : layeredSystem.getFileProcessorForExtension(ext, this, null);
+
+         // Only cache files with a language processor attached
+         if (!Language.isParseable(fn))
+            proc = null;
+
+         if (proc != null) {
             String srcPath = FileUtil.concat(prefix, fn);
             // Register under both the name with and without the suffix
             srcDirCache.put(srcPath, f);
@@ -724,10 +754,23 @@ public class Layer implements ILifecycle, LayerConstants {
             String rootPath = dir.getPath();
             layeredSystem.addToPackageIndex(rootPath, this, false, true, absPrefix, fn);
 
+            String srcRelType = srcPath.replace(FileUtil.FILE_SEPARATOR, ".");
+
+            // Has this type already been loaded in a previous layer?  If so, we need to record that we need to apply this type in this layer after the
+            // layer has been started.
+            if (replacedTypes != null && proc.getProducesTypes()) {
+               boolean prepend = proc.getPrependLayerPackage();
+               String typeName =  prepend ? CTypeUtil.prefixPath(packagePrefix, FileUtil.removeExtension(srcRelType)) : srcRelType;
+
+               TypeDeclaration prevType = layeredSystem.getTypeFromCache(typeName, this, prepend);
+               if (prevType != null)
+                  replacedTypes.add(new ReplacedType(typeName, proc.getPrependLayerPackage()));
+            }
+
             dirIndex.add(FileUtil.removeExtension(fn));
          }
          else if (!excludedFile(fn, prefix) && f.isDirectory()) {
-            addSrcFilesToCache(f, FileUtil.concat(prefix, f.getName()));
+            addSrcFilesToCache(f, FileUtil.concat(prefix, f.getName()), replacedTypes);
          }
       }
    }
@@ -764,6 +807,16 @@ public class Layer implements ILifecycle, LayerConstants {
       String absPrefix = FileUtil.concat(packagePrefix.replace('.', '/'), srcEnt.getRelDir());
       layeredSystem.removeFromPackageIndex(layerPathName, this, false, true, absPrefix, srcEnt.baseFileName);
       // TODO: any reason to remove the dirIndex entry?
+   }
+
+   private static class ReplacedType {
+      String typeName;
+      boolean prependPackage;
+
+      ReplacedType(String tn, boolean pp) {
+         this.typeName = tn;
+         this.prependPackage = pp;
+      }
    }
 
    public void start() {
@@ -838,11 +891,23 @@ public class Layer implements ILifecycle, LayerConstants {
             layeredSystem.addPathToIndex(this, classDirs.get(j));
       }
 
+      if (layerDirName.equals("fs.bind"))
+         System.out.println("***");
+
+      ArrayList<ReplacedType> replacedTypes = new ArrayList<ReplacedType>();
       // Now init our index of the files managed by this layer
-      initSrcCache();
+      initSrcCache(replacedTypes);
 
       if (isBuildLayer())
          makeBuildLayer();
+
+      // This is the list of types defined in this layer which were already loaded.  We need to replace them with the ones
+      // in this layer now that this layer is active, simply by loading the file.
+      for (ReplacedType replacedType:replacedTypes) {
+         TypeDeclaration newType = layeredSystem.getSrcTypeDeclaration(replacedType.typeName, null, replacedType.prependPackage);
+         if (newType == null)
+            System.out.println("*** Error - did not find type: " + replacedType.typeName + " after adding layer: " + this);
+      }
    }
 
    public void ensureStarted(boolean checkBaseLayers) {
@@ -1201,7 +1266,7 @@ public class Layer implements ILifecycle, LayerConstants {
                String typeName = CTypeUtil.getPackageName(imp.identifier);
                Object typeObj = layeredSystem.getSrcTypeDeclaration(typeName, getNextLayer(), true);
                if (typeObj == null)
-                  typeObj = layeredSystem.getClassWithPathName(typeName);
+                  typeObj = layeredSystem.getClassWithPathName(typeName, true);
                if (imp.hasWildcard()) {
                   boolean addedAny = false;
                   if (typeObj != null) {
@@ -1330,6 +1395,10 @@ public class Layer implements ILifecycle, LayerConstants {
 
    private boolean checkIfStarted() {
       if (!isStarted() && !activated) {
+         if (baseLayers != null) {
+            for (Layer base:baseLayers)
+               base.checkIfStarted();
+         }
          if (initialized)
             ParseUtil.realInitAndStartComponent(this);
          else {
@@ -1339,19 +1408,27 @@ public class Layer implements ILifecycle, LayerConstants {
       return true;
    }
 
-   public File findSrcFile(String srcName) {
-      if (!checkIfStarted())
+   public File findSrcFile(String srcName, boolean layerResolve) {
+      if (!layerResolve && !checkIfStarted())
          return null;
-      return srcDirCache.get(srcName);
+      File res = srcDirCache.get(srcName);
+      if (res != null) {
+         if (srcName.contains("EditorContext"))
+            System.out.println("***");
+      }
+      return res;
    }
 
    /** List of suffixes to search for src files.  Right now this is only Java because zip files are only used for precompiled src. */
    private final String[] zipSrcSuffixes = {"java"};
 
-   public SrcEntry findSrcEntry(String srcName, boolean prependPackage) {
-      checkIfStarted();
+   public SrcEntry findSrcEntry(String srcName, boolean prependPackage, boolean layerResolve) {
+      if (!layerResolve)
+         checkIfStarted();
       File f = srcDirCache.get(srcName);
       if (f != null) {
+         if (srcName.contains("EditorContext"))
+            System.out.println("***");
          String path = f.getPath();
          String ext = FileUtil.getExtension(path);
          return new SrcEntry(this, path, srcName + "." + ext, prependPackage);
@@ -1811,7 +1888,7 @@ public class Layer implements ILifecycle, LayerConstants {
       String prefix = relDir == null ? "" : relDir;
       if (lastRefreshTime == -1 || (newTime = f.lastModified()) > lastRefreshTime) {
          // First update the src cache to pick up any new files, refresh any models we find in there when ctx is not null
-         addSrcFilesToCache(f, prefix);
+         addSrcFilesToCache(f, prefix, null);
       }
 
       File[] files = f.listFiles();
@@ -2389,7 +2466,7 @@ public class Layer implements ILifecycle, LayerConstants {
       return null;
    }
 
-   public SrcEntry getSrcFileFromRelativeTypeName(String relDir, String subPath, String pkgPrefix, boolean srcOnly, boolean checkBaseLayers) {
+   public SrcEntry getSrcFileFromRelativeTypeName(String relDir, String subPath, String pkgPrefix, boolean srcOnly, boolean checkBaseLayers, boolean layerResolve) {
       String relFilePath = relDir == null ? subPath : FileUtil.concat(relDir, subPath);
       boolean packageMatches;
 
@@ -2406,7 +2483,7 @@ public class Layer implements ILifecycle, LayerConstants {
       else
          packageMatches = true;
 
-      File res = findSrcFile(relFilePath);
+      File res = findSrcFile(relFilePath, layerResolve);
       LayeredSystem sys = getLayeredSystem();
       if (res != null) {
          String path = res.getPath();
@@ -2430,7 +2507,7 @@ public class Layer implements ILifecycle, LayerConstants {
       if (checkBaseLayers) {
          if (baseLayers != null) {
             for (Layer baseLayer:baseLayers) {
-               SrcEntry baseEnt = baseLayer.getSrcFileFromRelativeTypeName(relDir, subPath, pkgPrefix, srcOnly, true);
+               SrcEntry baseEnt = baseLayer.getSrcFileFromRelativeTypeName(relDir, subPath, pkgPrefix, srcOnly, true, layerResolve);
                if (baseEnt != null)
                   return baseEnt;
             }

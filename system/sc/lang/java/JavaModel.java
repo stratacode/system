@@ -533,8 +533,13 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    static {
       systemLayerModelPackages.add("java.lang");
       systemLayerModelPackages.add("java.util");
+      systemLayerModelPackages.add("sc.lang");
+      systemLayerModelPackages.add("sc.lang.sc");
+      systemLayerModelPackages.add("sc.lang.html");
+      systemLayerModelPackages.add("sc.lang.template");
       systemLayerModelPackages.add("sc.layer"); // For LayeredSystem in the layerDef files
-      systemLayerModelPackages.add("sc.js"); // For JSSettings in the LayerDef files
+      systemLayerModelPackages.add("sc"); // For looking up components of paths
+      systemLayerModelPackages.add("java"); // For looking up components of paths
    }
 
    public Object findTypeDeclaration(String typeName, boolean addExternalReference) {
@@ -560,7 +565,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       // Parsing the layer definition, need to skip over Java src in the standard packages: java.util and java.lang
       if (isLayerModel) {
          pkgName = CTypeUtil.getPackageName(typeName);
-         if (pkgName != null && systemLayerModelPackages.contains(pkgName))
+         if (pkgName == null || systemLayerModelPackages.contains(pkgName))
             skipSrc = true;
       }
 
@@ -569,7 +574,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       // Need to check relative references in this package before we do the imports cause that's
       // how Java does it.
       if (sys != null && !skipSrc) {
-         td = sys.getRelativeTypeDeclaration(typeName, getPackagePrefix(), null, prependLayerPackage, layer);
+         td = sys.getRelativeTypeDeclaration(typeName, getPackagePrefix(), null, prependLayerPackage, layer, isLayerModel);
       }
 
       boolean imported;
@@ -609,11 +614,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (layeredSystem != null) {
          // Look for a name relative to this path prefix
          if (importedName != typeName && !skipSrc) // intending to use != here to avoid the equals method
-            td = layeredSystem.getRelativeTypeDeclaration(importedName, getPackagePrefix(), null, true, layer);
+            td = layeredSystem.getRelativeTypeDeclaration(importedName, getPackagePrefix(), null, true, layer, isLayerModel);
          if (td == null) {
             if (!skipSrc) {
                // Look for an absolute name in both source and class form
-               td = layeredSystem.getTypeForCompile(importedName, null, true, false, srcOnly, layer);
+               td = layeredSystem.getTypeForCompile(importedName, null, true, false, srcOnly, layer, isLayerModel);
 
                // Check for the inner class source def before looking for compiled definitions
                if (td == null) {
@@ -638,12 +643,12 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                   for (String gpkg:globalTypes) {
                      String globalName = CTypeUtil.prefixPath(gpkg, typeName);
                      if (!skipSrc) {
-                        if ((td = layeredSystem.getTypeForCompile(globalName, null, true, false, srcOnly, layer)) != null) {
+                        if ((td = layeredSystem.getTypeForCompile(globalName, null, true, false, srcOnly, layer, isLayerModel)) != null) {
                            typeName = globalName;
                            break;
                         }
                      }
-                     if ((td = getClass(globalName, false)) != null) {
+                     if ((td = getClass(globalName, false, isLayerModel)) != null) {
                         typeName = globalName;
                         break;
                      }
@@ -652,14 +657,14 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                // TODO:  Very likely simplify this inner class stuff with the
                // code in LayeredSystem as it seems like there is redundancy.
                if (td == null)
-                  td = getClass(importedName, false);
+                  td = getClass(importedName, false, isLayerModel);
             }
             /* Only if we have not imported a class, try looking for a class in this package */
             if (td == null && importedName == typeName) {
                String pref = getPackagePrefix();
                if (pref != null) {
                   String prefTypeName = pref + "." + typeName;
-                  td = getClass(prefTypeName, false);
+                  td = getClass(prefTypeName, false, isLayerModel);
                }
             }
          }
@@ -695,12 +700,16 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public Object getClass(String className, boolean useImports) {
+      return getClass(className, useImports, false);
+   }
+
+   public Object getClass(String className, boolean useImports, boolean layerResolve) {
       if (layeredSystem != null) {
-         Object cl = layeredSystem.getClassWithPathName(className);
+         Object cl = layeredSystem.getClassWithPathName(className, layerResolve);
          if (cl == null && useImports) {
             String impName = getImportedName(className);
             if (impName != null)
-               return layeredSystem.getClassWithPathName(impName);
+               return layeredSystem.getClassWithPathName(impName, layerResolve);
          }
          return cl;
       }
@@ -2155,7 +2164,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       // In the IDE context, we do not always load the types in reverse order like we during the build.  So from the IDE, we may need
       // to find and populate the most specific type here.
       String fullTypeName = modelType.getFullTypeName();
-      TypeDeclaration lastType = (TypeDeclaration) layeredSystem.getSrcTypeDeclaration(fullTypeName, null, true, false, true);
+      TypeDeclaration lastType = (TypeDeclaration) layeredSystem.getSrcTypeDeclaration(fullTypeName, null, true, false, true, null, isLayerModel);
       if (lastType != null)
          return lastType.getJavaModel();
 

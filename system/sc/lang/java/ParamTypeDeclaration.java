@@ -274,7 +274,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       if (definedInType != null)
          return definedInType.getClass(className, useImports);
       else
-         return system.getClassWithPathName(className);
+         return system.getClassWithPathName(className, false);
    }
 
    public Object findTypeDeclaration(String typeName, boolean addExternalReference) {

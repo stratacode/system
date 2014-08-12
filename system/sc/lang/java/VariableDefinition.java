@@ -678,7 +678,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          return this; // We are still valid
       Statement def = getDefinition();
       if (def instanceof FieldDefinition) {
-         Object res = oldModel.layeredSystem.getSrcTypeDeclaration(getEnclosingType().getFullTypeName(), null, true,  false, false, oldModel.layer);
+         Object res = oldModel.layeredSystem.getSrcTypeDeclaration(getEnclosingType().getFullTypeName(), null, true,  false, false, oldModel.layer, oldModel.isLayerModel);
          if (res instanceof BodyTypeDeclaration) {
             Object newField = ((BodyTypeDeclaration) res).declaresMember(variableName, MemberType.FieldSet, null, null);
             if (newField instanceof VariableDefinition)

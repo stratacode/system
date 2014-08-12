@@ -147,6 +147,9 @@ public class IdentifierExpression extends ArgumentsExpression {
 
          String firstIdentifier = identifiers.get(0).toString();
 
+         if (identifiers.size() == 3 && identifiers.get(2).equals("undo"))
+            System.out.println("***");
+
          // Sync uses very simple identifiers to refer to objects, set via the customResolver hook.  When that's in
          // place we look up the type thee and return an identifier for it so we can evaluate it, etc.
          if (arguments == null && model != null && model.customResolver != null) {
@@ -2725,6 +2728,8 @@ public class IdentifierExpression extends ArgumentsExpression {
    }
 
    static Object getTypeForIdentifier(IdentifierType[] idTypes, Object[] boundTypes, List<Expression> arguments, int ix, JavaModel model) {
+      if (model == null)
+         System.out.println("***");
       if (boundTypes == null)
          return null;
       if (idTypes[ix] != null) {

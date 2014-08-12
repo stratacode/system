@@ -189,7 +189,7 @@ public class HTMLLanguage extends TemplateLanguage {
 
    /** Each parselet instance generates one type of tag from this set */
    enum TagNameMatchType {
-      EscapedOpen, UnescapedOpen, CloseTag, AnyTagName
+      EscapedOpen, UnescapedOpen, CloseTag, AnyTagName, AttributeName
    }
 
    // This is broken out so that we can cache it efficiently between the different types of tagName sequences.
@@ -273,19 +273,17 @@ public class HTMLLanguage extends TemplateLanguage {
    /** Matches any tag - as a cleanup when no other parselets match */
    public Sequence anyTagName = new TagNameSequence(TagNameMatchType.AnyTagName);
 
+   public Sequence attrName = new TagNameSequence(TagNameMatchType.AttributeName);
+
    public Sequence closeTagName = new TagNameSequence(TagNameMatchType.CloseTag);
 
-   public OrderedChoice attributeValueString = new OrderedChoice(templateExpression, escapedString);
-   public OrderedChoice attributeValueSingleQuoteString = new OrderedChoice(templateExpression, escapedSingleQuoteString);
+   public Sequence attExpression = new Sequence("AttrExpr(op,expr)", new SymbolChoiceSpace(":=:", ":=", "=:", "="), expression);
+
+   public OrderedChoice attributeValueString = new OrderedChoice(templateExpression, attExpression, escapedString);
+   public OrderedChoice attributeValueSingleQuoteString = new OrderedChoice(templateExpression, attExpression, escapedSingleQuoteString);
 
    public Sequence attributeValueLiteral = new Sequence("(,.,)", doubleQuote, attributeValueString, doubleQuote);
-   {
-      attributeValueLiteral.styleName = "string";
-   }
    public Sequence attributeValueSQLiteral = new Sequence("(,.,)", singleQuote, attributeValueSingleQuoteString, singleQuote);
-   {
-      attributeValueLiteral.styleName = "string";
-   }
 
    Parselet attributeValue =  new OrderedChoice(attributeValueLiteral, attributeValueSQLiteral);
 

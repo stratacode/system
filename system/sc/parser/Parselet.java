@@ -91,6 +91,10 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
     */
    public IParseNode generateParseNode;
 
+   /**
+    * Assign a default style for semantic values produced by this parse node.  Often, but not always the style for a text node
+    * is associated with it's grammar node.  If you need to customize the style for a given node, override the styleNode method.
+    */
    public String styleName;
 
    // Was this parselet named directly by a field of the language it was defined in (as opposed to being a child of one of the parselets with a field)

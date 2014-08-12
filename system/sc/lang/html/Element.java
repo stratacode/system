@@ -2203,9 +2203,14 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                    boolean isIdProperty = att.name.equalsIgnoreCase("id");
                    Expression attExpr = att.valueExpr;
 
-                   // Need to make a copy of the attribute expressions.  We can regenerate the tag type and update it.  if we share the same expression with the old and new types, the stop of the old type messes up the new type.
-                   if (attExpr != null)
+                   // Need to make a copy of the attribute expressions.  We can regenerate the tag type and update it.  if we share the same expression with the old and new types, the update messes things up.
+                   if (attExpr != null) {
+                      if (att.name.equals("value") && att.value instanceof AttrExpr)
+                         System.out.println("***");
+                      ISemanticNode parentNode = attExpr.parentNode;
                       att.valueExprClone = attExpr = attExpr.deepCopy(CopyNormal | CopyInitLevels, null);
+                      att.valueExprClone.parentNode = parentNode;
+                   }
 
                    if (isIdProperty) {
                       // We might be inheriting this same id in which case do not set it - otherwise, we get duplicates of the same unique id.

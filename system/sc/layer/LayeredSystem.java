@@ -631,8 +631,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (runtimes != null && runtimes.size() > 1 && (peerSystems == null || peerSystems.size() < runtimes.size()-1)) {
 
          // We want all of the layered systems to use the same buildDir so pass it through options as though you had used the -d option.  Of course if you use -d, it will happen automatically.
-         if (options.buildDir == null)
-            options.buildDir = lastLayer.getDefaultBuildDir();
+         if (options.buildDir == null) {
+            if (lastLayer != null)
+               options.buildDir = lastLayer.getDefaultBuildDir();
+         }
 
          ArrayList<LayeredSystem> newPeers = new ArrayList<LayeredSystem>();
 
@@ -661,19 +663,26 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             ArrayList<String> procLayerNames = new ArrayList<String>();
             for (int i = 0; i < layers.size(); i++) {
                Layer layer = layers.get(i);
-               Layer.RuntimeEnabledState layerState = layer.isExplicitlyEnabledForRuntime(proc);
-               if (layerState == Layer.RuntimeEnabledState.Enabled || (layerState == Layer.RuntimeEnabledState.NotSet && layer.getAllowedInAnyLayer())) {
+               if (layer.includeForProcessor(proc))
                   procLayerNames.add(layer.getLayerName());
-               }
             }
 
             String peerLayerPath = layerPath;
             // When you run in the layer directory, the other runtime defines the root layer dir which we need as the layer path here since we specify all of the layers using absolute paths
             if (peerLayerPath == null && newLayerDir != null)
                peerLayerPath = newLayerDir;
-            LayeredSystem sys = new LayeredSystem(null, procLayerNames, explicitDynLayers, peerLayerPath, rootClassPath, options, proc, true, false);
-            sys.repositorySystem = repositorySystem;
-            newPeers.add(sys);
+            LayeredSystem peerSys = new LayeredSystem(null, procLayerNames, explicitDynLayers, peerLayerPath, rootClassPath, options, proc, true, false);
+            peerSys.repositorySystem = repositorySystem;
+
+            for (Layer inactiveLayer:inactiveLayers.values()) {
+               if (inactiveLayer.includeForProcessor(proc)) {
+                  Layer peerLayer = peerSys.getInactiveLayer(inactiveLayer.getLayerName(), false);
+                  if (peerLayer == null)
+                     System.err.println("*** failed to find peer layer");
+               }
+            }
+
+            newPeers.add(peerSys);
          }
 
          if (peerSystems == null)
@@ -691,14 +700,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
          for (int i = 0; i < layers.size(); i++) {
             Layer layer = layers.get(i);
-            Layer.RuntimeEnabledState layerState = layer.isExplicitlyEnabledForRuntime(null);
-            if (layerState == Layer.RuntimeEnabledState.Disabled || (layerState == Layer.RuntimeEnabledState.NotSet && !layer.getAllowedInAnyLayer())) {
+            if (layer.excludeForProcessor(null)) {
                layers.remove(i);
                deregisterLayer(layer, false);
                i--;
             }
             else
                layer.layerPosition = i;
+         }
+         for (Iterator<Map.Entry<String,Layer>> it = inactiveLayers.entrySet().iterator(); it.hasNext(); ) {
+            Map.Entry<String,Layer> ent = it.next();
+            Layer inactiveLayer = ent.getValue();
+            if (inactiveLayer.excludeForProcessor(null)) {
+               it.remove();
+            }
          }
       }
       else // If there's only one runtime, we'll use this layered system for it.
@@ -3963,7 +3978,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return layer;
 
       if (!lpi.activate) {
-         layer = lookupInactiveLayer(layerPathName);
+         layer = lookupInactiveLayer(layerPathName, false);
          if (layer != null)
             return layer;
       }
@@ -3992,7 +4007,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       else {
-         Layer inactiveLayer = lookupInactiveLayer(layerPathName.replace("/", "."));
+         Layer inactiveLayer = lookupInactiveLayer(layerPathName.replace("/", "."), false);
          if (inactiveLayer != null)
             return inactiveLayer;
       }
@@ -4149,8 +4164,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       inactiveLayers.put(layer.getLayerName(), layer);
    }
 
-   public Layer lookupInactiveLayer(String fullTypeName) {
-      return inactiveLayers.get(fullTypeName);
+   public Layer lookupInactiveLayer(String fullTypeName, boolean checkPeers) {
+      Layer res = inactiveLayers.get(fullTypeName);
+      if (res != null)
+         return res;
+      if (checkPeers && peerSystems != null) {
+         for (LayeredSystem peer:peerSystems) {
+            Layer peerRes = peer.lookupInactiveLayer(fullTypeName, false);
+            if (peerRes != null)
+               return peerRes;
+         }
+      }
+      return null;
    }
 
    public void deregisterLayer(Layer layer, boolean removeFromSpecified) {
@@ -4726,7 +4751,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       for (int i = 0; i < layers.size(); i++) {
          Layer layer = layers.get(i);
          if (layer.needsIndexRefresh)
-            layer.initSrcCache();
+            layer.initSrcCache(null);
       }
    }
 
@@ -6521,7 +6546,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   layerEnt.position = currentLayer.layerPosition;
                   for (IString dependent:layerEnt.fileList) {
                      String dependentStr = dependent.toString();
-                     File absSrcFile = currentLayer.findSrcFile(dependentStr);
+                     File absSrcFile = currentLayer.findSrcFile(dependentStr, true);
                      if (absSrcFile == null)
                         dent.invalid = true;
                      else {
@@ -7765,12 +7790,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return buildLayer != null && !buildLayer.isDynamicType(typeName) && getUseCompiledForFinal() && changedModels.get(typeName) == null && isCompiledFinalLayerType(typeName);
    }
 
-   public Object getTypeForCompile(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden, boolean srcOnly) {
-      return getTypeForCompile(typeName, fromLayer, prependPackage, notHidden, srcOnly, null);
-   }
-
    /** This is an optimization on top of getSrcTypeDeclaration - if the model is not changed and we are not going from a layer use the compiled version */
-   public Object getTypeForCompile(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden, boolean srcOnly, Layer refLayer) {
+   public Object getTypeForCompile(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden, boolean srcOnly, Layer refLayer, boolean layerResolve) {
       if (getUseCompiledForFinal() && fromLayer == null) {
          // First if we've loaded the src we need to return that.
          TypeDeclaration decl = getCachedTypeDeclaration(typeName, null, null, true, false);
@@ -7785,7 +7806,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (cl != null)
             return cl;
       }
-      return getSrcTypeDeclaration(typeName, fromLayer, prependPackage, notHidden, srcOnly, refLayer);
+      return getSrcTypeDeclaration(typeName, fromLayer, prependPackage, notHidden, srcOnly, refLayer, layerResolve);
    }
 
    public static int nestLevel = 0;
@@ -7795,11 +7816,26 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public TypeDeclaration getSrcTypeDeclaration(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden) {
-      return (TypeDeclaration) getSrcTypeDeclaration(typeName, fromLayer, prependPackage, notHidden, true, null);
+      return (TypeDeclaration) getSrcTypeDeclaration(typeName, fromLayer, prependPackage, notHidden, true, null, false);
    }
 
    public Object getSrcTypeDeclaration(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden, boolean srcOnly) {
-      return getSrcTypeDeclaration(typeName, fromLayer, prependPackage, notHidden, srcOnly, null);
+      return getSrcTypeDeclaration(typeName, fromLayer, prependPackage, notHidden, srcOnly, null, false);
+   }
+
+   public TypeDeclaration getTypeFromCache(String typeName, Layer fromLayer, boolean prependPackage) {
+      TypeDeclaration decl = getCachedTypeDeclaration(typeName, fromLayer, null, true, false);
+      if (decl != null)
+         return decl;
+
+      SrcEntry srcFile = getSrcFileFromTypeName(typeName, true, fromLayer, prependPackage, null, null, true);
+
+      if (srcFile != null) {
+         ILanguageModel model = modelIndex.get(srcFile.absFileName);
+         if (model != null)
+            return model.getModelTypeDeclaration();
+      }
+      return null;
    }
 
    /** Retrieves a type declaration, usually the source definition with a given type name.  If fromLayer != null, it retrieves only types
@@ -7813,7 +7849,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * If refLayer is supplied, it refers to the referring layer.  It's not ordinarily used in an active application but for an inactive layer, it
     * changes how the lookup is performed.
     */
-   public Object getSrcTypeDeclaration(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden, boolean srcOnly, Layer refLayer) {
+   public Object getSrcTypeDeclaration(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden, boolean srcOnly, Layer refLayer, boolean layerResolve) {
       TypeDeclaration decl = getCachedTypeDeclaration(typeName, fromLayer, null, true, false);
       SrcEntry srcFile = null;
       if (decl != null) {
@@ -7836,7 +7872,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (srcFile == null)
-         srcFile = getSrcFileFromTypeName(typeName, true, fromLayer, prependPackage, null, refLayer);
+         srcFile = getSrcFileFromTypeName(typeName, true, fromLayer, prependPackage, null, refLayer, layerResolve);
 
       if (srcFile != null) {
          // When notHidden is set, we do not load types which are in hidden layers
@@ -8210,9 +8246,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
-   public Object getRelativeTypeDeclaration(String typeName, String packagePrefix, Layer fromLayer, boolean prependPackage, Layer refLayer) {
+   public Object getRelativeTypeDeclaration(String typeName, String packagePrefix, Layer fromLayer, boolean prependPackage, Layer refLayer, boolean layerResolve) {
+      if (typeName.contains("ModelEditor"))
+         System.out.println("***");
       // TODO: Should we first be trying packagePrefix+typeName in the global cache?
-      SrcEntry srcFile = getSrcFileFromRelativeTypeName(typeName, packagePrefix, true, fromLayer, prependPackage, refLayer);
+      SrcEntry srcFile = getSrcFileFromRelativeTypeName(typeName, packagePrefix, true, fromLayer, prependPackage, refLayer, layerResolve);
       
       if (srcFile != null) {
          // When prependLayerPackage is false, lookup the type without the layer's package (e.g. doc/util.vdoc)
@@ -8240,7 +8278,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             TypeDeclaration loadedModelType = loading.getModelTypeDeclaration();
             if (loadedModelType != null)
                return loadedModelType;
-            return getRelativeTypeDeclaration(typeName, packagePrefix, srcFile.layer, prependPackage, refLayer);
+            return getRelativeTypeDeclaration(typeName, packagePrefix, srcFile.layer, prependPackage, refLayer, layerResolve);
          }
 
          if (srcFile.layer != null && !srcFile.layer.activated)
@@ -8412,7 +8450,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public SrcEntry getSrcFileFromTypeName(String typeName, boolean srcOnly, Layer fromLayer, boolean prependPackage, String suffix) {
-      return getSrcFileFromTypeName(typeName, srcOnly, fromLayer, prependPackage, suffix, null);
+      return getSrcFileFromTypeName(typeName, srcOnly, fromLayer, prependPackage, suffix, null, false);
    }
 
    /**
@@ -8420,7 +8458,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * which defines the class if no Java file is found.  You can use that mode to get the file which
     * defines the type for dependency purposes.
     */
-   public SrcEntry getSrcFileFromTypeName(String typeName, boolean srcOnly, Layer fromLayer, boolean prependPackage, String suffix, Layer refLayer) {
+   public SrcEntry getSrcFileFromTypeName(String typeName, boolean srcOnly, Layer fromLayer, boolean prependPackage, String suffix, Layer refLayer, boolean layerResolve) {
       String subPath = typeName.replace(".", FileUtil.FILE_SEPARATOR);
       if (suffix != null)
          subPath = FileUtil.addExtension(subPath, suffix);
@@ -8430,20 +8468,21 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (fromLayer.baseLayers == null)
             return null;
          for (Layer fromBase:fromLayer.baseLayers) {
-            SrcEntry resBaseEnt = fromBase.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath);
+            SrcEntry resBaseEnt = fromBase.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, runtimeProcessor, layerResolve);
             if (resBaseEnt != null)
                return resBaseEnt;
          }
          return null;
       }
 
-      if (refLayer != null && !refLayer.activated) {
-         return refLayer.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath);
-      }
-      else if (buildLayer == null) {
+      if (buildLayer == null || (refLayer != null && !refLayer.activated)) {
          SrcEntry lastEnt = null;
          for (Layer inactiveLayer:inactiveLayers.values()) {
-            SrcEntry ent = inactiveLayer.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath);
+            // TODO: we may end up finding more than one type here - essentially more than one variant of the layer stack that are independent.
+            // we have not committed to a version yet by choosing a build layer but all should be viable so we choose one at random.  There's
+            // tooling potential to accumulate this relationship into the index so we can switch back and forth between variants from the
+            // editing perspective when it makes a difference.
+            SrcEntry ent = inactiveLayer.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, runtimeProcessor, layerResolve);
             if (ent != null) {
                if (lastEnt == null || (ent.layer != null && lastEnt.layer != null && ent.layer.extendsLayer(lastEnt.layer))) {
                   lastEnt = ent;
@@ -8463,7 +8502,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       for (int i = startIx; i >= 0; i--) {
          Layer layer = layers.get(i);
 
-         SrcEntry res = layer.getSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath);
+         SrcEntry res = layer.getSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, layerResolve);
          if (res != null)
             return res;
       }
@@ -8475,22 +8514,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * which defines the class if no Java file is found.  You can use that mode to get the file which
     * defines the type for dependency purposes.
     */
-   public SrcEntry getSrcFileFromRelativeTypeName(String typeName, String packagePrefix, boolean srcOnly, Layer fromLayer, boolean prependPackage, Layer refLayer) {
+   public SrcEntry getSrcFileFromRelativeTypeName(String typeName, String packagePrefix, boolean srcOnly, Layer fromLayer, boolean prependPackage, Layer refLayer, boolean layerResolve) {
       String relDir = packagePrefix != null ? packagePrefix.replace(".", FileUtil.FILE_SEPARATOR) : null;
       String subPath = typeName.replace(".", FileUtil.FILE_SEPARATOR);
 
-      if (refLayer != null && !refLayer.activated) {
-         SrcEntry srcEnt = refLayer.getSrcFileFromRelativeTypeName(relDir, subPath, packagePrefix, srcOnly, true);
-         if (srcEnt != null)
-            return srcEnt;
-      }
-      else if (buildLayer == null) {
+      if (buildLayer == null || (refLayer != null && !refLayer.activated)) {
          SrcEntry lastEnt = null;
          for (Layer inactiveLayer:inactiveLayers.values()) {
-            SrcEntry ent = inactiveLayer.getSrcFileFromRelativeTypeName(relDir, subPath, packagePrefix, srcOnly, true);
-            if (ent != null) {
-               if (lastEnt == null || (ent.layer != null && lastEnt.layer != null && ent.layer.extendsLayer(lastEnt.layer))) {
-                  lastEnt = ent;
+            if (!inactiveLayer.excludeForProcessor(runtimeProcessor)) {
+               SrcEntry ent = inactiveLayer.getSrcFileFromRelativeTypeName(relDir, subPath, packagePrefix, srcOnly, false, layerResolve);
+               if (ent != null) {
+                  if (lastEnt == null || (ent.layer != null && lastEnt.layer != null && ent.layer.extendsLayer(lastEnt.layer))) {
+                     lastEnt = ent;
+                  }
                }
             }
          }
@@ -8507,7 +8543,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       for (int i = startIx; i >= 0; i--) {
          Layer layer = layers.get(i);
 
-         SrcEntry layerEnt = layer.getSrcFileFromRelativeTypeName(relDir, subPath, packagePrefix, srcOnly, false);
+         SrcEntry layerEnt = layer.getSrcFileFromRelativeTypeName(relDir, subPath, packagePrefix, srcOnly, false, layerResolve);
          if (layerEnt != null)
             return layerEnt;
       }
@@ -8515,6 +8551,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Object getClassWithPathName(String pathName) {
+      return getClassWithPathName(pathName, false);
+   }
+
+   public Object getClassWithPathName(String pathName, boolean layerResolve) {
       Object c = getClass(pathName);
       if (c != null)
          return c;
@@ -8527,7 +8567,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       while ((lix = rootTypeName.lastIndexOf(".")) != -1) {
          String nextRoot = rootTypeName.substring(0, lix);
          String tail = pathName.substring(lix+1);
-         if (systemCompiled || !toBeCompiled(nextRoot)) {
+         if (systemCompiled || !toBeCompiled(nextRoot, layerResolve)) {
             Object rootClass = getClass(nextRoot);
             if (rootClass != null && (c = ModelUtil.getInnerType(rootClass, tail, null)) != null)
                return c;
@@ -8544,8 +8584,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * way of avoiding the same thing.  Right now, the key problem is JavaModel.findTypeDeclaration call to getClass
     * when it can't find it as a relative type.
     */
-   public boolean toBeCompiled(String typeName) {
-      SrcEntry srcEnt = getSrcFileFromTypeName(typeName, true, null, true, null);
+   public boolean toBeCompiled(String typeName, boolean layerResolve) {
+      SrcEntry srcEnt = getSrcFileFromTypeName(typeName, true, null, true, null, null, layerResolve);
       return srcEnt != null && srcEnt.layer != null && !srcEnt.layer.getCompiledFinalLayer() && (!srcEnt.layer.compiled || !srcEnt.layer.buildSeparate);
    }
 
@@ -9567,7 +9607,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return NO_TYPES;
       ArrayList<TypeDeclaration> result = new ArrayList<TypeDeclaration>(subTypesMap.size());
       for (String subTypeName:subTypesMap.keySet()) {
-         TypeDeclaration res = (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, null);
+         TypeDeclaration res = (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, null, false);
          if (res != null)
             result.add(res);
       }
@@ -9877,8 +9917,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return options.restartArgsFile != null;
    }
 
-   public Layer getInactiveLayer(String layerPath) {
-      Layer inactiveLayer = lookupInactiveLayer(layerPath.replace("/", "."));
+   public Layer getInactiveLayer(String layerPath, boolean checkPeers) {
+      Layer inactiveLayer = lookupInactiveLayer(layerPath.replace("/", "."), checkPeers);
       if (inactiveLayer != null)
          return inactiveLayer;
       LayerParamInfo lpi = new LayerParamInfo();
@@ -9888,6 +9928,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             Layer layer = initLayer(layerPath, layerDir.getPath(), null, false, lpi);
             if (layer != null) {
                layer.ensureInitialized(true);
+
+               // We just created a new layer so now go and re-init the runtimes in case it is the first layer in
+               // a new runtime or this layer needs to move to the runtime before it's started.
+               if (!peerMode)
+                 initRuntimes(null);
+
+               // If this layer moved, now find it in the proper runtime
+               Layer newRes = lookupInactiveLayer(layer.getLayerName(), true);
+               if (newRes != layer) {
+                  if (newRes != null)
+                     return newRes;
+                  else
+                     System.out.println("***");
+               }
                return layer;
             }
          }
@@ -9909,7 +9963,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          layer = getLayerByPath(usePath);
          if (layer == null) {
             // Layer does not have to be active here - this lets us parse the code in the layer but not really start, transform or run the modules because the layer itself is not started
-            layer = getInactiveLayer(usePath);
+            layer = getInactiveLayer(usePath, true);
          }
 
          if (prefix != null) {

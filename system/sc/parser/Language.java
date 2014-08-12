@@ -253,7 +253,7 @@ public abstract class Language implements IFileProcessor {
       if (layerName != null) {
          Layer layer = sys.getLayerByPath(layerName);
          if (layer == null) {
-            layer = sys.getInactiveLayer(layerName);
+            layer = sys.getInactiveLayer(layerName, true);
             if (layer == null) {
                System.err.println("No layer named: " + layerName + " for styleFile method");
                return null;
@@ -395,6 +395,8 @@ public abstract class Language implements IFileProcessor {
    public String languageName;
 
    public static void registerLanguage(Language l, String extension) {
+      if (extension.equals("schtml"))
+         System.out.println("***");
       initLanguage(l);
       if (l.defaultExtension == null)
          l.defaultExtension = extension;

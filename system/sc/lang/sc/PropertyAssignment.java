@@ -921,7 +921,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       JavaModel oldModel = getJavaModel();
       if (!oldModel.removed)
          return this; // We are still valid
-      Object res = oldModel.layeredSystem.getSrcTypeDeclaration(getEnclosingType().getFullTypeName(), null, true,  false, false, oldModel.layer);
+      Object res = oldModel.layeredSystem.getSrcTypeDeclaration(getEnclosingType().getFullTypeName(), null, true,  false, false, oldModel.layer, oldModel.isLayerModel);
       if (res instanceof BodyTypeDeclaration) {
          Object newAssign = ((BodyTypeDeclaration) res).declaresMember(propertyName, MemberType.AssignmentSet, null, null);
          if (newAssign instanceof PropertyAssignment)

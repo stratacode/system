@@ -616,7 +616,7 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       if (replaced)
          return replacedByMethod.refreshNode();
       // Or we can look our replacement up...
-      Object newType = oldModel.layeredSystem.getSrcTypeDeclaration(getEnclosingType().getFullTypeName(), null, true,  false, false, oldModel.getLayer());
+      Object newType = oldModel.layeredSystem.getSrcTypeDeclaration(getEnclosingType().getFullTypeName(), null, true,  false, false, oldModel.getLayer(), oldModel.isLayerModel);
       if (newType instanceof BodyTypeDeclaration) {
          return ((BodyTypeDeclaration) newType).declaresMethodDef(name, getParameterList());
       }

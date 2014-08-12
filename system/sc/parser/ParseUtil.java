@@ -613,7 +613,7 @@ public class ParseUtil  {
                layer = sys.getLayerByPath(layerPath);
                if (layer == null) {
                   // Layer does not have to be active here - this lets us parse the code in the layer but not really start, transform or run the modules because the layer itself is not started
-                  layer = sys.getInactiveLayer(layerPath);
+                  layer = sys.getInactiveLayer(layerPath, true);
                   if (layer == null)
                      System.err.println("*** No layer: " + layerPath + " for style operation on: " + fileName);
                }
