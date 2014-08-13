@@ -157,7 +157,7 @@ public class ModifyDeclaration extends TypeDeclaration {
          }
          startExtendedType(modifyTypeDecl, "modified");
 
-         if (modifyTypeDecl.getJavaModel().isStarted())
+         if (!modifyTypeDecl.getJavaModel().isStarted())
             System.out.println("*** Model not started!");
 
          // First, if our modified type picks up the dynamic behavior because it extends a class which is dynamic,

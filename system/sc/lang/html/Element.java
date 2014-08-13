@@ -2974,6 +2974,17 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       return super.findType(name, refType, context);
    }
 
+   public Object findMethod(String name, List<? extends Object> parametersOrExpressions, Object fromChild, Object refType) {
+      if (refType != this) {
+         if (tagObject != null) {
+            Object meth = tagObject.findMethod(name, parametersOrExpressions, fromChild, refType);
+            if (meth != null)
+               return meth;
+         }
+      }
+      return super.findMethod(name, parametersOrExpressions, fromChild, refType);
+   }
+
    private Object findInnerTypeInChildList(SemanticNodeList<Object> childList, String name) {
       if (childList != null) {
          for (Object childObj:childList) {

@@ -2226,6 +2226,8 @@ public class JSRuntimeProcessor implements IRuntimeProcessor {
 
                      if (filteredDepType(type, depType))
                         continue;
+                     if (ModelUtil.isParameterizedType(depType))
+                        depType = ModelUtil.getParamTypeBaseType(depType);
                      if (!(depType instanceof BodyTypeDeclaration)) {
                         if (depType instanceof Class) {
                            Class depClass = (Class) depType;
