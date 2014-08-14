@@ -8247,8 +8247,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Object getRelativeTypeDeclaration(String typeName, String packagePrefix, Layer fromLayer, boolean prependPackage, Layer refLayer, boolean layerResolve) {
-      if (typeName.contains("ModelEditor"))
-         System.out.println("***");
       // TODO: Should we first be trying packagePrefix+typeName in the global cache?
       SrcEntry srcFile = getSrcFileFromRelativeTypeName(typeName, packagePrefix, true, fromLayer, prependPackage, refLayer, layerResolve);
       
@@ -9939,8 +9937,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                if (newRes != layer) {
                   if (newRes != null)
                      return newRes;
-                  else
-                     System.out.println("***");
                }
                return layer;
             }

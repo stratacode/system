@@ -987,7 +987,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                            str.append(" ");
                            str.append(att.name);
                            str.append("=");
-                           if (outputExpr == null || outputExpr instanceof StringLiteral) {
+                           if (outputExpr == null || (outputExpr instanceof StringLiteral && StringUtil.equalStrings(att.op, "="))) {
                               if (att.isString()) {
                                  str.append("\'");
 
@@ -1002,7 +1002,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                                  str.append("\'");
                               }
                               else {
-                                 System.out.println("*** unrecognized type in attribute list");
+                                 System.err.println("*** unrecognized type in attribute list");
                               }
                            }
                            else {
@@ -1014,6 +1014,8 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                               // If this is a comparison operator like foo != bar it needs to be wrapped to be combined with a + b + ...
                               if (outputExpr.needsParenWrapper())
                                  outputExprCopy = ParenExpression.create(outputExprCopy);
+                              if (outputExprCopy.parentNode == null)
+                                 outputExprCopy.parentNode = parentType;
 
                               Object exprType = outputExpr.getTypeDeclaration();
                               if (exprType != null && ModelUtil.isString(exprType)) {
@@ -2205,8 +2207,6 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
 
                    // Need to make a copy of the attribute expressions.  We can regenerate the tag type and update it.  if we share the same expression with the old and new types, the update messes things up.
                    if (attExpr != null) {
-                      if (att.name.equals("value") && att.value instanceof AttrExpr)
-                         System.out.println("***");
                       ISemanticNode parentNode = attExpr.parentNode;
                       att.valueExprClone = attExpr = attExpr.deepCopy(CopyNormal | CopyInitLevels, null);
                       att.valueExprClone.parentNode = parentNode;

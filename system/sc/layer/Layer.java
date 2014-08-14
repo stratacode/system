@@ -525,9 +525,6 @@ public class Layer implements ILifecycle, LayerConstants {
             baseLayer.initialize();
       }
 
-      if (layerDirName.contains("html.core"))
-         System.out.println("***");
-
       callLayerMethod("initialize");
 
       if (liveDynamicTypes && compiledOnly)
@@ -734,8 +731,6 @@ public class Layer implements ILifecycle, LayerConstants {
       for (String fn:files) {
          File f = new File(dir, fn);
 
-         if (fn.contains("ModelEditor"))
-            System.out.println("***");
          // Do not index the layer file itself.  otherwise, it shows up in the SC type system as a parent type in some weird cases
          if (prefix.equals("") && fn.equals(layerBaseName))
             continue;
@@ -891,10 +886,12 @@ public class Layer implements ILifecycle, LayerConstants {
             layeredSystem.addPathToIndex(this, classDirs.get(j));
       }
 
-      if (layerDirName.equals("fs.bind"))
-         System.out.println("***");
-
-      ArrayList<ReplacedType> replacedTypes = new ArrayList<ReplacedType>();
+      // When the layer is activated, we load types in the proper order but when it's not activated, we lazily populate
+      // the type system.  This means that as each layer is loaded, it's important that we find any types which we replace
+      // and replace them so the model is in sync with this layer.  When the layer is active, this operation should be fine
+      // but we end up loading types in the wrong order - particularly when there are multiple runtimes.
+      // We'd need to move this getSrcTypeDeclaration call until after we've started the corresponding peer layers.
+      ArrayList<ReplacedType> replacedTypes = !activated ? new ArrayList<ReplacedType>() : null;
       // Now init our index of the files managed by this layer
       initSrcCache(replacedTypes);
 
@@ -903,10 +900,12 @@ public class Layer implements ILifecycle, LayerConstants {
 
       // This is the list of types defined in this layer which were already loaded.  We need to replace them with the ones
       // in this layer now that this layer is active, simply by loading the file.
-      for (ReplacedType replacedType:replacedTypes) {
-         TypeDeclaration newType = layeredSystem.getSrcTypeDeclaration(replacedType.typeName, null, replacedType.prependPackage);
-         if (newType == null)
-            System.out.println("*** Error - did not find type: " + replacedType.typeName + " after adding layer: " + this);
+      if (replacedTypes != null) {
+         for (ReplacedType replacedType:replacedTypes) {
+            TypeDeclaration newType = layeredSystem.getSrcTypeDeclaration(replacedType.typeName, null, replacedType.prependPackage);
+            if (newType == null)
+               System.out.println("*** Error - did not find type: " + replacedType.typeName + " after adding layer: " + this);
+         }
       }
    }
 
@@ -1412,10 +1411,6 @@ public class Layer implements ILifecycle, LayerConstants {
       if (!layerResolve && !checkIfStarted())
          return null;
       File res = srcDirCache.get(srcName);
-      if (res != null) {
-         if (srcName.contains("EditorContext"))
-            System.out.println("***");
-      }
       return res;
    }
 
@@ -1427,8 +1422,6 @@ public class Layer implements ILifecycle, LayerConstants {
          checkIfStarted();
       File f = srcDirCache.get(srcName);
       if (f != null) {
-         if (srcName.contains("EditorContext"))
-            System.out.println("***");
          String path = f.getPath();
          String ext = FileUtil.getExtension(path);
          return new SrcEntry(this, path, srcName + "." + ext, prependPackage);

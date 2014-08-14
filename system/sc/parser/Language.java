@@ -395,8 +395,6 @@ public abstract class Language implements IFileProcessor {
    public String languageName;
 
    public static void registerLanguage(Language l, String extension) {
-      if (extension.equals("schtml"))
-         System.out.println("***");
       initLanguage(l);
       if (l.defaultExtension == null)
          l.defaultExtension = extension;

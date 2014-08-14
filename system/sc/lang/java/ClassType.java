@@ -331,9 +331,6 @@ public class ClassType extends JavaType {
       if (fullTypeName == null)
          return; // Invalid fragment
 
-      if (fullTypeName.equals("IListener"))
-         System.out.println("***");
-
       if (isLayer) {
          LayeredSystem sys = it.getLayeredSystem();
          if (sys != null){

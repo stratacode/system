@@ -179,8 +179,6 @@ public class Attr extends Node {
             op = ":=";
       }
       else if (attValue instanceof AttrExpr) {
-         if (name.equals("value"))
-            System.out.println("***");
          AttrExpr attExpr = (AttrExpr) attValue;
          this.op = attExpr.op;
          this.valueExpr = attExpr.expr;
@@ -203,5 +201,14 @@ public class Attr extends Node {
 
    public String getNodeWarningText() {
       return unknown ? "Unknown attribute: " + name : null;
+   }
+
+   public String toString() {
+      if (name == null)
+         return "<no name attribtue>";
+      if (value == null)
+         return name;
+      else
+         return name + " = " + value;
    }
 }
