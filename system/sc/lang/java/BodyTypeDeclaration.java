@@ -5528,7 +5528,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             }
          }
       }
-      else {
+      // TODO: Verify that this is the right test for when we want to use the current object.
+      if (info == null && iit == InitInstanceType.Init) {
          initCurrentObject(overriddenAssign, ctx, iit);
       }
    }

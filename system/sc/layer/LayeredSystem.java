@@ -3727,7 +3727,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                if (l != null && !layers.contains(l)) {
                   addLayer(l, null, false, false, false, false, false);
                }
-               else {
+               else if (l == null) {
                   System.err.println("*** No base layer: " + layer.baseLayerNames.get(li));
                }
                li++;
@@ -4372,7 +4372,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                addOrigBuild = false;
          }
       }
-      if (addOrigBuild) {
+      if (addOrigBuild && origBuildDir != null) {
          addQuotedPath(sb, origBuildDir);
       }
       return sb.toString() + FileUtil.PATH_SEPARATOR + rootClassPath;
@@ -9650,7 +9650,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       ArrayList<TypeDeclaration> result = new ArrayList<TypeDeclaration>(subTypesMap.size());
       for (String subTypeName:subTypesMap.keySet()) {
          TypeDeclaration res = (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, null, false);
-         if (res != null)
+         // Check the resulting class name.  getSrcTypeDeclaration may find the base-type of an inner type as it looks for inherited inner types under the parent type's name
+         if (res != null && res.getFullTypeName().equals(subTypeName))
             result.add(res);
       }
       return result.iterator();
