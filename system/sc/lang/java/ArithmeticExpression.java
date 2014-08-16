@@ -26,6 +26,8 @@ public class ArithmeticExpression extends BinaryExpression implements ISemanticW
    }
 
    public static Object getExpressionType(Expression lhs, String operator, Expression rhs) {
+      if (lhs == null || rhs == null)
+         return null;
       Object lhsType = lhs.getTypeDeclaration();
       Object rhsType;
       if (operator.equals("+")) {

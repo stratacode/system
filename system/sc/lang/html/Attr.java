@@ -4,6 +4,7 @@
 
 package sc.lang.html;
 
+import sc.lang.INamedNode;
 import sc.lang.ISemanticNode;
 import sc.lang.SCLanguage;
 import sc.lang.java.*;
@@ -11,7 +12,7 @@ import sc.parser.*;
 
 import java.util.IdentityHashMap;
 
-public class Attr extends Node {
+public class Attr extends Node implements INamedNode {
    public String name;
    // Can be either a String, TemplateExpression, or AttrExpr - which holds the op and expression
    public Object value;
@@ -210,5 +211,28 @@ public class Attr extends Node {
          return name;
       else
          return name + " = " + value;
+   }
+
+   public void setNodeName(String newName) {
+      setProperty("name", newName);
+   }
+
+   public String getNodeName() {
+      return name;
+   }
+
+   public String toListDisplayString() {
+      StringBuilder res = new StringBuilder();
+      res.append(name);
+      if (op != null) {
+         res.append(" ");
+         res.append(op);
+
+         if (value != null) {
+            res.append(" ");
+            res.append(value.toString());
+         }
+      }
+      return res.toString();
    }
 }

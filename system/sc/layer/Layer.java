@@ -617,7 +617,7 @@ public class Layer implements ILifecycle, LayerConstants {
          return buildClassesSubDir;
 
       // Separate layers do not inherit this since their builds are self-contained
-      if (buildSeparate)
+      if (buildSeparate || layerPosition == -1 || !activated)
          return null;
 
       // This gets inherited from any previous layers
@@ -824,7 +824,7 @@ public class Layer implements ILifecycle, LayerConstants {
             baseLayer.start();
       }
 
-      if (isBuildLayer()) {
+      if (isBuildLayer() && activated) {
          loadBuildInfo();
       }
 
@@ -935,6 +935,8 @@ public class Layer implements ILifecycle, LayerConstants {
 
    public boolean markBuildSrcFileInUse(File genFile, String genRelFileName) {
       SrcIndexEntry lastValid = null;
+      if (!activated)
+         throw new UnsupportedOperationException();
       for (int i = layerPosition; i < layeredSystem.layers.size(); i++) {
          Layer l = layeredSystem.layers.get(i);
          // We're only adding src index entries if there's an actual dependency.  Otherwise, this ends up putting extra entries
@@ -1540,19 +1542,29 @@ public class Layer implements ILifecycle, LayerConstants {
       }
    }
 
+   public List<Layer> getLayersList() {
+      return activated ? layeredSystem.layers : layeredSystem.inactiveLayers;
+   }
+
    /** Returns the layer after this one in the list, i.e. the one that overrides this layer */
    public Layer getNextLayer() {
-      int size = layeredSystem.layers.size();
-      if (layerPosition == size-1 || !activated)
+      List<Layer> layersList = getLayersList();
+      int size = layersList.size();
+      if (layerPosition == size-1)
          return null;
-      return layeredSystem.layers.get(layerPosition+1);
+      if (layerPosition + 1 >= layersList.size()) {
+         System.out.println("*** Error - invalid layer position");
+         return null;
+      }
+      return layersList.get(layerPosition + 1);
    }
 
    /** Returns the layer just before this one in the list, i.e. the one this layer overrides */
    public Layer getPreviousLayer() {
-      if (layerPosition == 0 || !activated)
+      if (layerPosition == 0)
          return null;
-      return layeredSystem.layers.get(layerPosition - 1);
+      List<Layer> layersList = getLayersList();
+      return layersList.get(layerPosition - 1);
    }
 
    public Layer getPreviousBuildLayer() {
@@ -1570,6 +1582,8 @@ public class Layer implements ILifecycle, LayerConstants {
    public Layer getNextBuildLayer(Layer forLayer) {
       if (isBuildLayer() && (forLayer == this || extendsLayer(forLayer)))
          return this;
+      if (!activated)
+         return null;
       int size = layeredSystem.layers.size();
       if (layerPosition == size-1 || this == layeredSystem.buildLayer)
          return this;
@@ -1924,6 +1938,8 @@ public class Layer implements ILifecycle, LayerConstants {
 
    /** Register the source file in any build layers including or following this one */
    public void addSrcFileIndex(String relFileName, byte[] hash, String ext) {
+      if (!activated)
+         throw new UnsupportedOperationException();
       for (int i = layerPosition; i < layeredSystem.layers.size(); i++) {
          Layer l = layeredSystem.layers.get(i);
          if (l.isBuildLayer()) {
@@ -1974,6 +1990,8 @@ public class Layer implements ILifecycle, LayerConstants {
    }
 
    public SrcIndexEntry getSrcFileIndex(String relFileName) {
+      if (!activated)
+         throw new UnsupportedOperationException();
       for (int i = layerPosition; i < layeredSystem.layers.size(); i++) {
          Layer l = layeredSystem.layers.get(i);
          if (l.isBuildLayer()) {
@@ -2359,8 +2377,9 @@ public class Layer implements ILifecycle, LayerConstants {
    /** Returns the set of layers which are transparent onto this layer.  This is fairly brute force and obviously could be sped up a lot by just pre-computing the list */
    public List<Layer> getTransparentLayers() {
       List<Layer> res = null;
-      for (int i = layerPosition+1; i < layeredSystem.layers.size(); i++) {
-         Layer other = layeredSystem.layers.get(i);
+      List<Layer> layersList = getLayersList();
+      for (int i = layerPosition+1; i < layersList.size(); i++) {
+         Layer other = layersList.get(i);
          if (other.transparent && other.extendsLayer(this)) {
             if (res == null)
                res = new ArrayList<Layer>();

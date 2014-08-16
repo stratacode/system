@@ -287,9 +287,9 @@ public class HTMLLanguage extends TemplateLanguage {
 
    Parselet attributeValue =  new OrderedChoice(attributeValueLiteral, attributeValueSQLiteral);
 
-
-   Sequence tagAttribute = new Sequence("Attr(name, *,)", 0, anyTagName, new Sequence ("(,value)", OPTIONAL, equalSign, attributeValue), htmlSpacing);
-   Sequence tagAttributes = new Sequence("([])", OPTIONAL | REPEAT, tagAttribute);
+   public Sequence tagAttributeValue = new Sequence ("(,value)", OPTIONAL, equalSign, attributeValue);
+   public Sequence tagAttribute = new Sequence("Attr(name, *,)", 0, anyTagName, tagAttributeValue, htmlSpacing);
+   public Sequence tagAttributes = new Sequence("([])", OPTIONAL | REPEAT, tagAttribute);
    {
       // Here we are skipping any incomplete attributes (e.g. id=) till we hit the end of close tag or the start of the next tag
       // It's important that we do not consume part or all of the next tag in the body of this tag if for some reason we decide to put this back in.

@@ -393,7 +393,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    Map<String,Object> globalObjects = new HashMap<String,Object>();
 
    // Index for layers which are not part of the actively executing layers list
-   Map<String,Layer> inactiveLayers = new HashMap<String,Layer>();
+   public ArrayList<Layer> inactiveLayers = new ArrayList<Layer>();
+
+   Map<String,Layer> inactiveLayerIndex = new HashMap<String,Layer>();
 
    // Global dependencies - used to store things like jar files, the set of mains, the set of tests, etc.
    public BuildInfo buildInfo;
@@ -672,9 +674,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (peerLayerPath == null && newLayerDir != null)
                peerLayerPath = newLayerDir;
             LayeredSystem peerSys = new LayeredSystem(null, procLayerNames, explicitDynLayers, peerLayerPath, rootClassPath, options, proc, true, false);
-            peerSys.repositorySystem = repositorySystem;
 
-            for (Layer inactiveLayer:inactiveLayers.values()) {
+            // Propagate any properties which directly go across to all peers
+            peerSys.repositorySystem = repositorySystem;
+            peerSys.disableCommandLineErrors = disableCommandLineErrors;
+
+            for (Layer inactiveLayer:inactiveLayers) {
                if (inactiveLayer.includeForProcessor(proc)) {
                   Layer peerLayer = peerSys.getInactiveLayer(inactiveLayer.getLayerName(), false);
                   if (peerLayer == null)
@@ -708,13 +713,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             else
                layer.layerPosition = i;
          }
-         for (Iterator<Map.Entry<String,Layer>> it = inactiveLayers.entrySet().iterator(); it.hasNext(); ) {
-            Map.Entry<String,Layer> ent = it.next();
-            Layer inactiveLayer = ent.getValue();
+         int removeIx = -1;
+         for (int i = 0; i < inactiveLayers.size(); i++) {
+            Layer inactiveLayer = inactiveLayers.get(i);
             if (inactiveLayer.excludeForProcessor(null)) {
-               it.remove();
+               inactiveLayerIndex.remove(inactiveLayer.getLayerName());
+               inactiveLayers.remove(i);
+               i--;
+               if (removeIx == -1)
+                  removeIx = i;
             }
          }
+         if (removeIx != -1)
+            renumberInactiveLayers(removeIx);
       }
       else // If there's only one runtime, we'll use this layered system for it.
          runtimeProcessor = runtimes != null && runtimes.size() > 0 ? runtimes.get(0) : null;
@@ -1375,7 +1386,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // use the current app's layers.
          if (refLayer == null) {
             if (buildLayer == null) {
-               for (Layer inactiveLayer:inactiveLayers.values()) {
+               for (Layer inactiveLayer:inactiveLayers) {
                   if (inactiveLayer.exportImports)
                      inactiveLayer.findMatchingGlobalNames(prefix, candidates, retFullTypeName, true);
 
@@ -4160,12 +4171,57 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public void registerInactiveLayer(Layer layer) {
-      // TODO: should we store these in dependent order to make lookups faster?
-      inactiveLayers.put(layer.getLayerName(), layer);
+      inactiveLayerIndex.put(layer.getLayerName(), layer);
+      int posIx = -1;
+      boolean replace = false;
+      for (int ix = 0; ix < inactiveLayers.size(); ix++) {
+         Layer oldLayer = inactiveLayers.get(ix);
+         if (oldLayer.getLayerName().equals(layer.getLayerName())) {
+            posIx = ix;
+            replace = true;
+            break;
+         }
+         boolean after = layer.extendsLayer(oldLayer);
+         boolean before = oldLayer.extendsLayer(layer);
+         if (after && before) {
+            System.err.println("*** Layer extends loop between: " + oldLayer + " and: " + layer);
+            before = false;
+         }
+         if (before) {
+            posIx = ix;
+            break;
+         }
+         else if (!after) {
+            if (layer.getSortPriority() < oldLayer.getSortPriority()) {
+               posIx = ix;
+               break;
+            }
+         }
+      }
+      if (replace) {
+         layer.layerPosition = posIx;
+         inactiveLayers.set(posIx, layer);
+      }
+      else {
+         if (posIx == -1) {
+            layer.layerPosition = inactiveLayers.size();
+            inactiveLayers.add(layer);
+         }
+         else {
+            layer.layerPosition = posIx;
+            inactiveLayers.add(posIx, layer);
+            renumberInactiveLayers(posIx + 1);
+         }
+      }
+   }
+     
+   private void renumberInactiveLayers(int fromIx) {
+      for (int i = fromIx; i < inactiveLayers.size(); i++)
+         inactiveLayers.get(i).layerPosition = i;
    }
 
    public Layer lookupInactiveLayer(String fullTypeName, boolean checkPeers) {
-      Layer res = inactiveLayers.get(fullTypeName);
+      Layer res = inactiveLayerIndex.get(fullTypeName);
       if (res != null)
          return res;
       if (checkPeers && peerSystems != null) {
@@ -6346,7 +6402,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public void setAutoSystemClassLoader(ClassLoader loader) {
       if (autoClassLoader) {
-         if (options.verbose)
+         if (options.verbose && loader != systemClassLoader)
             System.out.println("Updating auto system class loader for thread: " + Thread.currentThread().getName());
 
          setSystemClassLoader(loader);
@@ -7469,7 +7525,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   ILanguageModel getLanguageModel(SrcEntry srcEnt) {
+   public ILanguageModel getLanguageModel(SrcEntry srcEnt) {
       if (externalModelIndex != null) {
          ILanguageModel extModel = externalModelIndex.lookupJavaModel(srcEnt);
          if (extModel != null) {
@@ -8146,7 +8202,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             subTypeName = typeName.substring(ix+1);
 
             // Need to back the root up one layer so it includes the current layer of the child.
-            Layer rootFrom = fromLayer == null || fromLayer.layerPosition == layers.size()-1 || layers.size() == 0 ? null : layers.get(fromLayer.layerPosition+1);
+            Layer rootFrom = fromLayer == null ? null : fromLayer.getNextLayer();
 
             Object rootType = null;
             if (rootFrom == null && !srcOnly) {
@@ -8461,41 +8517,25 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (suffix != null)
          subPath = FileUtil.addExtension(subPath, suffix);
 
-      // If we are looking for the first entry not in this layer but referenced by this layer
-      if (fromLayer != null && !fromLayer.activated) {
-         if (fromLayer.baseLayers == null)
-            return null;
-         for (Layer fromBase:fromLayer.baseLayers) {
-            SrcEntry resBaseEnt = fromBase.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, runtimeProcessor, layerResolve);
-            if (resBaseEnt != null)
-               return resBaseEnt;
-         }
-         return null;
-      }
-
       if (buildLayer == null || (refLayer != null && !refLayer.activated)) {
-         SrcEntry lastEnt = null;
-         for (Layer inactiveLayer:inactiveLayers.values()) {
-            // TODO: we may end up finding more than one type here - essentially more than one variant of the layer stack that are independent.
-            // we have not committed to a version yet by choosing a build layer but all should be viable so we choose one at random.  There's
-            // tooling potential to accumulate this relationship into the index so we can switch back and forth between variants from the
-            // editing perspective when it makes a difference.
-            SrcEntry ent = inactiveLayer.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, runtimeProcessor, layerResolve);
+         int startIx = inactiveLayers.size() - 1;
+         if (fromLayer != null && !fromLayer.activated && fromLayer.layerPosition - 1 < inactiveLayers.size())
+            startIx = fromLayer.layerPosition - 1;
+         for (int i = startIx; i >= 0; i--) {
+            Layer inactiveLayer = inactiveLayers.get(i);
+            //SrcEntry ent = inactiveLayer.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, runtimeProcessor, layerResolve);
+            SrcEntry ent = inactiveLayer.getSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, layerResolve);
             if (ent != null) {
-               if (lastEnt == null || (ent.layer != null && lastEnt.layer != null && ent.layer.extendsLayer(lastEnt.layer))) {
-                  lastEnt = ent;
-               }
+               return ent;
             }
          }
-         if (lastEnt != null)
-            return lastEnt;
       }
 
       // In general we search from most recent to original
       int startIx = layers.size() - 1;
 
       // Only look at layers which precede the supplied layer
-      if (fromLayer != null)
+      if (fromLayer != null && fromLayer.activated)
          startIx = fromLayer.layerPosition - 1;
       for (int i = startIx; i >= 0; i--) {
          Layer layer = layers.get(i);
@@ -8518,13 +8558,17 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       if (buildLayer == null || (refLayer != null && !refLayer.activated)) {
          SrcEntry lastEnt = null;
-         for (Layer inactiveLayer:inactiveLayers.values()) {
+         int startIx = inactiveLayers.size() - 1;
+
+         // Only look at layers which precede the supplied layer
+         if (fromLayer != null)
+            startIx = fromLayer.layerPosition - 1;
+         for (int i = startIx; i >= 0; i--) {
+            Layer inactiveLayer = inactiveLayers.get(i);
             if (!inactiveLayer.excludeForProcessor(runtimeProcessor)) {
                SrcEntry ent = inactiveLayer.getSrcFileFromRelativeTypeName(relDir, subPath, packagePrefix, srcOnly, false, layerResolve);
                if (ent != null) {
-                  if (lastEnt == null || (ent.layer != null && lastEnt.layer != null && ent.layer.extendsLayer(lastEnt.layer))) {
-                     lastEnt = ent;
-                  }
+                  return ent;
                }
             }
          }

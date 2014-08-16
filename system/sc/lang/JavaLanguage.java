@@ -688,7 +688,8 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    public JavaLanguage() {
       setSemanticValueClassPath("sc.lang.java");
       setStartParselet(compilationUnit);
-      languageName = "Java";
+      // The name used in the IntelliJ plugin files - for now not using as a precaution to try and avoid conflicts
+      languageName = "SCJava";
       defaultExtension = "java";
    }
 

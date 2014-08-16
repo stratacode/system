@@ -132,7 +132,7 @@ public abstract class AbstractInterpreter extends EditorContext {
             StringBuilder upPrefix = new StringBuilder();
             StringBuilder downPrefix = new StringBuilder();
             if (currentLayer != null) {
-               for (int c = currentLayer.getLayerPosition(); c < system.layers.size()-1; c++)
+               for (int c = currentLayer.getLayerPosition(); c < currentLayer.getLayersList().size()-1; c++)
                   upPrefix.append("#");
                for (int c = 0; c < currentLayer.getLayerPosition(); c++)
                   downPrefix.append("#");
@@ -803,6 +803,10 @@ public abstract class AbstractInterpreter extends EditorContext {
       System.out.println(LayerUtil.layersToString(system.layers));
    }
 
+   public void printInactiveLayers() {
+      System.out.println(LayerUtil.layersToString(system.inactiveLayers));
+   }
+
    /** General debug method to print out all information about a definition by its name */
    public void print(String def) {
       Object methObj = null;
@@ -1062,7 +1066,7 @@ public abstract class AbstractInterpreter extends EditorContext {
          else if ((pos = currentLayer.getLayerPosition()) == 0)
             System.err.println("At lowest level layer");
          else
-            setCurrentLayer(system.layers.get(pos - 1));
+            setCurrentLayer(currentLayer.getPreviousLayer());
       }
       else {
          BodyTypeDeclaration current = currentTypes.get(currentTypes.size()-1);
@@ -1086,7 +1090,7 @@ public abstract class AbstractInterpreter extends EditorContext {
          else if (currentLayer == system.lastLayer)
             System.err.println("Already at last layer");
          else
-            setCurrentLayer(system.layers.get(currentLayer.getLayerPosition() + 1));
+            setCurrentLayer(currentLayer.getNextLayer());
       }
       else {
          BodyTypeDeclaration current = currentTypes.get(currentTypes.size()-1);

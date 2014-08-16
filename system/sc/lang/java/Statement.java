@@ -227,6 +227,7 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
    }
 
    public ISrcStatement findFromStatement(ISrcStatement st) {
+      // If the src statement has a part of our origin statement we are a match.
       if (st.getNodeContainsPart(this.getFromStatement()))
          return this;
       if (fromStatement == st)

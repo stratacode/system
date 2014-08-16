@@ -18,6 +18,7 @@ import sc.lang.template.*;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.obj.*;
+import sc.parser.Language;
 import sc.parser.PString;
 import sc.parser.ParseError;
 import sc.parser.ParseUtil;
@@ -49,8 +50,10 @@ import java.util.*;
 // Using the js_ prefix for the tags.  Because tags.js uses the SyncManager in the JS file, we need to add this dependency explicitly.
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js")
 @CompilerSettings(dynChildManager="sc.lang.html.TagDynChildManager")
-public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjChildren, ITypeUpdateHandler {
+public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjChildren, ITypeUpdateHandler, IUserDataNode, ISrcStatement {
    public static boolean trace = false;
+
+   transient Object userData = null;  // A hook for user data - specifically for an IDE to store its instance for this node
 
    public String tagName;
    public SemanticNodeList<Attr> attributeList;
@@ -1152,11 +1155,14 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       if (extStr != null) {
          Object res = findType(extStr, this, null);
          if (res == null) {
-            res = getJavaModel().findTypeDeclaration(extStr, true, true);
-            if (res == null) {
-               displayError("No extends type: ", extStr, " for tag: ");
-               res = findType(extStr, this, null);
-               res = getJavaModel().findTypeDeclaration(extStr, true, true);
+            JavaModel model = getJavaModel();
+            if (model != null) {
+               res = model.findTypeDeclaration(extStr, true, true);
+               if (res == null) {
+                  displayError("No extends type: ", extStr, " for tag: ");
+                  res = findType(extStr, this, null);
+                  res = model.findTypeDeclaration(extStr, true, true);
+               }
             }
          }
          return res;
@@ -1178,7 +1184,8 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          return defaultExtendsType;
       LayeredSystem sys = getLayeredSystem();
       ArrayList<String> tagPackageList = sys == null ? new ArrayList<String>(0) : sys.tagPackageList;
-      String thisPackage = getJavaModel().getPackagePrefix();
+      JavaModel model = getJavaModel();
+      String thisPackage = model == null ? null : model.getPackagePrefix();
       int tagPackageStart = 0;
 
       // If we are in a tag-class that's already a top-level class and looking up from a package that's already in the tag package list, look starting from where this guy is.
@@ -1203,7 +1210,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          String typeName = CTypeUtil.prefixPath(tagPackage, CTypeUtil.capitalizePropertyName(tagName));
          Template templ = getEnclosingTemplate();
          // There's the odd case where the template itself is defining the default for this tag.  Obviously don't use the default in that case.
-         if (typeName.equals(templ.getModelTypeName()))
+         if (templ != null && typeName.equals(templ.getModelTypeName()))
             continue;
          // When we are compiling, need to pick up the src type declaration here so that we can get at the corresponding element to inherit tags.
          Object res = sys.getTypeDeclaration(typeName, true);
@@ -1846,6 +1853,26 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
 
    public void _updateInst() {
       invalidate();
+   }
+
+   public ISrcStatement getSrcStatement(Language lang) {
+      return this; // TODO: generating elements from code
+   }
+
+   public ISrcStatement findFromStatement(ISrcStatement st) {
+      return null; // TODO: generating elements from code
+   }
+
+   public void addGeneratedFromNodes(List<ISrcStatement> result, ISrcStatement st) {
+      // TODO: generating elements
+   }
+
+   public ISrcStatement getFromStatement() {
+      return null;
+   }
+
+   public boolean getNodeContainsPart(ISrcStatement partNode) {
+      return partNode == this;
    }
 
    static class AddChildResult {
@@ -3265,5 +3292,22 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          for (Attr att:attributeList)
             att.resetAttribute();
       }
+   }
+
+   public void setUserData(Object v)  {
+      userData = v;
+   }
+
+   public Object getUserData() {
+      return userData;
+   }
+
+   public Element refreshNode() {
+      if (tagObject != null) {
+         Element newElem = ((TypeDeclaration) tagObject.refreshNode()).element;
+         if (newElem != null)
+            return newElem;
+      }
+      return this;
    }
 }

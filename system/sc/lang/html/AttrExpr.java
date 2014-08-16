@@ -8,4 +8,10 @@ import sc.lang.java.JavaSemanticNode;
 public class AttrExpr extends JavaSemanticNode {
    public String op;
    public Expression expr;
+
+   public String toString() {
+      if (op == null || expr == null)
+         return "<not initialized>";
+      return op + " " + expr.toSafeLanguageString();
+   }
 }

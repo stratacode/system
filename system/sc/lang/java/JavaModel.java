@@ -935,7 +935,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public TypeDeclaration getPreviousDeclaration(String fullClassName) {
-      if (layeredSystem == null)
+      if (layeredSystem == null || isLayerModel)
          return null;
       return layeredSystem.getSrcTypeDeclaration(fullClassName, layer, prependLayerPackage);
    }
@@ -2598,6 +2598,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    public Object getUserData() {
       return userData;
+   }
+
+   public JavaModel refreshNode() {
+      return (JavaModel) layeredSystem.getLanguageModel(getSrcFile());
    }
 }
 
