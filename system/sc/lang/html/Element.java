@@ -2098,7 +2098,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
             // If we are modifying a type need to be sure this type is compatible with that type (and that one is a tag type)
             if (modifyType != null) {
                Object modifyExtendsType = ModelUtil.getExtendsClass(modifyType);
-               if (modifyExtendsType != null && modifyExtendsType != Object.class) {
+               if (modifyExtendsType != null && modifyExtendsType != Object.class && tagLayer.activated) {
                   if (!ModelUtil.isAssignableFrom(HTMLElement.class, modifyExtendsType)) {
                      displayError("tag with id: ", objName, " modifies type: ", ModelUtil.getTypeName(modifyType), " in layer:", ModelUtil.getLayerForType(null, modifyType) + " already extends: ", ModelUtil.getTypeName(modifyExtendsType), " which has no schtml file (and does not extends HTMLElement): ");
                      extendsType = null;
@@ -2444,7 +2444,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
    static {
       String[] emptyArgs = {};
       addTagAttributes("element", null, new String[] {"id", "style", "class"});
-      addTagAttributes("html", "element", emptyArgs);
+      addTagAttributes("html", "element", new String[] {"manifest", "xmlns"});
       addTagAttributes("select", "element", new String[] {"multiple", "disabled", "selectedindex"});
       addTagAttributes("option", "element", new String[] {"selected", "value", "disabled"});
       addTagAttributes("input", "element", new String[] {"value", "disabled", "type", "checked", "defaultchecked", "form", "name", "placeholder", "size", "autocomplete"});
@@ -2541,6 +2541,8 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       if (HTMLElement.isDOMEventName(name))
          return true;
       if (behaviorAttributes.contains(name))
+         return true;
+      if (tagName != null && tagName.equals("html") && name.startsWith("xmlns:"))
          return true;
       return false;
    }
@@ -3032,6 +3034,10 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
    public String toString() {
       String elemId = getElementId();
       return "<" + tagName + (elemId != null ? " id=" + elemId : "") + (selfClosed() ? "/>" : ">") + (children != null ? "...</" + tagName + ">" : "");
+   }
+
+   public String toDeclarationString() {
+      return toString();
    }
 
    public String getUserVisibleName() {

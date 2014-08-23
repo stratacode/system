@@ -746,7 +746,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       else {
          ParseUtil.initAndStartComponent(statements);
       }
-      return ParseUtil.styleParseResult(null, null, null, errors, false, statements);
+      return ParseUtil.styleParseResult(null, null, null, errors, false, statements, true);
    }
 
    public String getOpenArray() {

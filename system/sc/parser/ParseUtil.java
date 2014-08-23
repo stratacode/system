@@ -596,31 +596,31 @@ public class ParseUtil  {
       return adapter.getResult();
    }
 
-   public static Object styleParseResult(String layerPath, String dispLayerPath, String fileName, boolean displayErrors, boolean isLayer, Object result) {
+   public static Object styleParseResult(String layerPath, String dispLayerPath, String fileName, boolean displayErrors, boolean isLayer, Object result, boolean enabled) {
       Object semanticValue = ParseUtil.nodeToSemanticValue(result);
 
       if (semanticValue instanceof ILanguageModel) {
          ILanguageModel model = ((ILanguageModel) semanticValue);
+
          LayeredSystem sys = LayeredSystem.getCurrent().getMainLayeredSystem();
-         model.setLayeredSystem(sys);
+         Layer layer = layerPath == null ? null : sys.getActiveOrInactiveLayerByPath(layerPath, null, enabled);
+         if (layer != null)
+            model.setLayeredSystem(layer.layeredSystem);
+         else
+            model.setLayeredSystem(sys);
          if (model instanceof JavaModel) {
             ((JavaModel) model).isLayerModel = isLayer;
             ((JavaModel) model).temporary = true;
          }
          if (fileName != null) {
-            Layer layer = null;
-            if (layerPath != null) {
-               layer = sys.getLayerByPath(layerPath);
-               if (layer == null) {
-                  // Layer does not have to be active here - this lets us parse the code in the layer but not really start, transform or run the modules because the layer itself is not started
-                  layer = sys.getInactiveLayer(layerPath, true);
-                  if (layer == null)
-                     System.err.println("*** No layer: " + layerPath + " for style operation on: " + fileName);
-               }
-               model.setLayer(layer);
-            }
-            model.addSrcFile(new SrcEntry(layer, FileUtil.concat(layerPath, fileName), fileName));
+            model.setLayer(layer);
+            model.addSrcFile(new SrcEntry(layer, FileUtil.concat(layer.getLayerPathName(), fileName), fileName));
          }
+         // This is needed even though we may never use this model again.  Otherwise, we load the file twice if something
+         // initializing the model refers back to itself again.  Now that we have the inactiveModelIndex, this will go there
+         // unless it happens to be loaded as a current type.
+         if (model.getSrcFile() != null && model.getSrcFile().layer != null)
+            model.getLayeredSystem().addCachedModel(model);
          if (!displayErrors && model instanceof JavaModel)
             ((JavaModel) model).disableTypeErrors = true;
          ParseUtil.initAndStartComponent(semanticValue);

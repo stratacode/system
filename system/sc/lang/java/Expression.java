@@ -644,6 +644,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       if (!isRemote && isRemoteMethod(sys, methObj))
          isRemote = true;
       String remote = isRemote ? "Remote" : "";
+      // resolveMethod, resolveStaticMethod, resolveRemoteMethod, etc are formed here
       String resolveName = ModelUtil.hasModifier(methObj, "static") ? ".resolve" + remote + "StaticMethod" : ".resolve" + remote + "Method";
       IdentifierExpression getMethod = IdentifierExpression.create(typeName + resolveName + tailName);
       SemanticNodeList<Expression> getMethodArgs = new SemanticNodeList<Expression>();

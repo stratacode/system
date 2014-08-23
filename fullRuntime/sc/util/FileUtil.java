@@ -4,12 +4,13 @@
 
 package sc.util;
 
+import sc.util.zip.ExtraFieldUtils;
+import sc.util.zip.ZipExtraField;
+
 import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -277,8 +278,33 @@ public class FileUtil {
       }
    }
 
+   public static String exec(String input, boolean echoOutput, String... args) {
+      return execCommand(Arrays.asList(args), input, 0, echoOutput);
+   }
+
+   public static int fork(String inputString, boolean echoOutput, String... args) {
+      if (echoOutput)
+         System.out.println("Running: " + StringUtil.argsToString(args));
+      Process p = startCommand(Arrays.asList(args));
+      if (p == null) {
+         System.err.println("*** Start process failed for: " + StringUtil.argsToString(args));
+         return -1;
+      }
+
+      InputThread inputThread = null;
+      if (inputString != null) {
+         inputThread = new InputThread(p, inputString);
+         inputThread.start();
+      }
+
+      // Start up a thread to read any output from this command
+      new OutputThread(args[0], p, echoOutput).start();
+
+      return 0;
+   }
+
    public static String execCommand(List<String> args, String inputString) {
-      return execCommand(args, inputString, 0);
+      return execCommand(args, inputString, 0, false);
    }
 
    public static StringBuilder readInputStream(InputStream is) {
@@ -316,7 +342,7 @@ public class FileUtil {
       return null;
    }
 
-   public static String execCommand(List<String> args, String inputString, int successResult) {
+   public static String execCommand(List<String> args, String inputString, int successResult, boolean echoOutput) {
       // Handle simple unix shell scripts so we don't have to have special logic for windows to run as long as
       // cygwin or the shell at least is installed
       args = fixArgsForSystem(args);
@@ -337,7 +363,10 @@ public class FileUtil {
          StringBuilder sb = new StringBuilder();
          int len;
          while ((len = bis.read(buf, 0, buf.length)) != -1) {
-            sb.append(new String(buf, 0, len));
+            String out = new String(buf, 0, len);
+            if (echoOutput)
+               System.out.println(out);
+            sb.append(out);
          }
          int stat = p.waitFor();
          if (inputThread != null && inputThread.errorString != null)
@@ -426,6 +455,22 @@ public class FileUtil {
    private final static int BUFFER_SIZE = 64*1024;
 
    public static boolean unzip(String zipFile, String resName) {
+      String zipRes = exec(null, true, "unzip", zipFile, "-d", resName);
+      if (zipRes == null) {
+         System.err.println("*** zip failed");
+         return false;
+      }
+      return true;
+   }
+
+   /**
+    * TODO: remove this and the zip package?  This does not preserve the execute permissions... I have not found where
+    * that metadata exists in the zip file.  There are supposedly two "extra" data sections one in the header and one in the
+    * entry itself and I have only found one of them in the Java apis.  I carved out just a little of the apache code
+    * that handles the extra data fields and that code seems to work so leaving this in for now in case it's useful in
+    * the future.
+    */
+   public static boolean unzipJava(String zipFile, String resName) {
       File resDir = new File(resName);
       if (resDir.canRead() || resDir.isDirectory()) {
          System.err.println("*** unzip - res dir: " + resName + " exists");
@@ -439,9 +484,12 @@ public class FileUtil {
             ZipEntry ze = zfe.nextElement();
             String fileRelName = ze.getName();
             String fileAbsName = FileUtil.concat(resName, fileRelName);
+
             File f = new File(fileAbsName);
             File destParent = f.getParentFile();
             destParent.mkdirs();
+            byte[] extra = ze.getExtra();
+            int unixFileMode = ExtraFieldUtils.getUnixFileMode(extra);
             if (!ze.isDirectory()) {
                BufferedInputStream is = new BufferedInputStream(zf.getInputStream(ze));
                int bytesRead;
@@ -460,6 +508,12 @@ public class FileUtil {
                   try { dst.close(); } catch (IOException exc) {}
                   try { is.close(); } catch (IOException exc) {}
                }
+               if ((unixFileMode & 0111) != 0) {
+                  f.setExecutable(true, true);
+               }
+               if ((unixFileMode & 0444) != 0 && (unixFileMode & 0222) == 0) {
+                  f.setReadOnly();
+               }
             }
             else
                f.mkdirs();
@@ -472,8 +526,42 @@ public class FileUtil {
       }
    }
 
-   private static class InputThread extends Thread {
+   private static class OutputThread extends Thread {
+      Process process;
+      String name;
+      boolean echoOutput;
 
+      OutputThread(String name, Process p, boolean echoOutput) {
+         process = p;
+         this.name = name;
+         this.echoOutput = echoOutput;
+      }
+
+      public void run() {
+         BufferedInputStream bis = new BufferedInputStream(process.getInputStream());
+         byte [] buf = new byte[1024];
+         int len;
+
+         try {
+            while ((len = bis.read(buf, 0, buf.length)) != -1) {
+               if (len > 0) {
+                  String str = new String(buf, 0, len, "UTF-8");
+                  if (echoOutput && str.length() > 0) {
+                     System.out.println("Output from StrataCode forked command: " + name + ": ");
+                     System.out.println(str);
+                  }
+               }
+            }
+         }
+         catch (IOException e) {
+            System.err.println("*** failed to read from command: " + name + ": " + e);
+         }
+
+         System.out.println("Command: " + name + " exited:");
+      }
+   }
+
+   private static class InputThread extends Thread {
       Process process;
       StringReader inputReader;
       String errorString;

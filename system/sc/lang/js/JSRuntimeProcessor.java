@@ -6,10 +6,7 @@ package sc.lang.js;
 
 import sc.bind.Bind;
 import sc.dyn.DynUtil;
-import sc.lang.ILanguageModel;
-import sc.lang.ISemanticNode;
-import sc.lang.SemanticNodeList;
-import sc.lang.TemplateLanguage;
+import sc.lang.*;
 import sc.lang.html.Element;
 import sc.lang.java.*;
 import sc.lang.sc.SCModel;
@@ -45,15 +42,13 @@ import java.util.*;
  *    that are defined to be in that file.  Each entry point first makes sure all of the extends classes which are in the same file get added to the file first.   A base class must be defined before the sub-class is defined.
  *    After the dependent types have been loaded, the entryPoint type is itself added to the file.
  */
-public class JSRuntimeProcessor implements IRuntimeProcessor {
+public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    public final static boolean jsDebug = false;
 
    public static boolean traceSystemUpdates = false;
 
    public String templatePrefix;
    public String genJSPrefix;
-
-   LayeredSystem system;
 
    public JSBuildInfo jsBuildInfo;
 
@@ -83,9 +78,6 @@ public class JSRuntimeProcessor implements IRuntimeProcessor {
 
    public HashMap<String,StringBuilder> jsFileBodyStore = new HashMap<String, StringBuilder>();
 
-   /** Destination name you can use to talk to this runtime. (TODO: should this be a list?) */
-   public String destinationName;
-
    public String scLib = "js/sc.js";
    public String jsCoreLib = "js/sccore.js";
 
@@ -93,6 +85,9 @@ public class JSRuntimeProcessor implements IRuntimeProcessor {
 
    /** Set to true in the post start phase - after that phase, any other start models are not part of the build process (e.g. we might load the type declarations because they are init types when generating the page dispatcher)  */
    private boolean postStarted = false;
+
+   // For Javascript, we sync against the default runtime
+   { syncRuntimes.add(null); }
 
    /** Used to generate the JS code snippet to prefix all class-based type references */
    public String classPrefix = "<%= typeName %>" + prototypeSuffix;
@@ -134,6 +129,10 @@ public class JSRuntimeProcessor implements IRuntimeProcessor {
            "   sc_SyncManager_c.endSync();\n   if (sc_refresh !== undefined) sc_refresh();\n" +
            "}";
 
+
+   public JSRuntimeProcessor() {
+      super("js");
+   }
 
    class SystemUpdate {
       long updateTime;
@@ -441,13 +440,6 @@ public class JSRuntimeProcessor implements IRuntimeProcessor {
 
    }
 
-   public String getDestinationName() {
-      return destinationName;
-   }
-
-   public String getRuntimeName() {
-      return "js";
-   }
 
    public List<SrcEntry> getProcessedFiles(IFileProcessorResult model, Layer genLayer, String buildSrcDir, boolean generate) {
       ArrayList<SrcEntry> resFiles = new ArrayList<SrcEntry>();
@@ -2442,7 +2434,7 @@ public class JSRuntimeProcessor implements IRuntimeProcessor {
    }
 
    public void setLayeredSystem(LayeredSystem sys) {
-      system = sys;
+      super.setLayeredSystem(sys);
       sys.enableRemoteMethods = false; // Don't look for remote methods in the JS runtime.  Changing this to true is a bad idea, even if you wanted the server to call into the browser.  We have some initialization dependency problems to work out.
    }
 
@@ -2455,13 +2447,7 @@ public class JSRuntimeProcessor implements IRuntimeProcessor {
          System.out.println("Warning: JSRuntime - not running main method for: " + runClass + " - this will run in the browser");
    }
 
-   ArrayList<IRuntimeProcessor> syncRuntimes = new ArrayList<IRuntimeProcessor>();
-   { syncRuntimes.add(null); }
 
-   /** The list of runtimes that we are synchronizing with from this runtime.  In Javascript this is the default runtime */
-   public List<IRuntimeProcessor> getSyncRuntimes() {
-      return syncRuntimes;
-   }
 
    /** This runtime is not using the standard system class loader - so runtime types do not look in the class loader */
    public boolean usesThisClasspath() {
@@ -2698,7 +2684,4 @@ public class JSRuntimeProcessor implements IRuntimeProcessor {
    }
    */
 
-   public String toString() {
-      return "js runtime";
-   }
 }

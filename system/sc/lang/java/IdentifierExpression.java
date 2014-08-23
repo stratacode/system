@@ -1386,8 +1386,8 @@ public class IdentifierExpression extends ArgumentsExpression {
 
          int sz = identifiers.size();
 
-         //if (sz == 2 && identifiers.get(0).equals("img0") && identifiers.get(1).equals("outputTag"))
-         //   System.out.println("---");
+//         if (sz == 2 && identifiers.get(0).equals("listAvdResult") && identifiers.get(1).equals("indexOf"))
+//            System.out.println("---");
 
          JavaModel jmodel = getJavaModel();
          switch (idTypes[0]) {

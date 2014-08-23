@@ -705,11 +705,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    public Object getClass(String className, boolean useImports, boolean layerResolve) {
       if (layeredSystem != null) {
-         Object cl = layeredSystem.getClassWithPathName(className, layerResolve);
+         Object cl = layeredSystem.getClassWithPathName(className, layerResolve, false);
          if (cl == null && useImports) {
             String impName = getImportedName(className);
             if (impName != null)
-               return layeredSystem.getClassWithPathName(impName, layerResolve);
+               return layeredSystem.getClassWithPathName(impName, layerResolve, false);
          }
          return cl;
       }
@@ -1817,11 +1817,13 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (staticImportProperties != null) {
          type = staticImportProperties.get(name);
       }
-      if (type == null && getLayer() != null) {
-         // TODO: restrict by layer?
+      Layer modelLayer = getLayer();
+      if (type == null && modelLayer != null) {
+
+         Layer toFilterLayer = isLayerModel ? null : modelLayer;
 
          // This returns the type object containing the member.
-         if ((type = layeredSystem.getImportedStaticType(name, null)) != null) {
+         if ((type = layeredSystem.getImportedStaticType(name, toFilterLayer)) != null) {
             layeredSystem.addAutoImport(getLayer(), getModelTypeName(), ImportDeclaration.createStatic(CTypeUtil.prefixPath(ModelUtil.getTypeName(type), name)));
 
             // Now convert it to the member itself.
@@ -2214,6 +2216,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             return;
          }
       }
+      // Skip errors when the layer failed to start since they are most likely due to those errors
+      // TODO: should check for base layers and move this up so we don't report them in the IDE either?
+      if (layer != null && layer.errorsStarting)
+         return;
       System.err.println(error);
    }
 

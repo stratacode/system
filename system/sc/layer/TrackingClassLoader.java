@@ -30,7 +30,11 @@ public class TrackingClassLoader extends URLClassLoader {
       if (parent instanceof TrackingClassLoader) {
          parentTrackingLoader = (TrackingClassLoader) parent;
          // temp build layers will not include all of the URLs from previous build layers but dynamic and temp layers do not
-         if (!layer.tempLayer)
+         // Also GWT passes in null here to change the system loader.  In that case, we are just appending to the previous loader
+         // Also separate layers do not include the previous layers
+         // Also when we start a new stack of layers that are not related to the previous ones, we do not disable the old one.
+         Layer parentLayer = parentTrackingLoader.layer;
+         if (layer != null && !layer.tempLayer && !layer.buildSeparate && parentLayer != null && layer.extendsLayer(parentLayer))
             parentTrackingLoader.disableBuildLoaders(this);
       }
       else
@@ -58,8 +62,12 @@ public class TrackingClassLoader extends URLClassLoader {
          disabled = true;
          replaceLoader = parent;
       }
-      if (parentTrackingLoader != null)
-         parentTrackingLoader.disableBuildLoaders(parent);
+      if (parentTrackingLoader != null) {
+         Layer parentLayer = parentTrackingLoader.layer;
+         // If this is a completely different stack of layers, do not disable it
+         if (layer != null && parentLayer != null && layer.extendsLayer(parentLayer))
+            parentTrackingLoader.disableBuildLoaders(parent);
+      }
    }
 
    protected Class loadClass (String name, boolean resolve) throws ClassNotFoundException {

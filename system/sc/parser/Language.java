@@ -213,54 +213,60 @@ public abstract class Language implements IFileProcessor {
    /** Uses one file to parse, a separate to display so we can use the samples to build a new sample interactive sample */
    @sc.obj.HTMLSettings(returnsHTML=true)
    public Object styleDemoFile(String layerName, String dispLayerName, String fileName, String input) {
-      return styleInternal(layerName, dispLayerName, fileName, false, false, input);
+      return styleInternal(layerName, dispLayerName, fileName, false, false, input, true);
    }
 
    @sc.obj.HTMLSettings(returnsHTML=true)
    public Object styleFileNoTypeErrors(String layerName, String fileName, boolean isLayer) {
-      return styleFile(layerName, fileName, false, isLayer);
+      return styleFile(layerName, fileName, false, isLayer, true);
    }
 
    /** Uses a normalized file name. */
    @sc.obj.HTMLSettings(returnsHTML=true)
    public Object styleFileNoTypeErrors(String layerName, String fileName) {
-      return styleFile(layerName, fileName, false, false);
+      return styleFile(layerName, fileName, false, false, true);
    }
 
    /** Uses a normalized file name. */
    @sc.obj.HTMLSettings(returnsHTML=true)
    public Object styleFileNoTypeErrors(String fileName) {
-      return styleFile(null, fileName, true, false);
+      return styleFile(null, fileName, true, false, true);
    }
 
    /** Uses a normalized file name. */
    @sc.obj.HTMLSettings(returnsHTML=true)
    public Object styleFile(String layerName, String fileName) {
-      return styleFile(layerName, fileName, true, false);
+      return styleFile(layerName, fileName, true, false, true);
    }
 
    /** Takes a normalized file name - / instead of the OS dependent path */
    @sc.obj.HTMLSettings(returnsHTML=true)
    public Object styleFile(String fileName) {
-      return styleFile(null, fileName, true, false);
+      return styleFile(null, fileName, true, false, true);
    }
 
    @sc.obj.HTMLSettings(returnsHTML=true)
    public Object styleFile(String layerName, String fileName, boolean displayError, boolean isLayer) {
+      return styleFile(layerName, fileName, displayError, isLayer, true);
+   }
+
+   @sc.obj.HTMLSettings(returnsHTML=true)
+   public Object styleFile(String layerName, String fileName, boolean displayError, boolean isLayer, boolean layerEnabled) {
       LayeredSystem sys = LayeredSystem.getCurrent().getMainLayeredSystem();
       fileName = FileUtil.unnormalize(fileName);
       String absFileName = fileName;
+      // TODO: this is a hack!  Add a new parameter or maybe disabled:layerName?
       if (layerName != null) {
-         Layer layer = sys.getLayerByPath(layerName);
+         Layer layer = sys.getActiveOrInactiveLayerByPath(layerName, null, layerEnabled);
          if (layer == null) {
-            layer = sys.getInactiveLayer(layerName, true);
-            if (layer == null) {
-               System.err.println("No layer named: " + layerName + " for styleFile method");
-               return null;
-            }
+            System.err.println("No layer named: " + layerName + " for styleFile method");
+            return null;
          }
          absFileName = FileUtil.concat(layer.getLayerPathName(), fileName);
+         // Want to start the layer before we start loading types into it.  Otherwise, when it gets started we see that we have types to replace when we really don't.
+         layer.checkIfStarted();
       }
+      // TODO should we check the system.getCachedModel to see if we have this guy already?
       File file = new File(absFileName);
       try {
          Object result = parse(file);
@@ -268,7 +274,7 @@ public abstract class Language implements IFileProcessor {
             System.err.println("Error parsing string to be styled - no styling for this section: " + file + ": " + ((ParseError) result).errorStringWithLineNumbers(file));
             return "";
          }
-         return ParseUtil.styleParseResult(layerName, layerName, fileName, displayError, isLayer, result);
+         return ParseUtil.styleParseResult(layerName, layerName, fileName, displayError, isLayer, result, layerEnabled);
       }
       catch (IllegalArgumentException exc) {
          System.err.println("Error reading file to be styled: " + absFileName + ": " + exc);
@@ -277,10 +283,10 @@ public abstract class Language implements IFileProcessor {
    }
 
    private Object styleInternal(String layerName, String fileName, boolean displayTypeError, boolean isLayerModel, String input) {
-      return styleInternal(layerName, layerName, fileName, displayTypeError, isLayerModel, input);
+      return styleInternal(layerName, layerName, fileName, displayTypeError, isLayerModel, input, true);
    }
 
-   private Object styleInternal(String layerName, String dispLayerName, String fileName, boolean displayTypeError, boolean isLayerModel, String input) {
+   private Object styleInternal(String layerName, String dispLayerName, String fileName, boolean displayTypeError, boolean isLayerModel, String input, boolean layerEnabled) {
       if (fileName != null)
          fileName = FileUtil.unnormalize(fileName);
       Object result = parseString(input, true);
@@ -288,11 +294,11 @@ public abstract class Language implements IFileProcessor {
          Object pv;
          // Allow partial values for styling purposes
          if ((pv = ((ParseError)result).partialValue) != null)
-            return ParseUtil.styleParseResult(layerName, dispLayerName, fileName, displayTypeError, isLayerModel, pv);
+            return ParseUtil.styleParseResult(layerName, dispLayerName, fileName, displayTypeError, isLayerModel, pv, layerEnabled);
          System.err.println("Error parsing string to be styled - no styling for this section: " + ((ParseError) result).errorStringWithLineNumbers(input));
          return input;
       }
-      return ParseUtil.styleParseResult(layerName, dispLayerName, fileName, displayTypeError, isLayerModel, result);
+      return ParseUtil.styleParseResult(layerName, dispLayerName, fileName, displayTypeError, isLayerModel, result, layerEnabled);
    }
 
    /**

@@ -39,6 +39,7 @@ public interface IRuntimeProcessor {
 
    public int getExecMode();
 
+   /** Returns the given name or, if the runtime needs to rename this method for some reason (e.g. a conflict or framework injects a rename), returns the new method name. */
    public String replaceMethodName(LayeredSystem sys, Object methObj, String name);
 
    public void setLayeredSystem(LayeredSystem sys);
@@ -68,5 +69,6 @@ public interface IRuntimeProcessor {
 
    boolean getNeedsEnumToClassConversion();
 
+   /** Normally returns false - which means we can use .class files as an optimization except for special js types. */
    boolean needsSrcForBuildAll(Object cl);
 }

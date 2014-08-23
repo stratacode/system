@@ -1323,10 +1323,11 @@ public class ModelUtil {
       if (assignmentSemantics)
          return !isLong(rhsType) && !isFloat(rhsType) && !isDouble(rhsType);
       else {
+         // Java allows silent conversion up but not down
          if (isInteger(lhsType))
-            return isInteger(rhsType);
+            return isInteger(rhsType) || isShort(rhsType) || isByte(rhsType);
          if (isShort(lhsType))
-            return isShort(rhsType);
+            return isShort(rhsType) || isByte(rhsType);
          if (isByte(lhsType))
             return isByte(rhsType);
 
