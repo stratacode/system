@@ -60,7 +60,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
    public SemanticNodeList<Object> children;
    public transient SemanticNodeList<Object> hiddenChildren;
    public transient SemanticNodeList<Attr> inheritedAttributes;
-   // Set to true if this tag has a close symbol in the open tag
+  // Set to true from the parser if this tag has a close symbol in the open tag
    public Boolean selfClose;
    // Should always match tagName via toLowerCase.  TODO: For the grammar, we should only need to store a boolean as to whether there's a close tag or not.  But we also need a read-only "closeTagName" property for generation and not sure how to specify that.  I suppose using different rules for generation than for parsing?
    public String closeTagName;
@@ -297,6 +297,10 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       if (tagObject != null && !tagObject.isInitialized()) {
          tagObject.initialize();
       }
+   }
+
+   public void start() {
+      super.start();
    }
 
    public int getDefinedExecFlags() {
@@ -1170,7 +1174,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       return null;
    }
 
-   public Object getSpecifiedExtendsTypeDeclaration() {
+   private Object getSpecifiedExtendsTypeDeclaration() {
       Object res = getDeclaredExtendsTypeDeclaration();
       if (res != null)
          return res;
@@ -1183,16 +1187,17 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       if (defaultExtendsType != null)
          return defaultExtendsType;
       LayeredSystem sys = getLayeredSystem();
-      ArrayList<String> tagPackageList = sys == null ? new ArrayList<String>(0) : sys.tagPackageList;
+      ArrayList<LayeredSystem.TagPackageListEntry> tagPackageList = sys == null ? new ArrayList<LayeredSystem.TagPackageListEntry>() : sys.tagPackageList;
       JavaModel model = getJavaModel();
       String thisPackage = model == null ? null : model.getPackagePrefix();
       int tagPackageStart = 0;
+      Layer modelLayer = model.getLayer();
 
       // If we are in a tag-class that's already a top-level class and looking up from a package that's already in the tag package list, look starting from where this guy is.
       // If we are looking up an inner type that happens to be in the same package, we still need to pick up the most specific version of that type or layered inheritance does nto work.
       if (thisPackage != null && getEnclosingTag() == null) {
          int ct = 0;
-         for (String tagPackage:tagPackageList) {
+         for (LayeredSystem.TagPackageListEntry tagPackage:tagPackageList) {
             if (thisPackage.equals(tagPackage)) {
                tagPackageStart = ct+1;
                break;
@@ -1201,31 +1206,37 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          }
       }
       for (int i = tagPackageStart; i < tagPackageList.size(); i++) {
-         String tagPackage = tagPackageList.get(i);
-         String tagName = lowerTagName();
-         Template enclTemplate = getEnclosingTemplate();
-         if (tagName.equals("html") && enclTemplate.singleElementType)
-            tagName = "htmlPage";
-         // No longer capitalizing.  Object names should be lower case
-         String typeName = CTypeUtil.prefixPath(tagPackage, CTypeUtil.capitalizePropertyName(tagName));
-         Template templ = getEnclosingTemplate();
-         // There's the odd case where the template itself is defining the default for this tag.  Obviously don't use the default in that case.
-         if (templ != null && typeName.equals(templ.getModelTypeName()))
-            continue;
-         // When we are compiling, need to pick up the src type declaration here so that we can get at the corresponding element to inherit tags.
-         Object res = sys.getTypeDeclaration(typeName, true);
-         if (res != null && (!processable || ModelUtil.isProcessableType(res))) {
-            defaultExtendsType = res;
-            if (sys.options.verbose) {
-               if (verboseBaseTypeNames == null)
-                  verboseBaseTypeNames = new HashSet<String>();
-               if (!verboseBaseTypeNames.contains(typeName)) {
-                  Layer tagLayer = ModelUtil.getLayerForType(sys, res);
-                  System.out.println("Using: " + typeName + " for HTML tag: " + tagName + (tagLayer == null ? " (system default)" : " defined in layer: " + tagLayer));
-                  verboseBaseTypeNames.add(typeName);
+         LayeredSystem.TagPackageListEntry tagPackage = tagPackageList.get(i);
+
+         Layer tagPackageLayer = tagPackage.layer;
+
+         // Only match against tag packages which we directly extend
+         if (tagPackageLayer == null || modelLayer == null || modelLayer.extendsLayer(tagPackageLayer) || modelLayer == tagPackageLayer) {
+            String tagName = lowerTagName();
+            Template enclTemplate = getEnclosingTemplate();
+            if (tagName.equals("html") && enclTemplate.singleElementType)
+               tagName = "htmlPage";
+            // No longer capitalizing.  Object names should be lower case
+            String typeName = CTypeUtil.prefixPath(tagPackage.name, CTypeUtil.capitalizePropertyName(tagName));
+            Template templ = getEnclosingTemplate();
+            // There's the odd case where the template itself is defining the default for this tag.  Obviously don't use the default in that case.
+            if (templ != null && typeName.equals(templ.getModelTypeName()))
+               continue;
+            // When we are compiling, need to pick up the src type declaration here so that we can get at the corresponding element to inherit tags.
+            Object res = sys == null ? null : sys.getTypeDeclaration(typeName, true, model == null ? null : model.layer, model != null && model.isLayerModel);
+            if (res != null && (!processable || ModelUtil.isProcessableType(res))) {
+               defaultExtendsType = res;
+               if (sys.options.verbose) {
+                  if (verboseBaseTypeNames == null)
+                     verboseBaseTypeNames = new HashSet<String>();
+                  if (!verboseBaseTypeNames.contains(typeName)) {
+                     Layer tagLayer = ModelUtil.getLayerForType(sys, res);
+                     System.out.println("Using: " + typeName + " for HTML tag: " + tagName + (tagLayer == null ? " (system default)" : " defined in layer: " + tagLayer));
+                     verboseBaseTypeNames.add(typeName);
+                  }
                }
+               return res;
             }
-            return res;
          }
       }
       return null;
@@ -2098,7 +2109,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
             // If we are modifying a type need to be sure this type is compatible with that type (and that one is a tag type)
             if (modifyType != null) {
                Object modifyExtendsType = ModelUtil.getExtendsClass(modifyType);
-               if (modifyExtendsType != null && modifyExtendsType != Object.class && tagLayer.activated) {
+               if (modifyExtendsType != null && modifyExtendsType != Object.class) {
                   if (!ModelUtil.isAssignableFrom(HTMLElement.class, modifyExtendsType)) {
                      displayError("tag with id: ", objName, " modifies type: ", ModelUtil.getTypeName(modifyType), " in layer:", ModelUtil.getLayerForType(null, modifyType) + " already extends: ", ModelUtil.getTypeName(modifyExtendsType), " which has no schtml file (and does not extends HTMLElement): ");
                      extendsType = null;
@@ -2435,7 +2446,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
    static HashMap<String, Set<String>> htmlAttributeMap = new HashMap<String, Set<String>>();
    static HashMap<String, String> tagExtendsMap = new HashMap<String, String>();
 
-   static HashSet<String> singletonTagNames = new HashSet<String>();
+   private static HashSet<String> singletonTagNames = new HashSet<String>();
 
    static void addTagAttributes(String tagName, String extName, String[] htmlAttributes) {
       htmlAttributeMap.put(tagName, new TreeSet(Arrays.asList(htmlAttributes)));
@@ -2483,6 +2494,16 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       singletonTagNames.add("head");
       singletonTagNames.add("body");
       singletonTagNames.add("html");
+   }
+
+   private static void addMatchingTagNames(String prefix, Set<String> candidates) {
+      for (String tagName:htmlAttributeMap.keySet()) {
+         if (tagName.startsWith(prefix)) {
+            if (tagName.equals("element"))
+               continue;
+            candidates.add(tagName);
+         }
+      }
    }
 
    static HashSet<String> notInheritedAttributes = new HashSet<String>();
@@ -2549,6 +2570,32 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
 
    private static boolean isHtmlNamespace(String ns) {
       return ns.equals("wicket");
+   }
+
+   public Set<String> getPossibleAttributes() {
+      if (tagName == null)
+         return null;
+      return getPossibleAttributesForTag(tagName);
+   }
+
+   public static Set<String> getPossibleAttributesForTag(String tagName) {
+      if (tagName == null)
+         return null;
+      Set<String> res = htmlAttributeMap.get(tagName);
+
+      String extTagName = tagExtendsMap.get(tagName);
+      if (extTagName != null) {
+         Set<String> extPossNames = getPossibleAttributesForTag(extTagName);
+         if (extPossNames != null) {
+            if (res == null)
+               return extPossNames;
+            TreeSet<String> newRes = new TreeSet<String>();
+            newRes.addAll(res);
+            newRes.addAll(extPossNames);
+            return newRes;
+         }
+      }
+      return res;
    }
 
    private static boolean isHtmlAttributeForTag(String tagName, String name) {
@@ -2910,7 +2957,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
             return attr.value.toString();
          }
          else {
-            displayError("Dynamie: " + attName + " attribute not supported");
+            displayError("Attribute: " + attName + " must be a constant value");
          }
       }
       return null;
@@ -3032,7 +3079,12 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
    }
 
    public String toString() {
-      String elemId = getElementId();
+      String elemId = id;
+      if (elemId == null) {
+         Attr id = getAttribute("id");
+         if (id != null && id.value instanceof String)
+            elemId = (String) id.value;
+      }
       return "<" + tagName + (elemId != null ? " id=" + elemId : "") + (selfClosed() ? "/>" : ">") + (children != null ? "...</" + tagName + ">" : "");
    }
 
@@ -3315,5 +3367,17 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
             return newElem;
       }
       return this;
+   }
+
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+      if (children != null) {
+         // This is in the inside body of the tag.  Until we start a new tag, it's just template text right?
+         return -1;
+      }
+      if (tagName != null) {
+         addMatchingTagNames(tagName, candidates);
+         return 0;
+      }
+      return -1;
    }
 }

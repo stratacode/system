@@ -6675,8 +6675,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       LayeredSystem sys = getLayeredSystem();
 
       if (sys != null) {
+         Layer layer = getLayer();
          IRuntimeProcessor proc = sys.runtimeProcessor;
-         if (proc != null && (getExecMode() & sys.runtimeProcessor.getExecMode()) != 0)
+         if (proc != null && (getExecMode() & sys.runtimeProcessor.getExecMode()) != 0 && layer != null && layer.activated)
             proc.start(this);
       }
 
@@ -6771,8 +6772,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
       }
 
+      Layer layer = model.layer;
+
       IRuntimeProcessor proc = getLayeredSystem().runtimeProcessor;
-      if (proc != null && (getExecMode() & proc.getExecMode()) != 0)
+      if (proc != null && (getExecMode() & proc.getExecMode()) != 0 && layer != null && layer.activated)
          proc.process(this);
    }
 
@@ -7314,8 +7317,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return;
       }
 
-      // Don't do sync for the layer types, annotation layer types or interfaces.
-      if (isLayerType || layer.annotationLayer || getDeclarationType() == DeclarationType.INTERFACE)
+      // Don't do sync for the layer types, annotation layer types or interfaces or deactivated layers
+      if (isLayerType || layer.annotationLayer || getDeclarationType() == DeclarationType.INTERFACE || !layer.activated)
          return;
 
       // Or temporary types like documentation

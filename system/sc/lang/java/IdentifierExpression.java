@@ -3804,15 +3804,27 @@ public class IdentifierExpression extends ArgumentsExpression {
     */
    public void styleNode(IStyleAdapter adapter) {
       if (idTypes == null) {
-         super.styleNode(adapter);
+         // We've been replaced and not started - presumably this is just a copy of our statement so we can style it using the
+         // replacedByStatement's information - just need to use this parse node since it's the original one in the source.
+         if (replacedByStatement instanceof IdentifierExpression)
+            ((IdentifierExpression) replacedByStatement).styleExpression((ParentParseNode) parseNode, adapter);
+         else
+            super.styleNode(adapter);
          return;
       }
 
       int sz = identifiers.size();
+
+      styleExpression((ParentParseNode) parseNode, adapter);
+   }
+
+   private void styleExpression(ParentParseNode parseNode, IStyleAdapter adapter) {
       //String rep = ParseUtil.styleParseNode(parseNode);
       ParentParseNode pp = (ParentParseNode) parseNode;
       Parselet topParselet = pp.getParselet();
       ArrayList<Object> remaining = null;
+
+      int sz = identifiers.size();
 
       Parselet idExParselet = ((JavaLanguage) topParselet.getLanguage()).identifierExpression;
       // TODO: here we are dealing with the fact that the IdentifierExpression could be wrapped in
@@ -3873,7 +3885,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             switch (idTypes[i]) {
                case SetVariable:
                   if (!ModelUtil.isField(boundTypes[i]))
-                      break;
+                     break;
                case FieldName:
                case EnumName:
                case GetVariable:
@@ -3900,6 +3912,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                ParseUtil.toStyledString(adapter, node);
          }
       }
+
    }
 
 

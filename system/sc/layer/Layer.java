@@ -1761,7 +1761,8 @@ public class Layer implements ILifecycle, LayerConstants {
    public void findMatchingSrcNames(String prefix, Set<String> candidates, boolean retFullTypeName) {
       for (Iterator<String> srcFiles = getSrcFiles(); srcFiles.hasNext(); )  {
          String srcFile = srcFiles.next();
-         if (srcFile.startsWith(prefix)) {
+         String fileName = FileUtil.getFileName(srcFile);
+         if (fileName.startsWith(prefix)) {
             IFileProcessor depProc = layeredSystem.getFileProcessorForFileName(srcFile, this, BuildPhase.Process);
             // srcFile entries come back without suffixes... just ignore them.
             if (depProc != null) {

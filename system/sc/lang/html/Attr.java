@@ -11,6 +11,7 @@ import sc.lang.java.*;
 import sc.parser.*;
 
 import java.util.IdentityHashMap;
+import java.util.Set;
 
 public class Attr extends Node implements INamedNode {
    public String name;
@@ -234,5 +235,26 @@ public class Attr extends Node implements INamedNode {
          }
       }
       return res.toString();
+   }
+
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+      String attName = name;
+      Element enclTag = getEnclosingTag();
+      if (enclTag != null) {
+         Set<String> attNames = enclTag.getPossibleAttributes();
+         if (attNames != null) {
+            for (String possName:attNames) {
+               if (possName.startsWith(attName))
+                  candidates.add(possName);
+            }
+         }
+         // The tag object will not have been defined in most cases so just use the extends type from the tag to suggest members
+         Object baseClass = enclTag.getExtendsTypeDeclaration();
+         if (baseClass != null) {
+            ModelUtil.suggestMembers(getJavaModel(), baseClass, attName, candidates, false, true, false);
+         }
+         return 0;
+      }
+      return -1;
    }
 }

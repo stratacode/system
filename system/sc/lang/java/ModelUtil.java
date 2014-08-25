@@ -4585,6 +4585,14 @@ public class ModelUtil {
             }
          }
       }
+      AbstractMethodDefinition enclMethod = ((JavaSemanticNode)enclBlock).getEnclosingMethod();
+      if (enclMethod != null && enclMethod.parameters != null) {
+         for (Parameter param:enclMethod.parameters.getParameterList()) {
+            String varName = param.variableName;
+            if (varName != null && varName.startsWith(prefix))
+               candidates.add(varName);
+         }
+      }
       enclBlock = enclBlock.getEnclosingBlockStatement();
       if (enclBlock != null)
          suggestVariables(enclBlock, prefix, candidates);

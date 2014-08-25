@@ -483,11 +483,43 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** Set to true when we've removed layers.  Currently do not update the class loaders so once we remove a layer, we might not get the class we expect since the old layer's buildDir is in the way */
    public boolean staleClassLoader = false;
 
-   public ReentrantReadWriteLock globalDynLock = new ReentrantReadWriteLock();
+   /**
+    * This is the lock we use to access the layered system.  It's static now because otherwise we'd need to synchronize the cross-talk between LayeredSystem classes
+    * when dealing with more than one runtime.
+    */
+   public static ReentrantReadWriteLock globalDynLock = new ReentrantReadWriteLock();
 
-   public ArrayList<String> tagPackageList = new ArrayList<String>();
+   public static class TagPackageListEntry {
+      public Layer layer;
+      public String name;
+      public int priority;
+      TagPackageListEntry(String name, Layer layer, int priority) {
+         this.name = name;
+         this.layer = layer;
+         this.priority = priority;
+      }
+
+      public String toString() {
+         return "tagPackage: " + name + " defined in: " + layer + " (" + priority + ")";
+      }
+   }
+
+   public void addTagPackageDirectory(String name, Layer definedInLayer, int priority) {
+      TagPackageListEntry ent = new TagPackageListEntry(name, definedInLayer, priority);
+      int ix;
+      for (ix = 0; ix < tagPackageList.size(); ix++) {
+         if (ent.priority >= tagPackageList.get(ix).priority)
+            break;
+      }
+      if (ix == tagPackageList.size())
+         tagPackageList.add(ent);
+      else
+         tagPackageList.add(ix, ent);
+   }
+
+   public ArrayList<TagPackageListEntry> tagPackageList = new ArrayList<TagPackageListEntry>();
    {
-      tagPackageList.add(Template.TAG_PACKAGE);
+      tagPackageList.add(new TagPackageListEntry(Template.TAG_PACKAGE, null, 0));
    }
 
    public TreeSet<String> allOrNoneFinalPackages = new TreeSet<String>();
@@ -691,6 +723,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // Propagate any properties which directly go across to all peers
             peerSys.repositorySystem = repositorySystem;
             peerSys.disableCommandLineErrors = disableCommandLineErrors;
+            if (!autoClassLoader)
+               peerSys.setFixedSystemClassLoader(systemClassLoader);
 
             for (Layer inactiveLayer:inactiveLayers) {
                if (inactiveLayer.includeForProcessor(proc)) {
@@ -1312,9 +1346,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                //buildClassLoader = URLClassLoader.newInstance(layerURLs, buildClassLoader);
                updateBuildClassLoader(new TrackingClassLoader(sysLayer, layerURLs, buildClassLoader, !mode.doLibs()));
             }
-            // Since you can't unpeel the class loader onion in Java, track which layers have been loaded so we just accept
-            // that we cannot rebuild or re-add them again later on.
-            loadedBuildLayers.put(sysLayer.layerUniqueName, sysLayer.getBuildClassesDir());
+            if (sysLayer.activated) {
+               // Since you can't unpeel the class loader onion in Java, track which layers have been loaded so we just accept
+               // that we cannot rebuild or re-add them again later on.
+               loadedBuildLayers.put(sysLayer.layerUniqueName, sysLayer.getBuildClassesDir());
+            }
          }
          else {
             buildClassLoader = getClass().getClassLoader();
@@ -5869,6 +5905,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   System.err.println("Warning: file: " + dep.relFileName + " not found in layer path but referenced via a typeGroup dependency on group: " + dep.typeGroupName);
                else {
                   Object depModelObj = bd.typeGroupChangedModels.get(dep.typeName);
+                  if (depModelObj == null)
+                     depModelObj = getCachedModel(depFile);
                   if (depModelObj == null) {
                      TypeDeclaration depType = getCachedTypeDeclaration(dep.typeName, genLayer, null, false, true);
                      if (depType != null && depType != INVALID_TYPE_DECLARATION_SENTINEL)
@@ -6463,6 +6501,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public void setFixedSystemClassLoader(ClassLoader loader) {
       autoClassLoader = false;
       setSystemClassLoader(loader);
+      // Also use this base loader as the core for the build loader
+      if (buildClassLoader == null)
+         buildClassLoader = loader;
    }
 
    public void setAutoSystemClassLoader(ClassLoader loader) {
@@ -6835,8 +6876,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (result instanceof ParseError) {
             if (enablePartialValues) {
                Object val = ((ParseError) result).getRootPartialValue();
-               if (val instanceof ILanguageModel)
-                  initModel(srcEnt.layer, modTimeStart, (ILanguageModel) val, srcEnt.isLayerFile(), false);
+               initNewBufferModel(srcEnt, val, modTimeStart);
             }
             return result;
          }
@@ -6846,16 +6886,27 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (!(modelObj instanceof IFileProcessorResult))
                return modelObj;
 
-            IFileProcessorResult res = (IFileProcessorResult) modelObj;
-            res.addSrcFile(srcEnt);
+            initNewBufferModel(srcEnt, modelObj, modTimeStart);
 
-            if (res instanceof ILanguageModel)
-               initModel(srcEnt.layer, modTimeStart, (ILanguageModel) res, srcEnt.isLayerFile(), false);
-
-            return res;
+            return modelObj;
          }
       }
       throw new IllegalArgumentException(("No language processor for file: " + srcEnt.relFileName));
+   }
+
+   private void initNewBufferModel(SrcEntry srcEnt, Object modelObj, long modTimeStart) {
+      if (modelObj instanceof IFileProcessorResult) {
+         IFileProcessorResult res = (IFileProcessorResult) modelObj;
+         res.addSrcFile(srcEnt);
+
+         if (res instanceof ILanguageModel) {
+            ILanguageModel newModel = (ILanguageModel) res;
+            markBeingLoadedModel(srcEnt, newModel);
+            initModel(srcEnt.layer, modTimeStart, newModel, srcEnt.isLayerFile(), false);
+            beingLoaded.remove(srcEnt.absFileName);
+         }
+      }
+
    }
 
    public Object parseSrcFile(SrcEntry srcEnt, boolean isLayer, boolean checkPeers, boolean enablePartialValues, boolean reportErrors) {
@@ -6930,7 +6981,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
                ArrayList<JavaModel> clonedModels = null;
 
-               if (options.clonedParseModel && peerSystems != null && !isLayer && model instanceof JavaModel && checkPeers) {
+               if (options.clonedParseModel && peerSystems != null && !isLayer && model instanceof JavaModel && checkPeers && srcEnt.layer != null) {
                   for (LayeredSystem peerSys:peerSystems) {
                      Layer peerLayer = peerSys.getLayerByName(srcEnt.layer.layerUniqueName);
                      // does this layer exist in the peer runtime
@@ -7559,7 +7610,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (oldModel != null && options.verbose)
          System.err.println("Replacing model " + absName + " in layer: " + oldModel.getLayer() + " with: " + model.getLayer());
 
-      modelIndex.put(absName, model);
+      Layer layer = model.getLayer();
+      if (layer != null && layer.activated)
+         modelIndex.put(absName, model);
+      else
+         inactiveModelIndex.put(absName, model);
       if (model instanceof JavaModel) {
          JavaModel newModel = (JavaModel) model;
          if (oldModel != null) {
@@ -7577,13 +7632,22 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public void replaceModel(ILanguageModel oldModel, ILanguageModel newModel) {
       SrcEntry srcEnt = oldModel.getSrcFile();
-      modelIndex.put(srcEnt.absFileName, newModel);
+      if (srcEnt.layer != null && srcEnt.layer.activated)
+         modelIndex.put(srcEnt.absFileName, newModel);
+      else
+         inactiveModelIndex.put(srcEnt.absFileName, newModel);
    }
 
    public void removeModel(ILanguageModel model, boolean removeTypes) {
       SrcEntry srcEnt = model.getSrcFile();
 
-      if (modelIndex.remove(srcEnt.absFileName) == null) {
+      Object old;
+      if (srcEnt.layer != null && srcEnt.layer.activated)
+         old = modelIndex.remove(srcEnt.absFileName);
+      else
+         old = inactiveModelIndex.remove(srcEnt.absFileName);
+
+      if (old == null) {
          System.err.println("*** removeModel called with model that is not active");
          return;
       }
@@ -7603,10 +7667,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
+   private boolean isActivated(Layer layer) {
+      return layer != null && layer.activated;
+   }
+
    public ILanguageModel getLanguageModel(SrcEntry srcEnt) {
       if (externalModelIndex != null) {
          ILanguageModel extModel = externalModelIndex.lookupJavaModel(srcEnt);
-         if (extModel != null) {
+         // We store two copies of the model - activated and inactivated.  Need to make sure the editor is giving us
+         // the right one before we use it.  Right now, the next time the editor asks for the model, it will get the activated one.
+         if (extModel != null && isActivated(srcEnt.layer) == isActivated(extModel.getLayer())) {
             ILanguageModel oldModel = getCachedModel(srcEnt);
             if (oldModel != extModel && extModel instanceof JavaModel) {
                if (oldModel instanceof JavaModel) {
@@ -8095,10 +8165,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Object getTypeDeclaration(String typeName) {
-      return getTypeDeclaration(typeName, false);
+      return getTypeDeclaration(typeName, false, null, false);
    }
 
-   public Object getTypeDeclaration(String typeName, boolean srcOnly) {
+   public Object getTypeDeclaration(String typeName, boolean srcOnly, Layer refLayer, boolean layerResolve) {
       // TODO: can we just remove this whole method now that there's a srcOnly parameter to getSrcTypeDclaration - just call that?
       // First if we've loaded the src we need to return that.
       TypeDeclaration decl = getCachedTypeDeclaration(typeName, null, null, true, false);
@@ -8121,10 +8191,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (cl != null)
             return cl;
       }
-      // Need to use 'false' here
-      Object td = getSrcTypeDeclaration(typeName, null, true, false, srcOnly);
+      Object td = getSrcTypeDeclaration(typeName, null, true, false, srcOnly, refLayer, layerResolve);
       if (td == null)
-         return getClassWithPathName(typeName);
+         return getClassWithPathName(typeName, layerResolve, false);
       return td;
    }
 
@@ -8291,7 +8360,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
             Object rootType = null;
             if (rootFrom == null && !srcOnly) {
-               Object rootTypeObj = getTypeDeclaration(rootTypeName);
+               Object rootTypeObj = getTypeDeclaration(rootTypeName, false, refLayer, layerResolve);
                if (rootTypeObj != null)
                   rootType = rootTypeObj;
             }
@@ -8720,8 +8789,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public ClassLoader getSysClassLoader() {
       // This is the servlet web-app class loader case - at runtime with a class loader that will include our buildDir
-      if (systemClassLoader != null && !autoClassLoader)
-         return systemClassLoader;
+      //if (systemClassLoader != null && !autoClassLoader)
+      //   return systemClassLoader;
 
       if (buildClassLoader == null) {
          if (systemClassLoader != null)
@@ -10419,10 +10488,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                catch (IOException exc) {
                   System.err.println("*** Warning unable to map layer path name: " + origPathName + " error: " + exc);
                }
-               catch (RuntimeException exc) {
-                  System.err.println("*** failed with: " + exc);
-                  exc.printStackTrace();
-               }
+               // Do not catch the ProcessCanceledException from IntelliJ which bubbles up through IExternalModelIndex call
+               //catch (RuntimeException exc) {
+               //   System.err.println("*** LayeredSystem.getSrcEntryForPath failed with: " + exc);
+               //   exc.printStackTrace();
+               //}
             }
          }
       }

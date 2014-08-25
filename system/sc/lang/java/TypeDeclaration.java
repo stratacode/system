@@ -93,8 +93,6 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    }
 
    public void initialize() {
-      if (inactiveType)
-         return;
       JavaModel m = getJavaModel();
       if (m != null) {
          layer = m.getLayer(); // Bind this here so we can get the original layer from the type even after it was moved
@@ -113,7 +111,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    }
 
    public void start() {
-      if (started || inactiveType)
+      if (started)
          return;
 
       initTypeInfo();
@@ -154,7 +152,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    }
 
    public void validate() {
-      if (validated || inactiveType)
+      if (validated)
          return;
       if (implementsBoundTypes != null) {
          for (Object extendsTypeDecl:implementsBoundTypes) {
@@ -191,7 +189,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    }
 
    public void process() {
-      if (processed || inactiveType)
+      if (processed)
          return;
       if (implementsBoundTypes != null) {
          for (Object extendsTypeDecl:implementsBoundTypes) {

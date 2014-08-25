@@ -2079,6 +2079,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
       // Need to skip over any .inh files where there is no rdps.
       for (int i = buildLayer.getLayerPosition(); i >= thisLayer.getLayerPosition(); i--) {
+         if (i >= sys.layers.size())
+            System.out.println("*** invalid layer index!");
          Layer layer = sys.layers.get(i);
          deps = readLayerReverseDeps(layer);
          if (deps != null) {

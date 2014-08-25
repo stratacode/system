@@ -48,4 +48,10 @@ public abstract class ExpressionStatement extends Statement {
          res = expression.findFromStatement(toFind);
       return res;
    }
+
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+      if (expression != null)
+         return expression.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
+      return -1;
+   }
 }

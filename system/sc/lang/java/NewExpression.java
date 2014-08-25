@@ -867,4 +867,42 @@ public class NewExpression extends IdentifierExpression {
       }
       return super.toGenerateString();
    }
+
+   /** TODO: very similar to ClassValueExpression.suggestCompletions - try to share this code? */
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+      String typeName = typeIdentifier;
+      if (typeName == null || typeName.length() == 0 || arrayDimensions != null || arrayInitializer != null || classBody != null)
+         return -1;
+
+      JavaModel model = getJavaModel();
+      if (model == null)
+         return -1;
+
+      String pkgName = CTypeUtil.getPackageName(typeName);
+      String leafName = typeName;
+      if (pkgName != null) {
+         leafName = CTypeUtil.getClassName(leafName);
+         ModelUtil.suggestTypes(model, pkgName, leafName, candidates, false);
+      }
+
+      ModelUtil.suggestTypes(model, prefix, typeName, candidates, true);
+
+      int relPos = -1;
+
+      if (parseNode != null && parseNode.getStartIndex() != -1)
+         relPos = parseNode.getStartIndex() + parseNode.lastIndexOf(leafName);
+      else
+         relPos = command.lastIndexOf(leafName);
+      // TODO: Unfortunately IntelliJ wants the candidates string to match the PsiElement which in this case includes the "new "
+      // This won't work I think if there's more than one trailing space
+      if (candidates.size() > 0) {
+         ArrayList<String> newCandidates = new ArrayList<String>();
+         for (String cand:candidates)
+            newCandidates.add("new " + cand);
+         candidates.clear();
+         candidates.addAll(newCandidates);
+         relPos -= 4;
+      }
+      return relPos;
+   }
 }

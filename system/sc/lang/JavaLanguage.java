@@ -229,7 +229,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    Sequence varIdentifier = new Sequence("('','',)",startIdentifierChar, nextIdentChars, spacing) {
       /** Assumes we have validated the start and other chars already */
-      protected String accept(SemanticContext ctx, Object value, int star) {
+      protected String accept(SemanticContext ctx, Object value, int startIx, int endIx) {
          if (value instanceof IParseNode)
             value = ((IParseNode) value).getSemanticValue();
 
@@ -453,16 +453,20 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    Sequence forStatement =
        new Sequence("(,,.,,statement)", new KeywordSpace("for"), openParen, forControl, closeParenSkipOnError, statement);
 
+   KeywordSpace defaultKeyword = new KeywordSpace("default");
+
    OrderedChoice switchLabel = new OrderedChoice("<switchLabel>",
          new Sequence("SwitchLabel(operator, expression,)", new KeywordSpace("case"), expression, colonEOL),
-         new Sequence("SwitchLabel(operator,)", new KeywordSpace("default"), colonEOL));
+         new Sequence("SwitchLabel(operator,)", defaultKeyword, colonEOL));
 
    Sequence switchBlockStatementGroups =
        new Sequence("<switchBlockStatementGroups>([],[])",  OPTIONAL | REPEAT, new Sequence("<switchLabels>([])", REPEAT, switchLabel), blockStatements);
 
+   private KeywordSpace whileKeyword = new KeywordSpace("while");
+
    Sequence doStatement =
       new Sequence("WhileStatement(operator,statement,,expression,)", new KeywordSpace("do"), statement,
-      new KeywordSpace("while"), parenExpression, semicolonEOL);
+      whileKeyword, parenExpression, semicolonEOL);
 
    {
       doStatement.suppressNewlines = true;
@@ -472,7 +476,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       statement.put("{", block);
       statement.put("if", ifStatement);
       statement.put("for", forStatement);
-      statement.put("while", new Sequence("WhileStatement(operator, expression, statement)", new KeywordSpace("while"), parenExpression, statement));
+      statement.put("while", new Sequence("WhileStatement(operator, expression, statement)", whileKeyword, parenExpression, statement));
       statement.put("do", doStatement);
       // Note: this does not enforce the try must have one catch or finally rule.
       statement.put("try",
@@ -516,8 +520,10 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    public Sequence methodDeclaration = new Sequence("(name,.)", identifier, methodDeclaratorRest);
 
+   private KeywordSpace extendsKeyword = new KeywordSpace("extends");
+
    Sequence typeParameter = new Sequence("TypeParameter(name,extendsType)", identifier,
-                                          new Sequence("(,.)", OPTIONAL, new KeywordSpace("extends"), typeBound));
+                                          new Sequence("(,.)", OPTIONAL, extendsKeyword, typeBound));
    Sequence typeParameters =
        new Sequence("<typeParameters>(,[],[],)", lessThan, typeParameter,
                     new Sequence("(,[])", OPTIONAL | REPEAT, comma, typeParameter), greaterThanSkipOnError);
@@ -593,12 +599,12 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    public KeywordChoice classOperators = new KeywordChoice("class");
 
-   Sequence extendsType = new Sequence("<extends>(,.)", OPTIONAL, new KeywordSpace("extends"), type);
+   Sequence extendsType = new Sequence("<extends>(,.)", OPTIONAL, extendsKeyword, type);
    {
       // If we match the 'extends' but get an error matching the type, in error checking mode this will parse but marking that slot as an error
       extendsType.skipOnErrorSlot = 1;
    }
-   Sequence extendsTypes = new Sequence("(,[])", OPTIONAL, new KeywordSpace("extends"), typeList);
+   Sequence extendsTypes = new Sequence("(,[])", OPTIONAL, extendsKeyword, typeList);
    Sequence implementsTypes = new Sequence("<implements>(,[])", OPTIONAL, new KeywordSpace("implements"), typeList);
    {
       extendsTypes.skipOnErrorSlot = 1;
@@ -623,10 +629,12 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       classDeclaration.set(classModifiers, classDeclarationWithoutModifiers);
    }
 
-   Sequence normalInterfaceDeclaration = new Sequence("InterfaceDeclaration(,typeName,typeParameters,extendsTypes,body)",
-         new KeywordSpace("interface"), identifier, optTypeParameters, extendsTypes, classBody);
+   KeywordSpace interfaceKeyword = new KeywordSpace("interface");
 
-   Sequence annotationDefault = new Sequence("(,.)", OPTIONAL, new KeywordSpace("default"), elementValue);
+   Sequence normalInterfaceDeclaration = new Sequence("InterfaceDeclaration(,typeName,typeParameters,extendsTypes,body)",
+         interfaceKeyword, identifier, optTypeParameters, extendsTypes, classBody);
+
+   Sequence annotationDefault = new Sequence("(,.)", OPTIONAL, defaultKeyword, elementValue);
    {
       annotationDefault.ignoreEmptyList = false;
    }
@@ -647,7 +655,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    {
       annotationTypeDeclaration.set(
-         new SymbolSpace("@"), new KeywordSpace("interface"), identifier, annotationTypeBody);
+         new SymbolSpace("@"), interfaceKeyword, identifier, annotationTypeBody);
    }
 
 
