@@ -1146,6 +1146,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       }
    }
 
+   /** */
    public List<ISrcStatement> findGeneratedFromNodes(ISrcStatement srcStatement) {
       ArrayList<ISrcStatement> res = new ArrayList<ISrcStatement>();
       TypeDeclaration modelType = getUnresolvedModelTypeDeclaration();
@@ -1583,7 +1584,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             }
          }
       }
-      Object sysObj = layeredSystem != null ? layeredSystem.resolveName(name, create) : null;
+      Object sysObj = layeredSystem != null ? layeredSystem.resolveName(name, create, getLayer(), isLayerModel) : null;
       if (sysObj != null)
          return sysObj;
 
@@ -2011,7 +2012,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       LayeredSystem sys = getLayeredSystem();
       Layer thisLayer = getLayer();
 
-      if (sys == null || thisLayer == null || sys.buildLayer == null)
+      if (sys == null || thisLayer == null || sys.buildLayer == null || !thisLayer.activated)
          return null;
 
       // First approach is to use the buildSrcIndex to find the most specific file for this guy.
@@ -2190,21 +2191,21 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return "java file: ";
    }
 
-   transient IErrorHandler errorHandler = null;
+   transient IMessageHandler errorHandler = null;
    public transient StringBuilder errorMessages = null;
    public transient StringBuilder warningMessages = null;
 
-   public void setErrorHandler(IErrorHandler errorHandler) {
+   public void setErrorHandler(IMessageHandler errorHandler) {
       this.errorHandler = errorHandler;
    }
 
-   public IErrorHandler getErrorHandler() {
+   public IMessageHandler getErrorHandler() {
       return errorHandler;
    }
 
-   public void reportError(String error) {
+   public void reportError(String error, ISemanticNode source) {
       if (errorHandler != null) {
-         errorHandler.reportError(error);
+         LayerUtil.reportMessageToHandler(errorHandler, error, getSrcFile(), source, MessageType.Error);
       }
       else {
          if (errorMessages == null)
@@ -2214,7 +2215,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       hasErrors = true;
       if (layeredSystem != null) {
          // Already seen this error in this build
-         if (layeredSystem.isErrorViewed(error)) {
+         if (layeredSystem.isErrorViewed(error, getSrcFile(), source)) {
             return;
          }
       }
@@ -2225,9 +2226,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       System.err.println(error);
    }
 
-   public void reportWarning(String error) {
+   public void reportWarning(String error, ISemanticNode source) {
       if (errorHandler != null) {
-         errorHandler.reportWarning(error);
+         LayerUtil.reportMessageToHandler(errorHandler, error, getSrcFile(), source, MessageType.Warning);
       }
       else {
          if (warningMessages == null)
@@ -2237,7 +2238,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       hasErrors = true;
       if (layeredSystem != null) {
          // Already seen this error in this build
-         if (layeredSystem.isWarningViewed(error)) {
+         if (layeredSystem.isWarningViewed(error, getSrcFile(), source)) {
             return;
          }
       }
@@ -2609,7 +2610,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public JavaModel refreshNode() {
-      return (JavaModel) layeredSystem.getLanguageModel(getSrcFile());
+      // Here we pick the latest annotated model
+      return (JavaModel) layeredSystem.getAnnotatedModel(getSrcFile());
    }
 }
 

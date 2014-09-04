@@ -6,12 +6,21 @@ package sc.lang.html;
 
 import sc.dyn.IDynObject;
 import sc.lang.DynObject;
+import sc.lang.INamedNode;
+import sc.lang.ISrcStatement;
+import sc.lang.IUserDataNode;
 import sc.lang.java.JavaSemanticNode;
+import sc.parser.Language;
 import sc.type.TypeUtil;
 
+import java.util.List;
+
 /** Nodes extend IDynObject to avoid the need for dybamic stubs to interpret template pages */
-public abstract class Node extends JavaSemanticNode implements IDynObject {
+public abstract class Node extends JavaSemanticNode implements IDynObject, ISrcStatement, INamedNode, IUserDataNode {
    protected sc.lang.DynObject dynObj;
+
+   transient Object userData = null;  // A hook for user data - specifically for an IDE to store its instance for this node
+
    public Node() {
    }
    public Node(sc.lang.java.TypeDeclaration concreteType)  {
@@ -77,4 +86,32 @@ public abstract class Node extends JavaSemanticNode implements IDynObject {
    public void addProperty(Object propType, String propName, Object initValue) {
       dynObj.addProperty(propType, propName, initValue);
    }
+
+   public ISrcStatement getSrcStatement(Language lang) {
+      return this; // TODO: may need this if we are ever generating elements or attributes from code and so need to propagate source location
+   }
+
+   public ISrcStatement findFromStatement(ISrcStatement st) {
+      // If the src statement has a part of our origin statement we are a match.
+      if (st.getNodeContainsPart(this))
+         return this;
+      return null;
+   }
+
+   public void addGeneratedFromNodes(List<ISrcStatement> result, ISrcStatement st) {
+      // TODO: generating elements
+   }
+
+   public ISrcStatement getFromStatement() {
+      return null;
+   }
+
+   public void setUserData(Object v)  {
+      userData = v;
+   }
+
+   public Object getUserData() {
+      return userData;
+   }
+
 }

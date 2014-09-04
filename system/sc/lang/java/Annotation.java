@@ -259,10 +259,13 @@ public class Annotation extends JavaSemanticNode implements IAnnotation {
       return super.toSafeLanguageString();
    }
 
-   public void displayTypeError(String...args) {
+   public boolean displayTypeError(String...args) {
       Statement st;
-      errorArgs = args;
-      super.displayTypeError(args);
+      if (super.displayTypeError(args)) {
+         errorArgs = args;
+         return true;
+      }
+      return false;
    }
 
    public String getNodeErrorText() {

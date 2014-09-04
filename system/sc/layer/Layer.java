@@ -271,13 +271,13 @@ public class Layer implements ILifecycle, LayerConstants {
    }
 
    public void createDefaultRuntime(String runtimeName) {
-      LayeredSystem.createDefaultRuntime(runtimeName);
+      LayeredSystem.createDefaultRuntime(this, runtimeName);
       setLayerRuntime(LayeredSystem.getRuntime(runtimeName));
    }
 
    public void addRuntime(IRuntimeProcessor proc) {
       setLayerRuntime(proc);
-      LayeredSystem.addRuntime(proc);
+      LayeredSystem.addRuntime(this, proc);
    }
 
    /** Some layers do not extend a layer bound to a runtime platform and so can run in any layer. */
@@ -605,19 +605,23 @@ public class Layer implements ILifecycle, LayerConstants {
    }
 
    public String getDefaultBuildDir() {
-      return LayerUtil.getLayerClassFileDirectory(this, layerPathName);
+      return LayerUtil.getLayerClassFileDirectory(this, layerPathName, false);
    }
 
    public void initBuildDir() {
       if (buildDir == null)
-         buildDir = LayerUtil.getLayerClassFileDirectory(this, layerPathName);
+         buildDir = LayerUtil.getLayerClassFileDirectory(this, layerPathName, false);
       else // Translate configured relative paths to be relative to the layer's path on disk
          buildDir = FileUtil.getRelativeFile(layerPathName, buildDir);
 
-      if (buildSrcDir == null)
-         buildSrcDir = FileUtil.concat(buildDir, layeredSystem.getRuntimePrefix(), getBuildSrcSubDir());
+      if (buildSrcDir == null) {
+         buildSrcDir = FileUtil.concat(LayerUtil.getLayerClassFileDirectory(this, layerPathName, true), layeredSystem.getRuntimePrefix(), getBuildSrcSubDir());
+      }
       else
          buildSrcDir = FileUtil.getRelativeFile(layerPathName, buildSrcDir);
+
+      // Is this right?
+      buildClassesDir = FileUtil.concat(buildDir, layeredSystem.getRuntimePrefix(), getBuildClassesSubDir());
 
       // If there's an existing build dir in this layer, mark it as a build layer.  Do this as soon as possible so it shows up and we know we need to
       // build it.
@@ -667,7 +671,8 @@ public class Layer implements ILifecycle, LayerConstants {
 
    public String getBuildClassesDir() {
       String sd = getBuildClassesSubDir();
-      return FileUtil.concat(buildDir, layeredSystem.getRuntimePrefix(), sd);
+      String res = FileUtil.concat(buildDir, layeredSystem.getRuntimePrefix(), sd);
+      return res;
    }
 
    // TODO: deal with build classes subdir here?
@@ -869,6 +874,8 @@ public class Layer implements ILifecycle, LayerConstants {
 
       if (isBuildLayer() && activated && !disabled) {
          loadBuildInfo();
+         LayeredSystem.initBuildFile(buildSrcDir);
+         LayeredSystem.initBuildFile(buildClassesDir);
       }
 
       // First start the model so that it can set up our paths etc.
@@ -2260,6 +2267,9 @@ public class Layer implements ILifecycle, LayerConstants {
       boolean first = true;
       for (Layer l:layeredSystem.layers) {
          if (this == layeredSystem.buildLayer || extendsLayer(l) || l == this) {
+            // Separate layers can be added non-disruptively since they store their build in a separate build-dir and the types cannot be modified by the other layers.
+            if (l.buildSeparate)
+               continue;
             if (!first) {
                sb.append(" ");
             }
@@ -2269,10 +2279,26 @@ public class Layer implements ILifecycle, LayerConstants {
             // Maybe we could optimize this so we only mark the files in this layer as changed?
             if (l.dynamic)
               sb.append("dyn:");
-            sb.append(l.layerPathName);
+            sb.append(l.getLayerName());
          }
       }
       return sb.toString();
+   }
+
+   private boolean needsRebuildForLayersChange(String newDependentNames, String oldDependentLayerNames) {
+      if (!newDependentNames.equals(oldDependentLayerNames))
+         return true;
+      /* Otherwise - do a fuzzy overlap test here where we create sets for each group and walk each list looking for
+         for non-additive combinations.
+      String[] layerNames = StringUtil.split(oldDependentLayerNames, " ");
+      TreeSet<String> oldNames = new TreeSet<String>(Arrays.asList(layerNames));
+      for (Layer l:layeredSystem.layers) {
+         if (this == layeredSystem.buildLayer || extendsLayer(l) || l == this) {
+
+         }
+      }
+      */
+      return false;
    }
 
    public boolean getBuildAllFiles() {
@@ -2297,7 +2323,8 @@ public class Layer implements ILifecycle, LayerConstants {
                System.out.println("Missing BuildInfo file: " + buildInfoFile + " for runtime: " + layeredSystem.getRuntimeName());
             buildAllFiles = true;
          }
-         else if (!StringUtil.equalStrings(currentLayerNames, gd.layerNames)) {
+         //  (!StringUtil.equalStrings(currentLayerNames, gd.layerNames))
+         else if (needsRebuildForLayersChange(currentLayerNames, gd.layerNames)) {
             if (layeredSystem.options.verbose)
                System.out.println("Layer names changed from: " + gd.layerNames + " to: " + currentLayerNames);
             else if (layeredSystem.options.info)
@@ -2468,11 +2495,24 @@ public class Layer implements ILifecycle, LayerConstants {
       if (hidden)
          return false;
 
+      // TODO: call isSpecifiedLayer instead... even though its slightly different it probably will work the same.
       for (int i = 0; i < layeredSystem.specifiedLayers.size(); i++) {
          Layer specLayer = layeredSystem.specifiedLayers.get(i);
          if (specLayer == this)
             return true;
          if (!specLayer.hidden && specLayer.extendsLayer(this))
+            return true;
+      }
+      return false;
+   }
+
+   /** Is this a layer which was specified by the user (true) or a layer which was dragged in by a dependency (false) */
+   public boolean isSpecifiedLayer() {
+      for (int i = 0; i < layeredSystem.specifiedLayers.size(); i++) {
+         Layer specLayer = layeredSystem.specifiedLayers.get(i);
+         if (specLayer == this)
+            return true;
+         if (specLayer.extendsLayer(this))
             return true;
       }
       return false;
@@ -2602,6 +2642,10 @@ public class Layer implements ILifecycle, LayerConstants {
          }
       }
       return null;
+   }
+
+   public String getUnderscoreName() {
+      return getLayerName().replace('.', '_');
    }
 
 }

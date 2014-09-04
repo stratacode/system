@@ -934,21 +934,28 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
                      }
                      // The field's variable definition's initializer is the parseResult's semantic value.
                      FieldDefinition tempField = FieldDefinition.createFromJavaType(ClassType.create("Object"), fieldName, ":=", expr);
+                     tempField.fromStatement = parentElement;
                      tempField.addModifier("public");
                      parentType.addBodyStatementIndent(tempField);
 
                      // Then add a property assignment with reverse binding for this field.
-                     PropertyAssignment ba = PropertyAssignment.create(fieldName, IdentifierExpression.createMethodCall(new SemanticNodeList(), "invalidate" + methSuffix), "=:");
+                     IdentifierExpression methCall = IdentifierExpression.createMethodCall(new SemanticNodeList(), "invalidate" + methSuffix);
+                     methCall.fromStatement = parentElement; // We will likely strip off the reverse-only PropertyAssignment so put it at this level here.
+                     PropertyAssignment ba = PropertyAssignment.create(fieldName, methCall, "=:");
+                     ba.fromStatement = parentElement;
                      parentType.addBodyStatementIndent(ba);
                   }
                   else {
                      // Then add a property assignment with reverse binding for this field.
                      PropertyAssignment ba = PropertyAssignment.create(fieldName, expr, ":=");
+                     ba.fromStatement = parentElement;
                      parentType.addBodyStatementIndent(ba);
                   }
 
                   // Then add to the output method a new identifier expression for the field.
-                  addToOutputMethod(block, getExprStringOutputStatement(fieldName));
+                  Statement outputCall = getExprStringOutputStatement(fieldName);
+                  outputCall.fromStatement = parentElement;
+                  addToOutputMethod(block, outputCall);
 
                   handled = true;
                }
@@ -956,7 +963,9 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
 
             if (!handled) {
                if (!mergeStringInOutput(block, expr, null)) {
-                  addToOutputMethod(block, getExprStringOutputStatement(parseResult.toString()));
+                  Statement outputSt = getExprStringOutputStatement(parseResult.toString());
+                  outputSt.fromStatement = parentElement;
+                  addToOutputMethod(block, outputSt);
                }
             }
          }
@@ -968,7 +977,9 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
          // This is an optimization - if there's a StringLiteral right before us, just merge it in.
          if (!mergeStringInOutput(block, null, newStr)) {
             // Output sb.append('the string')
-            addToOutputMethod(block, getConstStringOutputStatement(newStr));
+            Statement outExpr = getConstStringOutputStatement(newStr);
+            outExpr.fromStatement = parentElement;
+            addToOutputMethod(block, outExpr);
          }
       }
       // For class/object definitions, any root level glue declarations get processed as part of the root template

@@ -7,7 +7,6 @@ package sc.parser;
 import sc.lang.ILanguageModel;
 import sc.lang.SemanticNode;
 import sc.lang.ISemanticNode;
-import sc.lang.java.BlockStatement;
 import sc.lang.java.JavaModel;
 import sc.lang.SemanticNodeList;
 import sc.lang.java.JavaSemanticNode;
@@ -186,32 +185,44 @@ public class ParseUtil  {
 
       return charOffsetToLine(s, charOffset);
    }
-   
+
+   public static FilePosition charOffsetToLinePos(File file, int charOffset) {
+      String s = readFileString(file);
+      if (s == null)
+         return null;
+
+      return charOffsetToLinePos(s, charOffset);
+   }
+
    public static String charOffsetToLine(String s, int charOffset) {
+      FilePosition pos = charOffsetToLinePos(s, charOffset);
+      if (pos == null)
+         return "end of file";
+      return "line: " + pos.lineNum + " column: " + pos.colNum;
+   }
+
+   public static FilePosition charOffsetToLinePos(String s, int charOffset) {
       int lineCt = 1;
       int column = 0;
       boolean newLine = false;
 
       if (charOffset >= s.length())
-          return "end of file";
+          return null;
 
-      for (int i = 0; i < charOffset; i++)
-      {
+      for (int i = 0; i < charOffset; i++) {
          char c = s.charAt(i);
-         if (c == '\n')
-         {
+         if (c == '\n') {
             lineCt++;
             newLine = true;
          }
-         if (newLine)
-         {
+         if (newLine) {
             column = 0;
             newLine = false;
          }
          else
             column++;
       }
-      return "line: " + lineCt + " column: " + column;
+      return new FilePosition(lineCt, column);
    }
 
    /** Given a parse node, returns either that parse node or a child of that parse node. */
@@ -816,5 +827,22 @@ public class ParseUtil  {
          return null;
 
       return parseNode.getNodeAtLine(ctx, requiredLineNum);
+   }
+
+   public static ISemanticNode findSameNodeInNewModel(ILanguageModel newModel, ISemanticNode oldNode) {
+      // Our file model is not the current one managed by the system so we need to find the corresponding node.
+      IParseNode origParseNode = oldNode.getParseNode();
+      if (origParseNode != null) {
+         int startIx = origParseNode.getStartIndex();
+         if (startIx != -1) {
+            IParseNode newNode = newModel.getParseNode().findParseNode(startIx, origParseNode.getParselet());
+            if (newNode != null) {
+               Object semValue = newNode.getSemanticValue();
+               if (semValue != null && semValue.getClass() == oldNode.getClass())
+                  return (JavaSemanticNode) semValue;
+            }
+         }
+      }
+      return null;
    }
 }

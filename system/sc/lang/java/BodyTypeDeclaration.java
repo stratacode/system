@@ -3211,7 +3211,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       initOuterInstanceSlot(inst, ctx);
 
-      if (getLiveDynamicTypesAnnotation()) {
+      if (getLiveDynamicTypesAnnotation() && !isLayerType) {
          // Add this instance to the global table so we can do type -> inst mapping
          getLayeredSystem().addDynInstanceInternal(this.getFullTypeName(), inst);
       }

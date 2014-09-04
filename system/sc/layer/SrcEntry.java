@@ -121,4 +121,8 @@ public class SrcEntry {
    public boolean isLayerFile() {
       return relFileName != null && layer != null && relFileName.equals(layer.layerBaseName);
    }
+
+   public String getJarUrl() {
+      return "file://" + absFileName;
+   }
 }

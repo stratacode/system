@@ -486,11 +486,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
                String[] jsFiles = addJSLibFiles(td, false, null, null, null);
                if (jsFiles == null) {
-                  // Skip annotation classes for now
+                  // Do not need annotation classes to be converted to JS for any use cases we support so far but still need to generate the Java.
                   if (td instanceof AnnotationTypeDeclaration) {
-                     return new ArrayList<SrcEntry>();
+                     return model.getProcessedFiles(genLayer, buildSrcDir, generate);
                   }
-
                   saveJSTypeToFile(td, genLayer, buildSrcDir, resFiles);
 
                   return resFiles;
@@ -1111,6 +1110,11 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       if (modFile == null)
          return scLib;
       return modFile;
+   }
+
+   public String getCachedJSModuleFile(String typeName) {
+      String res = jsBuildInfo.jsModuleNames.get(typeName);
+      return res;
    }
 
    public String getJSModuleFile(Object type, boolean resolveSrc) {
@@ -2455,14 +2459,20 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    public List<String> getJSFiles(Object type) {
-      // Get the src file for this type in this runtime.  The type given may be from another runtime.
-      type = system.getRuntimeTypeDeclaration(ModelUtil.getTypeName(type));
-      // If there's no type name in the javascript runtime, no need for any JS files.
-      if (type == null)
-         return null;
-      String modFile = getJSModuleFile(type, true);
-      if (modFile == null)
-         return jsBuildInfo.jsFiles;
+      String typeName = ModelUtil.getTypeName(type);
+      String modFile = getCachedJSModuleFile(typeName);
+      if (modFile == null) {
+         // Get the src file for this type in this runtime.  The type given may be from another runtime.
+         // Do not look up the type unless we need to because otherwise we load stuff into the JS runtime that may not otherwise be needed.
+         type = system.getRuntimeTypeDeclaration(typeName);
+         // If there's no type name in the javascript runtime, no need for any JS files.
+         if (type == null)
+            return null;
+
+         modFile = getJSModuleFile(type, true);
+         if (modFile == null)
+            return jsBuildInfo.jsFiles;
+      }
       int startIx = jsBuildInfo.jsFiles.indexOf(modFile);
       ArrayList<String> resFiles = new ArrayList<String>();
       resFiles.add(modFile);
@@ -2487,7 +2497,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          return true;
       }
       else {
-         File f = new File(FileUtil.concat(system.buildDir, JS_BUILD_INFO_FILE));
+         String jsBuildInfoFile = FileUtil.concat(system.buildDir, JS_BUILD_INFO_FILE);
+         File f = new File(jsBuildInfoFile);
          if (f.canRead()) {
             try {
                ObjectInputStream ios = new ObjectInputStream(new FileInputStream(f));
@@ -2514,6 +2525,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                f.delete();
             }
          }
+         else if (system.options.verbose)
+            System.out.println("*** Missing jsBuildInfoFile: " + jsBuildInfoFile + " building all files");
          if (jsBuildInfo == null)
             jsBuildInfo = new JSBuildInfo();
          return true;
@@ -2684,4 +2697,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
    */
 
+   public boolean getLoadClassesInRuntime() {
+      return false;
+   }
 }

@@ -80,6 +80,9 @@ public interface IParseNode extends CharSequence, IParseResult {
    void computeLineNumberForNode(LineFormatContext ctx, IParseNode toFindPN);
 
    ISemanticNode getNodeAtLine(NodeAtLineCtx ctx, int requiredLineNum);
+
+   /** Find the parse node at the specified start index.  If matchParselet is not null the match is only returned if it is the same as the parselet specified */
+   IParseNode findParseNode(int startIndex, Parselet matchParselet);
 }
 
 

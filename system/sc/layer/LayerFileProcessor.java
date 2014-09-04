@@ -62,6 +62,12 @@ public class LayerFileProcessor implements IFileProcessor {
 
    private boolean producesTypes = false;
 
+   public void validate() {
+      if (useSrcDir && useClassesDir) {
+         System.err.println("*** LayerFileProcessor: " + this + " has both useSrcDir and useClassesDir set.  Set useSrcDir to store the results in the buildSrc directory and useClassesDir to store it next to the classes in the runtime specific folder.  If useSrcDir = false and useClassesDir=false, the default is to store it in the buildDir without the runtime prefix.");
+      }
+   }
+
    public Object process(SrcEntry srcEnt, boolean enablePartialValues) {
       LayerFileProcessorResult res = null;
       LayerFileProcessorResult current = fileIndex.get(srcEnt.relFileName);

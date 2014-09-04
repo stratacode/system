@@ -71,4 +71,7 @@ public interface IRuntimeProcessor {
 
    /** Normally returns false - which means we can use .class files as an optimization except for special js types. */
    boolean needsSrcForBuildAll(Object cl);
+
+   /** Some runtimes, like Javascript, are not active in Java so suppress loading classes there */
+   boolean getLoadClassesInRuntime();
 }

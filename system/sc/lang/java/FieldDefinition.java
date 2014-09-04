@@ -670,13 +670,30 @@ public class FieldDefinition extends TypedDefinition {
    }
 
    public boolean getNodeContainsPart(ISrcStatement fromSt) {
-      if (fromSt == this)
+      if (super.getNodeContainsPart(fromSt))
          return true;
       if (variableDefinitions != null) {
          for (VariableDefinition varDef:variableDefinitions)
-            if (varDef == fromSt)
+            if (varDef == fromSt || varDef.getNodeContainsPart(fromSt))
                return true;
       }
       return false;
+   }
+
+   public ISrcStatement findFromStatement(ISrcStatement st) {
+      ISrcStatement fromSt = super.findFromStatement(st);
+      if (fromSt != null)
+        return fromSt;
+      // We may generate a FieldDefinition from a VariableDefinition.  In that case, the Field that encloses that
+      // variable may contain the link we need to follow to find this src file.
+      if (fromStatement instanceof VariableDefinition) {
+         Definition def = (((VariableDefinition) fromStatement).getDefinition());
+         if (def instanceof FieldDefinition) {
+            fromSt = ((FieldDefinition) def).findFromStatement(st);
+            if (fromSt != null)
+               return this;
+         }
+      }
+      return null;
    }
 }

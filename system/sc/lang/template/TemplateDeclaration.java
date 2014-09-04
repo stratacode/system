@@ -4,6 +4,7 @@
 
 package sc.lang.template;
 
+import sc.lang.ISrcStatement;
 import sc.lang.html.Element;
 import sc.lang.java.*;
 
@@ -44,5 +45,16 @@ public class TemplateDeclaration extends TypeDeclaration {
 
    public boolean needsTransform() {
       return true;
+   }
+
+   public boolean getNodeContainsPart(ISrcStatement fromSt) {
+      if (fromSt == this)
+         return true;
+      if (body != null) {
+         for (Statement st:body)
+            if (st == fromSt || st.getNodeContainsPart(fromSt))
+               return true;
+      }
+      return false;
    }
 }

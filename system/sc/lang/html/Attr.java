@@ -6,14 +6,16 @@ package sc.lang.html;
 
 import sc.lang.INamedNode;
 import sc.lang.ISemanticNode;
+import sc.lang.ISrcStatement;
 import sc.lang.SCLanguage;
 import sc.lang.java.*;
 import sc.parser.*;
 
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Set;
 
-public class Attr extends Node implements INamedNode {
+public class Attr extends Node implements ISrcStatement {
    public String name;
    // Can be either a String, TemplateExpression, or AttrExpr - which holds the op and expression
    public Object value;
@@ -257,4 +259,23 @@ public class Attr extends Node implements INamedNode {
       }
       return -1;
    }
+
+   /** This handles breakpoints at the tag level.  To find the matching source statement, need to check our attributes and sub-tags */
+   public boolean getNodeContainsPart(ISrcStatement partNode) {
+      if (partNode == this || sameSrcLocation(partNode))
+         return true;
+      if (value != null) {
+         if (value instanceof AttrExpr) {
+            AttrExpr attExpr = (AttrExpr) value;
+            if (attExpr.expr != null && (attExpr.expr == partNode || attExpr.expr.getNodeContainsPart(partNode)))
+               return true;
+         }
+         else if (value instanceof Expression) {
+            if (value == partNode || ((Expression) value).getNodeContainsPart(partNode))
+               return true;
+         }
+      }
+      return false;
+   }
+
 }

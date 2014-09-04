@@ -11,4 +11,6 @@ import sc.lang.ILanguageModel;
  */
 public interface IExternalModelIndex {
    public ILanguageModel lookupJavaModel(SrcEntry srcEnt);
+
+   public void replaceModel(ILanguageModel oldModel, ILanguageModel newModel);
 }

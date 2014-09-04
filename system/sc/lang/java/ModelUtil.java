@@ -3159,6 +3159,15 @@ public class ModelUtil {
          return sb.toString();
       }
       else if (genType instanceof Class) {
+         Class cl = (Class) genType;
+         if (cl.isArray()) {
+            Class componentClass = cl.getComponentType();
+            String componentName = resolveGenericTypeName(srcType, resultType, componentClass, includeDims);
+            if (includeDims)
+               return componentName + "[]";
+            else
+               return componentName;
+         }
          return ((Class) genType).getName();
       }
       else if (ModelUtil.isTypeVariable(genType)) {
@@ -4208,8 +4217,8 @@ public class ModelUtil {
          BodyTypeDeclaration typeDef = (BodyTypeDeclaration) type;
          JavaModel model = typeDef.getJavaModel();
 
-         ErrorHandler handler = new ErrorHandler();
-         IErrorHandler oldHandler = model.getErrorHandler();
+         MessageHandler handler = new MessageHandler();
+         IMessageHandler oldHandler = model.getErrorHandler();
          try {
             model.setErrorHandler(handler);
 

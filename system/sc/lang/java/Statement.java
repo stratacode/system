@@ -4,16 +4,10 @@
 
 package sc.lang.java;
 
-import sc.lang.ISemanticNode;
-import sc.lang.ISrcStatement;
-import sc.lang.IUserDataNode;
-import sc.lang.SemanticNodeList;
+import sc.lang.*;
 import sc.lang.js.JSFormatMode;
 import sc.lang.js.JSLanguage;
-import sc.parser.FormatContext;
-import sc.parser.Language;
-import sc.parser.ParentParseNode;
-import sc.parser.ParseUtil;
+import sc.parser.*;
 import sc.type.IBeanMapper;
 import sc.type.TypeUtil;
 
@@ -91,11 +85,14 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       return false;
    }
 
-   public void displayTypeError(String...args) {
+   public boolean displayTypeError(String...args) {
       if (errorArgs == null) {
-         super.displayTypeError(args);
-         errorArgs = args;
+         if (super.displayTypeError(args)) {
+            errorArgs = args;
+            return true;
+         }
       }
+      return false;
    }
 
    public void displayError(String...args) {
@@ -223,19 +220,25 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
    }
 
    public boolean getNodeContainsPart(ISrcStatement partNode) {
-      return partNode == this;
+      return partNode == this || sameSrcLocation(partNode);
    }
 
+   /**
+    * Returns the statement that was generated from the given src statement.  This will end up being the first
+    * one we encounter in the search for the src statement in the chain of fromStatements.
+    */
    public ISrcStatement findFromStatement(ISrcStatement st) {
       // If the src statement has a part of our origin statement we are a match.
       if (st.getNodeContainsPart(this.getFromStatement()))
          return this;
-      if (fromStatement == st)
-         return this;
-      // Note we return the first reference even after following the chain - since we want the resulting generated source
-      // as mapped to the original source.
-      if (fromStatement != null && fromStatement.findFromStatement(st) != null)
-         return this;
+      if (fromStatement != null) {
+         if (fromStatement == st || ((SemanticNode) fromStatement).sameSrcLocation(st))
+            return this;
+         // Note we return the first reference even after following the chain - since we want the resulting generated source
+         // as mapped to the original source.
+         if (fromStatement.findFromStatement(st) != null)
+            return this;
+      }
       return null;
    }
 

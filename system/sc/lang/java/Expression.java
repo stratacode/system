@@ -5,7 +5,7 @@
 package sc.lang.java;
 
 import sc.bind.ConstantBinding;
-import sc.lang.JavaLanguage;
+import sc.lang.*;
 import sc.lang.js.JSLanguage;
 import sc.lang.sc.PropertyAssignment;
 import sc.layer.LayeredSystem;
@@ -17,9 +17,6 @@ import sc.type.TypeUtil;
 import sc.bind.BindingDirection;
 import sc.bind.Bind;
 import sc.bind.IBinding;
-import sc.lang.ILanguageModel;
-import sc.lang.ISemanticNode;
-import sc.lang.SemanticNodeList;
 import sc.util.StringUtil;
 
 import java.lang.reflect.Method;
@@ -484,6 +481,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       if (origParent.replaceChild(this, bindingExpr) == -1)
          System.err.println("Unable to find bindingExpr in parent for replace");
       replacedByStatement = bindingExpr;
+      bindingExpr.fromStatement = this;
       bindingExpr.transform(runtime);
    }
 
@@ -934,4 +932,16 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
          System.out.println("*** Generation error for statmeent: " + this);
       return res;
    }
+
+   public ISrcStatement findFromStatement(ISrcStatement st) {
+      ISrcStatement res = super.findFromStatement(st);
+      if (res != null)
+         return res;
+      if (bindingStatement != null) {
+         if (bindingStatement.findFromStatement(st) != null)
+            return this;
+      }
+      return null;
+   }
+
 }

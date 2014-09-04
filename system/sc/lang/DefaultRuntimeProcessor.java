@@ -104,6 +104,10 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor {
       return false;
    }
 
+   public boolean getLoadClassesInRuntime() {
+      return true;
+   }
+
    public String toString() {
       return runtimeName + " runtime";
    }

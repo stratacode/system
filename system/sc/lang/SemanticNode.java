@@ -905,4 +905,23 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
    public ISemanticNode refreshNode() {
       return this;
    }
+
+   public boolean sameSrcLocation(ISemanticNode st) {
+      if (st == null)
+         return false;
+      if (st.getClass() != this.getClass())
+         return false;
+
+      IParseNode myNode = getParseNode();
+      IParseNode stNode = st.getParseNode();
+
+      int myIx = myNode == null ? -1 : myNode.getStartIndex();
+
+      if (myNode != null && stNode != null && isParseNodeValid() && st.isParseNodeValid() && myIx == stNode.getStartIndex() && myIx != -1) {
+         if (deepEquals(st))
+            return true;
+      }
+      return false;
+   }
+
 }

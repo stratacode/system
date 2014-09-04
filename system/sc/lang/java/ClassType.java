@@ -304,10 +304,13 @@ public class ClassType extends JavaType {
       super.displayError(args);
    }
 
-   public void displayTypeError(String...args) {
+   public boolean displayTypeError(String...args) {
       Statement st;
-      errorArgs = args;
-      super.displayTypeError(args);
+      if (super.displayTypeError(args)) {
+         errorArgs = args;
+         return true;
+      }
+      return false;
       /*
       if ((st = getEnclosingStatement()) != null)
          st.displayTypeError(args);

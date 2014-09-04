@@ -242,6 +242,16 @@ public class ParseNode extends AbstractParseNode {
       return null;
    }
 
+   public IParseNode findParseNode(int startIndex, Parselet matchParselet) {
+      IParseNode res = super.findParseNode(startIndex, matchParselet);
+      if (res != null)
+         return res;
+
+      if (value instanceof IParseNode)
+         return ((IParseNode) value).findParseNode(startIndex, matchParselet);
+
+      return null;
+   }
 
    public Object getSkippedValue() {
       return value;

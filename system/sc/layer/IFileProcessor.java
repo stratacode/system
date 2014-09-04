@@ -14,6 +14,7 @@ package sc.layer;
  * versa.
  */
 public interface IFileProcessor {
+   void validate();
    Object process(SrcEntry file, boolean enablePartialValues);
 
    boolean getInheritFiles();

@@ -607,4 +607,7 @@ public abstract class Language implements IFileProcessor {
    public boolean getInheritFiles() {
       return true;
    }
+
+   public void validate() {
+   }
 }

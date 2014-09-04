@@ -3806,8 +3806,15 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (idTypes == null) {
          // We've been replaced and not started - presumably this is just a copy of our statement so we can style it using the
          // replacedByStatement's information - just need to use this parse node since it's the original one in the source.
-         if (replacedByStatement instanceof IdentifierExpression)
-            ((IdentifierExpression) replacedByStatement).styleExpression((ParentParseNode) parseNode, adapter);
+         if (replacedByStatement instanceof IdentifierExpression) {
+            IdentifierExpression replaced = (IdentifierExpression) replacedByStatement;
+            // Currently the Element does not always start it's children expressions... instead the root is started.  Here we could either find
+            // the active element that corresponds to this expression and use it for styling or just start this here.  This will require all language
+            // elements to be able to resolve their value without being converted so long term maybe the other approach is easier?
+            if (!replaced.isStarted())
+               ParseUtil.realInitAndStartComponent(replaced);
+            replaced.styleExpression((ParentParseNode) parseNode, adapter);
+         }
          else
             super.styleNode(adapter);
          return;
@@ -3881,7 +3888,12 @@ public class IdentifierExpression extends ArgumentsExpression {
             }
          }
          boolean handled = false;
-         if (idTypes[i] != null) {
+
+         if (idTypes == null) {
+            System.err.println("*** styling identifier expression that has not been initializd?");
+         }
+
+         if (idTypes != null && idTypes[i] != null) {
             switch (idTypes[i]) {
                case SetVariable:
                   if (!ModelUtil.isField(boundTypes[i]))
@@ -4359,8 +4371,14 @@ public class IdentifierExpression extends ArgumentsExpression {
          int skipCt = 0;
          // Method super
          if (sz == 2) {
-            // convert from super.x(..) to JSType_c.x.call(this, ..)
-            setIdentifier(0, getLayeredSystem().runtimeProcessor.getStaticPrefix(getTypeForIdentifier(0), this), IdentifierType.BoundTypeName, boundTypes[0]);
+            if (getLayeredSystem() == null || getLayeredSystem().runtimeProcessor == null)
+               System.out.println("***");
+            if (boundTypes == null)
+               System.err.println("*** Unresolved identifier expression in JS conversion: " + this);
+            else {
+               // convert from super.x(..) to JSType_c.x.call(this, ..)
+               setIdentifier(0, getLayeredSystem().runtimeProcessor.getStaticPrefix(getTypeForIdentifier(0), this), IdentifierType.BoundTypeName, boundTypes[0]);
+            }
          }
          // Constructor super
          else {
@@ -4379,7 +4397,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                addOuter = true;
             }
             // convert from super.x(..) to JSType.call(this, ..)
-            setIdentifier(0, JSUtil.convertTypeName(getLayeredSystem(),ModelUtil.getTypeName(getTypeForIdentifier(0))), IdentifierType.BoundTypeName, boundTypes[0]);
+            setIdentifier(0, JSUtil.convertTypeName(getLayeredSystem(), ModelUtil.getTypeName(getTypeForIdentifier(0))), IdentifierType.BoundTypeName, boundTypes[0]);
          }
          addIdentifier(sz, "call", idType, boundTypes[sz-1]);
          arguments.add(0, IdentifierExpression.create(new NonKeywordString("this")));
@@ -4606,5 +4624,30 @@ public class IdentifierExpression extends ArgumentsExpression {
          return annotVal != null && (Boolean) annotVal;
       }
       return false;
+   }
+
+   public boolean getNodeContainsPart(ISrcStatement fromSt) {
+      if (super.getNodeContainsPart(fromSt))
+         return true;
+      if (arguments != null) {
+         for (Expression arg:arguments)
+            if (arg == fromSt || arg.getNodeContainsPart(fromSt))
+               return true;
+      }
+      return false;
+   }
+
+   public ISrcStatement findFromStatement(ISrcStatement st) {
+      ISrcStatement res = super.findFromStatement(st);
+      if (res != null)
+         return res;
+      // The breakpoint may be set on some expression that has been embedded into one of our arguments.  If so, we are the closest statement to the breakpoint
+      if (arguments != null) {
+         for (Expression arg:arguments) {
+            if (arg.findFromStatement(st) != null)
+               return this;
+         }
+      }
+      return null;
    }
 }

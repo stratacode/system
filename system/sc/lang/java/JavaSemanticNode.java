@@ -9,6 +9,7 @@ import sc.lang.JavaLanguage;
 import sc.lang.html.Element;
 import sc.lang.template.Template;
 import sc.layer.LayeredSystem;
+import sc.parser.IParseNode;
 import sc.type.PTypeUtil;
 import sc.lang.SemanticNode;
 
@@ -320,11 +321,13 @@ public abstract class JavaSemanticNode extends SemanticNode {
    }
 
    /** Used for errors involving type resolution.  These errors can be disabled during certain operations like transform */
-   public void displayTypeError(String...args) {
+   public boolean displayTypeError(String...args) {
       JavaModel model = getJavaModel();
       if (model != null && !model.disableTypeErrors) {
-         model.reportError(getMessageString(args));
+         model.reportError(getMessageString(args), this);
+         return true;
       }
+      return false;
    }
 
    final static int FILE_MARGIN = 70;
@@ -353,14 +356,14 @@ public abstract class JavaSemanticNode extends SemanticNode {
    public void displayError(String...args) {
       JavaModel model = getJavaModel();
       if (model != null) {
-         model.reportError(getMessageString(args));
+         model.reportError(getMessageString(args), this);
       }
    }
 
    public void displayWarning(String...args) {
       JavaModel model = getJavaModel();
       if (model != null) {
-         model.reportWarning(getMessageString(args));
+         model.reportWarning(getMessageString(args), this);
       }
    }
 
@@ -375,7 +378,7 @@ public abstract class JavaSemanticNode extends SemanticNode {
    public void displayFormattedError(String err) {
       JavaModel model = getJavaModel();
       if (model != null) {
-         model.reportError(err);
+         model.reportError(err, this);
       }
    }
 
@@ -534,6 +537,25 @@ public abstract class JavaSemanticNode extends SemanticNode {
     * to find the node in the other model that corresponds to this node and return it.
     */
    public JavaSemanticNode refreshNode() {
+      JavaModel myModel = getJavaModel();
+      if (myModel != null) {
+         JavaModel newModel = (JavaModel) myModel.getLayeredSystem().getAnnotatedModel(myModel.getSrcFile());
+         // Our file model is not the current one managed by the system so we need to find the corresponding node.
+         if (newModel != myModel) {
+            IParseNode origParseNode = getParseNode();
+            if (origParseNode != null) {
+               int startIx = origParseNode.getStartIndex();
+               if (startIx != -1) {
+                  IParseNode newNode = newModel.getParseNode().findParseNode(startIx, origParseNode.getParselet());
+                  if (newNode != null) {
+                     Object semValue = newNode.getSemanticValue();
+                     if (semValue != null && semValue.getClass() == getClass())
+                        return (JavaSemanticNode) semValue;
+                  }
+               }
+            }
+         }
+      }
       return this;
    }
 }

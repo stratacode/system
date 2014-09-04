@@ -38,4 +38,8 @@ public class ZipSrcEntry extends SrcEntry {
    public boolean isZip() {
       return true;
    }
+
+   public String getJarUrl() {
+      return "jar://" + zipFileName + "!/" + zipEntry.getName();
+   }
 }

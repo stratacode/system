@@ -716,6 +716,8 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       if (def != null && def.findFromStatement(st) != null) {
          return this;
       }
+      if (initializer != null && initializer.findFromStatement(st) != null)
+         return this;
       return null;
    }
 
@@ -724,7 +726,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
    }
 
    public boolean getNodeContainsPart(ISrcStatement partNode) {
-      return this == partNode;
+      return this == partNode || sameSrcLocation(partNode);
    }
 
    public boolean childIsTopLevelStatement(ISrcStatement st) {

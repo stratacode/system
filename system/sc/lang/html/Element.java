@@ -50,10 +50,8 @@ import java.util.*;
 // Using the js_ prefix for the tags.  Because tags.js uses the SyncManager in the JS file, we need to add this dependency explicitly.
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js")
 @CompilerSettings(dynChildManager="sc.lang.html.TagDynChildManager")
-public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjChildren, ITypeUpdateHandler, IUserDataNode, ISrcStatement {
+public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjChildren, ITypeUpdateHandler, ISrcStatement {
    public static boolean trace = false;
-
-   transient Object userData = null;  // A hook for user data - specifically for an IDE to store its instance for this node
 
    public String tagName;
    public SemanticNodeList<Attr> attributeList;
@@ -940,12 +938,12 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
    /** This method gets called from two different contexts and for tags which are both dynamic and static so it's
     * a little confusing.
     *
-    * For "OutputAll" and this is a dynamic tag (i.e. needs an object) it is added to the parent's outputTag method
+    * For "OutputAll" and this tag needs an object, it is added to the parent's outputTag method
     *      objectName.outputTag(sb);
     *
     * For static tags (deprecated), we add the expressions needed to render this tag as content in the parent method.
     *
-    * For dynamic objects, we also call this method with just outputStart and outputBody.  The content for the object
+    * For needsObject tags, we also call this method to generate the outputStart and outputBody methods in separate passes.  The content for the object
     * then gets added to the outputStart and outputBody methods of the generated object for this tag.
     * */
    public int addToOutputMethod(TypeDeclaration parentType, BlockStatement block, Template template, int doFlags, SemanticNodeList<Object> uniqueChildren, int initCt, boolean statefulContext) {
@@ -955,10 +953,13 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       int ix = initCt;
 
       boolean needsObject = needsObject();
+      // Here we process a reference to the object
       if (doFlags == doOutputAll && needsObject) {
          if (!isAbstract()) {
             String objName = isRepeatElement() ? getRepeatObjectName() : getObjectName();
             Statement st = IdentifierExpression.createMethodCall(getOutputArgs(template), this == template.rootType ? null : objName, "outputTag");
+            // The original source statement for the outputTag call in the parent should be the element itself for breakpoints in the debugger.
+            st.fromStatement = this;
             template.addToOutputMethod(block, st);
          }
       }
@@ -988,6 +989,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                               str = new StringBuilder();
                            }
                            Expression boolExpr = ParenExpression.create(QuestionMarkExpression.create((Expression) outputExpr.deepCopy(ISemanticNode.CopyNormal, null), StringLiteral.create(" " + mapAttributeToProperty(att.name)), StringLiteral.create("")));
+                           boolExpr.fromStatement = att;
                            strExprs.add(boolExpr);
                         }
                         else {
@@ -999,8 +1001,12 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                                  str.append("\'");
 
                                  if (att.name.equals("id") && needsObject) {
-                                    strExprs.add(StringLiteral.create(str.toString()));
-                                    strExprs.add(IdentifierExpression.createMethodCall(new SemanticNodeList(), "getId"));
+                                    Expression expr = StringLiteral.create(str.toString());
+                                    expr.fromStatement = att;
+                                    strExprs.add(expr);
+                                    expr = IdentifierExpression.createMethodCall(new SemanticNodeList(), "getId");
+                                    strExprs.add(expr);
+                                    expr.fromStatement = att;
                                     str = new StringBuilder();
                                  }
                                  else {
@@ -1014,7 +1020,9 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                            }
                            else {
                               str.append("\"");
-                              strExprs.add(StringLiteral.create(str.toString()));
+                              Expression strExpr = StringLiteral.create(str.toString());
+                              strExpr.fromStatement = att;
+                              strExprs.add(strExpr);
                               str = new StringBuilder();
                               str.append("\"");
                               Expression outputExprCopy = (Expression) outputExpr.deepCopy(ISemanticNode.CopyNormal, null);
@@ -1029,6 +1037,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                                  SemanticNodeList<Expression> escArgs = new SemanticNodeList<Expression>();
                                  escArgs.add(outputExprCopy);
                                  Expression escExpr = IdentifierExpression.createMethodCall(escArgs, "escAtt");
+                                 escExpr.fromStatement = att;
                                  strExprs.add(escExpr);
                               }
                               else
@@ -1048,10 +1057,14 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
             str = addExtraAttributes(str, strExprs);
 
             if (!inactive) {
+               Expression texpr;
                if (needsId()) {
                   str.append(" id='");
-                  strExprs.add(StringLiteral.create(str.toString()));
-                  strExprs.add(IdentifierExpression.createMethodCall(new SemanticNodeList(), "getId"));
+                  texpr = StringLiteral.create(str.toString());
+                  texpr.fromStatement = this;
+                  strExprs.add(texpr);
+                  texpr = IdentifierExpression.createMethodCall(new SemanticNodeList(), "getId");
+                  strExprs.add(texpr);
                   str = new StringBuilder();
                   str.append("'");
                }
@@ -1061,15 +1074,20 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                   str.append(">");
                }
                if (strExprs.size() > 0) {
-                  strExprs.add(StringLiteral.create(str.toString()));
+                  texpr = StringLiteral.create(str.toString());
+                  texpr.fromStatement = this;
+                  strExprs.add(texpr);
                   str = new StringBuilder();
                }
             }
          }
 
          if (uniqueChildren != null && (doFlags & doOutputBody) != 0) {
+            Expression texpr;
             if (str.length() > 0 && !inactive) {
-               strExprs.add(StringLiteral.create(str.toString()));
+               texpr = StringLiteral.create(str.toString());
+               texpr.fromStatement = this;
+               strExprs.add(texpr);
                str = new StringBuilder();
             }
             if (strExprs.size() > 0) {
@@ -1094,8 +1112,11 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
             str.append(">");
          }
 
-         if (str.length() > 0)
-            strExprs.add(StringLiteral.create(str.toString()));
+         if (str.length() > 0) {
+            Expression texpr = StringLiteral.create(str.toString());
+            texpr.fromStatement = this;
+            strExprs.add(texpr);
+         }
 
          Expression tagExpr = null;
          if (strExprs.size() == 1) {
@@ -1866,25 +1887,23 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       invalidate();
    }
 
-   public ISrcStatement getSrcStatement(Language lang) {
-      return this; // TODO: generating elements from code
-   }
 
-   public ISrcStatement findFromStatement(ISrcStatement st) {
-      return null; // TODO: generating elements from code
-   }
-
-   public void addGeneratedFromNodes(List<ISrcStatement> result, ISrcStatement st) {
-      // TODO: generating elements
-   }
-
-   public ISrcStatement getFromStatement() {
-      return null;
-   }
-
+   /** This handles breakpoints at the tag level.  To find the matching source statement, need to check our attributes and sub-tags */
    public boolean getNodeContainsPart(ISrcStatement partNode) {
-      return partNode == this;
+      if (partNode == this || sameSrcLocation(partNode))
+         return true;
+      if (children != null) {
+         for (Object child:children) {
+            if (child instanceof ISrcStatement) {
+               ISrcStatement childSt = (ISrcStatement) child;
+               if (childSt == partNode || childSt.getNodeContainsPart(partNode))
+                  return true;
+            }
+         }
+      }
+      return false;
    }
+
 
    static class AddChildResult {
       boolean needsSuper = false;
@@ -2151,6 +2170,8 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          //if (isAbstract())
          //   tagType.addModifier("abstract");
       }
+      // Leave a trail for finding where this statement was generated from for debugging purposes
+      tagType.fromStatement = this;
       if (repeatWrapper == null && extTypeDecl != null) {
          // Only support the repeat element type parameter if the base class has it set.
          List<?> extTypeParams = ModelUtil.getTypeParameters(extTypeDecl);
@@ -2279,7 +2300,10 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                          tagType.addBodyStatementIndent(pa);
                       // If we're tracking changes for the page content
                       if (template.statefulPage && !isReadOnlyAttribute(att.name) && isHtmlAttribute(att.name) && !hasInvalidateBinding(att.name) && !isRefreshAttribute(att.name)) {
-                         PropertyAssignment ba = PropertyAssignment.create(Element.mapAttributeToProperty(att.name), IdentifierExpression.createMethodCall(new SemanticNodeList(), "invalidateStartTag"), "=:");
+                         IdentifierExpression methCall = IdentifierExpression.createMethodCall(new SemanticNodeList(), "invalidateStartTag");
+                         methCall.fromStatement = att; // We will strip off the PropertyAssignment so need to set this up here too
+                         PropertyAssignment ba = PropertyAssignment.create(Element.mapAttributeToProperty(att.name), methCall, "=:");
+                         ba.fromStatement = att;
                          tagType.addBodyStatementIndent(ba);
                       }
                    }
@@ -2330,6 +2354,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
             // TODO: make these parameters configurable - e.g. request and response?  Or just as a RequestContext method we can customize for different frameworks
             outputStartMethod.setProperty("parameters", template.getDefaultOutputParameters());
             outputStartMethod.initBody();
+            outputStartMethod.fromStatement = this;
             String preTagStr;
             if (preTagContent == null) {
                StringBuilder parentPreTagContent = getInheritedPreTagContent();
@@ -2361,6 +2386,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
             outputBodyMethod.setProperty("modifiers", mods);
             outputBodyMethod.setProperty("type", PrimitiveType.create("void"));
             outputBodyMethod.setProperty("parameters", template.getDefaultOutputParameters());
+            outputBodyMethod.fromStatement = this;
             outputBodyMethod.initBody();
             SemanticNodeList<Expression> outArgs = new SemanticNodeList<Expression>();
             outArgs.add(IdentifierExpression.create("out"));
@@ -2370,8 +2396,11 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                // Use of addBefore or addAfter with append mode?  Not sure this makes sense... maybe an error?
                if (uniqueChildren == children || bodyMerge == MergeMode.Merge) {
                   // Do not do the super if there are any addBefore or addAfter's in our children's list
-                  if (needsSuper)
-                     outputBodyMethod.addStatement(IdentifierExpression.createMethodCall(outArgs, "super.outputBody"));
+                  if (needsSuper) {
+                     IdentifierExpression texpr = IdentifierExpression.createMethodCall(outArgs, "super.outputBody");
+                     texpr.fromStatement = this;
+                     outputBodyMethod.addStatement(texpr);
+                  }
                }
                else
                   displayWarning("Use of addBefore/addAfter with bodyMerge='append' - not appending to eliminate duplicate content");
@@ -3352,14 +3381,6 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       }
    }
 
-   public void setUserData(Object v)  {
-      userData = v;
-   }
-
-   public Object getUserData() {
-      return userData;
-   }
-
    public Element refreshNode() {
       if (tagObject != null) {
          Element newElem = ((TypeDeclaration) tagObject.refreshNode()).element;
@@ -3379,5 +3400,17 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          return 0;
       }
       return -1;
+   }
+
+   public void setNodeName(String newName) {
+      setProperty("tagName", newName);
+   }
+
+   public String getNodeName() {
+      return tagName;
+   }
+
+   public String toListDisplayString() {
+      return toString();
    }
 }

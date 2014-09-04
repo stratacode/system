@@ -9,6 +9,7 @@ import sc.bind.BindingDirection;
 import sc.dyn.DynUtil;
 import sc.lang.ILanguageModel;
 import sc.lang.INamedNode;
+import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
 import sc.lang.html.Attr;
 import sc.layer.Layer;
@@ -309,6 +310,8 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
          else {
             newInit = getInitializerExpr();
          }
+         if (newInit.fromStatement == null)
+            newInit.fromStatement = fromStatement;
          /*
          if (!removeReverseSet) {
             ParseUtil.initAndStartComponent(newInit);
@@ -929,5 +932,22 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
          displayError("Property removed ", propertyName);
       }
       return null;
+   }
+
+   public ISrcStatement findFromStatement(ISrcStatement st) {
+      ISrcStatement res = super.findFromStatement(st);
+      if (res != null)
+         return res;
+
+      if (st == fromAttribute || (fromAttribute != null && fromAttribute.findFromStatement(st) != null))
+         return this;
+      return null;
+   }
+
+   public ISrcStatement getSrcStatement(Language lang) {
+      // We will propagate this request as long as this node is not in the target language
+      if (fromAttribute != null && (parseNode == null || parseNode.getParselet().getLanguage() != lang))
+         return fromAttribute.getSrcStatement(lang);
+      return super.getSrcStatement(lang);
    }
 }

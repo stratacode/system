@@ -4,16 +4,13 @@
 
 package sc.layer;
 
-import sc.lang.SCLanguage;
-import sc.lang.SemanticNodeList;
-import sc.parser.Language;
+import sc.lang.*;
+import sc.parser.*;
 import sc.type.CTypeUtil;
 import sc.util.ExtensionFilenameFilter;
 import sc.util.FileUtil;
 import sc.util.PatternFilenameFilter;
 import sc.util.StringUtil;
-import sc.parser.IString;
-import sc.parser.PString;
 
 import javax.tools.*;
 import java.io.*;
@@ -26,8 +23,16 @@ public class LayerUtil implements LayerConstants {
       return layerName + FileUtil.FILE_SEPARATOR + LAYER_CLASS_NAME + ".java";
    }
 
-   public static String getLayerClassFileDirectory(Layer layer, String layerName) {
-      return layerName + FileUtil.FILE_SEPARATOR + (layer.dynamic ? DYN_BUILD_DIRECTORY : BUILD_DIRECTORY);
+   public static String getLayerClassFileDirectory(Layer layer, String layerName, boolean srcDir) {
+      LayeredSystem sys = layer.layeredSystem;
+      String sysBuildDir = srcDir && sys.options.buildSrcDir != null ?  sys.options.buildSrcDir : sys.options.buildDir;
+      String newLayerDir = sys.newLayerDir;
+      if (newLayerDir == null) {
+         newLayerDir = System.getProperty("user.dir");
+      }
+      String prefix = sysBuildDir == null ?  FileUtil.concat(newLayerDir, "temp", "build") : sysBuildDir;
+      prefix = FileUtil.concat(prefix, layer.getUnderscoreName());
+      return prefix + FileUtil.FILE_SEPARATOR + (layer.dynamic ? DYN_BUILD_DIRECTORY : BUILD_DIRECTORY);
    }
 
    /** Takes the generated srcEnt */
@@ -517,4 +522,22 @@ public class LayerUtil implements LayerConstants {
       }
       return sb.toString();
    }
+
+   public static void reportMessageToHandler(IMessageHandler errorHandler, String error, SrcEntry srcEnt, ISemanticNode node, MessageType type) {
+      int line = -1;
+      int col = -1;
+      IParseNode parseNode = node.getParseNode();
+      if (parseNode != null) {
+         int startIx = parseNode.getStartIndex();
+         if (startIx != -1) {
+            FilePosition pos = ParseUtil.charOffsetToLinePos(new File(srcEnt.absFileName), startIx);
+            if (pos != null) {
+               line = pos.lineNum;
+               col = pos.colNum;
+            }
+         }
+      }
+      errorHandler.reportMessage(error, srcEnt == null ? null : srcEnt.getJarUrl(), line, col, type);
+   }
+
 }

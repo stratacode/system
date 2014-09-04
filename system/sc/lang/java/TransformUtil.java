@@ -380,7 +380,7 @@ public class TransformUtil {
                }
             }
 
-            // For debugging registration, we need to walk the generated code and re-stablishe the links to the assignment expressions from which these were generated.
+            // For debugging registration, we need to walk the generated code and re-establish the links to the assignment expressions from which these were generated.
             if (fromStatements != null || globalFromStatement != null)
                ModelUtil.updateFromStatementRefs(list, fromStatements, globalFromStatement);
 
@@ -1028,6 +1028,7 @@ public class TransformUtil {
       }
       params.setTypeName = setMethod == null ? params.propertyTypeName : ModelUtil.getGenericSetMethodPropertyTypeName(typeDeclaration, setMethod, true);
       params.enclosingTypeName = typeDeclaration.getFullTypeName();
+
       TypeDeclaration rootType = typeDeclaration.getRootType();
       if (rootType == null)
          rootType = typeDeclaration;

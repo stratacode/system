@@ -724,8 +724,8 @@ public class EditorContext extends ClientEditorContext {
       BodyTypeDeclaration currentTD = (BodyTypeDeclaration) currentType;
       JavaModel model = currentTD.getJavaModel();
 
-      ErrorHandler handler = new ErrorHandler();
-      IErrorHandler oldHandler = model.getErrorHandler();
+      MessageHandler handler = new MessageHandler();
+      IMessageHandler oldHandler = model.getErrorHandler();
       ExecutionContext ctx = new ExecutionContext(system);
       Statement replaced = null;
       try {
