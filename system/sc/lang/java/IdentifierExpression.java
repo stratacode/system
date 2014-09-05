@@ -4372,7 +4372,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          // Method super
          if (sz == 2) {
             if (getLayeredSystem() == null || getLayeredSystem().runtimeProcessor == null)
-               System.out.println("***");
+               System.out.println("*** Error - invalid type in JS conversion");
             if (boundTypes == null)
                System.err.println("*** Unresolved identifier expression in JS conversion: " + this);
             else {
@@ -4649,5 +4649,15 @@ public class IdentifierExpression extends ArgumentsExpression {
          }
       }
       return null;
+   }
+
+   // An argument of the expression might be a NewExpression with a class body so we need to look for more than just one match against the identifier expression
+   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      super.addGeneratedFromNodes(res, srcStatement);
+      if (arguments != null) {
+         for (Expression arg:arguments) {
+            arg.addGeneratedFromNodes(res, srcStatement);
+         }
+      }
    }
 }

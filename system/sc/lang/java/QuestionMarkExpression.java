@@ -5,6 +5,7 @@
 package sc.lang.java;
 
 import sc.bind.BindingDirection;
+import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
 
 import java.util.List;
@@ -186,5 +187,15 @@ public class QuestionMarkExpression extends Expression {
 
    public boolean applyPartialValue(Object value) {
       return super.applyPartialValue(value);
+   }
+
+   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      super.addGeneratedFromNodes(res, srcStatement);
+      if (condition != null)
+         condition.addGeneratedFromNodes(res, srcStatement);
+      if (trueChoice != null)
+         trueChoice.addGeneratedFromNodes(res, srcStatement);
+      if (falseChoice != null)
+         falseChoice.addGeneratedFromNodes(res, srcStatement);
    }
 }

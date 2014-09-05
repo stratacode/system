@@ -25,6 +25,10 @@ public class LayerUtil implements LayerConstants {
 
    public static String getLayerClassFileDirectory(Layer layer, String layerName, boolean srcDir) {
       LayeredSystem sys = layer.layeredSystem;
+      // This is a convenience option which eliminates the layer_name/build from the paths we generate for the final build layer
+      if (sys.buildLayer == layer && sys.options.buildLayerAbsDir != null) {
+         return sys.options.buildLayerAbsDir;
+      }
       String sysBuildDir = srcDir && sys.options.buildSrcDir != null ?  sys.options.buildSrcDir : sys.options.buildDir;
       String newLayerDir = sys.newLayerDir;
       if (newLayerDir == null) {
@@ -55,7 +59,7 @@ public class LayerUtil implements LayerConstants {
       suppressedCompilerMessages.add("Note: Recompile with -Xlint:unchecked for details.");
    }
 
-   public static int compileJavaFilesInternal(Collection<SrcEntry> srcEnts, String buildDir, String classPath, boolean debug) {
+   public static int compileJavaFilesInternal(Collection<SrcEntry> srcEnts, String buildDir, String classPath, boolean debug, IMessageHandler messageHandler) {
       JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
 
       DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<JavaFileObject>();
@@ -88,8 +92,11 @@ public class LayerUtil implements LayerConstants {
          for (Diagnostic diagnostic : diagnostics.getDiagnostics()) {
             java.io.PrintStream printer = result ? System.out : System.err;
             String message = diagnostic.getMessage(Locale.getDefault());
-            if (!result && !suppressedCompilerMessages.contains(message))
+            if (!result && !suppressedCompilerMessages.contains(message)) {
+               if (messageHandler != null)
+                  messageHandler.reportMessage(message, null, -1, -1, MessageType.Error);
                printer.println(message);
+            }
             printer.flush();
          }
 
@@ -124,7 +131,7 @@ public class LayerUtil implements LayerConstants {
       }
    }
    
-   public static int compileJavaFiles(Collection<SrcEntry> srcEnts, String buildDir, String classPath, boolean debug) {
+   public static int compileJavaFiles(Collection<SrcEntry> srcEnts, String buildDir, String classPath, boolean debug, IMessageHandler handler) {
       if (srcEnts.size() > 0) {
          List<String> args = new ArrayList<String>(srcEnts.size() + 5);
          args.add("javac");

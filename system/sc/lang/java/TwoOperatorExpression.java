@@ -84,4 +84,13 @@ public abstract class TwoOperatorExpression extends Expression {
    public boolean matchesStatement(Statement other) {
       return deepEquals(other);
    }
+
+   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      super.addGeneratedFromNodes(res, srcStatement);
+      if (lhs != null) {
+         lhs.addGeneratedFromNodes(res, srcStatement);
+      }
+      if (rhs != null)
+         rhs.addGeneratedFromNodes(res, srcStatement);
+   }
 }

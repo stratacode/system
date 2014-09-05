@@ -6,6 +6,7 @@ package sc.lang.java;
 
 import sc.bind.ArraySelectorBinding;
 import sc.dyn.DynUtil;
+import sc.lang.ISrcStatement;
 import sc.lang.JavaLanguage;
 import sc.lang.ILanguageModel;
 import sc.parser.ParseUtil;
@@ -919,4 +920,32 @@ public class SelectorExpression extends ChainedExpression {
       return false;
    }
 
+   public ISrcStatement findFromStatement(ISrcStatement st) {
+      ISrcStatement res = super.findFromStatement(st);
+      if (res != null)
+         return res;
+      if (expression != null && expression.findFromStatement(st) != null)
+         return this;
+      // The breakpoint may be set on some expression that has been embedded into one of our arguments.  If so, we are the closest statement to the breakpoint
+      if (selectors != null) {
+         for (Selector sel:selectors) {
+            if (sel.findFromStatement(st) != null)
+               return this;
+         }
+      }
+      return null;
+   }
+
+   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      super.addGeneratedFromNodes(res, srcStatement);
+      if (expression != null) {
+         expression.addGeneratedFromNodes(res, srcStatement);
+      }
+      // The breakpoint may be set on some expression that has been embedded into one of our arguments.  If so, we are the closest statement to the breakpoint
+      if (selectors != null) {
+         for (Selector sel:selectors) {
+            sel.addGeneratedFromNodes(res, srcStatement);
+         }
+      }
+   }
 }

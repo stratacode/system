@@ -5,10 +5,12 @@
 package sc.lang.java;
 
 import sc.lang.ISemanticNode;
+import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
 import sc.type.TypeUtil;
 
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Set;
 
 public class VariableSelector extends Selector {
@@ -113,5 +115,28 @@ public class VariableSelector extends Selector {
          res.isAssignment = isAssignment;
       }
       return res;
+   }
+
+   public ISrcStatement findFromStatement(ISrcStatement st) {
+      if (arguments != null) {
+         for (Expression expr:arguments) {
+            if (expr != null) {
+               ISrcStatement res = expr.findFromStatement(st);
+               if (res != null)
+                  return res;
+            }
+         }
+      }
+      return null;
+   }
+
+   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      if (arguments != null) {
+         for (Expression expr:arguments) {
+            if (expr != null) {
+               expr.addGeneratedFromNodes(res, srcStatement);
+            }
+         }
+      }
    }
 }

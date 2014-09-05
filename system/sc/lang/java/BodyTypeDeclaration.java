@@ -3758,7 +3758,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             System.out.println("Compiling: " + toCompileEnts + " into build dir: " + bd + " with classpath: " + cp);
          else if (sys.options.info)
             System.out.println("Compiling: " + toCompileEnts.size() + " stub files");
-         if (doCompile && LayerUtil.compileJavaFilesInternal(toCompileEnts, bd, cp, sys.options.debug) != 0) {
+         if (doCompile && LayerUtil.compileJavaFilesInternal(toCompileEnts, bd, cp, sys.options.debug, sys.messageHandler) != 0) {
             displayError("Failed compile step for dynamic type: " + getFullTypeName() + " for ");
          }
       }
@@ -7974,4 +7974,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public boolean childIsTopLevelStatement(Statement child) {
       return true;
    }
+
+   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      super.addGeneratedFromNodes(res, srcStatement);
+      if (body != null) {
+         for (Statement st:body) {
+            st.addGeneratedFromNodes(res, srcStatement);
+         }
+      }
+   }
+
 }

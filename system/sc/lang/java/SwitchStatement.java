@@ -4,6 +4,8 @@
 
 package sc.lang.java;
 
+import sc.lang.ISrcStatement;
+
 import java.util.EnumSet;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -185,4 +187,15 @@ public class SwitchStatement extends Statement {
       return newSt;
    }
 
+   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      super.addGeneratedFromNodes(res, srcStatement);
+      if (expression != null)
+         expression.addGeneratedFromNodes(res, srcStatement);
+      if (statements != null) {
+         for (Statement statement:statements) {
+            if (statement != null)
+               statement.addGeneratedFromNodes(res, srcStatement);
+         }
+      }
+   }
 }

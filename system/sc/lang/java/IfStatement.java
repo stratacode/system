@@ -107,4 +107,19 @@ public class IfStatement extends NonIndentedStatement {
    public boolean childIsTopLevelStatement(Statement child) {
       return child == trueStatement || child == falseStatement;
    }
+
+   public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append("if (");
+      if (expression != null)
+         sb.append(expression);
+      sb.append(")");
+      if (trueStatement != null)
+         sb.append(trueStatement);
+      if (falseStatement != null) {
+         sb.append(" else ");
+         sb.append(falseStatement);
+      }
+      return sb.toString();
+   }
 }

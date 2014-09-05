@@ -8,6 +8,7 @@ import sc.bind.BindingDirection;
 import sc.bind.Bind;
 import sc.bind.IBinding;
 import sc.lang.ILanguageModel;
+import sc.lang.ISrcStatement;
 import sc.lang.SCLanguage;
 import sc.lang.SemanticNodeList;
 import sc.lang.js.JSUtil;
@@ -23,6 +24,7 @@ import java.lang.reflect.Array;
 import java.util.*;
 
 public class NewExpression extends IdentifierExpression {
+   public static String ANON_TYPE_PREFIX = "__Anon";
    public SemanticNodeList<Expression> arrayDimensions;
    public ArrayInitializer arrayInitializer;
    public String typeIdentifier;
@@ -78,7 +80,7 @@ public class NewExpression extends IdentifierExpression {
             // maybe we do not need to do this afterall?   Right now it's a mix of both approaches.
             anonType = new AnonClassDeclaration();
             anonId = enclType.allocateAnonId();
-            anonType.typeName = "__Anon" + anonId;
+            anonType.typeName = ANON_TYPE_PREFIX + anonId;
             anonType.operator = "class";
             anonType.newExpr = this;
 
@@ -435,7 +437,7 @@ public class NewExpression extends IdentifierExpression {
 
    private int anonId = -1;
 
-   ClassDeclaration getAnonymousType(boolean xform) {
+   public ClassDeclaration getAnonymousType(boolean xform) {
       if (anonType == null) {
          initAnonymousType();
       }
@@ -473,7 +475,7 @@ public class NewExpression extends IdentifierExpression {
          }
          if (anonId == -1) {
             anonId = enclType.allocateAnonId();
-            anonType.typeName = "__Anon" + anonId;
+            anonType.typeName = ANON_TYPE_PREFIX + anonId;
          }
          anonTypeInited = true;
 
@@ -904,5 +906,14 @@ public class NewExpression extends IdentifierExpression {
          relPos -= 4;
       }
       return relPos;
+   }
+
+   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      super.addGeneratedFromNodes(res, srcStatement);
+      if (classBody != null) {
+         for (Statement st:classBody) {
+            st.addGeneratedFromNodes(res, srcStatement);
+         }
+      }
    }
 }

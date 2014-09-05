@@ -5,7 +5,9 @@
 package sc.lang.java;
 
 import sc.bind.BindingDirection;
+import sc.lang.ISrcStatement;
 
+import java.util.List;
 import java.util.Set;
 
 public abstract class ChainedExpression extends Expression {
@@ -70,5 +72,12 @@ public abstract class ChainedExpression extends Expression {
       if (expression != null)
          expression.transformToJS();
       return this;
+   }
+
+   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      super.addGeneratedFromNodes(res, srcStatement);
+      if (expression != null) {
+         expression.addGeneratedFromNodes(res, srcStatement);
+      }
    }
 }

@@ -4,6 +4,9 @@
 
 package sc.lang.java;
 
+import sc.lang.ISrcStatement;
+
+import java.util.List;
 import java.util.Set;
 
 public class LabelStatement extends Statement {
@@ -24,5 +27,11 @@ public class LabelStatement extends Statement {
       if (statement != null)
          statement.transformToJS();
       return this;
+   }
+
+   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      super.addGeneratedFromNodes(res, srcStatement);
+      if (statement != null)
+         statement.addGeneratedFromNodes(res, srcStatement);
    }
 }

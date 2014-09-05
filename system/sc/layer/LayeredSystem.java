@@ -1083,6 +1083,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    private void initBuildDir() {
       if (layers.size() > 0) {
+         // Since we may need to generate dynamic stubs, we'll use the last layer, even if it is dynamic.
+         // The previous design was to make the buildDir the last-non-dynamic layer which would be nice but only
+         // if it was built the same no matter what the other layers.  Since dynamic layers inject dependencies,
+         // you can get a new build if you need to add a new stub.
+         buildLayer = layers.get(layers.size()-1);
 
          // Initializing the buildDir.  Must be done after the runtime processors are set up because that affects
          // the choice of the buildDir for a given layer.
@@ -1091,12 +1096,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (l.buildDir == null) // TODO: only for buildLayers?
                l.initBuildDir();
          }
-
-         // Since we may need to generate dynamic stubs, we'll use the last layer, even if it is dynamic.
-         // The previous design was to make the buildDir the last-non-dynamic layer which would be nice but only
-         // if it was built the same no matter what the other layers.  Since dynamic layers inject dependencies,
-         // you can get a new build if you need to add a new stub.
-         buildLayer = layers.get(layers.size()-1);
 
          String oldBuildDir = loadedBuildLayers.get(buildLayer.layerUniqueName);
          if (oldBuildDir != null && !buildLayer.getBuildClassesDir().equals(oldBuildDir))
@@ -1118,9 +1117,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                commonBuildLayer = buildLayer;
             }
 
-            String layerDirName = buildLayer.getUnderscoreName();
-
             /*
+               String layerDirName = buildLayer.getUnderscoreName();
+
             if (options.buildSrcDir == null && options.buildDir == null)
                buildSrcDir = buildLayer.buildSrcDir;
             else {
@@ -2043,6 +2042,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       /** When you have multiple build layers, causes each subsequent layer to get all source/class files from the previous. */
       @Constant public boolean useCommonBuildDir = false;
       @Constant public String buildDir;
+      @Constant public String buildLayerAbsDir;
       @Constant public String buildSrcDir;
       /** By default run all main methods defined with no arguments */
       @Constant public String runClass = ".*";
@@ -2136,7 +2136,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   else
                      usage("Unrecognized option: " + opt, args);
                case 'd':
-                  if (opt.equals("d") || opt.equals("ds") || opt.equals("db")) {
+                  if (opt.equals("d") || opt.equals("ds") || opt.equals("db") || opt.equals("da")) {
                      if (i == args.length - 1)
                         System.err.println("*** Missing buildDir argument to -d option");
                      else {
@@ -2145,6 +2145,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                            options.buildDir = buildArg;
                         if (opt.equals("ds"))
                            options.buildSrcDir = buildArg;
+                        if (opt.equals("da"))
+                           options.buildLayerAbsDir = buildArg;
                      }
                   }
                   else if (opt.equals("dynone")) {
@@ -3749,7 +3751,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public void addLayer(Layer layer, ExecutionContext ctx, boolean runMain, boolean setPackagePrefix, boolean saveModel, boolean makeBuildLayer, boolean build) {
       // Don't use the specified buildDir for the new layer
-      options.buildDir = null;
+      options.buildLayerAbsDir = null;
 
       int newLayerPos = lastLayer == null ? 0 : lastLayer.layerPosition + 1;
       Layer oldBuildLayer = buildLayer;
@@ -6421,7 +6423,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                System.out.println("Compiling Java: " + bd.toCompile.size() + " files into " + genLayer.getBuildClassesDir());
 
             PerfMon.start("javaCompile");
-            if (LayerUtil.compileJavaFilesInternal(bd.toCompile, genLayer.getBuildClassesDir(), getClassPathForLayer(genLayer, genLayer.getBuildClassesDir()), options.debug) == 0) {
+            if (LayerUtil.compileJavaFilesInternal(bd.toCompile, genLayer.getBuildClassesDir(), getClassPathForLayer(genLayer, genLayer.getBuildClassesDir()), options.debug, messageHandler) == 0) {
                if (!buildInfo.buildJars())
                   compileFailed = true;
             }
@@ -8816,21 +8818,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (suffix != null)
          subPath = FileUtil.addExtension(subPath, suffix);
 
-      // Should we check the inactiveLayers?  Only if we original the search from an inactive layer (or there are just no active layers yet)
-      if (buildLayer == null || (refLayer != null && !refLayer.activated) || (fromLayer != null && !fromLayer.activated)) {
-         int startIx = inactiveLayers.size() - 1;
-         if (fromLayer != null && !fromLayer.activated && fromLayer.layerPosition - 1 < inactiveLayers.size())
-            startIx = fromLayer.layerPosition - 1;
-         for (int i = startIx; i >= 0; i--) {
-            Layer inactiveLayer = inactiveLayers.get(i);
-            //SrcEntry ent = inactiveLayer.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, runtimeProcessor, layerResolve);
-            SrcEntry ent = inactiveLayer.getSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, layerResolve);
-            if (ent != null) {
-               return ent;
-            }
-         }
-      }
-
       // In general we search from most recent to original
       int startIx = layers.size() - 1;
 
@@ -8844,6 +8831,22 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (res != null)
             return res;
       }
+
+      // Should we check the inactiveLayers?  Only if we original the search from an inactive layer.  By default, don't look at inactiveLayers when we are building
+      if (!buildingSystem || (refLayer != null && !refLayer.activated) || (fromLayer != null && !fromLayer.activated)) {
+         startIx = inactiveLayers.size() - 1;
+         if (fromLayer != null && !fromLayer.activated && fromLayer.layerPosition - 1 < inactiveLayers.size())
+            startIx = fromLayer.layerPosition - 1;
+         for (int i = startIx; i >= 0; i--) {
+            Layer inactiveLayer = inactiveLayers.get(i);
+            //SrcEntry ent = inactiveLayer.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, runtimeProcessor, layerResolve);
+            SrcEntry ent = inactiveLayer.getSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, layerResolve);
+            if (ent != null) {
+               return ent;
+            }
+         }
+      }
+
       return null;
    }
 

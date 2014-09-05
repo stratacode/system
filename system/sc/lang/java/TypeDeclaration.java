@@ -480,15 +480,6 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return null;
    }
 
-   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
-      super.addGeneratedFromNodes(res, srcStatement);
-      if (body != null) {
-         for (Statement st:body) {
-            st.addGeneratedFromNodes(res, srcStatement);
-         }
-      }
-   }
-
    public static enum InitStatementMode {
       All, SimpleOnly, RefsOnly;
 

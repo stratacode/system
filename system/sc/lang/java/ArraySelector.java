@@ -5,8 +5,10 @@
 package sc.lang.java;
 
 import sc.dyn.DynUtil;
+import sc.lang.ISrcStatement;
 
 import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Set;
 
 public class ArraySelector extends Selector {
@@ -80,5 +82,16 @@ public class ArraySelector extends Selector {
          res.isAssignment = isAssignment;
       }
       return res;
+   }
+
+   public ISrcStatement findFromStatement(ISrcStatement st) {
+      if (expression != null)
+         return expression.findFromStatement(st);
+      return null;
+   }
+
+   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      if (expression != null)
+         expression.addGeneratedFromNodes(res, srcStatement);
    }
 }

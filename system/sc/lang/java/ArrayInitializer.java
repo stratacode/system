@@ -6,6 +6,7 @@ package sc.lang.java;
 
 import sc.bind.BindingDirection;
 import sc.dyn.DynUtil;
+import sc.lang.ISrcStatement;
 import sc.lang.JavaLanguage;
 import sc.parser.ParseError;
 import sc.parser.ParseUtil;
@@ -264,5 +265,15 @@ public class ArrayInitializer extends Expression {
       sb.append(" ");
       sb.append(closeArr);
       return sb.toString();
+   }
+
+   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      super.addGeneratedFromNodes(res, srcStatement);
+      if (initializers != null) {
+         for (Expression expr:initializers) {
+            if (expr != null)
+               expr.addGeneratedFromNodes(res, srcStatement);
+         }
+      }
    }
 }

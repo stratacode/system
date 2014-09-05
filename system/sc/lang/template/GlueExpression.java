@@ -8,6 +8,7 @@ import sc.bind.BindingDirection;
 import sc.bind.ConstantBinding;
 import sc.bind.IBinding;
 import sc.lang.ILanguageModel;
+import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
 import sc.lang.TemplateLanguage;
 import sc.lang.html.Element;
@@ -22,8 +23,8 @@ import java.util.Set;
 
 /**
  * The cousin to GlueStatement.  This gets produced in the TemplateLanguage grammar by matching %> templateStuff <%.  It turns into one giant out.append(...) call effectively.
- * We can then insert a GlueExpression into the "primary" choice so it can match any Java expression.  This lets you pass long template strings
- * as parametrs to a method or compare or initialize variables etc.
+ * We can then insert a GlueExpression into the "primary" grammar node as an option in the template language.  This allows us to break into template mode in place of a Java expression - e.g.
+ * pass template strings as parametrs to a method or compare or initialize variables etc.
  */
 public class GlueExpression extends Expression {
    public List<Object> expressions; // IStrings or expressions - all turn into "append" operations onto the StringBuffer
@@ -183,5 +184,15 @@ public class GlueExpression extends Expression {
       }
       sb.append(TemplateLanguage.START_CODE_DELIMITER);
       return sb.toString();
+   }
+
+   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      super.addGeneratedFromNodes(res, srcStatement);
+      if (expressions != null) {
+         for (Object expr:expressions) {
+            if (expr instanceof Expression)
+               ((Expression) expr).addGeneratedFromNodes(res, srcStatement);
+         }
+      }
    }
 }

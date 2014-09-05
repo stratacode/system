@@ -8,6 +8,7 @@ import sc.bind.BindingDirection;
 import sc.bind.Bind;
 import sc.bind.IListener;
 import sc.dyn.DynUtil;
+import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
 import sc.parser.IString;
 import sc.parser.IStyleAdapter;
@@ -237,5 +238,15 @@ public class ArrayElementExpression extends IdentifierExpression {
          }
       }
       return sb.toString();
+   }
+
+   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      super.addGeneratedFromNodes(res, srcStatement);
+      if (arrayDimensions != null) {
+         for (Expression dim:arrayDimensions) {
+            if (dim != null)
+               dim.addGeneratedFromNodes(res, srcStatement);
+         }
+      }
    }
 }

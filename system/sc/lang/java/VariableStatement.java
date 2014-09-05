@@ -123,4 +123,8 @@ public class VariableStatement extends TypedDefinition {
       }
       return super.toSafeLanguageString();
    }
+
+   public String toString() {
+      return toSafeLanguageString();
+   }
 }

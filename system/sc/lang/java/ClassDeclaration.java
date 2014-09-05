@@ -1034,6 +1034,7 @@ public class ClassDeclaration extends TypeDeclaration {
       IfStatement ifStatement = new IfStatement();
       ifStatement.setProperty("expression", ParenExpression.create(ce));
       ifStatement.setProperty("trueStatement", ReturnStatement.create(null));
+      ifStatement.fromStatement = this;
 
       int spot = 0;
 
@@ -1046,9 +1047,11 @@ public class ClassDeclaration extends TypeDeclaration {
           (ModelUtil.hasModifier(extendsMethod, "public") || ModelUtil.hasModifier(extendsMethod, "protected"))) {
          IdentifierExpression ie = IdentifierExpression.create("super", superName);
          ie.setProperty("arguments", new SemanticNodeList(0));
+         ie.fromStatement = this;
          method.addStatementAt(spot++, ie);
       }
       AssignmentExpression ae = AssignmentExpression.create(IdentifierExpression.create("_initState"), "=", IntegerLiteral.create(level));
+      ae.fromStatement = this;
       method.addStatementAt(spot++, ae);
    }
 

@@ -4,6 +4,9 @@
 
 package sc.lang.java;
 
+import sc.lang.ISrcStatement;
+
+import java.util.List;
 import java.util.Set;
 
 public abstract class Selector extends JavaSemanticNode {
@@ -23,4 +26,7 @@ public abstract class Selector extends JavaSemanticNode {
 
    public abstract String toGenerateString();
 
+   public abstract ISrcStatement findFromStatement(ISrcStatement st);
+
+   public abstract void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement);
 }

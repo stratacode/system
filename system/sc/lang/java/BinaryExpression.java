@@ -7,6 +7,7 @@ package sc.lang.java;
 import sc.bind.BindingDirection;
 import sc.dyn.DynUtil;
 import sc.lang.ISemanticNode;
+import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
 import sc.parser.ParseUtil;
 import sc.type.InverseOp;
@@ -884,5 +885,15 @@ public class BinaryExpression extends Expression {
          }
       }
       return res;
+   }
+
+   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      super.addGeneratedFromNodes(res, srcStatement);
+      if (lhs != null) {
+         lhs.addGeneratedFromNodes(res, srcStatement);
+      }
+      Expression rhsExpr = getRhsExpr();
+      if (rhsExpr != null)
+         rhsExpr.addGeneratedFromNodes(res, srcStatement);
    }
 }

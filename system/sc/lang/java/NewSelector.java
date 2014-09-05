@@ -4,6 +4,9 @@
 
 package sc.lang.java;
 
+import sc.lang.ISrcStatement;
+
+import java.util.List;
 import java.util.Set;
 
 public class NewSelector extends Selector {
@@ -49,4 +52,15 @@ public class NewSelector extends Selector {
       return sb.toString();
    }
 
+   public ISrcStatement findFromStatement(ISrcStatement st) {
+      if (innerCreator != null)
+         return innerCreator.findFromStatement(st);
+      return null;
+   }
+
+   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      if (innerCreator != null) {
+         innerCreator.addGeneratedFromNodes(res, srcStatement);
+      }
+   }
 }
