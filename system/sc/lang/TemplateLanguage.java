@@ -397,7 +397,7 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
                      // Also skip fragment pages.  Not sure these are exactly the right tests but on the server there will be a URL
                      boolean hasURL = false;
                      boolean hasMainInit = false;
-                     if (processOnlyURLs && (hasURL = ModelUtil.getInheritedAnnotation(sys, rootTypeObj, "sc.html.URL") == null) && (hasMainInit = ModelUtil.getInheritedAnnotation(buildLayer.layeredSystem, rootTypeObj, "sc.html.MainInit") == null)) {
+                     if (processOnlyURLs && (hasURL = ModelUtil.getInheritedAnnotation(sys, rootTypeObj, "sc.html.URL", false, null, false) == null) && (hasMainInit = ModelUtil.getInheritedAnnotation(buildLayer.layeredSystem, rootTypeObj, "sc.html.MainInit", false, null, false) == null)) {
                         if (buildLayer.layeredSystem.options.verbose)
                            System.out.println("No file for template: " + src.relFileName + " type: " + ModelUtil.getTypeName(rootTypeObj) + ": no @URL or @MainInit");
                         return;

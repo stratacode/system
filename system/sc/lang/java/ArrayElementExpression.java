@@ -200,7 +200,8 @@ public class ArrayElementExpression extends IdentifierExpression {
 
    public void styleNode(IStyleAdapter adapter) {
       super.styleNode(adapter);
-      arrayDimensions.styleNode(adapter);
+      // These get styled as the arguments in the identifier expression
+      //arrayDimensions.styleNode(adapter);
    }
 
    public void refreshBoundTypes() {

@@ -51,6 +51,7 @@ import java.util.zip.ZipFile;
  * you have a variety of ways to alter the behavior of how your project is built and run.
  */
 public class Layer implements ILifecycle, LayerConstants {
+   public final static Layer ANY_LAYER = new Layer();
    /** Any set of dependent classes code in this layer requires */
    public String classPath;
 
@@ -1339,7 +1340,7 @@ public class Layer implements ILifecycle, LayerConstants {
                // Forcing it to always check for inner types here since we may be directly importing an inner type.
                // There's an optimization to avoid the getClass call for inner types in the general case.
                if (typeObj == null)
-                  typeObj = layeredSystem.getClassWithPathName(typeName, true, true);
+                  typeObj = layeredSystem.getClassWithPathName(typeName, this, true, true);
                if (imp.hasWildcard()) {
                   boolean addedAny = false;
                   if (typeObj != null) {

@@ -727,11 +727,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public Object getInheritedAnnotation(String annotationName) {
-      return getInheritedAnnotation(annotationName, false);
+      return getInheritedAnnotation(annotationName, false, getLayer(), isLayerType);
    }
 
    // Either a compiled java annotation or a parsed Annotation
-   public Object getInheritedAnnotation(String annotationName, boolean skipCompiled) {
+   public Object getInheritedAnnotation(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
       Object annot = getAnnotation(annotationName);
       if (annot != null)
          return annot;
@@ -747,7 +747,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return null;
       }
 
-      Object annotObj = !skipCompiled || superType instanceof BodyTypeDeclaration ? ModelUtil.getInheritedAnnotation(model.layeredSystem, superType, annotationName, skipCompiled) : null;
+      Object annotObj = !skipCompiled || superType instanceof BodyTypeDeclaration ? ModelUtil.getInheritedAnnotation(model.layeredSystem, superType, annotationName, skipCompiled, refLayer, layerResolve) : null;
       if (annotObj != null)
          return annotObj;
 
@@ -756,7 +756,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // a meta layer to attach annotations onto a type which is automatically added via an annotation, e.g. GWT's EntryPoint
       // added by the GWTModule annotation.
       for (Object scopeType:scopeTypes) {
-         if ((annotObj = ModelUtil.getInheritedAnnotation(getJavaModel().layeredSystem, scopeType, annotationName)) != null)
+         if ((annotObj = ModelUtil.getInheritedAnnotation(getJavaModel().layeredSystem, scopeType, annotationName, false, refLayer, layerResolve)) != null)
             return annotObj;
       }
       return null;
@@ -1767,7 +1767,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public Object getClass(String className, boolean useImports) {
-      return getJavaModel().getClass(className, useImports);
+      JavaModel model = getJavaModel();
+      return model.getClass(className, useImports, model.getLayer(), model.isLayerModel);
    }
 
    public Object findTypeDeclaration(String typeName, boolean addExternalReference) {
@@ -3211,7 +3212,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       initOuterInstanceSlot(inst, ctx);
 
-      if (getLiveDynamicTypesAnnotation() && !isLayerType) {
+      if (!isLayerType && getLiveDynamicTypesAnnotation()) {
          // Add this instance to the global table so we can do type -> inst mapping
          getLayeredSystem().addDynInstanceInternal(this.getFullTypeName(), inst);
       }
@@ -7390,7 +7391,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
          // When dealing with the same system, we just process types that have @Sync explicitly set.  Otherwise, all types would overlap
          if (syncSys != sys) {
-            syncType = syncMode == SyncMode.Automatic? syncSys.getSrcTypeDeclaration(typeName, null, true) : null;
+            syncType = syncMode == SyncMode.Automatic? (TypeDeclaration) syncSys.getSrcTypeDeclaration(typeName, null, true, false, true, getLayer(), false) : null;
             if (syncType != null && syncType.isTransformed())
                System.err.println("*** Sync type has been transformed!");
          }
@@ -7964,10 +7965,19 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (removed) // For live types we have a ref to the replacement
          return (TypeDeclaration) replacedByType.refreshNode();
       // Or we can look our replacement up...
-      Object res = oldModel.layeredSystem.getSrcTypeDeclaration(getFullTypeName(), null, true,  false, false, layer, oldModel.isLayerModel);
-      if (res instanceof TypeDeclaration)
-         return (TypeDeclaration) res;
+      Object res = oldModel.layeredSystem.getSrcTypeDeclaration(getFullTypeName(), getLayer().getNextLayer(), true,  false, false, layer, oldModel.isLayerModel);
+      if (res instanceof TypeDeclaration) {
+         TypeDeclaration newType = (TypeDeclaration) res;
+         if (newType.getLayer() == getLayer())
+            return (TypeDeclaration) res;
+         else
+            System.out.println("***");
+         return this;
+      }
       displayError("Type removed: ", getFullTypeName(), " for ");
+      // TODO - remove for debugging
+      System.out.println("***");
+      res = oldModel.layeredSystem.getSrcTypeDeclaration(getFullTypeName(), null, true,  false, false, layer, oldModel.isLayerModel);
       return null;
    }
 

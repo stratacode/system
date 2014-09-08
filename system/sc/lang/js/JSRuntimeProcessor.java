@@ -958,7 +958,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
          // Since MainInit is in src form here, need to skip checking on compiled types or the runtime method barfs
          boolean entryPointAdded = false;
-         Object mainInit = type.getInheritedAnnotation("sc.html.MainInit", true);
+         Object mainInit = type.getInheritedAnnotation("sc.html.MainInit", true, type.getLayer(), false);
          if (mainInit != null && !type.hasModifier("abstract")) {
             Boolean subTypesOnly = (Boolean) ModelUtil.getAnnotationValue(mainInit, "subTypesOnly");
             if (subTypesOnly == null || !subTypesOnly || type.getAnnotation("sc.html.MainInit") == null) {
@@ -1098,7 +1098,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
    // TODO: should we check here if there's a main with MainSettings?
    public boolean isEntryPointType(Object type) {
-      Object mainInit = ModelUtil.getInheritedAnnotation(system, type, "sc.html.MainInit", true);
+      Object mainInit = ModelUtil.getInheritedAnnotation(system, type, "sc.html.MainInit", true, null, false);
       if (mainInit != null && !ModelUtil.hasModifier(type, "abstract")) {
          return true;
       }
@@ -1337,7 +1337,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          return true;
 
       if (type instanceof Class) {
-         Object newType = ModelUtil.findTypeDeclaration(system, ModelUtil.getTypeName(type));
+         Object newType = ModelUtil.findTypeDeclaration(system, ModelUtil.getTypeName(type), null, false);
          if (newType != null) {
             type = newType;
          }
@@ -1934,7 +1934,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             return null;
          //depType = ModelUtil.resolveSrcTypeDeclaration(system, depType);
          // But do not force the load of the src at this time.
-         Object newDepType = ModelUtil.findTypeDeclaration(system, ModelUtil.getTypeName(depType));
+         Object newDepType = ModelUtil.findTypeDeclaration(system, ModelUtil.getTypeName(depType), null, false);
          if (newDepType != null)
             depType = newDepType;
          else if (!depCL.isArray() && !depCL.isAnonymousClass())
@@ -2281,7 +2281,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       if (subTypeInfo != null && !subTypeInfo.presentInLayer(genLayer))
          return;
 
-      Object type = ModelUtil.findTypeDeclaration(system, typeName);
+      Object type = ModelUtil.findTypeDeclaration(system, typeName, genLayer, false);
       if (type instanceof BodyTypeDeclaration) {
          addTypeToFile((BodyTypeDeclaration) type, typesInFile, rootLibFile, genLayer, typesInSameFile);
       }
@@ -2453,6 +2453,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
 
 
+   // TODO: remove this in favor of loadClassesInRuntime?
    /** This runtime is not using the standard system class loader - so runtime types do not look in the class loader */
    public boolean usesThisClasspath() {
       return false;

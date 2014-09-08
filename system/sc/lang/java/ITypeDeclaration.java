@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.type.DynType;
 
@@ -52,7 +53,7 @@ public interface ITypeDeclaration {
 
    boolean implementsType(String otherTypeName);
 
-   Object getInheritedAnnotation(String annotationName, boolean skipCompiled);
+   Object getInheritedAnnotation(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve);
 
    Object getDerivedTypeDeclaration();
 

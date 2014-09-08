@@ -421,7 +421,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             // For styling snippets, there may be no src file and hence no type to be auto-imported
             String typeName = getModelTypeName();
             if (typeName != null) {
-               layeredSystem.addAutoImport(getLayer(), getModelTypeName(), autoImported);
+               Layer layer = getLayer();
+               // We only have to keep track of the auto-import if we are going to do some code-generation of this type - ie. it's activated
+               if (layer != null && layer.activated)
+                  layeredSystem.addAutoImport(getLayer(), getModelTypeName(), autoImported);
             }
             return autoImported.identifier;
          }
@@ -519,7 +522,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    /** Returns a type declaration defined in this model */
    public TypeDeclaration getTypeDeclaration(String typeName) {
-      assert initialized;
+     if (!initialized)
+       System.out.println("***");
+      //assert initialized;
 
       return definedTypesByName.get(typeName);
    }
@@ -648,7 +653,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                            break;
                         }
                      }
-                     if ((td = getClass(globalName, false, isLayerModel)) != null) {
+                     if ((td = getClass(globalName, false, layer, isLayerModel)) != null) {
                         typeName = globalName;
                         break;
                      }
@@ -657,14 +662,14 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                // TODO:  Very likely simplify this inner class stuff with the
                // code in LayeredSystem as it seems like there is redundancy.
                if (td == null)
-                  td = getClass(importedName, false, isLayerModel);
+                  td = getClass(importedName, false, layer, isLayerModel);
             }
             /* Only if we have not imported a class, try looking for a class in this package */
             if (td == null && importedName == typeName) {
                String pref = getPackagePrefix();
                if (pref != null) {
                   String prefTypeName = pref + "." + typeName;
-                  td = getClass(prefTypeName, false, isLayerModel);
+                  td = getClass(prefTypeName, false, layer, isLayerModel);
                }
             }
          }
@@ -700,16 +705,16 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public Object getClass(String className, boolean useImports) {
-      return getClass(className, useImports, false);
+      return getClass(className, useImports, null, false);
    }
 
-   public Object getClass(String className, boolean useImports, boolean layerResolve) {
+   public Object getClass(String className, boolean useImports, Layer refLayer, boolean layerResolve) {
       if (layeredSystem != null) {
-         Object cl = layeredSystem.getClassWithPathName(className, layerResolve, false);
+         Object cl = layeredSystem.getClassWithPathName(className, refLayer, layerResolve, false);
          if (cl == null && useImports) {
             String impName = getImportedName(className);
             if (impName != null)
-               return layeredSystem.getClassWithPathName(impName, layerResolve, false);
+               return layeredSystem.getClassWithPathName(impName, refLayer, layerResolve, false);
          }
          return cl;
       }
@@ -937,7 +942,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    public TypeDeclaration getPreviousDeclaration(String fullClassName) {
       if (layeredSystem == null || isLayerModel)
          return null;
-      return layeredSystem.getSrcTypeDeclaration(fullClassName, layer, prependLayerPackage);
+      return (TypeDeclaration) layeredSystem.getSrcTypeDeclaration(fullClassName, layer, prependLayerPackage, false, true, getLayer(), isLayerModel);
    }
 
    private final static List<SrcEntry> emptySrcEntriesList = Collections.emptyList();
@@ -1573,6 +1578,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
     * looks for a local type in this file, then will go resolve a global one from the system.
     */
    public Object resolveName(String name, boolean create, boolean addExternalReference) {
+      if (!initialized)
+         return null;
       Object type = findType(name);
       if (type != null) {
          if (type instanceof TypeDeclaration) {

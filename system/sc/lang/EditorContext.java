@@ -1214,7 +1214,7 @@ public class EditorContext extends ClientEditorContext {
             if (enclFragmentType != null && enclFragmentType.getEnclosingType() != null)
                typeName = CTypeUtil.prefixPath(typeName, CTypeUtil.getTailType(enclFragmentType.getInnerTypeName()));
 
-            Object enclType = system.getTypeDeclaration(typeName);
+            Object enclType = system.getTypeDeclaration(typeName, false, fileModel.getLayer(), fileModel.isLayerModel);
             if (enclType instanceof BodyTypeDeclaration)
                currentType = (BodyTypeDeclaration) enclType;
             else {

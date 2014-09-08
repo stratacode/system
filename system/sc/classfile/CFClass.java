@@ -547,13 +547,13 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       return false;
    }
 
-   public Object getInheritedAnnotation(String annotationName, boolean skipCompiled) {
+   public Object getInheritedAnnotation(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
       Object annot = ModelUtil.getAnnotation(this, annotationName);
       if (annot != null)
          return annot;
 
       Object superType = getDerivedTypeDeclaration();
-      annot = ModelUtil.getInheritedAnnotation(system, superType, annotationName, skipCompiled);
+      annot = ModelUtil.getInheritedAnnotation(system, superType, annotationName, skipCompiled, refLayer, layerResolve);
       if (annot != null)
          return annot;
 
@@ -561,7 +561,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          int numInterfaces = implementsTypes.size();
          for (int i = 0; i < numInterfaces; i++) {
             Object implType = implementsTypes.get(i);
-            if ((annot = ModelUtil.getInheritedAnnotation(system, implType, annotationName, skipCompiled)) != null)
+            if ((annot = ModelUtil.getInheritedAnnotation(system, implType, annotationName, skipCompiled, refLayer, layerResolve)) != null)
                return annot;
          }
       }

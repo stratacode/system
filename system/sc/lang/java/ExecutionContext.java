@@ -267,8 +267,9 @@ public class ExecutionContext {
          if (res != null)
             return res;
       }
-      if (resolver != null)
+      if (resolver != null) {
          return resolver.resolveName(name, createObjects);
+      }
       return null;
    }
 

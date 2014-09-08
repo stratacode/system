@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import sc.layer.Layer;
 import sc.type.CTypeUtil;
 import sc.type.DynType;
 import sc.layer.LayeredSystem;
@@ -134,8 +135,8 @@ public class CoercedTypeDeclaration implements ITypeDeclaration {
       return ModelUtil.implementsType(baseType, otherTypeName);
    }
 
-   public Object getInheritedAnnotation(String annotationName, boolean skipCompiled) {
-      return ModelUtil.getInheritedAnnotation(null, baseType, annotationName, skipCompiled);
+   public Object getInheritedAnnotation(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
+      return ModelUtil.getInheritedAnnotation(null, baseType, annotationName, skipCompiled, refLayer, layerResolve);
    }
 
    public boolean isAssignableFromClass(Class c) {

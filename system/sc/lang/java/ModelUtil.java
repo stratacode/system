@@ -3383,8 +3383,12 @@ public class ModelUtil {
    }
 
    public static Object getInheritedAnnotation(LayeredSystem system, Object superType, String annotationName, boolean skipCompiled) {
+      return getInheritedAnnotation(system, superType, annotationName, skipCompiled, null, false);
+   }
+
+   public static Object getInheritedAnnotation(LayeredSystem system, Object superType, String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
       if (superType instanceof ITypeDeclaration)
-         return ((ITypeDeclaration) superType).getInheritedAnnotation(annotationName, skipCompiled);
+         return ((ITypeDeclaration) superType).getInheritedAnnotation(annotationName, skipCompiled, refLayer, layerResolve);
       else {
          Class superClass = (Class) superType;
          Class annotationClass = RDynUtil.loadClass(annotationName);
@@ -3407,20 +3411,20 @@ public class ModelUtil {
             // a modified layer without modifying every class that implements that type.
             Class next = superClass.getSuperclass();
             if (next != null) {
-               Object nextType = findTypeDeclaration(system, next.getName());
+               Object nextType = findTypeDeclaration(system, next.getName(), refLayer, layerResolve);
                if (nextType != null && nextType instanceof TypeDeclaration) {
                   if (nextType == superType) {
                      System.err.println("*** Loop in inheritance tree: " + next.getName());
                      return null;
                   }
-                  return ((TypeDeclaration) nextType).getInheritedAnnotation(annotationName, skipCompiled);
+                  return ((TypeDeclaration) nextType).getInheritedAnnotation(annotationName, skipCompiled, refLayer, layerResolve);
                }
             }
             Class[] ifaces = superClass.getInterfaces();
             for (Class iface:ifaces) {
-               Object nextIFace = findTypeDeclaration(system, iface.getName());
+               Object nextIFace = findTypeDeclaration(system, iface.getName(), refLayer, layerResolve);
                if (nextIFace != null && nextIFace instanceof TypeDeclaration)
-                  return ((TypeDeclaration) nextIFace).getInheritedAnnotation(annotationName, skipCompiled);
+                  return ((TypeDeclaration) nextIFace).getInheritedAnnotation(annotationName, skipCompiled, refLayer, layerResolve);
             }
             superClass = next;
          }
@@ -3428,10 +3432,10 @@ public class ModelUtil {
       return null;
    }
 
-   public static Object findTypeDeclaration(LayeredSystem sys, String typeName) {
+   public static Object findTypeDeclaration(LayeredSystem sys, String typeName, Layer refLayer, boolean layerResolve) {
       if (sys == null)
          sys = LayeredSystem.getCurrent();
-      return sys.getTypeDeclaration(typeName);
+      return sys.getTypeDeclaration(typeName, false, refLayer, layerResolve);
    }
 
    public static Object resolveSrcTypeDeclaration(LayeredSystem sys, Object type) {
@@ -4827,7 +4831,7 @@ public class ModelUtil {
       // turns out, it does the lifecycle management we need through lifecycle.  This is not the clearest way
       // to spec it but if the overrideStartName is set, it means it does not implement the interface and we
       // can't treat it as a component in the code.
-      Object compilerSettings = ModelUtil.getInheritedAnnotation(sys, typeDecl, "sc.obj.CompilerSettings");
+      Object compilerSettings = ModelUtil.getInheritedAnnotation(sys, typeDecl, "sc.obj.CompilerSettings", false, typeDecl instanceof ITypeDeclaration ? ((BodyTypeDeclaration) typeDecl).getLayer() : null, false);
       if (compilerSettings == null)
          return true;
       String overrideStartName;

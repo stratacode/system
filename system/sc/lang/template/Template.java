@@ -233,10 +233,10 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
       return ModelUtil.implementsType(rootType, otherTypeName);
    }
 
-   public Object getInheritedAnnotation(String annotationName, boolean skipCompiled) {
+   public Object getInheritedAnnotation(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
       if (rootType == null)
          return null;
-      return ModelUtil.getInheritedAnnotation(getLayeredSystem(), rootType, annotationName, skipCompiled);
+      return ModelUtil.getInheritedAnnotation(getLayeredSystem(), rootType, annotationName, skipCompiled, refLayer, layerResolve);
    }
 
    public Object getDerivedTypeDeclaration() {

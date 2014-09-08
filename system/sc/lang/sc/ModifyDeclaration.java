@@ -346,7 +346,7 @@ public class ModifyDeclaration extends TypeDeclaration {
          if (modifyType == null) {
             String fullTypeName = getFullTypeName();
 
-            modifyClass = thisModel.getClass(fullTypeName, false, isLayerType);
+            modifyClass = thisModel.getClass(fullTypeName, false, layer, isLayerType);
 
             // For the layer object, it is registered as a global object.  Look it up with resolveName and just assign
             // the class to avoid the error.
@@ -476,7 +476,8 @@ public class ModifyDeclaration extends TypeDeclaration {
             // Make sure to resolve the extends type of this modified type from the current layer.
             // The case is:  A(L1) modifies A(L0)   A(L0) extends B(L0).   When we start A(L1) we need to make
             // sure that B(L1) has been started or we'll assume it just extends B(L0)
-            Object td = model.layeredSystem.getSrcTypeDeclaration(extTypeName, model.getLayer().getNextLayer(), true);
+            Layer modelLayer = model.getLayer();
+            Object td = model.layeredSystem.getSrcTypeDeclaration(extTypeName, modelLayer.getNextLayer(), true, false, true, modelLayer, false);
             if (td != null) {
                ParseUtil.initComponent(td);
                ParseUtil.startComponent(td); // TODO: do we need to start here if isStarted = false?
@@ -743,7 +744,7 @@ public class ModifyDeclaration extends TypeDeclaration {
 
    static int recurseCount = 0;
 
-   public Object getInheritedAnnotation(String annotationName, boolean skipCompiled) {
+   public Object getInheritedAnnotation(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
       // First check this definition
       Object annot = getAnnotation(annotationName);
       if (annot != null)
@@ -753,7 +754,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       Object annotObj;
       if (extendsBoundTypes != null) {
          for (Object extBoundType:extendsBoundTypes) {
-            annotObj = ModelUtil.getInheritedAnnotation(getJavaModel().getLayeredSystem(), extBoundType, annotationName, skipCompiled);
+            annotObj = ModelUtil.getInheritedAnnotation(getJavaModel().getLayeredSystem(), extBoundType, annotationName, skipCompiled, refLayer, layerResolve);
             if (annotObj != null)
                return annotObj;
          }
@@ -762,7 +763,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       Object superType = getDerivedTypeDeclaration();
       if (superType != null) {
          // We should not be modifying .classes so any annotation we pull off of a modified type should be in src
-         return ModelUtil.getInheritedAnnotation(getLayeredSystem(), superType, annotationName, skipCompiled);
+         return ModelUtil.getInheritedAnnotation(getLayeredSystem(), superType, annotationName, skipCompiled, refLayer, layerResolve);
       }
       return null;
    }

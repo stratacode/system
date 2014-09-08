@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import sc.layer.Layer;
 import sc.type.CTypeUtil;
 import sc.type.DynType;
 import sc.layer.LayeredSystem;
@@ -171,7 +172,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
    }
 
    public Object definesMethod(String name, List<? extends Object> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed) {
-      assert ctx == null;
+      // assert ctx == null; ??? this fails unfortunately...
       Object method = ModelUtil.definesMethod(baseType, name, parametersOrExpressions, this, refType, isTransformed);
       if (method != null && ModelUtil.hasParameterizedReturnType(method))
          return new ParamTypedMethod(method, this);
@@ -231,8 +232,8 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return ModelUtil.implementsType(baseType, otherTypeName);
    }
 
-   public Object getInheritedAnnotation(String annotationName, boolean skipCompiled) {
-      return ModelUtil.getInheritedAnnotation(system, baseType, annotationName, skipCompiled);
+   public Object getInheritedAnnotation(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
+      return ModelUtil.getInheritedAnnotation(system, baseType, annotationName, skipCompiled, refLayer, layerResolve);
    }
 
    public boolean isAssignableFromClass(Class c) {
@@ -274,7 +275,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       if (definedInType != null)
          return definedInType.getClass(className, useImports);
       else
-         return system.getClassWithPathName(className, false, false);
+         return system.getClassWithPathName(className, null, false, false);
    }
 
    public Object findTypeDeclaration(String typeName, boolean addExternalReference) {

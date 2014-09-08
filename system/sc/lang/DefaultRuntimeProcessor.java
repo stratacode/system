@@ -134,6 +134,6 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor {
    }
 
    public boolean usesThisClasspath() {
-      return false;
+      return true;
    }
 }
