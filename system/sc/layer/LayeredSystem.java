@@ -689,10 +689,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          cmd.updateLayerState();
       }
 
+      boolean reusingDefaultRuntime = !javaIsAlwaysDefaultRuntime && runtimes != null && runtimes.size() == 1;
       if (useRuntimeProcessor == null) {
-         removeExcludedLayers(true);
+         if (!reusingDefaultRuntime)
+            removeExcludedLayers(true);
          initRuntimes(explicitDynLayers, true);
-         removeExcludedLayers(false);
+         if (!reusingDefaultRuntime)
+            removeExcludedLayers(false);
       }
       else {
          runtimeProcessor = useRuntimeProcessor;
