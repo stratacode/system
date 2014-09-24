@@ -19,6 +19,7 @@ import java.util.Map;
  * Top level model object returned by parsing a language file whose semantic value returns this type (e.g. JavaModel)
  */
 public interface ILanguageModel extends IFileProcessorResult {
+
    enum RuntimeType { JAVA, STRATACODE}
    
    List<SrcEntry> getSrcFiles();
@@ -72,5 +73,10 @@ public interface ILanguageModel extends IFileProcessorResult {
     */
    void reinitialize();
 
+   void setAdded(boolean added);
+
+   boolean isAdded();
+
    Object getUserData();
+
 }

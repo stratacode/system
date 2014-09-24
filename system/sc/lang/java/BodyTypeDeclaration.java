@@ -60,6 +60,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    /** List of properties not defined in this class which need to have bindability or get/setters generated for them by this class because of how this class is used.  It is a Tree so the order maintained is consistent even if the list is built up in a different order */
    public transient TreeMap<String,Boolean> propertiesToMakeBindable;
 
+   /** List of properties with @Bindable(manual=true) - we need to at least compile in some annotations for these properties so we don't spit out warnings when mixing the compiled code with the dynamic runtime. */
+   public transient ArrayList<String> propertiesAlreadyBindable;
+
+   /** List of property names marked @Constant but which can't be annotated directly cause there's no generated getX, setX, or field.  These would primarily be put on external dyn types for the case when we annotate a compiled class to mark a property as constant. */
+   //public transient ArrayList<String> constProps;
+
    public transient TreeMap<String,Object> dynInvokeMethods;
 
    public transient boolean isLayerType;
@@ -163,7 +169,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public transient BodyTypeDeclaration transformedType;
 
    /** Caches whether we have the @Constant annotation to avoid the getInheritedAnnotation call */
-   public Boolean autoComponent = null;
+   public transient Boolean autoComponent = null;
 
    public Layer getLayer() {
       return layer;
@@ -247,6 +253,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public Object getDerivedTypeDeclaration() {
       return null;
+   }
+
+   protected void updateBoundExtendsType(Object newType) {
+
+   }
+
+   protected void updateBoundExtendsType(Object newType, Object oldType) {
+      throw new UnsupportedOperationException();
    }
 
    public String getDerivedTypeName() {
@@ -762,6 +776,42 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return null;
    }
 
+   public ArrayList<Object> getAllInheritedAnnotations(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
+      Object annot = getAnnotation(annotationName);
+      ArrayList<Object> res = null;
+      if (annot != null) {
+         res = new ArrayList<Object>();
+         res.add(annot);
+      }
+
+      Object superType = getDerivedTypeDeclaration();
+      if (superType == this) {
+         System.err.println("*** Derived type loop!");
+         return res;
+      }
+      JavaModel model = getJavaModel();
+      if (model == null) {
+         System.err.println("*** No model for getInheritedAnnotation");
+         return res;
+      }
+
+      ArrayList<Object> superRes = !skipCompiled || superType instanceof BodyTypeDeclaration ? ModelUtil.getAllInheritedAnnotations(model.layeredSystem, superType, annotationName, skipCompiled, refLayer, layerResolve) : null;
+      if (superRes != null) {
+         res = ModelUtil.appendLists(res, superRes);
+      }
+
+      Object[] scopeTypes = getScopeInterfaces();
+      // Check any interfaces appended on by annotations for for their own annotation.   This way, you can use
+      // a meta layer to attach annotations onto a type which is automatically added via an annotation, e.g. GWT's EntryPoint
+      // added by the GWTModule annotation.
+      for (Object scopeType:scopeTypes) {
+         if ((superRes = ModelUtil.getAllInheritedAnnotations(getJavaModel().layeredSystem, scopeType, annotationName, false, refLayer, layerResolve)) != null) {
+            res = ModelUtil.appendLists(res, superRes);
+         }
+      }
+      return res;
+   }
+
    // Either a compiled java annotation or a parsed Annotation
    public String getInheritedScopeName() {
       String scopeName = getScopeName();
@@ -779,22 +829,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    ArrayList<IDefinitionProcessor> getInheritedDefinitionProcessors() {
       LayeredSystem sys = getLayeredSystem();
 
-      ArrayList<IDefinitionProcessor> res = null;
-
-      HashMap<String,IAnnotationProcessor> procs = sys.annotationProcessors;
-      for (Map.Entry<String,IAnnotationProcessor> procEnt:procs.entrySet()) {
-         String annotTypeName = procEnt.getKey();
-         IAnnotationProcessor proc = procEnt.getValue();
-         if (proc.getInherited()) {
-            Object annot = getInheritedAnnotation(annotTypeName);
-            if (annot != null) {
-               if (res == null)
-                  res = new ArrayList<IDefinitionProcessor>();
-               res.add(proc);
-            }
-         }
-      }
-      return res;
+      return sys.getInheritedDefinitionProcessors(this);
    }
 
    ArrayList<IDefinitionProcessor> getAllDefinitionProcessors() {
@@ -1000,10 +1035,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public Object getInnerType(String name, TypeContext ctx) {
-      return getInnerType(name, ctx, true, false);
+      return getInnerType(name, ctx, true, false, false);
    }
 
-   public Object getInnerType(String name, TypeContext ctx, boolean checkBaseType, boolean redirected) {
+   public Object getInnerType(String name, TypeContext ctx, boolean checkBaseType, boolean redirected, boolean srcOnly) {
       int ix;
       boolean origSameType = ctx != null && ctx.sameType; 
       Object type = this;
@@ -1024,7 +1059,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             }
          }
          if (type instanceof BodyTypeDeclaration)
-            nextType = ((BodyTypeDeclaration) type).getSimpleInnerType(nextTypeName, ctx, checkBaseType, redirected);
+            nextType = ((BodyTypeDeclaration) type).getSimpleInnerType(nextTypeName, ctx, checkBaseType, redirected, srcOnly);
          else
             nextType = ModelUtil.getInnerType(type, name, ctx);
          if (nextType == null)
@@ -1039,7 +1074,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return type;
    }
 
-   public Object getSimpleInnerType(String name, TypeContext ctx, boolean checkBaseType, boolean redirected) {
+   public Object getSimpleInnerType(String name, TypeContext ctx, boolean checkBaseType, boolean redirected, boolean srcOnly) {
       /*
       IDefinitionProcessor[] procs = getDefinitionProcessors();
       if (procs != null) {
@@ -1105,26 +1140,39 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          // The redirected flag is set to true when we redirect to the same type.  It disables use of the "resolve" when we go to the extends type so when modify inherited is true, we are not redirecting.
          if (redirected && this instanceof ModifyDeclaration && ((ModifyDeclaration) this).modifyInherited)
             redirected = false;
-         return getSimpleInnerTypeFromExtends(extendsType, name, ctx, redirected);
+         return getSimpleInnerTypeFromExtends(extendsType, name, ctx, redirected, srcOnly);
       }
 
       return null;
    }
 
-   protected Object getSimpleInnerTypeFromExtends(Object extendsType, String name, TypeContext ctx, boolean redirected) {
+   protected Object getSimpleInnerTypeFromExtends(Object extendsType, String name, TypeContext ctx, boolean redirected, boolean srcOnly) {
       Object res;
       if (extendsType != null) {
          if (extendsType instanceof TypeDeclaration) {
             BodyTypeDeclaration ext = (TypeDeclaration) extendsType;
             if (!redirected && ext.replacedByType != null)
                ext = ext.resolve(true);
-            if ((res = ext.getInnerType(name, ctx, true, true)) != null)
+            if ((res = ext.getInnerType(name, ctx, true, true, srcOnly)) != null)
                if (ctx != null)
                   ctx.add(ext, this);
             return res;
          }
-         else
+         else {
+            Layer layer = getLayer();
+
+            // If we require a src type and we've bound to a compiled type, need to check if we can resolve the src
+            // for this type.  We may need it to modify this type downstream.  Annotation layers and modify declarations
+            // should not do this update.
+            if (srcOnly && layer != null && !layer.annotationLayer && !isLayerType) {
+               Object srcType = ModelUtil.resolveSrcTypeDeclaration(getLayeredSystem(), extendsType);
+               if (srcType instanceof BodyTypeDeclaration) {
+                  updateBoundExtendsType(srcType, extendsType);
+                  return getSimpleInnerTypeFromExtends(srcType, name, ctx, redirected, true);
+               }
+            }
             return ModelUtil.getInnerType(extendsType, name, ctx);
+         }
       }
       return null;
    }
@@ -1286,7 +1334,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public Definition modifyDefinition(BodyTypeDeclaration base, boolean doMerge, boolean inTransformed) {
-      Object otherTypeObj = base.getInnerType(typeName, null, true, false);
+      Object otherTypeObj = base.getInnerType(typeName, null, true, false, false);
       Object annotObj;
       if (otherTypeObj instanceof BodyTypeDeclaration) {
          BodyTypeDeclaration otherType = (BodyTypeDeclaration) otherTypeObj;
@@ -1305,7 +1353,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
          else {
             String otherTypeName = ((StringLiteral) annot.elementValue).stringValue;
-            Object indexType = base.getInnerType(otherTypeName, null, false, false);
+            Object indexType = base.getInnerType(otherTypeName, null, false, false, false);
             if (indexType == null || !(indexType instanceof BodyTypeDeclaration)) {
                System.err.println("*** Can't find type in annotation: " + annot.toDefinitionString() + " must be an object defined in: " + typeName);
             }
@@ -1805,11 +1853,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public Object refreshBoundType(Object boundType) {
       if (replaced) {
+         if (replacedByType == null)
+            return this;
          return replacedByType.refreshBoundType(boundType);
       }
       JavaModel model = getJavaModel();
 
-      if (getTransformed() || model.hasErrors()) {
+      if (/*getTransformed() ||*/ model.hasErrors()) {
          boundType = getJavaModel().findTypeDeclaration(getFullTypeName(), false);
          if (boundType == null) {
             System.err.println("*** Can't find post compiled type for: " + getFullTypeName());
@@ -1874,6 +1924,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          propertiesToMakeBindable = new TreeMap<String, Boolean>();
 
       propertiesToMakeBindable.putAll(properties);
+   }
+
+   public void addPropertyAlreadyBindable(String propName) {
+      if (propertiesAlreadyBindable == null)
+         propertiesAlreadyBindable = new ArrayList<String>();
+      else if (propertiesAlreadyBindable.contains(propName))
+         return;
+      propertiesAlreadyBindable.add(propName);
    }
 
    /**
@@ -6561,6 +6619,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       int index = getDynStaticFieldIndex(propName);
       if (index == -1) {
          Class cl = getCompiledClass();
+         if (cl == null) {
+            System.out.println("*** No compiled class for dynamic enum: " + propName + " access: " + getFullTypeName() + " compiled class: " + getCompiledClassName());
+            return null;
+         }
          return RTypeUtil.getEnum(cl, propName);
       }
       return getStaticValues()[index];
@@ -6943,7 +7005,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return false;
    }
 
-   int anonIdsAllocated = 0;
+   transient int anonIdsAllocated = 0;
 
    public int allocateAnonId() {
       // Note: this does not handle the case where the type graph changes after this has been called.
@@ -6979,7 +7041,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public Template findTemplatePath(String templatePath, String templateName, Class paramClass) {
       if (templatePath == null || templatePath.equals(""))
          return null;
-      Template template = getJavaModel().getLayeredSystem().getTemplate(templatePath, null, paramClass, null);
+      Template template = getJavaModel().getLayeredSystem().getTemplate(templatePath, null, paramClass, null, getLayer(), isLayerType);
       if (template == null) {
          System.err.println("*** Can't find " + templateName + " with value: " + templatePath + " for definition of type: " + toDefinitionString());
       }
@@ -7215,9 +7277,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return syncProperties != null;
    }
 
-   public ArrayList<SyncProperties> syncProperties = null;
+   transient public ArrayList<SyncProperties> syncProperties = null;
 
-   protected boolean syncPropertiesInited = false;
+   transient protected boolean syncPropertiesInited = false;
 
    public List<SyncProperties> getSyncProperties() {
       if (!syncPropertiesInited)
@@ -7803,6 +7865,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          res.compiledOnly = compiledOnly;
 
          res.propertiesToMakeBindable = propertiesToMakeBindable == null ? null : (TreeMap<String,Boolean>) propertiesToMakeBindable.clone();
+         res.propertiesAlreadyBindable = propertiesAlreadyBindable == null ? null : (ArrayList<String>) propertiesAlreadyBindable.clone();
          res.dynInvokeMethods = dynInvokeMethods;
          res.isLayerType = isLayerType;
          res.typeInfoCompleted = typeInfoCompleted;
@@ -7841,6 +7904,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          // Do copy the type this type is modified from but do not copy the replaced type (but hopefully we do not ever copy a replaced type)
          if (!replaced)
             res.replacedByType = replacedByType;
+
+         res.syncProperties = syncProperties;
+         res.syncPropertiesInited = syncPropertiesInited;
+         res.autoComponent = autoComponent;
+         res.anonIdsAllocated = anonIdsAllocated;
+         res.clientModifiers = clientModifiers;
       }
 
       if ((options & CopyTransformed) != 0) {
@@ -7876,7 +7945,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return layer != null && layer.finalLayer;
    }
 
-   ArrayList<String> clientModifiers;
+   transient ArrayList<String> clientModifiers;
    public ArrayList<String> getClientModifiers() {
       return clientModifiers;
    }
@@ -7968,15 +8037,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       Object res = oldModel.layeredSystem.getSrcTypeDeclaration(getFullTypeName(), getLayer().getNextLayer(), true,  false, false, layer, oldModel.isLayerModel);
       if (res instanceof TypeDeclaration) {
          TypeDeclaration newType = (TypeDeclaration) res;
-         if (newType.getLayer() == getLayer())
+         // We might switch from an inactive layer to an active layer, or maybe the layers themselves were reloaded?
+         if (newType.getLayer().getLayerName().equals(getLayer().getLayerName()))
             return (TypeDeclaration) res;
-         else
-            System.out.println("***");
          return this;
       }
       displayError("Type removed: ", getFullTypeName(), " for ");
       // TODO - remove for debugging
-      System.out.println("***");
       res = oldModel.layeredSystem.getSrcTypeDeclaration(getFullTypeName(), null, true,  false, false, layer, oldModel.isLayerModel);
       return null;
    }

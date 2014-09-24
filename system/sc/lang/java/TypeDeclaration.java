@@ -623,7 +623,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    }
 
    public Definition modifyDefinition(BodyTypeDeclaration base, boolean doMerge, boolean inTransformed) {
-      TypeDeclaration otherType = (TypeDeclaration) base.getInnerType(typeName, null, true, false);
+      TypeDeclaration otherType = (TypeDeclaration) base.getInnerType(typeName, null, true, false, false);
       Object annotObj;
       if (otherType != null) {
          overrides = otherType;
@@ -637,7 +637,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
          }
          else {
             String otherTypeName = ((StringLiteral) annot.elementValue).stringValue;
-            TypeDeclaration indexType = (TypeDeclaration) base.getInnerType(otherTypeName, null, false, false);
+            TypeDeclaration indexType = (TypeDeclaration) base.getInnerType(otherTypeName, null, false, false, false);
             if (indexType == null) {
                System.err.println("*** Can't find type in annotation: " + annot.toDefinitionString() + " must be an object defined in: " + typeName);
             }
@@ -726,8 +726,12 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
                      if (declaredField != null && declaredField != rtField && ModelUtil.isAutomaticBindable(declaredField))
                         stale = false;
                   }
-                  if (stale)
-                     sys.setStaleCompiledModel(true, "Recompile needed to make compiled property bindable: ", propertyName, " in type ", typeName);
+                  if (stale) {
+                     if (!ModelUtil.isBindable(sys, rtClass, propertyName)) {
+                        sys.setStaleCompiledModel(true, "Recompile needed to make compiled property bindable: ", propertyName, " in type ", typeName);
+                        ModelUtil.isBindable(sys, rtClass, propertyName); // TODO: remove - for debugging only
+                     }
+                  }
                }
             }
             // rtClass == null when we are building a new layer
@@ -1201,15 +1205,15 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return typeParameters;
    }
 
-   public Object getSimpleInnerType(String name, TypeContext ctx, boolean checkBaseType, boolean redirected) {
-      Object t = super.getSimpleInnerType(name, ctx, checkBaseType, redirected);
+   public Object getSimpleInnerType(String name, TypeContext ctx, boolean checkBaseType, boolean redirected, boolean srcOnly) {
+      Object t = super.getSimpleInnerType(name, ctx, checkBaseType, redirected, srcOnly);
       if (t != null)
          return t;
 
       if (checkBaseType) {
          if (implementsBoundTypes != null) {
             for (Object impl:implementsBoundTypes) {
-               if ((t = getSimpleInnerTypeFromExtends(impl, name, ctx, redirected)) != null)
+               if ((t = getSimpleInnerTypeFromExtends(impl, name, ctx, redirected, srcOnly)) != null)
                   return t;
             }
          }
@@ -1572,8 +1576,10 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
             }
          }
       }
+      /*
       if (transformedType != null)
          transformedType.refreshBoundTypes();
+      */
    }
 
    protected boolean isInterfaceField(Statement st) {

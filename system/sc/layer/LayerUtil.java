@@ -34,9 +34,12 @@ public class LayerUtil implements LayerConstants {
       if (newLayerDir == null) {
          newLayerDir = System.getProperty("user.dir");
       }
-      String prefix = sysBuildDir == null ?  FileUtil.concat(newLayerDir, "temp", "build") : sysBuildDir;
+      // If we use the -dyn option to selectively make layers dynamic, use a different build dir so that we can quickly switch back and forth between -dyn and not without rebuilding everything.
+      String prefix = sysBuildDir == null ?  FileUtil.concat(newLayerDir, "temp", sys.options.anyDynamicLayers ? "dynbuild" : "build") : sysBuildDir;
       prefix = FileUtil.concat(prefix, layer.getUnderscoreName());
-      return prefix + FileUtil.FILE_SEPARATOR + (layer.dynamic ? DYN_BUILD_DIRECTORY : BUILD_DIRECTORY);
+      // TODO: remove this comment - this was a naive solution that caused headaches between JS marks all layers as compiled
+      //return prefix + FileUtil.FILE_SEPARATOR + (layer.dynamic ? DYN_BUILD_DIRECTORY : BUILD_DIRECTORY);
+      return prefix;
    }
 
    /** Takes the generated srcEnt */

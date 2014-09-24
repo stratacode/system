@@ -763,7 +763,7 @@ public class IdentifierExpression extends ArgumentsExpression {
 
       if (!(referenceType instanceof BodyTypeDeclaration)) {
          if (!referenceOnly && ModelUtil.hasSetMethod(boundType) && ModelUtil.getAnnotation(annotType, "Bindable") == null)
-            fromExpr.displayWarning("Can't add binding to compiled type: " + referenceType + " for property: " + propertyName);
+            fromExpr.displayWarning("Can't add binding to compiled type: " + referenceType + " for property: " + propertyName + " in: ");
 
          if (!(sys = fromExpr.getLayeredSystem()).useRuntimeReflection) {
             sys.buildInfo.addExternalDynProp(referenceType, propertyName, fromExpr.getJavaModel(), referenceOnly);
@@ -823,6 +823,14 @@ public class IdentifierExpression extends ArgumentsExpression {
       // Get the set method and print a warning if it is not bindable
    }
 
+   /**
+    * Utility method for IdentifierExpr and SelectExpr to apply the data binding contract to a given property of the
+    * referenced object.   When referenceOnly = true, this is a getX reference only - not requiring that the referred
+    * property be made bindable.  This method both ensures the property is registered with it's parent type and
+    * adds a reference to that type in ReverseDependencies - reflecting the depenpendcy from the type which needs
+    * this property bindable.  When checkAnnotations is true, referenceOnly starts out false but then turns to 'true' if
+    * this property is marked as @Bindable so that we inject it during the code-gen phase (i.e. not manual bindable).
+    */
    public static void makeBindable(Statement expr, String propertyName, IdentifierType idType, Object boundType,
                                    Object typeForIdentifier, Object referenceType, boolean referenceOnly, boolean checkAnnotations) {
 

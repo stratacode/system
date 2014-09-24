@@ -125,6 +125,9 @@ public abstract class AbstractLiteral extends Expression implements IValueConver
             else if (literalValue instanceof Set) {
                return Expression.createFromValue(((Set) literalValue).toArray(), isInitializer);
             }
+            else if (literalValue instanceof Object[]) {
+               return Expression.createFromValue(literalValue, isInitializer);
+            }
             else {
                // TODO: use an annotation to override this
                IBeanMapper[] props = RTypeUtil.getPersistProperties(literalClass);

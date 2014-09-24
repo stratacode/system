@@ -51,8 +51,9 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
          return NullLiteral.create();
       Class cl = literalValue.getClass();
       if (cl.isArray()) {
-         if (isInitializer)
+         if (isInitializer) {
             return ArrayInitializer.create(literalValue);
+         }
          else
             return NewExpression.create(TypeUtil.getTypeName(cl, false), new SemanticNodeList<Expression>(0), ArrayInitializer.create(literalValue));
       }

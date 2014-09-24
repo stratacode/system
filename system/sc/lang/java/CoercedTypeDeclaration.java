@@ -139,6 +139,10 @@ public class CoercedTypeDeclaration implements ITypeDeclaration {
       return ModelUtil.getInheritedAnnotation(null, baseType, annotationName, skipCompiled, refLayer, layerResolve);
    }
 
+   public ArrayList<Object> getAllInheritedAnnotations(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
+      return ModelUtil.getAllInheritedAnnotations(null, baseType, annotationName, skipCompiled, refLayer, layerResolve);
+   }
+
    public boolean isAssignableFromClass(Class c) {
       return ModelUtil.isAssignableFrom(baseType, c);
    }

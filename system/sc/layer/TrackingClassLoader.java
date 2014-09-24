@@ -33,8 +33,9 @@ public class TrackingClassLoader extends URLClassLoader {
          // Also GWT passes in null here to change the system loader.  In that case, we are just appending to the previous loader
          // Also separate layers do not include the previous layers
          // Also when we start a new stack of layers that are not related to the previous ones, we do not disable the old one.
+         // TODO: Essentially we want this last test to  disable the previous loader if we included the URLs from the previous one in this one.  Maybe we should just change it to work by comparing the URLs or breaking out the logic in which we decide if we should include the URLs?
          Layer parentLayer = parentTrackingLoader.layer;
-         if (layer != null && !layer.tempLayer && !layer.buildSeparate && parentLayer != null && layer.extendsLayer(parentLayer))
+         if (layer != null && !layer.tempLayer && !layer.buildSeparate && parentLayer != null && (layer.isBuildLayer() || layer.extendsLayer(parentLayer)))
             parentTrackingLoader.disableBuildLoaders(this);
       }
       else

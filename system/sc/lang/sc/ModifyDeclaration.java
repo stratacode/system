@@ -65,6 +65,15 @@ public class ModifyDeclaration extends TypeDeclaration {
       return modifyClass;
    }
 
+   protected void updateBoundExtendsType(Object extType, Object oldType) {
+      if (modifyTypeDecl != oldType)
+         System.out.println("*** Warning - updating modify with inconsistent type?");
+      if (extType instanceof BodyTypeDeclaration)
+         modifyTypeDecl = (BodyTypeDeclaration) extType;
+      else
+         throw new UnsupportedOperationException();
+   }
+
    // This method is normally only used for ClassDeclarations - after we've merged ModifyDeclarations.  But during
    // validate or runtime we may want to find the compiled class for a modify class, i.e. to determine whether there's
    // an object set property ala JFrame's JMenuBar.
@@ -674,8 +683,8 @@ public class ModifyDeclaration extends TypeDeclaration {
       return null;
    }
 
-   public Object getSimpleInnerType(String name, TypeContext ctx, boolean checkBaseType, boolean redirected) {
-      Object bt = super.getSimpleInnerType(name, ctx, checkBaseType, true);
+   public Object getSimpleInnerType(String name, TypeContext ctx, boolean checkBaseType, boolean redirected, boolean srcOnly) {
+      Object bt = super.getSimpleInnerType(name, ctx, checkBaseType, true, srcOnly);
       if (bt != null)
          return bt;
 
@@ -684,7 +693,7 @@ public class ModifyDeclaration extends TypeDeclaration {
             if (extBoundType instanceof BodyTypeDeclaration) {
                BodyTypeDeclaration base = ((BodyTypeDeclaration) extBoundType);
                // Do not pass the CTX down here.  Because this is not the same type, we are extending another type, we do need to check for types defined up in the stack.  There's no risk of getting the same type here.
-               bt = base.getSimpleInnerType(name, null, checkBaseType, true);
+               bt = base.getSimpleInnerType(name, null, checkBaseType, true, srcOnly);
                if (bt != null) {
                   if (ctx != null)
                      ctx.add(base, this);
@@ -766,6 +775,36 @@ public class ModifyDeclaration extends TypeDeclaration {
          return ModelUtil.getInheritedAnnotation(getLayeredSystem(), superType, annotationName, skipCompiled, refLayer, layerResolve);
       }
       return null;
+   }
+
+   public ArrayList<Object> getAllInheritedAnnotations(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
+      // First check this definition
+      Object annot = getAnnotation(annotationName);
+      ArrayList<Object> res = null;
+      if (annot != null) {
+         res = new ArrayList<Object>(1);
+         res.add(annot);
+      }
+
+      // Then any modified extends
+      ArrayList<Object> superRes;
+      if (extendsBoundTypes != null) {
+         for (Object extBoundType:extendsBoundTypes) {
+            superRes = ModelUtil.getAllInheritedAnnotations(getJavaModel().getLayeredSystem(), extBoundType, annotationName, skipCompiled, refLayer, layerResolve);
+            if (superRes != null) {
+               res = ModelUtil.appendLists(res, superRes);
+            }
+         }
+      }
+      // Then the modified type
+      Object superType = getDerivedTypeDeclaration();
+      if (superType != null) {
+         // We should not be modifying .classes so any annotation we pull off of a modified type should be in src
+         superRes = ModelUtil.getAllInheritedAnnotations(getLayeredSystem(), superType, annotationName, skipCompiled, refLayer, layerResolve);
+         if (superRes != null)
+            res = ModelUtil.appendLists(res, superRes);
+      }
+      return res;
    }
 
    public int addChildNames(StringBuilder childNames, Map<String,StringBuilder> childNamesByScope, String prefix, boolean componentsOnly,
@@ -965,7 +1004,7 @@ public class ModifyDeclaration extends TypeDeclaration {
             subType = null;
             // CheckbaseType is true here - we'll need to create a modify if there's another type.  If it comes from
             // the extends type, that's the "modifyInherited" case.
-            Object innerTypeObj = nextParent.getInnerType(nextType, null, true, false);
+            Object innerTypeObj = nextParent.getInnerType(nextType, null, true, false, false);
             if (innerTypeObj != this && innerTypeObj instanceof BodyTypeDeclaration) {
                subType = (BodyTypeDeclaration) innerTypeObj;
             }
@@ -1232,7 +1271,7 @@ public class ModifyDeclaration extends TypeDeclaration {
          }
 
          subType = null;
-         Object innerTypeObj = nextParent.getInnerType(nextType, null, false, false);
+         Object innerTypeObj = nextParent.getInnerType(nextType, null, false, false, false);
          if (innerTypeObj != this && innerTypeObj instanceof BodyTypeDeclaration) {
             subType = (BodyTypeDeclaration) innerTypeObj;
             if (theRoot == null)
@@ -1368,7 +1407,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       if (outer != null) {
          // If this modify is overriding a definition in the same type we need to replace it here
          // so both are not processed when processing the parent type.
-         Object toReplaceObj = base.getInnerType(typeName, null, true, false);
+         Object toReplaceObj = base.getInnerType(typeName, null, true, false, false);
          if (toReplaceObj instanceof BodyTypeDeclaration) {
             BodyTypeDeclaration toReplace = (BodyTypeDeclaration) toReplaceObj;
             if (toReplace.getEnclosingType() == base) {

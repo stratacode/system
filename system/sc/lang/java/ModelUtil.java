@@ -71,7 +71,7 @@ public class ModelUtil {
       else if (varObj instanceof ITypedObject) 
          return ((ITypedObject) varObj).getTypeDeclaration();
       else if (varObj instanceof IBeanMapper)
-         return ((IBeanMapper) varObj).getPropertyType();
+         return ((IBeanMapper) varObj).getGenericType();
       else if (varObj instanceof ITypeDeclaration)
          return varObj;
       else if (varObj instanceof Class)
@@ -1665,6 +1665,8 @@ public class ModelUtil {
    }
 
    public static Object[] getConstructors(Object td, Object refType) {
+      while (ModelUtil.hasTypeParameters(td))
+         td = ModelUtil.getParamTypeBaseType(td);
       if (td instanceof ITypeDeclaration)
          return ((ITypeDeclaration) td).getConstructors(refType);
       else if (td instanceof Class) {
@@ -2131,6 +2133,10 @@ public class ModelUtil {
          return ((IDefinition) def).hasModifier(s);
       else if (def instanceof IBeanMapper)
          def = ((IBeanMapper) def).getPropertyMember();
+      else {
+         while (ModelUtil.hasTypeParameters(def))
+            def = ModelUtil.getParamTypeBaseType(def);
+      }
 
       if (def instanceof VariableDefinition)
          return hasModifier(((VariableDefinition) def).getDefinition(), s);
@@ -2557,6 +2563,25 @@ public class ModelUtil {
          boundType = ((PropertyAssignment) boundType).getAssignedProperty();
       VariableDefinition varDef;
       return (boundType instanceof VariableDefinition) && ((varDef = (VariableDefinition) boundType).needsGetSet() || varDef.isDynamicType());
+   }
+
+   /** Returns true if this property is marked as bindable as a type-level annotation.  Use isBindable(Object propObj) to check for annotations on the property object itself. */
+   public static boolean isBindable(LayeredSystem system, Object parentType, String propName) {
+      // Search the class hierarchy for all TypeSettings annotations and if any of them declare this property bindable at the type level
+      // we treat it as bindable.
+      ArrayList<Object> typeSetAnnots = ModelUtil.getAllInheritedAnnotations(system, parentType, "sc.obj.TypeSettings", false, null, false);
+      if (typeSetAnnots != null) {
+         for (Object typeSetAnnot:typeSetAnnots) {
+            String[] bindablePropNames = (String[]) ModelUtil.getAnnotationValue(typeSetAnnot, "bindableProps");
+            if (bindablePropNames != null) {
+               for (String bp:bindablePropNames)
+                  if (bp.equals(propName))
+                     return true;
+            }
+
+         }
+      }
+      return false;
    }
 
    public static boolean isBindable(Object assignedProperty) {
@@ -3384,6 +3409,71 @@ public class ModelUtil {
 
    public static Object getInheritedAnnotation(LayeredSystem system, Object superType, String annotationName, boolean skipCompiled) {
       return getInheritedAnnotation(system, superType, annotationName, skipCompiled, null, false);
+   }
+
+   public static ArrayList<Object> getAllInheritedAnnotations(LayeredSystem system, Object superType, String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
+      if (superType instanceof ITypeDeclaration)
+         return ((ITypeDeclaration) superType).getAllInheritedAnnotations(annotationName, skipCompiled, refLayer, layerResolve);
+      else {
+         ArrayList<Object> res = null;
+         Class superClass = (Class) superType;
+         Class annotationClass = RDynUtil.loadClass(annotationName);
+         if (annotationClass == null) {
+            annotationClass = RDynUtil.loadClass("sc.obj." + annotationName);
+         }
+
+         // TODO: fix annotation type name resolution problems
+         if (annotationClass == null) {
+            // Assuming layer dependencies are correct, compiled classes can't have non-compiled annotations so just return null (e.g. MainInit on a compiled class)
+            return null;
+         }
+         while (superClass != null) {
+            java.lang.annotation.Annotation jlannot = superClass.getAnnotation(annotationClass);
+            if (jlannot != null) {
+               if (res == null)
+                  res = new ArrayList<Object>();
+               res.add(jlannot);
+            }
+
+            // As we walk up the type hierarchy looking for annotations we need to see if there is
+            // a source version for any of these types.  That way, you can add annotations to a type in
+            // a modified layer without modifying every class that implements that type.
+            Class next = superClass.getSuperclass();
+            if (next != null) {
+               Object nextType = findTypeDeclaration(system, next.getName(), refLayer, layerResolve);
+               if (nextType != null && nextType instanceof TypeDeclaration) {
+                  if (nextType == superType) {
+                     System.err.println("*** Loop in inheritance tree: " + next.getName());
+                     return null;
+                  }
+                  ArrayList<Object> newRes = ((TypeDeclaration) nextType).getAllInheritedAnnotations(annotationName, skipCompiled, refLayer, layerResolve);
+                  if (newRes != null)
+                     res = appendLists(res, newRes);
+               }
+            }
+            Class[] ifaces = superClass.getInterfaces();
+            for (Class iface:ifaces) {
+               Object nextIFace = findTypeDeclaration(system, iface.getName(), refLayer, layerResolve);
+               if (nextIFace != null && nextIFace instanceof TypeDeclaration) {
+                   ArrayList<Object> newRes = ((TypeDeclaration) nextIFace).getAllInheritedAnnotations(annotationName, skipCompiled, refLayer, layerResolve);
+                  res = appendLists(res, newRes);
+               }
+            }
+            superClass = next;
+         }
+         return res;
+      }
+   }
+
+   public static ArrayList<Object> appendLists(ArrayList<Object> origList, ArrayList<Object> newList) {
+      if (origList == null)
+         return newList;
+      if (newList == null)
+         return origList;
+      ArrayList<Object> res = new ArrayList<Object>(origList.size() + newList.size());
+      res.addAll(origList);
+      res.addAll(newList);
+      return res;
    }
 
    public static Object getInheritedAnnotation(LayeredSystem system, Object superType, String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
@@ -5923,6 +6013,13 @@ public class ModelUtil {
    public static ISemanticNode getTopLevelStatement(ISemanticNode node) {
       Statement st = node instanceof Statement ? (Statement) node : ((JavaSemanticNode) node).getEnclosingStatement();
       ISemanticNode parent = st.getParentNode();
+
+      // We use the block statement that's part of the method to represent the "end of the method"
+      if (node instanceof BlockStatement) {
+         BlockStatement bst = (BlockStatement) node;
+         if (bst.getParentNode() instanceof MethodDefinition)
+            return bst;
+      }
       if (parent instanceof SemanticNodeList)
          parent = parent.getParentNode();
       if (parent == null || parent instanceof ILanguageModel)

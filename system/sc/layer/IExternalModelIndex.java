@@ -15,4 +15,6 @@ public interface IExternalModelIndex {
    public void replaceModel(ILanguageModel oldModel, ILanguageModel newModel);
 
    public boolean isValidModel(ILanguageModel model);
+
+   public long getModelTimestamp(ILanguageModel model);
 }

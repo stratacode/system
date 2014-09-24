@@ -5,8 +5,11 @@
 package sc.layer;
 
 import sc.classfile.CFClass;
+import sc.lang.IAnnotationProcessor;
+import sc.lang.IDefinitionProcessor;
 import sc.lang.ILanguageModel;
 import sc.lang.SemanticNodeList;
+import sc.lang.sc.IScopeProcessor;
 import sc.lang.sc.SCModel;
 import sc.lang.sc.PropertyAssignment;
 import sc.lifecycle.ILifecycle;
@@ -370,6 +373,63 @@ public class Layer implements ILifecycle, LayerConstants {
       return false;
    }
 
+   public IAnnotationProcessor getAnnotationProcessor(String annotName, boolean checkBaseLayers) {
+      IAnnotationProcessor proc;
+      if (annotationProcessors != null) {
+         proc = annotationProcessors.get(annotName);
+         if (proc != null)
+            return proc;
+      }
+      if (baseLayers != null && checkBaseLayers) {
+         for (Layer baseLayer:baseLayers) {
+            proc = baseLayer.getAnnotationProcessor(annotName, checkBaseLayers);
+            if (proc != null)
+               return proc;
+         }
+      }
+      return null;
+   }
+
+   public IScopeProcessor getScopeProcessor(String annotName, boolean checkBaseLayers) {
+      IScopeProcessor proc;
+      if (scopeProcessors != null) {
+         proc = scopeProcessors.get(annotName);
+         if (proc != null)
+            return proc;
+      }
+      if (baseLayers != null && checkBaseLayers) {
+         for (Layer baseLayer:baseLayers) {
+            proc = baseLayer.getScopeProcessor(annotName, checkBaseLayers);
+            if (proc != null)
+               return proc;
+         }
+      }
+      return null;
+   }
+
+   public ArrayList<IDefinitionProcessor> addInheritedAnnotationProcessors(BodyTypeDeclaration type, ArrayList<IDefinitionProcessor> res, boolean checkBaseLayers) {
+      if (annotationProcessors != null) {
+         for (Map.Entry<String,IAnnotationProcessor> procEnt:annotationProcessors.entrySet()) {
+            String annotTypeName = procEnt.getKey();
+            IAnnotationProcessor proc = procEnt.getValue();
+            if (proc.getInherited()) {
+               Object annot = type.getInheritedAnnotation(annotTypeName);
+               if (annot != null) {
+                  if (res == null)
+                     res = new ArrayList<IDefinitionProcessor>();
+                  res.add(proc);
+               }
+            }
+         }
+      }
+      if (baseLayers != null && checkBaseLayers) {
+         for (Layer baseLayer:baseLayers) {
+            res = baseLayer.addInheritedAnnotationProcessors(type, res, true);
+         }
+      }
+      return res;
+   }
+
    public enum RuntimeEnabledState {
       Enabled, Disabled, NotSet
    }
@@ -510,6 +570,10 @@ public class Layer implements ILifecycle, LayerConstants {
    boolean newLayer = false;   // Set to true for layers which are created fresh
 
    private boolean buildSrcIndexNeedsSave = false; // TODO: performance - this gets saved way too often now right - need to implement this flag
+
+   public HashMap<String, IScopeProcessor> scopeProcessors = null;
+
+   public HashMap<String,IAnnotationProcessor> annotationProcessors = null;
 
    public boolean isInitialized() {
       return initialized;
@@ -1958,7 +2022,7 @@ public class Layer implements ILifecycle, LayerConstants {
       lastRefreshTime = System.currentTimeMillis();
    }
 
-   public class ModelUpdate {
+   public static class ModelUpdate {
       public ILanguageModel oldModel;
       public Object changedModel;
 
@@ -1994,7 +2058,7 @@ public class Layer implements ILifecycle, LayerConstants {
          }
          else if (Language.isParseable(path) || (proc = layeredSystem.getFileProcessorForFileName(path, this, BuildPhase.Process)) != null) {
             SrcEntry srcEnt = new SrcEntry(this, relDir == null ? layerPathName : FileUtil.concat(layerPathName, relDir), relDir == null ? "" : relDir, subF.getName(), proc == null || proc.getPrependLayerPackage());
-            ILanguageModel oldModel = layeredSystem.getLanguageModel(srcEnt);
+            ILanguageModel oldModel = layeredSystem.getLanguageModel(srcEnt, false, changedModels);
             long newLastModTime = new File(srcEnt.absFileName).lastModified();
             if (oldModel == null) {
                // The processedFileIndex only holds entries we processed.  If this file did not change from when we did the build, we just have to
@@ -2004,7 +2068,7 @@ public class Layer implements ILifecycle, LayerConstants {
                        layeredSystem.lastRefreshTime == -1 ? layeredSystem.buildStartTime : layeredSystem.lastRefreshTime :
                        oldFile.getLastModifiedTime();
                if (lastTime == -1 || newLastModTime > lastTime) {
-                  layeredSystem.refreshFile(srcEnt, this);
+                  layeredSystem.refreshFile(srcEnt, this); // For non parseableable files - do the file copy since the source file changed
                }
             }
 
@@ -2089,6 +2153,7 @@ public class Layer implements ILifecycle, LayerConstants {
       return null;
    }
 
+   /** Does this layer have an explicit extends on the other layer */
    public boolean extendsLayer(Layer other) {
       if (baseLayers == null)
          return false;
@@ -2100,6 +2165,7 @@ public class Layer implements ILifecycle, LayerConstants {
       return false;
    }
 
+   /** Does this layer modify any types which are in the other layer. */
    public boolean modifiedByLayer(Layer other) {
       if (extendsLayer(other))
          return true;
@@ -2563,7 +2629,9 @@ public class Layer implements ILifecycle, LayerConstants {
       // A final layer is final once it's compiled.  After the entire system has been compiled, if we disable dynamic types
       // for this layer, those types won't change once the system is compiled.  This prevents us from loading those types as
       // source even when they are static.
-      return (finalLayer && (compiled || changedModelsDetected)) || (!liveDynamicTypes && layeredSystem.systemCompiled);
+      // For annotation layers, there's meta-data such as JComponent's @Constant for size that we need to load to avoid warnings about data binding.
+      // We also could fix that by adding the constant to ExtDynType info maybe via a constProps thing we add to the type and ExtDynType and @TypeSettings
+      return !annotationLayer && ((finalLayer && (compiled || changedModelsDetected)) || (!liveDynamicTypes && layeredSystem.systemCompiled));
    }
 
    public RepositoryPackage addRepositoryPackage(String pkgName, String repositoryTypeName, String url, boolean unzip) {
@@ -2648,6 +2716,39 @@ public class Layer implements ILifecycle, LayerConstants {
    public String getUnderscoreName() {
       return getLayerName().replace('.', '_');
    }
+
+   public void registerAnnotationProcessor(String annotationTypeName, IAnnotationProcessor processor) {
+      if (annotationProcessors == null)
+         annotationProcessors = new HashMap<String,IAnnotationProcessor>();
+      IAnnotationProcessor old = annotationProcessors.put(annotationTypeName, processor);
+      if (old != null && layeredSystem.options.verbose) {
+         System.out.println("Annotation processor for: " + annotationTypeName + " replaced: " + old + " with: " + processor);
+      }
+   }
+
+
+   /**
+    * When encountering scope&lt;name&gt; in the code as an annotation for a type, the IScopeProcessor will allow
+    * the framework developer the ability to customize how the getX, setX, methods of the object or property are
+    * generated.  You can inject additional interfaces and fields into the type.  Additional parameters to the
+    * constructor which are obtained in the current context in which this scope is valid.  Scopes let you flexibly
+    * separate the names from how they are implemented in code - supporting iteration and other advanced constructs
+    * at both the runtime and compile time contexts.
+    */
+   public void registerScopeProcessor(String scopeName, IScopeProcessor processor) {
+      if (scopeProcessors == null)
+         scopeProcessors = new HashMap<String,IScopeProcessor>();
+      IScopeProcessor old = scopeProcessors.put(scopeName, processor);
+      if (old != null && layeredSystem.options.verbose) {
+         System.out.println("Scope processor for: " + scopeName + " replaced: " + old + " with: " + processor);
+      }
+   }
+
+   public String getScopeNames() {
+      if (scopeProcessors == null) return "";
+      return scopeProcessors.keySet().toString();
+   }
+
 
 }
 

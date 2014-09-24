@@ -8,6 +8,7 @@ import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.type.DynType;
 
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 
@@ -53,7 +54,11 @@ public interface ITypeDeclaration {
 
    boolean implementsType(String otherTypeName);
 
+   /** Returns the first occurrence of the specified annotation on the types in the type hierarchy */
    Object getInheritedAnnotation(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve);
+
+   /** Returns all occurrences of the specified annotation on the types in the type hierarchy ordered so the first type encountered during the traversal is first. */
+   ArrayList<Object> getAllInheritedAnnotations(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve);
 
    Object getDerivedTypeDeclaration();
 
@@ -125,4 +130,5 @@ public interface ITypeDeclaration {
    void staticInit();
 
    boolean isTransformedType();
+
 }

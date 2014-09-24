@@ -85,8 +85,7 @@ public class IfStatement extends NonIndentedStatement {
    }
 
    public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement toFind) {
-      if (toFind == this)
-         res.add(this);
+      super.addGeneratedFromNodes(res, toFind);
       if (trueStatement != null) {
          trueStatement.addGeneratedFromNodes(res, toFind);
       }

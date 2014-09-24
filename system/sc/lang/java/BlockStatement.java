@@ -4,11 +4,12 @@
 
 package sc.lang.java;
 
+import sc.lang.IUserDataNode;
 import sc.lang.js.JSFormatMode;
 
 import java.util.IdentityHashMap;
 
-public class BlockStatement extends AbstractBlockStatement  {
+public class BlockStatement extends AbstractBlockStatement {
    // For a reverse binding, we convert the initializer into a block statement and use this
    // hook so we can get back to the variableDefinition we were created from in transformBinding.
    public transient JavaSemanticNode fromDefinition;

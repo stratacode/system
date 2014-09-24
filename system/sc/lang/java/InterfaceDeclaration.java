@@ -231,15 +231,15 @@ public class InterfaceDeclaration extends TypeDeclaration {
       return result;
    }
 
-   public Object getSimpleInnerType(String name, TypeContext ctx, boolean checkBaseType, boolean redirected) {
-      Object t = super.getSimpleInnerType(name, ctx, checkBaseType, redirected);
+   public Object getSimpleInnerType(String name, TypeContext ctx, boolean checkBaseType, boolean redirected, boolean srcOnly) {
+      Object t = super.getSimpleInnerType(name, ctx, checkBaseType, redirected, srcOnly);
       if (t != null)
          return t;
 
       if (checkBaseType) {
          if (extendsBoundTypes != null) {
             for (Object impl:extendsBoundTypes) {
-               if ((t = getSimpleInnerTypeFromExtends(impl, name, ctx, redirected)) != null)
+               if ((t = getSimpleInnerTypeFromExtends(impl, name, ctx, redirected, srcOnly)) != null)
                   return t;
             }
          }

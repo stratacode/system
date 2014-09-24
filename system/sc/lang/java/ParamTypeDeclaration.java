@@ -236,6 +236,10 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return ModelUtil.getInheritedAnnotation(system, baseType, annotationName, skipCompiled, refLayer, layerResolve);
    }
 
+   public ArrayList<Object> getAllInheritedAnnotations(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
+      return ModelUtil.getAllInheritedAnnotations(system, baseType, annotationName, skipCompiled, refLayer, layerResolve);
+   }
+
    public boolean isAssignableFromClass(Class c) {
       return ModelUtil.isAssignableFrom(baseType, c);
    }

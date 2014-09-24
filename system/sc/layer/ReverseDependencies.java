@@ -13,12 +13,14 @@ import java.util.*;
 public class ReverseDependencies implements Serializable {
    public static final String REVERSE_DEPENDENCIES_EXTENSION = "rdps";
    int typeCount = 0;
+   /** Stores the type names as the key, the type count id as the value.  Designed so multiple references from the same types are efficiently stored. */
    HashMap<String,Integer> typeRegistry = new HashMap<String,Integer>();
    public HashMap<Integer,String> typeIndex = new HashMap<Integer,String>();
 
    /** Property name to type index code mapping for bindable properties */
    public HashMap<String,PropertyDep[]> bindableDeps = new HashMap<String,PropertyDep[]>();
 
+   /** Stores the list of methods which need to be available to the dynamic runtime.  The external type index will code-generation the 'invoke('name')' method dispatch logic */
    public HashMap<MethodKey,int[]> dynMethods = new HashMap<MethodKey,int[]>();
 
    /**

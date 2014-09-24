@@ -29,14 +29,20 @@ public class Annotation extends JavaSemanticNode implements IAnnotation {
    public static Annotation create(String typeName, String valName, Object valValue) {
       Annotation annot = create(typeName);
 
-      SemanticNodeList<AnnotationValue> values = new SemanticNodeList<AnnotationValue>();
       AnnotationValue av = new AnnotationValue();
       av.identifier = valName;
       av.elementValue = AbstractLiteral.createFromValue(valValue, true);
-      values.add(av);
-      annot.setProperty("elementValue", values);
+
+      annot.addAnnotationValues(av);
 
       return annot;
+   }
+
+   public void addAnnotationValues(AnnotationValue... elemValues) {
+      SemanticNodeList<AnnotationValue> newValues = new SemanticNodeList<AnnotationValue>();
+      for (AnnotationValue val:elemValues)
+         newValues.add(val);
+      setProperty("elementValue", newValues);
    }
 
    public void start() {

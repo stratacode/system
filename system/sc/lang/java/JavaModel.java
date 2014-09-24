@@ -154,6 +154,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    // dependent types are changed.
    public transient Layer initializedInLayer;
 
+   /** Has this model been added to the type system */
+   public transient boolean added = false;
+
    public void setLayeredSystem(LayeredSystem system) {
       layeredSystem = system;
    }
@@ -522,10 +525,6 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    /** Returns a type declaration defined in this model */
    public TypeDeclaration getTypeDeclaration(String typeName) {
-     if (!initialized)
-       System.out.println("***");
-      //assert initialized;
-
       return definedTypesByName.get(typeName);
    }
 
@@ -1048,63 +1047,74 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
       PerfMon.start("transform");
 
-      if (sys.options.clonedTransform) {
-         // This returns true for types that either need a transform call made here in Java or do a transform of the model for JS for enumerated types.
-         if (needsTransform()) {
-            // TODO: during rebuild, are there any cases where we need to transform, even if our model did not change?
-            /*
-            if (transformedModel != null && transformedModel.getTransformed())
-               return true;
-            if (transformedModel == null)
-            */
-            // Need to reset the transformed model each time we transform.  If we changed this model, it would have been
-            // reloaded, but the transformed model may be affected by other layers, unless it is final.
-            // Sometimes we clone the transformed model without transforming.  In that case, we can just use that model.
-            if (transformedModel == null || transformedInLayer == null ||
-                   (transformedModel.getTransformed() && transformedInLayer != layeredSystem.currentBuildLayer) && changedSinceLayer(transformedInLayer))
-               cloneTransformedModel();
+      boolean topLevelTransform = false;
+      if (!sys.allTypesProcessed) {
+         sys.allTypesProcessed = true;
+         topLevelTransform = true;
+      }
 
-            // Already transformed
-            if (transformedModel.getTransformed()) {
-               PerfMon.end("transform");
-               return true;
+      try {
+         if (sys.options.clonedTransform) {
+            // This returns true for types that either need a transform call made here in Java or do a transform of the model for JS for enumerated types.
+            if (needsTransform()) {
+               // TODO: during rebuild, are there any cases where we need to transform, even if our model did not change?
+               /*
+               if (transformedModel != null && transformedModel.getTransformed())
+                  return true;
+               if (transformedModel == null)
+               */
+               // Need to reset the transformed model each time we transform.  If we changed this model, it would have been
+               // reloaded, but the transformed model may be affected by other layers, unless it is final.
+               // Sometimes we clone the transformed model without transforming.  In that case, we can just use that model.
+               if (transformedModel == null || transformedInLayer == null ||
+                      (transformedModel.getTransformed() && transformedInLayer != layeredSystem.currentBuildLayer) && changedSinceLayer(transformedInLayer))
+                  cloneTransformedModel();
+
+               // Already transformed
+               if (transformedModel.getTransformed()) {
+                  PerfMon.end("transform");
+                  return true;
+               }
+
+               prepareModelTypeForTransform(true, transformedModel.getModelTypeDeclaration());
+
+               if (sys.options.verbose)
+                  System.out.println("Transforming: " + getSrcFile() + " runtime: " + layeredSystem.getRuntimeName());
+
+               didTransform = transformedModel.transform(RuntimeType.JAVA);
+               if (!didTransform && sys.options.sysDetails)
+                  System.out.println("   (no code changes)");
             }
+            else {
+               didTransform = false;
+               cachedNeedsTransform = false;
+               if (transformedInLayer == null && sys.options.verbose)
+                  System.out.println("Plain Java: " + getSrcFile() + " runtime: " + layeredSystem.getRuntimeName());
 
-            prepareModelTypeForTransform(true, transformedModel.getModelTypeDeclaration());
+               // Just setting this so that we do not print the Plain Java message over and over again
+               transformedInLayer = layeredSystem.currentBuildLayer;
 
-            if (sys.options.verbose)
-               System.out.println("Transforming: " + getSrcFile() + " runtime: " + layeredSystem.getRuntimeName());
-
-            didTransform = transformedModel.transform(RuntimeType.JAVA);
-            if (!didTransform && sys.options.sysDetails)
-               System.out.println("   (no code changes)");
+               // TODO: DEBUG: remove - this will mess up the flushTypeCache - by marking all these objects as transformed, even if they do not change.
+               //boolean testTransformed = transform(RuntimeType.JAVA);
+               //if (testTransformed != didTransform) {
+               //   System.err.println("*** needsTransform bug - did not predict that the model was transformed!");
+               //}
+               // TODO: end remove
+            }
          }
          else {
-            didTransform = false;
-            cachedNeedsTransform = false;
-            if (transformedInLayer == null && sys.options.verbose)
-               System.out.println("Plain Java: " + getSrcFile() + " runtime: " + layeredSystem.getRuntimeName());
+            prepareModelTypeForTransform(true, getModelTypeDeclaration());
 
-            // Just setting this so that we do not print the Plain Java message over and over again
-            transformedInLayer = layeredSystem.currentBuildLayer;
-
-            // TODO: DEBUG: remove - this will mess up the flushTypeCache - by marking all these objects as transformed, even if they do not change.
-            //boolean testTransformed = transform(RuntimeType.JAVA);
-            //if (testTransformed != didTransform) {
-            //   System.err.println("*** needsTransform bug - did not predict that the model was transformed!");
-            //}
-            // TODO: end remove
+            didTransform = transform(RuntimeType.JAVA);
          }
+
+         PerfMon.end("transform");
+         return didTransform;
       }
-      else {
-         prepareModelTypeForTransform(true, getModelTypeDeclaration());
-
-         didTransform = transform(RuntimeType.JAVA);
+      finally {
+         if (topLevelTransform)
+            sys.allTypesProcessed = false;
       }
-
-      PerfMon.end("transform");
-      return didTransform;
-
    }
 
    /** Returns the transformed model for this model. */
@@ -1115,7 +1125,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (transformedModel != null)
          return transformedModel;
 
-      if (!isProcessed()) {
+      if (!isProcessed()) { // TODO: this code needs work!  We need to set allTypesProcess = true before we start and false afterwards.  for now we are trying to avoid the need for this code path by building everything up front the first time.
          ParseUtil.initAndStartComponent(this);
          ParseUtil.processComponent(this);
       }
@@ -1428,6 +1438,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (!newModel.isValidated()) {
          ParseUtil.validateComponent(newModel);
       }
+      newModel.readReverseDeps(layeredSystem.buildLayer);
       if (!newModel.isProcessed()) {
          ParseUtil.processComponent(newModel);
       }
@@ -1944,8 +1955,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          Layer myBuildLayer = getBuildLayer();
          if (myBuildLayer == null || getSrcFile() == null)
             return;
-         if (reverseDepsInited || !readReverseDeps(myBuildLayer))
+         if (reverseDepsInited || !readReverseDeps(myBuildLayer)) {
             reverseDeps = new ReverseDependencies();
+         }
       }
 
       reverseDeps.addBindDependency(ModelUtil.getTypeName(fromType), getInnerTypeMemberName(toType, property), referenceOnly);
@@ -2253,6 +2265,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public void clearTransformed() {
+      if (replacedByModel != null)
+         replacedByModel.clearTransformed();
       if (transformed) {
          transformed = false;
          if (types != null) {
@@ -2260,6 +2274,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                type.clearTransformed();
          }
       }
+
       transformedModel = null;
       transformedInLayer = null;
 
@@ -2619,6 +2634,14 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    public JavaModel refreshNode() {
       // Here we pick the latest annotated model
       return (JavaModel) layeredSystem.getAnnotatedModel(getSrcFile());
+   }
+
+   public void setAdded(boolean v) {
+      added = v;
+   }
+
+   public boolean isAdded() {
+      return added;
    }
 }
 
