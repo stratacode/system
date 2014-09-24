@@ -24,8 +24,17 @@ sc -c -a system -d $BUILDDIR
 
 # Now we package up the STAGEDIR/StrataCode directory.  
 rm -rf STAGEDIR/StrataCode
+
+# old - top level build dir
 echo "cp -rf $BUILDDIR $STAGEDIR/StrataCode"
 cp -rf $BUILDDIR $STAGEDIR/StrataCode
+
+# new - sub-dirs
+#echo "cp -rf $BUILDDIR/coreRuntime/build/ $STAGEDIR/StrataCode"
+#cp -rf $BUILDDIR/coreRuntime/build/ $STAGEDIR/StrataCode
+#echo "cp -rf $BUILDDIR/system/build/ $STAGEDIR/StrataCode"
+#cp -rf $BUILDDIR/system/build/ $STAGEDIR/StrataCode
+
 echo "cd $STAGEDIR"
 cd $STAGEDIR
 echo "zip StrataCode.zip StrataCode/bin/* StrataCode/README.txt"

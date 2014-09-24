@@ -1,0 +1,3 @@
+#!/bin/sh
+
+../../makeSC.sh /jjv/vbuild/
