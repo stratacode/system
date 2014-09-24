@@ -35,7 +35,7 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor {
       return runtimeName;
    }
 
-   public boolean initRuntime() {
+   public boolean initRuntime(boolean fromScratch) {
       return false;
    }
 

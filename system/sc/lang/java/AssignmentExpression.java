@@ -407,6 +407,10 @@ public class AssignmentExpression extends TwoOperatorExpression {
    public ISrcStatement findFromStatement (ISrcStatement st) {
       if (fromDefinition instanceof ISrcStatement && ((ISrcStatement) fromDefinition).findFromStatement(st) != null)
          return this;
+      if (lhs != null && st.getNodeContainsPart(lhs))
+         return this;
+      if (rhs != null && st.getNodeContainsPart(rhs))
+         return this;
       return super.findFromStatement(st);
    }
 

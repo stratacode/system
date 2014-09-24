@@ -10,6 +10,7 @@ import sc.layer.LayeredSystem;
 import sc.type.*;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 
@@ -196,6 +197,10 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
 
    public Object getInheritedAnnotation(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
       return ModelUtil.getInheritedAnnotation(definedInType.getLayeredSystem(), componentType, annotationName, skipCompiled, refLayer, layerResolve);
+   }
+
+   public ArrayList<Object> getAllInheritedAnnotations(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
+      return ModelUtil.getAllInheritedAnnotations(definedInType.getLayeredSystem(), componentType, annotationName, skipCompiled, refLayer, layerResolve);
    }
 
    // Don't think this is used right now but basically keep the dimensions in tact and return the componenet's base type.

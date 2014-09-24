@@ -310,6 +310,7 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
    }
 
    public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement st) {
+      super.addGeneratedFromNodes(res, st);
       addBlockGeneratedFromNodes(this, res, st);
    }
 

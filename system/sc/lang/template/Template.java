@@ -239,6 +239,12 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
       return ModelUtil.getInheritedAnnotation(getLayeredSystem(), rootType, annotationName, skipCompiled, refLayer, layerResolve);
    }
 
+   public ArrayList<Object> getAllInheritedAnnotations(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
+      if (rootType == null)
+         return null;
+      return ModelUtil.getAllInheritedAnnotations(getLayeredSystem(), rootType, annotationName, skipCompiled, refLayer, layerResolve);
+   }
+
    public Object getDerivedTypeDeclaration() {
       if (rootType == null)
          return null;
@@ -580,13 +586,18 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
                }
             }
          }
-         ParseUtil.initAndStartComponent(this);
-         ParseUtil.processComponent(this);
+         // this resets the rootType
+         ParseUtil.initComponent(this);
 
          if (restart && oldRootType instanceof BodyTypeDeclaration && rootType instanceof BodyTypeDeclaration) {
             BodyTypeDeclaration rootTD = (BodyTypeDeclaration) rootType;
             ((BodyTypeDeclaration) oldRootType).updateType(rootTD, null, TypeUpdateMode.Replace, false, null);
          }
+
+         // Doing the start and validate after we've updated the type so that we are all properly initialized
+         ParseUtil.startComponent(this);
+         ParseUtil.validateComponent(this);
+         ParseUtil.processComponent(this);
       }
    }
 

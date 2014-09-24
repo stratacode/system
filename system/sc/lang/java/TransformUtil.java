@@ -15,6 +15,7 @@ import sc.parser.*;
 import sc.util.PerfMon;
 
 import java.io.InputStream;
+import java.lang.reflect.ParameterizedType;
 import java.util.*;
 
 public class TransformUtil {
@@ -45,8 +46,19 @@ public class TransformUtil {
    public static NewExpression convertArrayInitializerToNewCollection(JavaSemanticNode st, Object arrayType, ArrayInitializer arrInit) {
       String containerTypeName = null;
       Object componentType;
-      if (arrayType instanceof ParamTypeDeclaration) {
-         componentType = ((ParamTypeDeclaration) arrayType).getDefaultType(0);
+      if (ModelUtil.hasTypeParameters(arrayType)) {
+         // Need a new util method for this?  We are getting the closest approximation to the type we can get from the first type parameter.
+         // It might be a type variable in which case we turn in into the default type.
+         if (arrayType instanceof ParamTypeDeclaration) {
+            componentType = ((ParamTypeDeclaration) arrayType).getDefaultType(0);
+         }
+         else if (arrayType instanceof ParameterizedType) {
+            componentType = ((ParameterizedType) arrayType).getActualTypeArguments()[0];
+            if (ModelUtil.isTypeVariable(componentType))
+               componentType = ModelUtil.getTypeParameterDefault(componentType);
+         }
+         else
+            throw new UnsupportedOperationException();
       }
       else
          componentType = Object.class;
@@ -129,7 +141,7 @@ public class TransformUtil {
 
    private final static String OBJECT_DEFINITION =
            "<% if (!overrideField) { %><%=fieldModifiers%> <%=variableTypeName%> <%=lowerClassName%>;<% } %>\n" +
-                   "<%= needsTypeSettings ? \"@sc.obj.TypeSettings(objectType=true)\\n\" : \"\"%>" +
+                   "<%= typeSettingsAnnotation %>" +
                    "<%=getModifiers%> <%=variableTypeName%> get<%=upperClassName%>() {\n" +
                    "   return (<%=variableTypeName%>) (<%=lowerClassName%> == null ? <%=lowerClassName%> = new <%=typeName%>() : <%=lowerClassName%>);\n" +
                    "}\n";
@@ -165,7 +177,7 @@ public class TransformUtil {
 
    private final static String COMPLEX_OBJECT_DEFINITION =
        "<% if (needsField) { %><%=fieldModifiers%> <%=variableTypeName%> <%=lowerClassName%>;\n<% } %>" +
-       "<%= needsTypeSettings ? \"@sc.obj.TypeSettings(objectType=true)\\n\" : \"\"%>" +
+       "<%= typeSettingsAnnotation %>" +
        "<%=getModifiers%> <%=variableTypeName%> get<%=upperClassName%>() {\n" +
        "<% if (needsCustomResolver) { %>\n" +
           "<%= customResolver %>" +
@@ -221,7 +233,7 @@ public class TransformUtil {
                    "   else return <%=returnCast%><%=lowerClassName%>;\n" +
                    "}\n" +
                    "\n" +
-                   "<%= needsTypeSettings ? \"@sc.obj.TypeSettings(objectType=true)\\n\" : \"\"%>" +
+                   "<%= typeSettingsAnnotation %>" +
                    "<%=getModifiers%> <%=variableTypeName%> get<%=upperClassName%>() { return get<%=upperClassName%>(true); }\n";
 
    private static Template componentObjectDefinitionTemplate;
@@ -346,7 +358,7 @@ public class TransformUtil {
           return 0;
       Object result = SCLanguage.INSTANCE.parseString(codeToInsert, SCLanguage.INSTANCE.classBodySnippet);
       if (result instanceof ParseError) {
-         System.err.println("*** error parsing: " + ((ParseError) result).errorStringWithLineNumbers(codeToInsert));
+         System.err.println("*** error parsing object template: " + ((ParseError) result).errorStringWithLineNumbers(codeToInsert));
          return -1;
       }
       else {

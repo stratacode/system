@@ -10,10 +10,7 @@ import sc.sync.SyncProperties;
 import sc.type.CTypeUtil;
 import sc.util.StringUtil;
 
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * This class is passed to the object and new templates as speciified by the objTemplate and newTemplate fields in
@@ -358,15 +355,45 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       return sb.toString();
    }
 
-   /** Only output the TypeSettings if we did not have one defined explicitly or inherit one through mergeModifiers in the modify inherited case. */
+   /** Do we need the type settings at all?  Even if we inherit it from a base type, we still want to include it in the code-gen. */
    public boolean getNeedsTypeSettings() {
-      return true;
+      return ModelUtil.isObjectType(objType) || objType.propertiesAlreadyBindable != null;
       //return objType.getAnnotation("sc.obj.TypeSettings") == null;
    }
 
+   public String getTypeSettingsAnnotation() {
+      boolean isObject = ModelUtil.isObjectType(objType);
+      ArrayList<String> bindProps = objType.propertiesAlreadyBindable;
+      StringBuilder sb = null;
+      if (isObject || bindProps != null) {
+         sb = new StringBuilder();
+         sb.append("@sc.obj.TypeSettings(");
+         if (isObject) {
+            sb.append("objectType=true");
+         }
+         if (bindProps != null) {
+            if (isObject)
+               sb.append(",");
+            sb.append("bindableProps={");
+            for (String bp:bindProps) {
+               sb.append('"');
+               sb.append(bp);
+               sb.append('"');
+            }
+            sb.append("}");
+         }
+         sb.append(")\n");
+      }
+      return sb == null ? "" : sb.toString();
+   }
 
    public String getTemplateSuffix() {
       JavaModel model = objType.getJavaModel();
       return model.resultSuffix;
+   }
+
+   public ArrayList<String> getPropertiesAlreadyBindable() {
+      ArrayList<String> res = objType.propertiesAlreadyBindable;
+      return res == null ? StringUtil.EMPTY_STRING_LIST : res;
    }
 }

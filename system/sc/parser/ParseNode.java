@@ -227,8 +227,9 @@ public class ParseNode extends AbstractParseNode {
       if (PString.isString(childVal)) {
          CharSequence nodeStr = (CharSequence) childVal;
          ctx.curLines += ParseUtil.countLinesInNode(nodeStr);
-         if (ctx.curLines >= lineNum)
+         if (ctx.curLines >= lineNum) {
             return ctx.lastVal;
+         }
       }
       else {
          res = ((IParseNode) childVal).getNodeAtLine(ctx, lineNum);

@@ -140,8 +140,7 @@ public class TryStatement extends Statement implements IBlockStatement {
    }
 
    public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement toFind) {
-      if (toFind == this)
-         res.add(this);
+      super.addGeneratedFromNodes(res, toFind);
       AbstractBlockStatement.addBlockGeneratedFromNodes(this, res, toFind);
       if (catchStatements != null) {
          for (Statement st:catchStatements) {

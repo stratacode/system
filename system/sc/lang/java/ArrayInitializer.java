@@ -123,6 +123,15 @@ public class ArrayInitializer extends Expression {
       info.visitList(initializers, ctx);
    }
 
+   public static SemanticNodeList<Object> createAnnotationValue(Object literalValue) {
+      int len = DynUtil.getArrayLength(literalValue);
+      SemanticNodeList values = new SemanticNodeList(len);
+      for (int i = 0; i < len; i++) {
+         values.add(createFromValue(DynUtil.getArrayElement(literalValue, i), false));
+      }
+      return values;
+   }
+
    public static ArrayInitializer create(Object literalValue) {
       ArrayInitializer arr = new ArrayInitializer();
       int len = Array.getLength(literalValue);

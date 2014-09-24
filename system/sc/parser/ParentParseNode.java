@@ -5,6 +5,8 @@
 package sc.parser;
 
 import sc.lang.ISemanticNode;
+import sc.lang.java.BlockStatement;
+import sc.lang.java.IdentifierExpression;
 import sc.lang.java.IfStatement;
 import sc.util.PerfMon;
 
@@ -675,24 +677,56 @@ public class ParentParseNode extends AbstractParseNode {
          int childIx = 0;
          for (Object childNode:children) {
             // For repeat nodes, as we walk past each significant value, update the lastVal
-            if (isList && (childIx % parselet.parselets.size()) == 0 && listVal.size() > listIx) {
-               Object elemObj = listVal.get(listIx++);
-               if (elemObj instanceof ISemanticNode) {
-                  ISemanticNode node = (ISemanticNode) elemObj;
-                  if (node.getParentNode() != null)
-                     ctx.lastVal = node;
+            if (isList) {
+               if (parselet == null || parselet.parselets == null)
+                  System.err.println("*** parselet not initialized in getNodeAtLine");
+               int parseletIndex = childIx % parselet.parselets.size();
+               if (parseletIndex == 0 && listVal.size() > listIx) {
+                  // We have a child of a parselet which produces a list.  For this current slot mapping:
+                  // SKIP corresponds to whitespace which should not match the node.  PROPAGATE and ARRAY slots which support the appropriate semantic value that's tied into the tree do match.
+                  if (parselet.parameterMapping == null || parselet.parameterMapping[parseletIndex] != NestedParselet.ParameterMapping.SKIP) {
+                     if (childNode instanceof IParseNode) {
+                        Object elemObj = listVal.get(listIx++);
+                        if (elemObj instanceof ISemanticNode) {
+                           ISemanticNode node = (ISemanticNode) elemObj;
+                           if (node.getParentNode() != null) {
+                              ctx.lastVal = node;
+                           }
+                        }
+                     }
+                  }
                }
             }
             if (PString.isString(childNode)) {
                CharSequence nodeStr = (CharSequence) childNode;
+               int oldLine = ctx.curLines;
                ctx.append(nodeStr);
-               if (ctx.curLines >= lineNum)
+               if (ctx.curLines >= lineNum) {
+                  // This is the case where we have a token which includes a newline - say }\n that's a child parselet for a block statement.  In this case, we need to match with the block statement as the semantic value.
+                  // Specifically for the block statement note that we match the parent value as a node to match the end brace.  This is a little odd... should we really match the semicolonEOL parselet?
+                  // for IntelliJ at least, the block statement uses the navigation element to point to the close brace so it fixes that oddity but if that becomes a problem for another framework we can fix this another way.
+                  if (value instanceof ISemanticNode && value != ctx.lastVal)
+                     ctx.lastVal = (ISemanticNode) value;
                   return ctx.lastVal;
+               }
+               // When a string token has a newline and it does not match, we don't want to count the next
+               // line as part of the value.
+               else if (oldLine != ctx.curLines) {
+                  ctx.lastVal = null;
+               }
             }
             else if (childNode != null) {
                res = ((IParseNode) childNode).getNodeAtLine(ctx, lineNum);
-               if (res != null || ctx.curLines > lineNum)
+               if (res != null || ctx.curLines >= lineNum) {
+                  // We have just passed the line we are looking for but haven't matched a value yet.  This means the parent node includes the line in question.
+                  // If our value is suitable let's use it as the starting point.  If not, we'll pass the buck to our parent node.
+                  if (res == null && value instanceof ISemanticNode) {
+                     ISemanticNode semValue = (ISemanticNode) value;
+                     if (semValue.getParentNode() != null)
+                        return (ISemanticNode) value;
+                  }
                   return res;
+               }
 
                // We take the most specific value which has a parent, then walk up the parent hierarchy till we find
                // a statement at the right level.  So no resetting the current value here.

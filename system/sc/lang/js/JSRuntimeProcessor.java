@@ -918,7 +918,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                         }
                      }
                   }
-                  else if (!(depType instanceof PrimitiveType))
+                  else if (!(depType instanceof PrimitiveType) && !(depType instanceof TypeVariable))
                      System.err.println("*** Warning: unrecognized js type: " + type.typeName + " depends on compiled thing: " + depType);
                }
 
@@ -1557,7 +1557,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       Object typeParams = new JSTypeParameters(td);
 
       String templatePath = getJSTypeTemplatePath(td);
-      String rootTypeResult = system.evalTemplate(typeParams, templatePath, JSTypeParameters.class);
+      String rootTypeResult = system.evalTemplate(typeParams, templatePath, JSTypeParameters.class, td.getLayer(), td.isLayerType);
       result.append(rootTypeResult);
 
       processedTypes.add(td.getFullTypeName());
@@ -2492,7 +2492,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
    private final static String JS_BUILD_INFO_FILE = "jsBuildInfo.ser";
 
-   public boolean initRuntime() {
+   /** Returns true if we need to rebuild all.  If fromScratch is true, we reset for a new full build */
+   public boolean initRuntime(boolean fromScratch) {
+      if (!fromScratch || jsBuildInfo != null)
+         return false;
       if (system.options.buildAllFiles) {
          jsBuildInfo = new JSBuildInfo();
          return true;

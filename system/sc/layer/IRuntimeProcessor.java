@@ -17,8 +17,8 @@ public interface IRuntimeProcessor {
 
    public List<SrcEntry> getProcessedFiles(IFileProcessorResult model, Layer genLayer, String buildSrcDir, boolean generate);
 
-   /** Return true if you need to build all files for this runtime */
-   public boolean initRuntime();
+   /** Return true if you need to build all files for this runtime.  If fromScratch is true, prepare for a full rebuild */
+   public boolean initRuntime(boolean fromScratch);
 
    public void saveRuntime();
 

@@ -14,5 +14,11 @@ import static java.lang.annotation.ElementType.*;
 @Target({TYPE, METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface TypeSettings {
+   /** Annotation that designates a class or getX method which is an object that's been through the code-generation phase. */
    boolean objectType() default false;
+   /** List of properties that are bindable but there's no code that reflects that binding in this class.  The common case is to mark the field, getX or setX method
+    * as @Bindable but in some cases we do not have an artifact in the generated class to inject this annotation.  This annotation works for those cases.  It may be set
+    * on the class generated, the getX method or (TODO: in the ExternalDynType generated for a class when this behavior is added in an anotationLayer and we do not generate
+    * a class at all for that type). */
+   String[] bindableProps() default {};
 }

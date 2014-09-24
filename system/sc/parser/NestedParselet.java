@@ -8,6 +8,7 @@ import sc.dyn.DynUtil;
 import sc.dyn.IDynObject;
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
+import sc.lang.java.Annotation;
 import sc.lang.java.ITypeDeclaration;
 import sc.type.RTypeUtil;
 import sc.type.BeanMapper;
@@ -320,7 +321,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
             String [] params = paramStr.split(",");
             parameterMapping = new ParameterMapping[params.length];
 
-            if (parameterMapping != null && parameterMapping.length != parselets.size())
+            if (parameterMapping.length != parselets.size())
                throw new IllegalArgumentException("Number of parselet parameters does not match number of child parselets: " + this + " " + name);
 
             for (int i = 0; i < params.length; i++) {

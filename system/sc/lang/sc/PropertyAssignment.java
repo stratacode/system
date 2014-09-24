@@ -143,6 +143,16 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
                  IdentifierExpression.getIdentifierTypeFromType(assignedProperty),
                  assignedProperty, getTypeDeclaration(), referenceType, !makeBindable && !bindingDirection.doReverse(), false);
       }
+      // If the annotation is set on this assignment and there's no code-gen for this property
+      else if (annot != null && getMyAnnotation("sc.bind.Bindable") != null) {
+         Object referenceType = findMemberOwner(propertyName, MemberType.PropertyGetSet);
+         if (referenceType instanceof BodyTypeDeclaration) {
+            BodyTypeDeclaration decl = ((BodyTypeDeclaration) referenceType);
+            decl.addPropertyAlreadyBindable(propertyName);
+         }
+         //else - live with the warning... can't change it anyway since the type is only compiled
+         // assert makeBindable = false
+      }
    }
 
    public Object definesMember(String name, EnumSet<MemberType> mtype, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {
@@ -628,6 +638,10 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       if (assignedProperty != null)
          return ModelUtil.getAccessLevel(assignedProperty, explicitOnly);
       return null;
+   }
+
+   public Object getMyAnnotation(String annotation) {
+      return super.getAnnotation(annotation);
    }
 
    public Object getAnnotation(String annotation) {

@@ -172,6 +172,25 @@ public class ClassDeclaration extends TypeDeclaration {
       return Object.class;
    }
 
+   protected void updateBoundExtendsType(Object newType, Object oldType) {
+      Object curType = null;
+      if (extendsType != null && ((curType = extendsType.getTypeDeclaration()) == oldType || curType == newType)) {
+         extendsType.setTypeDeclaration(newType);
+         return;
+      }
+      if (implementsTypes != null) {
+         for (JavaType implType:implementsTypes) {
+            if ((curType = implType.getTypeDeclaration()) == oldType || curType == newType) {
+               implType.setTypeDeclaration(newType);
+               return;
+            }
+         }
+      }
+      if (oldType == Object.class || newType == Object.class)
+         return;
+      System.err.println("*** Failed to update type in updateBoundExtendsType: " + oldType + " ->" + newType);
+   }
+
    public Object getDerivedTypeDeclaration() {
       if (extendsType != null) {
          if (extendsInvalid)
@@ -771,9 +790,17 @@ public class ClassDeclaration extends TypeDeclaration {
          any = true;
       }
 
-      if (isObject) {
-         if (getAnnotation("sc.obj.TypeSettings") == null)
-            addModifier(Annotation.create("sc.obj.TypeSettings", "objectType", true));
+      if (isObject || propertiesAlreadyBindable != null) {
+         if (getAnnotation("sc.obj.TypeSettings") == null) {
+            Annotation annot = Annotation.create("sc.obj.TypeSettings");
+            ArrayList<AnnotationValue> annotVals = new ArrayList<AnnotationValue>();
+            if (isObject)
+               annotVals.add(AnnotationValue.create("objectType", Boolean.TRUE));
+            if (propertiesAlreadyBindable != null)
+               annotVals.add(AnnotationValue.create("bindableProps", propertiesAlreadyBindable));
+            annot.addAnnotationValues(annotVals.toArray(new AnnotationValue[annotVals.size()]));
+            addModifier(annot);
+         }
       }
 
       /** For types like Android's activity which get created externally, this provides the init hook to use */

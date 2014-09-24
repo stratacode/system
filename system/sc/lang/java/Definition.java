@@ -63,7 +63,7 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
                      return;
                }
                ScopeModifier scope = (ScopeModifier) mod;
-               IScopeProcessor p = sys.scopeProcessors.get(scope.scopeName);
+               IScopeProcessor p = sys.getScopeProcessor(model.getLayer(), scope.scopeName);
                if (p != null) {
                   p.init(this);
                }
@@ -91,8 +91,11 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
                   if (sys == null)
                      return;
                }
+               JavaModel model = getJavaModel();
+               if (model == null)
+                  return;
                Annotation annot = (Annotation) mod;
-               IAnnotationProcessor p = sys.annotationProcessors.get(annot.getFullTypeName());
+               IAnnotationProcessor p = sys.getAnnotationProcessor(model.getLayer(), annot.getFullTypeName());
                if (p != null) {
                   p.start(this, annot);
                }
@@ -103,14 +106,17 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
                   if (sys == null)
                      return;
                }
+               JavaModel model = getJavaModel();
+               if (model == null)
+                  return;
                ScopeModifier scope = (ScopeModifier) mod;
-               IScopeProcessor p = sys.scopeProcessors.get(scope.scopeName);
+               IScopeProcessor p = sys.getScopeProcessor(model.getLayer(), scope.scopeName);
                if (p != null) {
                   p.start(this);
                   String requiredParentType;
                   if ((requiredParentType = p.getRequiredParentType()) != null) {
                      Object ourEncType = getEnclosingType();
-                     Object reqParent = sys.getTypeDeclaration(requiredParentType);
+                     Object reqParent = sys.getTypeDeclaration(requiredParentType, false, model.getLayer(), model.isLayerModel);
                      if (reqParent == null) {
                         displayError("No type for requiredParentType: ", requiredParentType, " as set on scope: ", scope.scopeName, " for: ");
                      }
@@ -144,9 +150,12 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
                   if (sys == null)
                      return;
                }
+               JavaModel model = getJavaModel();
+               if (model == null)
+                  return;
                Annotation annot = (Annotation) mod;
                String annotName = annot.getFullTypeName();
-               IAnnotationProcessor p = sys.annotationProcessors.get(annotName);
+               IAnnotationProcessor p = sys.getAnnotationProcessor(model.getLayer(), annotName);
                if (p != null) {
                   if (!p.getSubTypesOnly())
                      p.process(this, annot);
@@ -160,8 +169,11 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
                   if (sys == null)
                      return;
                }
+               JavaModel model = getJavaModel();
+               if (model == null)
+                  return;
                ScopeModifier scope = (ScopeModifier) mod;
-               IScopeProcessor p = sys.scopeProcessors.get(scope.scopeName);
+               IScopeProcessor p = sys.getScopeProcessor(model.getLayer(), scope.scopeName);
                if (p != null)
                   p.process(this);
             }
@@ -221,9 +233,12 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
       LayeredSystem sys = getLayeredSystem();
       if (sys == null)
          return null;
+      JavaModel model = getJavaModel();
+      if (model == null)
+         return null;
 
       String scopeName = getScopeName();
-      return sys.scopeProcessors.get(scopeName);
+      return sys.getScopeProcessor(model.getLayer(), scopeName);
    }
 
    public IDefinitionProcessor[] getDefinitionProcessors() {
@@ -236,7 +251,10 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
                if (sys == null)
                   sys = getLayeredSystem();
                if (sys == null) return null;
-               IScopeProcessor sproc = sys.scopeProcessors.get(((ScopeModifier)mod).scopeName);
+               JavaModel model = getJavaModel();
+               if (model == null)
+                  return null;
+               IScopeProcessor sproc = sys.getScopeProcessor(model.getLayer(), ((ScopeModifier)mod).scopeName);
                if (sproc != null) {
                   if (defProcs == null)
                      defProcs = new ArrayList<IDefinitionProcessor>(1);
@@ -246,7 +264,10 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
             else if (mod instanceof Annotation) {
                Annotation annot = (Annotation) mod;
                String annotTypeName = annot.getFullTypeName();
-               IAnnotationProcessor aproc = getLayeredSystem().annotationProcessors.get(annotTypeName);
+               JavaModel model = getJavaModel();
+               if (model == null)
+                  return null;
+               IAnnotationProcessor aproc = model.layeredSystem.getAnnotationProcessor(model.getLayer(), annotTypeName);
                if (aproc != null) {
                   if (defProcs == null)
                      defProcs = new ArrayList<IDefinitionProcessor>(1);
@@ -381,7 +402,9 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
    }
 
    private boolean includeForType(Annotation annot, MemberType type) {
-      IAnnotationProcessor p = getLayeredSystem().annotationProcessors.get(annot.getFullTypeName());
+      JavaModel model = getJavaModel();
+      Layer layer = model == null ? null : model.getLayer();
+      IAnnotationProcessor p = getLayeredSystem().getAnnotationProcessor(layer, annot.getFullTypeName());
       if (p == null) {
          // Right now for the Bindable annotation, we'll move it from the field to the Get/Set during conversion since
          // those become the public contract for the property.
@@ -547,8 +570,11 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
             if (mod instanceof Annotation) {
                if (sys == null)
                   sys = getLayeredSystem();
+               JavaModel model = getJavaModel();
+               if (model == null)
+                  return;
                Annotation annot = (Annotation) mod;
-               IAnnotationProcessor p = sys.annotationProcessors.get(annot.getFullTypeName());
+               IAnnotationProcessor p = sys.getAnnotationProcessor(model.getLayer(), annot.getFullTypeName());
                if (p != null) {
                   p.transform(this, annot, null);
                }
@@ -559,8 +585,11 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
                   if (sys == null)
                      return;
                }
+               JavaModel model = getJavaModel();
+               if (model == null)
+                  return;
                ScopeModifier scope = (ScopeModifier) mod;
-               IScopeProcessor p = sys.scopeProcessors.get(scope.scopeName);
+               IScopeProcessor p = sys.getScopeProcessor(model.getLayer(), scope.scopeName);
                if (p != null) {
                   // Warning: this might add to the modifiers list above - for example, when transforming a scope we might add an annotation to mark the runtime class for that scope
                   p.transform(this, null);

@@ -14,6 +14,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class StringUtil {
+   public static ArrayList<String> EMPTY_STRING_LIST = new ArrayList<String>(0);
+
    public static boolean isEmpty(String s) {
       return s == null || s.length() == 0;
    }
