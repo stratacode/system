@@ -4402,6 +4402,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          else {
             int numLayers = layers.size();
+
+            // Make sure any layers which have features which this layer replaces are updated to know that this layer is present.
+            layer.initReplacedLayers();
+
             // This is just a nicety but since compiledLayers tend to be framework layers, it's best to put them
             // in front of those that can be made dynamic.  That also means they won't jump positions when going
             // from compiled to dynamic.  The stack is in general more readable when framework layers are at the base.
@@ -4410,8 +4414,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                int resortIx = -1;
                for (int prevIx = numLayers - 1; prevIx >= 0; prevIx--) {
                   Layer prevLayer = layers.get(prevIx);
-                  if (sortPriority < prevLayer.getSortPriority() && !layer.extendsLayer(prevLayer)) {
-                     resortIx = prevIx;
+                  // Should we move this layer up one past the prev layer - only if it does not extend it!
+                  if (!layer.extendsLayer(prevLayer)) {
+                     // If this layer extends some layer which is replaced by this layer - in other words, the new layer replaces a feature in some core layer extended so
+                     // the new layer needs to go before this layer.
+                     if (prevLayer.extendsReplacedLayer(layer)) {
+                        resortIx = prevIx;
+                     }
+                     else if (sortPriority < prevLayer.getSortPriority()) {
+                        resortIx = prevIx;
+                     }
                   }
                   else
                      break;

@@ -2665,6 +2665,8 @@ public class ModelUtil {
          return (Class) fieldType;
       else if (fieldType instanceof TypeParameter)
          return getCompiledClass(((TypeParameter) fieldType).getTypeDeclaration());
+      else if (hasTypeParameters(fieldType))
+         return getCompiledClass(getParamTypeBaseType(fieldType));
       else if (fieldType == null)
          return null;
       else if (fieldType instanceof java.lang.reflect.Type) {

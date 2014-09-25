@@ -225,6 +225,9 @@ public class Layer implements ILifecycle, LayerConstants {
 
    private ArrayList<String> modifiedLayerNames;
 
+   private ArrayList<String> replacesLayerNames;
+   private ArrayList<Layer> replacedByLayers;
+
    /** Set to true for a given build layer which needs to build all files */
    public boolean buildAllFiles = false;
 
@@ -245,6 +248,26 @@ public class Layer implements ILifecycle, LayerConstants {
       if (modifiedLayerNames == null)
          modifiedLayerNames = new ArrayList();
       modifiedLayerNames.add(otherLayerName);
+   }
+
+   /**
+    * For fine-grained control over layer ordering, a downstream layer can mark that it replaces an update stream layer.
+    * This is always going to be a layer which the downstream layer already extends.  When determining layer ordering, if a third layer
+    * extends the upstream layer, it will also follow the downstream layer which replaces that upstream layer.
+    * For example, if html.schtml replaces html.core, and you extend html.core, you'll be guaranteed to follow html.schtml in the layer list.
+    *
+    * Why this is necessary?  In most cases, you explicitly depend upon a feature of another layer so you usually extend the layers you depend upon.
+    * But if another framework layer modifies that feature, and it follows your layer in the stack, supporting all of the invalidation and rebuilds necessary
+    * so you end up recompiling all affected files is too much work.
+    * The tagPackageList is an example of a feature that does not always respect the strict layering due to it's flexibility.  So classes put into that list
+    * may need to replace the layer which defined the tagPackage entry.
+    *
+    * Essentially, your application layer may need to inherit a dependency on the last layer which replaces the feature to work properly.
+    */
+   public void replacesLayer(String otherLayerName) {
+      if (replacesLayerNames == null)
+         replacesLayerNames = new ArrayList<String>();
+      replacesLayerNames.add(otherLayerName);
    }
 
    public void excludeRuntimes(String... names) {
@@ -2165,9 +2188,47 @@ public class Layer implements ILifecycle, LayerConstants {
       return false;
    }
 
+   void initReplacedLayers() {
+      if (replacesLayerNames != null && activated) {
+         for (String modLayerName:replacesLayerNames) {
+            Layer modLayer = layeredSystem.getLayerByDirName(modLayerName);
+            if (modLayer == null)
+               System.err.println("*** Invalid replacesLayer call: replaces layer: " + modLayerName + " not found for downstream layer: " + getLayerName());
+            else {
+               if (modLayer.replacedByLayers == null)
+                  modLayer.replacedByLayers = new ArrayList<Layer>();
+               modLayer.replacedByLayers.add(this);
+            }
+         }
+      }
+   }
+
+   /** Does this layer extend any layers which replaced features of layers we do extend */
+   public boolean extendsReplacedLayer(Layer other) {
+      initReplacedLayers();
+      if (replacedByLayers != null) {
+         for (Layer replacedByLayer:replacedByLayers) {
+            if (other == replacedByLayer) {
+               return true;
+            }
+         }
+      }
+      if (baseLayers == null)
+         return false;
+      for (int i = 0; i < baseLayers.size(); i++) {
+         Layer base = baseLayers.get(i);
+         if (base == other || base.extendsReplacedLayer(other))
+            return true;
+      }
+      return false;
+   }
+
    /** Does this layer modify any types which are in the other layer. */
    public boolean modifiedByLayer(Layer other) {
       if (extendsLayer(other))
+         return true;
+
+      if (extendsReplacedLayer(other))
          return true;
 
       boolean packagesOverlap = false;
