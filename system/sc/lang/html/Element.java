@@ -1655,7 +1655,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       else if (bodyMerge == MergeMode.Merge) {
          // look for children which do not match one of those in the parent type
          childRes.needsSuper = derivedElement != null && canInherit;
-         childRes.needsBody = children != null || (derivedElement != null && !derivedElement.isEmptyBody());
+         childRes.needsBody = childRes.needsBody || children != null || (derivedElement != null && !derivedElement.isEmptyBody());
          if (!canInherit && derivedChildren != null) {
             if (res == null) {
                res = new SemanticNodeList<Object>();
