@@ -816,10 +816,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // Then purge any layers from this LayeredSystem which should not be here.
       if (runtimes != null && runtimes.size() > 1 && (peerSystems == null || peerSystems.size() < runtimes.size()-1)) {
          // We want all of the layered systems to use the same buildDir so pass it through options as though you had used the -d option.  Of course if you use -d, it will happen automatically.
-         //if (options.buildDir == null) {
-         //   if (lastLayer != null)
-         //      options.buildDir = lastLayer.getDefaultBuildDir();
-         //}
+         if (options.buildDir == null) {
+            if (lastLayer != null)
+               options.buildLayerAbsDir = lastLayer.getDefaultBuildDir();
+         }
 
          ArrayList<LayeredSystem> newPeers = new ArrayList<LayeredSystem>();
 
