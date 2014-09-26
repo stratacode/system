@@ -5660,7 +5660,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          //boolean layeredCompile = srcEnt.layer.compiled;
          //boolean incrCompile = !genLayer.getBuildAllFiles();
          // If we are dealing with a source file that's already built in a previous build layer, use that layer's "buildAllFiles" so we do the build-all one clump of files at a time.
-         boolean incrCompile = !srcEnt.layer.getNextBuildLayer().getBuildAllFiles();
+         Layer prevSrcEntBuildLayer = srcEnt.layer.getNextBuildLayer();
+         boolean incrCompile = !prevSrcEntBuildLayer.getBuildAllFiles();
          boolean layeredCompile = false;
 
          boolean depFileExists = depFile.exists();
@@ -5912,6 +5913,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      if (!needsGenerate && ent.srcEntries != null && ent.genFileNames != null && ent.genFileNames.size() > 0) {
                         // For each file the current srcEnt depends upon
                         for (SrcEntry otherFileName:ent.srcEntries) {
+
+                           // We are building all files in this build layer but inheriting a build of this file from a previous build layer.
+                           // If any of the src files which we depend upon is after the previous build layer we need to rebuild this file here.
+                           if (genLayer.buildAllFiles) {
+                              if (otherFileName.layer.getLayerPosition() > prevSrcEntBuildLayer.getLayerPosition()) {
+                                 needsGenerate = true;
+                                 break;
+                              }
+                           }
 
                            // If we are already generating this, skip the file system check.
                            if (toGenerate.contains(otherFileName)) {

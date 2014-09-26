@@ -1352,8 +1352,9 @@ public class Layer implements ILifecycle, LayerConstants {
          try {
             ObjectInputStream ios = new ObjectInputStream(new FileInputStream(dynTypeIndexFile));
             HashSet<String> res = (HashSet<String>) ios.readObject();
-            if (res != null)
+            if (res != null) {
                return res;
+            }
          }
          catch (InvalidClassException exc) {
             System.out.println("reaDynTypeIndex - version changed: " + this);
@@ -2454,7 +2455,7 @@ public class Layer implements ILifecycle, LayerConstants {
          //  (!StringUtil.equalStrings(currentLayerNames, gd.layerNames))
          else if (needsRebuildForLayersChange(currentLayerNames, gd.layerNames)) {
             if (layeredSystem.options.verbose)
-               System.out.println("Layer names changed from: " + gd.layerNames + " to: " + currentLayerNames);
+               System.out.println("Layer names changed for build layer: " + getLayerName() + "\n   from: " + gd.layerNames + "\n   to:   " + currentLayerNames);
             else if (layeredSystem.options.info)
                System.out.println("Layer names changed - building all");
             // Mark this layer as requiring "buildAllFiles" - not globally since downstream layers are not affected

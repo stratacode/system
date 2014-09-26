@@ -656,6 +656,8 @@ public class IdentifierExpression extends ArgumentsExpression {
             String pname = identifiers.get(ix).toString();
             if (ix > 0) {
                Object parentType = getTypeForIdentifier(ix-1);
+               if (parentType == null)
+                  return null;
                return ModelUtil.definesMember(parentType, pname, MemberType.PropertyAssignmentSet, getEnclosingIType(), ctx);
             }
             else {
