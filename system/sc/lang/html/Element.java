@@ -2127,13 +2127,21 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
             extendsType = getExtendsType();
             // If we are modifying a type need to be sure this type is compatible with that type (and that one is a tag type)
             if (modifyType != null) {
+               Object declaredExtends = getDeclaredExtendsTypeDeclaration();
                Object modifyExtendsType = ModelUtil.getExtendsClass(modifyType);
+
                if (modifyExtendsType != null && modifyExtendsType != Object.class) {
-                  if (!ModelUtil.isAssignableFrom(HTMLElement.class, modifyExtendsType)) {
+                  if (declaredExtends != null && !ModelUtil.isAssignableFrom(modifyExtendsType, declaredExtends)) {
+                     // This is the equivalent of redefining the class for schtml - just define an incompatible base class and it breaks the link automatically with the previous type - the sensible default.
+                     if (ModelUtil.isAssignableFrom(HTMLElement.class, declaredExtends)) {
+                        modifyType = null;
+                        modifyExtendsType = null;
+                     }
+                  }
+                  if (modifyExtendsType != null && !ModelUtil.isAssignableFrom(HTMLElement.class, modifyExtendsType)) {
                      displayError("tag with id: ", objName, " modifies type: ", ModelUtil.getTypeName(modifyType), " in layer:", ModelUtil.getLayerForType(null, modifyType) + " already extends: ", ModelUtil.getTypeName(modifyExtendsType), " which has no schtml file (and does not extends HTMLElement): ");
                      extendsType = null;
                   }
-                  Object declaredExtends = getDeclaredExtendsTypeDeclaration();
                   if (declaredExtends != null) {
                      if (!ModelUtil.isAssignableFrom(modifyExtendsType, declaredExtends)) {
                         displayError("The extends attribute: ", ModelUtil.getTypeName(declaredExtends), " overrides an incompatible extends type: ", ModelUtil.getTypeName(modifyExtendsType), " for tag: ");

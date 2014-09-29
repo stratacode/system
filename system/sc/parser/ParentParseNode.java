@@ -5,8 +5,6 @@
 package sc.parser;
 
 import sc.lang.ISemanticNode;
-import sc.lang.java.BlockStatement;
-import sc.lang.java.IdentifierExpression;
 import sc.lang.java.IfStatement;
 import sc.util.PerfMon;
 
@@ -435,6 +433,18 @@ public class ParentParseNode extends AbstractParseNode {
          for (int i = 0; i < children.size(); i++) {
             Object childNode = children.get(i);
             if (childNode == toFindPN) {
+               if (childNode instanceof IParseNode) {
+                  IParseNode childParseNode = (IParseNode) childNode;
+                  Object childValue = childParseNode.getSemanticValue();
+                  if (childValue instanceof ISemanticNode) {
+                     ISemanticNode semVal = (ISemanticNode) childValue;
+                     // Some nodes mark their value as the end of the line - add in the contents of the parse node
+                     if (semVal.isTrailingSrcStatement()) {
+                        childParseNode.computeLineNumberForNode(ctx, toFindPN);
+                        ctx.curLines--;
+                     }
+                  }
+               }
                ctx.found = true;
                return;
             }

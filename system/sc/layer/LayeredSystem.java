@@ -901,6 +901,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             peer.peerSystems = peerPeers;
          }
 
+         if (modelListeners != null) {
+            for (IModelListener ml:modelListeners) {
+               for (LayeredSystem newPeer:newPeers) {
+                  ml.runtimeAdded(newPeer);
+               }
+            }
+         }
+
       }
       // We've added some layers to the this layered system through activate.  Now we need to go through the
       // other systems and include the layers in them if they are needed.
@@ -4450,8 +4458,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                layers.add(layer);
             }
          }
-
          ParseUtil.initComponent(layer);
+
+         notifyLayerAdded(layer);
       }
       else {
          registerInactiveLayer(layer);
@@ -4533,6 +4542,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             renumberInactiveLayers(posIx + 1);
          }
       }
+      notifyLayerAdded(layer);
    }
      
    private void renumberInactiveLayers(int fromIx) {
@@ -7785,12 +7795,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public void addNewModel(ILanguageModel model, Layer fromLayer, ExecutionContext ctx, boolean isLayer) {
       model.setAdded(true);
       SrcEntry srcEnt = model.getSrcFile();
-      if (!isLayer) {
+      Layer srcEntLayer = srcEnt.layer;
+      if (!isLayer && srcEntLayer != null && srcEntLayer.activated) {
          // Now we can get its types and info.
-         addTypesByName(srcEnt.layer, model.getPackagePrefix(), model.getDefinedTypes(), fromLayer);
+         addTypesByName(srcEntLayer, model.getPackagePrefix(), model.getDefinedTypes(), fromLayer);
       }
       // Also register it in the layer model index
-      srcEnt.layer.layerModels.add(new IdentityWrapper(model));
+      srcEntLayer.layerModels.add(new IdentityWrapper(model));
 
       updateModelIndex(srcEnt, model, ctx);
    }
@@ -7833,6 +7844,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public boolean removeNewModelListener(IModelListener l) {
       return modelListeners.remove(l);
+   }
+
+   public boolean hasNewModelListener(IModelListener l) {
+      return modelListeners.contains(l);
    }
 
    /**
@@ -8085,6 +8100,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public void addTypeByName(Layer layer, String fullTypeName, TypeDeclaration toAdd, Layer fromLayer) {
+      if (!layer.activated || !toAdd.getLayer().activated)
+         System.out.println("*** Error adding inactivated type to type system");
       addToRootNameIndex(toAdd);
       TypeDeclarationCacheEntry tds = typesByName.get(fullTypeName);
       if (tds != null) {
@@ -8744,7 +8761,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      Layer declLayer = decl.getJavaModel().getLayer();
                      if (declLayer == null)
                         System.out.println("*** Warning - adding inner type without a layer");
-                     addTypeByName(declLayer, CTypeUtil.prefixPath(rootTypeActualName, subTypeName), decl, fromLayer);
+
+                     if (declLayer == null || declLayer.activated)
+                        addTypeByName(declLayer, CTypeUtil.prefixPath(rootTypeActualName, subTypeName), decl, fromLayer);
                   }
                   if (fromLayer == null && cacheForRefLayer(refLayer))
                      innerTypeCache.put(typeName, decl);

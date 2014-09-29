@@ -144,4 +144,7 @@ public interface ISemanticNode {
 
    /** For nodes that are able to re-resolve themselves to the latest version, return the latest version.  otherwise returns this. */
    public ISemanticNode refreshNode();
+
+   /** Most statements if started before the newline that signals a breakpoint should be considered the 'source statement' for that line.  Block statement is used to signal the end of the statement and is an exception.  */
+   public boolean isTrailingSrcStatement();
 }

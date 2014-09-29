@@ -14,4 +14,5 @@ public interface IModelListener {
    void layerRemoved(Layer layer);
    void innerTypeAdded(ITypeDeclaration type);
    void innerTypeRemoved(ITypeDeclaration type);
+   void runtimeAdded(LayeredSystem sys);
 }

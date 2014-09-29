@@ -141,7 +141,7 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
       Object val = getSemanticValue();
       if (val instanceof ISemanticNode) {
          ISemanticNode valNode = (ISemanticNode) val;
-         if (valNode.getParentNode() != null)
+         if (valNode.getParentNode() != null && !valNode.isTrailingSrcStatement())
             ctx.lastVal = valNode;
       }
       return null;

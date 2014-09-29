@@ -683,4 +683,8 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
    public SemanticNodeList refreshNode() {
       return this;
    }
+
+   public boolean isTrailingSrcStatement() {
+      return false;
+   }
 }

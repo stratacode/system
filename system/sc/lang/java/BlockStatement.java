@@ -34,4 +34,7 @@ public class BlockStatement extends AbstractBlockStatement {
       return res;
    }
 
+   public boolean isTrailingSrcStatement() {
+      return true;
+   }
 }

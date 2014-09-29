@@ -924,4 +924,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       return false;
    }
 
+   public boolean isTrailingSrcStatement() {
+      return false;
+   }
 }

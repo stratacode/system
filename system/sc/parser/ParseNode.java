@@ -203,8 +203,18 @@ public class ParseNode extends AbstractParseNode {
 
    public void computeLineNumberForNode(LineFormatContext ctx, IParseNode toFindPN) {
       Object pnVal = value;
-      if (pnVal == toFindPN)
+      if (pnVal == toFindPN) {
+         if (pnVal instanceof IParseNode) {
+            IParseNode pn = (IParseNode) pnVal;
+            Object semVal = pn.getSemanticValue();
+            if (semVal instanceof ISemanticNode && ((ISemanticNode) semVal).isTrailingSrcStatement()) {
+               // Add in the contribution for this parse node if we treat it's src line as the last line of the statement.
+               toFindPN.computeLineNumberForNode(ctx, toFindPN);
+               ctx.curLines--;
+            }
+         }
          ctx.found = true;
+      }
       else if (pnVal instanceof IParseNode) {
          IParseNode pn = (IParseNode) pnVal;
          pn.computeLineNumberForNode(ctx, toFindPN);
