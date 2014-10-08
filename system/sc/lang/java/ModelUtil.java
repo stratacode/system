@@ -5975,10 +5975,15 @@ public class ModelUtil {
             else
                ParseUtil.realInitAndStartComponent(model);
          }
-         else if (validate)
-            ParseUtil.initAndStartComponent(model);
-         else
+         else if (validate) {
+            if (!model.isValidated())
+               ParseUtil.initAndStartComponent(model);
+            else
+               ParseUtil.initAndStartComponent(td);
+         }
+         else {
             ParseUtil.realInitAndStartComponent(model);
+         }
       }
       else {
          if (validate)

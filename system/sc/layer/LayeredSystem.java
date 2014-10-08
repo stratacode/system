@@ -808,7 +808,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   System.exit(-1);
             }
          }
-         typeIndex = new HashMap<String,LayerTypeIndex>();
+         if (typeIndex == null)
+            typeIndex = new HashMap<String,LayerTypeIndex>();
       }
 
       if (!isPeer)

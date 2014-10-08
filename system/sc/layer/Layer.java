@@ -1466,6 +1466,8 @@ public class Layer implements ILifecycle, LayerConstants {
       // A clean build of everything will reset the layerTypeIndex
       if (typeIndexFile.canRead() && (!activated || !getBuildAllFiles())) {
          layerTypeIndex = layeredSystem.readTypeIndexFile(getLayerName());
+         if (layeredSystem.typeIndex == null)
+            layeredSystem.typeIndex = new HashMap<String,LayerTypeIndex>();
          layeredSystem.typeIndex.put(getLayerName(), layerTypeIndex);
       }
    }
