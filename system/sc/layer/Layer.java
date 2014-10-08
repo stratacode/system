@@ -586,6 +586,10 @@ public class Layer implements ILifecycle, LayerConstants {
             return LayerEnabledState.Disabled;
       }
 
+      LayerEnabledState runtimeState = isExplicitlyEnabledForRuntime(runtimeProc);
+      if (runtimeState != LayerEnabledState.NotSet)
+         return runtimeState;
+
       if (baseLayers != null && inheritProcess && inheritRuntime) {
          LayerEnabledState baseState = LayerEnabledState.NotSet;
          for (int i = 0; i < baseLayers.size(); i++) {
@@ -602,10 +606,6 @@ public class Layer implements ILifecycle, LayerConstants {
          if (baseState != LayerEnabledState.NotSet)
             return baseState;
       }
-
-      LayerEnabledState runtimeState = isExplicitlyEnabledForRuntime(runtimeProc);
-      if (runtimeState != LayerEnabledState.NotSet)
-         return runtimeState;
 
       return LayerEnabledState.NotSet;
    }
