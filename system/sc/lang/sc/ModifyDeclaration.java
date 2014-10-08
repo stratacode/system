@@ -314,6 +314,8 @@ public class ModifyDeclaration extends TypeDeclaration {
       super.completeInitTypeInfo();
 
       JavaModel thisModel = getJavaModel();
+      if (thisModel == null)
+         System.out.println("*** Error: initializing the type of a modify type that's not in a model!");
 
       boolean skipRoots = false;
 
@@ -915,7 +917,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       // subsequent extends type and override the previous one.   Don't do this in "start" because as we are starting types
       // we need the extends types to be used for validating members in previous layers.
       if (extendsTypes != null && extendsTypes.size() > 0) {
-         if (modifyTypeDecl.getExtendsType() != null) {
+         if (modifyTypeDecl != null && modifyTypeDecl.getExtendsType() != null) {
             // TODO: check if the old type is castable to the new one.  If not, track this as a type incompatbile layer and list the types which change.  Use that for good diagnostics when we get type errors on this layer.
             // Should be able to validate the reference in the overridden extends class so we can print out the offending layer, type, etc.   Also do this when a class overrides an existing class at the top level.
             modifyTypeDecl.extendsOverridden = true;
@@ -923,7 +925,7 @@ public class ModifyDeclaration extends TypeDeclaration {
 
       }
       // Since we inherit getExtendsType we also need to propagate this down
-      if (extendsOverridden && modifyTypeDecl.getExtendsType() != null && !modifyInherited)
+      if (extendsOverridden && modifyTypeDecl != null && modifyTypeDecl.getExtendsType() != null && !modifyInherited)
          modifyTypeDecl.extendsOverridden = true;
 
       super.process();
@@ -1365,8 +1367,12 @@ public class ModifyDeclaration extends TypeDeclaration {
       else {
          JavaModel m = getJavaModel();
          inst = m.resolveName(CTypeUtil.prefixPath(m.getPackagePrefix(), typeName), false);
-         if (inst == null)
-            throw new IllegalArgumentException("Can't create instance of non-existent type: " + typeName + " used in modify statement: " + toDefinitionString());
+         if (inst == null) {
+            if (m.isLayerModel)
+               throw new IllegalArgumentException("Layer definition file refers to: " + typeName + " which does not match it's path: " + getJavaModel().getSrcFile());
+            else
+               throw new IllegalArgumentException("Can't create instance of non-existent type: " + typeName + " used in modify statement: " + toDefinitionString());
+         }
 
          // If the resolved name binds to a runtime class, we'll create an instance of that class then set the properties
          // TODO: if this is a component, we should probably be doing the component init here right?

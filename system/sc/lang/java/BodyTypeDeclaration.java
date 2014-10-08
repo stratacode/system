@@ -6744,6 +6744,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             proc.start(this);
       }
 
+      // We should be able to do this right after we have the extends and implements stuff bound.  Maybe we could move it later but
+      // the goal is to have the index info as early as possible for the IDE.
+      if (layer != null)
+         layer.updateTypeIndex(createTypeIndex());
    }
 
    public void validate() {
@@ -6806,6 +6810,40 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             }
          }
       }
+
+   }
+
+   public TypeIndex createTypeIndex() {
+      TypeIndex idx = new TypeIndex();
+      idx.typeName = getFullTypeName();
+      Layer layer = getLayer();
+      idx.layerName = layer == null ? null : layer.getLayerName();
+      ArrayList<String> baseTypes = null;
+      JavaModel model = getJavaModel();
+      if (model != null) {
+         idx.fileName = model.getSrcFile().absFileName;
+         idx.lastModified = model.getLastModifiedTime();
+      }
+      Object extType;
+      if ((extType = getExtendsTypeDeclaration()) != null) {
+         baseTypes = new ArrayList<String>();
+         baseTypes.add(ModelUtil.getTypeName(extType));
+      }
+      Object[] impls = getImplementsTypeDeclarations();
+      if (impls != null) {
+         for (Object impl:impls) {
+            if (impl != null) {
+               if (baseTypes == null)
+                  baseTypes = new ArrayList<String>();
+               baseTypes.add(ModelUtil.getTypeName(impl));
+            }
+         }
+      }
+      idx.baseTypes = baseTypes;
+      idx.declType = getDeclarationType();
+      idx.isLayerType = isLayerType;
+      // TODO: inner types, methods? and property references
+      return idx;
    }
 
    public void process() {

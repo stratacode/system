@@ -62,7 +62,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
 
       BodyTypeDeclaration encType = getEnclosingType();
       if (encType == null) {
-         System.out.println("*** Error starting PropertyAssignment that's not connected to any model");
+         // System.out.println("*** Error starting PropertyAssignment that's not connected to any model");
          return;
       }
 

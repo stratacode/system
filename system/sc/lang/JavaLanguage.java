@@ -698,7 +698,9 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       setStartParselet(compilationUnit);
       // The name used in the IntelliJ plugin files - for now not using as a precaution to try and avoid conflicts
       languageName = "SCJava";
-      defaultExtension = "java";
+      // We used to use java here for java files in layer directories but this makes the IDE registration difficult
+      // since intelliJ does not let us register a processor for a file in special folder - they are global per suffix.
+      defaultExtension = "scj";
    }
 
    public String getJavaFileName(String fileName) {

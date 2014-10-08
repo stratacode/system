@@ -25,6 +25,8 @@ import java.util.Set;
  */
 public class SCLanguage extends JavaLanguage {
 
+   public static final String DEFAULT_EXTENSION = "sc";
+
    static Set<IString> SC_KEYWORD_SET = new HashSet<IString>(Arrays.asList(PString.toPString(JAVA_KEYWORDS)));
    static Set<IString> SC_VARNAME_KEYWORD_SET = new HashSet<IString>(Arrays.asList(PString.toPString(JAVA_VARNAME_KEYWORD_SET.toArray())));
 
@@ -127,12 +129,12 @@ public class SCLanguage extends JavaLanguage {
       super();
       addToSemanticValueClassPath("sc.lang.sc");
       languageName = "StrataCode";
-      defaultExtension = "sc";
+      defaultExtension = DEFAULT_EXTENSION;
    }
 
    public static void main(String[] args)
    {
-      SCLanguage c = (SCLanguage) Language.getLanguageByExtension("sc");
+      SCLanguage c = (SCLanguage) Language.getLanguageByExtension(DEFAULT_EXTENSION);
       c.debug = false;
 
       parseFiles(c, inputFileNames, false);

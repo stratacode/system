@@ -90,7 +90,14 @@ public class TrackingClassLoader extends URLClassLoader {
             else
                return nonTrackingParent.loadClass(name);
          }
-         c = super.loadClass(name, resolve);
+         try {
+           c = super.loadClass(name, resolve);
+         }
+         // If we define a class which overrides a system class we'll get this error
+         catch (SecurityException exc) {
+            System.err.println("*** Attempt to override system class: " + name + ": " + exc);
+            c = null;
+         }
          if (c != null) {
             loaded.add(name);
          }

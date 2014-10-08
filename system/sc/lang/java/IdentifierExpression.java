@@ -3679,11 +3679,17 @@ public class IdentifierExpression extends ArgumentsExpression {
          }
       }
 
-      if (obj == null)
+      if (obj == null && idSize == 1) {
          obj = ctx.getCurrentObject();
+      }
 
-      if (obj == null)
-         obj = currentType;
+      if (obj == null) {
+         if (idSize == 1 || boundTypes == null)
+            obj = currentType;
+         else {
+            obj = getTypeForIdentifier(idSize-2);
+         }
+      }
 
       if (!(obj instanceof Class) && !(obj instanceof ITypeDeclaration)) {
          if (obj != null)

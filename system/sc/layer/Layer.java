@@ -180,12 +180,16 @@ public class Layer implements ILifecycle, LayerConstants {
     * Or if this layer is run on both JS and Java will extending layers run on both too?
     */
    public boolean exportRuntime = true;
+   /* Same as exportRuntime but for the process name */
+   public boolean exportProcess = true;
    /**
     * Controls whether we inherit the runtime dependencies of our base classes.  By default, if you extend a layer that
     * only runs in Javascript or Java your layer will only run in Java or JS.  If you set this flag to false, it can
     * run on any runtime.
     */
    public boolean inheritRuntime = true;
+   /** Same as inheritRuntime but for the process name */
+   public boolean inheritProcess = true;
 
    /** Set to true when this layer is removed from the system */
    public boolean removed = false;
@@ -202,8 +206,14 @@ public class Layer implements ILifecycle, LayerConstants {
    public List<String> excludeRuntimes = null;
    public List<String> includeRuntimes = null;
 
+   public List<String> excludeProcesses = null;
+   public List<String> includeProcesses = null;
+
    public boolean hasDefinedRuntime = false;
    public IRuntimeProcessor definedRuntime = null;
+
+   public boolean hasDefinedProcess = false;
+   public IRuntimeProcessor definedProcess = null;
 
    /** Enable or disable the default sync mode for types which are defined in this layer. */
    public SyncMode defaultSyncMode = SyncMode.Automatic;
@@ -238,6 +248,8 @@ public class Layer implements ILifecycle, LayerConstants {
    public List<RepositoryPackage> repositoryPackages = null;
 
    public boolean errorsStarting = false;
+
+   LayerTypeIndex layerTypeIndex = new LayerTypeIndex();
 
    /**
     * Add an explicitly dependency on layer.  This will ensure that if your layer and the otherLayerName are in the stack, that this layer will be compiled along with other layer.
@@ -297,18 +309,20 @@ public class Layer implements ILifecycle, LayerConstants {
       hasDefinedRuntime = true;
    }
 
+   /** Creates a new java runtime which is incompatible with the standard Java runtime */
    public void createDefaultRuntime(String runtimeName) {
       LayeredSystem.createDefaultRuntime(this, runtimeName);
       setLayerRuntime(LayeredSystem.getRuntime(runtimeName));
    }
 
+   /** Called from the layer definition file to register a new runtime required by this layer.  */
    public void addRuntime(IRuntimeProcessor proc) {
       setLayerRuntime(proc);
       LayeredSystem.addRuntime(this, proc);
    }
 
    /** Some layers do not extend a layer bound to a runtime platform and so can run in any layer. */
-   public boolean getAllowedInAnyLayer() {
+   public boolean getAllowedInAnyRuntime() {
       if (hasDefinedRuntime)
          return false;
 
@@ -321,7 +335,30 @@ public class Layer implements ILifecycle, LayerConstants {
       if (baseLayers != null && inheritRuntime) {
          for (int i = 0; i < baseLayers.size(); i++) {
             Layer base = baseLayers.get(i);
-            if (base.exportRuntime && !base.getAllowedInAnyLayer())
+            if (base.exportRuntime && !base.getAllowedInAnyRuntime())
+               return false;
+         }
+      }
+      return true;
+   }
+
+   public boolean getAllowedInAnyProcess() {
+      if (!getAllowedInAnyRuntime())
+         return false;
+
+      if (hasDefinedProcess)
+         return false;
+
+      if (excludeProcesses != null && excludeProcesses.size() > 0)
+         return false;
+
+      if (includeProcesses != null && includeProcesses.size() > 0)
+         return false;
+
+      if (baseLayers != null && inheritProcess && inheritRuntime) {
+         for (int i = 0; i < baseLayers.size(); i++) {
+            Layer base = baseLayers.get(i);
+            if (base.exportProcess && base.exportRuntime && !base.getAllowedInAnyProcess())
                return false;
          }
       }
@@ -333,15 +370,15 @@ public class Layer implements ILifecycle, LayerConstants {
       return this == layeredSystem.buildLayer || this == layer || extendsLayer(layer);
    }
 
-   public SrcEntry getInheritedSrcFileFromTypeName(String typeName, boolean srcOnly, boolean prependPackage, String subPath, IRuntimeProcessor runtime, boolean layerResolve) {
-      if (excludeForProcessor(runtime) || excluded)
+   public SrcEntry getInheritedSrcFileFromTypeName(String typeName, boolean srcOnly, boolean prependPackage, String subPath, IProcessDefinition proc, boolean layerResolve) {
+      if (excludeForProcess(proc) || excluded)
          return null;
       SrcEntry res = getSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, layerResolve);
       if (res != null)
          return res;
       if (baseLayers != null) {
          for (Layer base:baseLayers) {
-            res = base.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, runtime, layerResolve);
+            res = base.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, proc, layerResolve);
             if (res != null)
                return res;
          }
@@ -380,19 +417,42 @@ public class Layer implements ILifecycle, LayerConstants {
       return null;
    }
 
-   public boolean excludeForProcessor(IRuntimeProcessor proc) {
-      Layer.RuntimeEnabledState layerState = isExplicitlyEnabledForRuntime(proc);
-      if (layerState == Layer.RuntimeEnabledState.Disabled || (layerState == Layer.RuntimeEnabledState.NotSet && !getAllowedInAnyLayer())) {
+   public boolean excludeForRuntime(IRuntimeProcessor proc) {
+      LayerEnabledState layerState = isExplicitlyEnabledForRuntime(proc);
+      if (layerState == LayerEnabledState.Disabled || (layerState == LayerEnabledState.NotSet && !getAllowedInAnyRuntime())) {
          return true;
       }
       return false;
    }
 
-   public boolean includeForProcessor(IRuntimeProcessor proc) {
-      Layer.RuntimeEnabledState layerState = isExplicitlyEnabledForRuntime(proc);
-      if (layerState == Layer.RuntimeEnabledState.Enabled || (layerState == Layer.RuntimeEnabledState.NotSet && getAllowedInAnyLayer())) {
+   public boolean includeForRuntime(IRuntimeProcessor proc) {
+      LayerEnabledState layerState = isExplicitlyEnabledForRuntime(proc);
+      if (layerState == LayerEnabledState.Enabled || (layerState == LayerEnabledState.NotSet && getAllowedInAnyRuntime())) {
          return true;
       }
+      return false;
+   }
+
+   public boolean excludeForProcess(IProcessDefinition proc) {
+      IRuntimeProcessor rtProc = proc == null ? null : proc.getRuntimeProcessor();
+      if (excludeForRuntime(rtProc))
+         return true;
+      LayerEnabledState layerState = isExplicitlyEnabledForProcess(proc);
+      if (layerState == LayerEnabledState.Disabled || (layerState == LayerEnabledState.NotSet && !getAllowedInAnyProcess())) {
+         return true;
+      }
+      return false;
+   }
+
+   public boolean includeForProcess(IProcessDefinition proc) {
+      IRuntimeProcessor rtProc = proc == null ? null : proc.getRuntimeProcessor();
+      LayerEnabledState layerState = isExplicitlyEnabledForProcess(proc);
+      if (layerState == LayerEnabledState.Enabled || (layerState == LayerEnabledState.NotSet && getAllowedInAnyProcess())) {
+         return true;
+      }
+      // We are included only if we are included by the runtime.
+      if (layerState == LayerEnabledState.NotSet)
+         return includeForRuntime(rtProc);
       return false;
    }
 
@@ -453,33 +513,38 @@ public class Layer implements ILifecycle, LayerConstants {
       return res;
    }
 
-   public enum RuntimeEnabledState {
+   public void updateTypeIndex(TypeIndex typeIndex) {
+      layerTypeIndex.layerTypeIndex.put(typeIndex.typeName, typeIndex);
+      layerTypeIndex.fileIndex.put(typeIndex.fileName, typeIndex);
+   }
+
+   public enum LayerEnabledState {
       Enabled, Disabled, NotSet
    }
 
-   public RuntimeEnabledState isExplicitlyEnabledForRuntime(IRuntimeProcessor proc) {
+   public LayerEnabledState isExplicitlyEnabledForRuntime(IRuntimeProcessor proc) {
       // If this layer explicitly defines a runtime, it's clearly enabled for that runtime
       if (hasDefinedRuntime && proc == definedRuntime)
-         return RuntimeEnabledState.Enabled;
+         return LayerEnabledState.Enabled;
 
       // If it explicitly excludes the runtime, then it's excluded clearly.  If it excludes another runtime, it's also explicitly included for this runtime.
       String runtimeName = proc == null ? IRuntimeProcessor.DEFAULT_RUNTIME_NAME : proc.getRuntimeName();
       if (excludeRuntimes != null) {
          if (excludeRuntimes.contains(runtimeName))
-            return RuntimeEnabledState.Disabled;
+            return LayerEnabledState.Disabled;
          else
-            return RuntimeEnabledState.Enabled;
+            return LayerEnabledState.Enabled;
       }
 
       if (includeRuntimes != null) {
          if (includeRuntimes.contains(runtimeName))
-            return RuntimeEnabledState.Enabled;
+            return LayerEnabledState.Enabled;
          else
-            return RuntimeEnabledState.Disabled;
+            return LayerEnabledState.Disabled;
       }
 
       if (baseLayers != null && inheritRuntime) {
-         RuntimeEnabledState baseState = RuntimeEnabledState.NotSet;
+         LayerEnabledState baseState = LayerEnabledState.NotSet;
          for (int i = 0; i < baseLayers.size(); i++) {
             Layer base = baseLayers.get(i);
             if (!base.exportRuntime)
@@ -487,15 +552,62 @@ public class Layer implements ILifecycle, LayerConstants {
             baseState = base.isExplicitlyEnabledForRuntime(proc);
             // If this layer extends any layer which is enabled, it is enabled.  So if you extend one layer that is disabled and
             // another that is enabled, you should be enabled.
-            if (baseState == RuntimeEnabledState.Enabled)
+            if (baseState == LayerEnabledState.Enabled)
                return baseState;
          }
          // TODO: if you do not extend an explicitly enabled layer should we disable you if you extend an explicitly disabled layer here?
-         if (baseState != RuntimeEnabledState.NotSet)
+         if (baseState != LayerEnabledState.NotSet)
             return baseState;
       }
 
-      return RuntimeEnabledState.NotSet;
+      return LayerEnabledState.NotSet;
+   }
+
+   public LayerEnabledState isExplicitlyEnabledForProcess(IProcessDefinition proc) {
+      IRuntimeProcessor runtimeProc = proc == null ? null : proc.getRuntimeProcessor();
+
+      // If this layer explicitly defines a runtime, it's clearly enabled for that runtime
+      if (hasDefinedProcess && proc == definedProcess)
+         return LayerEnabledState.Enabled;
+
+      // If it explicitly excludes the runtime, then it's excluded clearly.  If it excludes another runtime, it's also explicitly included for this runtime.
+      String procName = proc == null ? IProcessDefinition.DEFAULT_PROCESS_NAME : proc.getProcessName();
+      if (excludeProcesses != null) {
+         if (excludeProcesses.contains(procName))
+            return LayerEnabledState.Disabled;
+         else
+            return LayerEnabledState.Enabled;
+      }
+
+      if (includeProcesses != null) {
+         if (includeProcesses.contains(procName))
+            return LayerEnabledState.Enabled;
+         else
+            return LayerEnabledState.Disabled;
+      }
+
+      if (baseLayers != null && inheritProcess && inheritRuntime) {
+         LayerEnabledState baseState = LayerEnabledState.NotSet;
+         for (int i = 0; i < baseLayers.size(); i++) {
+            Layer base = baseLayers.get(i);
+            if (!base.exportProcess || !base.exportRuntime)
+               continue;
+            baseState = base.isExplicitlyEnabledForProcess(proc);
+            // If this layer extends any layer which is enabled, it is enabled.  So if you extend one layer that is disabled and
+            // another that is enabled, you should be enabled.
+            if (baseState == LayerEnabledState.Enabled)
+               return baseState;
+         }
+         // TODO: if you do not extend an explicitly enabled layer should we disable you if you extend an explicitly disabled layer here?
+         if (baseState != LayerEnabledState.NotSet)
+            return baseState;
+      }
+
+      LayerEnabledState runtimeState = isExplicitlyEnabledForRuntime(runtimeProc);
+      if (runtimeState != LayerEnabledState.NotSet)
+         return runtimeState;
+
+      return LayerEnabledState.NotSet;
    }
 
    // TODO: "final" modifier on the layer should disallow modification of types.  Could give finer grained options like: enable/disable adding/removing fields, overriding methods or anything that would alter the Java .class
@@ -645,6 +757,8 @@ public class Layer implements ILifecycle, LayerConstants {
       if (excluded)
          return;
 
+      initTypeIndex();
+
       if (baseLayers != null && !activated) {
          for (Layer baseLayer:baseLayers)
             baseLayer.ensureInitialized(true);
@@ -777,12 +891,17 @@ public class Layer implements ILifecycle, LayerConstants {
       return lastModified;
    }
 
+   public static boolean isBuildDirPath(String dir) {
+      return dir.contains("${buildDir}");
+   }
+
    void initSrcCache(ArrayList<ReplacedType> replacedTypes) {
       for (String dir: topLevelSrcDirs) {
-         if (dir.indexOf("${buildDir}") == -1)
+         if (!isBuildDirPath(dir))
             dir = FileUtil.getRelativeFile(layerPathName, dir);
          else {
             // Can only process buildDir paths when we are activated
+            // Used by android because we build R.java in the prebuild stage so it is available to the SC source
             if (!activated)
                continue;
             dir = dir.replace("${buildDir}", layeredSystem.buildDir);
@@ -1004,6 +1123,10 @@ public class Layer implements ILifecycle, LayerConstants {
          String [] srcList = srcPath.split(FileUtil.PATH_SEPARATOR);
          topLevelSrcDirs = Arrays.asList(srcList);
       }
+
+      layerTypeIndex.topLevelSrcDirs = topLevelSrcDirs.toArray(new String[topLevelSrcDirs.size()]);
+      layerTypeIndex.layerPathName = getLayerPathName();
+
       if (excludedFiles != null) {
          excludedPatterns = new ArrayList<Pattern>(excludedFiles.size());
          for (int i = 0; i < excludedFiles.size(); i++)
@@ -1332,7 +1455,29 @@ public class Layer implements ILifecycle, LayerConstants {
          buildSrcIndexNeedsSave = false;
       }
       catch (IOException exc) {
-         System.out.println("*** can't write build srcFile: " + exc);
+         System.err.println("*** can't write build srcFile: " + exc);
+      }
+   }
+
+   public final static String TYPE_INDEX_SUFFIX = "__typeIndex.ser";
+
+   public void initTypeIndex() {
+      File typeIndexFile = new File(layeredSystem.getTypeIndexFileName(getLayerName()));
+      // A clean build of everything will reset the layerTypeIndex
+      if (typeIndexFile.canRead() && (!activated || !getBuildAllFiles())) {
+         layerTypeIndex = layeredSystem.readTypeIndexFile(getLayerName());
+         layeredSystem.typeIndex.put(getLayerName(), layerTypeIndex);
+      }
+   }
+
+   public void saveTypeIndex() {
+      File typeIndexFile = new File(layeredSystem.getTypeIndexFileName(getLayerName()));
+      try {
+         ObjectOutputStream os = new ObjectOutputStream(new FileOutputStream(typeIndexFile));
+         os.writeObject(layerTypeIndex);
+      }
+      catch (IOException exc) {
+         System.err.println("*** Unable to write typeIndexFile: " + exc);
       }
    }
 
@@ -1630,6 +1775,38 @@ public class Layer implements ILifecycle, LayerConstants {
          }
       }
       return srcEntries;
+   }
+
+   public void startAllTypes() {
+      for (Iterator<String> srcFiles = getSrcFiles(); srcFiles.hasNext(); )  {
+         String srcFile = srcFiles.next();
+         IFileProcessor depProc = layeredSystem.getFileProcessorForFileName(srcFile, this, BuildPhase.Process);
+         String typeName;
+         // srcFile entries come back without suffixes... just ignore them.
+         if (depProc != null) {
+            String fullTypeName = CTypeUtil.prefixPath(depProc.getPrependLayerPackage() ? packagePrefix: null, FileUtil.removeExtension(srcFile).replace(FileUtil.FILE_SEPARATOR, "."));
+            TypeDeclaration td = (TypeDeclaration) layeredSystem.getSrcTypeDeclaration(fullTypeName, this.getNextLayer(), depProc.getPrependLayerPackage(), false, true, this, false);
+            if (td != null) {
+               ParseUtil.initAndStartComponent(td);
+            }
+            else {
+               String subPath = fullTypeName.replace(".", FileUtil.FILE_SEPARATOR);
+               SrcEntry srcEnt = getSrcFileFromTypeName(fullTypeName, true, depProc.getPrependLayerPackage(), subPath, false);
+               if (srcEnt != null) {
+                  // This happens for Template's which do not transform into a type - e.g. sctd files.  It's important that we record something for this source file so we don't re-parse the layer etc. next time.
+                  TypeIndex dummyIndex = new TypeIndex();
+                  dummyIndex.typeName = fullTypeName;
+                  dummyIndex.layerName = getLayerName();
+                  dummyIndex.fileName = srcEnt.absFileName;
+                  dummyIndex.declType = DeclarationType.TEMPLATE; // Is it always a template?
+                  updateTypeIndex(dummyIndex);
+               }
+               else {
+                  System.err.println("*** No type or src file found for index entry for source file: " + srcFile);
+               }
+            }
+         }
+      }
    }
 
    public Set<String> getSrcTypeNames(boolean prependLayerPrefix, boolean includeInnerTypes, boolean restrictToLayer, boolean includeImports) {
@@ -2779,6 +2956,13 @@ public class Layer implements ILifecycle, LayerConstants {
       return getLayerName().replace('.', '_');
    }
 
+   public static String getLayerNameFromUniqueUnderscoreName(String uname) {
+      return uname.replace("__", ".");
+   }
+   public static String getUniqueUnderscoreName(String layerName) {
+      return layerName.replace(".", "__");
+   }
+
    public void registerAnnotationProcessor(String annotationTypeName, IAnnotationProcessor processor) {
       if (annotationProcessors == null)
          annotationProcessors = new HashMap<String,IAnnotationProcessor>();
@@ -2806,11 +2990,33 @@ public class Layer implements ILifecycle, LayerConstants {
       }
    }
 
+   public void registerLanguage(Language lang, String ext) {
+      if (ext == null)
+         throw new IllegalArgumentException("Null extension pass to registerLanguage");
+      Language.registerLanguage(lang, ext);
+      if (layerTypeIndex.langExtensions == null) {
+         layerTypeIndex.langExtensions = new String[] {ext};
+      }
+      else {
+         String[] oldList = layerTypeIndex.langExtensions;
+         String[] newList = new String[oldList.length+1];
+         System.arraycopy(oldList, 0, newList, 0, oldList.length);
+         newList[oldList.length] = ext;
+         layerTypeIndex.langExtensions = newList;
+      }
+   }
+
    public String getScopeNames() {
       if (scopeProcessors == null) return "";
       return scopeProcessors.keySet().toString();
    }
 
+   public void initAllTypeIndex() {
+      checkIfStarted();
+      // Just walk through and start each of the types in this layer  TODO - include inner types in the type index?
+      startAllTypes();
+      saveTypeIndex();
+   }
 
 }
 

@@ -38,8 +38,10 @@ public class LayerIndexInfo {
             if (extPkg != null)
                return extPkg;
          }
-         else
-            System.err.println("*** No layer: " + extName + " from 'extends' for layer: " + layerDirName + " found in layer path: " + layerPathRoot + " when building all layers index");
+         else {
+            if (system.options.verbose)
+               System.out.println("Layer: " + layerDirName + " extends layer excluded from project: " + extName + " found in layer path: " + layerPathRoot + " when building all layers index");
+         }
       }
       return null;
    }
