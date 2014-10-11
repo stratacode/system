@@ -184,15 +184,32 @@ public class InterfaceDeclaration extends TypeDeclaration {
 
       if (extendsBoundTypes != null) {
          for (Object impl:extendsBoundTypes) {
-            Object[] implResult = ModelUtil.getMethods(impl, methodName, modifier);
-            if (implResult != null && implResult.length > 0) {
-               if (result == null)
-                  result = new ArrayList<Object>();
-               result.addAll(Arrays.asList(implResult));
+            if (impl != null) {
+               Object[] implResult = ModelUtil.getMethods(impl, methodName, modifier);
+               if (implResult != null && implResult.length > 0) {
+                  if (result == null)
+                     result = new ArrayList<Object>();
+                  result.addAll(Arrays.asList(implResult));
+               }
             }
          }
       }
       return result;
+   }
+
+   protected void updateBoundExtendsType(Object newType, Object oldType) {
+      Object curType = null;
+      if (extendsTypes != null) {
+         for (JavaType implType:extendsTypes) {
+            if ((curType = implType.getTypeDeclaration()) == oldType || curType == newType) {
+               implType.setTypeDeclaration(newType);
+               return;
+            }
+         }
+      }
+      if (oldType == Object.class || newType == Object.class)
+         return;
+      System.err.println("*** Failed to update type in updateBoundExtendsType: " + oldType + " ->" + newType);
    }
 
    public List<Object> getAllProperties(String modifier, boolean includeAssigns) {

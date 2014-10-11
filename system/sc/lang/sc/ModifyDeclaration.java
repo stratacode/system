@@ -277,8 +277,10 @@ public class ModifyDeclaration extends TypeDeclaration {
       if (isStarting)
          return;
 
-      if (modifyTypeDecl != null)
-         modifyTypeDecl.validate();
+      if (modifyTypeDecl != null) {
+         // Start and validate the modified type
+         ParseUtil.initAndStartComponent(modifyTypeDecl);
+      }
 
       if (modifyInherited && isDynamicType() && !ModelUtil.isDynamicType(modifyTypeDecl)) {
          getEnclosingType().setNeedsDynamicStub(true);

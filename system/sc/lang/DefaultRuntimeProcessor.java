@@ -13,7 +13,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Created by jvroom on 8/17/14.
+ * The RuntimeProcessor contains the code and configuration necessary to plug in a new runtime language, such as Javascript.
+ * This default runtime processor is used to represent the default Java runtime.
  */
 public class DefaultRuntimeProcessor implements IRuntimeProcessor {
    public LayeredSystem system;

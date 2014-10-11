@@ -12,6 +12,7 @@ import java.util.HashMap;
 */
 public class LayerTypeIndex implements Serializable {
    String layerPathName; // Path to layer directory
+   String[] baseLayerNames; // List of base layer names for this layer
    String[] topLevelSrcDirs; // Top-level srcDirs as registered after starting the layer
    HashMap<String,TypeIndex> layerTypeIndex = new HashMap<String,TypeIndex>();
    HashMap<String,TypeIndex> fileIndex = new HashMap<String,TypeIndex>();

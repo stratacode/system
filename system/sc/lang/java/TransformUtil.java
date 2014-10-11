@@ -1038,7 +1038,7 @@ public class TransformUtil {
          params.setModifiers = "@sc.bind.Bindable(manual=true) " + removeModifiers(params.setModifiers, bindableModifiers);
          params.getModifiers = "@sc.bind.Bindable(manual=true) " + removeModifiers(params.getModifiers, bindableModifiers);
       }
-      params.setTypeName = setMethod == null ? params.propertyTypeName : ModelUtil.getGenericSetMethodPropertyTypeName(typeDeclaration, setMethod, true);
+      params.setTypeName = setMethod == null ? params.propertyTypeName : ModelUtil.getGenericSetMethodPropertyTypeName(typeDeclaration, setMethod, false);
       params.enclosingTypeName = typeDeclaration.getFullTypeName();
 
       TypeDeclaration rootType = typeDeclaration.getRootType();
@@ -1187,7 +1187,7 @@ public class TransformUtil {
       PerfMon.start("parseCodeTemplate");
       Object res = parselet.getLanguage().parseString(codeToInsert, parselet);
       if (res instanceof ParseError)
-         throw new IllegalArgumentException(((ParseError) res).errorStringWithLineNumbers(codeToInsert));
+         throw new IllegalArgumentException("Parsing - code evaluated during code generation from template: " + template + " code parsed:\n" + codeToInsert + "\n\nerror: " + ((ParseError) res).errorStringWithLineNumbers(codeToInsert));
       Object value = ParseUtil.nodeToSemanticValue(res);
       PerfMon.end("parseCodeTemplate");
       return value;

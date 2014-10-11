@@ -5,6 +5,7 @@
 package sc.layer;
 
 import sc.lang.*;
+import sc.obj.SyncMode;
 import sc.parser.*;
 import sc.type.CTypeUtil;
 import sc.util.ExtensionFilenameFilter;
@@ -410,6 +411,12 @@ public class LayerUtil implements LayerConstants {
             first = opAppend(sb, " excludes: " + l.excludeRuntimes, first);
          if (l.hasDefinedRuntime)
             first = opAppend(sb, " only: " + (l.definedRuntime == null ? "java" : l.definedRuntime), first);
+         if (l.excludeProcesses != null)
+            first = opAppend(sb, " excludes: " + l.excludeProcesses, first);
+         if (l.hasDefinedProcess)
+            first = opAppend(sb, " only: " + (l.definedProcess == null ? "<default>" : l.definedProcess), first);
+         if (l.defaultSyncMode == SyncMode.Automatic)
+            first = opAppend(sb, " auto-sync", first);
          sb.append("\n");
       }
    }

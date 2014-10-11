@@ -6820,7 +6820,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       idx.layerName = layer == null ? null : layer.getLayerName();
       ArrayList<String> baseTypes = null;
       JavaModel model = getJavaModel();
-      if (model != null) {
+      if (model != null && model.getSrcFile() != null) {
          idx.fileName = model.getSrcFile().absFileName;
          idx.lastModified = model.getLastModifiedTime();
       }

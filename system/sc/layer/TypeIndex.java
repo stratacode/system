@@ -21,4 +21,10 @@ public class TypeIndex implements Serializable {
    // Computed - not stored
    public transient List<String> modifiedByTypes;
    public transient List<String> extendedByTypes;
+
+   public String toString() {
+      return "index: " + typeName + " (" + layerName + ")";
+   }
+
+   public static final TypeIndex EXCLUDED_SENTINEL = new TypeIndex();
 }
