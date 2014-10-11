@@ -1249,8 +1249,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    /** When there's more than one runtime, need to prefix the src, classes with the runtime name */
    public String getRuntimePrefix() {
-      if (runtimePrefix == null)
-         return getProcessIdent();  // Returns 'java' or java_server if there's a defined process name
+      if (runtimePrefix == null) {
+         return getRuntimeName();
+         // TODO: there's a problem using the process name which is that it can change from null to some new process name as we add the first layer which depends on a specific process.  We don't handle that
+         // transition cleanly now...  One option is to leave only one runtime - say the web framework as the default process and not to change it at all for a given system.
+         //return getProcessIdent();  // Returns 'java' or java_server if there's a defined process name
+      }
       return runtimePrefix;
    }
 
