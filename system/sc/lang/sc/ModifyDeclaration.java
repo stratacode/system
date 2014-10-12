@@ -490,12 +490,14 @@ public class ModifyDeclaration extends TypeDeclaration {
             // The case is:  A(L1) modifies A(L0)   A(L0) extends B(L0).   When we start A(L1) we need to make
             // sure that B(L1) has been started or we'll assume it just extends B(L0)
             Layer modelLayer = model.getLayer();
-            Object td = model.layeredSystem.getSrcTypeDeclaration(extTypeName, modelLayer.getNextLayer(), true, false, true, modelLayer, false);
-            if (td != null) {
-               ParseUtil.initComponent(td);
-               ParseUtil.startComponent(td); // TODO: do we need to start here if isStarted = false?
-               if (isValidated())
-                  ParseUtil.validateComponent(td);
+            if (!modelLayer.disabled) {
+               Object td = model.layeredSystem.getSrcTypeDeclaration(extTypeName, modelLayer.getNextLayer(), true, false, true, modelLayer, false);
+               if (td != null) {
+                  ParseUtil.initComponent(td);
+                  ParseUtil.startComponent(td); // TODO: do we need to start here if isStarted = false?
+                  if (isValidated())
+                     ParseUtil.validateComponent(td);
+               }
             }
          }
       }

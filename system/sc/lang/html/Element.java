@@ -2138,19 +2138,23 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                         modifyExtendsType = null;
                      }
                   }
-                  if (modifyExtendsType != null && !ModelUtil.isAssignableFrom(HTMLElement.class, modifyExtendsType)) {
-                     displayError("tag with id: ", objName, " modifies type: ", ModelUtil.getTypeName(modifyType), " in layer:", ModelUtil.getLayerForType(null, modifyType) + " already extends: ", ModelUtil.getTypeName(modifyExtendsType), " which has no schtml file (and does not extends HTMLElement): ");
-                     extendsType = null;
-                  }
-                  if (declaredExtends != null) {
-                     if (!ModelUtil.isAssignableFrom(modifyExtendsType, declaredExtends)) {
-                        displayError("The extends attribute: ", ModelUtil.getTypeName(declaredExtends), " overrides an incompatible extends type: ", ModelUtil.getTypeName(modifyExtendsType), " for tag: ");
+                  // These errors can occur in normal situations in inactive layers - because we are not guaranteeing just one stacking order... for now we are going to ignore them and use the declared
+                  // extends and modify types for code navigation purposes.
+                  if (javaModel.getLayer().activated) {
+                     if (modifyExtendsType != null && !ModelUtil.isAssignableFrom(HTMLElement.class, modifyExtendsType)) {
+                        displayError("tag with id: ", objName, " modifies type: ", ModelUtil.getTypeName(modifyType), " in layer:", ModelUtil.getLayerForType(null, modifyType) + " already extends: ", ModelUtil.getTypeName(modifyExtendsType), " which has no schtml file (and does not extends HTMLElement): ");
                         extendsType = null;
                      }
+                     if (declaredExtends != null) {
+                        if (!ModelUtil.isAssignableFrom(modifyExtendsType, declaredExtends)) {
+                           displayError("The extends attribute: ", ModelUtil.getTypeName(declaredExtends), " overrides an incompatible extends type: ", ModelUtil.getTypeName(modifyExtendsType), " for tag: ");
+                           extendsType = null;
+                        }
+                     }
+                     // Do not set an extends type here - we need to inherit it from the modified type
+                     else
+                        extendsType = null;
                   }
-                  // Do not set an extends type here - we need to inherit it from the modified type
-                  else
-                     extendsType = null;
                }
             }
          }

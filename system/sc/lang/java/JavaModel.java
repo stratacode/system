@@ -26,11 +26,17 @@ import java.io.*;
 import java.util.*;
 
 public class JavaModel extends JavaSemanticNode implements ILanguageModel, INameContext, IChangeable, IUserDataNode {
+   static private final String[] SYSTEM_PACKAGE_PREFIX = {"java.", "javax."};
+
    public Package packageDef;
    public SemanticNodeList<ImportDeclaration> imports;
    public SemanticNodeList<TypeDeclaration> types;  // populated from grammar
 
-   static private final String[] SYSTEM_PACKAGE_PREFIX = {"java.", "javax."};
+   @Constant
+   transient public LayeredSystem layeredSystem;
+
+   @Constant
+   transient public Layer layer;
 
    transient Set<String> externalReferences = new HashSet<String>();
 
@@ -50,12 +56,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    // Type parameter names
    transient Map<String,TypeParameter> typeParameters = new HashMap<String,TypeParameter>();
 
-   transient public LayeredSystem layeredSystem;
-
    transient Object userData;
-
-   @Constant
-   transient public Layer layer;
 
    /** During an add layer, this stores the old model - the one, this model replaced so we know how to do the refresh */
    transient public JavaModel replacesModel;
@@ -1923,7 +1924,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (JavaSemanticNode.debugDisablePrettyToString)
          return toModelString();
       LayeredSystem sys = getLayeredSystem();
-      String runtime = sys != null ? " (runtime: " + sys.getRuntimeName() + ")" : "";
+      String runtime = sys != null ? " (runtime: " + sys.getProcessIdent() + ")" : "";
       String isTransformed = nonTransformedModel != null ? " (transformed)" : "";
       return toLocationString(null, true, false, false) + runtime + isTransformed;
    }

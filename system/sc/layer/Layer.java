@@ -639,12 +639,19 @@ public class Layer implements ILifecycle, LayerConstants {
          else
             return LayerEnabledState.Disabled;
       }
+      LayerEnabledState baseState = LayerEnabledState.NotSet;
+      boolean runtimeBaseState = false;
+      boolean runtimeNewState;
 
       // Not set explicitly on the process, look for direct config on this layer for the runtime to include/reject it on that basis alone.
       if (checkRuntime) {
          LayerEnabledState runtimeState = isExplicitlyEnabledForRuntime(runtimeProc, false);
          if (runtimeState != LayerEnabledState.NotSet)
             return runtimeState;
+      }
+      else {
+         baseState = isExplicitlyEnabledForRuntime(runtimeProc, false);
+         runtimeBaseState = true;
       }
 
       /*
@@ -661,9 +668,6 @@ public class Layer implements ILifecycle, LayerConstants {
       */
 
       if (baseLayers != null && inheritProcess && checkBaseLayers) {
-         LayerEnabledState baseState = LayerEnabledState.NotSet;
-         boolean runtimeBaseState = false;
-         boolean runtimeNewState;
          for (int i = 0; i < baseLayers.size(); i++) {
             Layer base = baseLayers.get(i);
             if (!base.exportProcess)
@@ -675,7 +679,7 @@ public class Layer implements ILifecycle, LayerConstants {
             if (newBaseState == LayerEnabledState.Enabled)
                return newBaseState;
             // When a layer has no state for the process, check the runtime and use it's status
-            else if (newBaseState == LayerEnabledState.NotSet && checkRuntime && inheritRuntime) {
+            else if (newBaseState == LayerEnabledState.NotSet && inheritRuntime) {
                runtimeNewState = true;
                newBaseState = base.isExplicitlyEnabledForRuntime(runtimeProc, true);
             }
