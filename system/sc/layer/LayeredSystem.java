@@ -460,27 +460,40 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   public JavaModel getTransformedModelForType(String typeName) {
+   public JavaModel getTransformedModelForType(String typeName, IRuntimeProcessor proc) {
+      acquireDynLock(false);
       Layer oldBuildLayer = currentBuildLayer;
       try {
          // This gets set normally during the generateAndCompile method but needs also to be defined during the transformation process if we need a transformedModel
          // say for debugging.
          currentBuildLayer = buildLayer;
-         TypeDeclaration origType = (TypeDeclaration) getSrcTypeDeclaration(typeName, null, true, false, true);
-         if (origType == null)
-            return null;
-
-         JavaModel origModel = origType.getJavaModel();
-         if (origModel == null)
-            return null;
-         Layer modelLayer = origModel.getLayer();
-         if (modelLayer != null && modelLayer.annotationLayer) {
-            return null; // Should we check the previous layer here... I think it's always compiled so there is no transformed model for this type.
+         if (proc == runtimeProcessor) {
+            TypeDeclaration origType = (TypeDeclaration) getSrcTypeDeclaration(typeName, null, true, false, true);
+            if (origType != null) {
+               JavaModel origModel = origType.getJavaModel();
+               if (origModel != null) {
+                  Layer modelLayer = origModel.getLayer();
+                  if (modelLayer != null && modelLayer.annotationLayer) {
+                     return null; // Should we check the previous layer here... I think it's always compiled so there is no transformed model for this type.
+                  }
+                  return origModel.getTransformedModel();
+               }
+            }
          }
-         return origModel.getTransformedModel();
+         if (!peerMode && peerSystems != null) {
+            for (LayeredSystem peerSys:peerSystems) {
+               if (peerSys.runtimeProcessor == proc) {
+                  JavaModel res = peerSys.getTransformedModelForType(typeName, proc);
+                  if (res != null)
+                     return res;
+               }
+            }
+         }
+         return null;
       }
       finally {
          currentBuildLayer = oldBuildLayer;
+         releaseDynLock(false);
       }
    }
 
@@ -578,14 +591,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      Object newTypeObj = layer.layeredSystem.getSrcTypeDeclaration(typeName, null, true, false, true, Layer.ANY_LAYER, false);
                      if (newTypeObj != null)
                         res.add(newTypeObj);
-                     else
-                        System.out.println("***");
                   }
                }
             }
          }
       }
    }
+
 
    public enum BuildCommandTypes {
       Pre, Post, Run, Test
@@ -919,6 +931,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    private void initRuntimes(List<String> explicitDynLayers, boolean active) {
+      LayeredSystem curSys = getCurrent();
       // If we have activated some layers and still don't have any runtimes, we create the default runtime
       if (runtimes == null && layers.size() != 0)
          addRuntime(null, null);
@@ -943,16 +956,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
             // If we have any peer systems, see if we have already created one for this runtime
             if (peerSystems != null) {
-               boolean found = false;
+               LayeredSystem processPeer = null;
                for (LayeredSystem peer:peerSystems) {
                   if (ProcessDefinition.compare(peer.processDefinition, proc)) {
-                     found = true;
+                     processPeer = peer;
                      break;
                   }
                }
 
-               if (found)
+               // Since we may have added layers, for each process see if those layers also need to go into the peer.
+               if (processPeer != null) {
+                  updateSystemLayers(processPeer);
                   continue;
+               }
             }
 
             // Now create the new peer layeredSystem for this runtime.
@@ -1033,20 +1049,28 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          runtimeProcessor = processDefinition == null ? null : processDefinition.getRuntimeProcessor();
          if (peerSystems != null) {
             for (LayeredSystem peerSys:peerSystems) {
-               if (getNeedsProcess(peerSys.processDefinition)) {
-                  ArrayList<String> newPeerLayers = new ArrayList<String>();
-                  // Here only include layers that are included by a specified layer
-                  addIncludedLayerNamesForProc(peerSys.processDefinition, newPeerLayers, true);
-                  if (newPeerLayers.size() > 0) {
-                     peerSys.initLayersWithNames(newPeerLayers, false, false, null, true, true);
-                  }
-               }
+               updateSystemLayers(peerSys);
             }
          }
       }
 
       // This is set in the constructor for the new LayeredSystem so we need to restore it here
-      setCurrent(this);
+      setCurrent(curSys);
+   }
+
+   /** Designed to be called from the main layered system */
+   private void updateSystemLayers(LayeredSystem peerSys) {
+      if (peerMode)
+         System.err.println("*** Warning - updating system layers from a peer system!");
+
+      if (getNeedsProcess(peerSys.processDefinition)) {
+         ArrayList<String> newPeerLayers = new ArrayList<String>();
+         // Here only include layers that are included by a specified layer
+         addIncludedLayerNamesForProc(peerSys.processDefinition, newPeerLayers, true);
+         if (newPeerLayers.size() > 0) {
+            peerSys.initLayersWithNames(newPeerLayers, false, false, null, true, true);
+         }
+      }
    }
 
    /** Before we activate layers in a new runtime, make sure one of the specified layers requires that runtime.
@@ -1072,9 +1096,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // Remove any layers that don't belong in the runtime.  The other runtimes are configured with the right
       // layers from the start in the active set.
       if (!peerMode) {
+         boolean needsDefaultProcess = getNeedsProcess(processDefinition);
          for (int i = 0; i < layers.size(); i++) {
             Layer layer = layers.get(i);
-            if (layer.excludeForProcess(processDefinition)) {
+            if (layer.isStarted())
+               continue;
+            // When we know we don't need the default process, we must automatically exclude the layer.  For other peer systems we only process the init layers if the process is needed, but for the main system, we use it to bootstrap all of the layers
+            boolean included = needsDefaultProcess && layer.includeForProcess(processDefinition);
+            if (!included || layer.excludeForProcess(processDefinition)) {
                layer.excluded = true;
                if (!markOnly) {
                   layers.remove(i);
@@ -1087,6 +1116,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
 
+      checkLayerPosition();
+
       int removeIx = -1;
       // Remove any layers that don't belong in this runtime
       for (int i = 0; i < inactiveLayers.size(); i++) {
@@ -1096,14 +1127,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (!markOnly) {
                inactiveLayerIndex.remove(inactiveLayer.getLayerName());
                inactiveLayers.remove(i);
-               i--;
                if (removeIx == -1)
                   removeIx = i;
+               i--;
             }
          }
       }
       if (removeIx != -1)
          renumberInactiveLayers(removeIx);
+
+      checkLayerPosition();
    }
 
    public boolean installSystem() {
@@ -1339,11 +1372,45 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return p.matcher(value).matches();
    }
 
+   /** By default we sync against one layered system for each runtime, unless the process opts out of the default sync profile for that runtime. */
    public List<LayeredSystem> getSyncSystems() {
-      if (runtimeProcessor != null)
-         return runtimeProcessor.getLayeredSystem().peerSystems;
+      TreeSet<String> syncRuntimes = new TreeSet<String>();
+      ArrayList<LayeredSystem> res = new ArrayList<LayeredSystem>();
+      List<LayeredSystem> peerSysList;
+      if (runtimeProcessor != null) {
+         peerSysList = runtimeProcessor.getLayeredSystem().peerSystems;
+      }
       else
-         return peerSystems;
+         peerSysList = peerSystems;
+
+      if (peerSysList != null) {
+         for (LayeredSystem peerSys:peerSysList) {
+            boolean sameRuntime = peerSys.getRuntimeName().equals(getRuntimeName());
+            IProcessDefinition procDef = peerSys.processDefinition;
+            List<String> syncProcNames = processDefinition == null ? null : processDefinition.getSyncProcessNames();
+            List<String> peerSyncProcNames = peerSys.processDefinition == null ? null : peerSys.processDefinition.getSyncProcessNames();
+
+            // By default, we do not sync against the same runtime unless there are two process which need to sync
+            if (sameRuntime &&
+                 (syncProcNames == null || !syncProcNames.contains(peerSys.getProcessName())) &&
+                 (peerSyncProcNames == null || !peerSyncProcNames.contains(getProcessName())))
+               continue;
+
+            boolean perProcessSync = procDef != null && procDef.getPerProcessSync();
+            if (perProcessSync) {
+               res.add(peerSys);
+            }
+            else {
+               if (!syncRuntimes.contains(peerSys.getRuntimeName())) {
+                  res.add(peerSys);
+                  syncRuntimes.add(peerSys.getRuntimeName());
+               }
+            }
+         }
+         return res;
+      }
+      else
+         return null;
    }
 
    public LayeredSystem getMainLayeredSystem() {
@@ -3263,6 +3330,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       for (BuildPhase phase:BuildPhase.values()) {
          GenerateCodeStatus result = GenerateCodeStatus.NoFilesToCompile;
 
+         if (getCurrent() != this)
+            System.out.println("*** Error mismatching layered system");
+
          if ((!newLayersOnly || !layer.compiled) && (!separateLayersOnly || layer.buildSeparate) && (result = generateCode(layer, includeFiles, phase, separateLayersOnly)) != GenerateCodeStatus.Error) {
             if (phase == BuildPhase.Process && !skipBuild) {
                layer.compiled = true;
@@ -3419,6 +3489,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          else {
             if (!buildLayersIfNecessary(layers.size(), includeFiles, newLayersOnly, separateLayersOnly))
                return false;
+
+            if (getCurrent() != this)
+               System.out.println("*** Error mismatching layered systems");
 
             GenerateCodeStatus stat;
             boolean firstCompile = !buildLayer.compiled;
@@ -4760,8 +4833,24 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       notifyLayerAdded(layer);
+
+      checkLayerPosition();
    }
-     
+
+   private void checkLayerPosition() {
+      int i = 0;
+      for (Layer l:inactiveLayers) {
+         if (l.layerPosition != i)
+            System.err.println("*** Invalid inactive layer position");
+         i++;
+      }
+      i = 0;
+      for (Layer l:layers) {
+         if (l.layerPosition != i)
+            System.err.println("*** Invalid layer position");
+         i++;
+      }
+   }
    private void renumberInactiveLayers(int fromIx) {
       for (int i = fromIx; i < inactiveLayers.size(); i++)
          inactiveLayers.get(i).layerPosition = i;
@@ -5485,8 +5574,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   if (layer != null) {
                      SysTypeIndex sysIdx = layer.layeredSystem.typeIndex;
                      LayerListTypeIndex idx = layer.activated ? sysIdx.activeTypeIndex : sysIdx.inactiveTypeIndex;
-                     if (layer.layerTypeIndex == null)
-                        System.out.println("***");
                      idx.typeIndex.put(layerName, layer.layerTypeIndex);
                      refreshedLayers.add(layerName);
                   }
@@ -5880,6 +5967,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public GenerateCodeStatus startPeerChangedModels(Layer genLayer, List<String> includeFiles, BuildPhase phase, boolean separateOnly) {
       // Before we start this model's files, make sure any build layers in peer systems have been started.  This happens when there's an
       // intermediate build layer in the peer before the one in the default runtime.
+      // NOTE: peerMode = true should still iterate over this list.  We have the changedModelsStarted flag to prevent recursion.  When we
+      // build the peer system, it's the itiator and we need to make sure it coordinates with the other systems.
       if (peerSystems != null && !separateOnly) {
          for (LayeredSystem peer:peerSystems) {
             Layer srcLayer = genLayer;
@@ -6976,6 +7065,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             File depFile = srcDirEnt.depFile;
             boolean depsChanged = srcDirEnt.depsChanged;
 
+            if (getCurrent() != this)
+               System.out.println("*** Error mismatching layered system");
+
             for (ModelToTransform mtt:srcDirEnt.modelsToTransform) {
                SrcEntry toGenEnt = mtt.toGenEnt;
                IFileProcessorResult model = mtt.model;
@@ -7852,6 +7944,27 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return m;
    }
 
+   /** Returns the cached active model for the specified runtime processor */
+   public ILanguageModel getActiveModel(SrcEntry srcEnt, IRuntimeProcessor proc) {
+      ILanguageModel m;
+      String fn = srcEnt.absFileName;
+      if (proc == runtimeProcessor) {
+         m = modelIndex.get(fn);
+         if (m != null)
+            return m;
+      }
+      if (!peerMode && peerSystems != null) {
+         for (LayeredSystem peerSys:peerSystems) {
+            if (peerSys.runtimeProcessor == proc) {
+               m = peerSys.modelIndex.get(fn);
+               if (m != null)
+                  return m;
+            }
+         }
+      }
+      return null;
+   }
+
    public boolean hasAnnotatedModel(SrcEntry srcEnt) {
       String fn = srcEnt.absFileName;
       ILanguageModel m = modelIndex.get(fn);
@@ -7863,7 +7976,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return false;
    }
 
-   public ILanguageModel getAnnotatedModel(SrcEntry srcEnt) {
+   private ILanguageModel getCachedAnnotatedModel(SrcEntry srcEnt, boolean checkPeers) {
       String fn = srcEnt.absFileName;
       ILanguageModel m = modelIndex.get(fn);
       if (m != null && m.getUserData() != null)
@@ -7876,9 +7989,28 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          else
             return m;
       }
+      if (checkPeers && peerSystems != null) {
+         for (LayeredSystem peerSys:peerSystems) {
+            m = peerSys.getCachedAnnotatedModel(srcEnt, false);
+            if (m != null)
+               return m;
+         }
+      }
+      return null;
+   }
+
+   public ILanguageModel getAnnotatedModel(SrcEntry srcEnt) {
+      ILanguageModel m;
+      m = getCachedAnnotatedModel(srcEnt, true);
+      if (m != null)
+         return m;
       // Look up an annotated version through the external model index - we don't care if it's active or inactive when using this api since
       // the editor might be displaying the wrong one
-      return getLanguageModel(srcEnt, true, null);
+      m = getAnyLanguageModel(srcEnt, true);
+      if (m != null) {
+         return m;
+      }
+      return null;
    }
 
    public void markBeingLoadedModel(SrcEntry srcEnt, ILanguageModel model) {
@@ -8053,7 +8185,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // TODO: buildAllFiles does not always work so at some point we need to either fix this or turn it into buildIfAnyChanges
       if (systemCompiled) {
          options.buildAllFiles = false;
-         buildLayer.buildAllFiles = false;
+         if (buildLayer != null)
+            buildLayer.buildAllFiles = false;
       }
       buildingSystem = true;
       if (peerSystems != null && !peerMode) {
@@ -8554,6 +8687,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    private boolean isActivated(Layer layer) {
       return layer != null && layer.activated;
+   }
+
+   public ILanguageModel getAnyLanguageModel(SrcEntry srcEnt, boolean activeOrInactive) {
+      ILanguageModel m = getLanguageModel(srcEnt, activeOrInactive, null);
+      if (m != null)
+         return m;
+      if (peerSystems != null) {
+         for (LayeredSystem peerSys:peerSystems) {
+            m = peerSys.getLanguageModel(srcEnt);
+            if (m != null)
+               return m;
+         }
+      }
+      return null;
    }
 
    public ILanguageModel getLanguageModel(SrcEntry srcEnt) {
@@ -10435,6 +10582,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             return null;
 
          int startPos = startLayer.layerPosition;
+         if (startPos >= inactiveLayers.size()) {
+            System.out.println("*** Invalid layer position: " + startPos + " when starting layer: " + startLayer);
+            return null;
+         }
          for (int i = startPos; i > endPos; i--) {
             Layer layer = inactiveLayers.get(i);
             // Check if there's an active layer with this name... if so we'll use the active layer's classpath.
@@ -11189,6 +11340,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private Layer completeNewInactiveLayer(Layer layer, boolean doBuild) {
       layer.ensureInitialized(true);
 
+      checkLayerPosition();
+
       // First mark any excluded layers with the excluded flag so we know they do not belong in this runtime.
       // We leave the excluded layers in place through initRuntimes though so we can use these excluded layers
       // to find the runtimes in which they belong.
@@ -11201,6 +11354,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       removeExcludedLayers(false);
+
+      checkLayerPosition();
 
       if (!peerMode && peerSystems != null) {
          // Need to also load this layer and any dependent layers as an inactive layers into the other runtimes if they are needed there.
@@ -11225,6 +11380,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (activeLayer.buildSeparate && !activeLayer.compiled && !activeLayer.disabled) {
             // then build the separate layers so the compiled results are available for parsing the types - again for all peers
             buildSystem(null, true, true);
+
+            setCurrent(this);
             break;
          }
       }

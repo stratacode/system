@@ -1044,7 +1044,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       boolean didTransform = false;
       LayeredSystem sys = getLayeredSystem();
 
-      String modelTypeName = getModelTypeName();
+      //String modelTypeName = getModelTypeName();
 
       PerfMon.start("transform");
 

@@ -1276,22 +1276,31 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public String getFullTypeName() {
       if (fullTypeName != null)
          return fullTypeName;
+      fullTypeName = getFullTypeName(".");
+      return fullTypeName;
+   }
+
+   public String getJavaFullTypeName() {
+      return getFullTypeName("$");
+   }
+
+   private String getFullTypeName(String innerTypeSep) {
       ISemanticNode pnode = parentNode instanceof BodyTypeDeclaration || parentNode instanceof JavaModel ? parentNode : parentNode == null ? null : parentNode.getParentNode(); // Skip the list, not there for command completion
       String res;
       if (pnode instanceof JavaModel || pnode instanceof TemplateStatement) {
          res = CTypeUtil.prefixPath(getJavaModel().getPackagePrefix(), typeName);
       }
       else if (pnode instanceof ITypeDeclaration)
-         res = ((ITypeDeclaration) pnode).getFullTypeName() + "." + typeName;
+         res = ((ITypeDeclaration) pnode).getFullTypeName() + innerTypeSep + typeName;
       else if (pnode instanceof BlockStatement)
          res = null;
       else if (pnode == null)
          res = typeName;
       else
          throw new UnsupportedOperationException();
-      fullTypeName = res;
       return res;
    }
+
 
    // For sync to JS
    public void setFullTypeName() {
@@ -7475,6 +7484,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          syncSystems.add(sys);
       }
 
+      List<Object> allProps = getAllProperties(null, false);
+
       // If the type exists in another runtime which we are sync'ing to we should make it @Sync by default.
       BitSet matchedFilterNames = filterDestinations == null ? null : new BitSet(filterDestinations.size());
       for (int sysIx = 0; sysIx < syncSystems.size(); sysIx++) {
@@ -7491,12 +7502,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
          // When dealing with the same system, we just process types that have @Sync explicitly set.  Otherwise, all types would overlap
          if (syncSys != sys) {
-            syncType = syncMode == SyncMode.Automatic? (TypeDeclaration) syncSys.getSrcTypeDeclaration(typeName, null, true, false, true, getLayer(), false) : null;
+            Layer syncLayer = syncSys.getLayerByDirName(getLayer().getLayerName());
+            syncType = syncMode == SyncMode.Automatic? (TypeDeclaration) syncSys.getSrcTypeDeclaration(typeName, null, true, false, true, syncLayer, false) : null;
             if (syncType != null && syncType.isTransformed())
                System.err.println("*** Sync type has been transformed!");
          }
 
-         List<Object> allProps = getAllProperties(null, false);
          List<Object> syncProps = new ArrayList<Object>();
 
          if (allProps != null) {

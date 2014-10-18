@@ -55,6 +55,59 @@ import java.util.zip.ZipFile;
  */
 public class Layer implements ILifecycle, LayerConstants {
    public final static Layer ANY_LAYER = new Layer();
+
+   /** The name of the layer used to find it in the layer path dot separated, e.g. groupName.dirName */
+   @Constant public String layerDirName;
+
+   public LayeredSystem layeredSystem;
+
+   public ILanguageModel model;
+
+   /** Contains the list of layers this layer extends */
+   @Constant public List<String> baseLayerNames;
+
+   public List<Layer> baseLayers;
+
+   private boolean initialized = false;
+   public boolean started = false;
+   public boolean validated = false;
+
+   boolean processed = false;
+
+   /** Is this a compiled or a dynamic layer */
+   @Constant
+   public boolean dynamic;
+
+   /** Set to true when this layer is removed from the system */
+   public boolean removed = false;
+
+   /** Set to false for layers which are not part of the running application */
+   public boolean activated = true;
+
+   /** Set to true when this layer should not be started for whatever reason. */
+   public boolean disabled = false;
+
+   /** Set to true for a baseLayer which has been excluded from this runtime */
+   public boolean excluded = false;
+
+   /** Set to true for any layers which should be compiled individually.   Set to true when buildSeparate = true, this is the buildLayer (the last layer), or the layer was previous built */
+   public boolean buildLayer = false;
+
+   /** Set to true for layers who want to show all objects and properties visible in their extended layers */
+   @Constant
+   public boolean transparent = false;
+
+   /**
+    * Set this to true so that a given layer is compiled by itself - i.e. its build will not include source or
+    * classes for any layers which it extends.  In that case, those layers will have to be built separately
+    * before this layer can be run.
+    */
+   public boolean buildSeparate;
+
+   /** The integer position of the layer in the list of layers */
+   @Constant
+   int layerPosition;
+
    /** Any set of dependent classes code in this layer requires */
    public String classPath;
 
@@ -104,10 +157,6 @@ public class Layer implements ILifecycle, LayerConstants {
    /** The class directory where this layer's compiled files should go. */
    public String buildClassesDir;
 
-   /** Is this a compiled or a dynamic layer */
-   @Constant
-   public boolean dynamic;
-
    /** Set this to true for any layers you do not want to show up in the UI */
    @Constant
    public boolean hidden = false;
@@ -127,20 +176,6 @@ public class Layer implements ILifecycle, LayerConstants {
 
    /** Set to true when a layer has been compiled and put into the classpath */
    public boolean compiledInClassPath = false;
-
-   /** Set to true for layers who want to show all objects and properties visible in their extended layers */
-   @Constant
-   public boolean transparent = false;
-
-   /**
-    * Set this to true so that a given layer is compiled by itself - i.e. its build will not include source or
-    * classes for any layers which it extends.  In that case, those layers will have to be built separately
-    * before this layer can be run.
-    */
-   public boolean buildSeparate;
-
-   /** Set to true for any layers which should be compiled individually.   Set to true when buildSeparate = true, this is the buildLayer (the last layer), or the layer was previous built */
-   public boolean buildLayer = false;
 
    /** Set of patterns to ignore in any layer src or class directory, using Java's regex language */
    public List<String> excludedFiles = new ArrayList<String>(Arrays.asList(".git", ".*[\\(\\);@#$%\\^].*"));
@@ -191,18 +226,6 @@ public class Layer implements ILifecycle, LayerConstants {
    /** Same as inheritRuntime but for the process name */
    public boolean inheritProcess = true;
 
-   /** Set to true when this layer is removed from the system */
-   public boolean removed = false;
-
-   /** Set to false for layers which are not part of the running application */
-   public boolean activated = true;
-
-   /** Set to true when this layer should not be started for whatever reason. */
-   public boolean disabled = false;
-
-   /** Set to true for a baseLayer which has been excluded from this runtime */
-   public boolean excluded = false;
-
    public List<String> excludeRuntimes = null;
    public List<String> includeRuntimes = null;
 
@@ -224,8 +247,6 @@ public class Layer implements ILifecycle, LayerConstants {
     * load their class files directly, since they can't be changed by upstream layers.  This makes compiling makes must faster.
     */
    public boolean finalLayer = false;
-
-   boolean processed = false;
 
    // For build layers, while the layer is being build this stores the build state - changed files, etc.
    LayeredSystem.BuildState buildState;
@@ -250,6 +271,74 @@ public class Layer implements ILifecycle, LayerConstants {
    public boolean errorsStarting = false;
 
    LayerTypeIndex layerTypeIndex = new LayerTypeIndex();
+
+   /** If a Java file uses no extensions, we can either compile it from the source dir or copy it to the build dir */
+   public boolean copyPlainJavaFiles = true;
+
+   /** Set by the system to the full path to the directory containing LayerName.sc (layerFileName = layerPathName + layerBaseName) */
+   @Constant String layerPathName;
+
+   /** Just the LayerName.sc part */
+   @Constant public String layerBaseName;
+
+   /** The unique name of the layer - prefix + dirName, e.g. sc.util.util */
+   @Constant public String layerUniqueName;
+
+   // Cached list of top level src directories - usually just the layer's directory path
+   private List<String> topLevelSrcDirs;
+
+   // Cached list of all directories in this layer that contain source
+   private List<String> srcDirs = new ArrayList<String>();
+
+   private Map<String, TreeSet<String>> relSrcIndex = new TreeMap<String, TreeSet<String>>();
+
+   // A cached index of the relative file names to File objects so we can quickly resolve whether a file is
+   // there or not.  Also, this helps get the canonical case for the file name.
+   HashMap<String,File> srcDirCache = new HashMap<String,File>();
+
+   // TODO: right now this only stores ZipFiles in the preCompiledSrcPath.  We can't support zip entries for other than parsing models.
+   // Stores a list of zip files which are in the srcDirCache for this layer.  Note that this may store src files which are not actually processed by this layer.
+   ArrayList<ZipFile> srcDirZipFiles;
+
+   public HashMap<String,SrcIndexEntry> buildSrcIndex;
+
+   /** Stores the set of models in this layer, in the order in which we traversed the tree for consistency. */
+   LinkedHashSet<IdentityWrapper<ILanguageModel>> layerModels = new LinkedHashSet<IdentityWrapper<ILanguageModel>>();
+
+   List<String> classDirs;
+
+   // Parallel to classDirs - caches zips/jars
+   private ZipFile[] zipFiles;
+
+   /** Set to true if a base layer or start method failed to start */
+   public boolean initFailed = false;
+
+   private long lastModified = 0;
+
+   public boolean needsIndexRefresh = false;   // If you generate files into the srcPath set this to true so they get picked up
+
+   /** Set to true for layers that need to be saved the first time they are needed */
+   public boolean tempLayer = false;
+
+   /** Each build layer has a buildInfo which stores global project info for that layer */
+   public BuildInfo buildInfo;
+
+   /** Caches the typeNames of all dynamic types built in this build layer (if any) */
+   public HashSet<String> dynTypeIndex = null;
+
+   @Constant
+   public CodeType codeType = CodeType.Application;
+
+   @Constant
+   public CodeFunction codeFunction = CodeFunction.Program;
+
+   boolean newLayer = false;   // Set to true for layers which are created fresh
+
+   private boolean buildSrcIndexNeedsSave = false; // TODO: performance - this gets saved way too often now right - need to implement this flag
+
+   public HashMap<String, IScopeProcessor> scopeProcessors = null;
+
+   public HashMap<String,IAnnotationProcessor> annotationProcessors = null;
 
    /**
     * Add an explicitly dependency on layer.  This will ensure that if your layer and the otherLayerName are in the stack, that this layer will be compiled along with other layer.
@@ -751,94 +840,6 @@ public class Layer implements ILifecycle, LayerConstants {
    public Map classSubstitutionMap;
     */
 
-   /** Contains the list of layers this layer extends */
-   @Constant public List<String> baseLayerNames;
-
-   public List<Layer> baseLayers;
-
-   /** If a Java file uses no extensions, we can either compile it from the source dir or copy it to the build dir */
-   public boolean copyPlainJavaFiles = true;
-
-   /** Set by the system to the full path to the directory containing LayerName.sc (layerFileName = layerPathName + layerBaseName) */
-   @Constant String layerPathName;
-
-   /** Just the LayerName.sc part */
-   @Constant public String layerBaseName;
-
-   /** The name of the layer used to find it in the layer path dot separated, e.g. groupName.dirName */
-   @Constant public String layerDirName;
-
-   /** The unique name of the layer - prefix + dirName, e.g. sc.util.util */
-   @Constant public String layerUniqueName;
-
-   /** The integer position of the layer in the list of layers */
-   @Constant
-   int layerPosition;
-
-   public LayeredSystem layeredSystem;
-
-   // Cached list of top level src directories - usually just the layer's directory path
-   private List<String> topLevelSrcDirs;
-
-   // Cached list of all directories in this layer that contain source
-   private List<String> srcDirs = new ArrayList<String>();
-
-   private Map<String, TreeSet<String>> relSrcIndex = new TreeMap<String, TreeSet<String>>();
-
-   // A cached index of the relative file names to File objects so we can quickly resolve whether a file is
-   // there or not.  Also, this helps get the canonical case for the file name.
-   HashMap<String,File> srcDirCache = new HashMap<String,File>();
-
-   // TODO: right now this only stores ZipFiles in the preCompiledSrcPath.  We can't support zip entries for other than parsing models.
-   // Stores a list of zip files which are in the srcDirCache for this layer.  Note that this may store src files which are not actually processed by this layer.
-   ArrayList<ZipFile> srcDirZipFiles;
-
-   public HashMap<String,SrcIndexEntry> buildSrcIndex;
-
-   /** Stores the set of models in this layer, in the order in which we traversed the tree for consistency. */
-   LinkedHashSet<IdentityWrapper<ILanguageModel>> layerModels = new LinkedHashSet<IdentityWrapper<ILanguageModel>>();
-
-   List<String> classDirs;
-
-   // Parallel to classDirs - caches zips/jars
-   private ZipFile[] zipFiles;
-
-   private boolean initialized = false;
-   public boolean started = false;
-   public boolean validated = false;
-
-   /** Set to true if a base layer or start method failed to start */
-   public boolean initFailed = false;
-
-   private long lastModified = 0;
-
-   public ILanguageModel model;
-
-   public boolean needsIndexRefresh = false;   // If you generate files into the srcPath set this to true so they get picked up
-
-   /** Set to true for layers that need to be saved the first time they are needed */
-   public boolean tempLayer = false;
-
-   /** Each build layer has a buildInfo which stores global project info for that layer */
-   public BuildInfo buildInfo;
-
-   /** Caches the typeNames of all dynamic types built in this build layer (if any) */
-   public HashSet<String> dynTypeIndex = null;
-
-   @Constant
-   public CodeType codeType = CodeType.Application;
-
-   @Constant
-   public CodeFunction codeFunction = CodeFunction.Program;
-
-   boolean newLayer = false;   // Set to true for layers which are created fresh
-
-   private boolean buildSrcIndexNeedsSave = false; // TODO: performance - this gets saved way too often now right - need to implement this flag
-
-   public HashMap<String, IScopeProcessor> scopeProcessors = null;
-
-   public HashMap<String,IAnnotationProcessor> annotationProcessors = null;
-
    public boolean isInitialized() {
       return initialized;
    }
@@ -1215,8 +1216,6 @@ public class Layer implements ILifecycle, LayerConstants {
 
       if (isBuildLayer() && activated && !disabled) {
          loadBuildInfo();
-         if (buildSrcDir == null)
-            System.out.println("***");
          LayeredSystem.initBuildFile(buildSrcDir);
          LayeredSystem.initBuildFile(buildClassesDir);
       }
@@ -3017,9 +3016,6 @@ public class Layer implements ILifecycle, LayerConstants {
    public RepositoryPackage addRepositoryPackage(String pkgName, String repositoryTypeName, String url, boolean unzip) {
       if (repositoryPackages == null)
          repositoryPackages = new ArrayList<RepositoryPackage>();
-
-      if (layeredSystem == null || layeredSystem.repositorySystem == null)
-         System.out.println("***");
 
       IRepositoryManager mgr = layeredSystem.repositorySystem.getRepositoryManager(repositoryTypeName);
       if (mgr != null) {

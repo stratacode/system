@@ -353,7 +353,8 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          LayeredSystem sys = model.getLayeredSystem();
          // Only start checking after the current buildLayer is compiled.  Otherwise, this touches runtime classes
          // during the normal build which can suck in a version that will be replaced later on.
-         if (sys != null && sys.buildLayer != null && sys.buildLayer.compiled) {
+         // Don't do this test for the JS runtime... it forces us to load the js version of the class
+         if (sys != null && sys.buildLayer != null && sys.buildLayer.compiled && !sys.isDynamicRuntime()) {
             Object field = getRuntimePropertyMapping();
             // If field is null, it means we have not compiled a compiled class yet
             if (field != null && (!ModelUtil.isDynamicType(field) && !ModelUtil.isBindable(field)) && canMakeBindable() && !ModelUtil.isConstant(field))

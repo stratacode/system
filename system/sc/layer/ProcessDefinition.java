@@ -7,6 +7,8 @@ package sc.layer;
 import sc.dyn.DynUtil;
 import sc.util.StringUtil;
 
+import java.util.List;
+
 /**
  * An instance of this class is used to represent each process we need to build.  If the processName is null
  * we are using the default process - i.e. no layers have defined any process constraints.
@@ -32,6 +34,23 @@ public class ProcessDefinition implements IProcessDefinition {
    IRuntimeProcessor runtimeProcessor;
    public IRuntimeProcessor getRuntimeProcessor() {
       return runtimeProcessor;
+   }
+
+   boolean perProcessSync;
+   /** Set this to true if this process cannot use the default runtime's sync definition.  In this case, a new sync def is generated for this process. */
+   public boolean getPerProcessSync() {
+      return perProcessSync;
+   }
+   public void setPerProcessSync(boolean perProcessSync) {
+      this.perProcessSync = perProcessSync;
+   }
+
+   List<String> syncProcessNames;
+   public List<String> getSyncProcessNames() {
+      return syncProcessNames;
+   }
+   public void setSyncProcessNames(List<String> syncProcessNames) {
+      this.syncProcessNames = syncProcessNames;
    }
 
    public void setRuntimeProcessor(IRuntimeProcessor proc) {

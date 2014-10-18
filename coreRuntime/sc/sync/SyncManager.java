@@ -1867,6 +1867,9 @@ public class SyncManager {
       }
       else {
          SyncManager syncMgr = getSyncManager(props.destName);
+         if (syncMgr == null) {
+             throw new IllegalArgumentException("*** No sync destination registered for: " + props.destName);
+         }
          old = syncMgr.syncTypes.put(type, props);
       }
 
