@@ -47,6 +47,8 @@ public class ProcessDefinition implements IProcessDefinition {
 
    List<String> syncProcessNames;
    public List<String> getSyncProcessNames() {
+      if (syncProcessNames == null && runtimeProcessor != null)
+         return runtimeProcessor.getSyncProcessNames();
       return syncProcessNames;
    }
    public void setSyncProcessNames(List<String> syncProcessNames) {

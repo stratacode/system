@@ -53,6 +53,11 @@ public class SysTypeIndex {
             layerIx++;
          }
 
+         if (layerIx == indexEntries.size()) {
+            System.out.println("*** Warning - unable to find layer: " + typeLayer.getLayerName() + " in index");
+            return;
+         }
+
          // Now add each successive entry - those are the possible modifiers.
          for (int i = before ? 0 : layerIx+1; i < (before ? layerIx : indexEntries.size()); i++) {
             TypeIndex modTypeIndex = indexEntries.get(i);

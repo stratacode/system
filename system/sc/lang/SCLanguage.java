@@ -28,7 +28,7 @@ public class SCLanguage extends JavaLanguage {
    public static final String DEFAULT_EXTENSION = "sc";
 
    static Set<IString> SC_KEYWORD_SET = new HashSet<IString>(Arrays.asList(PString.toPString(JAVA_KEYWORDS)));
-   static Set<IString> SC_VARNAME_KEYWORD_SET = new HashSet<IString>(Arrays.asList(PString.toPString(JAVA_VARNAME_KEYWORD_SET.toArray())));
+   static Set<IString> SC_VARNAME_KEYWORD_SET = new HashSet<IString>(JAVA_VARNAME_KEYWORD_SET);
 
    static {
       SC_KEYWORD_SET.add(PString.toPString("object"));

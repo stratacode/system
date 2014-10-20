@@ -11,7 +11,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
 
-public class SwitchStatement extends Statement {
+public class SwitchStatement extends Statement implements IBlockStatement {
    public Expression expression;
    public List<Statement> statements;
 
@@ -197,5 +197,9 @@ public class SwitchStatement extends Statement {
                statement.addGeneratedFromNodes(res, srcStatement);
          }
       }
+   }
+
+   public List<Statement> getBlockStatements() {
+      return statements;
    }
 }

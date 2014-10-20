@@ -74,4 +74,7 @@ public interface IRuntimeProcessor {
 
    /** Some runtimes, like Javascript, are not active in Java so suppress loading classes there */
    boolean getLoadClassesInRuntime();
+
+   /** The list of process names this runtime should sync against. */
+   public List<String> getSyncProcessNames();
 }

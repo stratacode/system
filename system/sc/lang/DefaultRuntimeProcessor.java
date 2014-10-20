@@ -109,6 +109,19 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor {
       return true;
    }
 
+   List<String> syncProcessNames;
+   public List<String> getSyncProcessNames() {
+      return syncProcessNames;
+   }
+   public void setSyncProcessNames(List<String> syncProcessNames) {
+      this.syncProcessNames = syncProcessNames;
+   }
+   public void addSyncProcessName(String procName) {
+      if (syncProcessNames == null)
+         syncProcessNames = new ArrayList<String>();
+      syncProcessNames.add(procName);
+   }
+
    public String toString() {
       return runtimeName + " runtime";
    }

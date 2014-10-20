@@ -292,7 +292,7 @@ public abstract class AbstractInterpreter extends EditorContext {
                }
 
                Layer switchLayer;
-               if ((switchLayer = system.getLayerByPath(typeName)) != null || (switchLayer = system.getLayerByPath(CTypeUtil.prefixPath(currentLayer.getLayerGroupName(), typeName))) != null) {
+               if ((switchLayer = system.getLayerByPath(typeName, false)) != null || (switchLayer = system.getLayerByPath(CTypeUtil.prefixPath(currentLayer.getLayerGroupName(), typeName), false)) != null) {
                   setCurrentLayer(switchLayer);
                   recordOutput(recordString, origIndent);
                   return;
@@ -1047,7 +1047,7 @@ public abstract class AbstractInterpreter extends EditorContext {
 
    public void setEditLayerName(String name) {
       Layer newLayer;
-      if ((newLayer = system.getLayerByPath(name)) != null) {
+      if ((newLayer = system.getLayerByPath(name, false)) != null) {
          setCurrentLayer(newLayer);
       }
       else {

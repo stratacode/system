@@ -768,7 +768,7 @@ public class Layer implements ILifecycle, LayerConstants {
             if (newBaseState == LayerEnabledState.Enabled)
                return newBaseState;
             // When a layer has no state for the process, check the runtime and use it's status
-            else if (newBaseState == LayerEnabledState.NotSet && inheritRuntime) {
+            else if (newBaseState == LayerEnabledState.NotSet && inheritRuntime && checkRuntime) {
                runtimeNewState = true;
                newBaseState = base.isExplicitlyEnabledForRuntime(runtimeProc, true);
             }
@@ -1215,9 +1215,18 @@ public class Layer implements ILifecycle, LayerConstants {
       }
 
       if (isBuildLayer() && activated && !disabled) {
-         loadBuildInfo();
-         LayeredSystem.initBuildFile(buildSrcDir);
-         LayeredSystem.initBuildFile(buildClassesDir);
+         if (buildSrcDir == null) {
+            // For build separate layers that we create when we are inactive, we may not have initialized the build system so do it here.
+            if (buildSeparate)
+               initBuildDir();
+         }
+         if (buildSrcDir == null)
+            System.err.println("*** Warning - activated build layer started without build dirs initialized: " + this);
+         else {
+            loadBuildInfo();
+            LayeredSystem.initBuildFile(buildSrcDir);
+            LayeredSystem.initBuildFile(buildClassesDir);
+         }
       }
 
       // First start the model so that it can set up our paths etc.
@@ -1611,13 +1620,16 @@ public class Layer implements ILifecycle, LayerConstants {
    }
 
    public void saveTypeIndex() {
-      File typeIndexFile = new File(layeredSystem.getTypeIndexFileName(getLayerName()));
-      try {
-         ObjectOutputStream os = new ObjectOutputStream(new FileOutputStream(typeIndexFile));
-         os.writeObject(layerTypeIndex);
-      }
-      catch (IOException exc) {
-         System.err.println("*** Unable to write typeIndexFile: " + exc);
+      // For activated layers, we might not have a complete type index so we cannot save it.
+      if (!activated) {
+         File typeIndexFile = new File(layeredSystem.getTypeIndexFileName(getLayerName()));
+         try {
+            ObjectOutputStream os = new ObjectOutputStream(new FileOutputStream(typeIndexFile));
+            os.writeObject(layerTypeIndex);
+         }
+         catch (IOException exc) {
+            System.err.println("*** Unable to write typeIndexFile: " + exc);
+         }
       }
    }
 

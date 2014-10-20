@@ -47,12 +47,12 @@ public class LayerListTypeIndex {
          TypeIndex layerTypeIndex = typeEnt.getValue();
          String layerTypeName = typeEnt.getKey();
          // Build the reverse list - for each
-         if (layerTypeIndex.extendedByTypes != null) {
-            for (String extendedByType:layerTypeIndex.extendedByTypes) {
-               LinkedHashMap<String,TypeIndex> subTypes = subTypeIndex.get(extendedByType);
+         if (layerTypeIndex.baseTypes != null) {
+            for (String baseType:layerTypeIndex.baseTypes) {
+               LinkedHashMap<String,TypeIndex> subTypes = subTypeIndex.get(baseType);
                if (subTypes == null) {
                   subTypes = new LinkedHashMap<String,TypeIndex>();
-                  subTypeIndex.put(extendedByType, subTypes);
+                  subTypeIndex.put(baseType, subTypes);
                }
 
                subTypes.put(layerTypeName, layerTypeIndex);
@@ -63,7 +63,16 @@ public class LayerListTypeIndex {
             modifyTypes = new ArrayList<TypeIndex>();
             modifyTypeIndex.put(layerTypeName, modifyTypes);
          }
-         modifyTypes.add(layerTypeIndex);
+         int ix;
+         for (ix = 0; ix < modifyTypes.size(); ix++) {
+            TypeIndex tind = modifyTypes.get(ix);
+            if (tind.layerName.equals(layerTypeIndex.layerName) && tind.typeName.equals(layerTypeIndex.typeName))
+               break;
+         }
+         if (ix == modifyTypes.size())
+            modifyTypes.add(layerTypeIndex);
+         else
+            modifyTypes.set(ix, layerTypeIndex);
       }
    }
 

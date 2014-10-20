@@ -460,6 +460,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                candidates.add(ent);
          }
       }
+      JavaModel modModel = getModifiedModel();
+      if (modModel != null)
+         modModel.findMatchingGlobalNames(prefix, prefixPkgName, prefixBaseName, candidates);
       if (layeredSystem != null && layer != null) {
          layeredSystem.findMatchingGlobalNames(null, layer, prefix, prefixPkgName, prefixBaseName, candidates, false, false);
       }
