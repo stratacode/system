@@ -951,8 +951,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             IProcessDefinition proc = processes.get(ix);
 
             // Skip the processor associated with the main layered system
-            if (ProcessDefinition.compare(proc, processDefinition))
+            if (ProcessDefinition.compare(proc, processDefinition)) {
+               // make the main layered system point to this process.
+               if (processDefinition == null && proc != null)
+                  processDefinition = proc;
                continue;
+            }
 
             // If we have any peer systems, see if we have already created one for this runtime
             if (peerSystems != null) {
