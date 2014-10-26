@@ -5069,6 +5069,54 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
+   public void addLayerPathDir(String dirName) {
+      if (dirName.equals("."))
+         dirName = System.getProperty("user.dir");
+      if (dirName.length() == 0) {
+         if (layerPathDirs.size() == 0)
+            throw new IllegalArgumentException("Invalid empty layer path specified");
+         else {
+            System.err.println("*** Ignoring empty directory name in layer path: " + dirName);
+         }
+      }
+      File f = new File(dirName);
+      if (!f.exists() || !f.isDirectory())
+         throw new IllegalArgumentException("*** Invalid layer path - Each path entry should be a directory: " + f);
+         // TODO: error if path directories are nested
+      else {
+         String layerPathFileName = FileUtil.concat(dirName, ".layerPath");
+         File layerPathFile = new File(layerPathFileName);
+         if (layerPathFile.canRead()) {
+            // As soon as we find one .layerPath file, consider the system installed
+            systemInstalled = true;
+            // Include any new entries in the .layerPath file into the layer path
+            String layerPath = FileUtil.getFileAsString(layerPathFileName);
+            if (layerPath != null && !layerPath.trim().equals(".")) {
+               String[] newLayerPaths = layerPath.split(":");
+               for (String newLayerPath:newLayerPaths) {
+                  if (!inLayerPath(newLayerPath)) {
+                     File newDirFile = new File(newLayerPath);
+                     if (!newDirFile.exists() || !newDirFile.isDirectory()) {
+                        System.err.println("*** Ignoring invalid layerPath directory in: " + layerPathFileName + "  directory: " + newLayerPath + " does not exist");
+                     }
+                     else
+                        layerPathDirs.add(newDirFile);
+                  }
+               }
+            }
+         }
+         layerPathDirs.add(f);
+      }
+   }
+
+   boolean inLayerPath(String newLayerPath) {
+      for (File layerPath:layerPathDirs) {
+         if (layerPath.getPath().equals(newLayerPath))
+            return true;
+      }
+      return false;
+   }
+
    private void initLayerPath() {
       if (layerPath != null) {
          // When you explicitly set the layerPath we assume everything is installed
@@ -5078,45 +5126,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          List dirNameList = Arrays.asList(dirNames);
          layerPathDirs = new ArrayList<File>(dirNames.length);
          for (String d:dirNames) {
-            if (d.equals("."))
-               d = System.getProperty("user.dir");
-            if (d.length() == 0) {
-               if (dirNames.length == 0)
-                  throw new IllegalArgumentException("Invalid empty layer path specified");
-               else {
-                  System.err.println("*** Ignoring empty directory name in layer path: " + layerPath);
-                  continue;
-               }
-            }
-            File f = new File(d);
-            if (!f.exists() || !f.isDirectory())
-               throw new IllegalArgumentException("*** Invalid layer path - Each path entry should be a directory: " + f);
-            // TODO: error if path directories are nested
-            else {
-               String layerPathFileName = FileUtil.concat(d, ".layerPath");
-               File layerPathFile = new File(layerPathFileName);
-               if (layerPathFile.canRead()) {
-                  // As soon as we find one .layerPath file, consider the system installed
-                  systemInstalled = true;
-                  // Include any new entries in the .layerPath file into the layer path
-                  String layerPath = FileUtil.getFileAsString(layerPathFileName);
-                  if (layerPath != null && !layerPath.trim().equals(".")) {
-                     String[] newLayerPaths = layerPath.split(":");
-                     for (String newLayerPath:newLayerPaths) {
-                        if (!dirNameList.contains(newLayerPath)) {
-                           File newDirFile = new File(newLayerPath);
-                           if (!newDirFile.exists() || !newDirFile.isDirectory()) {
-                              System.err.println("*** Ignoring invalid layerPath directory in: " + layerPathFileName + "  directory: " + newLayerPath + " does not exist");
-                           }
-                           else
-                              layerPathDirs.add(newDirFile);
-                        }
-                     }
-                  }
-
-               }
-               layerPathDirs.add(f);
-            }
+            addLayerPathDir(d);
          }
       }
       else {
@@ -5140,68 +5150,73 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                }
             }
             else {
-               layerPathFileName = FileUtil.concat("..", "layers", ".layerPath");
-               layerPathFile = new File(layerPathFileName);
-               if (layerPathFile.canRead()) {
-                  systemInstalled = true;
-                  if (layerPath == null) {
-                     // newLayerDir needs to be absolute
-                     String newDir = getLayersDirFromBinDir();
-                     if (newDir != null) {
-                        newLayerDir = newDir;
-                        layerPath = newLayerDir;
-                        layerPathDirs = new ArrayList<File>();
-                        layerPathDirs.add(new File(layerPath));
-                     }
-                  }
-               }
-               // We may be inside of a layer directory in the layer path.  We'll figure that out later on but for now just
-               // find the .layerPath above us so we do not install incorrectly.
                String currentDir = System.getProperty("user.dir");
                if (currentDir != null) {
-                  File currentFile = new File(currentDir);
-                  String parentName;
-                  File binDir = new File(currentFile, "bin");
-                  if (binDir.isDirectory()) {
-                     File scJarFile = new File(binDir, "sc.jar");
-                     // When running from the StrataCode dist directory, we put the results in 'layers' mostly because
-                     // git needs an empty directory to start from.
-                     if (scJarFile.canRead()) {
-                        layersFilePathPrefix = "layers";
-                     }
-                  }
-                  else {
-                     // Perhaps running from the bin directory
-                     String parentDir = FileUtil.getParentPath(currentDir);
-                     if (parentDir != null) {
-                        binDir = new File(parentDir, "bin");
-                        if (binDir.isDirectory()) {
-                           File scJarFile = new File(binDir, "sc.jar");
-                           if (scJarFile.canRead()) {
-                              layersFilePathPrefix = ".." + FileUtil.FILE_SEPARATOR + "layers";
-                           }
-                        }
-                     }
-                  }
-
-                  do {
-                     parentName = currentFile.getParent();
-                     if (parentName != null) {
-                        layerPathFile = new File(FileUtil.concat(parentName, ".layerPath"));
-                        if (layerPathFile.canRead()) {
-                           systemInstalled = true;
-                           // Need to at least install it in the right place
-                           if (layerPath == null) {
-                              newLayerDir = parentName;
-                              layerPath = parentName;
+                  // If we are in the bin directory, check for the layers up and over one level
+                  if (FileUtil.getFileName(currentDir).equals("bin")) {
+                     layerPathFileName = FileUtil.concat("..", "layers", ".layerPath");
+                     layerPathFile = new File(layerPathFileName);
+                     if (layerPathFile.canRead()) {
+                        systemInstalled = true;
+                        if (layerPath == null) {
+                           // newLayerDir needs to be absolute
+                           String newDir = getLayersDirFromBinDir();
+                           if (newDir != null) {
+                              newLayerDir = newDir;
+                              layerPath = newLayerDir;
                               layerPathDirs = new ArrayList<File>();
                               layerPathDirs.add(new File(layerPath));
                            }
                         }
-                        else
-                           currentFile = new File(parentName);
                      }
-                  } while (parentName != null && !systemInstalled);
+                  }
+                  // We may be inside of a layer directory in the layer path.  We'll figure that out later on but for now just
+                  // find the .layerPath above us so we do not install incorrectly.
+                  else {
+                     File currentFile = new File(currentDir);
+                     String parentName;
+                     File binDir = new File(currentFile, "bin");
+                     if (binDir.isDirectory()) {
+                        File scJarFile = new File(binDir, "sc.jar");
+                        // When running from the StrataCode dist directory, we put the results in 'layers' mostly because
+                        // git needs an empty directory to start from.
+                        if (scJarFile.canRead()) {
+                           layersFilePathPrefix = "layers";
+                        }
+                     }
+                     else {
+                        // Perhaps running from the bin directory
+                        String parentDir = FileUtil.getParentPath(currentDir);
+                        if (parentDir != null) {
+                           binDir = new File(parentDir, "bin");
+                           if (binDir.isDirectory()) {
+                              File scJarFile = new File(binDir, "sc.jar");
+                              if (scJarFile.canRead()) {
+                                 layersFilePathPrefix = ".." + FileUtil.FILE_SEPARATOR + "layers";
+                              }
+                           }
+                        }
+                     }
+
+                     do {
+                        parentName = currentFile.getParent();
+                        if (parentName != null) {
+                           layerPathFile = new File(FileUtil.concat(parentName, ".layerPath"));
+                           if (layerPathFile.canRead()) {
+                              systemInstalled = true;
+                              // Need to at least install it in the right place
+                              if (layerPath == null) {
+                                 newLayerDir = parentName;
+                                 layerPath = parentName;
+                                 layerPathDirs = new ArrayList<File>();
+                                 layerPathDirs.add(new File(layerPath));
+                              }
+                           }
+                           else
+                              currentFile = new File(parentName);
+                        }
+                     } while (parentName != null && !systemInstalled);
+                  }
                }
             }
          }

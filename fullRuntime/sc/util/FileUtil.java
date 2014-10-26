@@ -370,19 +370,19 @@ public class FileUtil {
          }
          int stat = p.waitFor();
          if (inputThread != null && inputThread.errorString != null)
-            System.err.println("*** exec command: " + args.toString() + " - error reading input: " + inputThread.errorString);
+            System.err.println("*** exec command: " + StringUtil.argsToString(args) + " - error reading input: " + inputThread.errorString);
          else if (stat == successResult)
             return sb.toString();
          else
-            System.err.println("*** exec command: " + args.toString() + " - returns status " + stat);
+            System.err.println("*** exec command: " + StringUtil.argsToString(args) + " - returns status " + stat);
       }
       catch (InterruptedException exc) {
          if (args != null)
-            System.err.println("*** exec command: " + args.toString() + " - wait interrupted: " + exc);
+            System.err.println("*** exec command: " + StringUtil.argsToString(args) + " - wait interrupted: " + exc);
       }
       catch (IOException exc) {
          if (args != null)
-            System.err.println("*** command: " + args.toString() + " failed: " + exc);
+            System.err.println("*** command: " + StringUtil.argsToString(args) + " failed: " + exc);
       }
       return null;
    }
