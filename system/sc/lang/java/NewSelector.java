@@ -60,7 +60,7 @@ public class NewSelector extends Selector {
 
    public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
       if (innerCreator != null) {
-         innerCreator.addGeneratedFromNodes(res, srcStatement);
+         innerCreator.addBreakpointNodes(res, srcStatement);
       }
    }
 }

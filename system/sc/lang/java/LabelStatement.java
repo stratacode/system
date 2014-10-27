@@ -29,9 +29,9 @@ public class LabelStatement extends Statement {
       return this;
    }
 
-   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
-      super.addGeneratedFromNodes(res, srcStatement);
+   public void addBreakpointNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      super.addBreakpointNodes(res, srcStatement);
       if (statement != null)
-         statement.addGeneratedFromNodes(res, srcStatement);
+         statement.addBreakpointNodes(res, srcStatement);
    }
 }

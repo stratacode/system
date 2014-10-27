@@ -219,6 +219,10 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       return userData;
    }
 
+   /**
+    * If this statement, as part of the transformed model was generated from this provided source statement.
+    * Override this statement to control which generated statements are produced from a given stc statement.
+    */
    public boolean getNodeContainsPart(ISrcStatement partNode) {
       return partNode == this || sameSrcLocation(partNode);
    }
@@ -242,7 +246,7 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       return null;
    }
 
-   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement st) {
+   public void addBreakpointNodes(List<ISrcStatement> res, ISrcStatement st) {
       ISrcStatement fromSt = findFromStatement(st);
       if (fromSt != null)
          res.add(fromSt);

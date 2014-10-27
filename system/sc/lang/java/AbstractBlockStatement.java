@@ -309,8 +309,8 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
       return statements;
    }
 
-   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement st) {
-      super.addGeneratedFromNodes(res, st);
+   public void addBreakpointNodes(List<ISrcStatement> res, ISrcStatement st) {
+      super.addBreakpointNodes(res, st);
       addBlockGeneratedFromNodes(this, res, st);
    }
 
@@ -320,7 +320,7 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
       List<Statement> sts = bst.getBlockStatements();
       if (sts != null) {
          for (Statement st:sts) {
-            st.addGeneratedFromNodes(res, toFind);
+            st.addBreakpointNodes(res, toFind);
          }
       }
       return null;

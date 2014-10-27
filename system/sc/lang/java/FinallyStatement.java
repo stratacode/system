@@ -65,8 +65,8 @@ public class FinallyStatement extends NonIndentedStatement implements IBlockStat
       return statements;
    }
 
-   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement st) {
-      super.addGeneratedFromNodes(res, st);
+   public void addBreakpointNodes(List<ISrcStatement> res, ISrcStatement st) {
+      super.addBreakpointNodes(res, st);
       AbstractBlockStatement.addBlockGeneratedFromNodes(this, res, st);
    }
 

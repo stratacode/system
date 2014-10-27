@@ -187,14 +187,14 @@ public class SwitchStatement extends Statement implements IBlockStatement {
       return newSt;
    }
 
-   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
-      super.addGeneratedFromNodes(res, srcStatement);
+   public void addBreakpointNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      super.addBreakpointNodes(res, srcStatement);
       if (expression != null)
-         expression.addGeneratedFromNodes(res, srcStatement);
+         expression.addBreakpointNodes(res, srcStatement);
       if (statements != null) {
          for (Statement statement:statements) {
             if (statement != null)
-               statement.addGeneratedFromNodes(res, srcStatement);
+               statement.addBreakpointNodes(res, srcStatement);
          }
       }
    }

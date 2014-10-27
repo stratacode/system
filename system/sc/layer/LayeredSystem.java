@@ -598,6 +598,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
+   public TypeDeclaration getActivatedType(IRuntimeProcessor proc, String layerName, String typeName) {
+      Layer resLayer = getLayerByDirName(layerName);
+      TypeDeclaration resTD = null;
+      if (resLayer != null) {
+         resTD = resLayer.layeredSystem.getSrcTypeDeclaration(typeName, resLayer.getNextLayer(), true);
+      }
+      return resTD;
+   }
+
 
    public enum BuildCommandTypes {
       Pre, Post, Run, Test
@@ -7979,14 +7988,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public ILanguageModel getActiveModel(SrcEntry srcEnt, IRuntimeProcessor proc) {
       ILanguageModel m;
       String fn = srcEnt.absFileName;
-      if (proc == runtimeProcessor) {
+      if (DefaultRuntimeProcessor.compareRuntimes(proc, runtimeProcessor)) {
          m = modelIndex.get(fn);
          if (m != null)
             return m;
       }
       if (!peerMode && peerSystems != null) {
          for (LayeredSystem peerSys:peerSystems) {
-            if (peerSys.runtimeProcessor == proc) {
+            if (DefaultRuntimeProcessor.compareRuntimes(peerSys.runtimeProcessor, proc)) {
                m = peerSys.modelIndex.get(fn);
                if (m != null)
                   return m;

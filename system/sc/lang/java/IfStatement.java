@@ -84,13 +84,13 @@ public class IfStatement extends NonIndentedStatement {
       return false;
    }
 
-   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement toFind) {
-      super.addGeneratedFromNodes(res, toFind);
+   public void addBreakpointNodes(List<ISrcStatement> res, ISrcStatement toFind) {
+      super.addBreakpointNodes(res, toFind);
       if (trueStatement != null) {
-         trueStatement.addGeneratedFromNodes(res, toFind);
+         trueStatement.addBreakpointNodes(res, toFind);
       }
       if (falseStatement != null) {
-         falseStatement.addGeneratedFromNodes(res, toFind);
+         falseStatement.addBreakpointNodes(res, toFind);
       }
    }
 

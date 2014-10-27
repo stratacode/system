@@ -624,10 +624,10 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       return null;
    }
 
-   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement toFind) {
-      super.addGeneratedFromNodes(res, toFind);
+   public void addBreakpointNodes(List<ISrcStatement> res, ISrcStatement toFind) {
+      super.addBreakpointNodes(res, toFind);
       if (body != null)
-         body.addGeneratedFromNodes(res, toFind);
+         body.addBreakpointNodes(res, toFind);
    }
 
    public boolean updateFromStatementRef(Statement fromSt, ISrcStatement defaultSt) {

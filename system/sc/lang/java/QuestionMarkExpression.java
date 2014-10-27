@@ -189,13 +189,13 @@ public class QuestionMarkExpression extends Expression {
       return super.applyPartialValue(value);
    }
 
-   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
-      super.addGeneratedFromNodes(res, srcStatement);
+   public void addBreakpointNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      super.addBreakpointNodes(res, srcStatement);
       if (condition != null)
-         condition.addGeneratedFromNodes(res, srcStatement);
+         condition.addBreakpointNodes(res, srcStatement);
       if (trueChoice != null)
-         trueChoice.addGeneratedFromNodes(res, srcStatement);
+         trueChoice.addBreakpointNodes(res, srcStatement);
       if (falseChoice != null)
-         falseChoice.addGeneratedFromNodes(res, srcStatement);
+         falseChoice.addBreakpointNodes(res, srcStatement);
    }
 }

@@ -958,6 +958,17 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       return null;
    }
 
+   public void addBreakpointNodes(List<ISrcStatement> res, ISrcStatement st) {
+      /* TODO: What we really want to do here is to stop when the binding fires.  If we set the assigned property, we'll stop too often when a class-hierarchy is involved if we just propagate to the property.
+       * one way we could do this is to genenerate some code for each binding for debugging purposes, then call this code reflectively.   A better way would be to support dynamic code breakpoints... this will require
+       * hooking into the runtime at a lower level... and building the RPC interface to dynamic code so we can communicate with the remote process.
+      if (assignedProperty instanceof Statement) {
+         ((Statement) assignedProperty).addBreakpointNodes(res, st);
+      }
+      */
+      super.addBreakpointNodes(res, st);
+   }
+
    public ISrcStatement getSrcStatement(Language lang) {
       // We will propagate this request as long as this node is not in the target language
       if (fromAttribute != null && (parseNode == null || parseNode.getParselet().getLanguage() != lang))

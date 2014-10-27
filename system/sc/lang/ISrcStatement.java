@@ -25,9 +25,10 @@ public interface ISrcStatement extends ISemanticNode {
 
    /**
     * Adds all of the generated statements to the resulting list, for the case where more than one fromStatement points
-    * to the same src statement.
+    * to the same src statement.  These are used to determine which statements in the generated code should cause a 'break'
+    * when the developer sets a breakpoint on this statement.
     */
-   void addGeneratedFromNodes (List<ISrcStatement> result, ISrcStatement st);
+   void addBreakpointNodes(List<ISrcStatement> result, ISrcStatement st);
 
    /** Returns the value of the 'fromStatement' field stored on this node to represent a link from a generated node from
     * an original source one. */

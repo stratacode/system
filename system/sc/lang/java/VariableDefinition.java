@@ -734,7 +734,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       return false;
    }
 
-   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement st) {
+   public void addBreakpointNodes(List<ISrcStatement> res, ISrcStatement st) {
       ISrcStatement fromSt = findFromStatement(st);
       if (fromSt != null)
          res.add(fromSt);

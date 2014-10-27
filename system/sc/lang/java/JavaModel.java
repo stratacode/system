@@ -1165,11 +1165,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       }
    }
 
-   /** */
-   public List<ISrcStatement> findGeneratedFromNodes(ISrcStatement srcStatement) {
+   /** Returns the list of statements generated from this statement that are used when setting breakpoints on this statement. */
+   public List<ISrcStatement> getBreakpointStatements(ISrcStatement srcStatement) {
       ArrayList<ISrcStatement> res = new ArrayList<ISrcStatement>();
       TypeDeclaration modelType = getUnresolvedModelTypeDeclaration();
-      modelType.addGeneratedFromNodes(res, srcStatement);
+      modelType.addBreakpointNodes(res, srcStatement);
       if (res.size() == 0)
          return null;
       return res;

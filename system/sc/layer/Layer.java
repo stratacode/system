@@ -5,10 +5,7 @@
 package sc.layer;
 
 import sc.classfile.CFClass;
-import sc.lang.IAnnotationProcessor;
-import sc.lang.IDefinitionProcessor;
-import sc.lang.ILanguageModel;
-import sc.lang.SemanticNodeList;
+import sc.lang.*;
 import sc.lang.sc.IScopeProcessor;
 import sc.lang.sc.SCModel;
 import sc.lang.sc.PropertyAssignment;
@@ -648,6 +645,24 @@ public class Layer implements ILifecycle, LayerConstants {
    public void updateTypeIndex(TypeIndex typeIndex) {
       layerTypeIndex.layerTypeIndex.put(typeIndex.typeName, typeIndex);
       layerTypeIndex.fileIndex.put(typeIndex.fileName, typeIndex);
+   }
+
+   // TODO: Note - there could potentially be multiple returns here - say 'desktop' and 'server' but I'm not sure we'll ever need two different 'java' runtimes activated at the same time
+   public TypeDeclaration getActivatedType(IRuntimeProcessor proc, String typeName) {
+      String layerName = getLayerName();
+      TypeDeclaration resType;
+      if (DefaultRuntimeProcessor.compareRuntimes(layeredSystem.runtimeProcessor, proc)) {
+         resType = layeredSystem.getActivatedType(proc, layerName, typeName);
+         if (resType != null)
+            return resType;
+      }
+
+      for (LayeredSystem peerSys : layeredSystem.peerSystems) {
+         resType = peerSys.getActivatedType(proc, layerName, typeName);
+         if (resType != null)
+            return resType;
+      }
+      return null;
    }
 
    public enum LayerEnabledState {

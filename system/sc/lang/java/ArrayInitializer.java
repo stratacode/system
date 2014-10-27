@@ -276,12 +276,12 @@ public class ArrayInitializer extends Expression {
       return sb.toString();
    }
 
-   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
-      super.addGeneratedFromNodes(res, srcStatement);
+   public void addBreakpointNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      super.addBreakpointNodes(res, srcStatement);
       if (initializers != null) {
          for (Expression expr:initializers) {
             if (expr != null)
-               expr.addGeneratedFromNodes(res, srcStatement);
+               expr.addBreakpointNodes(res, srcStatement);
          }
       }
    }

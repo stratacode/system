@@ -92,6 +92,6 @@ public class ArraySelector extends Selector {
 
    public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
       if (expression != null)
-         expression.addGeneratedFromNodes(res, srcStatement);
+         expression.addBreakpointNodes(res, srcStatement);
    }
 }

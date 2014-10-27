@@ -908,11 +908,11 @@ public class NewExpression extends IdentifierExpression {
       return relPos;
    }
 
-   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
-      super.addGeneratedFromNodes(res, srcStatement);
+   public void addBreakpointNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      super.addBreakpointNodes(res, srcStatement);
       if (classBody != null) {
          for (Statement st:classBody) {
-            st.addGeneratedFromNodes(res, srcStatement);
+            st.addBreakpointNodes(res, srcStatement);
          }
       }
    }

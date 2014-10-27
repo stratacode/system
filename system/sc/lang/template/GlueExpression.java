@@ -186,12 +186,12 @@ public class GlueExpression extends Expression {
       return sb.toString();
    }
 
-   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
-      super.addGeneratedFromNodes(res, srcStatement);
+   public void addBreakpointNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      super.addBreakpointNodes(res, srcStatement);
       if (expressions != null) {
          for (Object expr:expressions) {
             if (expr instanceof Expression)
-               ((Expression) expr).addGeneratedFromNodes(res, srcStatement);
+               ((Expression) expr).addBreakpointNodes(res, srcStatement);
          }
       }
    }

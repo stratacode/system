@@ -4668,11 +4668,11 @@ public class IdentifierExpression extends ArgumentsExpression {
    }
 
    // An argument of the expression might be a NewExpression with a class body so we need to look for more than just one match against the identifier expression
-   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
-      super.addGeneratedFromNodes(res, srcStatement);
+   public void addBreakpointNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      super.addBreakpointNodes(res, srcStatement);
       if (arguments != null) {
          for (Expression arg:arguments) {
-            arg.addGeneratedFromNodes(res, srcStatement);
+            arg.addBreakpointNodes(res, srcStatement);
          }
       }
    }

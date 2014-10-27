@@ -74,10 +74,10 @@ public abstract class ChainedExpression extends Expression {
       return this;
    }
 
-   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
-      super.addGeneratedFromNodes(res, srcStatement);
+   public void addBreakpointNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      super.addBreakpointNodes(res, srcStatement);
       if (expression != null) {
-         expression.addGeneratedFromNodes(res, srcStatement);
+         expression.addBreakpointNodes(res, srcStatement);
       }
    }
 }

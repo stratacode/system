@@ -54,7 +54,7 @@ public class SysTypeIndex {
          }
 
          if (layerIx == indexEntries.size()) {
-            System.out.println("*** Warning - unable to find layer: " + typeLayer.getLayerName() + " in index");
+            // Since we search each layered system for each type, we may just not find this type in this layered system so add no entries from it.
             return;
          }
 

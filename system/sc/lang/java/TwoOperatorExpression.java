@@ -85,12 +85,12 @@ public abstract class TwoOperatorExpression extends Expression {
       return deepEquals(other);
    }
 
-   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
-      super.addGeneratedFromNodes(res, srcStatement);
+   public void addBreakpointNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      super.addBreakpointNodes(res, srcStatement);
       if (lhs != null) {
-         lhs.addGeneratedFromNodes(res, srcStatement);
+         lhs.addBreakpointNodes(res, srcStatement);
       }
       if (rhs != null)
-         rhs.addGeneratedFromNodes(res, srcStatement);
+         rhs.addBreakpointNodes(res, srcStatement);
    }
 }

@@ -98,7 +98,7 @@ public abstract class Node extends JavaSemanticNode implements IDynObject, ISrcS
       return null;
    }
 
-   public void addGeneratedFromNodes(List<ISrcStatement> result, ISrcStatement st) {
+   public void addBreakpointNodes(List<ISrcStatement> result, ISrcStatement st) {
       // TODO: generating elements
    }
 

@@ -134,7 +134,7 @@ public class VariableSelector extends Selector {
       if (arguments != null) {
          for (Expression expr:arguments) {
             if (expr != null) {
-               expr.addGeneratedFromNodes(res, srcStatement);
+               expr.addBreakpointNodes(res, srcStatement);
             }
          }
       }

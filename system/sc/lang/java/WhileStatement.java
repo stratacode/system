@@ -81,10 +81,10 @@ public class WhileStatement extends ExpressionStatement {
       return this;
    }
 
-   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement toFind) {
-      super.addGeneratedFromNodes(res, toFind);
+   public void addBreakpointNodes(List<ISrcStatement> res, ISrcStatement toFind) {
+      super.addBreakpointNodes(res, toFind);
       if (statement != null)
-         statement.addGeneratedFromNodes(res, toFind);
+         statement.addBreakpointNodes(res, toFind);
    }
 
    public boolean updateFromStatementRef(Statement fromSt, ISrcStatement defaultSt) {

@@ -936,10 +936,10 @@ public class SelectorExpression extends ChainedExpression {
       return null;
    }
 
-   public void addGeneratedFromNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
-      super.addGeneratedFromNodes(res, srcStatement);
+   public void addBreakpointNodes(List<ISrcStatement> res, ISrcStatement srcStatement) {
+      super.addBreakpointNodes(res, srcStatement);
       if (expression != null) {
-         expression.addGeneratedFromNodes(res, srcStatement);
+         expression.addBreakpointNodes(res, srcStatement);
       }
       // The breakpoint may be set on some expression that has been embedded into one of our arguments.  If so, we are the closest statement to the breakpoint
       if (selectors != null) {

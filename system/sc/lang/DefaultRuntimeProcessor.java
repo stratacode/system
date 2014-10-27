@@ -150,4 +150,21 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor {
    public boolean usesThisClasspath() {
       return true;
    }
+
+   public boolean equals(String runtimeName) {
+      if (runtimeName == null)
+         return getRuntimeName().equals(DEFAULT_RUNTIME_NAME);
+      return getRuntimeName().equals(runtimeName);
+   }
+
+   public int hashCode() {
+      // since null and 'java' are equivalent
+      if (getRuntimeName().equals(DEFAULT_RUNTIME_NAME))
+         return 0;
+      return getRuntimeName().hashCode();
+   }
+
+   public static boolean compareRuntimes(IRuntimeProcessor proc1, IRuntimeProcessor proc2) {
+      return proc1 == proc2 || (proc1 != null && proc1.equals(proc2)) || (proc2 != null && proc2.equals(proc1));
+   }
 }

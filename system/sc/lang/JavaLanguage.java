@@ -17,7 +17,7 @@ import java.util.Set;
 /** This is the main implementation class for the Java parser and grammar.  Like all languages 
  * built with the parselets framework, it exposes fields for each Parselet.  Some of these are
  * marked "public" so that you can parse and manipulate individual language elements like a
- * statement or an initialzier 
+* statement or an initializer
  */
 public class JavaLanguage extends BaseLanguage implements IParserConstants {
    protected static final String[] JAVA_KEYWORDS = {
