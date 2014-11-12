@@ -80,6 +80,7 @@ public class ClassType extends JavaType {
       ClassType ct = new ClassType();
       ct.typeName = name;
       ct.chained = true;
+
       SemanticNodeList<ClassType> newTypes = root.chainedTypes;
       if (newTypes == null) {
          newTypes = new SemanticNodeList<ClassType>(4);
@@ -351,6 +352,10 @@ public class ClassType extends JavaType {
          return;
       }
 
+      if (typeArguments != null && chainedTypes != null) {
+         chainedTypes.get(chainedTypes.size()-1).typeArguments = typeArguments;
+      }
+
       type = node.findType(fullTypeName);
 
       if (type == null) { // not a relative name
@@ -405,6 +410,11 @@ public class ClassType extends JavaType {
       return true;
    }
 
+   /**
+    * This property gets set when we parse the method signature string.
+    * It's a different way of producing a ClassType...
+    * need to manually patch up the chainedTypes and typeArguments so they are structured like the normal
+    class type. */
    public void setCompiledTypeName(String compiledTypeName) {
       this.compiledTypeName = compiledTypeName;
       setFullTypeName(compiledTypeName.replace('$','.').replace('/','.'));
@@ -435,6 +445,7 @@ public class ClassType extends JavaType {
          ClassType ct = new ClassType();
          ct.typeName = rest;
          ct.chained = true;
+         ct.typeArguments = typeArguments;
          newChainedTypes.add(ct);
 
          setProperty("chainedTypes", newChainedTypes);

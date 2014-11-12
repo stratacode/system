@@ -1596,7 +1596,7 @@ public class ModelUtil {
 
    public static Object definesConstructor(Object td, List<?> parameters, ITypeParamContext ctx, Object refType, boolean isTransformed) {
       Object res;
-      if (td instanceof ITypeDeclaration) {
+      if (td instanceof ITypeDeclaration && !(td instanceof CFClass)) {
          if ((res = ((ITypeDeclaration)td).definesConstructor(parameters, ctx, isTransformed)) != null)
             return res;
       }
@@ -1612,7 +1612,7 @@ public class ModelUtil {
             return res;
       }
       */
-      else if (td instanceof Class) {
+      else if (td instanceof Class || td instanceof CFClass) {
          int paramsLen = parameters == null ? 0 : parameters.size();
          Object[] list = getConstructors(td, null);
          res = null;
@@ -5365,6 +5365,12 @@ public class ModelUtil {
       if (boundType instanceof IBeanMapper) {
          IBeanMapper mapper = (IBeanMapper) boundType;
          return getRuntimeEnum(mapper.getField());
+      }
+      if (boundType instanceof CFField) {
+         CFField cfield = (CFField) boundType;
+         if (cfield.isEnumConstant()) {
+            return getRuntimeEnum(((CFField) boundType).getRuntimeField());
+         }
       }
       throw new UnsupportedOperationException();
    }

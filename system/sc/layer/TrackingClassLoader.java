@@ -93,7 +93,8 @@ public class TrackingClassLoader extends URLClassLoader {
          try {
            c = super.loadClass(name, resolve);
          }
-         // If we define a class which overrides a system class we'll get this error
+         // If we define a class which overrides a system class we'll get this error.  We are unfortunately out of luck at this point
+         // and instead need to limit what can be done or use the externalClassPath for loading JAR files using the CFClass mechanism.
          catch (SecurityException exc) {
             System.err.println("*** Attempt to override system class: " + name + ": " + exc);
             c = null;

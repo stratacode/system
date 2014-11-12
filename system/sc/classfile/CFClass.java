@@ -217,6 +217,8 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          CFClassSignature sig = signature;
          sig.parentNode = this;
          extendsType = sig.extendsType != null ? sig.extendsType.getTypeDeclaration() : null;
+         if (extendsType instanceof ParamTypeDeclaration)
+            extendsType = ((ParamTypeDeclaration) extendsType).getBaseType();
          if (sig.implementsTypes != null) {
             implementsTypes = new ArrayList<Object>(sig.implementsTypes.size());
             for (int i = 0; i < sig.implementsTypes.size(); i++) {
@@ -428,28 +430,13 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
    }
 
    public Object definesConstructor(List<?> parametersOrExpressions, ITypeParamContext ctx, boolean isTransformed) {
+      if (!started)
+         start();
       Object[] meths = methodsByName.get("<init>");  //To change body of implemented methods use File | Settings | File Templates.
       if (meths == null)
          return null;
-      int numRequested = parametersOrExpressions == null ? 0 : parametersOrExpressions.size();
 
-      // TODO: this is not doing var-args... probably should split out code in ModelUtil?  Right now though
-      // we don't need flexible lookups for constructors.
-      for (int i = 0; i < meths.length; i++) {
-         Object meth = meths[i];
-         Object[] paramTypes = ModelUtil.getParameterTypes(meth);
-         int numParams = paramTypes == null ? 0 : paramTypes.length;
-         if (numParams == numRequested) {
-            int j;
-            for (j = 0; j < numParams; j++) {
-               if (!ModelUtil.isAssignableFrom(paramTypes[j], parametersOrExpressions.get(j)))
-                  break;
-            }
-            if (j == numParams)
-               return meth;
-         }
-      }
-      return null;
+      return ModelUtil.definesConstructor(this, Arrays.asList(ModelUtil.parametersToTypeArray(parametersOrExpressions, ctx)), ctx, this, isTransformed);
    }
 
    public Object definesMember(String name, EnumSet<JavaSemanticNode.MemberType> mtype, Object refType, TypeContext ctx) {
@@ -930,8 +917,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
    }
 
    public List<JavaType> getCompiledTypeArgs(List<JavaType> typeArgs) {
-      System.err.println("*** Not converting type args for CFClass case");
-      return null;
+      return typeArgs;
    }
 
    public boolean needsOwnClass(boolean checkComponents) {

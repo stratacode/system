@@ -108,6 +108,9 @@ public class Layer implements ILifecycle, LayerConstants {
    /** Any set of dependent classes code in this layer requires */
    public String classPath;
 
+   /** Any set of dependent classes code in this layer requires which cannot be loaded into the normal ClassLoader */
+   public String externalClassPath;
+
    /** Optional: if not set, the layer's top level folder is used as the one src directory. */
    public String srcPath;
 
@@ -304,8 +307,12 @@ public class Layer implements ILifecycle, LayerConstants {
 
    List<String> classDirs;
 
+   List<String> externalClassDirs;
+
    // Parallel to classDirs - caches zips/jars
    private ZipFile[] zipFiles;
+
+   private ZipFile[] externalZipFiles;
 
    /** Set to true if a base layer or start method failed to start */
    public boolean initFailed = false;
@@ -1275,6 +1282,25 @@ public class Layer implements ILifecycle, LayerConstants {
             }
          }
       }
+      if (externalClassPath != null) {
+         externalClassDirs = Arrays.asList(externalClassPath.split(FileUtil.PATH_SEPARATOR));
+         externalZipFiles = new ZipFile[externalClassDirs.size()];
+         for (int i = 0; i < externalClassDirs.size(); i++) {
+            String classDir = externalClassDirs.get(i);
+            // Make classpath entries relative to the layer directory for easy encapsulation
+            classDir = FileUtil.getRelativeFile(layerPathName, classDir);
+            externalClassDirs.set(i, classDir); // Store the translated path
+            String ext = FileUtil.getExtension(classDir);
+            if (ext != null && (ext.equals("jar") || ext.equals("zip"))) {
+               try {
+                  externalZipFiles[i] = new ZipFile(classDir);
+               }
+               catch (IOException exc) {
+                  System.err.println("*** Can't open layer: " + layerPathName + "'s classPath entry as a zip file: " + classDir);
+               }
+            }
+         }
+      }
       if (srcPath == null) {
          topLevelSrcDirs = Collections.singletonList(LayerUtil.getLayerSrcDirectory(layerPathName));
       }
@@ -1310,6 +1336,10 @@ public class Layer implements ILifecycle, LayerConstants {
       if (classDirs != null) {
          for (int j = 0; j < classDirs.size(); j++)
             layeredSystem.addPathToIndex(this, classDirs.get(j));
+      }
+      if (externalClassDirs != null) {
+         for (int j = 0; j < externalClassDirs.size(); j++)
+            layeredSystem.addPathToIndex(this, externalClassDirs.get(j));
       }
 
       // When the layer is activated, we load types in the proper order but when it's not activated, we lazily populate
@@ -1739,8 +1769,10 @@ public class Layer implements ILifecycle, LayerConstants {
                Object typeObj = layeredSystem.getSrcTypeDeclaration(typeName, getNextLayer(), true);
                // Forcing it to always check for inner types here since we may be directly importing an inner type.
                // There's an optimization to avoid the getClass call for inner types in the general case.
+               //
+               // Not using layerResolve here since this type is resolved for runtime, not for layer init time.
                if (typeObj == null)
-                  typeObj = layeredSystem.getClassWithPathName(typeName, this, true, true);
+                  typeObj = layeredSystem.getClassWithPathName(typeName, this, false, true);
                if (imp.hasWildcard()) {
                   boolean addedAny = false;
                   if (typeObj != null) {
@@ -1781,7 +1813,7 @@ public class Layer implements ILifecycle, LayerConstants {
                   Object property = ModelUtil.definesMember(typeObj, memberName, JavaSemanticNode.MemberType.PropertyGetSet, null, null);
                   if (property == null)
                      property = ModelUtil.definesMember(typeObj, memberName, JavaSemanticNode.MemberType.PropertySetSet, null, null);
-                  if (ModelUtil.hasModifier(property, "static")) {
+                  if (property != null && ModelUtil.hasModifier(property, "static")) {
                      addStaticImportType(memberName, typeObj);
                      added = true;
                   }
@@ -2117,19 +2149,28 @@ public class Layer implements ILifecycle, LayerConstants {
     * If it is a zip file, we can just return the zip file.  We first look in the build directory.
     */
    public File findClassFile(String classFileName, boolean includePrevious) {
-      File result;
+      File res = findClassFile(classFileName, includePrevious, false);
+      if (res == null)
+         res = findClassFile(classFileName, includePrevious, true);
+      return res;
+   }
 
-      if (buildDir != null && compiled) {
+   public File findClassFile(String classFileName, boolean includePrevious, boolean external) {
+      File result;
+      if (buildDir != null && compiled && !external) {
          result = new File(buildDir, classFileName);
          if (result.canRead())
             return result;
       }
 
-      if (classDirs != null) {
-         for (int i = 0; i < classDirs.size(); i++) {
-            String classDir = classDirs.get(i);
-            if (zipFiles[i] != null) {
-               if (zipFiles[i].getEntry(classFileName) != null)
+      List<String> cdirs = external ? externalClassDirs : classDirs;
+      ZipFile[] zfiles = external ? externalZipFiles : zipFiles;
+
+      if (cdirs != null) {
+         for (int i = 0; i < cdirs.size(); i++) {
+            String classDir = cdirs.get(i);
+            if (zfiles[i] != null) {
+               if (zfiles[i].getEntry(classFileName) != null)
                   return new File(classDir);
             }
             else {
@@ -2142,29 +2183,45 @@ public class Layer implements ILifecycle, LayerConstants {
       if (includePrevious) {
          Layer prevLayer = getPreviousLayer();
          if (prevLayer != null)
-            return prevLayer.findClassFile(classFileName, true);
+            return prevLayer.findClassFile(classFileName, true, external);
       }
       return null;
    }
 
    public Object getClass(String classFileName, String className) {
-      if (!layeredSystem.options.crossCompile) {
+      Object res = getClass(classFileName, className, false);
+      if (res == null)
+         res = getClass(classFileName, className, true);
+      return res;
+   }
+
+   public Object getClass(String classFileName, String className, boolean external) {
+      if (!external && !layeredSystem.options.crossCompile) {
          return RTypeUtil.loadClass(layeredSystem.getSysClassLoader(), className, false);
       }
       else
-         return getCFClass(classFileName);
+         return getCFClass(classFileName, external);
    }
 
    public Object getCFClass(String classFileName) {
-      if (classDirs == null)
+      Object res = getCFClass(classFileName, false);
+      if (res == null)
+         res = getCFClass(classFileName, true);
+      return res;
+   }
+
+   public Object getCFClass(String classFileName, boolean external) {
+      List<String> cdirs = external ? externalClassDirs : classDirs;
+      ZipFile[] zfiles = external ? externalZipFiles : zipFiles;
+      if (cdirs == null)
          return null;
-      for (int i = 0; i < classDirs.size(); i++) {
+      for (int i = 0; i < cdirs.size(); i++) {
          CFClass cl;
-         if (zipFiles[i] != null) {
-            cl = CFClass.load(zipFiles[i], classFileName, this);
+         if (zfiles[i] != null) {
+            cl = CFClass.load(zfiles[i], classFileName, this);
          }
          else
-            cl = CFClass.load(FileUtil.concat(classDirs.get(i), classFileName), this);
+            cl = CFClass.load(FileUtil.concat(cdirs.get(i), classFileName), this);
          if (cl != null)
             return cl;
       }
@@ -2425,8 +2482,8 @@ public class Layer implements ILifecycle, LayerConstants {
             }
          }
          else if (Language.isParseable(path) || (proc = layeredSystem.getFileProcessorForFileName(path, this, BuildPhase.Process)) != null) {
-            SrcEntry srcEnt = new SrcEntry(this, relDir == null ? layerPathName : FileUtil.concat(layerPathName, relDir), relDir == null ? "" : relDir, subF.getName(), proc == null || proc.getPrependLayerPackage());
-            ILanguageModel oldModel = layeredSystem.getLanguageModel(srcEnt, false, changedModels);
+            SrcEntry srcEnt = new SrcEntry(this, srcDir, relDir == null ? "" : relDir, subF.getName(), proc == null || proc.getPrependLayerPackage());
+            ILanguageModel oldModel = layeredSystem.getLanguageModel(srcEnt, false, null);
             long newLastModTime = new File(srcEnt.absFileName).lastModified();
             if (oldModel == null) {
                // The processedFileIndex only holds entries we processed.  If this file did not change from when we did the build, we just have to
@@ -3102,7 +3159,9 @@ public class Layer implements ILifecycle, LayerConstants {
       }
       else if (!srcOnly && packageMatches) {
          relFilePath = subPath + ".class";
-         res = findClassFile(relFilePath, false);
+         res = findClassFile(relFilePath, false, false);
+         if (res == null)
+            res = findClassFile(relFilePath, false, true);
          if (res != null)
             return new SrcEntry(this, res.getPath(), relFilePath);
       }

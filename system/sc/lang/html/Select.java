@@ -86,9 +86,13 @@ public class Select<RE> extends HTMLElement<RE> {
 
       outputStartTag(sb);
       int ix = 0;
+      int selIndex = getSelectedIndex();
       for (Object val: optionDataSource) {
          if (defChildren == null) {
-            sb.append("<option>");
+            sb.append("<option");
+            if (ix == selIndex)
+               sb.append(" selected");
+            sb.append(">");
             sb.append(val.toString());
             sb.append("</option>");
          }

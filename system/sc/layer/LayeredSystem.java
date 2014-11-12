@@ -256,7 +256,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    private Set<String> changedDirectoryIndex = new HashSet<String>();
    private List<File> layerPathDirs;
-   private Map<String,Object> otherClassCache; // Only used for CFClass
+   private Map<String,Object> otherClassCache; // Only used for CFClass - when crossCompile is true
    private Map<String,Class> compiledClassCache = new HashMap<String,Class>(); // Class
    {
       initClassCache();
@@ -1551,7 +1551,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       boolean buildSubDir;
    }
 
-   // TODO: make this configurable more easily from the debugger somehow.  You can set that system property but for intelliJ that means setting every run configuration separately
+   // TODO: make this configurable more easily from the debugger by reading it from a file similar to how we can bootstrap layerpath.
+   // For now, add -Dsc.core.path="/jjv/vbuild/bin/scrt.jar" as the VM paramrs for any android run configurations we want to run
+   // from the debugger.
    public final static String scRuntimePath = "/jjv/sc/sc/coreRuntime";
 
    public String getStrataCodeRuntimePath(boolean core, boolean src) {
@@ -1598,6 +1600,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** Locates the StrataCode runtime in the system paths so that we can use this to ensure generated scripts pick up the sc libraries */
    public RuntimeRootInfo getRuntimeRootInfo() {
       RuntimeRootInfo rootInfo = new RuntimeRootInfo();
+      String propName = "sc.core.path";
+      String path;
+      if ((path = System.getProperty(propName)) != null) {
+         rootInfo.zipFileName = path;
+         return rootInfo;
+      }
       boolean warned = false;
       for (int i = 0; i < runtimePackages.length; i++) {
          String pkg = runtimePackages[i];
@@ -3214,7 +3222,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             buildInfo.runMatchingScripts(options.runClass, options.runClassArgs, lowestLayer);
       }
       else {
-         Object rc = lowestLayer == 0 ? getClass(options.runClass) : null;
+         Object rc = lowestLayer == 0 ? getClass(options.runClass, true) : null;
          if (rc instanceof CFClass)
             rc = ((CFClass)rc).getCompiledClass();
 
@@ -5032,7 +5040,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       sb.append(useBuildDir); // Our build dir overrides all other directories
       for (int i = startLayer.layerPosition; i >= 0; i--) {
          Layer layer = layers.get(i);
-         if (layer.classPath != null) {
+         if (layer.classPath != null && !layer.disabled && !layer.excluded) {
             for (int j = 0; j < layer.classDirs.size(); j++) {
                String dir = layer.classDirs.get(j);
                addQuotedPath(sb, dir);
@@ -7013,6 +7021,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         ParseUtil.validateComponent(depModel);
                         ParseUtil.processComponent(depModel);
                         List<String> prevTypeGroupMembers = depModel.getPrevTypeGroupMembers(genLayer, dep.typeGroupName);
+                        if (genLayer.buildInfo == null) {
+                           System.out.println("*** Error - layer: " + genLayer + " not initialized to build");
+                        }
                         List<TypeGroupMember> newTypeGroupMembers = genLayer.buildInfo.getTypeGroupMembers(dep.typeGroupName);
                         boolean typeGroupChanged = false;
                         if (prevTypeGroupMembers != null || newTypeGroupMembers != null) {
@@ -8023,7 +8034,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return m;
       m = inactiveModelIndex.get(fn);
       if (m != null && m.getUserData() != null) {
-         if (!externalModelIndex.isValidModel(m)) {
+         if (externalModelIndex == null || !externalModelIndex.isValidModel(m)) {
             System.out.println("*** Found invalid model in the cache");
          }
          else
@@ -9895,7 +9906,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Object getClassWithPathName(String pathName, Layer refLayer, boolean layerResolve, boolean alwaysCheckInnerTypes) {
-      Object c = getClass(pathName);
+      Object c = getClass(pathName, layerResolve);
       if (c != null)
          return c;
 
@@ -9908,7 +9919,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          String nextRoot = rootTypeName.substring(0, lix);
          String tail = pathName.substring(lix+1);
          if (alwaysCheckInnerTypes || systemCompiled || !toBeCompiled(nextRoot, refLayer, layerResolve)) {
-            Object rootClass = getClass(nextRoot);
+            Object rootClass = getClass(nextRoot, layerResolve);
             if (rootClass != null && (c = ModelUtil.getInnerType(rootClass, tail, null)) != null)
                return c;
          }
@@ -9990,7 +10001,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * It will use either of two mechanisms to get the class definition - read it using the ClassLoader or
     * it will find the file and parse the .class file into a lightweight data structure.
     */
-   public Object getClass(String className) {
+   public Object getClass(String className, boolean forceClass) {
       Class res;
 
       res = compiledClassCache.get(className);
@@ -10007,7 +10018,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             return resObj;
       }
 
-      if (!options.crossCompile) {
+      if (!options.crossCompile || forceClass) {
          // Check the system class loader first
          res = RTypeUtil.loadClass(getSysClassLoader(), className, false);
          if (res != null) {
@@ -10017,8 +10028,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       String classFileName = className.replace(".", FileUtil.FILE_SEPARATOR) + ".class";
-      if (options.crossCompile) {
-         return getClassFromClassFileName(classFileName, className);
+      if (!forceClass) {
+         Object resObj = getClassFromClassFileName(classFileName, className);
+         if (resObj != null)
+            return resObj;
       }
       /*
       for (int i = layers.size()-1; i >= 0; i--) {
@@ -10091,6 +10104,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                res = NullClassSentinel.class;
             if (className == null)
                className = FileUtil.removeExtension(classFileName.replace('$','.'));
+            if (otherClassCache == null)
+               otherClassCache = new HashMap<String,Object>();
             otherClassCache.put(className, res);
             return res;
          }

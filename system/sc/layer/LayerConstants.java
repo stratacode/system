@@ -11,4 +11,5 @@ public interface LayerConstants
    public static final String DYN_BUILD_DIRECTORY = "dynbuild";
    public static final String BUILD_INFO_FILE = "BuildInfo.sc";
    public static final String DYN_TYPE_INDEX_FILE = "dynTypeIndex.ser";
+   public static final String DEFAULT_VM_PARAMETERS = "-Xmx1024m";
 }

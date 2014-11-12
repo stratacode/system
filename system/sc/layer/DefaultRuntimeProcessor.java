@@ -2,7 +2,7 @@
  * Copyright (c) 2014. Jeffrey Vroom. All Rights Reserved.
  */
 
-package sc.lang;
+package sc.layer;
 
 import sc.lang.java.BodyTypeDeclaration;
 import sc.lang.java.JavaSemanticNode;
@@ -105,8 +105,12 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor {
       return false;
    }
 
+   boolean loadClassesInRuntime = true;
+   public void setLoadClassesInRuntime(boolean val) {
+      this.loadClassesInRuntime = val;
+   }
    public boolean getLoadClassesInRuntime() {
-      return true;
+      return loadClassesInRuntime;
    }
 
    List<String> syncProcessNames;

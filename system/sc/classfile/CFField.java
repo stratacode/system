@@ -7,6 +7,7 @@ package sc.classfile;
 import sc.lang.java.IVariable;
 import sc.lang.java.IFieldDefinition;
 import sc.lang.java.JavaType;
+import sc.lang.java.ModelUtil;
 
 public class CFField extends ClassFile.FieldMethodInfo implements IVariable, IFieldDefinition {
    public JavaType type;
@@ -57,5 +58,12 @@ public class CFField extends ClassFile.FieldMethodInfo implements IVariable, IFi
 
    public String getOperator() {
       return "=";
+   }
+
+   public Object getRuntimeField() {
+      Object rtType = ownerClass.getRuntimeType();
+      if (rtType == null)
+         return null;
+      return ModelUtil.definesMember(rtType, name, MemberType.FieldEnumSet, null, null);
    }
 }

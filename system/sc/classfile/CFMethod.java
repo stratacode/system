@@ -164,8 +164,14 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
       return (accessFlags & ACC_VARARGS) != 0;
    }
 
+   /** Returns only the signature of the parameters of the method - strips off the ( ) and return value - e.g. (I)V becomes I */
    public String getTypeSignature() {
-      return typeSignature;
+      if (typeSignature == null)
+         return null;
+      int closeIx = typeSignature.indexOf(")");
+      if (closeIx == -1)
+         return typeSignature; // Not reached
+      return typeSignature.substring(1, closeIx);
    }
 
    public JavaType[] getExceptionTypes() {
