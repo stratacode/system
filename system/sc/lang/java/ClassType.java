@@ -519,7 +519,7 @@ public class ClassType extends JavaType {
       if (chained)
          return false;
 
-      if (type != null && type instanceof TypeDeclaration && (ModelUtil.isDynamicType(type) || !ModelUtil.needsOwnClass(type, false))) {
+      if (type != null && type instanceof TypeDeclaration && (ModelUtil.isDynamicType(type) || !ModelUtil.needsOwnClass(type, true))) {
          String runtimeTypeName = ((TypeDeclaration) type).getCompiledClassName();
          setProperty("chainedTypes", null);
          if (runtimeTypeName.indexOf(".") != -1) {

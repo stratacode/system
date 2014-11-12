@@ -487,7 +487,6 @@ public class ClassDeclaration extends TypeDeclaration {
          displayError("Component types cannot have CompilerSettings.constructorInit=true for: ");
       }
 
-
       boolean inHiddenBody = false;
       if (((isObject || isComponent || hasSubobjects) && !hasModifier("abstract")) || customTemplate != null || mixinTemplates != null || staticMixinTemplates != null) {
          TypeDeclaration outer = getEnclosingType();
