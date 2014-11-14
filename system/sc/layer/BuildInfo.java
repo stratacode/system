@@ -25,7 +25,6 @@ public class BuildInfo {
    public List<ModelJar> modelJarFiles;
    public List<MainMethod> mainMethods;
    public List<TestInstance> testInstances;
-   public List<VMParameter> vmParameters;
    public Set<TypeGroupMember> typeGroupMembers;
    public Set<ExternalDynType> extDynTypes;
 
@@ -198,49 +197,6 @@ public class BuildInfo {
          System.out.println("No main methods match pattern: " + runClass + " in: " + mainMethods);
    }
 
-   /**
-    * Add parameters to the virtual machine to run this program.  Each parameter is given a name so that it can
-    * be overridden.  For options like -mx the name should be the option itself as I'm sure Java doesn't want more than one
-    * of those.
-    */
-   public void addVMParameter(String paramName, String value) {
-      changed = true;
-      if (vmParameters == null)
-         vmParameters = new ArrayList<VMParameter>(1);
-      else {
-         for (int i = 0; i < vmParameters.size(); i++) {
-            VMParameter p = vmParameters.get(i);
-            if (p.parameterName.equals(paramName)) {
-               p.parameterValue = value;
-               return;
-            }
-         }
-      }
-      vmParameters.add(new VMParameter(paramName, value));
-
-      if (system != null && system.buildInfo == this) {
-         for (Layer l:system.layers) {
-            if (needsBuildInfo(l)) {
-               l.buildInfo.addVMParameter(paramName, value);
-            }
-         }
-      }
-   }
-
-   public String getVMParameters() {
-      if (vmParameters == null)
-         return "";
-      else {
-         StringBuilder sb = new StringBuilder();
-         sb.append(" ");
-         for (VMParameter vmp:vmParameters) {
-            sb.append(vmp.parameterValue);
-            sb.append(" ");
-         }
-         return sb.toString();
-      }
-   }
-
    public void addTypeGroupMember(String typeName, String typeGroupName) {
       changed = true;
       if (typeGroupMembers == null)
@@ -362,32 +318,6 @@ public class BuildInfo {
 
       public int hashCode() {
          return typeName.hashCode() + (testType != null ? testType.hashCode() : 0);
-      }
-   }
-
-   /** Layer components can add their own VM parameters */
-   public static class VMParameter {
-      public String parameterName;
-      public String parameterValue;
-      public VMParameter(String name, String value) {
-         parameterName = name;
-         parameterValue = value;
-      }
-
-      public boolean equals(Object other) {
-         if (other instanceof VMParameter) {
-            VMParameter otherMM = (VMParameter) other;
-            if (!StringUtil.equalStrings(parameterName, otherMM.parameterName))
-               return false;
-            if (!StringUtil.equalStrings(parameterName, otherMM.parameterName))
-               return false;
-            return true;
-         }
-         return false;
-      }
-
-      public int hashCode() {
-         return parameterName.hashCode() + (parameterValue != null ? parameterValue.hashCode() : 0);
       }
    }
 
@@ -699,16 +629,6 @@ public class BuildInfo {
                initTestInstances();
                testInstances.add(ti);
             }
-         }
-      }
-
-      if (src.vmParameters != null) {
-         for (int i = 0; i < src.vmParameters.size(); i++) {
-            VMParameter ti = src.vmParameters.get(i);
-            if (vmParameters == null)
-               vmParameters = new ArrayList<VMParameter>(1);
-            if (!vmParameters.contains(ti))
-               vmParameters.add(ti);
          }
       }
 

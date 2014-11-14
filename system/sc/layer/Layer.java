@@ -397,6 +397,28 @@ public class Layer implements ILifecycle, LayerConstants {
       includeRuntimes.add(name);
    }
 
+   public void excludeProcesses(String... names) {
+      for (String name:names)
+         excludeProcess(name);
+   }
+
+   public void excludeProcess(String name) {
+      if (excludeProcesses == null)
+         excludeProcesses = new ArrayList<String>();
+      excludeProcesses.add(name);
+   }
+
+   public void includeProcesses(String... names) {
+      for (String name:names)
+         includeProcess(name);
+   }
+
+   public void includeProcess(String name) {
+      if (includeProcesses == null)
+         includeProcesses = new ArrayList<String>();
+      includeProcesses.add(name);
+   }
+
    public void setLayerRuntime(IRuntimeProcessor proc) {
       definedRuntime = proc;
       hasDefinedRuntime = true;

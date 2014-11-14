@@ -326,7 +326,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                }
 
                String memStr = (minMem != null && minMem != 0 ? " -ms" + minMem + "m ": "") + (maxMem != null && maxMem != 0 ? " -mx" + maxMem + "m " : "");
-               String vmParams = lsys.buildInfo.getVMParameters();
+               String vmParams = lsys.getVMParameters();
                // TODO: put this code into a configurable template
                if (produceJar != null && produceJar) {
                   // TODO: need to find a way to inject command line args into the jar process

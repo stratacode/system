@@ -150,6 +150,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       setCurrent(this);
    }
 
+   public final static String SC_DIR = ".stratacode";
+   public final static String LAYER_PATH_FILE = "layerPath";
+   public final static String SC_SOURCE_PATH = "scSourcePath";
+
    @Constant
    public List<Layer> layers = new ArrayList<Layer>(16);
 
@@ -321,6 +325,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    TreeSet<String> customSuffixes = new TreeSet<String>();
 
    SysTypeIndex typeIndex;
+
+   public List<VMParameter> vmParameters;
+
+   /** When you are running with the source to StrataCode, instead of just with sc.jar point this to the source root - i.e. the dir which holds coreRuntime, fullRuntime, and sc */
+   public static String scSourcePath = null;
 
    private void clearReverseTypeIndex() {
       typeIndex.clearReverseTypeIndex();
@@ -781,7 +790,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (dir == null) {
          dir = System.getProperty("user.dir");
       }
-      return FileUtil.concat(dir, "temp", "_" + dirName);
+      return FileUtil.concat(dir, SC_DIR, dirName);
    }
 
    public LayeredSystem(String lastLayerName, List<String> initLayerNames, List<String> explicitDynLayers, String layerPathNames, String rootClassPath, Options options, IProcessDefinition useProcessDefinition, LayeredSystem parentSystem, boolean startInterpreter) {
@@ -808,7 +817,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       layerPath = layerPathNames;
       initLayerPath();
-
       // Do this before we init the layers so they can see the classes in the system layer
       initClassIndex(rootClassPath);
       initSysClassLoader(null, ClassLoaderMode.LIBS);
@@ -827,6 +835,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (!peerMode) {
+         String scSourceConfig = getStrataCodeDir(SC_SOURCE_PATH);
+         if (new File(scSourceConfig).canRead()) {
+            scSourcePath = FileUtil.getFileAsString(scSourceConfig);
+            if (scSourcePath != null)
+               scSourcePath = scSourcePath.trim();
+         }
+
          if (!systemInstalled) {
             if (initLayerNames != null) {
                // If at least one of the specified layers exist from the current directory consider this a valid layer directory
@@ -1102,6 +1117,38 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          Layer layer = layersList.get(i);
          if (layer.includeForProcess(proc) && (!specifiedLayers || layer.isSpecifiedLayer()))
             procLayerNames.add(layer.getLayerName());
+      }
+   }
+
+   private void startSeparateLayers() {
+      ArrayList<Layer> toRemove = null;
+      for (Layer layer:inactiveLayers) {
+         // Build separate layers have to be activated when they are not excluded.
+         if (layer.buildSeparate && !layer.excluded && !layers.contains(layer)) {
+            if (layer.isStarted())
+               System.out.println("*** Error - started layer found that needs to be activated");
+            layer.activated = true;
+            layer.layerPosition = layers.size();
+            registerLayer(layer);
+            layers.add(layer);
+            lastLayer = layer;
+            if (toRemove == null)
+               toRemove = new ArrayList<Layer>();
+            toRemove.add(layer);
+         }
+      }
+      if (toRemove != null) {
+         int remIx = -1;
+         for (Layer remLayer:toRemove) {
+            int ix = inactiveLayers.indexOf(remLayer);
+            if (ix != -1) {
+               inactiveLayers.remove(ix);
+               if (remIx == -1)
+                  remIx = ix;
+            }
+         }
+         renumberInactiveLayers(remIx);
+         checkLayerPosition();
       }
    }
 
@@ -1551,11 +1598,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       boolean buildSubDir;
    }
 
-   // TODO: make this configurable more easily from the debugger by reading it from a file similar to how we can bootstrap layerpath.
-   // For now, add -Dsc.core.path="/jjv/vbuild/bin/scrt.jar" as the VM paramrs for any android run configurations we want to run
-   // from the debugger.
-   public final static String scRuntimePath = "/jjv/sc/sc/coreRuntime";
-
    public String getStrataCodeRuntimePath(boolean core, boolean src) {
       String propName = "sc." + (core ? "core." : "") + (src ? "src." : "") + "path";
       String path;
@@ -1573,10 +1615,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                return FileUtil.concat(sysRoot, core ? "coreRuntime" : "fullRuntime", !isIDEBuildLayer(info.buildDirName) ? "build" : null);
          }
       }
-      File f = new File(scRuntimePath);
-      if (!f.canRead())
-         System.err.println("*** Unable to determine SCRuntimePath due to non-standard location of the sc.util, type, binding obj, and dyn packages");
-      return scRuntimePath;
+      if (scSourcePath != null) {
+         String scRuntimePath = FileUtil.concat(scSourcePath, "coreRuntime");
+         File f = new File(scRuntimePath);
+         if (!f.canRead())
+            System.err.println("*** Unable to determine SCRuntimePath due to non-standard location of the sc.util, type, binding obj, and dyn packages");
+         else
+            return scRuntimePath;
+      }
+      return "<error - missing layers/.sc/scSourcePath>/coreRuntime";
    }
 
    private static String getSystemBuildLayer(String buildDirName) {
@@ -5071,7 +5118,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public boolean isValidLayersDir(String dirName) {
-      String layerPathFileName = FileUtil.concat(dirName, ".layerPath");
+      String layerPathFileName = FileUtil.concat(dirName, SC_DIR, LAYER_PATH_FILE);
       File layerPathFile = new File(layerPathFileName);
       return layerPathFile.canRead();
    }
@@ -5101,7 +5148,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          throw new IllegalArgumentException("*** Invalid layer path - Each path entry should be a directory: " + f);
          // TODO: error if path directories are nested
       else {
-         String layerPathFileName = FileUtil.concat(dirName, ".layerPath");
+         String layerPathFileName = FileUtil.concat(dirName, SC_DIR, LAYER_PATH_FILE);
          File layerPathFile = new File(layerPathFileName);
          if (layerPathFile.canRead()) {
             // As soon as we find one .layerPath file, consider the system installed
@@ -5147,13 +5194,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       else {
-         String layerPathFileName = FileUtil.concat(".", ".layerPath");
+         String layerPathFileName = FileUtil.concat(".", SC_DIR, LAYER_PATH_FILE);
          File layerPathFile = new File(layerPathFileName);
          if (layerPathFile.canRead()) {
             systemInstalled = true;
          }
          else {
-            layerPathFileName = FileUtil.concat("layers", ".layerPath");
+            layerPathFileName = FileUtil.concat("layers", SC_DIR, LAYER_PATH_FILE);
             layerPathFile = new File(layerPathFileName);
             // This is the case where have installed into the StrataCode dist directory
             if (layerPathFile.canRead()) {
@@ -10565,10 +10612,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       try {
          Layer layer = ((ModifyDeclaration)decl).createLayerInstance(prefix, inheritedPrefix);
 
+         // Need to set the excluded flag here for buildSeparate layers
+         if (!lpi.activate && layer.buildSeparate) {
+            layer.excluded = !layer.includeForProcess(processDefinition);
+         }
+
          // When a layer has buildSeparate it means we need to build it in order to resolve the types of the other layers.
          // Those layers always need to be built, even for the IDE so we can use the generated classes to resolve types of
          // the rest of the source.
-         layer.activated = lpi.activate || layer.buildSeparate;
+         layer.activated = lpi.activate;
          if (!lpi.enabled)
             layer.disabled = true;
          layer.imports = model.getImports();
@@ -10691,15 +10743,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public void acquireDynLock(boolean readOnly) {
       long startTime = 0;
+      if (options.verbose || options.verboseLocks)
+         startTime = System.currentTimeMillis();
       if (options.verboseLocks) {
          System.out.println("Acquiring system dyn lock for read-only: " + readOnly + " thread: " + Thread.currentThread().getName() + ": runtime: " + getRuntimeName());
-         startTime = System.currentTimeMillis();
       }
       if (!readOnly)
          globalDynLock.writeLock().lock();
       else
          globalDynLock.readLock().lock();
-      if (options.verboseLocks ) {
+      if (options.verboseLocks || options.verbose) {
          long duration = System.currentTimeMillis() - startTime;
          if (duration > 300) {
             System.err.println("Warning: waited: " + duration + " millis for lock on thread: " + Thread.currentThread().getName());
@@ -11424,12 +11477,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private Layer completeNewInactiveLayer(Layer layer, boolean doBuild) {
       layer.ensureInitialized(true);
 
-      checkLayerPosition();
-
       // First mark any excluded layers with the excluded flag so we know they do not belong in this runtime.
       // We leave the excluded layers in place through initRuntimes though so we can use these excluded layers
       // to find the runtimes in which they belong.
       removeExcludedLayers(true);
+
+      // For any buildSeparate layers that are needed in this runtime, add them over to 'layers'
+      startSeparateLayers();
 
       // We just created a new layer so now go and re-init the runtimes in case it is the first layer in
       // a new runtime or this layer needs to move to the runtime before it's started.
@@ -11928,6 +11982,40 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                return true;
       }
       return false;
+   }
+
+   /**
+    * Add parameters to the virtual machine to run this program.  Each parameter is given a name so that it can
+    * be overridden.  For options like -mx the name should be the option itself as I'm sure Java doesn't want more than one
+    * of those.
+    */
+   public void addVMParameter(String paramName, String value) {
+      if (vmParameters == null)
+         vmParameters = new ArrayList<VMParameter>(1);
+      else {
+         for (int i = 0; i < vmParameters.size(); i++) {
+            VMParameter p = vmParameters.get(i);
+            if (p.parameterName.equals(paramName)) {
+               p.parameterValue = value;
+               return;
+            }
+         }
+      }
+      vmParameters.add(new VMParameter(paramName, value));
+   }
+
+   public String getVMParameters() {
+      if (vmParameters == null)
+         return "";
+      else {
+         StringBuilder sb = new StringBuilder();
+         sb.append(" ");
+         for (VMParameter vmp:vmParameters) {
+            sb.append(vmp.parameterValue);
+            sb.append(" ");
+         }
+         return sb.toString();
+      }
    }
 
 }
