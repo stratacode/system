@@ -817,6 +817,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       layerPath = layerPathNames;
       initLayerPath();
+
       // Do this before we init the layers so they can see the classes in the system layer
       initClassIndex(rootClassPath);
       initSysClassLoader(null, ClassLoaderMode.LIBS);
@@ -915,8 +916,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       initBuildSystem(false, true);
 
-      this.rootClassPath = rootClassPath;
-
       if (excludedFiles != null) {
          excludedPatterns = new ArrayList<Pattern>(excludedFiles.size());
          for (int i = 0; i < excludedFiles.size(); i++)
@@ -948,6 +947,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (buildLayer != null)
          buildInfo = buildLayer.loadBuildInfo();
 
+      for (int i = 0; i < layers.size(); i++) {
+         Layer l = layers.get(i);
+         if (l.isBuildLayer() && l.buildInfo == null) {
+            if (l.buildSrcDir == null)
+               l.initBuildDir();
+            l.loadBuildInfo();
+         }
+      }
+
       if (initPeers && peerSystems != null) {
          for (LayeredSystem peerSys:peerSystems)
             peerSys.initBuildSystem(false, fromScratch);
@@ -965,7 +973,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (processes != null && processes.size() > 1 && (peerSystems == null || peerSystems.size() < processes.size()-1)) {
          // We want all of the layered systems to use the same buildDir so pass it through options as though you had used the -d option.  Of course if you use -d, it will happen automatically.
          if (options.buildDir == null) {
-            if (lastLayer != null)
+            if (lastLayer != null && !lastLayer.buildSeparate)
                options.buildLayerAbsDir = lastLayer.getDefaultBuildDir();
          }
 
@@ -1527,7 +1535,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // the choice of the buildDir for a given layer.
          for (int i = 0; i < layers.size(); i++) {
             Layer l = layers.get(i);
-            if (l.buildDir == null) // TODO: only for buildLayers?
+            if (l.buildDir == null || l.buildSrcDir == null) // TODO: only for buildLayers?
                l.initBuildDir();
          }
 
@@ -3505,7 +3513,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             break;
 
          // Should we inherit from build directories we find along the way?  If so, we should make sure their build directories are up to date and build them.
-         if (l.isBuildLayer() && !l.compiled && (!separateLayersOnly || l.buildSeparate)) {
+         if (l.isBuildLayer() && (!separateLayersOnly || l.buildSeparate)) {
             if (generateAndCompileLayer(l, includeFiles, newLayersOnly, separateLayersOnly) == GenerateCodeStatus.Error) {
                return false;
             }
@@ -5535,6 +5543,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    /** Must be called after the layers have been initialized */
    private void initClassIndex(String rootCP) {
+      rootClassPath = rootCP;
       addPathToIndex(null, rootCP);
       // Ordinarily the classes.jar is in the classpath.  But if not (like in the -jar option used in layerCake), we need to
       // find the classes in the boot class path.
@@ -11457,6 +11466,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       LayerParamInfo lpi = new LayerParamInfo();
       lpi.activate = false;
       lpi.enabled = enabled;
+
       if (layerPathDirs != null) {
          for (File layerDir:layerPathDirs) {
             Layer layer = initLayer(layerPath, layerDir.getPath(), null, false, lpi);
@@ -11487,7 +11497,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       // We just created a new layer so now go and re-init the runtimes in case it is the first layer in
       // a new runtime or this layer needs to move to the runtime before it's started.
-      if (!peerMode && !layer.disabled) {
+      if (!peerMode) {
          initRuntimes(null, false);
       }
 

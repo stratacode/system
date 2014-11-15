@@ -2304,6 +2304,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                System.err.println("*** Missing JS type info");
             else if (subTypeInfo.typesInSameFile != null) {
                for (String subTypeName:subTypeInfo.typesInSameFile) {
+                  if (typeName.equals(subTypeName)) {
+                     System.err.println("*** Invalid sub-type name - same as main type: " + subTypeName);
+                     continue;
+                  }
                   addCompiledTypesToFile(subTypeName, typesInFile, rootLibFile, genLayer, jsFileBody, subTypeInfo.typesInSameFile);
                }
             }

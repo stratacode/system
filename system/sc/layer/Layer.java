@@ -762,8 +762,6 @@ public class Layer implements ILifecycle, LayerConstants {
       if (excludeProcesses != null) {
          if (excludeProcesses.contains(procName))
             return LayerEnabledState.Disabled;
-         else
-            return LayerEnabledState.Enabled;
       }
 
       if (includeProcesses != null) {
@@ -783,6 +781,13 @@ public class Layer implements ILifecycle, LayerConstants {
             return runtimeState;
       }
       else {
+         // If we have explicitly set an incompatible runtime, don't go and look at the parent types.
+         // For example gwt.lib only works on the gwt runtime but extends servlet stuff which is explicitly enabled
+         // for java_Server.  We need gwt.lib to be disabled since the runtime is not compatible.
+         if (hasDefinedRuntime) {
+            if (!DefaultRuntimeProcessor.compareRuntimes(definedRuntime, runtimeProc))
+               return LayerEnabledState.Disabled;
+         }
          baseState = isExplicitlyEnabledForRuntime(runtimeProc, false);
          runtimeBaseState = true;
       }
@@ -1260,9 +1265,7 @@ public class Layer implements ILifecycle, LayerConstants {
 
       if (isBuildLayer() && activated && !disabled) {
          if (buildSrcDir == null) {
-            // For build separate layers that we create when we are inactive, we may not have initialized the build system so do it here.
-            if (buildSeparate)
-               initBuildDir();
+            initBuildDir();
          }
          if (buildSrcDir == null)
             System.err.println("*** Warning - activated build layer started without build dirs initialized: " + this);
@@ -2018,6 +2021,7 @@ public class Layer implements ILifecycle, LayerConstants {
                   TypeIndex dummyIndex = new TypeIndex();
                   dummyIndex.typeName = fullTypeName;
                   dummyIndex.layerName = getLayerName();
+                  dummyIndex.processIdent = layeredSystem.getProcessIdent();
                   dummyIndex.fileName = srcEnt.absFileName;
                   dummyIndex.declType = DeclarationType.TEMPLATE; // Is it always a template?
                   updateTypeIndex(dummyIndex);
@@ -2959,7 +2963,8 @@ public class Layer implements ILifecycle, LayerConstants {
             layeredSystem.saveTypeToFixedTypeFile(FileUtil.concat(buildSrcDir, layeredSystem.getBuildInfoFile()), buildInfo,
                     "sc.layer.BuildInfo");
 
-         saveDynTypeIndex();
+         if (buildSrcDir != null)
+            saveDynTypeIndex();
       }
    }
 

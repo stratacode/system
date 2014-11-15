@@ -6827,6 +6827,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       idx.typeName = getFullTypeName();
       Layer layer = getLayer();
       idx.layerName = layer == null ? null : layer.getLayerName();
+      LayeredSystem sys = getLayeredSystem();
+      idx.processIdent = sys == null ? null : sys.getProcessIdent();
       ArrayList<String> baseTypes = null;
       JavaModel model = getJavaModel();
       if (model != null && model.getSrcFile() != null) {

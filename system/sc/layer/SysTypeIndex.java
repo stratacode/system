@@ -6,6 +6,7 @@ package sc.layer;
 
 import sc.lang.java.TypeDeclaration;
 import sc.type.CTypeUtil;
+import sc.util.StringUtil;
 
 import java.util.*;
 
@@ -65,14 +66,16 @@ public class SysTypeIndex {
             // TODO: add a mode which creates stub type declarations when the type has not been loaded so we do not have to parse so much code in this operation.
             // we can use the replaced logic to swap in the new one once it's fetched and/or just populate this one when we need to by parsing it's file.
 
-            Layer modLayer = sys.getActiveOrInactiveLayerByPath(modTypeIndex.layerName, null, true);
-            if (modLayer == null) {
-               System.err.println("*** Warning unable to find modifying layer: " + modTypeIndex.layerName + " - skipping index entyr");
-            }
-            else {
-               TypeDeclaration modType = (TypeDeclaration) modLayer.layeredSystem.getSrcTypeDeclaration(typeName, modLayer.getNextLayer(), true, false, true, type.getLayer(), type.isLayerType);
-               if (modType != null) {
-                  res.add(modType);
+            // Make sure the index entry matches this process before we go and add it.
+            if (StringUtil.equalStrings(modTypeIndex.processIdent, sys.getProcessIdent())) {
+               Layer modLayer = sys.getActiveOrInactiveLayerByPath(modTypeIndex.layerName, null, true);
+               if (modLayer == null) {
+                  System.err.println("*** Warning unable to find modifying layer: " + modTypeIndex.layerName + " - skipping index entyr");
+               } else {
+                  TypeDeclaration modType = (TypeDeclaration) modLayer.layeredSystem.getSrcTypeDeclaration(typeName, modLayer.getNextLayer(), true, false, true, type.getLayer(), type.isLayerType);
+                  if (modType != null) {
+                     res.add(modType);
+                  }
                }
             }
          }
