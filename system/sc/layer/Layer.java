@@ -422,11 +422,14 @@ public class Layer implements ILifecycle, LayerConstants {
    public void setLayerRuntime(IRuntimeProcessor proc) {
       definedRuntime = proc;
       hasDefinedRuntime = true;
+      inheritRuntime = false;
+      inheritProcess = false; // gwt.lib sets an explicit runtime to 'gwt' that should override both the Java_Server runtime and process it inherits by extending the servlet stuff.
    }
 
    public void setLayerProcess(IProcessDefinition proc) {
       definedProcess = proc;
       hasDefinedProcess = true;
+      inheritProcess = false;
    }
 
    /** Creates a new java runtime which is incompatible with the standard Java runtime */
@@ -781,13 +784,6 @@ public class Layer implements ILifecycle, LayerConstants {
             return runtimeState;
       }
       else {
-         // If we have explicitly set an incompatible runtime, don't go and look at the parent types.
-         // For example gwt.lib only works on the gwt runtime but extends servlet stuff which is explicitly enabled
-         // for java_Server.  We need gwt.lib to be disabled since the runtime is not compatible.
-         if (hasDefinedRuntime) {
-            if (!DefaultRuntimeProcessor.compareRuntimes(definedRuntime, runtimeProc))
-               return LayerEnabledState.Disabled;
-         }
          baseState = isExplicitlyEnabledForRuntime(runtimeProc, false);
          runtimeBaseState = true;
       }
