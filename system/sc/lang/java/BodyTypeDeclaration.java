@@ -532,6 +532,23 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (res != null)
          return res;
 
+      /*
+       * Note - we do this in getPreviousMember through the getDefinitionProcessor hook
+      if (!transformed && !skipIfaces) {
+         Object[] scopeTypes = getScopeInterfaces();
+         if (scopeTypes != null) {
+            // Check any interfaces appended on by annotations for for their own annotation.   This way, you can use
+            // a meta layer to attach annotations onto a type which is automatically added via an annotation, e.g. GWT's EntryPoint
+            // added by the GWTModule annotation.
+            for (Object scopeType : scopeTypes) {
+               if (scopeType != null && (res = ModelUtil.definesMember(scopeType, name, mtype, refType, ctx, skipIfaces, isTransformed)) != null) {
+                  return res;
+               }
+            }
+         }
+      }
+      */
+
       return super.definesMember(name, mtype, refType, ctx, skipIfaces, isTransformed);
    }
 

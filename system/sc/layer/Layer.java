@@ -836,7 +836,8 @@ public class Layer implements ILifecycle, LayerConstants {
                      runtimeBaseState = runtimeNewState;
                   }
                }
-               else {
+               // Do not overwrite a process base state with one computed at the runtime level
+               else if (!runtimeNewState || runtimeBaseState || baseState == LayerEnabledState.NotSet) {
                   baseState = newBaseState;
                   runtimeBaseState = runtimeNewState;
                }
@@ -1628,11 +1629,15 @@ public class Layer implements ILifecycle, LayerConstants {
       }
    }
 
-   private void writeBuildSrcIndex() {
+   private void writeBuildSrcIndex(boolean clean) {
       if (buildSrcIndex == null)
          return;
 
-      cleanBuildSrcIndex();
+      // TODO: used to do cleanBuildSrcIndex here but that actually removes the files.  We call saveBuildInfo on
+      // each build, even when we've just added a new layer so that did not work
+
+      if (clean)
+         cleanBuildSrcIndex();
 
       saveBuildSrcIndex();
       if (traceBuildSrcIndex) {
@@ -2953,7 +2958,7 @@ public class Layer implements ILifecycle, LayerConstants {
    public void saveBuildInfo(boolean writeBuildSrcIndex) {
       if (isBuildLayer()) {
          if (writeBuildSrcIndex)
-            writeBuildSrcIndex();
+            writeBuildSrcIndex(!layeredSystem.systemCompiled);
 
          if (buildInfo != null && buildInfo.changed)
             layeredSystem.saveTypeToFixedTypeFile(FileUtil.concat(buildSrcDir, layeredSystem.getBuildInfoFile()), buildInfo,

@@ -254,12 +254,17 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
                JavaModel model = getJavaModel();
                if (model == null)
                   return null;
-               IScopeProcessor sproc = sys.getScopeProcessor(model.getLayer(), ((ScopeModifier)mod).scopeName);
+               String scopeName = ((ScopeModifier)mod).scopeName;
+               IScopeProcessor sproc = sys.getScopeProcessor(model.getLayer(), scopeName);
                if (sproc != null) {
                   if (defProcs == null)
                      defProcs = new ArrayList<IDefinitionProcessor>(1);
                   defProcs.add(sproc);
                }
+               /* TODO: should this be a warning or error?  global is not mapped currently since it does not need any processing.
+               else if (!scopeName.equals("global"))
+                  System.out.println("*** Missing processor for scope: " + scopeName);
+               */
             }
             else if (mod instanceof Annotation) {
                Annotation annot = (Annotation) mod;

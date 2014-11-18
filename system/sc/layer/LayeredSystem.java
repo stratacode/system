@@ -1109,11 +1109,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   /** Before we activate layers in a new runtime, make sure one of the specified layers requires that runtime.
-    * otherwise, we drag in a lot of the overlapping layers, without the application layers being specified. */
+   /**
+    * Before we activate layers in a new runtime, make sure one of the specified layers requires that runtime.
+    * otherwise, we drag in a lot of the overlapping layers, without the application layers being specified.
+    */
    private boolean getNeedsProcess(IProcessDefinition proc) {
       for (Layer specLayer:specifiedLayers) {
-         if (specLayer.includeForProcess(proc))
+         // Need to ignore the separate layers here since those get added as active layers even when it's pulled in by inactive layers.
+         if (specLayer.includeForProcess(proc) && !specLayer.buildSeparate)
             return true;
       }
       return false;
@@ -1139,6 +1142,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             layer.layerPosition = layers.size();
             registerLayer(layer);
             layers.add(layer);
+            // Separate layers should not be used in 'specifing' the process since they get started.
+            //specifiedLayers.add(layer);
             lastLayer = layer;
             if (toRemove == null)
                toRemove = new ArrayList<Layer>();
@@ -1165,15 +1170,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // layers from the start in the active set.
       if (!peerMode) {
          boolean needsDefaultProcess = getNeedsProcess(processDefinition);
+         int activeRemoveIx = -1;
          for (int i = 0; i < layers.size(); i++) {
             Layer layer = layers.get(i);
             if (layer.isStarted())
                continue;
             // When we know we don't need the default process, we must automatically exclude the layer.  For other peer systems we only process the init layers if the process is needed, but for the main system, we use it to bootstrap all of the layers
-            boolean included = needsDefaultProcess && layer.includeForProcess(processDefinition);
+            boolean included = (needsDefaultProcess || layer.buildSeparate) && layer.includeForProcess(processDefinition);
             if (!included || layer.excludeForProcess(processDefinition)) {
                layer.excluded = true;
                if (!markOnly) {
+                  if (activeRemoveIx == -1)
+                     activeRemoveIx = i;
                   layers.remove(i);
                   deregisterLayer(layer, false);
                   i--;
@@ -1181,6 +1189,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
             else if (!markOnly)
                layer.layerPosition = i;
+         }
+         if (activeRemoveIx != -1) {
+            for (int i = activeRemoveIx; i < layers.size(); i++) {
+               layers.get(i).layerPosition = i;
+            }
          }
       }
 
@@ -6264,7 +6277,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       if (!skipBuild) {
 
-         if (genLayer.getBuildAllFiles() && phase == BuildPhase.Process)
+         // Only do this the first time - if we are building just a separate layer, don't remove all of the generated files!
+         if (genLayer.getBuildAllFiles() && phase == BuildPhase.Process && !systemCompiled)
             genLayer.cleanBuildSrcIndex();
 
          Options options = this.options;
@@ -8086,12 +8100,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private ILanguageModel getCachedAnnotatedModel(SrcEntry srcEnt, boolean checkPeers) {
       String fn = srcEnt.absFileName;
       ILanguageModel m = modelIndex.get(fn);
-      if (m != null && m.getUserData() != null)
-         return m;
+      if (m != null && m.getUserData() != null) {
+         if (externalModelIndex != null && !externalModelIndex.isValidModel(m))
+            m = null;
+         else
+            return m;
+      }
       m = inactiveModelIndex.get(fn);
       if (m != null && m.getUserData() != null) {
-         if (externalModelIndex == null || !externalModelIndex.isValidModel(m)) {
-            System.out.println("*** Found invalid model in the cache");
+         if (externalModelIndex != null && !externalModelIndex.isValidModel(m)) {
+            m = null;
          }
          else
             return m;
@@ -11514,13 +11532,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
 
-      if (doBuild) {
-         for (Layer activeLayer:layers) {
-            if (activeLayer.buildSeparate && !activeLayer.compiled && !activeLayer.disabled) {
-               // We need to reset the buildDir's in case we added new separate layers for all peers.  This should not init the build system from scratch in case there's already build state like jsFiles
-               initBuildSystem(true, false);
-               break;
-            }
+      for (Layer activeLayer:layers) {
+         if (activeLayer.buildSeparate && !activeLayer.compiled && !activeLayer.disabled) {
+            // We need to reset the buildDir's in case we added new separate layers for all peers.  This should not init the build system from scratch in case there's already build state like jsFiles
+            initBuildSystem(true, false);
+            break;
          }
       }
 
@@ -11810,13 +11826,17 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       while (layerAndFileName.startsWith(FileUtil.FILE_SEPARATOR))
          layerAndFileName = layerAndFileName.substring(FileUtil.FILE_SEPARATOR.length());
 
-
-      // TODO: can we support parsing a file if it's not in a layer?
       if (layerAndFileName.length() > 0) {
-         Layer layer = activeOnly ? getLayerByPath(layerAndFileName, true) : getActiveOrInactiveLayerByPath(layerAndFileName, null, true);
-         // This path is for the layer itself
-         if (layer != null) {
-            return new SrcEntry(layer, layer.getLayerPathName(), "");
+         String pathFileName = FileUtil.getFileName(layerAndFileName);
+         String parentDirPath = FileUtil.getParentPath(layerAndFileName);
+         String dirName = FileUtil.getFileName(parentDirPath);
+         Layer layer;
+         if (pathFileName.endsWith(SCLanguage.DEFAULT_EXTENSION) && FileUtil.removeExtension(pathFileName).equals(dirName)) {
+            layer = activeOnly ? getLayerByPath(parentDirPath, true) : getActiveOrInactiveLayerByPath(parentDirPath, null, true);
+            // This path is for the layer itself
+            if (layer != null) {
+               return new SrcEntry(layer, pathName, pathFileName);
+            }
          }
 
          String layerName = null;
