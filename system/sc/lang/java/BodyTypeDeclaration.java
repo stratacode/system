@@ -893,6 +893,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public IScopeProcessor getScopeProcessor() {
       if (replacedByType != null)
          return replacedByType.getScopeProcessor();
+      if (getLayer() == null)
+         return null;
       return super.getScopeProcessor();
    }
 
@@ -3298,7 +3300,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       if (!isLayerType && getLiveDynamicTypesAnnotation()) {
          // Add this instance to the global table so we can do type -> inst mapping
-         getLayeredSystem().addDynInstanceInternal(this.getFullTypeName(), inst);
+         getLayeredSystem().addDynInstanceInternal(this.getFullTypeName(), inst, getLayer());
       }
 
       ctx.pushCurrentObject(inst);

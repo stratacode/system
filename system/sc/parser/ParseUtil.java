@@ -4,11 +4,8 @@
 
 package sc.parser;
 
-import sc.lang.ILanguageModel;
-import sc.lang.SemanticNode;
-import sc.lang.ISemanticNode;
+import sc.lang.*;
 import sc.lang.java.JavaModel;
-import sc.lang.SemanticNodeList;
 import sc.lang.java.JavaSemanticNode;
 import sc.layer.SrcEntry;
 import sc.lifecycle.ILifecycle;
@@ -832,14 +829,25 @@ public class ParseUtil  {
    public static ISemanticNode findSameNodeInNewModel(ILanguageModel newModel, ISemanticNode oldNode) {
       // Our file model is not the current one managed by the system so we need to find the corresponding node.
       IParseNode origParseNode = oldNode.getParseNode();
+      boolean computed = false;
+      if (origParseNode == null && oldNode instanceof ISrcStatement) {
+         ISrcStatement srcSt = (ISrcStatement) oldNode;
+         ISemanticNode fromSt = srcSt.getFromStatement();
+         if (fromSt != null) {
+            origParseNode = fromSt.getParseNode();
+            computed = true;
+         }
+      }
       if (origParseNode != null) {
          int startIx = origParseNode.getStartIndex();
          if (startIx != -1) {
             IParseNode newNode = newModel.getParseNode().findParseNode(startIx, origParseNode.getParselet());
             if (newNode != null) {
                Object semValue = newNode.getSemanticValue();
-               if (semValue != null && semValue.getClass() == oldNode.getClass())
+               if (semValue instanceof JavaSemanticNode)
                   return (JavaSemanticNode) semValue;
+               else
+                  System.err.println("*** Unrecognized return type");
             }
          }
       }

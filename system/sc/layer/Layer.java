@@ -824,8 +824,6 @@ public class Layer implements ILifecycle, LayerConstants {
                             // always override runtime with process state or if we are both runtime or both process, enabled trumps Disabled.
                             (!runtimeNewState && runtimeBaseState) || (/*runtimeNewState == runtimeBaseState && */ baseState == LayerEnabledState.Disabled && newBaseState == LayerEnabledState.Enabled))) {
 
-               //if (baseState != LayerEnabledState.NotSet)
-               //   System.out.println("***");
                // Now the tricky case - should disabled at the process level trump runtime enabled - sometimes yes, sometimes no.
                if (baseState != LayerEnabledState.NotSet && baseState != newBaseState && newBaseState == LayerEnabledState.Disabled) {
                   // assert baseState = Enabled

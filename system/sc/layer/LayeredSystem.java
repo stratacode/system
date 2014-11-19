@@ -580,15 +580,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       Object typeObj = getSrcTypeDeclaration(typeName, null, true, false, true, Layer.ANY_LAYER, false);
       if (typeObj != null)
          res.add(typeObj);
-      if (typeObj == null && peerSystems != null) {
+      /*
+      if (peerSystems != null) {
          for (LayeredSystem peerSys:peerSystems) {
             typeObj = peerSys.getSrcTypeDeclaration(typeName, null, true, false, true, Layer.ANY_LAYER, false);
             if (typeObj != null) {
                res.add(typeObj);
-               break;
             }
          }
       }
+      */
       if (typeIndexProcessMap != null) {
          for (Map.Entry<String,SysTypeIndex> indexEnt:typeIndexProcessMap.entrySet()) {
             SysTypeIndex sysIndex = indexEnt.getValue();
@@ -10221,7 +10222,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (val != null)
          return val;
 
-      TypeDeclaration td = (TypeDeclaration) getSrcTypeDeclaration(name, null, true, false, true, refLayer, layerResolve);
+      TypeDeclaration td = refLayer == null ? null : (TypeDeclaration) getSrcTypeDeclaration(name, null, true, false, true, refLayer, layerResolve);
       if (td != null && td.replacedByType != null)
          td = (TypeDeclaration) td.replacedByType;
 
@@ -10856,24 +10857,26 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public void addDynInstance(String typeName, Object inst) {
       if (getLiveDynamicTypes(typeName)) {
-         addDynInstanceInternal(typeName, inst);
+         addDynInstanceInternal(typeName, inst, lastLayer);
       }
    }
 
-   public void addDynInstanceInternal(String typeName, Object inst) {
+   public void addDynInstanceInternal(String typeName, Object inst, Layer refLayer) {
       WeakIdentityHashMap<Object,Boolean> instMap = instancesByType.get(typeName);
       if (instMap == null) {
          instMap = new WeakIdentityHashMap<Object, Boolean>(2);
          instancesByType.put(typeName, instMap);
 
-         // Make sure we've cached and started the dynamic type corresponding to these instances.  If this file later changes
-         // we can do an incremental update, or at least detect when the model is stale.  Also need to make sure the
-         // sub-types get registered for someone to query for instances of this type from a base type.
-         TypeDeclaration type = getSrcTypeDeclaration(typeName, null, true, true);
-         if (type != null && !type.isLayerType && !type.isStarted()) {
-            JavaModel typeModel = type.getJavaModel();
-            // Need to start here so the sub-types get registered
-            ParseUtil.initAndStartComponent(typeModel);
+         if (refLayer != null) {
+            // Make sure we've cached and started the dynamic type corresponding to these instances.  If this file later changes
+            // we can do an incremental update, or at least detect when the model is stale.  Also need to make sure the
+            // sub-types get registered for someone to query for instances of this type from a base type.
+            TypeDeclaration type = (TypeDeclaration) getSrcTypeDeclaration(typeName, null, true, true, true, refLayer, false);
+            if (type != null && !type.isLayerType && !type.isStarted()) {
+               JavaModel typeModel = type.getJavaModel();
+               // Need to start here so the sub-types get registered
+               ParseUtil.initAndStartComponent(typeModel);
+            }
          }
       }
       instMap.put(inst, Boolean.TRUE);

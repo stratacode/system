@@ -13,6 +13,7 @@ import sc.dyn.IDynObject;
 import sc.lang.*;
 import sc.lang.html.Attr;
 import sc.lang.html.Element;
+import sc.lang.js.JSTypeTemplateBase;
 import sc.lang.sc.PropertyAssignment;
 import sc.lang.sc.ModifyDeclaration;
 import sc.lang.sc.OverrideAssignment;
@@ -3502,7 +3503,7 @@ public class ModelUtil {
             // a source version for any of these types.  That way, you can add annotations to a type in
             // a modified layer without modifying every class that implements that type.
             Class next = superClass.getSuperclass();
-            if (next != null) {
+            if (next != null && refLayer != null) {
                Object nextType = findTypeDeclaration(system, next.getName(), refLayer, layerResolve);
                if (nextType != null && nextType instanceof TypeDeclaration) {
                   if (nextType == superType) {

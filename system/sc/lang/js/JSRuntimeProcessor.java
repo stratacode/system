@@ -698,6 +698,13 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       if (postStarted)
          return;
 
+      IFileProcessor proc = system.getFileProcessorForFileName(model.getSrcFile().relFileName, td.getLayer(), BuildPhase.Process);
+      if (proc instanceof TemplateLanguage) {
+         TemplateLanguage tl = (TemplateLanguage) proc;
+         if (!tl.needsJavascript)
+            return;
+      }
+
       PerfMon.start("startJS", false);
 
       if (td.getEnclosingType() == null) {
