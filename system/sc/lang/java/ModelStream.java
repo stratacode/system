@@ -35,6 +35,8 @@ public class ModelStream extends SemanticNode implements ICustomResolver {
 
    private LayeredSystem system;
 
+   public boolean useRuntimeResolution = true;
+
    private HashMap<String,TypeDeclaration> lastTypeForName = new HashMap<String,TypeDeclaration>();
 
    public ModelStream() {
@@ -97,6 +99,8 @@ public class ModelStream extends SemanticNode implements ICustomResolver {
    /** TODO: could relax this dependency so it only uses the class loader for basic object lookup and property setting. */
    public void setLayeredSystem(LayeredSystem sys) {
       system = sys;
+      if (sys.hasDynamicLayers())
+         useRuntimeResolution = false; // Need to turn off this optimization when we may have dynamic types since there are no .class files for them in general
       if (modelList != null) {
          for (JavaModel model:modelList) {
             // When we have a sync context, it does the resolving.  We are not updating types, but instances.
@@ -227,8 +231,9 @@ public class ModelStream extends SemanticNode implements ICustomResolver {
       return "sc.sync.SyncManager.resolveOrCreateSyncInst";
    }
 
+   /** Return true for the sync system to look up .class files only.  We only use this optimization when all of the classes are compiled. */
    public boolean useRuntimeResolution() {
-      return true;
+      return useRuntimeResolution;
    }
 
    public void addModel(JavaModel model) {

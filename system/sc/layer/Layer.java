@@ -590,13 +590,7 @@ public class Layer implements ILifecycle, LayerConstants {
       if (layerState == LayerEnabledState.Disabled) {
          return true;
       }
-      // If we are not prohibited from the runtime we are not in fact excluded.
-      /*
-      if (layerState == LayerEnabledState.NotSet) {
-         if (!getAllowedInAnyProcess())
-            System.out.println("***");
-      }
-      */
+      // If we are not prohibited from the process we are not considered excluded.
       return false;
    }
 
@@ -610,10 +604,6 @@ public class Layer implements ILifecycle, LayerConstants {
       if (layerState == LayerEnabledState.NotSet) {
          return true;
       }
-
-      // We are included only if we are included by the runtime.
-      if (layerState == LayerEnabledState.NotSet)
-         return includeForRuntime(rtProc);
       return false;
    }
 
@@ -626,7 +616,7 @@ public class Layer implements ILifecycle, LayerConstants {
       }
       if (baseLayers != null && checkBaseLayers) {
          for (Layer baseLayer:baseLayers) {
-            proc = baseLayer.getAnnotationProcessor(annotName, checkBaseLayers);
+            proc = baseLayer.getAnnotationProcessor(annotName, true);
             if (proc != null)
                return proc;
          }
@@ -643,7 +633,7 @@ public class Layer implements ILifecycle, LayerConstants {
       }
       if (baseLayers != null && checkBaseLayers) {
          for (Layer baseLayer:baseLayers) {
-            proc = baseLayer.getScopeProcessor(annotName, checkBaseLayers);
+            proc = baseLayer.getScopeProcessor(annotName, true);
             if (proc != null)
                return proc;
          }

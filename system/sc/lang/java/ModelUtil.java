@@ -5471,8 +5471,15 @@ public class ModelUtil {
 
    /** Returns the class which will hold the newX method for a component type that is transformed */
    public static Object getAccessClass(Object base) {
-      if (!(base instanceof TypeDeclaration))
+      if (!(base instanceof TypeDeclaration)) {
+         if (base instanceof Class) {
+            Class enclType = ((Class) base).getDeclaringClass();
+            if (enclType == null)
+               return base;
+            return enclType;
+         }
          return base;
+      }
       TypeDeclaration baseTD = (TypeDeclaration) base;
       TypeDeclaration enclType;
       if ((enclType = baseTD.getEnclosingType()) == null)

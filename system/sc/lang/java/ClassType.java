@@ -8,6 +8,7 @@ import sc.lang.ILanguageModel;
 import sc.lang.JavaLanguage;
 import sc.lang.SemanticNodeList;
 import sc.lang.js.JSUtil;
+import sc.lang.sc.ModifyDeclaration;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.type.CTypeUtil;
