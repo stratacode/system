@@ -68,7 +68,7 @@ public class ClassDeclaration extends TypeDeclaration {
          // For incompatible changes, this will cause errors - e.g. coreRuntime PTypeUtil and fullRuntime PTypeUtil.
          // This solution reuses replacedByType - which will resolve to the most specific type in the stack and use that to
          // process all layers.  When incompatible changes are made to a type, this won't resolve the earlier references properly.
-         if (!layer.activated) {
+         if (layer != null && !layer.activated) {
             String fullTypeName = getFullTypeName();
             TypeDeclaration prevDecl = thisModel.getPreviousDeclaration(fullTypeName);
             if (prevDecl != null && prevDecl.getFullTypeName().equals(fullTypeName))
