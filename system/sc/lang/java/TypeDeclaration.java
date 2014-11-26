@@ -1223,30 +1223,26 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
    public String mapTypeParameterNameToTypeName(String childTypeParameter) {
       Object typeRef = getDerivedTypeDeclaration();
-      // Pick the first extends type which has bound a parameter for this name.  This seems wrong in some
-      // respects cause theoretically you could reuse the same name twice in a type hierarchy
-      // We probably should start out where CompilerSettings is defined and work backwards to find the type.
       while (typeRef != null) {
          if (typeRef instanceof ParamTypeDeclaration) {
             Object paramType = ((ParamTypeDeclaration) typeRef).getTypeDeclarationForParam(childTypeParameter);
             if (paramType != null)
                return ModelUtil.getTypeName(paramType);
          }
-         /*
-         List<?> typeParams = ModelUtil.getTypeParameters(type);
+         // This case is used from ObjectDefinitionParameters
+         List<?> typeParams = ModelUtil.getTypeParameters(typeRef);
          if (typeParams != null) {
             for (int i = 0; i < typeParams.size(); i++) {
                if (ModelUtil.getTypeParameterName(typeParams.get(i)).equals(childTypeParameter)) {
-                  JavaType extType = extendsType;
+                  Object extType = ModelUtil.getExtendsJavaType(this);
                   while (extType != null) {
-                     Object mappedType = extType.getTypeArgumentDeclaration(i);
+                     Object mappedType = ModelUtil.getTypeArgument(extType, i);
                      if (mappedType != null)
                         return ModelUtil.getTypeName(mappedType);
                   }
                }
             }
          }
-         */
          typeRef = ModelUtil.getSuperclass(typeRef);
       }
       // No bound parameter for this name - default is Object

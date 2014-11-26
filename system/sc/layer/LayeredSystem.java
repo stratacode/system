@@ -237,6 +237,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** The list of processes to build for this stack of layers */
    public static ArrayList<IProcessDefinition> processes;
 
+   /** A user configurable list of runtime names which are ignored */
+   public ArrayList<String> disabledRuntimes;
+
+   /** An internal index of the layers which live only in disabledRuntimes (used only when peerMode = false) - those LayeredSystems are not created so we use these Layers as placeholders. */
+   private HashMap<String,Layer> disabledLayersIndex;
+   public ArrayList<Layer> disabledLayers;
+
    public String runtimePrefix; // If not set, defaults to the runtime name - 'java' or 'js' used for storing the src files.
 
    /** Set to true when we've detected that the layers have been installed properly. */
@@ -402,6 +409,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          layer.removed = true;
       }
       layers.clear();
+      layerDynStartPos = -1;
       specifiedLayers.clear();
 
       typesByName.clear();
@@ -682,6 +690,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public String newLayerDir = null; // Directory for creating new layers
 
+   public String mainLayerDir = null; // Directory containing .stratacode dir be using by this stack - this is the last .stratacode dir found in the layer path.
+
    /** Set to "layers" or "../layers" when we are running in the StrataCode main/bin directories.  In this case we look for and by default install the layers folder next to the bin directory  */
    public String layersFilePathPrefix = null;
 
@@ -787,7 +797,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public TreeSet<String> overrideFinalPackages = new TreeSet<String>();
 
    public String getStrataCodeDir(String dirName) {
-      String dir = newLayerDir;
+      String dir = mainLayerDir;
       if (dir == null) {
          dir = System.getProperty("user.dir");
       }
@@ -797,6 +807,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public LayeredSystem(String lastLayerName, List<String> initLayerNames, List<String> explicitDynLayers, String layerPathNames, String rootClassPath, Options options, IProcessDefinition useProcessDefinition, LayeredSystem parentSystem, boolean startInterpreter) {
       this.options = options;
       this.peerMode = parentSystem != null;
+
+      if (!peerMode) {
+         disabledLayersIndex = new HashMap<String, Layer>();
+         disabledLayers = new ArrayList<Layer>();
+
+         disabledRuntimes = options.disabledRuntimes;
+         if (disabledRuntimes == null) {
+            disabledRuntimes = new ArrayList<String>();
+         }
+         else if (options.verbose)
+            System.out.println("Disable runtimes: " + disabledRuntimes);
+      }
+      else
+         disabledRuntimes = parentSystem.disabledRuntimes;
 
       IRuntimeProcessor useRuntimeProcessor = useProcessDefinition == null ? null : useProcessDefinition.getRuntimeProcessor();
 
@@ -835,6 +859,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          else
             newLayerDir = mapLayerDirName(".");
       }
+      if (mainLayerDir == null)
+         mainLayerDir = newLayerDir;
 
       if (!peerMode) {
          String scSourceConfig = getStrataCodeDir(SC_SOURCE_PATH);
@@ -864,7 +890,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (!peerMode)
-         this.repositorySystem = new RepositorySystem(this, getStrataCodeDir("pkgs"));
+         this.repositorySystem = new RepositorySystem(getStrataCodeDir("pkgs"), options.verbose);
       else {
          this.repositorySystem = parentSystem.repositorySystem;
          disableCommandLineErrors = parentSystem.disableCommandLineErrors;
@@ -1008,6 +1034,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                }
             }
 
+            if (proc != null && isRuntimeDisabled(proc.getRuntimeName())) {
+               continue;
+            }
+
             // Now create the new peer layeredSystem for this runtime.
             ArrayList<String> procLayerNames = new ArrayList<String>();
 
@@ -1045,6 +1075,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
             else
               peerSys.typeIndex.setSystem(peerSys);
+            peerSys.disabledRuntimes = disabledRuntimes;
 
             for (Layer inactiveLayer:inactiveLayers) {
                if (inactiveLayer.includeForProcess(proc)) {
@@ -1236,8 +1267,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             System.exit(-1);
          }
 
-         if (input != null && input.trim().length() > 0) {
-            newLayerDir = input;
+         if (input.trim().length() > 0) {
+            mainLayerDir = newLayerDir = input;
 
             if (isValidLayersDir(newLayerDir)) {
                systemInstalled = true;
@@ -1247,13 +1278,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
          input = cmd.readLine("No StrataCode layers found - install default layers into: " + newLayerDir + "? [y/n]: ");
          if (input != null && (input.equalsIgnoreCase("y") || input.equalsIgnoreCase("yes"))) {
-            RepositorySystem sys = new RepositorySystem(this, newLayerDir);
-
-            IRepositoryManager mgr = sys.getRepositoryManager("git");
-            RepositoryPackage pkg = new RepositoryPackage("layers", new RepositorySource(mgr, "https://github.com/stratacode/layers.git", false));
-            //RepositoryPackage pkg = new RepositoryPackage("layers", new RepositorySource(mgr, "ssh://vsgit@stratacode.com/home/git/vs/layers", false));
-            pkg.fileName = null; // Just install this package into the packageRoot - don't add the packageName like we do for most packages
-            String err = pkg.install();
+            String err = LayerUtil.installDefaultLayers(newLayerDir, options.verbose, null);
             if (err != null)
                return false;
             systemInstalled = true;
@@ -2576,6 +2601,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       @Constant public boolean updateSystem = false;
 
       @Constant public TypeIndexMode typeIndexMode = TypeIndexMode.Lazy;
+
+      @Constant public ArrayList<String> disabledRuntimes;
    }
 
    @MainSettings(produceJar = true, produceScript = true, execName = "bin/sc", debug = false, maxMemory = 1024)
@@ -4765,6 +4792,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // everyone else back.
          if (layerDynStartPos != -1 && !layer.dynamic) {
             layer.layerPosition = layerDynStartPos;
+
             layers.add(layerDynStartPos, layer);
 
             layerDynStartPos++;
@@ -5170,6 +5198,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          throw new IllegalArgumentException("*** Invalid layer path - Each path entry should be a directory: " + f);
          // TODO: error if path directories are nested
       else {
+         String scDirName = FileUtil.concat(dirName, SC_DIR);
+         // TODO: picking the last directory in the layer path because right now that's how IntelliJ orders them and it seems
+         // like a potentially 'too powerful' idea to let someone replace a layer in a subsequent layer path, for the same reasons Java makes it so hard to replace a class
+         // You can just replace the types to fix the layer if you need to in an incremental way.
+         // Down the road we could reverse this decision to make it consistent.
+         if (new File(scDirName).isDirectory()) {
+            mainLayerDir = dirName;
+         }
          String layerPathFileName = FileUtil.concat(dirName, SC_DIR, LAYER_PATH_FILE);
          File layerPathFile = new File(layerPathFileName);
          if (layerPathFile.canRead()) {
@@ -5191,6 +5227,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                }
             }
          }
+
          layerPathDirs.add(f);
       }
    }
@@ -5229,7 +5266,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                systemInstalled = true;
                if (layerPath == null) {
                   String currentDir = System.getProperty("user.dir");
-                  newLayerDir = FileUtil.concat(currentDir, "layers");
+                  mainLayerDir = newLayerDir = FileUtil.concat(currentDir, "layers");
                   layerPath = newLayerDir;
                   layerPathDirs = new ArrayList<File>();
                   layerPathDirs.add(new File(layerPath));
@@ -5248,7 +5285,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                            // newLayerDir needs to be absolute
                            String newDir = getLayersDirFromBinDir();
                            if (newDir != null) {
-                              newLayerDir = newDir;
+                              mainLayerDir = newLayerDir = newDir;
                               layerPath = newLayerDir;
                               layerPathDirs = new ArrayList<File>();
                               layerPathDirs.add(new File(layerPath));
@@ -5292,7 +5329,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                               systemInstalled = true;
                               // Need to at least install it in the right place
                               if (layerPath == null) {
-                                 newLayerDir = parentName;
+                                 mainLayerDir = newLayerDir = parentName;
                                  layerPath = parentName;
                                  layerPathDirs = new ArrayList<File>();
                                  layerPathDirs.add(new File(layerPath));
@@ -5320,8 +5357,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public String getUndoDirPath() {
-      String newLayerDir = getNewLayerDir();
-      String undoDirPath = FileUtil.concat(newLayerDir, ".undo");
+      String undoDirPath = FileUtil.concat(mainLayerDir, ".undo");
       File undoDir = new File(undoDirPath);
       if (!undoDir.isDirectory())
          undoDir.mkdirs();
@@ -5698,7 +5734,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      else {
                         switch (options.typeIndexMode) {
                            case Refresh:
-                              // TODO: grab last-modified from the .ser file and compare that to the file's last modified - load any changed entries, cull unused entries
                               layerTypeIndex = refreshLayerTypeIndex(layerName, layerTypeIndex, new File(FileUtil.concat(typeIndexDir.getPath(), indexFileName)).lastModified());
                               refreshedLayers.add(layerName);
                               break;
@@ -5861,12 +5896,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          System.err.println("*** Unable to index layer: " + layerName);
          return null;
       }
+      else if (layer.disabled) {
+         return null;
+      }
       else if (!layer.excluded && layer.layeredSystem == this) {
          layer.initAllTypeIndex();
          typeIndex.inactiveTypeIndex.typeIndex.put(layerName, layer.layerTypeIndex);
          return layer.layerTypeIndex;
       }
-      else {
+      else { // For excluded layers, hand it off to the layer's layered system
          if (layer.layeredSystem != this) {
             return layer.layeredSystem.buildLayerTypeIndex(layerName);
          }
@@ -10214,7 +10252,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Object resolveName(String name, boolean create) {
-      return resolveName(name, create, null, false);
+      // Using last layer here as the refLayer so we pick up active objects
+      return resolveName(name, create, lastLayer, false);
    }
 
    public Object resolveName(String name, boolean create, Layer refLayer, boolean layerResolve) {
@@ -10517,7 +10556,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             relDir = FileUtil.concat("..", relDir);
          if (newLayerDir == null) {
             // Need to make this absolute before we start running the app - which involves switching the current directory sometimes.
-            newLayerDir = mapLayerDirName(relDir);
+            mainLayerDir = newLayerDir = mapLayerDirName(relDir);
          }
          globalObjects.remove(defFile.layer.layerUniqueName);
          defFile.layer.layerUniqueName = modelTypeName;
@@ -11147,7 +11186,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       typeIndex.addModifiedTypesOfType(getTypeIndexIdent(), this, type, before, checkedTypes, res);
 
       if (checkPeers && !peerMode && peerSystems != null) {
-         for (LayeredSystem peerSys:peerSystems) {
+         ArrayList<LayeredSystem> peerSystemsCopy = (ArrayList<LayeredSystem>) peerSystems.clone();
+         for (LayeredSystem peerSys:peerSystemsCopy) {
             checkedTypes.add(peerSys.getTypeIndexIdent());
             ArrayList<TypeDeclaration> peerTypes = peerSys.getModifiedTypesOfType(type, before, false);
             if (peerTypes != null)
@@ -11479,22 +11519,26 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * we create temporarily to bootstrap layers in other runtimes.   We first create the Layer in the original runtime to see if it's excluded or not.  If so, we remove from the list.
     */
    public Layer getInactiveLayer(String layerPath, boolean checkPeers, boolean enabled, boolean skipExcluded) {
-      Layer inactiveLayer = lookupInactiveLayer(layerPath.replace("/", "."), checkPeers, skipExcluded);
+      String layerName = layerPath.replace("/", ".");
+      Layer inactiveLayer = lookupInactiveLayer(layerPath, checkPeers, skipExcluded);
       if (inactiveLayer != null) {
          if (inactiveLayer.layeredSystem == this || (inactiveLayer.excludeForProcess(processDefinition) || !inactiveLayer.includeForProcess(processDefinition)))
             return inactiveLayer;
       }
+
+      if (disabledLayersIndex != null) {
+         inactiveLayer = disabledLayersIndex.get(layerName);
+         if (inactiveLayer != null)
+            return inactiveLayer;
+      }
+
       LayerParamInfo lpi = new LayerParamInfo();
       lpi.activate = false;
       lpi.enabled = enabled;
 
-      if (layerPathDirs != null) {
-         for (File layerDir:layerPathDirs) {
-            Layer layer = initLayer(layerPath, layerDir.getPath(), null, false, lpi);
-            if (layer != null) {
-               return completeNewInactiveLayer(layer, checkPeers);
-            }
-         }
+      Layer layer = initLayer(layerPath, null, null, false, lpi);
+      if (layer != null) {
+         return completeNewInactiveLayer(layer, checkPeers);
       }
       else if (getNewLayerDir() != null) {
          Layer res = initLayer(layerPath, getNewLayerDir(), null, false, lpi);
@@ -11526,11 +11570,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       checkLayerPosition();
 
+      boolean foundInPeer = false;
+
       if (!peerMode && peerSystems != null) {
          // Need to also load this layer and any dependent layers as an inactive layers into the other runtimes if they are needed there.
          for (LayeredSystem peerSys:peerSystems) {
             if (layer.includeForProcess(peerSys.processDefinition)) {
                Layer peerRes = peerSys.getInactiveLayer(layer.getLayerName(), false, !layer.disabled, false);
+               if (peerRes != null)
+                  foundInPeer = true;
             }
          }
       }
@@ -11563,6 +11611,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (newRes != null)
             return newRes;
          else {
+            disabledLayersIndex.put(layer.getLayerName(), layer);
+            layer.layerPosition = disabledLayers.size();
+            disabledLayers.add(layer);
+         }
+            /*
+         else {
             newRes = lookupActiveLayer(layer.getLayerName(), true, true);
             if (newRes == null) {
                if (!layer.disabled)
@@ -11571,6 +11625,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             else
                return newRes;
          }
+               */
          // else - error -
       }
       return layer;
@@ -11829,16 +11884,23 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       while (layerAndFileName.startsWith(FileUtil.FILE_SEPARATOR))
          layerAndFileName = layerAndFileName.substring(FileUtil.FILE_SEPARATOR.length());
 
+      boolean isDir = FileUtil.getExtension(pathName) == null && new File(pathName).isDirectory();
+
       if (layerAndFileName.length() > 0) {
          String pathFileName = FileUtil.getFileName(layerAndFileName);
-         String parentDirPath = FileUtil.getParentPath(layerAndFileName);
-         String dirName = FileUtil.getFileName(parentDirPath);
+
+         String parentDirPath = isDir ? layerAndFileName : FileUtil.getParentPath(layerAndFileName);
+         String dirName = parentDirPath == null ? null : FileUtil.getFileName(parentDirPath);
          Layer layer;
-         if (pathFileName.endsWith(SCLanguage.DEFAULT_EXTENSION) && FileUtil.removeExtension(pathFileName).equals(dirName)) {
+         if (dirName == null) {
+            System.err.println("*** Invalid path: " + pathName);
+            return new SrcEntry(null, pathName, pathFileName);
+         }
+         if (isDir || (pathFileName.endsWith(SCLanguage.DEFAULT_EXTENSION) && FileUtil.removeExtension(pathFileName).equals(dirName))) {
             layer = activeOnly ? getLayerByPath(parentDirPath, true) : getActiveOrInactiveLayerByPath(parentDirPath, null, true);
             // This path is for the layer itself
             if (layer != null) {
-               return new SrcEntry(layer, pathName, pathFileName);
+               return getSrcEntryForLayerPaths(layer, pathName, pathFileName, isDir);
             }
          }
 
@@ -11853,7 +11915,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                layer = activeOnly ? getLayerByPath(layerName, true) : getActiveOrInactiveLayerByPath(layerName, null, true);
                if (layer != null) {
                   // TODO: validate that we found this layer under the right root?
-                  return new SrcEntry(layer, pathName, fileName);
+                  return getSrcEntryForLayerPaths(layer, pathName, fileName, isDir);
                }
                layerAndFileName = fileName;
             }
@@ -11862,6 +11924,17 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          } while(true);
       }
       return null;
+   }
+
+   private SrcEntry getSrcEntryForLayerPaths(Layer layer, String relPath, String fileName, boolean isDir) {
+      if (isDir) {
+         String parentPath = FileUtil.getParentPath(fileName);
+         if (parentPath == null)
+            parentPath = "";
+         return new SrcEntry(layer, FileUtil.getParentPath(relPath), parentPath);
+      }
+      else
+         return new SrcEntry(layer, relPath, fileName);
    }
 
    public SrcEntry getSrcEntryForPath(String pathName, boolean activeOnly) {
@@ -12049,6 +12122,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          return sb.toString();
       }
+   }
+
+   public boolean isRuntimeDisabled(String runtimeName) {
+      return disabledRuntimes.contains(runtimeName);
+   }
+
+   public boolean isDisabled() {
+      return isRuntimeDisabled(getRuntimeName());
    }
 
 }

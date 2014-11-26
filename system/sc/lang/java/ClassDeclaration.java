@@ -58,6 +58,14 @@ public class ClassDeclaration extends TypeDeclaration {
    public void start() {
       if (started) return;
 
+      if (!(this instanceof AnonClassDeclaration)) {
+         JavaModel thisModel = getJavaModel();
+         String fullTypeName = getFullTypeName();
+         TypeDeclaration prevDecl = thisModel.getPreviousDeclaration(fullTypeName);
+         if (prevDecl != null && prevDecl.getFullTypeName().equals(fullTypeName))
+            prevDecl.replacedByType = this;
+      }
+
       // Need to set this before we start the nested components of this class in super.start().
       // We also could inject ourselves as the "resolver" node?  
       if (extendsType != null) {

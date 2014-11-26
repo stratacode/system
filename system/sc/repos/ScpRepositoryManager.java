@@ -12,8 +12,8 @@ import java.util.ArrayList;
 /**
  */
 public class ScpRepositoryManager extends AbstractRepositoryManager {
-   public ScpRepositoryManager(LayeredSystem sys, String managerName, String rootDir) {
-      super(sys, managerName, rootDir);
+   public ScpRepositoryManager(String managerName, String rootDir, boolean verbose) {
+      super(managerName, rootDir, verbose);
    }
 
    public String doInstall(RepositorySource src) {
@@ -23,7 +23,7 @@ public class ScpRepositoryManager extends AbstractRepositoryManager {
       args.add("-r");
       args.add(src.url);
       args.add(resFile);
-      if (rootSystem.options.verbose)
+      if (verbose)
          System.out.println("Running: " + argsToString(args));
       String res = FileUtil.execCommand(args, null);
       if (res == null)

@@ -14,12 +14,12 @@ import java.util.TreeMap;
 public class RepositorySystem {
    public String packageRoot;
 
-   public RepositorySystem(LayeredSystem sys, String rootDir) {
+   public RepositorySystem(String rootDir, boolean verbose) {
       packageRoot = rootDir;
 
-      addRepositoryManager(new ScpRepositoryManager(sys, "scp", packageRoot));
-      addRepositoryManager(new GitRepositoryManager(sys, "git", packageRoot));
-      addRepositoryManager(new URLRepositoryManager(sys, "url", packageRoot));
+      addRepositoryManager(new ScpRepositoryManager("scp", packageRoot, verbose));
+      addRepositoryManager(new GitRepositoryManager("git", packageRoot, verbose));
+      addRepositoryManager(new URLRepositoryManager("url", packageRoot, verbose));
    }
 
    public IRepositoryManager[] repositories;

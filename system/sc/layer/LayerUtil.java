@@ -7,6 +7,10 @@ package sc.layer;
 import sc.lang.*;
 import sc.obj.SyncMode;
 import sc.parser.*;
+import sc.repos.IRepositoryManager;
+import sc.repos.RepositoryPackage;
+import sc.repos.RepositorySource;
+import sc.repos.RepositorySystem;
 import sc.type.CTypeUtil;
 import sc.util.ExtensionFilenameFilter;
 import sc.util.FileUtil;
@@ -31,12 +35,12 @@ public class LayerUtil implements LayerConstants {
          return sys.options.buildLayerAbsDir;
       }
       String sysBuildDir = srcDir && sys.options.buildSrcDir != null ?  sys.options.buildSrcDir : sys.options.buildDir;
-      String newLayerDir = sys.newLayerDir;
-      if (newLayerDir == null) {
-         newLayerDir = System.getProperty("user.dir");
+      String mainLayerDir = sys.mainLayerDir;
+      if (mainLayerDir == null) {
+         mainLayerDir = System.getProperty("user.dir");
       }
       // If we use the -dyn option to selectively make layers dynamic, use a different build dir so that we can quickly switch back and forth between -dyn and not without rebuilding everything.
-      String prefix = sysBuildDir == null ?  FileUtil.concat(newLayerDir, LayeredSystem.SC_DIR, sys.options.anyDynamicLayers ? "dynbuild" : "build") : sysBuildDir;
+      String prefix = sysBuildDir == null ?  FileUtil.concat(mainLayerDir, LayeredSystem.SC_DIR, sys.options.anyDynamicLayers ? "dynbuild" : "build") : sysBuildDir;
       prefix = FileUtil.concat(prefix, layer.getUnderscoreName());
       // TODO: remove this comment - this was a naive solution that caused headaches between JS marks all layers as compiled
       //return prefix + FileUtil.FILE_SEPARATOR + (layer.dynamic ? DYN_BUILD_DIRECTORY : BUILD_DIRECTORY);
@@ -555,6 +559,17 @@ public class LayerUtil implements LayerConstants {
          }
       }
       errorHandler.reportMessage(error, srcEnt == null ? null : srcEnt.getJarUrl(), line, col, type);
+   }
+
+   public static String installDefaultLayers(String resultDir, boolean verbose, String gitURL) {
+      RepositorySystem sys = new RepositorySystem(resultDir, verbose);
+      IRepositoryManager mgr = sys.getRepositoryManager("git");
+      String fileName = gitURL == null ? "layers" : FileUtil.removeExtension(FileUtil.getFileName(gitURL)); // Remove the '.git' suffix and take the last name as the file name.
+      RepositoryPackage pkg = new RepositoryPackage(mgr, fileName, new RepositorySource(mgr, gitURL == null ? LayerConstants.DEFAULT_LAYERS_URL : gitURL, false));
+      //RepositoryPackage pkg = new RepositoryPackage("layers", new RepositorySource(mgr, "ssh://vsgit@stratacode.com/home/git/vs/layers", false));
+      pkg.fileName = null; // Just install this package into the packageRoot - don't add the packageName like we do for most packages
+      String err = pkg.install();
+      return err;
    }
 
 }

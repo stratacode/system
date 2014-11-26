@@ -14,7 +14,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
    public String managerName;
    public String packageRoot;
 
-   LayeredSystem rootSystem;
+   public boolean verbose;
 
    public boolean active = true;
 
@@ -28,15 +28,17 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       return managerName;
    }
 
-   public AbstractRepositoryManager(LayeredSystem rootSystem, String mn, String reposRoot) {
-      this.rootSystem = rootSystem;
+   public String getPackageRoot() {
+      return packageRoot;
+   }
+
+   public AbstractRepositoryManager(String mn, String reposRoot, boolean verbose) {
       this.managerName = mn;
       packageRoot = reposRoot;
+      this.verbose = verbose;
    }
 
    public String install(RepositorySource src) {
-      updateInstallRoot(src);
-
       // Putting this into the installed root so it more reliably gets removed if the folder itself is removed
       File tagFile = new File(src.pkg.installedRoot, ".scPackageInstalled");
       File rootFile = new File(src.pkg.installedRoot);
@@ -59,17 +61,17 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       // No last modified time for this source... assume it's up to date unless it's not installed
       if (packageTime == -1) {
          if (installedTime != -1) {
-            if (rootSystem.options.verbose)
+            if (verbose)
                System.out.println("Package: " + src.pkg.packageName + " already installed");
             return null;
          }
       }
       else if (installedTime > packageTime) {
-         if (rootSystem.options.verbose)
+         if (verbose)
             System.out.println("Package: " + src.pkg.packageName + " uptodate");
          return null;
       }
-      if (rootSystem.options.verbose)
+      if (verbose)
          System.out.println("Installing package: " + src.pkg.packageName + " from: " + src.url);
       String err = doInstall(src);
       if (err != null) {
@@ -92,16 +94,6 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
    public String update(RepositorySource src) {
       // TODO - not yet implemented
       return null;
-   }
-
-   public void updateInstallRoot(RepositorySource src) {
-      String resName;
-      String fileName = src.pkg.fileName;
-      if (fileName == null)
-         resName = packageRoot;
-      else
-         resName = FileUtil.concat(packageRoot, fileName);
-      src.pkg.installedRoot = resName;
    }
 
    protected String argsToString(List<String> args) {

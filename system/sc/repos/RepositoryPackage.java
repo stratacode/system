@@ -4,6 +4,8 @@
 
 package sc.repos;
 
+import sc.util.FileUtil;
+
 /**
  * Represents a third party package that's managed by a RepositoryManager
  */
@@ -20,18 +22,20 @@ public class RepositoryPackage {
 
    public String fileName = null;
 
-   public RepositoryPackage(String pkgName, RepositorySource src) {
+   public RepositoryPackage(IRepositoryManager mgr, String pkgName, RepositorySource src) {
       this.fileName = this.packageName = pkgName;
       this.sources = new RepositorySource[1];
       src.pkg = this;
       this.sources[0] = src;
+      updateInstallRoot(mgr);
    }
 
-   public RepositoryPackage(String pkgName, RepositorySource[] srcs) {
+   public RepositoryPackage(IRepositoryManager mgr, String pkgName, RepositorySource[] srcs) {
       this.fileName = this.packageName = pkgName;
       this.sources = srcs;
       for (RepositorySource src:srcs)
          src.pkg = this;
+      updateInstallRoot(mgr);
    }
 
    public String install() {
@@ -65,4 +69,14 @@ public class RepositoryPackage {
 
       return currentSource.repository.update(currentSource);
    }
+
+   public void updateInstallRoot(IRepositoryManager mgr) {
+      String resName;
+      if (fileName == null)
+         resName = mgr.getPackageRoot();
+      else
+         resName = FileUtil.concat(mgr.getPackageRoot(), fileName);
+      installedRoot = resName;
+   }
+
 }

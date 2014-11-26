@@ -13,4 +13,7 @@ public interface IRepositoryManager {
    public String update(RepositorySource toInstall);
    public boolean isActive();
    public String getManagerName();
+
+   /** Returns the root dir defining where these packages should be installed */
+   public String getPackageRoot();
 }

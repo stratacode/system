@@ -12,8 +12,8 @@ import java.util.ArrayList;
 /**
  */
 public class GitRepositoryManager extends AbstractRepositoryManager {
-   public GitRepositoryManager(LayeredSystem sys, String managerName, String rootDir) {
-      super(sys, managerName, rootDir);
+   public GitRepositoryManager(String managerName, String rootDir, boolean verbose) {
+      super(managerName, rootDir, verbose);
    }
 
    public String doInstall(RepositorySource src) {
@@ -23,7 +23,7 @@ public class GitRepositoryManager extends AbstractRepositoryManager {
       args.add(src.url);
       String resDir = src.pkg.installedRoot;
       args.add(resDir);
-      if (rootSystem.options.verbose)
+      if (verbose)
          System.out.println("Running: " + argsToString(args));
       String res = FileUtil.execCommand(args, null);
       if (res == null)

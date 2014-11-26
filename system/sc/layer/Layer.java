@@ -272,6 +272,9 @@ public class Layer implements ILifecycle, LayerConstants {
 
    LayerTypeIndex layerTypeIndex = new LayerTypeIndex();
 
+   /** Used to order the loading of layers in the layer type index.  We need to load it from the bottom up to be sure all extended types have been loaded before we load subsequent layers. */
+   private boolean layerTypesStarted = false;
+
    /** If a Java file uses no extensions, we can either compile it from the source dir or copy it to the build dir */
    public boolean copyPlainJavaFiles = true;
 
@@ -1065,13 +1068,15 @@ public class Layer implements ILifecycle, LayerConstants {
             dir = FileUtil.getRelativeFile(layerPathName, dir);
          else {
             // Can only process buildDir paths when we are activated
-            // Used by android because we build R.java in the prebuild stage so it is available to the SC source
+            // TODO: Need to fix this for android because we need to build R.java in the prebuild stage so it is available to the SC source
+            // Instead of trying to get prebuild to work for inactive layers, we could try to run the android tool against the inactive source, storing the result in a
+            // directory we include only when looking up the inactive layers.
             if (!activated)
                continue;
             dir = dir.replace("${buildDir}", layeredSystem.buildDir);
          }
-         if (dir.indexOf("${") != -1)
-            System.err.println("Unrecognized variable in srcPath: " + dir);
+         if (dir.contains("${"))
+            System.err.println("Layer: " + getLayerName() + ": Unrecognized variable in srcPath: " + dir);
          File dirFile = new File(dir);
          addSrcFilesToCache(dirFile, "", replacedTypes);
       }
@@ -1267,7 +1272,6 @@ public class Layer implements ILifecycle, LayerConstants {
 
       if (disabled) {
          System.out.println("Layer: " + getLayerName() + " is disabled");
-         errorsStarting = true;
          return;
       }
 
@@ -2104,6 +2108,8 @@ public class Layer implements ILifecycle, LayerConstants {
    }
 
    public List<Layer> getLayersList() {
+      if (disabled)
+         return layeredSystem.disabledLayers;
       return activated ? layeredSystem.layers : layeredSystem.inactiveLayers;
    }
 
@@ -3119,18 +3125,21 @@ public class Layer implements ILifecycle, LayerConstants {
 
       IRepositoryManager mgr = layeredSystem.repositorySystem.getRepositoryManager(repositoryTypeName);
       if (mgr != null) {
-         RepositoryPackage pkg = new RepositoryPackage(pkgName, new RepositorySource(mgr, url, unzip));
+         RepositorySource repoSrc = new RepositorySource(mgr, url, unzip);
+         RepositoryPackage pkg = new RepositoryPackage(mgr, pkgName, repoSrc);
          repositoryPackages.add(pkg);
 
-         // We do the install and update immediately after they are added so that the layer definition file has
-         // access to the installed state, to for example, list the contents of the lib directory to get the jar files
-         // to add to the classpath.
-         String err = pkg.install();
-         if (err != null) {
-            System.err.println("Failed to install repository package: " + pkg.packageName + " for layer: " + this + " error: " + err);
-         }
-         else if (layeredSystem.options.updateSystem) {
-            pkg.update();
+         if (!disabled) {
+            // We do the install and update immediately after they are added so that the layer definition file has
+            // access to the installed state, to for example, list the contents of the lib directory to get the jar files
+            // to add to the classpath.
+            String err = pkg.install();
+            if (err != null) {
+               System.err.println("Failed to install repository package: " + pkg.packageName + " for layer: " + this + " error: " + err);
+            }
+            else if (layeredSystem.options.updateSystem) {
+               pkg.update();
+            }
          }
          return pkg;
       }
@@ -3254,6 +3263,14 @@ public class Layer implements ILifecycle, LayerConstants {
    }
 
    public void initAllTypeIndex() {
+      if (layerTypesStarted)
+         return;
+      layerTypesStarted = true;
+      if (baseLayers != null) {
+         for (Layer base : baseLayers) {
+            base.initAllTypeIndex();
+         }
+      }
       checkIfStarted();
       // Just walk through and start each of the types in this layer  TODO - include inner types in the type index?
       startAllTypes();

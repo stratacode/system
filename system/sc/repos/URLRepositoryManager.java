@@ -21,8 +21,8 @@ import java.nio.channels.Channels;
  * From there they are transfered to the installedRoot, which is then typically unzipped.
  */
 public class URLRepositoryManager extends AbstractRepositoryManager {
-   public URLRepositoryManager(LayeredSystem sys, String managerName, String rootDir) {
-      super(sys, managerName, rootDir);
+   public URLRepositoryManager(String managerName, String rootDir, boolean verbose) {
+      super(managerName, rootDir, verbose);
    }
 
    public String doInstall(RepositorySource src) {
@@ -32,7 +32,7 @@ public class URLRepositoryManager extends AbstractRepositoryManager {
       String fileName;
       try {
          url = new URL(src.url);
-         if (rootSystem.options.verbose)
+         if (verbose)
             System.out.println("Downloading url: " + src.url + " into: " + src.pkg.installedRoot);
          rbc = Channels.newChannel(url.openStream());
          fileName = src.pkg.installedRoot;
