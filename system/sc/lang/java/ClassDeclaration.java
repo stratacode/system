@@ -8,6 +8,7 @@ import sc.lang.*;
 import sc.lang.sc.PropertyAssignment;
 import sc.lang.template.Template;
 import sc.lang.template.TemplateDeclaration;
+import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.parser.ParseUtil;
 import sc.type.CTypeUtil;
@@ -60,10 +61,19 @@ public class ClassDeclaration extends TypeDeclaration {
 
       if (!(this instanceof AnonClassDeclaration)) {
          JavaModel thisModel = getJavaModel();
-         String fullTypeName = getFullTypeName();
-         TypeDeclaration prevDecl = thisModel.getPreviousDeclaration(fullTypeName);
-         if (prevDecl != null && prevDecl.getFullTypeName().equals(fullTypeName))
-            prevDecl.replacedByType = this;
+         Layer layer = thisModel.getLayer();
+         // In the activated case, we have only one set of types we are really processing and we load from top-down.
+         // TODO: In the inactive case, we are really processing each layer individually.  What we really need in this case is to
+         // check the refLayer in the 'resolve' and walk up to find the valid type for that layer when a type is replaced.
+         // For incompatible changes, this will cause errors - e.g. coreRuntime PTypeUtil and fullRuntime PTypeUtil.
+         // This solution reuses replacedByType - which will resolve to the most specific type in the stack and use that to
+         // process all layers.  When incompatible changes are made to a type, this won't resolve the earlier references properly.
+         if (!layer.activated) {
+            String fullTypeName = getFullTypeName();
+            TypeDeclaration prevDecl = thisModel.getPreviousDeclaration(fullTypeName);
+            if (prevDecl != null && prevDecl.getFullTypeName().equals(fullTypeName))
+               prevDecl.replacedByType = this;
+         }
       }
 
       // Need to set this before we start the nested components of this class in super.start().
