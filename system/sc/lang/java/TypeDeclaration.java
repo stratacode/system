@@ -1229,13 +1229,13 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
             if (paramType != null)
                return ModelUtil.getTypeName(paramType);
          }
-         // This case is used from ObjectDefinitionParameters
+         // This case is used from ObjectDefinitionParameters for swing.expertSystem with scope<ListItem>'s scope mixin template.
          List<?> typeParams = ModelUtil.getTypeParameters(typeRef);
          if (typeParams != null) {
-            for (int i = 0; i < typeParams.size(); i++) {
-               if (ModelUtil.getTypeParameterName(typeParams.get(i)).equals(childTypeParameter)) {
-                  Object extType = ModelUtil.getExtendsJavaType(this);
-                  while (extType != null) {
+            Object extType = ModelUtil.getExtendsJavaType(this);
+            if (extType != null) {
+               for (int i = 0; i < typeParams.size(); i++) {
+                  if (ModelUtil.getTypeParameterName(typeParams.get(i)).equals(childTypeParameter)) {
                      Object mappedType = ModelUtil.getTypeArgument(extType, i);
                      if (mappedType != null)
                         return ModelUtil.getTypeName(mappedType);
