@@ -10,6 +10,7 @@ import sc.bind.Bind;
 import sc.bind.IChangeable;
 import sc.dyn.DynUtil;
 import sc.layer.Layer;
+import sc.layer.LayeredSystem;
 import sc.obj.Constant;
 import sc.obj.IObjectId;
 
@@ -112,5 +113,17 @@ public class ClientTypeDeclaration extends TypeDeclaration implements IChangeabl
    public String getObjectId() {
       // Unique ids - MD = "metadata"
       return DynUtil.getObjectId(this, null, "MD_" + typeName);
+   }
+
+   public LayeredSystem getLayeredSystem() {
+      if (orig != null)
+         return orig.getLayeredSystem();
+      return super.getLayeredSystem();
+   }
+
+   public Class getCompiledClass(boolean init) {
+      if (orig != null)
+         return orig.getCompiledClass(init);
+      return super.getCompiledClass(init);
    }
 }

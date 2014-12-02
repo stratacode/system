@@ -1273,9 +1273,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (isDynamicStub(true) && init) {
          compileDynamicStub(true, true);
       }
+      LayeredSystem sys = getLayeredSystem();
+      if (sys == null) {
+         System.err.println("*** No layered system for type: " + typeName);
+         return null;
+      }
       // TODO: if this returns null, shouldn't we try to transform/generate the file so we can handle at least
       // adding new compiled types on the fly?
-      return getLayeredSystem().getCompiledClassWithPathName(typeName);
+      return sys.getCompiledClassWithPathName(typeName);
    }
 
    public void genDynamicStubIfNecessary() {
