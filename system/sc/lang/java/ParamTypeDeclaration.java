@@ -438,6 +438,12 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return ModelUtil.isTransformedType(baseType);
    }
 
+   public Object getArrayComponentType() {
+      if (baseType != null)
+         return ModelUtil.getArrayComponentType(baseType);
+      return null;
+   }
+
    public String toString() {
       StringBuilder sb = new StringBuilder();
       sb.append(ModelUtil.getTypeName(baseType));
@@ -457,4 +463,5 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
    public ParamTypeDeclaration copy() {
       return new ParamTypeDeclaration(system, new ArrayList<Object>(typeParams), new ArrayList<Object>(types), baseType);
    }
+
 }

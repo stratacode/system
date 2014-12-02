@@ -309,4 +309,10 @@ public class CoercedTypeDeclaration implements ITypeDeclaration {
    public boolean isTransformedType() {
       return ModelUtil.isTransformedType(baseType);
    }
+
+   public Object getArrayComponentType() {
+      if (baseType != null)
+         return ModelUtil.getArrayComponentType(baseType);
+      return null;
+   }
 }

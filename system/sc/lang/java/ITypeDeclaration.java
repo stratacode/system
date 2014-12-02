@@ -131,4 +131,6 @@ public interface ITypeDeclaration {
 
    boolean isTransformedType();
 
+   /** If this type extends for example ArrayList return the value of the first type parameter so we get the accurate component type. */
+   Object getArrayComponentType();
 }

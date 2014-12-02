@@ -19,10 +19,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.EnumSet;
-import java.util.List;
+import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -953,5 +950,19 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
 
    public boolean isTransformedType() {
       return false;
+   }
+
+   public Object getArrayComponentType() {
+      if (typeParameters != null && extendsType != null) {
+         if (ModelUtil.isAssignableFrom(Collection.class, extendsType)) {
+            if (typeParameters.size() == 1)
+               return typeParameters.get(0).getTypeDeclaration();
+         }
+         else if (ModelUtil.isAssignableFrom(Map.class, extendsType)) {
+            if (typeParameters.size() == 2)
+               return typeParameters.get(1).getTypeDeclaration();
+         }
+      }
+      return null;
    }
 }

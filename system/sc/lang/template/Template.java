@@ -379,6 +379,12 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
       return nonTransformedModel != null;
    }
 
+   public Object getArrayComponentType() {
+      if (rootType != null)
+         return ModelUtil.getArrayComponentType(rootType);
+      return null;
+   }
+
    public DeclarationType getDeclarationType() {
       if (rootType == null)
          return DeclarationType.OBJECT;

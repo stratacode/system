@@ -361,4 +361,8 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
          return ModelUtil.isTransformedType(componentType);
       return false;
    }
+
+   public Object getArrayComponentType() {
+      return componentType;
+   }
 }

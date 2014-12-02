@@ -1146,6 +1146,9 @@ public class ModelUtil {
             ParameterizedType pt = (ParameterizedType) arrayType;
             return pt.getActualTypeArguments()[0];
          }
+         else if (arrayType instanceof ITypeDeclaration) {
+            return ((ITypeDeclaration) arrayType).getArrayComponentType();
+         }
          return Object.class;
       }
       // for java.util.Map, we'll pull out the type parameter for the value
@@ -1161,6 +1164,8 @@ public class ModelUtil {
             if (typeArgs.length == 2)
                return typeArgs[1];
          }
+         else if (arrayType instanceof ITypeDeclaration)
+            return ((ITypeDeclaration) arrayType).getArrayComponentType();
          return Object.class;
       }
       else
