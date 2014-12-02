@@ -8133,16 +8133,17 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public Object getArrayComponentType() {
       JavaType extType = getExtendsType();
-      List<JavaType> typeParams = extType.getResolvedTypeArguments();
-      if (typeParams != null) {
-         Object extTypeDecl = extType.getTypeDeclaration();
-         if (ModelUtil.isAssignableFrom(Collection.class, extTypeDecl)) {
-            if (typeParams.size() == 1)
-               return typeParams.get(0).getTypeDeclaration();
-         }
-         else if (ModelUtil.isAssignableFrom(Map.class, extTypeDecl)) {
-            if (typeParams.size() == 2)
-               return typeParams.get(1).getTypeDeclaration();
+      if (extType != null) {
+         List<JavaType> typeParams = extType.getResolvedTypeArguments();
+         if (typeParams != null) {
+            Object extTypeDecl = extType.getTypeDeclaration();
+            if (ModelUtil.isAssignableFrom(Collection.class, extTypeDecl)) {
+               if (typeParams.size() == 1)
+                  return typeParams.get(0).getTypeDeclaration();
+            } else if (ModelUtil.isAssignableFrom(Map.class, extTypeDecl)) {
+               if (typeParams.size() == 2)
+                  return typeParams.get(1).getTypeDeclaration();
+            }
          }
       }
       return null;
