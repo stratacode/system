@@ -379,7 +379,7 @@ public class SelectorExpression extends ChainedExpression {
          props.add(expression);
 
          selectors(lastType, props, 0);
-         bindArgs.add(createBindingArray(props, false));
+         bindArgs.add(createBindingArray(props, true));
       }
    }
 

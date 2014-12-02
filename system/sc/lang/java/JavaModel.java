@@ -2230,6 +2230,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public void reportError(String error, ISemanticNode source) {
+      if (layer != null && layer.getBaseLayerDisabled())
+         error = "Layer disabled: " + error;
       if (errorHandler != null) {
          LayerUtil.reportMessageToHandler(errorHandler, error, getSrcFile(), source, MessageType.Error);
       }

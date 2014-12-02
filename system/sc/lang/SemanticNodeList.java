@@ -680,6 +680,10 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       return null;
    }
 
+   public String getDependencyDisabledText() {
+      return null;
+   }
+
    public SemanticNodeList refreshNode() {
       return this;
    }

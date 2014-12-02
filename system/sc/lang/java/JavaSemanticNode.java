@@ -558,4 +558,13 @@ public abstract class JavaSemanticNode extends SemanticNode {
       }
       return this;
    }
+
+   public String getDependencyDisabledText() {
+      JavaModel model = getJavaModel();
+      if (model != null && model.layer != null && model.layer.getBaseLayerDisabled()) {
+         String disabledLayerName = model.layer.getDisabledLayerName();
+         return "Layer: " + disabledLayerName + " is disabled";
+      }
+      return null;
+   }
 }

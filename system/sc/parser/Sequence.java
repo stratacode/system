@@ -268,16 +268,6 @@ public class Sequence extends NestedParselet  {
       if (value == null)
          return false;
 
-      /*
-      if (parser.currentIndex == parser.currentErrorEndIndex && parser.currentErrorEndIndex != parser.currentErrorStartIndex) {
-         return false;
-      }
-
-      if (parser.currentIndex != parser.currentErrorStartIndex) {
-         System.out.println("***");
-      }
-      */
-
       //if (parser.currentIndex == parser.currentErrorStartIndex) {
          Object nsv = ParseUtil.nodeToSemanticValue(value);
          if (nsv instanceof JavaSemanticNode) {

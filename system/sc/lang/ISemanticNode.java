@@ -62,6 +62,9 @@ public interface ISemanticNode {
 
    public String getNodeWarningText();
 
+   /** Returns null or the text describing a dependency which is disabled to augment the error - e.g. for when a Layer is disabled and you want to reflect that in the error message you give to the user. */
+   public String getDependencyDisabledText();
+
    /** Options for the deepCopy method - OR'd together as bit flags.  Copy the complete parse node tree */
    public static final int CopyParseNode = 1;
 

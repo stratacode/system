@@ -564,11 +564,6 @@ public class Layer implements ILifecycle, LayerConstants {
          return true;
       }
       if (layerState == LayerEnabledState.NotSet) {
-         /*
-         if (!getAllowedInAnyRuntime()) {
-            System.out.println("***");
-         }
-         */
          return false;
       }
       return false;
@@ -686,6 +681,31 @@ public class Layer implements ILifecycle, LayerConstants {
          resType = peerSys.getActivatedType(proc, layerName, typeName);
          if (resType != null)
             return resType;
+      }
+      return null;
+   }
+
+   public boolean getBaseLayerDisabled() {
+      if (disabled)
+         return true;
+      if (baseLayers != null) {
+         for (Layer baseLayer:baseLayers)
+            if (baseLayer.getBaseLayerDisabled())
+               return true;
+      }
+      return false;
+   }
+
+   /** If getBaseLayerDisabled returns true, this method returns the name of the first layer it encounters which is disabled (for diagnostic purposes). */
+   public String getDisabledLayerName() {
+      if (disabled)
+         return getLayerName();
+      if (baseLayers != null) {
+         for (Layer baseLayer:baseLayers) {
+            String disabledName = baseLayer.getDisabledLayerName();
+            if (disabledName != null)
+               return disabledName;
+         }
       }
       return null;
    }
@@ -932,6 +952,10 @@ public class Layer implements ILifecycle, LayerConstants {
       }
 
       callLayerMethod("initialize");
+
+      if (disabled) {
+         disableLayer();
+      }
 
       if (liveDynamicTypes && compiledOnly)
          liveDynamicTypes = false;
@@ -1272,10 +1296,16 @@ public class Layer implements ILifecycle, LayerConstants {
 
       if (disabled) {
          System.out.println("Layer: " + getLayerName() + " is disabled");
+         disableLayer();
          return;
       }
 
       callLayerMethod("start");
+
+      if (disabled) {
+         disableLayer();
+         return;
+      }
 
       if (classPath != null) {
          classDirs = Arrays.asList(classPath.split(FileUtil.PATH_SEPARATOR));
@@ -2116,6 +2146,8 @@ public class Layer implements ILifecycle, LayerConstants {
    /** Returns the layer after this one in the list, i.e. the one that overrides this layer */
    public Layer getNextLayer() {
       List<Layer> layersList = getLayersList();
+      if (layersList == null)
+         return null;
       int size = layersList.size();
       if (layerPosition == size-1)
          return null;
@@ -3280,6 +3312,10 @@ public class Layer implements ILifecycle, LayerConstants {
    public boolean hasDefinitionForType(String typeName) {
       String subPath = typeName.replace(".", FileUtil.FILE_SEPARATOR);
       return getSrcFileFromTypeName(typeName, true, true, subPath, false) != null;
+   }
+
+   public void disableLayer() {
+      layeredSystem.disableLayer(this);
    }
 }
 

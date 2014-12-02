@@ -8,6 +8,7 @@ import sc.lang.SemanticNodeList;
 
 import java.util.EnumSet;
 
+/** This is used for the old-style for (init: condition: repeat) type of for statement */
 public class ForControlStatement extends ForStatement {
    public SemanticNodeList<Definition> forInit;
    public Expression condition;

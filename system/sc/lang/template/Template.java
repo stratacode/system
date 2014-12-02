@@ -1002,8 +1002,6 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
                for (int j = 0; j < td.body.size(); j++) {
                   Object childDecl = td.body.get(j);
                   if (childDecl instanceof TypeDeclaration) {
-                     assert childDecl == rootType;
-
                      TypeDeclaration childTD = (TypeDeclaration) childDecl;
                      if (childTD.layer == null)
                         childTD.layer = layer;

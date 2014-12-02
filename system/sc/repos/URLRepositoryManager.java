@@ -4,6 +4,7 @@
 
 package sc.repos;
 
+import sc.lang.IMessageHandler;
 import sc.layer.LayeredSystem;
 import sc.util.FileUtil;
 
@@ -21,8 +22,8 @@ import java.nio.channels.Channels;
  * From there they are transfered to the installedRoot, which is then typically unzipped.
  */
 public class URLRepositoryManager extends AbstractRepositoryManager {
-   public URLRepositoryManager(String managerName, String rootDir, boolean verbose) {
-      super(managerName, rootDir, verbose);
+   public URLRepositoryManager(String managerName, String rootDir, IMessageHandler handler, boolean info) {
+      super(managerName, rootDir, handler, info);
    }
 
    public String doInstall(RepositorySource src) {
@@ -32,8 +33,8 @@ public class URLRepositoryManager extends AbstractRepositoryManager {
       String fileName;
       try {
          url = new URL(src.url);
-         if (verbose)
-            System.out.println("Downloading url: " + src.url + " into: " + src.pkg.installedRoot);
+         if (info)
+            info("Downloading url: " + src.url + " into: " + src.pkg.installedRoot);
          rbc = Channels.newChannel(url.openStream());
          fileName = src.pkg.installedRoot;
          if (src.unzip)
@@ -57,6 +58,9 @@ public class URLRepositoryManager extends AbstractRepositoryManager {
       catch (IOException exc) {
          return "Error downloading from URL: " + src.url + " details: " + exc.toString();
       }
+
+      if (info)
+         info("Completed download of url: " + src.url + " into: " + src.pkg.installedRoot);
 
       if (src.unzip) {
          String noSuffix = FileUtil.removeExtension(fileName);

@@ -31,6 +31,9 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
    public boolean allowNullElements = false;
    public boolean allowEmptyPartialElements = false;
 
+   /** From the IDE's perspective, by default a tree element  */
+   public boolean complexStringType = false;
+
    enum ParameterMapping {
       SKIP,      //  empty string - return this slot as the parentNode's value
       PROPAGATE, // "." in the param name slot
@@ -2329,5 +2332,9 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
             return false;
       }
       return result;
+   }
+
+   public boolean isComplexStringType() {
+      return complexStringType;
    }
 }

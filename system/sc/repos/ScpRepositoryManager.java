@@ -4,6 +4,7 @@
 
 package sc.repos;
 
+import sc.lang.IMessageHandler;
 import sc.layer.LayeredSystem;
 import sc.util.FileUtil;
 
@@ -12,8 +13,8 @@ import java.util.ArrayList;
 /**
  */
 public class ScpRepositoryManager extends AbstractRepositoryManager {
-   public ScpRepositoryManager(String managerName, String rootDir, boolean verbose) {
-      super(managerName, rootDir, verbose);
+   public ScpRepositoryManager(String managerName, String rootDir, IMessageHandler handler, boolean info) {
+      super(managerName, rootDir, handler, info);
    }
 
    public String doInstall(RepositorySource src) {
@@ -23,8 +24,8 @@ public class ScpRepositoryManager extends AbstractRepositoryManager {
       args.add("-r");
       args.add(src.url);
       args.add(resFile);
-      if (verbose)
-         System.out.println("Running: " + argsToString(args));
+      if (info)
+         info("Running: " + argsToString(args));
       String res = FileUtil.execCommand(args, null);
       if (res == null)
          return "Error: failed to run install command";
@@ -37,6 +38,8 @@ public class ScpRepositoryManager extends AbstractRepositoryManager {
                return "Failed to unzip: " + res + " into: " + noSuffix;
          }
       }
+      if (info)
+         info("Completed: " + argsToString(args));
       return null;
    }
 

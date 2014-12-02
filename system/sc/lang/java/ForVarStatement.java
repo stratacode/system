@@ -7,6 +7,7 @@ package sc.lang.java;
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
 
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.Iterator;
 
@@ -47,6 +48,23 @@ public class ForVarStatement extends ForStatement implements IVariable {
 
    public String getVariableName() {
       return identifier;
+   }
+
+   public void start() {
+      super.start();
+      if (type != null && expression != null) {
+         Object exprType = expression.getGenericType();
+         if (exprType != null && !ModelUtil.isArray(exprType) && !ModelUtil.isAssignableFrom(Collection.class, exprType)) {
+            displayTypeError("For loop - expression after the ':' must be an array or a java.util.Collection");
+         }
+         else {
+            Object componentType = ModelUtil.getArrayOrListComponentType(exprType);
+            Object varType = type.getTypeDeclaration();
+            if (componentType != null && !ModelUtil.isAssignableFrom(varType, componentType)) {
+               displayTypeError("The 'for' statement's variable type: " + ModelUtil.getTypeName(varType) + " does not match the collection's component type: " + ModelUtil.getTypeName(componentType) + "\n:   ");
+            }
+         }
+      }
    }
 
    public ExecResult exec(ExecutionContext ctx) {

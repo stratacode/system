@@ -4,6 +4,7 @@
 
 package sc.repos;
 
+import sc.lang.IMessageHandler;
 import sc.layer.LayeredSystem;
 
 import java.util.TreeMap;
@@ -14,12 +15,12 @@ import java.util.TreeMap;
 public class RepositorySystem {
    public String packageRoot;
 
-   public RepositorySystem(String rootDir, boolean verbose) {
+   public RepositorySystem(String rootDir, IMessageHandler handler, boolean info) {
       packageRoot = rootDir;
 
-      addRepositoryManager(new ScpRepositoryManager("scp", packageRoot, verbose));
-      addRepositoryManager(new GitRepositoryManager("git", packageRoot, verbose));
-      addRepositoryManager(new URLRepositoryManager("url", packageRoot, verbose));
+      addRepositoryManager(new ScpRepositoryManager("scp", packageRoot, handler, info));
+      addRepositoryManager(new GitRepositoryManager("git", packageRoot, handler, info));
+      addRepositoryManager(new URLRepositoryManager("url", packageRoot, handler, info));
    }
 
    public IRepositoryManager[] repositories;
@@ -33,5 +34,11 @@ public class RepositorySystem {
 
    public IRepositoryManager addRepositoryManager(IRepositoryManager mgr) {
       return repositoriesByName.put(mgr.getManagerName(), mgr);
+   }
+
+   public void setMessageHandler(IMessageHandler handler) {
+      for (IRepositoryManager mgr:repositoriesByName.values()) {
+         mgr.setMessageHandler(handler);
+      }
    }
 }

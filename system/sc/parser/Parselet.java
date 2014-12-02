@@ -628,4 +628,8 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       return getSemanticValueClass();
    }
 
+   /** From the IDE's perspective,  */
+   public boolean isComplexStringType() {
+      return false;
+   }
 }

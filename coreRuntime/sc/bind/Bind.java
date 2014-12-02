@@ -138,11 +138,11 @@ public class Bind {
       return bindInternal(dstObj, binding);
    }
 
-   public static Object selector(Object dstObj, String dstProp, IBinding [] boundProps, BindingDirection dir) {
+   public static Object selector(Object dstObj, String dstProp, Object [] boundProps, BindingDirection dir) {
       return selector(dstObj, TypeUtil.resolveObjectPropertyMapping(dstObj, dstProp), boundProps, dir);
    }
 
-   public static Object selector(Object dstObj, IBinding dstProp, IBinding[] boundProps, BindingDirection dir) {
+   public static Object selector(Object dstObj, IBinding dstProp, Object[] boundProps, BindingDirection dir) {
       SelectorBinding binding = new SelectorBinding(dstObj, dstProp, boundProps, dir);
       return bindInternal(dstObj, binding);
    }
@@ -319,7 +319,7 @@ public class Bind {
       return new CastBinding(theClass, boundArg);
    }
 
-   public static IBinding selectorP(IBinding[] boundProps) {
+   public static IBinding selectorP(Object[] boundProps) {
       return new SelectorBinding(boundProps);
    }
 

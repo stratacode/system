@@ -4,6 +4,8 @@
 
 package sc.repos;
 
+import sc.lang.IMessageHandler;
+import sc.lang.MessageType;
 import sc.layer.LayeredSystem;
 import sc.util.FileUtil;
 
@@ -14,7 +16,8 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
    public String managerName;
    public String packageRoot;
 
-   public boolean verbose;
+   public IMessageHandler messageHandler;
+   public boolean info;
 
    public boolean active = true;
 
@@ -32,10 +35,12 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       return packageRoot;
    }
 
-   public AbstractRepositoryManager(String mn, String reposRoot, boolean verbose) {
+   public AbstractRepositoryManager(String mn, String reposRoot, IMessageHandler handler, boolean info) {
       this.managerName = mn;
       packageRoot = reposRoot;
-      this.verbose = verbose;
+
+      this.messageHandler = handler;
+      this.info = info;
    }
 
    public String install(RepositorySource src) {
@@ -61,18 +66,18 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       // No last modified time for this source... assume it's up to date unless it's not installed
       if (packageTime == -1) {
          if (installedTime != -1) {
-            if (verbose)
-               System.out.println("Package: " + src.pkg.packageName + " already installed");
+            if (info)
+               info("Package: " + src.pkg.packageName + " already installed");
             return null;
          }
       }
       else if (installedTime > packageTime) {
-         if (verbose)
-            System.out.println("Package: " + src.pkg.packageName + " uptodate");
+         if (info)
+            info("Package: " + src.pkg.packageName + " uptodate");
          return null;
       }
-      if (verbose)
-         System.out.println("Installing package: " + src.pkg.packageName + " from: " + src.url);
+      if (info)
+         info("Installing package: " + src.pkg.packageName + " from: " + src.url);
       String err = doInstall(src);
       if (err != null) {
          tagFile.delete();
@@ -86,6 +91,14 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
    }
 
    public abstract String doInstall(RepositorySource src);
+
+   public void info(String infoMessage) {
+      if (messageHandler != null) {
+         messageHandler.reportMessage(infoMessage, null, -1, -1, MessageType.Info);
+      }
+      if (info)
+         System.out.println(infoMessage);
+   }
 
    public long getLastModifiedTime(RepositorySource src) {
       return -1;
@@ -104,5 +117,9 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
          sb.append(args.get(i));
       }
       return sb.toString();
+   }
+
+   public void setMessageHandler(IMessageHandler handler) {
+      this.messageHandler = handler;
    }
 }

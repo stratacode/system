@@ -4,6 +4,8 @@
 
 package sc.repos;
 
+import sc.lang.IMessageHandler;
+
 /**
  */
 public interface IRepositoryManager {
@@ -16,4 +18,6 @@ public interface IRepositoryManager {
 
    /** Returns the root dir defining where these packages should be installed */
    public String getPackageRoot();
+
+   public void setMessageHandler(IMessageHandler handler);
 }

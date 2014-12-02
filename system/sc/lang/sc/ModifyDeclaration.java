@@ -41,7 +41,7 @@ public class ModifyDeclaration extends TypeDeclaration {
    private transient boolean isStarting = false;
 
    public Object getDerivedTypeDeclaration() {
-      assert initialized;
+      //assert initialized;
 
       // Layer types can't be started here because we need to initialize the inheritPackage property
       // before we can set the layer's packagePrefix.  Before that is set, we don't know the type.

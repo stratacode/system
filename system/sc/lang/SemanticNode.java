@@ -894,6 +894,10 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       return null;
    }
 
+   public String getDependencyDisabledText() {
+      return null;
+   }
+
    /** Returns the statement which is aligned to the source for debugging purposes that contains this node. */
    public ISrcStatement getEnclosingSrcStatement() {
       for (ISemanticNode pnode = parentNode; pnode != null; pnode = pnode.getParentNode())

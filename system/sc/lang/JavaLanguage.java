@@ -346,6 +346,11 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    }
 
    public Sequence annotation = new Sequence("Annotation(,typeName,elementValue)"); // Forward
+   {
+      // The Annotation is composed entirely of Strings but in the IntelliJ's plugin we want to treat it as a 'composite' element, not collapse it into a String which is the default for
+      // parselet types which are composed of all strings.
+      annotation.complexStringType = true;
+   }
    Sequence elementValueArrayInitializer = new Sequence("(,[],[],,)");
 
    OrderedChoice elementValue =
