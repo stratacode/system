@@ -5132,6 +5132,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       else if (layer.initFailed && lpi.activate) {
          System.err.println("Layer: " + layer.getLayerName() + " failed to start");
+         anyErrors = true;
          return null;
       }
       return layer;
@@ -10611,6 +10612,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (layerPrefix == null) {
          layerPrefix = model.getRelDirPath();
          isRelDirPrefix = true;
+         if (relPath == null)
+            relPath = layerPrefix;
       }
 
       if (prefix != null && layerPrefix != null) {
@@ -10650,14 +10653,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // At the top-level, we might need to pull the prefix out of the model's type, like when you
       // from inside of the top-level layer directory.
       if (relPath == null && layerPrefix == null) {
-         // Don't include the package prefix here - it comes in below
-         /*
          String modelTypeName = modelType.typeName;
          if (modelTypeName.indexOf('.') != -1) {
             relPath = CTypeUtil.getPackageName(modelTypeName);
-            expectedName = CTypeUtil.prefixPath(relPath, expectedName);
+            // Don't include the package prefix here - it comes in below
+            //expectedName = CTypeUtil.prefixPath(relPath, expectedName);
          }
-         */
       }
 
       if (modelType != null && !modelType.typeName.equals(expectedName)) {
