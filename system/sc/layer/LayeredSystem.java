@@ -280,8 +280,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public long sysStartTime = -1;
    long buildStartTime = -1;
 
-   public boolean loadClassesInRuntime = true;
-
    /** A global setting turned on when in the IDE.  If true the original runtime is always 'java' - the default.  In the normal build env, if there's only one runtime, we never create the default runtime. */
    public static boolean javaIsAlwaysDefaultRuntime = false;
 
@@ -302,9 +300,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     */
    final static boolean layeredClassPaths = false;
 
-   /** When doing an incremental build, this optimization allows us to load the compiled class for final types. */
-   public boolean useCompiledForFinal = true;
-
    /* Stores the models which have been detected as changed based on their type name since the start of this build.  Preserved across the entire buildSystem call, i.e. even over a layered builds. */
    HashMap<String,IFileProcessorResult> changedModels = new HashMap<String, IFileProcessorResult>();
 
@@ -316,8 +311,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    HashSet<String> processedModels = new HashSet<String>();
 
    LinkedHashSet<String> viewedErrors = new LinkedHashSet<String>();
-
-   public boolean disableCommandLineErrors = false;
 
    /** Register an optional error handler for all system errors */
    public IMessageHandler messageHandler = null;
@@ -374,13 +367,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (messageHandler != null) {
          LayerUtil.reportMessageToHandler(messageHandler, error, srcEnt, node, MessageType.Error);
       }
-      if (disableCommandLineErrors)
+      if (options.disableCommandLineErrors)
          return true;
       if (viewedErrors == null)
          return false;
       if (viewedErrors.size() == 50) {
          System.err.println(".... too many errors - disabling command line layers");
-         disableCommandLineErrors = true;
+         options.disableCommandLineErrors = true;
          return true;
       }
       if (viewedErrors.add(error)) {
@@ -398,7 +391,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (messageHandler != null) {
          LayerUtil.reportMessageToHandler(messageHandler, warning, srcEnt, node, MessageType.Warning);
       }
-      if (disableCommandLineErrors)
+      if (options.disableCommandLineErrors)
          return true;
       // TODO: do we need viewedWarnings here?
       return false;
@@ -845,9 +838,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return FileUtil.concat(dir, SC_DIR, dirName);
    }
 
-   public LayeredSystem(String lastLayerName, List<String> initLayerNames, List<String> explicitDynLayers, String layerPathNames, String rootClassPath, Options options, IProcessDefinition useProcessDefinition, LayeredSystem parentSystem, boolean startInterpreter) {
+   public LayeredSystem(String lastLayerName, List<String> initLayerNames, List<String> explicitDynLayers, String layerPathNames, String rootClassPath, Options options, IProcessDefinition useProcessDefinition, LayeredSystem parentSystem, boolean startInterpreter, IExternalModelIndex extModelIndex) {
       this.options = options;
       this.peerMode = parentSystem != null;
+      this.externalModelIndex = extModelIndex;
 
       if (!peerMode) {
          disabledLayersIndex = new HashMap<String, Layer>();
@@ -934,11 +928,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          this.repositorySystem = new RepositorySystem(getStrataCodeDir("pkgs"), messageHandler, options.verbose);
       else {
          this.repositorySystem = parentSystem.repositorySystem;
-         disableCommandLineErrors = parentSystem.disableCommandLineErrors;
          messageHandler = parentSystem.messageHandler;
-         externalModelIndex = parentSystem.externalModelIndex;
-         loadClassesInRuntime = parentSystem.loadClassesInRuntime;
-         useCompiledForFinal = parentSystem.useCompiledForFinal;
       }
 
       if (initLayerNames != null) {
@@ -1100,7 +1090,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // When you run in the layer directory, the other runtime defines the root layer dir which we need as the layer path here since we specify all of the layers using absolute paths
             if (peerLayerPath == null && newLayerDir != null)
                peerLayerPath = newLayerDir;
-            LayeredSystem peerSys = new LayeredSystem(null, procLayerNames, explicitDynLayers, peerLayerPath, rootClassPath, options, proc, this, false);
+            LayeredSystem peerSys = new LayeredSystem(null, procLayerNames, explicitDynLayers, peerLayerPath, rootClassPath, options, proc, this, false, externalModelIndex);
 
             // Propagate any properties which directly go across to all peers
             if (!autoClassLoader)
@@ -2098,7 +2088,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // currently only correspond to the layers in files we've loaded so far.  Once an app has been run, we'll just
             // use the current app's layers.
             if (refLayer == null) {
-               for (Layer inactiveLayer:inactiveLayers) {
+               for (int i = 0; i < inactiveLayers.size(); i++) {
+                  Layer inactiveLayer = inactiveLayers.get(i);
                   if (inactiveLayer.exportImports)
                      inactiveLayer.findMatchingGlobalNames(prefix, candidates, retFullTypeName, true);
 
@@ -2120,7 +2111,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                typeIndex.addMatchingGlobalNames(prefix, candidates, retFullTypeName);
 
                if (!peerMode && peerSystems != null) {
-                  for (LayeredSystem peerSys:peerSystems) {
+                  for (int i = 0; i < peerSystems.size(); i++) {
+                     LayeredSystem peerSys = peerSystems.get(i);
                      peerSys.findMatchingGlobalNames(null, null, prefix, prefixPkg, prefixBaseName, candidates, retFullTypeName, srcOnly);
                   }
                }
@@ -2647,6 +2639,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       @Constant public TypeIndexMode typeIndexMode = TypeIndexMode.Lazy;
 
       @Constant public ArrayList<String> disabledRuntimes;
+
+      @Constant public boolean disableCommandLineErrors = false;
+
+      /** When doing an incremental build, this optimization allows us to load the compiled class for final types. */
+      @Constant public boolean useCompiledForFinal = true;
+
    }
 
    @MainSettings(produceJar = true, produceScript = true, execName = "bin/sc", debug = false, maxMemory = 1024)
@@ -3014,7 +3012,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             usage("The -dyn option was provided without a list of layers.  The -dyn option should be in front of the list of layer names you want to make dynamic.", args);
          }
 
-         sys = new LayeredSystem(buildLayerName, includeLayers, recursiveDynLayers, layerPath, classPath, options, null, null, startInterpreter);
+         sys = new LayeredSystem(buildLayerName, includeLayers, recursiveDynLayers, layerPath, classPath, options, null, null, startInterpreter, null);
          if (defaultLayeredSystem == null)
             defaultLayeredSystem = sys;
          currentLayeredSystem.set(sys);
@@ -7673,6 +7671,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // Also use this base loader as the core for the build loader
       if (buildClassLoader == null)
          buildClassLoader = loader;
+
+      if (!peerMode && peerSystems != null) {
+         for (LayeredSystem peerSys:peerSystems)
+            peerSys.setFixedSystemClassLoader(loader);
+      }
    }
 
    public void setAutoSystemClassLoader(ClassLoader loader) {
@@ -9476,7 +9479,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public boolean getUseCompiledForFinal() {
       // TODO: Even if buildAllFiles is true we want this optimization.  Otherwise, source will be loaded for the sc.bind classes
       // in the sys/sccore layer.  It sets compiled=true before we've even built so we should always load those files as binary.
-      return useCompiledForFinal;
+      return options.useCompiledForFinal;
    }
 
    public Object getTypeDeclaration(String typeName) {
@@ -9901,7 +9904,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       model = inactiveModelIndex.get(srcEnt.absFileName);
       if (model == null) {
-         Object result = parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, !disableCommandLineErrors);
+         Object result = parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, !options.disableCommandLineErrors);
          // We might have to load files for inactive types which the IDE is not maintaining.  So we always cache these
          // models in the local index so we avoid loading them over and over again.
          if (result instanceof ILanguageModel) {

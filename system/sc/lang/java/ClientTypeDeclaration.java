@@ -126,4 +126,10 @@ public class ClientTypeDeclaration extends TypeDeclaration implements IChangeabl
          return orig.getCompiledClass(init);
       return super.getCompiledClass(init);
    }
+
+   public Object getExtendsTypeDeclaration() {
+      if (orig != null)
+         return orig.getExtendsTypeDeclaration();
+      return super.getExtendsTypeDeclaration();
+   }
 }
