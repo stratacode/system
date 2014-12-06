@@ -5,7 +5,9 @@
 package sc.lang;
 
 import sc.lang.java.*;
+import sc.layer.IFileProcessorResult;
 import sc.layer.LayeredSystem;
+import sc.layer.SrcEntry;
 import sc.obj.Constant;
 import sc.type.TypeUtil;
 import sc.parser.*;
@@ -775,4 +777,5 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    public boolean getSupportsLongTypeSuffix() {
       return true;
    }
+
 }

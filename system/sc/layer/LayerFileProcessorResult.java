@@ -46,8 +46,7 @@ public class LayerFileProcessorResult implements IFileProcessorResult {
       if (processor.getLayerFile(srcEnt.relFileName) == this || processor.processInAllLayers) {
          SrcEntry src = srcEnt;
          LayeredSystem sys = srcEnt.layer.layeredSystem;
-         String newRelFile = FileUtil.concat(processor.templatePrefix == null ? null : processor.templatePrefix,
-                 FileUtil.concat(processor.prependLayerPackage ? srcEnt.layer.getPackagePath() : null, src.relFileName));
+         String newRelFile = processor.getOutputFileToUse(sys, this, src);
          String newFile = FileUtil.concat(processor.getOutputDirToUse(sys, buildSrcDir, buildLayer.buildDir),  newRelFile);
 
          // The layered system processes hidden layer files backwards.  So generate will be true the for the

@@ -602,6 +602,48 @@ public class FileUtil {
       return path;
    }
 
+   private static final int TEMP_DIR_TRYCT = 3;
+
+   public static File createTempDir(String prefix) {
+      File tempDir = new File(System.getProperty("java.io.tmpdir"));
+      String baseName = prefix + "-" + System.currentTimeMillis() + "-";
+
+      for (int ct = 0; ct < TEMP_DIR_TRYCT; ct++) {
+         File newDirName = new File(tempDir, baseName + ct);
+         if (newDirName.mkdir()) {
+            return newDirName;
+         }
+      }
+      throw new IllegalArgumentException("Failed to create temporary directory in: " + tempDir + " file: " + baseName + "0..." + baseName + (TEMP_DIR_TRYCT - 1));
+   }
+
+   public static boolean copyAllFiles(String srcDirName, String dstDirName, boolean mkdirs, FilenameFilter filter) {
+      File srcDir = new File(srcDirName);
+      File dstDir = new File(dstDirName);
+      if (mkdirs)
+         dstDir.mkdirs();
+
+      if (!dstDir.isDirectory()) {
+         System.err.println("*** Invalid destination directory for copyAllFiles: " + dstDirName);
+         return false;
+      }
+
+      boolean res = false;
+
+      List<String> allFiles = getRecursiveFiles(srcDirName, null, filter);
+      for (String file:allFiles) {
+         String srcFile = FileUtil.concat(srcDirName, file);
+         String dstFile = FileUtil.concat(dstDirName, file);
+         res |= copyFile(srcFile, dstFile, true);
+
+         if (!res) {
+            System.err.println("*** Error copying file: " + srcFile + " to: " + dstFile);
+            break;
+         }
+      }
+      return res;
+   }
+
    public static boolean copyFile(String srcFileName, String dstFileName, boolean mkdirs) {
       InputStream in = null;
       OutputStream out = null;

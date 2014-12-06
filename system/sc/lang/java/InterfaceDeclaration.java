@@ -217,11 +217,13 @@ public class InterfaceDeclaration extends TypeDeclaration {
 
       if (extendsBoundTypes != null) {
          for (Object impl:extendsBoundTypes) {
-            Object[] implResult = ModelUtil.getProperties(impl, modifier, includeAssigns);
-            if (implResult != null && implResult.length > 0) {
-               if (result == null)
-                  result = new ArrayList<Object>();
-               result.addAll(Arrays.asList(implResult));
+            if (impl != null) {
+               Object[] implResult = ModelUtil.getProperties(impl, modifier, includeAssigns);
+               if (implResult != null && implResult.length > 0) {
+                  if (result == null)
+                     result = new ArrayList<Object>();
+                  result.addAll(Arrays.asList(implResult));
+               }
             }
          }
       }

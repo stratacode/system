@@ -19,9 +19,6 @@ import sc.layer.deps.*;
 import sc.lifecycle.ILifecycle;
 import sc.obj.*;
 import sc.parser.*;
-import sc.repos.IRepositoryManager;
-import sc.repos.RepositoryPackage;
-import sc.repos.RepositorySource;
 import sc.repos.RepositorySystem;
 import sc.sync.SyncManager;
 import sc.sync.SyncOptions;
@@ -150,10 +147,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       setCurrent(this);
    }
 
-   public final static String SC_DIR = ".stratacode";
-   public final static String LAYER_PATH_FILE = "layerPath";
-   public final static String SC_SOURCE_PATH = "scSourcePath";
-
    @Constant
    public List<Layer> layers = new ArrayList<Layer>(16);
 
@@ -206,6 +199,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public boolean updateSystemClassLoader = false;  // After compiling, do we add buildDir and layer classpath to the sys classpath?
    
    public String runtimeLibsDir = null;   /* Frameworks like android which can't just include sc runtime classes from the classpath can specify this path, relative to the buildDir.  The build will look for the sc classes in its classpath.  If it finds scrt.jar, it copies it.   If it finds a buildDir, it generates it and places it in the lib dir.  */
+   public String runtimeSrcDir = null;   /* Some frameworks also may need to deploy the src to the core runtime - for example, to convert it to Javascript.  Set this property to the directory where the scrt-core-src.jar file should go */
+   public String strataCodeLibsDir = null; /* Or set this directory to have sc.jar either copied or built from the scSourcePath */
 
    public boolean systemCompiled = false;  // Set to true when the system has been fully compiled once
    public boolean buildingSystem = false;
@@ -1108,7 +1103,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
               peerSys.typeIndex.setSystem(peerSys);
             peerSys.disabledRuntimes = disabledRuntimes;
 
-            for (Layer inactiveLayer:inactiveLayers) {
+            for (int i = 0; i < inactiveLayers.size(); i++) {
+               Layer inactiveLayer = inactiveLayers.get(i);
                if (inactiveLayer.includeForProcess(proc)) {
                   Layer peerLayer = peerSys.getInactiveLayer(inactiveLayer.getLayerName(), false, !inactiveLayer.disabled, false);
                   if (peerLayer == null)
@@ -1659,7 +1655,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   private final static String[] runtimePackages = {"sc/util", "sc/type", "sc/bind", "sc/obj", "sc/dyn"};
+   /** This should ideally be synchronized with coreRuntime's Bind classes CompilerSettings - the two ways we build this src jar file */
+   private final static String[] runtimePackages = {"sc/util", "sc/type", "sc/bind", "sc/obj", "sc/dyn", "sc/js", "sc/sync"};
 
    /** Once we've reloaded a type, we may have added dependencies on that type which were lost after we flushed the type cache.  On the positive, the reverse deps are now fresh so all we have to do is to reload them. */
    public boolean staleModelDependencies(String typeName) {
@@ -1697,14 +1694,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       if (scSourcePath != null) {
-         String scRuntimePath = FileUtil.concat(scSourcePath, "coreRuntime");
+         String scRuntimePath = FileUtil.concat(scSourcePath, core ? "coreRuntime": "fullRuntime");
          File f = new File(scRuntimePath);
          if (!f.canRead())
             System.err.println("*** Unable to determine SCRuntimePath due to non-standard location of the sc.util, type, binding obj, and dyn packages");
          else
             return scRuntimePath;
       }
-      return "<error - missing layers/.sc/scSourcePath>/coreRuntime";
+      return "Error - sourcePath is not set in layers/.stratacode/scSourcePath";
    }
 
    private static String getSystemBuildLayer(String buildDirName) {
@@ -1794,6 +1791,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    private final static String STRATACODE_RUNTIME_FILE = "scrt.jar";
+
    private void syncRuntimeLibraries(String dir) {
       RuntimeRootInfo info = getRuntimeRootInfo();
       String outJarName = FileUtil.concat(dir, STRATACODE_RUNTIME_FILE);
@@ -1826,6 +1824,67 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          System.out.println("Copying scrt.jar from: " + info.zipFileName + " to: " + outJarName);
          if (!FileUtil.copyFile(info.zipFileName, outJarName, true))
             System.err.println("*** Attempt to copy sc runtime files from: " + info.zipFileName + " to lib directory: " + dir + " failed");
+      }
+   }
+
+   private final static String STRATACODE_RUNTIME_SRC_FILE = "scrt-core-src.jar";
+
+   private void syncRuntimeSrc(String dir) {
+      String srcDir = getStrataCodeRuntimePath(true, true);
+      File srcDirFile = new File(srcDir);
+
+      String outJarName = FileUtil.concat(dir, STRATACODE_RUNTIME_SRC_FILE);
+      if (dir != null && dir.length() > 0) {
+         File f = new File(dir);
+         f.mkdirs();
+      }
+
+      if (srcDirFile.isDirectory()) {
+         if (options.info)
+            System.out.println("Building scrt-core-src.jar from src dir: " + srcDir + " into: " + outJarName);
+         if (LayerUtil.buildJarFile(srcDir, null, outJarName, null,  runtimePackages, /* userClassPath */ null, LayerUtil.SRC_JAR_FILTER, options.verbose) != 0)
+            System.err.println("*** Failed trying to jar sc runtime src files into: " + outJarName + " from buildDir: " + srcDir);
+      }
+      else {
+         System.out.println("Copying scrt-core-src.jar from: " + srcDir + " to: " + outJarName);
+         if (!FileUtil.copyFile(srcDir, outJarName, true))
+            System.err.println("*** Failed to copy sc runtime files from: " + srcDir + " to: " + dir);
+      }
+   }
+
+   private final static String STRATACODE_LIBRARIES_FILE = "sc.jar";
+
+   private void syncStrataCodeLibraries(String dir) {
+      String fullRuntimeDir = getStrataCodeRuntimePath(false, false);
+      File srcDirFile = new File(fullRuntimeDir);
+
+      String outJarName = FileUtil.concat(dir, STRATACODE_LIBRARIES_FILE);
+      if (dir != null && dir.length() > 0) {
+         File f = new File(dir);
+         f.mkdirs();
+      }
+
+      if (srcDirFile.isDirectory()) {
+         String srcRoot = FileUtil.getParentPath(fullRuntimeDir);
+         String[] srcSubDirs = new String[] {"coreRuntime", "fullRuntime", "sc"};
+         File tempDir = FileUtil.createTempDir("scbuild");
+         String tempDirPath = tempDir.getPath();
+         for (String srcSubDir:srcSubDirs) {
+            String srcDir = FileUtil.concat(srcRoot, srcSubDir);
+            FileUtil.copyAllFiles(srcDir, tempDirPath, true, LayerUtil.CLASSES_JAR_FILTER);
+         }
+         if (options.info)
+            System.out.println("Building sc.jar from src dirs: " + srcRoot + " into: " + outJarName);
+         if (LayerUtil.buildJarFile(tempDir.getPath(), null, outJarName, null,  null, /* userClassPath */ null, LayerUtil.CLASSES_JAR_FILTER, options.verbose) != 0)
+            System.err.println("*** Failed trying to jar sc runtime src files into: " + outJarName + " from buildDir: " + tempDirPath);
+         else
+            FileUtil.removeFileOrDirectory(tempDir);
+      }
+      else {
+         String srcDirPath = srcDirFile.getPath();
+         System.out.println("Copying scr.jar from: " + srcDirPath + " to: " + outJarName);
+         if (!FileUtil.copyFile(srcDirPath, outJarName, true))
+            System.err.println("*** Failed to copy sc runtime files from: " + srcDirPath + " to: " + outJarName);
       }
    }
 
@@ -5183,9 +5242,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private void addQuotedPath(StringBuilder sb, String path) {
       sb.append(FileUtil.PATH_SEPARATOR);
       if (path.indexOf(' ') != -1) {
-         sb.append('"');
+         // this actually breaks the compile if there are spaces in it.
+         //sb.append('"');
          sb.append(path);
-         sb.append('"');
+         //sb.append('"');
       } else
          sb.append(path);
    }
@@ -6393,6 +6453,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (genLayer == buildLayer) {
          if (runtimeLibsDir != null) {
             syncRuntimeLibraries(runtimeLibsDir);
+         }
+         if (runtimeSrcDir != null) {
+            syncRuntimeSrc(runtimeSrcDir);
+         }
+         if (strataCodeLibsDir != null) {
+            syncStrataCodeLibraries(strataCodeLibsDir);
          }
       }
 
@@ -11670,8 +11736,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       boolean foundInPeer = false;
 
       if (!peerMode && peerSystems != null) {
-         // Need to also load this layer and any dependent layers as an inactive layers into the other runtimes if they are needed there.
-         for (LayeredSystem peerSys:peerSystems) {
+         for (int i = 0; i < peerSystems.size(); i++) {
+            LayeredSystem peerSys = peerSystems.get(i);
+
+           // Need to also load this layer and any dependent layers as an inactive layers into the other runtimes if they are needed there.
             if (layer.includeForProcess(peerSys.processDefinition)) {
                Layer peerRes = peerSys.getInactiveLayer(layer.getLayerName(), false, !layer.disabled, false);
                if (peerRes != null)

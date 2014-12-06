@@ -54,7 +54,7 @@ public class SelectorExpression extends ChainedExpression {
          idTypes = new IdentifierExpression.IdentifierType[sz];
          boundTypes = new Object[sz];
 
-         Object currentType = expression.getTypeDeclaration();
+         Object currentType = expression.getGenericType();
          for (int i = 0; i < selectors.size(); i++) {
             Selector sel = selectors.get(i);
             if (currentType == null) {
@@ -77,7 +77,7 @@ public class SelectorExpression extends ChainedExpression {
                   else {
                      IdentifierExpression.bindNextIdentifier(this, currentType, nextName, i, idTypes, boundTypes,
                                     vsel.isAssignment, vsel.arguments != null, vsel.arguments, bindingDirection, false);
-                     currentType = IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, vsel.arguments, i, getJavaModel(), i == 0 ? expression.getGenericType() : null);
+                     currentType = IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, vsel.arguments, i, getJavaModel(), currentType);
                   }
                }
                else if (sel instanceof ArraySelector) {
@@ -293,7 +293,28 @@ public class SelectorExpression extends ChainedExpression {
       }
 
       int last = selectors.size()-1;
-      return IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, getArguments(last), last, getJavaModel(), last == 0 ? expression.getGenericType() : null);
+      // TODO: isn't this just boundTypes[last]?
+      return IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, getArguments(last), last, getJavaModel(), last == 0 ? expression.getGenericType() : getGenericTypeForSelector(last-1, null));
+   }
+
+   private Object getGenericTypeForSelector(int i, Object currentType) {
+      if (currentType == null) {
+         currentType = i == 0 ? expression.getGenericType() : getGenericTypeForSelector(i-1, null);
+      }
+      Selector sel = selectors.get(i);
+      if (sel instanceof VariableSelector) {
+         VariableSelector vsel = (VariableSelector) sel;
+         return IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, vsel.arguments, i, getJavaModel(), currentType);
+      }
+      else if (sel instanceof ArraySelector) {
+         ArraySelector asel = (ArraySelector) sel;
+         if (boundTypes[i] == null)
+            return ModelUtil.getArrayComponentType(currentType);
+         return boundTypes[i];
+      }
+      else
+         System.err.println("*** unrecognized selector type:");
+      return null;
    }
 
    public Object getAssignedProperty() {

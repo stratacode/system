@@ -610,4 +610,8 @@ public abstract class Language implements IFileProcessor {
 
    public void validate() {
    }
+
+   public String getOutputFileToUse(LayeredSystem sys, IFileProcessorResult result, SrcEntry srcEnt) {
+      return srcEnt.relFileName;
+   }
 }

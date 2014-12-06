@@ -40,7 +40,7 @@ public class LayerUtil implements LayerConstants {
          mainLayerDir = System.getProperty("user.dir");
       }
       // If we use the -dyn option to selectively make layers dynamic, use a different build dir so that we can quickly switch back and forth between -dyn and not without rebuilding everything.
-      String prefix = sysBuildDir == null ?  FileUtil.concat(mainLayerDir, LayeredSystem.SC_DIR, sys.options.anyDynamicLayers ? "dynbuild" : "build") : sysBuildDir;
+      String prefix = sysBuildDir == null ?  FileUtil.concat(mainLayerDir, SC_DIR, sys.options.anyDynamicLayers ? "dynbuild" : "build") : sysBuildDir;
       prefix = FileUtil.concat(prefix, layer.getUnderscoreName());
       // TODO: remove this comment - this was a naive solution that caused headaches between JS marks all layers as compiled
       //return prefix + FileUtil.FILE_SEPARATOR + (layer.dynamic ? DYN_BUILD_DIRECTORY : BUILD_DIRECTORY);
@@ -209,10 +209,67 @@ public class LayerUtil implements LayerConstants {
       return l;
    }
 
-   public static final FilenameFilter CLASSES_JAR_FILTER = new ExtensionFilenameFilter(Arrays.asList(new String[]{"class", "properties", "sctp"}), true);
+   // TODO: Write a FilenameFilter which uses the logic in the IFileProcessor's to match class and source files.  We might need a new flag in there when the default is not accurate but we already know whether a file goes into the buildSrc or buildClasses folders.
+   // Note: ft and html are here for the sc4idea plugin which uses those extensions to load resources from the classpath for the file templates.
+   public static final FilenameFilter CLASSES_JAR_FILTER = new ExtensionFilenameFilter(Arrays.asList(new String[]{"class", "properties", "sctp", "xml", "jpg", "gif", "png", "ft", "html"}), true);
    public static final FilenameFilter SRC_JAR_FILTER = new ExtensionFilenameFilter(Arrays.asList(new String[]{"java", "properties", "sctp", "xml"}), true);
 
-   public static int buildJarFile(String buildDir, String prefix, String jarName, String typeName, String[] pkgs, String classPath, FilenameFilter jarFilter, boolean verbose) {
+   /**
+    * Before creating a Jar file, we go through and order the files by directory name and include an entry for each directory.
+    * For some reason, this makes a subtle difference in how IntelliJ processes Jar files from plugins - it won't recognize the file templates in the jar unless
+    * we have things ordered this way - with an explicit entry for the folder.   There may be a specific check for that folder in the zip file?
+    */
+   private static List<String> folderizeFileList(List<String> allClassFiles) {
+      int ndirs = 1;
+      Map<String, Object> dirList = new LinkedHashMap<String, Object>();
+      for (String fileName:allClassFiles) {
+         Map<String, Object> curDir = dirList;
+
+         String fileRest = fileName;
+         int slashIx;
+         do {
+            slashIx = fileRest.indexOf(FileUtil.FILE_SEPARATOR);
+            if (slashIx != -1) {
+               String dirName = fileRest.substring(0, slashIx);
+               Object dirEnt = curDir.get(dirName);
+               if (dirEnt instanceof String)
+                  throw new IllegalArgumentException("File and directory with same name!" + dirEnt);
+               Map<String,Object> nextDir = (Map<String,Object>) dirEnt;
+               if (nextDir == null) {
+                  nextDir = new LinkedHashMap<String,Object>();
+                  ndirs++;
+                  curDir.put(dirName, nextDir);
+               }
+               curDir = nextDir;
+               fileRest = fileRest.substring(slashIx+1);
+            }
+         } while (slashIx != -1 && fileRest.length() > 0);
+
+         if (fileRest.length() > 0) {
+            curDir.put(fileRest, fileName);
+         }
+      }
+      ArrayList<String> resFiles = new ArrayList<String>(allClassFiles.size() + ndirs);
+      addFilesToSubList(resFiles, dirList, "");
+      return resFiles;
+   }
+
+   private static void addFilesToSubList(ArrayList<String> resFiles, Map<String,Object> dirList, String curPath) {
+      for (Map.Entry<String,Object> fileEnt:dirList.entrySet()) {
+         String fileName = fileEnt.getKey();
+         Object fileValue = fileEnt.getValue();
+         if (fileValue instanceof String)
+            resFiles.add((String) fileValue);
+         else {
+            String dirPath = FileUtil.concat(curPath, fileName);
+            resFiles.add(dirPath);
+            Map<String,Object> dirEnt = (Map<String,Object>) fileValue;
+            addFilesToSubList(resFiles, dirEnt, dirPath);
+         }
+      }
+   }
+
+   public static int buildJarFile(String buildDir, String prefix, String jarName, String mainTypeName, String[] pkgs, String classPath, FilenameFilter jarFilter, boolean verbose) {
       List<String> args = null;
       File manifestTmp = null;
 
@@ -242,11 +299,13 @@ public class LayerUtil implements LayerConstants {
          }
          String opts;
 
-         if (typeName != null || classPath != null) {
+         allClassFiles = folderizeFileList(allClassFiles);
+
+         if (mainTypeName != null || classPath != null) {
             StringBuilder manifestChunk = new StringBuilder();
-            if (typeName != null) {
+            if (mainTypeName != null) {
                manifestChunk.append("Main-Class: ");
-               manifestChunk.append(typeName);
+               manifestChunk.append(mainTypeName);
                manifestChunk.append(FileUtil.LINE_SEPARATOR);
             }
             if (classPath != null) {

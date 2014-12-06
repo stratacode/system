@@ -268,7 +268,7 @@ public class RTypeUtil {
                      // Only override the method once for a given class.  Java has an annoying habit of returning
                      // interface methods that have different signatures from the class versions after the main
                      // methods in this list.  As long as we ignore those other methods, we get by ok.
-                     if (superMethodList[j] == methodList[j]) {
+                     if (j < methodList.length && superMethodList[j] == methodList[j]) {
                         // We start out sharing the array from our super class = make a copy on the
                         // first change only
                         if (superMethodList == methodList) {

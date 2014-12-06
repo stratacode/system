@@ -254,8 +254,27 @@ public abstract class JavaSemanticNode extends SemanticNode {
          }
          if (pnode instanceof NewExpression) {
             NewExpression newEx = (NewExpression) pnode;
-            if (newEx.classBody != null)
-               return newEx.getAnonymousType(false);
+            if (newEx.classBody != null) {
+               // When you have a value in the parameters for a new anonymous class, it's enclosing type is not the
+               // anonymous class but instead the anonymous classes enclosing class.
+               if (newEx.arguments != null) {
+                  boolean isParameter = false;
+                  ISemanticNode parent = parentNode;
+                  while (parent != null) {
+                     if (parent == newEx.arguments) {
+                        isParameter = true;
+                        break;
+                     }
+                     if (parent == newEx)
+                        break;
+                     parent = parent.getParentNode();
+                  }
+                  if (!isParameter)
+                     return newEx.getAnonymousType(false);
+               }
+               else
+                  return newEx.getAnonymousType(false);
+            }
          }
       }
       return null;

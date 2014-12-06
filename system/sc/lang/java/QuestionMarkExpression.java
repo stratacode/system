@@ -49,6 +49,11 @@ public class QuestionMarkExpression extends Expression {
          if (bindingDirection == BindingDirection.REVERSE)
             return Object.class;
          displayError("Types used in question mark operator do not match: ", " " + falseType + " != " + trueType);
+         try {
+            return ModelUtil.coerceTypes(trueType, falseType);
+         }
+         catch (IllegalArgumentException exc2) {
+         }
       }
       return null;
    }

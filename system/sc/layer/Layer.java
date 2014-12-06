@@ -183,7 +183,7 @@ public class Layer implements ILifecycle, LayerConstants {
    private List<Pattern> excludedPatterns; // Computed from the above
 
    /** Normalized paths relative to the layer directory that are excluded from processing */
-   public List<String> excludedPaths = new ArrayList<String>(Arrays.asList(LayerConstants.DYN_BUILD_DIRECTORY, LayerConstants.BUILD_DIRECTORY, "out", "bin", "lib", "build-save"));
+   public List<String> excludedPaths = new ArrayList<String>(Arrays.asList(LayerConstants.DYN_BUILD_DIRECTORY, LayerConstants.BUILD_DIRECTORY, LayerConstants.SC_DIR, "out", "bin", "lib", "build-save"));
 
    /** Set of paths to which are included in the src cache but not processed */
    public List<String> skipStartPaths = new ArrayList<String>();

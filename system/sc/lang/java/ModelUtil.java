@@ -161,7 +161,11 @@ public class ModelUtil {
                      // Special case - Class<E> - e.g. <E extends Enum<E>> EnumSet<E> allOf(Class<E> elementType)
                      if (ModelUtil.getTypeName(genParam).equals("java.lang.Class") && DynUtil.isType(argType)) {
                         // assert curParamType.isAssignableFrom(atp)
-                        paramMap.put(argParamName, argType = arguments.get(i).getGenericArgumentType());
+                        Object paramArgType = arguments.get(i).getGenericArgumentType();
+                        if (ModelUtil.isAssignableFrom(curParamType, paramArgType)) {
+                           argType = paramArgType;
+                           paramMap.put(argParamName, argType);
+                        }
                      }
                      else {
                         int paramPos = ModelUtil.getTypeParameterPosition(curParamType, argParamName);
@@ -279,6 +283,8 @@ public class ModelUtil {
                      return paramType;
                   return new ArrayTypeDeclaration(model.getModelTypeDeclaration(), paramType, StringUtil.repeat("[]", ndim));
                }
+               if (retType != null && isTypeVariable)
+                  return retType;
             }
          }
          return getTypeDeclFromType(typeContext, meth.getGenericReturnType(), false, model.getLayeredSystem());
@@ -518,9 +524,13 @@ public class ModelUtil {
          // Protected works for either the same package or a subclass
          case Protected:
             Object encType = getEnclosingType(member);
-            boolean val = ModelUtil.isAssignableFrom(encType, refType);
-            if (val)
-               return true;
+            Object refEnclType = refType;
+            while (refEnclType != null) {
+               boolean val = ModelUtil.isAssignableFrom(encType, refEnclType);
+               if (val)
+                  return true;
+               refEnclType = ModelUtil.getEnclosingType(refEnclType);
+            }
             // FALL THROUGH if false
             return ModelUtil.samePackage(refType, encType);
          default:
@@ -966,7 +976,47 @@ public class ModelUtil {
       while (o2 != null && !ModelUtil.isAssignableFrom(o2, c1))
          o2 = ModelUtil.getSuperclass(o2);
 
-      return o1 != null && o2 != null && ModelUtil.isAssignableFrom(o1, o2) ? o2 : o1;
+      // We found a class which matches so return that
+      if (o1 != null && o2 != null)
+         return ModelUtil.isAssignableFrom(o1, o2) ? o2 : o1;
+
+      if (o1 != null)
+         return o1;
+
+      if (o2 != null)
+         return o2;
+
+      o1 = findBestMatchingInterface(c1, c2, null);
+      o2 = findBestMatchingInterface(c2, c1, null);
+
+      if (o1 != null && o2 != null)
+         return ModelUtil.isAssignableFrom(o1, o2) ? o2 : o1;
+
+      if (o1 != null)
+         return o1;
+
+      if (o2 != null)
+         return o2;
+
+      return null;
+   }
+
+   public static Object findBestMatchingInterface(Object src, Object target, Object curRes) {
+      Object res = curRes;
+      Object[] impls = ModelUtil.getImplementsTypeDeclarations(src);
+      if (impls != null) {
+         for (Object impl:impls) {
+            if (ModelUtil.isAssignableFrom(impl, target)) {
+               if (res == null || ModelUtil.isAssignableFrom(res, impl))
+                  res = impl;
+            }
+            else {
+               // Look for any super-interfaces of this interface that might match.
+               res = findBestMatchingInterface(impl, target, res);
+            }
+         }
+      }
+      return res;
    }
 
    // TODO: replace with getRuntimeClass

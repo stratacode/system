@@ -4,6 +4,8 @@
 
 package sc.layer;
 
+import sc.util.FileUtil;
+
 import java.util.HashMap;
 
 /**
@@ -60,7 +62,11 @@ public class LayerFileProcessor implements IFileProcessor {
    /** When inheriting a file from a previous layer, should we use the .inh files and remove all class files like the Java case does? */
    public boolean inheritFiles = false;
 
+   /** For files that start with this prefix, do not include that prefix in the output path used for the file. e.g. with skipSrcPathPrefix = "resources", a path of "resources/icons/foo.gif" turns into "icons/foo.gif" */
+   public String skipSrcPathPrefix;
+
    private boolean producesTypes = false;
+
 
    public void validate() {
       if (useSrcDir && useClassesDir) {
@@ -102,6 +108,15 @@ public class LayerFileProcessor implements IFileProcessor {
 
    public String getOutputDir() {
       return outputDir;
+   }
+
+   public String getOutputFileToUse(LayeredSystem sys, IFileProcessorResult result, SrcEntry srcEnt) {
+      String relFileName = srcEnt.relFileName;
+      if (skipSrcPathPrefix != null && relFileName.startsWith(skipSrcPathPrefix))
+         relFileName = relFileName.substring(skipSrcPathPrefix.length() + 1);
+
+      return FileUtil.concat(templatePrefix == null ? null : templatePrefix,
+              FileUtil.concat(prependLayerPackage ? srcEnt.layer.getPackagePath() : null, relFileName));
    }
 
    public String getOutputDirToUse(LayeredSystem sys, String buildSrcDir, String layerBuildDir) {

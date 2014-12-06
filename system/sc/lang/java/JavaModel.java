@@ -58,6 +58,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    transient Object userData;
 
+   /** A flag used in the IDE when the userData has been mapped */
+   public transient boolean userDataMapped;
+
    /** During an add layer, this stores the old model - the one, this model replaced so we know how to do the refresh */
    transient public JavaModel replacesModel;
 
@@ -281,7 +284,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             Set<String> filesInPkg = layeredSystem.getFilesInPackage(pkgName);
             if (filesInPkg != null) {
                for (String impName:filesInPkg) {
-                  importsByName.put(impName, CTypeUtil.prefixPath(pkgName, impName));
+                  // A wildcard import should not override an explicit one
+                  if (importsByName.get(impName) == null)
+                     importsByName.put(impName, CTypeUtil.prefixPath(pkgName, impName));
                }
             }
             else {
@@ -2242,15 +2247,15 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       }
       hasErrors = true;
       if (layeredSystem != null) {
+         // Skip errors when the layer failed to start since they are most likely due to those errors
+         // TODO: should check for base layers and move this up so we don't report them in the IDE either?
+         if (layer != null && layer.errorsStarting)
+            return;
          // Already seen this error in this build
          if (layeredSystem.isErrorViewed(error, getSrcFile(), source)) {
             return;
          }
       }
-      // Skip errors when the layer failed to start since they are most likely due to those errors
-      // TODO: should check for base layers and move this up so we don't report them in the IDE either?
-      if (layer != null && layer.errorsStarting)
-         return;
       System.err.println(error);
    }
 
