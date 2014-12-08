@@ -3059,6 +3059,9 @@ public class ModelUtil {
             return ((IMethodDefinition) member).getReturnType();
          else if (member instanceof Class)
             return member;
+         // Either ParamTypeDeclaration or ParameterizedType
+         else if (ModelUtil.hasTypeParameters(member))
+            return member;
       }
       else if (type == JavaSemanticNode.MemberType.ObjectType) {
          return member;
