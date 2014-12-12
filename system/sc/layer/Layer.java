@@ -52,6 +52,7 @@ import java.util.zip.ZipFile;
  */
 public class Layer implements ILifecycle, LayerConstants {
    public final static Layer ANY_LAYER = new Layer();
+   public final static Layer ANY_INACTIVE_LAYER = new Layer();
 
    /** The name of the layer used to find it in the layer path dot separated, e.g. groupName.dirName */
    @Constant public String layerDirName;
@@ -2026,33 +2027,37 @@ public class Layer implements ILifecycle, LayerConstants {
 
    public void startAllTypes() {
       for (Iterator<String> srcFiles = getSrcFiles(); srcFiles.hasNext(); )  {
-         String srcFile = srcFiles.next();
-         IFileProcessor depProc = layeredSystem.getFileProcessorForFileName(srcFile, this, BuildPhase.Process);
-         String typeName;
-         // srcFile entries come back without suffixes... just ignore them.
-         if (depProc != null) {
-            String fullTypeName = CTypeUtil.prefixPath(depProc.getPrependLayerPackage() ? packagePrefix: null, FileUtil.removeExtension(srcFile).replace(FileUtil.FILE_SEPARATOR, "."));
-            TypeDeclaration td = (TypeDeclaration) layeredSystem.getSrcTypeDeclaration(fullTypeName, this.getNextLayer(), depProc.getPrependLayerPackage(), false, true, this, false);
-            if (td != null) {
-               ParseUtil.initAndStartComponent(td);
-            }
-            else {
-               String subPath = fullTypeName.replace(".", FileUtil.FILE_SEPARATOR);
-               SrcEntry srcEnt = getSrcFileFromTypeName(fullTypeName, true, depProc.getPrependLayerPackage(), subPath, false);
-               if (srcEnt != null) {
-                  // This happens for Template's which do not transform into a type - e.g. sctd files.  It's important that we record something for this source file so we don't re-parse the layer etc. next time.
-                  TypeIndex dummyIndex = new TypeIndex();
-                  dummyIndex.typeName = fullTypeName;
-                  dummyIndex.layerName = getLayerName();
-                  dummyIndex.processIdent = layeredSystem.getProcessIdent();
-                  dummyIndex.fileName = srcEnt.absFileName;
-                  dummyIndex.declType = DeclarationType.TEMPLATE; // Is it always a template?
-                  updateTypeIndex(dummyIndex);
+         try {
+            layeredSystem.acquireDynLock(false);
+            String srcFile = srcFiles.next();
+            IFileProcessor depProc = layeredSystem.getFileProcessorForFileName(srcFile, this, BuildPhase.Process);
+            String typeName;
+            // srcFile entries come back without suffixes... just ignore them.
+            if (depProc != null) {
+               String fullTypeName = CTypeUtil.prefixPath(depProc.getPrependLayerPackage() ? packagePrefix : null, FileUtil.removeExtension(srcFile).replace(FileUtil.FILE_SEPARATOR, "."));
+               TypeDeclaration td = (TypeDeclaration) layeredSystem.getSrcTypeDeclaration(fullTypeName, this.getNextLayer(), depProc.getPrependLayerPackage(), false, true, this, false);
+               if (td != null) {
+                  ParseUtil.initAndStartComponent(td);
+               } else {
+                  String subPath = fullTypeName.replace(".", FileUtil.FILE_SEPARATOR);
+                  SrcEntry srcEnt = getSrcFileFromTypeName(fullTypeName, true, depProc.getPrependLayerPackage(), subPath, false);
+                  if (srcEnt != null) {
+                     // This happens for Template's which do not transform into a type - e.g. sctd files.  It's important that we record something for this source file so we don't re-parse the layer etc. next time.
+                     TypeIndex dummyIndex = new TypeIndex();
+                     dummyIndex.typeName = fullTypeName;
+                     dummyIndex.layerName = getLayerName();
+                     dummyIndex.processIdent = layeredSystem.getProcessIdent();
+                     dummyIndex.fileName = srcEnt.absFileName;
+                     dummyIndex.declType = DeclarationType.TEMPLATE; // Is it always a template?
+                     updateTypeIndex(dummyIndex);
+                  } else {
+                     System.err.println("*** No type or src file found for index entry for source file: " + srcFile);
+                  }
                }
-               else {
-                  System.err.println("*** No type or src file found for index entry for source file: " + srcFile);
-               }
             }
+         }
+         finally {
+            layeredSystem.releaseDynLock(false);
          }
       }
    }

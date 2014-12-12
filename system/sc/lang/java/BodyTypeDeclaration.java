@@ -7672,8 +7672,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if (syncProps.size() > 0) {
             if (syncProperties == null)
                syncProperties = new ArrayList<SyncProperties>();
-            String destName = syncSystems.size() == 1 || rt == null ? null : rt.getDestinationName();
-            syncProperties.add(new SyncProperties(destName, syncGroup, syncProps.toArray(new Object[syncProps.size()]), flags));
+            String remoteDestName = syncSystems.size() == 1 || rt == null ? null : rt.getDestinationName();
+            syncProperties.add(new SyncProperties(remoteDestName, syncGroup, syncProps.toArray(new Object[syncProps.size()]), flags));
          }
       }
       if (filterDestinations != null) {

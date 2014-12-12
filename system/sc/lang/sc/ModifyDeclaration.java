@@ -1623,6 +1623,10 @@ public class ModifyDeclaration extends TypeDeclaration {
    }
 
    private Object getModifyObj() {
+      if (modifyTypeDecl == this) {
+         System.err.println("*** Modify type for: " + typeName + " points to this!");
+         return null;
+      }
       if (enumConstant)
          return getEnclosingType();
       return modifyTypeDecl == null ? modifyClass : modifyTypeDecl.resolve(false);

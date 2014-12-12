@@ -614,4 +614,7 @@ public abstract class Language implements IFileProcessor {
    public String getOutputFileToUse(LayeredSystem sys, IFileProcessorResult result, SrcEntry srcEnt) {
       return srcEnt.relFileName;
    }
+
+   public void resetBuild() {
+   }
 }

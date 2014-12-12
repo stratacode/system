@@ -16,10 +16,25 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Public, static methods used to programmatically create bindings.  Generated code uses this info.
- * When you add new code to the core runtime (i.e. used by GWT), you must add the package name to the jarPackages.
+ * This is the main set of interfaces to the data binding system.  It contains static methods which you
+ * can use to create bindings on objects and properties from the API perspective.  These static methods are used
+ * in the generated code to implement all bindings so it's easy to find examples by looking at the generated source.
+ * To create a simple binding use the
+ * Bind.bind() method.  You provide the destination object (i.e. the lhs), the name or property mapper for the destination property,
+ * the srcObject (if any) used in mapping the binding, and the list of properties in the chain (i.e. "a" and "b" in an a.b binding).
+ * Each binding can either be specified as the String name of the property or you can find the IBeanMapper and pass that in.
+ * When you use the IBeanMapper, lookups will be faster since an integer index is used rather than the String to do a hashtable lookup.
+ * You also specify the BindingDirection - forward, reverse or bidirectional.
+ * <p>
+ * The other types of bindings - method, arithmetic, cast, unary, condition, ternary, arrayElement, new and newArray.  There's also a constant
+ * binding you can use when you need to substitute a constant in an expression.  Finally there's an assignment binding which is used
+ * most commonly in reverse-only bindings to perform an assignment when the binding is fired.
+ * </p>
+ * <p>
+ * SC developers note: When you add new code to the core runtime (i.e. used by GWT), you must add the package name to the jarPackages.
  * You also must change the Bind's CompilerSettings in the full runtime and the StrataCode.gwt.xml file in the
  * core src root folder.
+ * </p>
  */
 @CompilerSettings(jarFileName="bin/scrt-core.jar", srcJarFileName="bin/scrt-core-src.jar",
                   jarPackages={"sc.type", "sc.js", "sc.bind", "sc.obj", "sc.dyn", "sc.util", "sc", "sc.sync"})
@@ -48,6 +63,13 @@ public class Bind {
 
    public static BindingManager bindingManager = new BindingManager();
 
+   /**
+    * Add a simple binding onto dstProp in dstObj.  Returns the initial value of the binding.  Takes an optional srcObj
+    * to refer to a constant object which starts the "a.b" chain of expressions.  Then it takes a list of boundProps -
+    * either String names of properties in the chain or IBeanMapper instances or nested bindings using the IBinding implementation (created with
+    * the bindP, methodP, etc. method calls).  The final parameter is the direction which
+    * can be forward, reverse or bi-directional.
+    */
    public static Object bind(Object dstObj, String dstProp, Object srcObj, Object[] boundProps, BindingDirection dir) {
       return bind(dstObj, TypeUtil.resolveObjectPropertyMapping(dstObj, dstProp), srcObj, boundProps, dir);
    }
@@ -65,6 +87,7 @@ public class Bind {
       return ((Number) val).intValue();
    }
 
+   /** Implements a top-level method binding */
    public static Object method(Object dstObj, String dstProp, Object method, IBinding[] boundArgs, BindingDirection dir) {
       return method(dstObj, TypeUtil.resolveObjectPropertyMapping(dstObj, dstProp), method, boundArgs, dir);
    }

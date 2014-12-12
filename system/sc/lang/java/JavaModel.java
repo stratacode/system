@@ -541,20 +541,6 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       typeIndex.clear();
    }
 
-   /** These are packages which do not check for source definitions during the resolution of a layer definition file */
-   private final static HashSet<String> systemLayerModelPackages = new HashSet<String>();
-   static {
-      systemLayerModelPackages.add("java.lang");
-      systemLayerModelPackages.add("java.util");
-      systemLayerModelPackages.add("sc.lang");
-      systemLayerModelPackages.add("sc.lang.sc");
-      systemLayerModelPackages.add("sc.lang.html");
-      systemLayerModelPackages.add("sc.lang.template");
-      systemLayerModelPackages.add("sc.layer"); // For LayeredSystem in the layerDef files
-      systemLayerModelPackages.add("sc"); // For looking up components of paths
-      systemLayerModelPackages.add("java"); // For looking up components of paths
-   }
-
    public Object findTypeDeclaration(String typeName, boolean addExternalReference) {
       return findTypeDeclaration(typeName, addExternalReference, false);
    }
@@ -578,7 +564,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       // Parsing the layer definition, need to skip over Java src in the standard packages: java.util and java.lang
       if (isLayerModel) {
          pkgName = CTypeUtil.getPackageName(typeName);
-         if (pkgName == null || systemLayerModelPackages.contains(pkgName))
+         if (pkgName == null || LayeredSystem.systemLayerModelPackages.contains(pkgName))
             skipSrc = true;
       }
 
@@ -597,7 +583,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
          if (isLayerModel && importedName != null) {
             pkgName = CTypeUtil.getPackageName(importedName);
-            if (pkgName != null && systemLayerModelPackages.contains(pkgName))
+            if (pkgName != null && LayeredSystem.systemLayerModelPackages.contains(pkgName))
                skipSrc = true;
          }
       }

@@ -119,6 +119,10 @@ public class LayerFileProcessor implements IFileProcessor {
               FileUtil.concat(prependLayerPackage ? srcEnt.layer.getPackagePath() : null, relFileName));
    }
 
+   public void resetBuild() {
+      fileIndex.clear();
+   }
+
    public String getOutputDirToUse(LayeredSystem sys, String buildSrcDir, String layerBuildDir) {
       return outputDir == null ?
               (useSrcDir ? buildSrcDir :

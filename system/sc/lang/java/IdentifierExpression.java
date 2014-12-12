@@ -1085,7 +1085,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       for (LayeredSystem syncSys:syncSystems) {
          if (!syncSys.enableRemoteMethods)
             continue;
-         Object peerType = syncSys.getTypeDeclaration(typeName);
+         Object peerType = syncSys.getTypeDeclaration(typeName, false, exprModel.getLayer(), false);
          Object enclPeerType = enclType == peerType ? peerType : syncSys.getTypeDeclaration(enclType.getFullTypeName());
          Object meth;
          ModelUtil.ensureStarted(peerType, false);
