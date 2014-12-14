@@ -50,21 +50,21 @@ import java.util.zip.ZipFile;
  * of application code - a single tree organized in a hierarchical name space of definitions.  Definitions
  * create classes, objects, or modify classes or objects.  These layers are merged together to create the
  * current application's program state.
- * <P>
+ * <p/>
  * The program state can be processed to produce Java code, then compiled to produce .class files.
  * This class has a main method which implements command line functionality to process and compile Java files.
- * <P>
+ * <p/>
  * The layered system is provided with a primary layer which is used as the most specific layer.  You can also
  * specify additional layers to include in the application ahead of the primary layer.  All of the layers
  * extended by these layers are expanded, duplicates are removed and the list is sorted into dependency order
  * producing the list of layers that define the application's initial state.
- * <P>
+ * <p/>
  * The layered system is used at build time to
  * generate the class path for the compiler, find source files to be compiled, and manage the compilation
  * process.  Tools also use the layered system to read and manage program elements, and (eventually) interpret layers.
  * Generated applications typically do not depend on the layered system unless they need to interpret code,
  * use the command line interpreter, or ohter tools to edit the program.
- * <p>
+ * <p/>
  * The layered system has a main for processing and compiling applications.  The processing phase generates Java
  * code as needed for any language extensions encountered and places these files into the build directory.  At
  * any given time, the layered system is modifying files in a single build directory.  By default, this is the
@@ -73,12 +73,12 @@ import java.util.zip.ZipFile;
  * in a single directory reducing the need for Jar files in making it easy to compartmentalize components.  Because
  * these packages are exposed to higher level programmers, the Java programmers make a concession in cleanliness for
  * the ease of use of all.
- * <p>
+ * <p/>
  * If a Java file does not use any language extensions
  * it can optionally be copied to the build directory along with the generated code so that you have one complete
  * source directory with all source, or it can be compiled directly from where it lives in the source tree.
  * After generating any Java files, any modified files are then compiled using a standard java compiler.
- * <p>
+ * <p/>
  * java v.layer.LayeredSystem [-a -dyn -i -nc -bo -cp <classpath> -lp <layerpath> ] [<includeLayerDir1> ... <includeLayerDirN-1>] <includeLayerN> [ -f <file-list> ]");
  * You must provide at least one layer name or directory.
  * Options:
@@ -86,31 +86,31 @@ import java.util.zip.ZipFile;
  * -cp: System class path.  By default, the layered system uses the current classpath to search for regular Java
  * classes that can be used by the code in the specified layers.  You can override this with the -cp option
  * or by constructing your own LayeredSystem.
- * <p>
+ * <p/>
  * -lp: Layer path.  Specifies a list of directories to search in order for layers.  Each directory you specify
  * should contain one or more layer directories.  Keep in mind that layer names are themselves hierarchical - the layer
  * path should contain the root of the layer tree.  So if your layer name is "foo.bar" the directory tree would look like:
  * layerDir/foo/bar where layerDir is in the layerPath.  If this option is not set, the value of the system property
  * sc.layer.path is used and if that is not set, the current directory is the only directory consulted for layers.
- * <p>
+ * <p/>
  * -dyn: treat layers following this option and those they extend as dynamic - i.e. any layers dragged in by this dependency that does not have compiledOnly=true are made dynamic.
- * <p>
+ * <p/>
  * -dynall: treat all layers named on the command line and all layers they include as dynamic even if they are not marked with the dynamic keyword.  Layers with compiledOnly=true are always compiled.
- * <p>
+ * <p/>
  * -dynone: treat layers named on the command line as dynamic even if they are not marked with the dynamic keyword.
- * <p>
+ * <p/>
  * -nc: Skip the compilation.  Useful when you are compiling the Java files with an IDE
- * <p>
+ * <p/>
  * -bo: Generate code for the build-layer only.  There are two ways you can manage the compilation.  By default,
  * all layers are merged and compiled into the buildDir of the last layer which is not interpreted.  With this
  * mode, only the last layer in the list is compiled - it assumes all of the extended layers have already been
  * compiled and so only generates and compiles any files added or modified in this layer.  This could greatly
  * speed compilation time in some cases.  Question: do we need a more flexible way to specify which layers
  * are compiled individually and merged via classpath versus recursively included and put into one directory?
- * <P>
+ * <p/>
  * -f <file1> <file2>.. files names following this argument are interpreted as names of files to be
  * compiled rather than layer names to be included.
- * <p>
+ * <p/>
  * -a: Process all files, update all dependency info.
  * The layered system generated dependency information which it uses to optimize future compiles unless
  * you specify the -a option during the compile.  The dependencies take into account all normal Java dependencies
@@ -119,27 +119,27 @@ import java.util.zip.ZipFile;
  * as it eliminates runtime errors caused by stale code and catches more errors at compile time.  These dependency
  * files are stored in each src directory and are named "process.dep".  You can read these files yourself to understand
  * what files each file in that directory depends upon for debugging problems.
- * <p>
+ * <p/>
  * -i: Start the command line interpreter editing a temporary layer.  Without -i, the command line interpreter where it edits the last layer.
- * <p>
+ * <p/>
  * -ni: Disable the command interpreter
- * <p>
+ * <p/>
  * -t <test-class-patterh>:  Run test classes matching this pattern.
- * <p>
+ * <p/>
  * -ta: Run all tests
- * <p>
+ * <p/>
  * -r <main-class-pattern>:  Run main classses matching this pattern.  All -r options pass remaining args to the main program.
- * <p>
+ * <p/>
  * -rs <main-class-pattern>:  Run main classses matching this pattern by executing the script in a new process
- * <p>
+ * <p/>
  * -ra: Run all main classes.
- * <p>
+ * <p/>
  * -d, -db, -ds:  Override the buildDir and buildSrcDir values.
- * <p>
+ * <p/>
  * -v, -vb, -vs, -vsa, -vba:  Turn on verbose info globally, for sync, for data binding, and more verbose versions of sync and data binding
- * <p>
+ * <p/>
  * -vh, -vha - verbose HTML and very verbose HTML
- * <p>
+ * <p/>
  * -vl - show the initial layers as in verbose
  */
 public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSystem {
@@ -197,7 +197,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    // TODO: Sadly this does not work at least on MacOSX
    public boolean updateSystemClassLoader = false;  // After compiling, do we add buildDir and layer classpath to the sys classpath?
-   
+
    public String runtimeLibsDir = null;   /* Frameworks like android which can't just include sc runtime classes from the classpath can specify this path, relative to the buildDir.  The build will look for the sc classes in its classpath.  If it finds scrt.jar, it copies it.   If it finds a buildDir, it generates it and places it in the lib dir.  */
    public String runtimeSrcDir = null;   /* Some frameworks also may need to deploy the src to the core runtime - for example, to convert it to Javascript.  Set this property to the directory where the scrt-core-src.jar file should go */
    public String strataCodeLibsDir = null; /* Or set this directory to have sc.jar either copied or built from the scSourcePath */
@@ -268,7 +268,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       initClassCache();
    }
 
-   static ThreadLocal<LayeredSystem> currentLayeredSystem = new ThreadLocal<LayeredSystem>();
+   static ThreadLocal<LayerUtil.LayeredSystemPtr> currentLayeredSystem = new ThreadLocal<LayerUtil.LayeredSystemPtr>();
 
    static LayeredSystem defaultLayeredSystem;
    long lastRefreshTime = -1;
@@ -290,7 +290,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * so, return it.  But if not, load it from the outside/in - i.e. pick the most specific version of that class.  The layered type system should catch class incompatibility errors that might exist (or at least it can evolve to
     * eliminate those errors).  In the more flexible layeredClassPaths model, we build all build layers and build the last compiled layer in a merged manner.  All dynamic layers are then in separate buildDir's which can be added andlet's be sure we have proper version - active or inactive
     * removed from the class path as needed.  This model lets us also more accurately detect when a subsequent layer's class will override a previous layer.
-    *
+    * <p/>
     * TODO: So we need to implement our own class loading to do this which I have not done.  Setting this to "true" gets part of the way.
     */
    final static boolean layeredClassPaths = false;
@@ -313,8 +313,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** Should we pick up the current class loader from the dynamic type system or used a fixed class loader (like in the plugin environment) */
    private boolean autoClassLoader = true;
 
-   /** For the master LayeredSystem only - the map from processident to TypeIndex HashMap, used to bootstrap the TypeIndexes, before the
-    * peerSystems are created.  */
+   /**
+    * For the master LayeredSystem only - the map from processident to TypeIndex HashMap, used to bootstrap the TypeIndexes, before the
+    * peerSystems are created.
+    */
    HashMap<String, SysTypeIndex> typeIndexProcessMap = null;
 
    TreeSet<String> customSuffixes = new TreeSet<String>();
@@ -325,6 +327,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    /** When you are running with the source to StrataCode, instead of just with sc.jar point this to the source root - i.e. the dir which holds coreRuntime, fullRuntime, and sc */
    public static String scSourcePath = null;
+
+   private LayerUtil.LayeredSystemPtr systemPtr;
 
    private void clearReverseTypeIndex() {
       typeIndex.clearReverseTypeIndex();
@@ -395,21 +399,31 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    List<String> activatedLayerNames = null;
 
    public void clearActiveLayers() {
-      for (Layer layer:layers) {
-         layer.removed = true;
+      activatedLayerNames = null;
+      for (Layer layer: layers) {
+         layer.destroyLayer();
       }
       layers.clear();
+      cleanupLayerFileProcessors();
+      Language.cleanupLanguages();
       layerDynStartPos = -1;
       specifiedLayers.clear();
 
       typesByName.clear();
+      typesByRootName.clear();
       modelIndex.clear();
       innerTypeCache.clear();
+
+      templateCache.clear();
 
       buildLayer = null;
       buildInfo = null;
       currentBuildLayer = null;
+      commonBuildLayer = null;
       lastLayer = null;
+      lastBuiltLayer = null;
+      lastStartedLayer = null;
+      lastCompiledLayer = null;
 
       layerIndex.clear();
       layerFileIndex.clear();
@@ -427,12 +441,38 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       typeGroupDeps.clear();
 
+      loadedBuildLayers.clear();
+
+      instancesByType.clear();
+      innerToOuterIndex.clear();
+
+      objectNameIndex.clear();
+
+      subTypesByType.clear();
+
+      if (buildClassLoader instanceof TrackingClassLoader) {
+         ClassLoader newLoader = ((TrackingClassLoader) buildClassLoader).resetBuildLoader();
+         Thread cur = Thread.currentThread();
+         if (cur.getContextClassLoader() == buildClassLoader)
+            cur.setContextClassLoader(newLoader);
+         buildClassLoader = newLoader;
+      }
+
+      if (typeIndexProcessMap != null) {
+         for (Map.Entry<String, SysTypeIndex> indexEnt : typeIndexProcessMap.entrySet()) {
+            SysTypeIndex sysTypeIndex = indexEnt.getValue();
+            sysTypeIndex.clearActiveLayers();
+         }
+      }
+
+      generatedLayers.clear();
+
       if (!peerMode && peerSystems != null) {
-         for (LayeredSystem peerSys:peerSystems)
+         for (LayeredSystem peerSys : peerSystems)
             peerSys.clearActiveLayers();
       }
 
-      resetBuild(true);
+      resetBuild(false);
    }
 
    public void activateLayers(List<String> layerNames) {
@@ -589,11 +629,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       */
       if (typeIndexProcessMap != null) {
-         for (Map.Entry<String,SysTypeIndex> indexEnt:typeIndexProcessMap.entrySet()) {
+         for (Map.Entry<String, SysTypeIndex> indexEnt : typeIndexProcessMap.entrySet()) {
             SysTypeIndex sysIndex = indexEnt.getValue();
             ArrayList<TypeIndex> typeIndexes = sysIndex.getTypeIndexes(typeName);
             if (typeIndexes != null) {
-               for (TypeIndex typeIndex:typeIndexes) {
+               for (TypeIndex typeIndex : typeIndexes) {
                   Layer layer = getInactiveLayerByPath(typeIndex.layerName, null, true);
                   if (layer != null) {
                      Object newTypeObj = layer.layeredSystem.getSrcTypeDeclaration(typeName, null, true, false, true, Layer.ANY_INACTIVE_LAYER, false);
@@ -744,8 +784,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    {
       registerDefaultAnnotationProcessor("sc.obj.Sync", SyncAnnotationProcessor.getSyncAnnotationProcessor());
    }
-   /** Keeps track of all of the active instances for dynamic types (when enabled) */
-   public HashMap<String, WeakIdentityHashMap<Object,Boolean>> instancesByType = new HashMap<String, WeakIdentityHashMap<Object,Boolean>>();
+
+   /**
+    * Keeps track of all of the active instances for dynamic types (when enabled)
+    */
+   public HashMap<String, WeakIdentityHashMap<Object, Boolean>> instancesByType = new HashMap<String, WeakIdentityHashMap<Object, Boolean>>();
 
    public WeakIdentityHashMap<Object, Object> innerToOuterIndex = new WeakIdentityHashMap<Object, Object>();
 
@@ -785,6 +828,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       public Layer layer;
       public String name;
       public int priority;
+
       TagPackageListEntry(String name, Layer layer, int priority) {
          this.name = name;
          this.layer = layer;
@@ -823,6 +867,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       allOrNoneFinalPackages.add("sc.lang.sc");  // For SCModel
       allOrNoneFinalPackages.add("sc.lang.template");  // For Template
    }
+
    public TreeSet<String> overrideFinalPackages = new TreeSet<String>();
 
    public String getStrataCodeDir(String dirName) {
@@ -834,6 +879,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public LayeredSystem(String lastLayerName, List<String> initLayerNames, List<String> explicitDynLayers, String layerPathNames, String rootClassPath, Options options, IProcessDefinition useProcessDefinition, LayeredSystem parentSystem, boolean startInterpreter, IExternalModelIndex extModelIndex) {
+      this.systemPtr = new LayerUtil.LayeredSystemPtr(this);
       this.options = options;
       this.peerMode = parentSystem != null;
       this.externalModelIndex = extModelIndex;
@@ -868,7 +914,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       Language.registerLanguage(TemplateLanguage.INSTANCE, "sct");
 
       // Not registering Javascript yet because it is not complete.  In most projects we just copy the JS files as well so don't need to parse them as a language
-      Language.initLanguage(JSLanguage.INSTANCE);
+      JSLanguage.INSTANCE.initialize();
 
       layerPath = layerPathNames;
       initLayerPath();
@@ -884,7 +930,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // If the layer path is explicitly specified, by default we store new files in the last
          // directory int eh layer path
          if (layerPathNames != null && layerPathDirs != null && layerPathDirs.size() > 0) {
-            newLayerDir = layerPathDirs.get(layerPathDirs.size()-1).getPath();
+            newLayerDir = layerPathDirs.get(layerPathDirs.size() - 1).getPath();
          }
          else
             newLayerDir = mapLayerDirName(".");
@@ -1023,7 +1069,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       // Create a new LayeredSystem for each additional runtime we need to satisfy the active set of layers.
       // Then purge any layers from this LayeredSystem which should not be here.
-      if (processes != null && processes.size() > 1 && (peerSystems == null || peerSystems.size() < processes.size()-1)) {
+      if (processes != null && processes.size() > 1 && (peerSystems == null || peerSystems.size() < processes.size() - 1)) {
          // We want all of the layered systems to use the same buildDir so pass it through options as though you had used the -d option.  Of course if you use -d, it will happen automatically.
          if (options.buildDir == null) {
             if (lastLayer != null && !lastLayer.buildSeparate)
@@ -1046,7 +1092,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // If we have any peer systems, see if we have already created one for this runtime
             if (peerSystems != null) {
                LayeredSystem processPeer = null;
-               for (LayeredSystem peer:peerSystems) {
+               for (LayeredSystem peer: peerSystems) {
                   if (ProcessDefinition.compare(peer.processDefinition, proc)) {
                      processPeer = peer;
                      break;
@@ -1074,7 +1120,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                // may also need to be in this runtime.  For any new layers, that have been added since the last initRuntimes call,
                // we have them in the core layered system at this stage, even if they do not belong there in the long term.
                if (peerSystems != null) {
-                  for (LayeredSystem oldPeerSys:peerSystems) {
+                  for (LayeredSystem oldPeerSys : peerSystems) {
                      // As well as those layers in any peer runtimes that exist that as belong in the other runtime
                      oldPeerSys.addIncludedLayerNamesForProc(proc, procLayerNames, false);
                   }
@@ -1100,7 +1146,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   typeIndexProcessMap.put(peerSys.getTypeIndexIdent(), peerSys.typeIndex);
             }
             else
-              peerSys.typeIndex.setSystem(peerSys);
+               peerSys.typeIndex.setSystem(peerSys);
             peerSys.disabledRuntimes = disabledRuntimes;
 
             for (int i = 0; i < inactiveLayers.size(); i++) {
@@ -1121,7 +1167,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             peerSystems.addAll(newPeers);
 
          // Each layered system gets a list of the other systems
-         for (LayeredSystem peer:peerSystems) {
+         for (LayeredSystem peer: peerSystems) {
             ArrayList<LayeredSystem> peerPeers = (ArrayList<LayeredSystem>) peerSystems.clone();
             peerPeers.remove(peer);
             peerPeers.add(this);
@@ -1129,8 +1175,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
 
          if (modelListeners != null) {
-            for (IModelListener ml:modelListeners) {
-               for (LayeredSystem newPeer:newPeers) {
+            for (IModelListener ml: modelListeners) {
+               for (LayeredSystem newPeer: newPeers) {
                   ml.runtimeAdded(newPeer);
                }
             }
@@ -1143,7 +1189,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          processDefinition = processes != null && processes.size() > 0 ? processes.get(0) : null;
          runtimeProcessor = processDefinition == null ? null : processDefinition.getRuntimeProcessor();
          if (peerSystems != null) {
-            for (LayeredSystem peerSys:peerSystems) {
+            for (LayeredSystem peerSys: peerSystems) {
                updateSystemLayers(peerSys);
             }
          }
@@ -1153,7 +1199,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       setCurrent(curSys);
    }
 
-   /** Designed to be called from the main layered system */
+   /**
+    * Designed to be called from the main layered system
+    */
    private void updateSystemLayers(LayeredSystem peerSys) {
       if (peerMode)
          System.err.println("*** Warning - updating system layers from a peer system!");
@@ -1321,7 +1369,23 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return true;
    }
 
+   public void performExitCleanup() {
+      if (options.clearOnExit) {
+         acquireDynLock(false);
+         try {
+            destroySystem();
+         }
+         finally {
+            releaseDynLock(false);
+         }
+      }
+   }
+
    public void destroySystem() {
+      clearActiveLayers();
+
+      TransformUtil.clearTemplateCache();
+
       runtimes.remove(runtimeProcessor);
       processes.remove(processDefinition);
       setCurrent(null);
@@ -1332,10 +1396,33 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          peerSystems = null; // cull the reference graph to these
       }
+      lastInitedInactiveLayer = null;
       inactiveModelIndex = null;
       modelIndex = null;
+      if (inactiveLayers != null) {
+         for (Layer l:inactiveLayers) {
+            l.destroyLayer();
+         }
+      }
+      if (disabledLayers != null) {
+         for (Layer l:disabledLayers) {
+            l.destroyLayer();
+         }
+      }
+      Language.cleanupLanguages();
+      if (buildClassLoader instanceof TrackingClassLoader)
+         buildClassLoader = ((TrackingClassLoader) buildClassLoader).resetBuildLoader();
       inactiveLayers = null;
+      inactiveLayerIndex = null;
       layers = null;
+      fileProcessors = null;
+      filePatterns = null;
+      disabledLayers = null;
+      disabledLayersIndex = null;
+
+      // Various threads might still hold onto the systemPtr but let them GC the LayeredSystem object
+      // Maybe a more robust way to do this would be to enumerate the thread local map and remove any refs to this system so we don't even leak those objects.
+      systemPtr.system = null;
    }
 
    /**
@@ -2029,6 +2116,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       //if (mode.doLibs() || sysLayer.buildSeparate || sysLayer == buildLayer) {
       if (mode.doLibs() || sysLayer.isBuildLayer()) {
          if (sysLayer != null) {
+
+            // We use one class loader for both the active and inactive types.  The .class files loaded will be the same for both
+            // so there's no point in registering them multiple times.  When we deactivate layers, we really can't unpeel them from
+            // the class loader onion due to dependencies that might have formed.  At some point, we might need to flush the entire
+            // inactive type system when we deactivate and reactivate layers.  Really the active layers should be in a separate
+            // process which we communicate with to do the builds.  That way we have multiple of these build processes, one for each
+            // bundle of layers.
+            if (mode.doLibs() && buildClassLoader instanceof TrackingClassLoader) {
+               if (((TrackingClassLoader) buildClassLoader).hasLibsForLayer(sysLayer))
+                  return;
+            }
+
             URL[] layerURLs = getLayerClassURLs(sysLayer, lastPos, mode);
             if (layerURLs.length > 0) {
                if (options.verbose) {
@@ -2119,14 +2218,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (sys == null)
          currentLayeredSystem.remove();
       else
-         currentLayeredSystem.set(sys);
+         currentLayeredSystem.set(sys.systemPtr);
    }
 
    public static LayeredSystem getCurrent() {
-      LayeredSystem cur = currentLayeredSystem.get();
-      if (cur == null)
-         cur = defaultLayeredSystem;
-      return cur;
+      LayerUtil.LayeredSystemPtr cur = currentLayeredSystem.get();
+      if (cur == null || cur.system == null)
+         return defaultLayeredSystem;
+      return cur.system;
    }
 
    public String getSystemClass(String name) {
@@ -2734,6 +2833,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       /** When doing an incremental build, this optimization allows us to load the compiled class for final types. */
       @Constant public boolean useCompiledForFinal = true;
 
+      /** Should we clear up all data structured after running the program (for better heap diagnostics) */
+      @Constant public boolean clearOnExit = true;
    }
 
    @MainSettings(produceJar = true, produceScript = true, execName = "bin/sc", debug = false, maxMemory = 1024)
@@ -3104,7 +3205,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          sys = new LayeredSystem(buildLayerName, includeLayers, recursiveDynLayers, layerPath, classPath, options, null, null, startInterpreter, null);
          if (defaultLayeredSystem == null)
             defaultLayeredSystem = sys;
-         currentLayeredSystem.set(sys);
+         currentLayeredSystem.set(sys.systemPtr);
       }
       catch (IllegalArgumentException exc) {
          String message = exc.toString();
@@ -3249,7 +3350,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
 
          if (options.runClass != null) {
-            // Do we need one monolithic class loader or is the layered class loader design good enough?
+            // TODO: Do we need one monolithic class loader or is the layered class loader design viable in all situations?
             // Originally I thought JPA required the monolithic thing but really it just needed the context
             // class loader set in the interpreter thread
             //sys.resetClassLoader();
@@ -3300,6 +3401,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          System.err.println("*** Uncaught error running test commands: " + exc);
          exc.printStackTrace();
          System.exit(-1);
+      }
+
+      // If the interpreter is started, it's responsible for the cleanup when it exits - which will be after this guy because it can't start till it gets the lock.
+      if (!startInterpreter) {
+         sys.performExitCleanup();
       }
 
       PerfMon.end("main");
@@ -5276,7 +5382,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          //sb.append('"');
          sb.append(path);
          //sb.append('"');
-      } else
+      }
+      else
          sb.append(path);
    }
 
@@ -5878,7 +5985,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (curSys != null && curSys.typeIndex == null)
             curSys.typeIndex = curTypeIndex;
 
-         for (String indexFileName : filesToProcess.keySet()) {
+         for (String indexFileName:filesToProcess.keySet()) {
             if (!filesToProcess.get(indexFileName)) {
                if (indexFileName.endsWith(Layer.TYPE_INDEX_SUFFIX)) {
                   String uname = indexFileName.substring(0, indexFileName.length() - Layer.TYPE_INDEX_SUFFIX.length());
@@ -6025,7 +6132,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (curTypeIndex == TypeIndex.EXCLUDED_SENTINEL)
                continue;
             String ext = FileUtil.getExtension(path);
-            if (curTypeIndex != null || Language.isParseable(path) || (ext != null && customSuffixes.contains(ext))) {
+            if (curTypeIndex != null || isParseable(path) || (ext != null && customSuffixes.contains(ext))) {
                if (curTypeIndex == null || lastModified < subF.lastModified()) {
                   try {
                      acquireDynLock(false);
@@ -6165,7 +6272,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       for (String fn:files) {
          if (layer != null && layer.excludedFile(fn, null))
             continue;
-         if (Language.isParseable(fn) || fn.endsWith(".class"))
+         if (isParseable(fn) || fn.endsWith(".class"))
             addToPackageIndex(rootDir, layer, false, false, relDir, fn);
          else {
             File subDir = new File(dirFile, fn);
@@ -7734,6 +7841,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    /**
+    * TODO - maybe remove this?  It's not used anymore.
     * Before we run any application code, we want to build a single canonical class loader used by the system.
     * We'll throw away the existing one and flush out any classes loaded for compilation.  The issue is that some
     * systems like openJPA use their class loader to load resources etc.  This class loader needs to have access to
@@ -8067,6 +8175,37 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          fileProcessors.put(ext, newProcs);
       }
       systemDetailsDisplayed = false;
+   }
+
+   public void cleanupLayerFileProcessors() {
+      HashMap<String,IFileProcessor[]> newMap = new HashMap<String,IFileProcessor[]>();
+      for (Map.Entry<String,IFileProcessor[]> procEnt:fileProcessors.entrySet()) {
+         ArrayList<IFileProcessor> newProcs = null;
+         IFileProcessor[] procs = procEnt.getValue();
+         for (IFileProcessor proc:procs) {
+            Layer l = proc.getDefinedInLayer();
+            if (l == null || !l.removed) {
+               if (newProcs == null)
+                  newProcs = new ArrayList<IFileProcessor>();
+               newProcs.add(proc);
+            }
+         }
+         if (newProcs != null)
+            newMap.put(procEnt.getKey(), newProcs.toArray(new IFileProcessor[newProcs.size()]));
+      }
+      fileProcessors = newMap;
+
+      LinkedHashMap<Pattern,IFileProcessor> newFilePatterns = new LinkedHashMap<Pattern,IFileProcessor>();
+      if (filePatterns.size() > 0) {
+         for (Map.Entry<Pattern, IFileProcessor> ent : filePatterns.entrySet()) {
+            Pattern patt = ent.getKey();
+            IFileProcessor fproc = ent.getValue();
+            Layer l = fproc.getDefinedInLayer();
+            if (l == null || !l.activated)
+               newFilePatterns.put(patt, fproc);
+         }
+      }
+      filePatterns = newFilePatterns;
    }
 
    public IFileProcessor getFileProcessorForExtension(String ext) {
@@ -12388,6 +12527,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public boolean isDisabled() {
       return isRuntimeDisabled(getRuntimeName());
+   }
+
+   public boolean isParseable(String fileName) {
+      IFileProcessor proc = getFileProcessorForFileName(fileName, null, BuildPhase.Process);
+      if (proc != null)
+         return proc.isParsed();
+      return Language.isParseable(fileName);
    }
 
 }

@@ -53,4 +53,7 @@ public interface IFileProcessor {
    String getOutputFileToUse(LayeredSystem sys, IFileProcessorResult result, SrcEntry srcEnt);
 
    void resetBuild();
+
+   /** Returns true for Language implementations that are parseable. */
+   boolean isParsed();
 }

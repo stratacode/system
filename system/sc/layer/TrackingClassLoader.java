@@ -59,6 +59,8 @@ public class TrackingClassLoader extends URLClassLoader {
     * </p>
     */
    private void disableBuildLoaders(TrackingClassLoader parent) {
+      if (disabled)
+         return;
       if (buildLoader && (layer == null || !layer.buildSeparate)) {
          disabled = true;
          replaceLoader = parent;
@@ -69,6 +71,8 @@ public class TrackingClassLoader extends URLClassLoader {
          if (layer != null && parentLayer != null && layer.extendsLayer(parentLayer))
             parentTrackingLoader.disableBuildLoaders(parent);
       }
+      if (disabled)
+         layer = null;
    }
 
    protected Class loadClass (String name, boolean resolve) throws ClassNotFoundException {
@@ -113,4 +117,25 @@ public class TrackingClassLoader extends URLClassLoader {
       return loaded.contains(className) || (parentTrackingLoader != null && parentTrackingLoader.isLoaded(className));
    }
 
+   public boolean hasLibsForLayer(Layer sysLayer) {
+      if (!disabled && !buildLoader && layer != null && layer.getLayerName().equals(sysLayer.getLayerName()))
+         return true;
+      if (parentTrackingLoader != null)
+         return parentTrackingLoader.hasLibsForLayer(sysLayer);
+      return false;
+   }
+
+   public ClassLoader resetBuildLoader() {
+      // We currently do not remove inactive layers but will remove active layers.  Don't want a reference to a deleted layer sticking around in the class loader
+      if (buildLoader || (layer != null && (layer.activated || layer.removed))) {
+         disabled = true;
+         layer = null; // release the reference to the layer
+         if (parentTrackingLoader != null) {
+            return parentTrackingLoader.resetBuildLoader();
+         }
+         if (nonTrackingParent != null)
+            return nonTrackingParent;
+      }
+      return this;
+   }
 }

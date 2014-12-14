@@ -32,6 +32,11 @@ public class LayerListTypeIndex {
       modifyTypeIndex.clear();
    }
 
+   public void clearTypeIndex() {
+      typeIndex.clear();
+      layersList.clear();
+   }
+
    private void visitIndexEntry(String layerName, LayerTypeIndex lti, HashSet<String> visitedLayers) {
       if (visitedLayers.contains(layerName))
          return;
@@ -92,5 +97,10 @@ public class LayerListTypeIndex {
          }
          visitIndexEntry(layerName, lti, visitedLayers);
       }
+   }
+
+   public void clear() {
+      clearTypeIndex();
+      clearReverseTypeIndex();
    }
 }

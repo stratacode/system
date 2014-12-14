@@ -368,12 +368,6 @@ public class Sequence extends NestedParselet  {
                   }
                   */
                   /*
-                  if (snl.contains(esv))
-                     System.out.println("***");
-                  else
-                     snl.add(esv);
-                  err.startIndex = parser.currentIndex;
-                  */
                   //err.partialValue = snl;
                   // TODO: Seems like we should not always be returning true here but instead should have
                   // a mechanism to be sure this error is extended - like check if the parselet types match and

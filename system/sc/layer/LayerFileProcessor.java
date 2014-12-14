@@ -180,4 +180,8 @@ public class LayerFileProcessor implements IFileProcessor {
       sb.append("LayerFileProcessor: definedInLayer: " + definedInLayer + " for phase: " + buildPhase + " prependLayerPackage=" + prependLayerPackage + " outputDir=" + outputDir + " templatePrefix=" + templatePrefix + " useCommonBuildDir=" + useCommonBuildDir);
       return sb.toString();
    }
+
+   public boolean isParsed() {
+      return false;
+   }
 }

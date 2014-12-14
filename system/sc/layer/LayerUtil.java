@@ -24,6 +24,13 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 public class LayerUtil implements LayerConstants {
+   public static class LayeredSystemPtr {
+      public LayeredSystem system;
+      public LayeredSystemPtr(LayeredSystem sys) {
+         this.system = sys;
+      }
+   }
+
    public static String getLayerJavaFileFromName(String layerName) {
       return layerName + FileUtil.FILE_SEPARATOR + LAYER_CLASS_NAME + ".java";
    }

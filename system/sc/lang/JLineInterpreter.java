@@ -89,6 +89,7 @@ public class JLineInterpreter extends AbstractInterpreter implements Runnable, C
                }
             }
             if (nextLine == null) {
+               system.performExitCleanup();
                if (pendingInput.length() > 0) {
                   System.err.println("EOF with unprocessed input: " + pendingInput);
                   return false;
@@ -124,9 +125,12 @@ public class JLineInterpreter extends AbstractInterpreter implements Runnable, C
    }
 
 
-   /** TODO: This is here as part of the thread implementation... should not be exposed to command methods.  needs @private */
+   /**
+    * TODO: This is here as part of the thread implementation... should not be exposed to command methods.
+    * Maybe We should add a special annotation here to mark public methods that are really supposed to be private to layers above the annotation.
+    */
    public void run() {
-      System.exit(readParseLoop() ? 0 : 1);
+      System.exit(readParseLoop() && !system.anyErrors ? 0 : 1);
    }
 
    public int getTermWidth() {

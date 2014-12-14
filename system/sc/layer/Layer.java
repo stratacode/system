@@ -1183,11 +1183,7 @@ public class Layer implements ILifecycle, LayerConstants {
          String ext = FileUtil.getExtension(fn);
          IFileProcessor proc = ext == null ? null : layeredSystem.getFileProcessorForExtension(ext, this, null);
 
-         // Only cache files with a language processor attached
-         if (!Language.isParseable(fn))
-            proc = null;
-
-         if (proc != null) {
+         if (proc != null && proc.isParsed()) {
             String srcPath = FileUtil.concat(prefix, fn);
             // Register under both the name with and without the suffix
             srcDirCache.put(srcPath, f);
@@ -3278,10 +3274,15 @@ public class Layer implements ILifecycle, LayerConstants {
       }
    }
 
+   public void registerFileProcessor(IFileProcessor proc, String ext) {
+      layeredSystem.registerFileProcessor(ext, proc, this);
+   }
+
    public void registerLanguage(Language lang, String ext) {
       if (ext == null)
          throw new IllegalArgumentException("Null extension pass to registerLanguage");
-      Language.registerLanguage(lang, ext);
+      //Language.registerLanguage(lang, ext);
+      layeredSystem.registerFileProcessor(ext, lang, this);
       if (layerTypeIndex.langExtensions == null) {
          layerTypeIndex.langExtensions = new String[] {ext};
       }
@@ -3321,6 +3322,17 @@ public class Layer implements ILifecycle, LayerConstants {
 
    public void disableLayer() {
       layeredSystem.disableLayer(this);
+   }
+
+   public void destroyLayer() {
+      removed = true;
+      stop();
+      layerModels = null;
+      if (baseLayers != null)
+         baseLayers.clear();
+      relSrcIndex = null;
+      srcDirs = null;
+      srcDirCache = null;
    }
 }
 

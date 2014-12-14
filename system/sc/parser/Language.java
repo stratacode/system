@@ -15,6 +15,7 @@ import sc.util.PerfMon;
 import java.io.*;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 /** 
@@ -53,6 +54,8 @@ public abstract class Language implements IFileProcessor {
    String[] semanticValueClassPath;
 
    public boolean debug = false;
+
+   public boolean initialized = false;
 
    /** The generation scheme works in two modes: when trackTranges=true, each property change automatically updates the generated result.  When it is false, we invalidate changed nodes and only revalidate them as needed.  tracking changes is better for debugging but a little slower */
    public boolean trackChanges = false;
@@ -396,12 +399,14 @@ public abstract class Language implements IFileProcessor {
 
    /* Maintains the set of languages currently registered in this class loader */
 
+   // TODO: move this into LayeredSystem - using LayeredSystem.getCurrent() - but we should not have static stuff that could change between layered systems
+   // if we have more than one in a runtime.
    public static Map<String,Language> languages = new HashMap<String,Language>();
 
    public String languageName;
 
    public static void registerLanguage(Language l, String extension) {
-      initLanguage(l);
+      l.initialize();
       if (l.defaultExtension == null)
          l.defaultExtension = extension;
       languages.put(extension, l);
@@ -409,12 +414,6 @@ public abstract class Language implements IFileProcessor {
 
    public static void removeLanguage(String extension) {
       languages.remove(extension);
-   }
-
-   public static void initLanguage(Language l) {
-      l.startParselet.initialize();
-      l.startParselet.start();
-      l.initialize();
    }
 
    public static Language getLanguageByExtension(String type) {
@@ -473,7 +472,7 @@ public abstract class Language implements IFileProcessor {
       if (disableProcessing)
          return FileEnabledState.Disabled;
       
-      if (definedInLayer == null)
+      if (definedInLayer == null || layer == null)
          return FileEnabledState.Enabled;
 
       return (exportProcessing ? layer.getLayerPosition() >= definedInLayer.getLayerPosition() :
@@ -490,6 +489,18 @@ public abstract class Language implements IFileProcessor {
 
    public Layer getDefinedInLayer() {
       return definedInLayer;
+   }
+
+   public static void cleanupLanguages() {
+      for (Iterator<Language> langIter = languages.values().iterator(); langIter.hasNext(); ) {
+         Language lang = langIter.next();
+         Layer langLayer = lang.getDefinedInLayer();
+         if (langLayer != null && langLayer.removed) {
+            langIter.remove();
+            lang.definedInLayer = null;
+         }
+      }
+
    }
 
    public BuildPhase getBuildPhase() {
@@ -515,6 +526,11 @@ public abstract class Language implements IFileProcessor {
 
    // Name the parselets
    public void initialize() {
+      if (initialized)
+         return;
+      initialized = true;
+      startParselet.initialize();
+      startParselet.start();
 
       DynType type = TypeUtil.getPropertyCache(getClass());
       IBeanMapper[] props = type.getSemanticPropertyList();
@@ -609,6 +625,7 @@ public abstract class Language implements IFileProcessor {
    }
 
    public void validate() {
+      initialize();
    }
 
    public String getOutputFileToUse(LayeredSystem sys, IFileProcessorResult result, SrcEntry srcEnt) {
@@ -616,5 +633,9 @@ public abstract class Language implements IFileProcessor {
    }
 
    public void resetBuild() {
+   }
+
+   public boolean isParsed() {
+      return true;
    }
 }

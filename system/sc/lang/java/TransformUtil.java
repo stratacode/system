@@ -154,7 +154,23 @@ public class TransformUtil {
       return objectDefinitionTemplate = parseTemplate(OBJECT_DEFINITION, ObjectDefinitionParameters.class, false);
    }
 
+   // TODO: move this into LayeredSystem so we don't rely on static things that could theoretically change between layered systems
    private static final HashMap<String,Template> templateCache = new HashMap<String, Template>();
+
+   public static void clearTemplateCache() {
+      templateCache.clear();
+      templateResourceCache.clear();
+
+      complexObjectDefinitionTemplate = null;
+      componentObjectDefinitionTemplate = null;
+      objectDefinitionTemplate = null;
+      componentClassDefinitionTemplate = null;
+      objChildrenDefinitionTemplate = null;
+      propertyDefinitionTemplate = null;
+      interfaceGetSetTemplate = null;
+      propertyDefinitionStaticTemplate = null;
+      dynTypePropDefStaticTemplate = null;
+   }
 
    public static Template parseTemplate(String templateCode, Class defaultExtendsType, boolean cache) {
       if (cache) {
