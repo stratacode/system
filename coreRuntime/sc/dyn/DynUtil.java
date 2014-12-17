@@ -42,6 +42,10 @@ public class DynUtil {
 
    static Map<Class, DynType> mappingCache = new HashMap<Class, DynType>();
 
+   public static void clearObjectIds() {
+      objectIds.clear();
+   }
+
    public static void flushCaches() {
       mappingCache.clear();
    }

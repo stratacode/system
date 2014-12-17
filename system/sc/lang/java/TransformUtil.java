@@ -162,14 +162,16 @@ public class TransformUtil {
       templateResourceCache.clear();
 
       complexObjectDefinitionTemplate = null;
-      componentObjectDefinitionTemplate = null;
       objectDefinitionTemplate = null;
+      componentObjectDefinitionTemplate = null;
       componentClassDefinitionTemplate = null;
       objChildrenDefinitionTemplate = null;
       propertyDefinitionTemplate = null;
       interfaceGetSetTemplate = null;
       propertyDefinitionStaticTemplate = null;
       dynTypePropDefStaticTemplate = null;
+      initedDefinition = altInitedDefinition = null;
+      bindableDefinitions = null;
    }
 
    public static Template parseTemplate(String templateCode, Class defaultExtendsType, boolean cache) {

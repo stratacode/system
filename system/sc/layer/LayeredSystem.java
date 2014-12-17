@@ -437,6 +437,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       changedDirectoryIndex.clear();
 
       resetClassCache();
+      RTypeUtil.flushCaches();
       modelsToPostBuild.clear();
 
       typeGroupDeps.clear();
@@ -473,6 +474,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       resetBuild(false);
+
+      DynUtil.clearObjectIds();
+
+      TransformUtil.clearTemplateCache();
+
+      removeAllActivePackageIndexEntries();
+
+      if (!peerMode)
+         System.gc();
+
    }
 
    public void activateLayers(List<String> layerNames) {
@@ -730,6 +741,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    // The globally scoped objects which have been defined.
    Map<String,Object> globalObjects = new HashMap<String,Object>();
+
+   // These store Layer objects temporarily - they are used for moving the layer instance from 'findLayer' to 'resolveName'
+   TreeMap<String,Layer> pendingActiveLayers = new TreeMap<String,Layer>();
+   TreeMap<String,Layer> pendingInactiveLayers = new TreeMap<String,Layer>();
 
    Map<String,Layer> inactiveLayerIndex = new HashMap<String,Layer>();
 
@@ -1384,10 +1399,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public void destroySystem() {
       clearActiveLayers();
 
-      TransformUtil.clearTemplateCache();
+      for (int i = 0; i < runtimes.size(); i++) {
+         if (DefaultRuntimeProcessor.compareRuntimes(runtimes.get(i), runtimeProcessor)) {
+            runtimes.remove(i);
+            i--;
+         }
+      }
+      for (int i = 0; i < processes.size(); i++) {
+         if (ProcessDefinition.compare(processes.get(i), processDefinition)) {
+            processes.remove(i);
+            i--;
+         }
+      }
 
-      runtimes.remove(runtimeProcessor);
-      processes.remove(processDefinition);
       setCurrent(null);
       if (!peerMode && peerSystems != null) {
          for (int i = 0; i < peerSystems.size(); i++) {
@@ -1410,6 +1434,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       Language.cleanupLanguages();
+      cleanupFileProcessors();
       if (buildClassLoader instanceof TrackingClassLoader)
          buildClassLoader = ((TrackingClassLoader) buildClassLoader).resetBuildLoader();
       inactiveLayers = null;
@@ -1423,6 +1448,36 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // Various threads might still hold onto the systemPtr but let them GC the LayeredSystem object
       // Maybe a more robust way to do this would be to enumerate the thread local map and remove any refs to this system so we don't even leak those objects.
       systemPtr.system = null;
+
+      if (typeIndexProcessMap != null) {
+         for (Map.Entry<String, SysTypeIndex> indexEnt : typeIndexProcessMap.entrySet()) {
+            SysTypeIndex sysTypeIndex = indexEnt.getValue();
+            sysTypeIndex.clearInactiveLayers();
+         }
+      }
+
+      System.gc();
+   }
+
+   /**
+    * We associate some languages - even those that are static, with a "defined in layer" so we can determine how that language is applied to files for a given system
+    * When the system is destroyed, we need to remove that association.
+    */
+   private void cleanupFileProcessors() {
+      for (Map.Entry<String,IFileProcessor[]> procEnt:fileProcessors.entrySet()) {
+         IFileProcessor[] procList = procEnt.getValue();
+         for (IFileProcessor proc:procList) {
+            Layer l = proc.getDefinedInLayer();
+            if (l != null && l.removed)
+               proc.setDefinedInLayer(null);
+         }
+      }
+      for (Map.Entry<Pattern,IFileProcessor> procEnt:filePatterns.entrySet()) {
+         IFileProcessor proc = procEnt.getValue();
+         Layer l = proc.getDefinedInLayer();
+         if (l != null && l.removed)
+            proc.setDefinedInLayer(null);
+      }
    }
 
    /**
@@ -4940,7 +4995,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          /* For flexibility, allow users to specify the package prefix or not */
       }
 
-      if ((layer = layerPathIndex.get(layerPathName)) != null)
+      if (lpi.activate && (layer = layerPathIndex.get(layerPathName)) != null)
          return layer;
 
       if (!lpi.activate) {
@@ -4961,18 +5016,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // Gets reset layer once we parse the layer define file and find the packagePrefix[
       layer.layerUniqueName = layerTypeName;
 
-      if (lpi.activate) {
-         Object existingLayerObj;
-         if ((existingLayerObj = globalObjects.get(layerTypeName)) != null) {
-            if (existingLayerObj instanceof Layer) {
-               Layer existingLayer = (Layer) existingLayerObj;
-               throw new IllegalArgumentException("Layer extends cycle detected: " + findLayerCycle(existingLayer));
-            }
-            else
-               throw new IllegalArgumentException("Component/layer name conflict: " + layerTypeName + " : " + existingLayerObj + " and " + layerDefFile);
+      Map<String, Layer> pendingLayers = lpi.activate ? pendingActiveLayers : pendingInactiveLayers;
+      Object existingLayerObj;
+      if ((existingLayerObj = pendingLayers.get(layerTypeName)) != null) {
+         if (existingLayerObj instanceof Layer) {
+            Layer existingLayer = (Layer) existingLayerObj;
+            throw new IllegalArgumentException("Layer extends cycle detected: " + findLayerCycle(existingLayer));
          }
+         else
+            throw new IllegalArgumentException("Component/layer name conflict: " + layerTypeName + " : " + existingLayerObj + " and " + layerDefFile);
       }
-      else {
+
+      if (!lpi.activate) {
          Layer inactiveLayer = lookupInactiveLayer(layerPathName.replace("/", "."), false, false);
          if (inactiveLayer != null)
             return inactiveLayer;
@@ -4984,7 +5039,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // Initially register the global object under its type name before parsing
          // Do this for de-activated objects as well because it's needed for the 'resolveName' instance made
          // in the modify declaration when initializing the instance.
-         globalObjects.put(layerTypeName, layer);
+         pendingLayers.put(layerTypeName, layer);
 
          SrcEntry defSrcEnt = new SrcEntry(layer, layerDefFile, FileUtil.concat(layerGroup, layerBaseName));
 
@@ -4992,7 +5047,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          Layer newLayer = (Layer) loadLayerObject(defSrcEnt, Layer.class, layerTypeName, layerPrefix, relDir, layerPathPrefix, inLayerDir, markDynamic, layerPathName, lpi);
 
          // No matter what, get it out since the name name have changed or maybe we did not look it up.
-         globalObjects.remove(layerTypeName);
+         pendingLayers.remove(layerTypeName);
 
          if (newLayer != null) {
             layer = newLayer;
@@ -5134,7 +5189,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // Need to be careful here: packagePrefix is what will make the directory names unique
       // so we need to avoid conflicting definitions and make sure this guy ends up registered
       // under the right name.
-      globalObjects.put(layer.layerUniqueName, layer);
+      //globalObjects.put(layer.layerUniqueName, layer);
 
       if (newLayers != null)
          newLayers.add(layer);
@@ -5280,9 +5335,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       List<String> baseLayers = foundLayer.baseLayerNames;
       ArrayList<Layer> cycleLayers = new ArrayList<Layer>();
       cycleLayers.add(foundLayer);
+      Map<String, Layer> pendingLayers = foundLayer.activated ? pendingActiveLayers : pendingInactiveLayers;
       if (baseLayers != null) {
          for (int i = 0; i < baseLayers.size(); i++) {
-            Object baseLayerObj = globalObjects.get(baseLayers.get(i));
+            Object baseLayerObj = pendingLayers.get(baseLayers.get(i));
             if (baseLayerObj instanceof Layer) {
                Layer baseLayer = (Layer) baseLayerObj;
                if (baseLayer.extendsLayer(foundLayer)) {
@@ -6241,6 +6297,21 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          packageEntry = new HashMap<String,PackageEntry>();
          packageIndex.put(relDir, packageEntry);
       }
+      PackageEntry cur = packageEntry.get(fileName);
+      while (cur != null) {
+         if (cur.src && layer != null && isSrc && cur.layer != null) {
+            boolean sameLayer = cur.layer.getLayerName().equals(layer.getLayerName());
+            if (sameLayer) {
+               if (layer.activated && !cur.layer.activated)
+                  return;
+               if (cur.layer.activated && !layer.activated) {
+                  cur.layer = layer;
+                  return;
+               }
+            }
+         }
+         cur = cur.prev;
+      }
       PackageEntry newEnt = new PackageEntry(rootDir, isZip, isSrc, layer);
       newEnt.prev = packageEntry.put(fileName, newEnt);
    }
@@ -6263,6 +6334,53 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          packageEntry.remove(fileName);
       else
          packageEntry.put(fileName, curEnt.prev);
+   }
+
+   private void removeAllActivePackageIndexEntries() {
+      for (Iterator<HashMap<String,PackageEntry>> packageIterator = packageIndex.values().iterator(); packageIterator.hasNext();) {
+         HashMap<String,PackageEntry> packageEntry = packageIterator.next();
+         HashMap<String,PackageEntry> toReplace = null;
+         ArrayList<String> toRemove = null;
+         for (Map.Entry<String,PackageEntry> pentEnt : packageEntry.entrySet()) {
+            PackageEntry pent = pentEnt.getValue();
+            PackageEntry cur = pent;
+            PackageEntry newEnt = null;
+            PackageEntry prevEnt = null;
+            boolean removedAny = false;
+            while (cur != null) {
+               if (cur.src && cur.layer != null && cur.layer.activated) {
+                  newEnt = cur.prev;
+                  removedAny = true;
+                  if (prevEnt != null)
+                     prevEnt.prev = newEnt;
+               }
+               else
+                  prevEnt = cur;
+               cur = cur.prev;
+            }
+            if (removedAny) {
+               if (newEnt == null) {
+                  if (toRemove == null)
+                     toRemove = new ArrayList<String>();
+                  toRemove.add(pentEnt.getKey());
+               }
+               else {
+                  if (toReplace == null)
+                     toReplace = new HashMap<String, PackageEntry>();
+                  toReplace.put(pentEnt.getKey(), newEnt);
+               }
+            }
+         }
+         if (toReplace != null) {
+            for (Map.Entry<String,PackageEntry> toRepl:toReplace.entrySet()) {
+               packageEntry.put(toRepl.getKey(), toRepl.getValue());
+            }
+         }
+         if (toRemove != null) {
+            for (String toRem: toRemove)
+               packageEntry.remove(toRem);
+         }
+      }
    }
 
    private void addDirToIndex(Layer layer, String dirName, String relDir, String rootDir) {
@@ -8189,6 +8307,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   newProcs = new ArrayList<IFileProcessor>();
                newProcs.add(proc);
             }
+            else
+               proc.setDefinedInLayer(null);
          }
          if (newProcs != null)
             newMap.put(procEnt.getKey(), newProcs.toArray(new IFileProcessor[newProcs.size()]));
@@ -10609,6 +10729,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (val != null)
          return val;
 
+      if (layerResolve) {
+         Map<String,Layer> pendingLayers = refLayer.activated ? pendingActiveLayers : pendingInactiveLayers;
+         Layer pendingLayer = pendingLayers.get(name);
+         if (pendingLayer != null)
+            return pendingLayer;
+      }
+
       TypeDeclaration td = refLayer == null ? null : (TypeDeclaration) getSrcTypeDeclaration(name, null, true, false, true, refLayer, layerResolve);
       if (td != null && td.replacedByType != null)
          td = (TypeDeclaration) td.replacedByType;
@@ -10899,9 +11026,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // Need to make this absolute before we start running the app - which involves switching the current directory sometimes.
             mainLayerDir = newLayerDir = mapLayerDirName(relDir);
          }
-         globalObjects.remove(defFile.layer.layerUniqueName);
+         //globalObjects.remove(defFile.layer.layerUniqueName);
          defFile.layer.layerUniqueName = modelTypeName;
-         globalObjects.put(defFile.layer.layerUniqueName, defFile.layer);
+         //globalObjects.put(defFile.layer.layerUniqueName, defFile.layer);
       }
 
       // At the top-level, we might need to pull the prefix out of the model's type, like when you

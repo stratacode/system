@@ -11,6 +11,7 @@ import java.util.*;
  */
 public class LayerListTypeIndex {
    LayeredSystem sys;
+   // NOTE: this points directly to either LayeredSystem.layers or LayeredSystem.inactiveLayers - it's not a copy
    List<Layer> layersList;
 
    /** Global typeIndex which maps from layerName to the Map of typeName to TypeIndex entries each of which maps to the Layer.layerTypeIndex map in each layer.  We'll accumulate type index's over both active and inactive layers */
@@ -34,7 +35,8 @@ public class LayerListTypeIndex {
 
    public void clearTypeIndex() {
       typeIndex.clear();
-      layersList.clear();
+      sys = null;
+      // do not clear layersList here - it is the list managed by the LayeredSystems
    }
 
    private void visitIndexEntry(String layerName, LayerTypeIndex lti, HashSet<String> visitedLayers) {

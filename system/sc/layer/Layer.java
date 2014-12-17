@@ -3333,6 +3333,14 @@ public class Layer implements ILifecycle, LayerConstants {
       relSrcIndex = null;
       srcDirs = null;
       srcDirCache = null;
+      layeredSystem = null;
+      model = null;
+      importsByName = null;
+      staticImportTypes = null;
+      globalPackages = null;
+      layerTypeIndex = null;
+      origBuildLayer = null;
+      buildInfo = null;
    }
 }
 

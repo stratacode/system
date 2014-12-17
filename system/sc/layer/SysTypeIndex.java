@@ -109,4 +109,8 @@ public class SysTypeIndex {
    public void clearActiveLayers() {
       activeTypeIndex.clear();
    }
+
+   public void clearInactiveLayers() {
+      inactiveTypeIndex.clear();
+   }
 }

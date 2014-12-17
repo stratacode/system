@@ -86,7 +86,7 @@ public class TrackingClassLoader extends URLClassLoader {
 
             // This loader has been disabled but if the replacing loader is not in the call chain, we need to use it as it
             // contains the most up-to-date way to resolve classes for this loader.
-            if (replaceLoader.activeCount == 0) {
+            if (replaceLoader != null && replaceLoader.activeCount == 0) {
                return replaceLoader.loadClass(name, resolve);
             }
             if (parentTrackingLoader != null)
@@ -135,6 +135,19 @@ public class TrackingClassLoader extends URLClassLoader {
          }
          if (nonTrackingParent != null)
             return nonTrackingParent;
+      }
+      else {
+         if (parentTrackingLoader != null) {
+            ClassLoader newLoader = parentTrackingLoader.resetBuildLoader();
+            if (newLoader instanceof TrackingClassLoader) {
+               parentTrackingLoader = (TrackingClassLoader) newLoader;
+               nonTrackingParent = null;
+            }
+            else {
+               parentTrackingLoader = null;
+               nonTrackingParent = newLoader;
+            }
+         }
       }
       return this;
    }
