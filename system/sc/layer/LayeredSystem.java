@@ -997,7 +997,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (lastLayerName != null) {
-         lastLayer = initLayer(lastLayerName, null, null, options.dynamicLayers, null);
+         lastLayer = initLayer(lastLayerName, null, null, options.dynamicLayers, new LayerParamInfo());
          if (!specifiedLayers.contains(lastLayer))
             specifiedLayers.add(lastLayer);
          if (lastLayer == null) {
