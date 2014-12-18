@@ -6849,7 +6849,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          System.out.println("Find changes: " + getRuntimeName() + " runtime -" + (genLayer == buildLayer ? " sys build layer: " : " pre build layer: ") + genLayer + " including: " + startedLayers);
       }
 
-
       // For each directory or src file we need to look at.  Top level directories are put into this list before we begin.
       // As we find a sub-directory we insert it into the list from inside the loop.
       for (int i = 0; i < bd.srcEnts.size(); i++) {
@@ -7778,14 +7777,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       }
 
-      if (!bd.anyError) {
-         // Run the runtimeProcessor hook, e.g. to roll up the java script files generated for each type into a file which can be loaded
-         // Do this before we save the build info in case the hook needs to add more info.
-         if (runtimeProcessor != null)
-            runtimeProcessor.postProcess(this, genLayer);
-      }
-
       if (phase == BuildPhase.Process) {
+         if (!bd.anyError) {
+            // Run the runtimeProcessor hook, e.g. to roll up the java script files generated for each type into a file which can be loaded
+            // Do this before we save the build info in case the hook needs to add more info.
+            if (runtimeProcessor != null)
+               runtimeProcessor.postProcess(this, genLayer);
+         }
+
          genLayer.processed = true;
          if (genLayer == buildLayer) {
             saveBuildInfo();
