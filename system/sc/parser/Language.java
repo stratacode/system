@@ -475,8 +475,22 @@ public abstract class Language implements IFileProcessor {
       if (definedInLayer == null || layer == null)
          return FileEnabledState.Enabled;
 
-      return (exportProcessing ? layer.getLayerPosition() >= definedInLayer.getLayerPosition() :
-              layer.getLayerPosition() == definedInLayer.getLayerPosition()) ? FileEnabledState.Enabled : FileEnabledState.NotEnabled;
+      // We might use a singleton Language instance for more than one runtime.  Just need to remap the layers to do the comparison in this case.
+      int definedInPos = definedInLayer.getLayerPosition();
+      int layerPos = layer.getLayerPosition();
+      LayeredSystem layerSys = layer.layeredSystem;
+      if (definedInLayer.layeredSystem != layerSys) {
+         String definedInName = definedInLayer.getLayerName();
+         Layer newDefinedInLayer = layer.activated ? layerSys.getLayerByDirName(definedInName) : layerSys.lookupInactiveLayer(definedInName, false, true);
+         if (newDefinedInLayer == null) {
+            System.err.println("*** System error - layer not in runtime?");
+            return FileEnabledState.Disabled;
+         }
+         definedInPos = newDefinedInLayer.getLayerPosition();
+      }
+
+      return (exportProcessing ? layerPos >= definedInPos :
+              layerPos == definedInPos) ? FileEnabledState.Enabled : FileEnabledState.NotEnabled;
    }
 
    public int getLayerPosition() {

@@ -16,6 +16,8 @@ public interface IExternalModelIndex {
 
    public boolean isValidModel(ILanguageModel model);
 
+   public boolean isInUse(ILanguageModel model);
+
    public boolean isExcludedFile(String fileName);
 
    public long getModelTimestamp(ILanguageModel model);
