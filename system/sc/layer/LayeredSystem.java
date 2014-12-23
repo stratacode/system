@@ -6633,12 +6633,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private Object startModel(SrcEntry toGenEnt, Layer genLayer, boolean incrCompile, BuildState bd, BuildPhase phase, String defaultReason) {
       Object modelObj;
       IFileProcessor proc = getFileProcessorForFileName(toGenEnt.relFileName, toGenEnt.layer, phase);
+      if (proc == null)
+         return null;
       if (proc.getProducesTypes()) {
          // We may have already parsed and initialized this component from a reference.
-         modelObj = getCachedTypeDeclaration(proc.getPrependLayerPackage() ? toGenEnt.getTypeName() : toGenEnt.getRelTypeName(), toGenEnt.layer.getNextLayer(), null, false, false);
-         if (modelObj instanceof ILanguageModel && ((ILanguageModel) modelObj).getLayer() != toGenEnt.layer) {
+         TypeDeclaration cachedType = getCachedTypeDeclaration(proc.getPrependLayerPackage() ? toGenEnt.getTypeName() : toGenEnt.getRelTypeName(), toGenEnt.layer.getNextLayer(), null, false, false);
+         // Make sure it's from the right layer
+         if (cachedType != null && cachedType.getLayer() == toGenEnt.layer)
+            modelObj = cachedType;
+         else
             modelObj = null;
-         }
       }
       else
          modelObj = null;
