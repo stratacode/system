@@ -6628,10 +6628,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return null; // possibly not processed in this phase
       if (proc.getProducesTypes()) {
          // We may have already parsed and initialized this component from a reference.
-         modelObj = getCachedTypeDeclaration(proc.getPrependLayerPackage() ? toGenEnt.getTypeName() : toGenEnt.getRelTypeName(), toGenEnt.layer.getNextLayer(), null, false, false);
-         if (modelObj instanceof ILanguageModel && ((ILanguageModel) modelObj).getLayer() != toGenEnt.layer) {
+         TypeDeclaration cachedType = getCachedTypeDeclaration(proc.getPrependLayerPackage() ? toGenEnt.getTypeName() : toGenEnt.getRelTypeName(), toGenEnt.layer.getNextLayer(), null, false, false);
+         // Make sure it's from the right layer
+         if (cachedType != null && cachedType.getLayer() == toGenEnt.layer)
+            modelObj = cachedType;
+         else
             modelObj = null;
-         }
       }
       else
          modelObj = null;
