@@ -663,6 +663,35 @@ public class Layer implements ILifecycle, LayerConstants {
       return res;
    }
 
+   void initLayerModel(JavaModel model, LayerParamInfo lpi, String layerDirName, boolean inLayerDir, boolean baseIsDynamic, boolean markDyn) {
+      TypeDeclaration modelType = model.getModelTypeDeclaration();
+      // When a layer has buildSeparate it means we need to build it in order to resolve the types of the other layers.
+      // Those layers always need to be built, even for the IDE so we can use the generated classes to resolve types of
+      // the rest of the source.
+      activated = lpi.activate;
+      if (!lpi.enabled) {
+         disabled = true;
+      }
+      imports = model.getImports();
+      this.model = model;
+      this.layerDirName = layerDirName == null ? (inLayerDir ? "." : null) : layerDirName.replace('/', '.');
+      dynamic = !layeredSystem.getCompiledOnly() && !compiledOnly && (baseIsDynamic || modelType.hasModifier("dynamic") || markDyn ||
+              (lpi.explicitDynLayers != null && (layerDirName != null && (lpi.explicitDynLayers.contains(layerDirName) || lpi.explicitDynLayers.contains("<all>")))));
+
+      //if (options.verbose && markDyn && layer.compiledOnly) {
+      //   System.out.println("Compiling layer: " + layer.toString() + " with compiledOnly = true");
+      //}
+
+      if (modelType.hasModifier("public"))
+         defaultModifier = "public";
+      else if (modelType.hasModifier("private"))
+         defaultModifier = "private";
+
+      if (packagePrefix == null) {
+         packagePrefix = "";
+      }
+   }
+
    public void updateTypeIndex(TypeIndex typeIndex) {
       layerTypeIndex.layerTypeIndex.put(typeIndex.typeName, typeIndex);
       layerTypeIndex.fileIndex.put(typeIndex.fileName, typeIndex);
@@ -965,6 +994,31 @@ public class Layer implements ILifecycle, LayerConstants {
          buildLayer = true;
 
       // Create a map from class name to the full imported name
+      initImports();
+   }
+
+   public boolean updateModel(JavaModel newModel) {
+      boolean reInit = model != null && model != newModel;
+      model = newModel;
+      TypeDeclaration modelType = model.getModelTypeDeclaration();
+      if (reInit && initialized && modelType instanceof ModifyDeclaration) {
+         ModifyDeclaration layerModel = (ModifyDeclaration) modelType;
+         initImports();
+         initImportCache();
+         baseLayerNames = layerModel.getExtendsTypeNames();
+         baseLayers = layeredSystem.mapLayerNamesToLayers(model.getRelDirPath(), baseLayerNames, activated);
+         LayerParamInfo lpi = new LayerParamInfo();
+         initFailed = layeredSystem.cleanupLayers(baseLayers) || initFailed;
+         lpi.activate = activated;
+         // TODO: we are resetting the Layer properties based on the new model but really need to first reset them to the defaults.
+         // or should we just create a new Layer instance and then update the Layer object references in all of the dependent models, or use a "removeLayer" and "removed" flag?
+         modelType.initDynamicInstance(this);
+         initLayerModel((JavaModel) model, lpi, layerDirName, false, false, dynamic);
+      }
+      return reInit;
+   }
+
+   private void initImports() {
       if (imports != null) {
          importsByName = new HashMap<String,ImportDeclaration>();
          for (ImportDeclaration imp:imports) {
@@ -983,6 +1037,8 @@ public class Layer implements ILifecycle, LayerConstants {
             }
          }
       }
+      else
+        importsByName = null;
    }
 
    public void ensureInitialized(boolean checkBaseLayers) {

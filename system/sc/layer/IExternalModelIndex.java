@@ -16,9 +16,14 @@ public interface IExternalModelIndex {
 
    public boolean isValidModel(ILanguageModel model);
 
+   /** The IDE can let the layered system know whether a given model is being edited so SC can reclaim memory after building the type index. */
    public boolean isInUse(ILanguageModel model);
 
+   /** Has this file been excluded from the IDE's project */
    public boolean isExcludedFile(String fileName);
 
    public long getModelTimestamp(ILanguageModel model);
+
+   /** Callback to notify the external index that an inactive layer was edited */
+   public void layerChanged(Layer layer);
 }

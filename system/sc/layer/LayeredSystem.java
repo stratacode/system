@@ -4901,15 +4901,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return layerDir;
    }
 
-   static class LayerParamInfo {
-      List<String> explicitDynLayers;
-      List<String> recursiveDynLayers;
-      boolean markExtendsDynamic;
-      boolean activate = true;
-      boolean enabled = true;
-      boolean explicitLayers = false;  // When set to true, only process the explicitly specified layers, not the base layers.  This option is used when we have already determine just the layers we need.
-   }
-
    private String mapLayerDirName(String layerDir) {
       if (layerDir.equals(".")) {
          layerDir = System.getProperty("user.dir");
@@ -6633,6 +6624,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private Object startModel(SrcEntry toGenEnt, Layer genLayer, boolean incrCompile, BuildState bd, BuildPhase phase, String defaultReason) {
       Object modelObj;
       IFileProcessor proc = getFileProcessorForFileName(toGenEnt.relFileName, toGenEnt.layer, phase);
+      if (proc == null)
+         return null; // possibly not processed in this phase
       if (proc.getProducesTypes()) {
          // We may have already parsed and initialized this component from a reference.
          modelObj = getCachedTypeDeclaration(proc.getPrependLayerPackage() ? toGenEnt.getTypeName() : toGenEnt.getRelTypeName(), toGenEnt.layer.getNextLayer(), null, false, false);
@@ -9319,8 +9312,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (layer != null && layer.activated) {
          modelIndex.put(absName, model);
       }
-      else
-         inactiveModelIndex.put(absName, model);
+      else {
+         ILanguageModel oldModel = inactiveModelIndex.put(absName, model);
+         if (oldModel != null && model instanceof JavaModel) {
+            JavaModel javaModel = (JavaModel) model;
+            // We only do this if replacing the inactive model.  The first time, we will have parsed an unannotated layer model so don't process the update for that.
+            if (javaModel.isLayerModel && layer != null && oldModel.getUserData() != null) {
+               boolean layerModelChanged = layer.updateModel((JavaModel) model);
+               if (layerModelChanged && externalModelIndex != null)
+                  externalModelIndex.layerChanged(layer);
+            }
+         }
+      }
    }
 
    private void updateModelIndex(SrcEntry srcEnt, ILanguageModel model, ExecutionContext ctx) {
@@ -11150,11 +11153,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       List<JavaType> extendLayerTypes = null;
 
       if (decl instanceof ModifyDeclaration) {
-         extendLayerTypes = ((ModifyDeclaration) decl).extendsTypes;
+         ModifyDeclaration layerModel = (ModifyDeclaration) decl;
+         extendLayerTypes = layerModel.extendsTypes;
          if (extendLayerTypes != null) {
-            baseLayerNames = new ArrayList<String>(extendLayerTypes.size());
-            for (JavaType extType:extendLayerTypes)
-               baseLayerNames.add(extType.getFullTypeName());
+            baseLayerNames = layerModel.getExtendsTypeNames();
          }
       }
       else {
@@ -11180,17 +11182,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          else {
             // When we are processing only the explicit layers do not recursively init the layers.  Just init the layers specified.
-            baseLayers = new ArrayList<Layer>();
-            for (int li = 0; li < baseLayerNames.size(); li++) {
-               String baseLayerName = baseLayerNames.get(li);
-               Layer bl = findLayerByName(relPath, baseLayerName);
-               if (bl != null)
-                  baseLayers.add(bl);
-               else {
-                  // For this case we may be in the JS runtime and this layer is server specific...
-                  //baseLayers.add(null);
-               }
-            }
+            baseLayers = mapLayerNamesToLayers(relPath, baseLayerNames, lpi.activate);
          }
          /*
          if (baseLayers != null) {
@@ -11206,12 +11198,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          */
 
-         // One of our base layers failed so we fail too
-         if (baseLayers == null || baseLayers.contains(null))
-            initFailed = true;
-
-         while (baseLayers.contains(null))
-            baseLayers.remove(null);
+         initFailed = cleanupLayers(baseLayers) || initFailed;
       }
 
       /* Now that we have defined the base layers, we'll inherit the package prefix and dynamic state */
@@ -11243,35 +11230,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             layer.excluded = !layer.includeForProcess(processDefinition);
          }
 
-         // When a layer has buildSeparate it means we need to build it in order to resolve the types of the other layers.
-         // Those layers always need to be built, even for the IDE so we can use the generated classes to resolve types of
-         // the rest of the source.
-         layer.activated = lpi.activate;
-         if (!lpi.enabled) {
-            layer.disabled = true;
-         }
-         layer.imports = model.getImports();
          layer.initFailed = initFailed;
-         layer.model = model;
          layer.baseLayerNames = baseLayerNames;
          layer.baseLayers = baseLayers;
-         layer.layerDirName = layerDirName == null ? (inLayerDir ? "." : null) : layerDirName.replace('/', '.');
-         layer.dynamic = !getCompiledOnly() && !layer.compiledOnly && (baseIsDynamic || modelType.hasModifier("dynamic") || markDyn ||
-                         (lpi.explicitDynLayers != null && (layerDirName != null && (lpi.explicitDynLayers.contains(layerDirName) || lpi.explicitDynLayers.contains("<all>")))));
+         layer.initLayerModel(model, lpi, layerDirName, inLayerDir, baseIsDynamic, markDyn);
 
-         //if (options.verbose && markDyn && layer.compiledOnly) {
-         //   System.out.println("Compiling layer: " + layer.toString() + " with compiledOnly = true");
-         //}
-
-         if (modelType.hasModifier("public"))
-            layer.defaultModifier = "public";
-         else if (modelType.hasModifier("private"))
-            layer.defaultModifier = "private";
-
-         if (layer.packagePrefix == null) {
-            if (layer.packagePrefix == null)
-               layer.packagePrefix = "";
-         }
          return layer;
       }
       catch (RuntimeException exc) {
@@ -11304,6 +11267,35 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             return dir + FileUtil.FILE_SEPARATOR;
       }
       return dir;
+   }
+
+   List<Layer> mapLayerNamesToLayers(String relPath, List<String> baseLayerNames, boolean activated) {
+      List<Layer> baseLayers = new ArrayList<Layer>();
+      if (baseLayerNames == null)
+         return null;
+      for (int li = 0; li < baseLayerNames.size(); li++) {
+         String baseLayerName = baseLayerNames.get(li);
+         Layer bl = activated ? findLayerByName(relPath, baseLayerName) : getInactiveLayer(baseLayerName.replace("/", "."), false, false, false);
+         if (bl != null)
+            baseLayers.add(bl);
+         else {
+            // For this case we may be in the JS runtime and this layer is server specific...
+            //baseLayers.add(null);
+         }
+      }
+      return baseLayers;
+   }
+
+   boolean cleanupLayers(List<Layer> baseLayers) {
+      // One of our base layers failed so we fail too
+      boolean initFailed = baseLayers == null || baseLayers.contains(null);
+
+      if (baseLayers != null) {
+         while (baseLayers.contains(null))
+            baseLayers.remove(null);
+      }
+
+      return initFailed;
    }
 
    private void addClassURLs(List<URL> urls, Layer layer, boolean checkBaseLayers) {

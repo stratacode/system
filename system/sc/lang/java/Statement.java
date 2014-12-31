@@ -298,4 +298,10 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
    public boolean childIsTopLevelStatement(Statement child) {
       return false;
    }
+
+   public void stop() {
+      super.stop();
+
+      errorArgs = null;
+   }
 }

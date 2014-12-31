@@ -2512,4 +2512,14 @@ public class ModifyDeclaration extends TypeDeclaration {
       }
       return -1;
    }
+
+   public List<String> getExtendsTypeNames() {
+      List<String> baseLayerNames = null;
+      if (extendsTypes != null) {
+         baseLayerNames = new ArrayList<String>(extendsTypes.size());
+         for (JavaType extType:extendsTypes)
+            baseLayerNames.add(extType.getFullTypeName());
+      }
+      return baseLayerNames;
+   }
 }

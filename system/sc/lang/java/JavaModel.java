@@ -1153,7 +1153,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          validated = false;
          processed = false;
          hasErrors = false;
-
+         initPackage = false;
 
          ParseUtil.initAndStartComponent(this);
       }
@@ -2419,7 +2419,15 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    public void stop() {
       super.stop();
 
+      typeInfoInited = false;
       initPackage = false;
+      typeIndex.clear();
+      externalReferences.clear();
+      importsByName.clear();
+      if (staticImportProperties != null)
+         staticImportProperties = null;
+      if (staticImportMethods != null)
+         staticImportMethods = null;
    }
 
    @Bindable(manual=true)
