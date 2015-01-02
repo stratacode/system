@@ -1003,8 +1003,6 @@ public class Layer implements ILifecycle, LayerConstants {
       TypeDeclaration modelType = model.getModelTypeDeclaration();
       if (reInit && initialized && modelType instanceof ModifyDeclaration) {
          ModifyDeclaration layerModel = (ModifyDeclaration) modelType;
-         initImports();
-         initImportCache();
          baseLayerNames = layerModel.getExtendsTypeNames();
          baseLayers = layeredSystem.mapLayerNamesToLayers(model.getRelDirPath(), baseLayerNames, activated);
          LayerParamInfo lpi = new LayerParamInfo();
@@ -1014,6 +1012,8 @@ public class Layer implements ILifecycle, LayerConstants {
          // or should we just create a new Layer instance and then update the Layer object references in all of the dependent models, or use a "removeLayer" and "removed" flag?
          modelType.initDynamicInstance(this);
          initLayerModel((JavaModel) model, lpi, layerDirName, false, false, dynamic);
+         initImports();
+         initImportCache();
       }
       return reInit;
    }

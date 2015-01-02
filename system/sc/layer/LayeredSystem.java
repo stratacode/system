@@ -9320,7 +9320,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             JavaModel javaModel = (JavaModel) model;
             // We only do this if replacing the inactive model.  The first time, we will have parsed an unannotated layer model so don't process the update for that.
             if (javaModel.isLayerModel && layer != null && oldModel.getUserData() != null) {
-               boolean layerModelChanged = layer.updateModel((JavaModel) model);
+               boolean layerModelChanged = layer.updateModel(javaModel);
                if (layerModelChanged && externalModelIndex != null)
                   externalModelIndex.layerChanged(layer);
             }
