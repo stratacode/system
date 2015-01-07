@@ -1305,7 +1305,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return false;
    }
 
-   String getAlias(Object type) {
+   public String getAlias(Object type) {
       String typeName = ModelUtil.getTypeName(type);
       return jsBuildInfo.replaceTypes.get(typeName);
    }

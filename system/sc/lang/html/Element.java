@@ -1184,7 +1184,8 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
             if (model != null) {
                res = model.findTypeDeclaration(extStr, true, true);
                if (res == null) {
-                  displayError("No extends type: ", extStr, " for tag: ");
+                  Attr attr = getAttribute("extends");
+                  attr.displayError("No extends type: ", extStr, " for tag: ");
                   res = findType(extStr, this, null);
                   res = model.findTypeDeclaration(extStr, true, true);
                }
@@ -1990,11 +1991,18 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          return null;
       String[] implNames = StringUtil.split(implementsStr, ',');
       ArrayList<Object> implTypes = new ArrayList<Object>(implNames.length);
+
       for (String name:implNames) {
          Object type = tagObject.findType(name, this, null);
-         if (type == null)
-            displayError("No implements type: " + name + ": ");
-         else
+         if (type == null) {
+            JavaModel model = getJavaModel();
+            type = model.findTypeDeclaration(name, true, true);
+            if (type == null) {
+               Attr attr = getAttribute("implements");
+               attr.displayError("No implements type: " + name + ": ");
+            }
+         }
+         if (type != null)
             implTypes.add(type);
       }
       return implTypes;
@@ -2034,26 +2042,50 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       boolean remoteContent = isRemoteContent();
 
       boolean isRepeatElement = isRepeatElement();
+      Object repeatWrapperType = null;
+      boolean needsWrapperInterface = true;
       if (isRepeatElement && !remoteContent) {
-         repeatWrapper = ClassDeclaration.create(isAbstract() ? "class" : "object", getRepeatObjectName(), JavaType.createJavaType(HTMLElement.class));
-         repeatWrapper.addImplements(JavaType.createJavaType(IRepeatWrapper.class));
+         String repeatWrapperName = getFixedAttribute("repeatWrapper");
+         if (repeatWrapperName != null) {
+            repeatWrapperType = findType(repeatWrapperName, this, null);
+            if (repeatWrapperType == null) {
+               JavaModel model = getJavaModel();
+               if (model != null) {
+                  repeatWrapperType = model.findTypeDeclaration(repeatWrapperName, true, true);
+                  if (repeatWrapperType == null) {
+                     displayError("No repeatWrapper type: ", repeatWrapperName, " for tag: ");
+                  }
+               }
+            }
+            if (repeatWrapperType != null && !ModelUtil.isAssignableFrom(Element.class, repeatWrapperType)) {
+               displayError("Element's repeatWrapper type: " + repeatWrapperType + " must be extends be a tag object (i.e. extends sc.lang.html.Element)");
+               repeatWrapperType = null;
+            }
+            if (repeatWrapperType != null)
+               needsWrapperInterface = !ModelUtil.isAssignableFrom(IRepeatWrapper.class, repeatWrapperType);
+         }
+         repeatWrapper = ClassDeclaration.create(isAbstract() ? "class" : "object", getRepeatObjectName(), JavaType.createJavaType(repeatWrapperType == null ? HTMLElement.class : repeatWrapperType));
+         if (needsWrapperInterface)
+            repeatWrapper.addImplements(JavaType.createJavaType(IRepeatWrapper.class));
          repeatWrapper.element = this;
          repeatWrapper.layer = tagLayer;
          repeatWrapper.addModifier("public");
 
-         SemanticNodeList repeatMethList = (SemanticNodeList) TransformUtil.parseCodeTemplate(Object.class,
-                 "   public sc.lang.html.Element createElement(Object val, int ix) {\n " +
-                 "      sc.lang.html.Element elem = new " + objName + "();\n" +
-                 "      elem.repeatVar = val;\n" +
-                 "      elem.repeatIndex = ix;\n" +
-                 "      return elem;\n" +
-                 "   }",
-                 SCLanguage.INSTANCE.classBodySnippet, false);
+         if (needsWrapperInterface) {
+            SemanticNodeList repeatMethList = (SemanticNodeList) TransformUtil.parseCodeTemplate(Object.class,
+                    "   public sc.lang.html.Element createElement(Object val, int ix) {\n " +
+                            "      sc.lang.html.Element elem = new " + objName + "();\n" +
+                            "      elem.repeatVar = val;\n" +
+                            "      elem.repeatIndex = ix;\n" +
+                            "      return elem;\n" +
+                            "   }",
+                    SCLanguage.INSTANCE.classBodySnippet, false);
 
-         // TODO: should the Repeat wrapper implement IObjChildren so that the getObjChildren method is implemented by
-         // retrieving the current repeat tags?   This would let a node in the editor that is a repeat display its
-         // children in the child form.
-         repeatWrapper.addBodyStatement((Statement) repeatMethList.get(0));
+            // TODO: should the Repeat wrapper implement IObjChildren so that the getObjChildren method is implemented by
+            // retrieving the current repeat tags?   This would let a node in the editor that is a repeat display its
+            // children in the child form.
+            repeatWrapper.addBodyStatement((Statement) repeatMethList.get(0));
+         }
 
          if (parentType != null)
             parentType.addBodyStatement(repeatWrapper);
@@ -2179,8 +2211,8 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          // If we make these classes abstract, it makes it simpler to identify them and omit from type groups, but it means we can't
          // instantiate these classes as base type.  This means more classes in the code.  So instead the type groups stuff needs
          // to check Element.isAbstract.
-         //if (isAbstract())
-         //   tagType.addModifier("abstract");
+         if (isAbstract() && tagTypeNeedsAbstract())
+            tagType.addModifier("abstract");
       }
       // Leave a trail for finding where this statement was generated from for debugging purposes
       tagType.fromStatement = this;
@@ -2306,8 +2338,15 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                          tagType.addBodyStatementAtIndent(idIx, pa);
                          specifiedId = true;
                       }
-                      else if (att.name.equals("repeat"))
-                         repeatWrapper.addBodyStatementIndent(pa);
+                      // For the 'repeat' case, we have two classes which might hold the property - the wrapper or the element type.  We give preference
+                      // to the element type in case the property is in both.
+                      else if (att.name.equals("repeat") || repeatWrapper != null) {
+                         Object valuePropType =  ModelUtil.getEnclosingType(att.valueProp);
+                         if (att.name.equals("repeat") || (!ModelUtil.isAssignableFrom(valuePropType, tagType) && ModelUtil.isAssignableFrom(valuePropType, repeatWrapper)))
+                            repeatWrapper.addBodyStatementIndent(pa);
+                         else
+                            tagType.addBodyStatementIndent(pa);
+                      }
                       else
                          tagType.addBodyStatementIndent(pa);
                       // If we're tracking changes for the page content
@@ -2457,6 +2496,18 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       return tagType;
    }
 
+   private boolean tagTypeNeedsAbstract() {
+      if (children != null) {
+         for (Object child:children) {
+            if (child instanceof TemplateDeclaration) {
+               if (((TemplateDeclaration) child).needsAbstract())
+                  return true;
+            }
+         }
+      }
+      return false;
+   }
+
    /** Are we the top-level page element */
    protected boolean isPageElement() {
       return getEnclosingTag() == null;
@@ -2562,6 +2613,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       behaviorAttributes.add("tagMerge");
       behaviorAttributes.add("bodyMerge");
       behaviorAttributes.add("repeat");
+      behaviorAttributes.add("repeatWrapper");
       behaviorAttributes.add("repeatVarName");
       behaviorAttributes.add("abstract");
       behaviorAttributes.add("serverContent");
@@ -3182,7 +3234,11 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
             return param;
          }
       }
-      return super.definesMember(name, mtype, refType, ctx, skipIfaces, isTransformed);
+      o = super.definesMember(name, mtype, refType, ctx, skipIfaces, isTransformed);
+      if (o == null && repeatWrapper != null) {
+         o = repeatWrapper.definesMember(name, mtype, refType, ctx, skipIfaces, isTransformed);
+      }
+      return o;
    }
 
    private Object definesMemberInChildList(SemanticNodeList<Object> childList, String name, EnumSet<MemberType> mtype, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {
@@ -3424,5 +3480,10 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
 
    public String toListDisplayString() {
       return toString();
+   }
+
+   /** This method has to be here so we properly remap JS references to here instead of SemanticNode.stop which does not exist in the JS runtime */
+   public void stop() {
+      super.stop();
    }
 }

@@ -529,6 +529,8 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       LayeredSystem sys = getLayeredSystem();
       List<?> parameterTypes = getParameterList();
 
+      if (sys == null)
+         return null;
       addOverridingMethods(sys, enclType, res, parameterTypes);
 
       return res;
@@ -545,6 +547,10 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
 
          addOverridingMethods(sys, subType, res, ptypes);
       }
+   }
+
+   public boolean isAbstractMethod() {
+      return body == null;
    }
 
 }

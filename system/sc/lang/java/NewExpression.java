@@ -266,6 +266,11 @@ public class NewExpression extends IdentifierExpression {
             }
             ie.setProperty("arguments", arguments);
             parentNode.replaceChild(this, ie);
+            int last = ie.identifiers.size() - 1;
+            // If we are not able to resolve the newX method, it's because the component has not been transformed yet.  We store the enclosing type
+            // so that when we transformToJS this identifier expression, we know the type for property 'this' and 'outer' generation.
+            if (ie.boundTypes[last] == null)
+               ie.boundTypes[last] = boundType;
          }
          any = true;
       }
@@ -789,8 +794,9 @@ public class NewExpression extends IdentifierExpression {
          Object enclType = getEnclosingType();
 
          while (enclType != null && !ModelUtil.isAssignableFrom(enclInstType, enclType)) {
+            int ct = ModelUtil.getOuterInstCount(enclType);
             enclType = ModelUtil.getEnclosingType(enclType);
-            args.add(PString.toIString("outer"));
+            args.add(PString.toIString("_outer" + (ct == 0 ? "" : ct)));
          }
 
          if (outerExpr == null)

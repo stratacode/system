@@ -18,6 +18,7 @@ import java.util.List;
 /** Nodes extend IDynObject to avoid the need for dybamic stubs to interpret template pages */
 public abstract class Node extends JavaSemanticNode implements IDynObject, ISrcStatement, INamedNode, IUserDataNode {
    protected sc.lang.DynObject dynObj;
+   public transient Object[] errorArgs;
 
    transient Object userData = null;  // A hook for user data - specifically for an IDE to store its instance for this node
 
@@ -112,6 +113,24 @@ public abstract class Node extends JavaSemanticNode implements IDynObject, ISrcS
 
    public Object getUserData() {
       return userData;
+   }
+
+   public String getNodeErrorText() {
+      if (errorArgs != null) {
+         StringBuilder sb = new StringBuilder();
+         for (Object arg:errorArgs)
+            sb.append(arg.toString());
+         sb.append(this.toString());
+         return sb.toString();
+      }
+      return null;
+   }
+
+   public void displayError(String...args) {
+      if (errorArgs == null) {
+         super.displayError(args);
+         errorArgs = args;
+      }
    }
 
 }

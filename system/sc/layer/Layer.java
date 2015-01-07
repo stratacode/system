@@ -1757,6 +1757,8 @@ public class Layer implements ILifecycle, LayerConstants {
       if (typeIndexFile.canRead() && (!activated || !getBuildAllFiles())) {
          layerTypeIndex = layeredSystem.readTypeIndexFile(getLayerName());
       }
+      if (layerTypeIndex == null)
+         layerTypeIndex = new LayerTypeIndex();
       SysTypeIndex sysIndex = layeredSystem.typeIndex;
       if (sysIndex == null)
          sysIndex = layeredSystem.typeIndex = new SysTypeIndex(layeredSystem);

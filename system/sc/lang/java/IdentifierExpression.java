@@ -4075,7 +4075,12 @@ public class IdentifierExpression extends ArgumentsExpression {
             start = i;
       }
 
+      boolean retried = false;
       for (int i = start; i < sz; i++) {
+         if (idTypes[i] == IdentifierType.UnboundName && !retried && !specialJSIdentifier(i)) {
+            retried = true;
+            resolveTypeReference();
+         }
          String str = identifiers.get(i).toString();
          if (JSUtil.jsKeywords.contains(str))
             identifiers.set(i, new PString("_" + str));
@@ -4115,7 +4120,8 @@ public class IdentifierExpression extends ArgumentsExpression {
 
          if (idTypes[i] == IdentifierType.MethodInvocation || idTypes[i] == IdentifierType.RemoteMethodInvocation) {
             Object meth = boundTypes[i];
-            if (meth != null) {
+            // Meth here is TypeDeclaration when we have a newX method that we could not resolve
+            if (meth != null && !(meth instanceof TypeDeclaration)) {
                JavaModel model = getJavaModel();
                if (model.customResolver == null || !model.customResolver.useRuntimeResolution())
                   meth = ModelUtil.resolveSrcMethod(getLayeredSystem(), meth, true, false);
@@ -4147,6 +4153,9 @@ public class IdentifierExpression extends ArgumentsExpression {
                }
             }
          }
+
+
+
       }
 
       if (idTypes.length > start) {
@@ -4372,7 +4381,7 @@ public class IdentifierExpression extends ArgumentsExpression {
 
    private boolean specialJSIdentifier(int ix) {
       // This guy won't get bound but ignore the error
-      if (identifiers.get(ix).equals("_outer"))
+      if (identifiers.get(ix).startsWith("_outer"))
          return true;
       return false;
    }

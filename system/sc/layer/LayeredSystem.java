@@ -335,12 +335,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    private void buildReverseTypeIndex() {
-      typeIndex.buildReverseTypeIndex();
+      try {
+         acquireDynLock(false);
 
-      if (!peerMode && peerSystems != null) {
-         for (LayeredSystem peerSys:peerSystems) {
-            peerSys.buildReverseTypeIndex();
+         typeIndex.buildReverseTypeIndex();
+
+         if (!peerMode && peerSystems != null) {
+            for (LayeredSystem peerSys: peerSystems) {
+               peerSys.buildReverseTypeIndex();
+            }
          }
+      }
+      finally {
+         releaseDynLock(false);
       }
    }
 
@@ -9316,11 +9323,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       else {
          ILanguageModel oldModel = inactiveModelIndex.put(absName, model);
-         if (oldModel != null && model instanceof JavaModel) {
+         if (oldModel != null && model instanceof JavaModel && oldModel != model) {
             JavaModel javaModel = (JavaModel) model;
             // We only do this if replacing the inactive model.  The first time, we will have parsed an unannotated layer model so don't process the update for that.
-            if (javaModel.isLayerModel && layer != null && oldModel.getUserData() != null) {
-               boolean layerModelChanged = layer.updateModel(javaModel);
+            if (layer != null && oldModel.getUserData() != null) {
+               boolean layerModelChanged;
+               if (javaModel.isLayerModel)
+                  layerModelChanged = layer.updateModel(javaModel);
+               else
+                  layerModelChanged = true;
                if (layerModelChanged && externalModelIndex != null)
                   externalModelIndex.layerChanged(layer);
             }

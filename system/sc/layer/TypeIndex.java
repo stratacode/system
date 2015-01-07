@@ -19,10 +19,6 @@ public class TypeIndex implements Serializable {
    public long lastModified;
    public boolean isLayerType;
 
-   // Computed - not stored
-   public transient List<String> modifiedByTypes;
-   public transient List<String> extendedByTypes;
-
    public String toString() {
       return "index: " + typeName + " (" + layerName + ")";
    }

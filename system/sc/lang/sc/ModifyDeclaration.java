@@ -494,7 +494,8 @@ public class ModifyDeclaration extends TypeDeclaration {
                Object td = model.layeredSystem.getSrcTypeDeclaration(extTypeName, modelLayer.getNextLayer(), true, false, true, modelLayer, false);
                if (td != null) {
                   ParseUtil.initComponent(td);
-                  ParseUtil.startComponent(td); // TODO: do we need to start here if isStarted = false?
+                  if (isStarted())
+                     ParseUtil.startComponent(td);  // Only start here if we're already started.  Otherwise, we end up starting too soon when initializing extends types.
                   if (isValidated())
                      ParseUtil.validateComponent(td);
                }

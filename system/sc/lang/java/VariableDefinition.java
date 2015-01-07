@@ -675,7 +675,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
 
    public VariableDefinition refreshNode() {
       JavaModel oldModel = getJavaModel();
-      if (!oldModel.removed)
+      if (oldModel == null || !oldModel.removed)
          return this; // We are still valid
       Statement def = getDefinition();
       if (def instanceof FieldDefinition) {

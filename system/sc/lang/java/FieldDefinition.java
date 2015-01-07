@@ -282,10 +282,11 @@ public class FieldDefinition extends TypedDefinition {
    }
 
    public Definition modifyDefinition(BodyTypeDeclaration base, boolean doMerge, boolean inTransformed) {
+      Object refType = getEnclosingType();
       for (int i = 0; i < variableDefinitions.size(); i++) {
          VariableDefinition v = variableDefinitions.get(i);
          Object oldVar;
-         if ((oldVar = base.definesMember(v.variableName, MemberType.FieldSet, null, null)) != null) {
+         if ((oldVar = base.definesMember(v.variableName, MemberType.FieldSet, refType, null)) != null) {
             if (oldVar == v) {
                System.out.println("*** error: base type returns same field as modified type!");
                break;

@@ -245,7 +245,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // This name has been mapped to something else so don't return any types past this point.  Make sure to use
       // the refType here so we don't see private things we shouldn't and cancel a valid search
       // Skip the search if it's a complex name.
-      if (name.indexOf('.') == -1 && definesMember(name, m.enableExtensions() ? MemberType.PropertyGetSet : MemberType.FieldEnumSet, refType, ctx) != null)
+      if (name.indexOf('.') == -1 && definesMember(name, m == null || m.enableExtensions() ? MemberType.PropertyGetSet : MemberType.FieldEnumSet, refType, ctx) != null)
          return null;
 
       return super.findType(name, refType, ctx);
@@ -8154,4 +8154,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return null;
    }
 
+   public boolean needsAbstract() {
+      if (body == null)
+         return false;
+      for (Statement st:body) {
+         if (st instanceof MethodDefinition && ((MethodDefinition) st).isAbstractMethod())
+            return true;
+      }
+      return false;
+   }
 }
