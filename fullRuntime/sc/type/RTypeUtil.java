@@ -251,6 +251,7 @@ public class RTypeUtil {
          Method method = methods[i];
          method.setAccessible(true);
          String methodName = method.getName();
+
          Method[] methodList = cache.get(methodName);
          if (methodList == null) {
             methodList = new Method[1];
@@ -297,6 +298,18 @@ public class RTypeUtil {
                newCachedList[methodList.length] = method;
                methodList = newCachedList;
                cache.put(methodName, methodList);
+            }
+            else {
+               for (int j = 0; j < methodList.length; j++) {
+                  Method otherMeth = methodList[j];
+                  if (otherMeth != method && overridesMethod(method, otherMeth)) {
+                     Method newMethod = pickMoreSpecificMethod(method, otherMeth, null);
+                     if (newMethod == method) {
+                        methodList[j] = method;
+                        break;
+                     }
+                  }
+               }
             }
          }
       }
