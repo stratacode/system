@@ -1406,16 +1406,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public void destroySystem() {
       clearActiveLayers();
 
-      for (int i = 0; i < runtimes.size(); i++) {
-         if (DefaultRuntimeProcessor.compareRuntimes(runtimes.get(i), runtimeProcessor)) {
-            runtimes.remove(i);
-            i--;
+      if (runtimes != null) {
+         for (int i = 0; i < runtimes.size(); i++) {
+            if (DefaultRuntimeProcessor.compareRuntimes(runtimes.get(i), runtimeProcessor)) {
+               runtimes.remove(i);
+               i--;
+            }
          }
       }
-      for (int i = 0; i < processes.size(); i++) {
-         if (ProcessDefinition.compare(processes.get(i), processDefinition)) {
-            processes.remove(i);
-            i--;
+      if (processes != null) {
+         for (int i = 0; i < processes.size(); i++) {
+            if (ProcessDefinition.compare(processes.get(i), processDefinition)) {
+               processes.remove(i);
+               i--;
+            }
          }
       }
 
