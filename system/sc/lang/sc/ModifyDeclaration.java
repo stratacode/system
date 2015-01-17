@@ -84,31 +84,19 @@ public class ModifyDeclaration extends TypeDeclaration {
       return super.getClassDeclarationForType();
    }
 
-   public void start() {
-      if (started)
+   /** 
+    * Here we are updating the 'replacedByType' on the modified type.  Since this is a
+    * structural part of the type system, that needs to be resolved during the initializae
+    * stage for the html Element convertToObject method, this section was broken out of the
+    * start method - so it's done as soon as modifyTypeDecl is updated.
+    */
+   public void initTypeInfo() {
+      if (typeInfoInitialized)
          return;
 
-      if (isStarting)
-         return;
+      super.initTypeInfo();
 
-      isStarting = true;
-
-      // Are we an "a.b" modify?
-      compoundName = typeName.indexOf(".") != -1;
-
-      JavaModel thisModel = getJavaModel();
-      if (thisModel == null) {
-         super.start();
-         isStarting = false;
-         return;
-      }
-
-      initTypeInfo();
-
-      // need to start the extends type before we go and start our children.  This ensures an independent layer
-      // gets started completely before the dependent layers.
       if (modifyTypeDecl != null) {
-         // temporary types which don't have a layer don't override.
          if (layer != null) {
             /*
             * If the type we are modifying comes from a super type we need to treat it differently on transform.
@@ -135,6 +123,7 @@ public class ModifyDeclaration extends TypeDeclaration {
                displayError("Modified type cannot extend an additional type: ");
             }
 
+            JavaModel thisModel = getJavaModel();
             // Give the modified type a back pointer - its "find" operations will map back to us so it gets the most
             // specific definition.  It does not matter much for most contracts given type compatibility but the
             // assignment contract requires the most specific definition so we can detect cycles properly.
@@ -163,6 +152,37 @@ public class ModifyDeclaration extends TypeDeclaration {
                   modifyTypeDecl.replacedByType = this;
                }
             }
+         }
+      }
+   }
+
+   public void start() {
+      if (started)
+         return;
+
+      if (isStarting)
+         return;
+
+      isStarting = true;
+
+      // Are we an "a.b" modify?
+      compoundName = typeName.indexOf(".") != -1;
+
+      JavaModel thisModel = getJavaModel();
+      if (thisModel == null) {
+         super.start();
+         isStarting = false;
+         return;
+      }
+
+      initTypeInfo();
+
+      // need to start the extends type before we go and start our children.  This ensures an independent layer
+      // gets started completely before the dependent layers.
+      if (modifyTypeDecl != null) {
+         // temporary types which don't have a layer don't override.
+         if (layer != null) {
+
          }
          startExtendedType(modifyTypeDecl, "modified");
 
@@ -494,8 +514,13 @@ public class ModifyDeclaration extends TypeDeclaration {
                Object td = model.layeredSystem.getSrcTypeDeclaration(extTypeName, modelLayer.getNextLayer(), true, false, true, modelLayer, false);
                if (td != null) {
                   ParseUtil.initComponent(td);
+                  // TODO: THIS isStarted call breaks compile doc test.  doc.layer/Head ends up not started when it should be started
+                  //if (!isStarted() && td instanceof TypeDeclaration && ((TypeDeclaration) td).typeName.equals("Head"))
+                  //   System.out.println("***");
                   if (isStarted())
                      ParseUtil.startComponent(td);  // Only start here if we're already started.  Otherwise, we end up starting too soon when initializing extends types.
+                  else if (typeInfoInitialized && td instanceof TypeDeclaration)
+                     ((TypeDeclaration) td).initTypeInfo();
                   if (isValidated())
                      ParseUtil.validateComponent(td);
                }

@@ -5202,6 +5202,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             modifiedByType.updateExtendsType(newType, true, false); // modify only - do not do the extends type
          }
 
+         if (newType == replacedByType)
+            System.err.println("*** Replacing a type with itself!");
          newType.replacedByType = replacedByType;
          replaced = true;
       }
@@ -5209,6 +5211,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // Now we are replaced by another type (note dual purpose use of "replacedByType" modulated by replaced flag)
       // If we are a modified type, do not replace this type if we are coming from a subclass (modifyInherited)
       if (updateMode == TypeUpdateMode.Replace || ((newType instanceof ModifyDeclaration) && !((ModifyDeclaration) newType).modifyInherited)) {
+         if (this == newType)
+            System.err.println("*** Replacing a type with itself!");
          replacedByType = newType;
          if (updateMode == TypeUpdateMode.Replace)
             replaced = true;
@@ -5223,6 +5227,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             if (modType.replacedByType == this)
                modType.replacedByType = null;
          }
+         if (this == newType)
+            System.err.println("*** Replacing a type with itself!");
          replacedByType = newType;
          replaced = true;
          newType.replacedByType = null;

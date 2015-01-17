@@ -39,7 +39,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
    public transient Object[] implementsBoundTypes;
 
-   private transient boolean typeInfoInitialized = false;
+   public transient boolean typeInfoInitialized = false;
    public transient String skippedClassVarName;   // If we omitted the real class for this type, this is the var name to replace it with
 
 
@@ -248,7 +248,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       initTypeInfo();
    }
 
-   protected void initTypeInfo() {
+   public void initTypeInfo() {
       if (typeInfoInitialized)
          return;
       typeInfoInitialized = true;
