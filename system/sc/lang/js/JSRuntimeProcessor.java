@@ -685,6 +685,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    public void start(BodyTypeDeclaration td) {
       // Don't start for model streams, i.e. where there's a custom resolver
       JavaModel model = td.getJavaModel();
+
       if (td.isLayerType || model.customResolver != null || model.temporary || !model.mergeDeclaration)
          return;
       if (td.typeName != null && td.typeName.equals("BuildInfo") && td.getDerivedTypeDeclaration() == BuildInfo.class)

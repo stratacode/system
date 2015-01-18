@@ -7478,26 +7478,28 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
 
+      if (phase == BuildPhase.Process) {
 
-      if (options.verbose) {
-         if (buildStartTime != -1)
-            System.out.println("Parsed changes till layer: " + genLayer + " in: " + StringUtil.formatFloat((System.currentTimeMillis() - buildStartTime)/1000.0));
+         if (options.verbose) {
+            if (buildStartTime != -1)
+               System.out.println("Parsed changes till layer: " + genLayer + " in: " + StringUtil.formatFloat((System.currentTimeMillis() - buildStartTime) / 1000.0));
+         }
+
+         if (bd.anyError)
+            return GenerateCodeStatus.Error;
+         else {
+            // Run the runtimeProcessor hook for the post start sequence
+            if (runtimeProcessor != null)
+               runtimeProcessor.postStart(this, genLayer);
+         }
+
+         // Doing this after postStart because by then we've detected all JS source we will load
+         for (Layer stLayer : startedLayers) {
+            stLayer.changedModelsDetected = true;
+         }
+
+         bd.changedModelsDetected = true;
       }
-
-      if (bd.anyError)
-         return GenerateCodeStatus.Error;
-      else {
-         // Run the runtimeProcessor hook for the post start sequence
-         if (runtimeProcessor != null)
-            runtimeProcessor.postStart(this, genLayer);
-      }
-
-      // Doing this after postStart because by then we've detected all JS source we will load
-      for (Layer stLayer:startedLayers) {
-         stLayer.changedModelsDetected = true;
-      }
-
-      bd.changedModelsDetected = true;
 
       // We want to initialize the peer layer that corresponds to this one (if any).  This is to make the synchronization initialize more smoothly - so we init and process all types in both systems before we end up
       // transforming any models we might depend on.
