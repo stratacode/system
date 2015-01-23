@@ -2314,6 +2314,10 @@ public class IdentifierExpression extends ArgumentsExpression {
          if (((SelectorExpression) parentNode).isThisExpression())
             return true;
       }
+      if (idTypes == null) {
+         return false;
+      }
+
       // This does actually occur in some cases... I think maybe when we build them in code?
       for (IdentifierType type:idTypes)
          if (type == IdentifierType.ThisExpression)
