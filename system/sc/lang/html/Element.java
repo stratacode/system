@@ -46,7 +46,7 @@ import java.util.*;
  * <p>Currently, the api doc for this class is hard to wade through given all of these concerns implemented in one class.  When we implement SC in SC, we can fix this with layered doc :)</p>
  */
 // Turn off suynchronization for all of the tag info etc.  This stuff gets compiled into the generated clases and so is state that already exists on the client.
-@Sync(syncMode= SyncMode.Disabled)
+@Sync(syncMode= SyncMode.Disabled, includeSuper=true)
 // Using the js_ prefix for the tags.  Because tags.js uses the SyncManager in the JS file, we need to add this dependency explicitly.
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js")
 @CompilerSettings(dynChildManager="sc.lang.html.TagDynChildManager")
@@ -168,14 +168,14 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       return getAttribute("repeat") != null;
    }
 
-   private Element createRepeatElement(Object val, int ix) {
+   private Element createRepeatElement(Object val, int ix, Element oldTag) {
       Element res;
       boolean flush = false;
       flush = SyncManager.beginSyncQueue();
       // When this instance was created from a tag, create the element from the generated code.
       if (this instanceof IRepeatWrapper) {
          IRepeatWrapper wrapper = (IRepeatWrapper) this;
-         res = wrapper.createElement(val, ix);
+         res = wrapper.createElement(val, ix, oldTag);
       }
       else if (dynObj != null) {
          res = (Element) dynObj.invokeFromWrapper(this, "createElement","Ljava/lang/Object;I", val, ix);
@@ -2073,7 +2073,9 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
 
          if (needsWrapperInterface) {
             SemanticNodeList repeatMethList = (SemanticNodeList) TransformUtil.parseCodeTemplate(Object.class,
-                    "   public sc.lang.html.Element createElement(Object val, int ix) {\n " +
+                    "   public sc.lang.html.Element createElement(Object val, int ix, sc.lang.html.Element oldTag) {\n " +
+                            "      if (oldTag != null)\n" +
+                            "         return oldTag;\n " +
                             "      sc.lang.html.Element elem = new " + objName + "();\n" +
                             "      elem.repeatVar = val;\n" +
                             "      elem.repeatIndex = ix;\n" +
@@ -2774,7 +2776,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                   System.err.println("Null value for repeat element: " + i + " for: " + this);
                   continue;
                }
-               Element arrayElem = createRepeatElement(arrayVal, i);
+               Element arrayElem = createRepeatElement(arrayVal, i, null);
                tags.add(arrayElem);
             }
          }
@@ -2801,13 +2803,26 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                      if (curIx == -1) {
                         // Either replace or insert a row
                         int curNewIx = repeatElementIndexOf(repeatVal, i, oldArrayVal);
-                        if (curNewIx == -1) { // Reuse the existing object so this turns into an incremental refresh
-                           oldElem.setRepeatIndex(i);
-                           oldElem.setRepeatVar(arrayVal);
+                        if (curNewIx == -1) {
+                           Element newElem = createRepeatElement(arrayVal, i, oldElem);
+                           if (oldElem == newElem) {
+                              // The createRepeatElement method returned the same object.
+                              // Reuse the existing object so this turns into an incremental refresh
+                              oldElem.setRepeatIndex(i);
+                              oldElem.setRepeatVar(arrayVal);
+                           }
+                           else {
+                              // The createRepeatElement method returned a different object
+                              // In this case, the newElem tag may not be the same so we need to replace the element.
+                              tags.remove(i);
+                              removeElement(oldElem, i);
+                              tags.add(i, newElem);
+                              insertElement(newElem, i);
+                           }
                         }
                         else {
                            // Assert curNewIx > i - if it is less, we should have already moved it when we processed the old guy
-                           Element newElem = createRepeatElement(arrayVal, i);
+                           Element newElem = createRepeatElement(arrayVal, i, null);
                            tags.add(i, newElem);
                            insertElement(newElem, i);
                         }
@@ -2840,7 +2855,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                }
                else {
                   if (curIx == -1) {
-                     Element arrayElem = createRepeatElement(arrayVal, i);
+                     Element arrayElem = createRepeatElement(arrayVal, i, null);
                      tags.add(arrayElem);
                      appendElement(arrayElem);
                   }

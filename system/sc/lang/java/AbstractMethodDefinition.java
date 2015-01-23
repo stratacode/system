@@ -636,4 +636,8 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
          return false;
       return body.updateFromStatementRef(fromSt, defaultSt);
    }
+
+   public boolean needsEnclosingClass() {
+      return true;
+   }
 }

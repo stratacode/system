@@ -1739,4 +1739,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return false;
    }
 
+   public boolean needsEnclosingClass() {
+      return true;
+   }
 }

@@ -975,4 +975,10 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
          return fromAttribute.getSrcStatement(lang);
       return super.getSrcStatement(lang);
    }
+
+   public boolean needsEnclosingClass() {
+      if (initializer != null)
+         return initializer.needsEnclosingClass();
+      return false;
+   }
 }

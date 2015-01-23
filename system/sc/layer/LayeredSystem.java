@@ -10086,9 +10086,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (srcFile != null) {
          String type = FileUtil.getExtension(srcFile.baseFileName);
 
-         Language lang = Language.getLanguageByExtension(type);
-         if (lang instanceof TemplateLanguage) {
-            Object result = lang.parse(srcFile.absFileName, false);
+         IFileProcessor fileProc = getFileProcessorForExtension(type);
+         if (fileProc == null)
+            fileProc = Language.getLanguageByExtension(type);
+
+         if (fileProc instanceof TemplateLanguage) {
+            Object result = ((TemplateLanguage) fileProc).parse(srcFile.absFileName, false);
             if (result instanceof ParseError)
                System.err.println("Template file: " + srcFile.absFileName + ": " +
                        ((ParseError) result).errorStringWithLineNumbers(new File(srcFile.absFileName)));
@@ -10110,6 +10113,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   templateCache.put(typeName, template);
                return template;
             }
+         }
+         else {
+            System.err.println("*** Incompatible file processor for template found: " + srcFile + " found: " + fileProc + " which is not a TemplateLanguage");
          }
       }
       // Look in the class path for a resource if there's nothing in the layered system.

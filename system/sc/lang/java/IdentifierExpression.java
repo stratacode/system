@@ -4685,4 +4685,13 @@ public class IdentifierExpression extends ArgumentsExpression {
          }
       }
    }
+
+   public boolean needsEnclosingClass() {
+      /** A Foo.this expression can implicitly bind in the absolute type hierarchy of the current code - disabling the optimization where we can eliminate an inner class. */
+      if (isThisExpression()) {
+         if (getEnclosingType() != getTypeDeclaration())
+            return true;
+      }
+      return false;
+   }
 }

@@ -969,4 +969,11 @@ public class SelectorExpression extends ChainedExpression {
          }
       }
    }
+
+   /** For Foo.this which refers to an outer class, it requires we generate the 'this' class so we can resolve it. */
+   public boolean needsEnclosingClass() {
+      if (isThisExpression() && getEnclosingType() != getTypeDeclaration())
+         return true;
+      return false;
+   }
 }

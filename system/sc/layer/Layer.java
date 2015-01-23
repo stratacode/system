@@ -239,7 +239,7 @@ public class Layer implements ILifecycle, LayerConstants {
    public boolean hasDefinedProcess = false;
    public IProcessDefinition definedProcess = null;
 
-   /** Enable or disable the default sync mode for types which are defined in this layer. */
+   /** Enable or disable the default sync mode for types which are defined in this layer. TODO - deprecated.  Use @Sync on the layer */
    public SyncMode defaultSyncMode = SyncMode.Disabled;
 
    /**

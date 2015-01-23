@@ -896,4 +896,13 @@ public class BinaryExpression extends Expression {
       if (rhsExpr != null)
          rhsExpr.addBreakpointNodes(res, srcStatement);
    }
+
+   public boolean needsEnclosingClass() {
+      if (lhs != null && lhs.needsEnclosingClass())
+         return true;
+      Expression rhsExpr = getRhsExpr();
+      if (rhsExpr != null && rhsExpr.needsEnclosingClass())
+         return true;
+      return false;
+   }
 }

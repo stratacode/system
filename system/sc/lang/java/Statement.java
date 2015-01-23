@@ -304,4 +304,13 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
 
       errorArgs = null;
    }
+
+   /**
+    * Disables the optimization where 'object foo extends bar' omits class foo for simple configuration objects.
+    * Certain constructs like methods, fields, clearly disable this.  Others like EnclosingType.this also will because
+    * we can only evaluate that expression in the context of a class (unless I suppose the object happens to be a child of the same outer type)
+    */
+   public boolean needsEnclosingClass() {
+      return false;
+   }
 }

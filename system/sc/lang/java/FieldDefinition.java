@@ -697,4 +697,8 @@ public class FieldDefinition extends TypedDefinition {
       }
       return null;
    }
+
+   public boolean needsEnclosingClass() {
+      return true;
+   }
 }

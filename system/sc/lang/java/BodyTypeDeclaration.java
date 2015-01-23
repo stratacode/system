@@ -6487,7 +6487,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public boolean bodyNeedsClass() {
       if (body != null) {
          for (Statement s:body) {
-            if (s instanceof AbstractMethodDefinition || s instanceof FieldDefinition || s instanceof TypeDeclaration || s instanceof BlockStatement)
+            //if (s instanceof AbstractMethodDefinition || s instanceof FieldDefinition || s instanceof TypeDeclaration || s instanceof BlockStatement)
+            if (s.needsEnclosingClass())
                return true;
          }
       }
@@ -7396,17 +7397,36 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       //excludedPropertyNames.add("class");
    }
 
-   private SyncMode getInheritedSyncMode(Object checkType, Object parentType, SyncMode defaultSync) {
+   private SyncMode getTypeOrLayerSyncMode(Object checkType) {
+      Object parentSyncAnnot = ModelUtil.getTypeOrLayerAnnotation(getLayeredSystem(), checkType, "sc.obj.Sync");
+      SyncMode parentSyncMode;
+      if (parentSyncAnnot != null) {
+         parentSyncMode = (SyncMode) ModelUtil.getAnnotationValue(parentSyncAnnot, "syncMode");
+         if (parentSyncMode == null)
+            parentSyncMode = SyncMode.Enabled;
+      }
+      else
+         parentSyncMode = null;
+      return parentSyncMode;
+   }
+
+   private SyncMode getInheritedSyncMode(Object checkType, Object parentType, SyncMode defaultSync, boolean includeSuper) {
       SyncMode res = null;
       // Pick the last annotation we find in the type hierarchy before we find the parent of the property.  This lets
-      // you turn on or off the disabled model throughout the hierarchy.
+      // you turn on or off the disabled sync mode as you walk from subclass to superclass.
+      LayeredSystem sys = getLayeredSystem();
       while (checkType != null) {
-         SyncMode parentSyncMode = (SyncMode) ModelUtil.getAnnotationValue(checkType, "sc.obj.Sync", "syncMode");
-         if (parentSyncMode != null) {
+         SyncMode parentSyncMode = getTypeOrLayerSyncMode(checkType);
+         if (parentSyncMode != null && (includeSuper || checkType == parentType)) {
             res = parentSyncMode;
          }
+         else {
+            if (parentSyncMode != null)
+               defaultSync = parentSyncMode;
+            res = null;
+         }
          if (checkType == parentType) {
-            return res == null ? defaultSync : res;
+            return res == null ? includeSuper ? defaultSync : null : res;
          }
          Object extendsType = ModelUtil.getExtendsClass(checkType);
          if (checkType instanceof ModifyDeclaration) {
@@ -7415,12 +7435,16 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             if (derivedType != null && derivedType != extendsType) {
                checkType = derivedType;
                while (checkType != null) {
-                  parentSyncMode = (SyncMode) ModelUtil.getAnnotationValue(checkType, "sc.obj.Sync", "syncMode");
+                  parentSyncMode = getTypeOrLayerSyncMode(checkType);
                   if (parentSyncMode != null) {
                      res = parentSyncMode;
+                     defaultSync = res;
+                  }
+                  else {
+                     res = null;
                   }
                   if (checkType == parentType) {
-                     return res == null ? defaultSync : res;
+                     return res == null ? includeSuper ? defaultSync : null : res;
                   }
                   checkType = ModelUtil.getSuperclass(checkType);
 
@@ -7430,9 +7454,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                }
             }
          }
-
          checkType = extendsType;
-         // TODO: check both derivedTypeDeclaration and extendsDeclaration unless they are the same
       }
       return res;
    }
@@ -7469,19 +7491,33 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return;
 
       Object syncAnnot = getInheritedAnnotation("sc.obj.Sync");
-      SyncMode syncMode = layer.defaultSyncMode; // TODO: should this be settable with the @Sync annotation at the level level?
+      Object layerSyncAnnot = ModelUtil.getLayerAnnotation(layer, "sc.obj.Sync");
+      SyncMode syncMode;
+      if (layerSyncAnnot != null) {
+         syncMode = (SyncMode) ModelUtil.getAnnotationValue(layerSyncAnnot, "syncMode");
+         if (syncMode == null)
+            syncMode = SyncMode.Enabled;
+      }
+      // TODO: remove this - left in for compatibility.  Now just set the @Sync annotation on the layer itself
+      else
+         syncMode = layer.defaultSyncMode != null ? layer.defaultSyncMode : null;
 
       PerfMon.start("initSyncProperties");
 
       List<String> filterDestinations = null;
       String syncGroup = null;
       int flags = 0;
+      boolean includeSuper = false;
+
       if (syncAnnot != null) {
          syncMode = (SyncMode) ModelUtil.getAnnotationValue(syncAnnot, "syncMode");
          if (syncMode == null) // The @Sync tag without any mode just turns it on.
             syncMode = SyncMode.Enabled;
          String[] destArray = (String[]) ModelUtil.getAnnotationValue(syncAnnot, "destinations");
          syncGroup = (String) ModelUtil.getAnnotationValue(syncAnnot, "groupName");
+         Boolean includeSuperObj = false;
+         includeSuperObj = (Boolean) ModelUtil.getAnnotationValue(syncAnnot, "includeSuper");
+         includeSuper = includeSuperObj != null && includeSuperObj;
          // Default should be null not ""
          if (syncGroup != null && syncGroup.length() == 0)
             syncGroup = null;
@@ -7587,22 +7623,30 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                   if (parentType != this) {
                      Object derivedType = getDerivedTypeDeclaration();
 
-                     SyncMode inheritSyncMode = derivedType == null ? null : getInheritedSyncMode(derivedType, parentType, syncMode);
+                     SyncMode inheritSyncMode = derivedType == null ? null : getInheritedSyncMode(derivedType, parentType, syncMode, includeSuper);
                      if (inheritSyncMode == null) {
                         Object checkType = getExtendsTypeDeclaration();
                         if (derivedType != checkType && checkType != null)
-                           inheritSyncMode = getInheritedSyncMode(checkType, parentType, syncMode);
+                           inheritSyncMode = getInheritedSyncMode(checkType, parentType, syncMode, includeSuper);
                      }
                      if (inheritSyncMode != null) {
                         propSyncMode = inheritSyncMode;
                         inheritedSync = true;
                      }
                   }
+                  else {
+                     propSyncMode = syncMode;
+                     inheritedSync = true;
+                  }
                }
+               /*
                if (propSyncMode == null) {
                   inheritedSync = true;
                   propSyncMode = syncMode;
                }
+               */
+               if (propSyncMode == null)
+                  propSyncMode = SyncMode.Disabled;
                boolean addSyncProp = false;
                switch (propSyncMode) {
                   case Automatic:

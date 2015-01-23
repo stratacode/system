@@ -6,5 +6,5 @@ package sc.lang.html;
 
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js")
 public interface IRepeatWrapper {
-   Element createElement(Object value, int ix);
+   Element createElement(Object value, int ix, Element oldTag);
 }

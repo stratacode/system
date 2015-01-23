@@ -1,6 +1,4 @@
 coreRuntime {
-   defaultSyncMode = sc.obj.SyncMode.Disabled;
-
    codeType = sc.layer.CodeType.Framework;
    codeFunction = sc.layer.CodeFunction.Program;
 

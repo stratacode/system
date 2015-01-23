@@ -336,12 +336,13 @@ public class ModifyDeclaration extends TypeDeclaration {
       super.completeInitTypeInfo();
 
       JavaModel thisModel = getJavaModel();
-      if (thisModel == null)
+      if (thisModel == null) {
          System.out.println("*** Error: initializing the type of a modify type that's not in a model!");
+      }
 
       boolean skipRoots = false;
 
-      if (thisModel.customResolver != null) {
+      if (thisModel != null && thisModel.customResolver != null) {
          String ftName = getFullTypeName();
 
          // There's a custom resolver for finding types - i.e. the model stream which will string together all of the modify tags that occur in the same stream for one object.
@@ -436,7 +437,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       initExtendsTypes();
 
       int lix;
-      if ((lix = typeName.lastIndexOf(".")) != -1 && !skipRoots) {
+      if ((lix = typeName.lastIndexOf(".")) != -1 && !skipRoots && thisModel != null) {
          List<Object> rootTypes = new ArrayList<Object>();
 
          String rootName = typeName.substring(0,lix);

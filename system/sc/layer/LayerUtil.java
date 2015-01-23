@@ -5,6 +5,7 @@
 package sc.layer;
 
 import sc.lang.*;
+import sc.lang.java.ModelUtil;
 import sc.obj.SyncMode;
 import sc.parser.*;
 import sc.repos.IRepositoryManager;
@@ -487,6 +488,13 @@ public class LayerUtil implements LayerConstants {
             first = opAppend(sb, " only: " + (l.definedProcess == null ? "<default>" : l.definedProcess), first);
          if (l.defaultSyncMode == SyncMode.Automatic)
             first = opAppend(sb, " auto-sync", first);
+         Object syncAnnot = ModelUtil.getLayerAnnotation(l, "sc.obj.Sync");
+         if (syncAnnot != null) {
+            SyncMode mode = (SyncMode) ModelUtil.getAnnotationValue(syncAnnot, "syncMode");
+            if (mode == null)
+               mode = SyncMode.Enabled;
+            first = opAppend(sb, " syncMode=" + mode.toString(), first);
+         }
          sb.append("\n");
       }
    }

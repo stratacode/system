@@ -1878,7 +1878,7 @@ public class SyncManager {
       }
    }
 
-   @Sync(syncMode= SyncMode.Disabled)
+   @Sync(syncMode= SyncMode.Disabled, includeSuper=true)
    class PropertyValueListener extends AbstractListener {
       public String syncGroup;
       public SyncContext ctx;
@@ -1898,7 +1898,7 @@ public class SyncManager {
 
    // The default event also may mean properties of the sync object itself has changed - e.g. JavaModel.  When it changes, it's declaredProperties, will change for instance.
    // We update any of them that have changed.
-   @Sync(syncMode= SyncMode.Disabled)
+   @Sync(syncMode= SyncMode.Disabled, includeSuper=true)
    class DefaultValueListener extends AbstractListener {
       public String syncGroup;
       public SyncContext ctx;
@@ -1911,7 +1911,7 @@ public class SyncManager {
       }
    }
 
-   @Sync(syncMode= SyncMode.Disabled)
+   @Sync(syncMode= SyncMode.Disabled, includeSuper=true)
    class SyncChangeListener extends AbstractListener {
       public String syncGroup;
       public SyncContext ctx;

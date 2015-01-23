@@ -419,4 +419,12 @@ public class AssignmentExpression extends TwoOperatorExpression {
          return ((ISrcStatement) fromDefinition).getSrcStatement(lang);
       return super.getSrcStatement(lang);
    }
+
+   public boolean needsEnclosingClass() {
+      if (lhs != null && lhs.needsEnclosingClass())
+         return true;
+      if (rhs != null && rhs.needsEnclosingClass())
+         return true;
+      return false;
+   }
 }

@@ -9,7 +9,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/** Specifies synchronization is to be performed on the type or property (either a field or a getX method). TODO: should we support this settable at the layer level? */
+/** Specifies synchronization is to be performed on the type or property (either a field or a getX method). */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE, ElementType.FIELD, ElementType.METHOD})
 public @interface Sync {
@@ -19,8 +19,16 @@ public @interface Sync {
    String groupName() default ""; 
    /** To be implemented - override the destinations to use for synchronization  Usually this is defined at the framework level globally.  */
    String[] destinations() default {};
+
+   /**
+    * TODO: do we need to implement this includeChildren flag?
+    * What about export and import attributes so we can export Sync from a downstream to an upstream
+    * and/or import so we can selectively inherit Sync from downstream layers?
+    */
    boolean includeChildren() default true;
-   boolean includeSuper() default true;
+
+   /** When you set @Sync(includeSuper=true) properties inherited from all base-types are also synchronized. */
+   boolean includeSuper() default false;
    /** 
     * Controls whether the synchronization for the type or property is eager or on-demand.  When a type is on-demand, it's only sent to the client
     * when it is first referenced by another object that's synchronized.  When a type is not on-demand, it's added to the set of objects to be 

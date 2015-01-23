@@ -296,6 +296,9 @@ public class ModelUtil {
          return ((ITypedObject) varObj).getTypeDeclaration();
       else if (varObj instanceof IBeanMapper)
          return getTypeDeclFromType(typeContext, ((IBeanMapper) varObj).getGenericType(), false, model.getLayeredSystem());
+      // Weird case - when you have a newX method which resolves against an untransformed reference - i.e. X has no newX method, it resolves to X.
+      else if (varObj instanceof ClassDeclaration)
+         return varObj;
       throw new UnsupportedOperationException();
    }
 
@@ -6000,6 +6003,28 @@ public class ModelUtil {
     * Use this method when you want to get an annotation first on this type, and if not set, use the layer's version.
     * Note that this does not support the inherited flag.  I'm not sure what that would mean... should it also search all dependent layers at the same time?
     * First check all types, then all layers?  Or should inheriting via the layer setting be different than inheriting from the type?
+    */
+   public static Object getTypeOrLayerAnnotation(LayeredSystem sys, Object type, String annotName) {
+      Object settingsObj = ModelUtil.getAnnotation(type, annotName);
+      Object value;
+
+      if (settingsObj != null) {
+         return settingsObj;
+      }
+
+      Layer layer = ModelUtil.getLayerForType(sys, type);
+      if (layer != null) {
+         settingsObj = getLayerAnnotation(layer, annotName);
+         if (settingsObj != null)
+            return settingsObj;
+      }
+      return null;
+   }
+
+   /**
+    * Use this method when you want to get an annotation first on this type, and if not set, use the layer's version.
+    * Note that this does not support the inherited flag.  I'm not sure what that would mean... should it also search all dependent layers at the same time?
+    * First check all types, then all layers?  Or should inheriting via the layer setting be different than inheriting from the type?
      */
    public static Object getTypeOrLayerAnnotationValue(LayeredSystem sys, Object type, String annotName, String attName) {
       Object settingsObj = ModelUtil.getAnnotation(type, annotName);
@@ -6013,10 +6038,21 @@ public class ModelUtil {
 
       Layer layer = ModelUtil.getLayerForType(sys, type);
       if (layer != null) {
-         settingsObj = ModelUtil.getAnnotation(layer.model.getModelTypeDeclaration(), annotName);
-         if (settingsObj != null) {
-            return ModelUtil.getAnnotationValue(settingsObj, attName);
-         }
+         settingsObj = getLayerAnnotationValue(layer, annotName, attName);
+         if (settingsObj != null)
+            return settingsObj;
+      }
+      return null;
+   }
+
+   public static Object getLayerAnnotation(Layer layer, String annotName) {
+      return ModelUtil.getAnnotation(layer.model.getModelTypeDeclaration(), annotName);
+   }
+
+   public static Object getLayerAnnotationValue(Layer layer, String annotName, String attName) {
+      Object settingsObj = ModelUtil.getAnnotation(layer.model.getModelTypeDeclaration(), annotName);
+      if (settingsObj != null) {
+         return ModelUtil.getAnnotationValue(settingsObj, attName);
       }
       return null;
    }

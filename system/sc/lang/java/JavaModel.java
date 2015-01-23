@@ -937,8 +937,6 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (layeredSystem == null || isLayerModel)
          return null;
       Layer layer = getLayer();
-      if (layer == null)
-         return null;
       return (TypeDeclaration) layeredSystem.getSrcTypeDeclaration(fullClassName, layer, prependLayerPackage, false, true, layer, isLayerModel);
    }
 
