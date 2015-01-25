@@ -132,7 +132,7 @@ public class SelectorExpression extends ChainedExpression {
          switch (idTypes[i]) {
             case ThisExpression:
                if (i != numSelectors - 1)
-                  val = IdentifierExpression.getRootFieldThis(this, boundTypes[i+1], ctx);
+                  val = IdentifierExpression.getRootFieldThis(this, boundTypes[i+1], ctx, true);
                // This is the TypeName.this case.  the "val" should be the typeObj - just find the "this" of that type
                // in the current context.
                else

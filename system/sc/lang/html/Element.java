@@ -178,7 +178,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          res = wrapper.createElement(val, ix, oldTag);
       }
       else if (dynObj != null) {
-         res = (Element) dynObj.invokeFromWrapper(this, "createElement","Ljava/lang/Object;I", val, ix);
+         res = (Element) dynObj.invokeFromWrapper(this, "createElement","Ljava/lang/Object;ILjava/lang/Object;", val, ix, oldTag);
       }
       // If it was created by parsing an HTML file, do it by hand.  We will not have an enclosing instance in this case so the deepCopy will work even in that case.
       else {

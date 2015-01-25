@@ -3158,7 +3158,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                case 'v':
                   if (opt.equals("vb"))
                      Bind.trace = true;
-                  if (opt.equals("vv")) {
+                  else if (opt.equals("vv")) {
                      options.sysDetails = true;
                      options.verbose = true;
                   }

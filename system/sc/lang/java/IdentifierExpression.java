@@ -1518,7 +1518,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             case IsVariable:
             case GetSetMethodInvocation:
                isType = false;
-               Object thisObj = getRootFieldThis(this, boundTypes[0], ctx);
+               Object thisObj = getRootFieldThis(this, boundTypes[0], ctx, false);
                value = getPropertyValueForType(thisObj, 0);
                break;
 
@@ -1528,7 +1528,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                if (boundTypes[0] == null)
                   throw new NullPointerException("Eval unresolved method: " + identifiers.get(0).toString());
                if (!ModelUtil.hasModifier(boundTypes[0], "static")) {
-                  methThis = getRootFieldThis(this, boundTypes[0], ctx);
+                  methThis = getRootFieldThis(this, boundTypes[0], ctx, false);
                   methThis = checkNullThis(methThis, identifiers.get(0).toString());
                }
               else
@@ -1700,7 +1700,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             case IsVariable:
             case SetVariable:
             case GetSetMethodInvocation:
-               Object obj = getRootFieldThis(this, boundTypes[0], ctx);
+               Object obj = getRootFieldThis(this, boundTypes[0], ctx, false);
                checkNullThis(obj, firstIdentifier);
                boolean handled = false;
                // Set method needs to override the field even in dynamic models.
@@ -1848,7 +1848,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          case IsVariable:
          case SetVariable:
          case GetSetMethodInvocation:
-            obj = getRootFieldThis(this, boundTypes[0], ctx);
+            obj = getRootFieldThis(this, boundTypes[0], ctx, false);
 
             // In this case, we want the object which stores the field
             if (sz == 1)
@@ -2928,60 +2928,38 @@ public class IdentifierExpression extends ArgumentsExpression {
    }
 
    static Object getCurrentThisType(Expression expr, Object srcType, ExecutionContext ctx) {
-      ITypeDeclaration type = expr.getEnclosingIType();
       Object srcObj = ctx.getCurrentObject();
       if (srcObj == null)
          return null;
+
       // Do we start out here with the current object's type or the current expression's enclosing type?
-      Object pType = DynUtil.getType(srcObj);
+      Object srcObjType = DynUtil.getType(srcObj);
 
-      // First check if the object's type is the same as identiier's type.  If so we just return the object.
-      if (ModelUtil.isAssignableFrom(srcType, pType))
-         return srcObj;
+      int numInstLevels = ModelUtil.getNumInnerTypeLevels(srcObjType);
+      int numRefLevels = ModelUtil.getNumInnerTypeLevels(srcType);
 
-      // Now check if the enclosing type of the identifier expression is the same.  I'm not sure why these
-      // two tests are not always the same... in some cases the TemplateDeclaration seems to be messing things
-      // up as it is considered a type but is not a formal inner type.
-      pType = type;
-
-      while (pType != null && !ModelUtil.isAssignableFrom(srcType, pType)) {
-         pType = ModelUtil.getEnclosingType(pType);
-         Object outerObj = null;
-         if (pType != null) {
-            // This inner loop is here because we may need to skip more than one level in the
-            // object's instance type hierarchy to reach the enclosing instance for the field.  This is the case
-            // where you have a class which extends an inner class from the same parent e.g.
-
-            //  class outer {
-            //      int someType;
-            //      class inner1 {
-            //         int ref := someType;
-            //      }
-            //      class inner2 {
-            //         class inner3 extends inner1 {
-            //
-            //         }
-            //      }
-            //  }
-            //  an instance of inner3 needs to go up two levels to get to "outer" even though it is only
-            //  one level removed from where the field is defined.
-            do {
-               if (ctx.system != null) {
-                  outerObj = ctx.system.getOuterInstance(srcObj);
-               }
-               if (outerObj == null)
-                  outerObj = DynObject.getParentInstance(srcObj);
-               srcObj = outerObj;
-            } while (srcObj != null && !ModelUtil.isAssignableFrom(srcType,  pType = DynUtil.getType(srcObj)));
-         }
+      while (numInstLevels > numRefLevels && srcObj != null) {
+         Object outerObj = getOuterInstance(ctx, srcObj);
+         srcObj = outerObj;
+         numInstLevels--;
       }
       return srcObj;
+   }
+
+   static Object getOuterInstance(ExecutionContext ctx, Object srcObj) {
+      Object outerObj = null;
+      if (ctx.system != null) {
+         outerObj = ctx.system.getOuterInstance(srcObj);
+      }
+      if (outerObj == null)
+         outerObj = DynObject.getParentInstance(srcObj);
+      return outerObj;
    }
 
    /** When your first identifier is a field, we need to figure out what the "this" is.
     *  It could be an outer class or it could be static - hence the class is what we want.
     */
-   static Object getRootFieldThis(Expression expr, Object thisType, ExecutionContext ctx) {
+   static Object getRootFieldThis(Expression expr, Object thisType, ExecutionContext ctx, boolean absolute) {
       ITypeDeclaration type = expr.getEnclosingIType();
       Object srcType;
       Object srcObj;
@@ -3012,6 +2990,13 @@ public class IdentifierExpression extends ArgumentsExpression {
             srcObj = ctx.resolveName(ModelUtil.getTypeName(srcType));
       }
       else {
+         /**
+          * When we have a Foo.this.x reference to something we need to walk up a specific number of type levels - not just use the first type we
+          * find like if we called 'toString()' - in that case, it's the first match which wins.
+          */
+         if (absolute)
+            return getCurrentThisType(expr, srcType, ctx);
+
          srcObj = ctx.getCurrentObject();
          if (srcObj == null)
             return null;
@@ -3075,18 +3060,14 @@ public class IdentifierExpression extends ArgumentsExpression {
          srcObj = ModelUtil.getEnclosingType(thisType);
       }
       else {
+         // TODO: replace with getCurrentThisType call
          srcObj = ctx.getCurrentObject();
          Object pType = type;
 
          while (pType != null && !ModelUtil.isAssignableFrom(srcType, pType)) {
             pType = ModelUtil.getEnclosingType(pType);
             if (pType != null) {
-               Object outerObj = null;
-               if (ctx.system != null) {
-                  outerObj = ctx.system.getOuterInstance(srcObj);
-               }
-               if (outerObj == null)
-                  outerObj = DynObject.getParentInstance(srcObj);
+               Object outerObj = getOuterInstance(ctx, srcObj);
                srcObj = outerObj;
             }
          }
@@ -3139,7 +3120,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          case GetVariable:
          case FieldName:
          case GetSetMethodInvocation:
-            srcObj = getRootFieldThis(this, boundTypes[0], ctx);
+            srcObj = getRootFieldThis(this, boundTypes[0], ctx, false);
             if (srcObj == null) {
                System.err.println("*** Unable to resolve root property for: " + toDefinitionString());
                return;
@@ -3172,7 +3153,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                startPropertyIndex = 1;
             }
             else
-               srcObj = getRootFieldThis(this, boundTypes[0], ctx);
+               srcObj = getRootFieldThis(this, boundTypes[0], ctx, false);
             if (srcObj == null) {
                System.err.println("*** Unable to resolve root obj for: " + toDefinitionString());
                return;

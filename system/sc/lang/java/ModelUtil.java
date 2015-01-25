@@ -2014,7 +2014,10 @@ public class ModelUtil {
             res = currentStatement.exec(ctx);
          }
          catch (RuntimeException exc) {
-            throw wrapRuntimeException(currentStatement, exc);
+            throw (RuntimeException) wrapRuntimeException(currentStatement, exc);
+         }
+         catch (Error exc) {
+            throw (Error) wrapRuntimeException(currentStatement, exc);
          }
          if (res != ExecResult.Next)
             return res;
@@ -2022,15 +2025,16 @@ public class ModelUtil {
       return res;
    }
 
-   public static RuntimeException wrapRuntimeException(Statement statement, RuntimeException exc) {
+   public static Throwable wrapRuntimeException(Statement statement, Throwable exc) {
       Class cl = exc.getClass();
       Constructor constr = RTypeUtil.getConstructor(cl, String.class, Throwable.class);
       boolean addThrowable = true;
       boolean newExc = false;
       if (constr == null) {
          constr = RTypeUtil.getConstructor(cl, String.class);
-         if (constr == null)
+         if (constr == null) {
             return exc;
+         }
          addThrowable = false;
       }
 
@@ -2062,9 +2066,9 @@ public class ModelUtil {
          return exc;
 
       if (addThrowable)
-         return (RuntimeException) PTypeUtil.createInstance(cl, null, message, exc);
+         return (Throwable) PTypeUtil.createInstance(cl, null, message, exc);
       else
-         return (RuntimeException) PTypeUtil.createInstance(cl, null, message);
+         return (Throwable) PTypeUtil.createInstance(cl, null, message);
    }
 
    public static Object getMethod(Object currentObject, String s) {

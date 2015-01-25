@@ -515,9 +515,6 @@ public class ModifyDeclaration extends TypeDeclaration {
                Object td = model.layeredSystem.getSrcTypeDeclaration(extTypeName, modelLayer.getNextLayer(), true, false, true, modelLayer, false);
                if (td != null) {
                   ParseUtil.initComponent(td);
-                  // TODO: THIS isStarted call breaks compile doc test.  doc.layer/Head ends up not started when it should be started
-                  //if (!isStarted() && td instanceof TypeDeclaration && ((TypeDeclaration) td).typeName.equals("Head"))
-                  //   System.out.println("***");
                   if (isStarted())
                      ParseUtil.startComponent(td);  // Only start here if we're already started.  Otherwise, we end up starting too soon when initializing extends types.
                   else if (typeInfoInitialized && td instanceof TypeDeclaration)

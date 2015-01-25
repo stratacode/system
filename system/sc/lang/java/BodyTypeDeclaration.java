@@ -3211,14 +3211,27 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
    }
 
-   public void initOuterInstanceSlot(Object inst, ExecutionContext ctx) {
+   public void initOuterInstanceSlot(Object inst, ExecutionContext ctx, Object outerObj) {
       // Needs to be here for when we init from external code
       if (!isLayerType && !isStarted())
          start();
 
       Object outerType = getEnclosingInstType();
       if (outerType != null) {
-         Object outerObj = ctx.getCurrentObject();
+         if (outerObj == null) {
+            int numOuterTypeLevels = ModelUtil.getNumInnerTypeLevels(outerType);
+            outerObj = ctx.getCurrentObject();
+
+            /*
+            Object outerObjType = DynUtil.getType(outerObj);
+            int numOuterObjLevels = ModelUtil.getNumInnerTypeLevels(outerObjType);
+            while (numOuterObjLevels > numOuterTypeLevels) {
+               outerObj = DynUtil.getOuterObject(outerObj);
+               numOuterObjLevels--;
+            }
+            */
+         }
+
          // Populate the outer object's "this" slot in the inner object
          if (outerObj != null) {
             if (inst instanceof IDynObject) {
@@ -3301,7 +3314,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          DynUtil.setPropertyValue(outerObj, typeName, inst);
       }
 
-      initOuterInstanceSlot(inst, ctx);
+      initOuterInstanceSlot(inst, ctx, outerObj);
 
       if (!isLayerType && getLiveDynamicTypesAnnotation()) {
          // Add this instance to the global table so we can do type -> inst mapping
@@ -3659,8 +3672,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             return true;
          }
       }
-      if (extType != null && isExtendsDynamicType(extType))
+      if (extType != null && ModelUtil.isDynamicStub(extType, true)) {
          return true;
+      }
       return false;
    }
 
@@ -5849,6 +5863,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (compClass == null || compClass == IDynObject.class)
          compClass = DynObject.class;
 
+      boolean appendOuterObj = outerObj != null;
+
       /* First remove the inner parent if the object we are constructing is not an inner class */
       if (argValues.length > 0 || outerObj != null) {
          BodyTypeDeclaration encType = getEnclosingInstType();
@@ -5857,7 +5873,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             // Need to strip out the inner arg if we go from having it to not having it
             if (compEncType == null) {
                // This is weird... either the outer obj can come in through the args or the outerObj
-               outerObj = null;
+               //outerObj = null;
+               appendOuterObj = false;
                if (argValues.length > 0) {
                   Object[] remOuterArgs = new Object[argValues.length-1];
                   System.arraycopy(argValues, 1, remOuterArgs, 0, remOuterArgs.length);
@@ -5875,7 +5892,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       allValues = addTypeDeclToConstrArgs(compClass, argValues);
 
-      if (outerObj != null)
+      if (outerObj != null && appendOuterObj)
          allValues = addObjectToArray(outerObj, allValues);
 
       Object inst = PTypeUtil.createInstance(compClass, null, allValues);

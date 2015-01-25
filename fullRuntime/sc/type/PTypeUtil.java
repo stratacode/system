@@ -345,11 +345,12 @@ public class PTypeUtil {
          throw new IllegalArgumentException("Can't invoke method: " + method);
       }
       catch (InvocationTargetException exc) {
-         System.err.println("*** Invoke method failed due to error in the method: " + exc.getTargetException());
          Throwable target = exc.getTargetException();
-         target.printStackTrace();
          if (target instanceof RuntimeException)
-           throw (RuntimeException) exc.getTargetException();
+           throw (RuntimeException) target;
+         else if (target instanceof Error) {
+            throw (Error) target;
+         }
          else
             throw new IllegalArgumentException("Non runtime exc caught when invoking a method: " + target.toString());
       }

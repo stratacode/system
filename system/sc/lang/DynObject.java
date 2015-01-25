@@ -281,7 +281,7 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
          ctx.pushCurrentObject(outerObj);
       boolean pushedObj = false;
       try {
-         dynType.initOuterInstanceSlot(dynObj, ctx);
+         dynType.initOuterInstanceSlot(dynObj, ctx, outerObj);
 
          if (dynType.getLiveDynamicTypesAnnotation()) {
             // Add this instance to the global table so we can do type -> inst mapping
