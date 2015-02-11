@@ -167,7 +167,7 @@ public class CreateLayerWizard extends CommandWizard {
             case Confirm:
                try {
                   if (validateYesNo(input, true)) {
-                     Layer layer = commandInterpreter.system.createLayer(layerName, layerPackage, extendsNames, isDynamic, isPublic, isTransparent);
+                     Layer layer = commandInterpreter.system.createLayer(layerName, layerPackage, extendsNames, isDynamic, isPublic, isTransparent, true, true);
                      commandInterpreter.setCurrentLayer(layer);
                   }
                }

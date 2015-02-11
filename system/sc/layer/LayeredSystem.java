@@ -905,6 +905,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       this.options = options;
       this.peerMode = parentSystem != null;
       this.externalModelIndex = extModelIndex;
+      this.systemInstalled = !options.installLayers;
 
       if (!peerMode) {
          disabledLayersIndex = new HashMap<String, Layer>();
@@ -2901,6 +2902,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       /** Should we clear up all data structured after running the program (for better heap diagnostics) */
       @Constant public boolean clearOnExit = true;
+
+      /** Should we install default layers if we can't find them in the layer path? */
+      @Constant public boolean installLayers = true;
    }
 
    @MainSettings(produceJar = true, produceScript = true, execName = "bin/sc", debug = false, maxMemory = 1024)
@@ -4195,7 +4199,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       else
          layer.packagePrefix = prefix == null ? "" : prefix;
 
-      addLayer(layer, null, runMain, false, true, true, false);
+      addLayer(layer, null, runMain, false, true, true, false, true);
    }
 
    public EditorContext getDefaultEditorContext() {
@@ -4590,17 +4594,24 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   public void addLayer(Layer layer, ExecutionContext ctx, boolean runMain, boolean setPackagePrefix, boolean saveModel, boolean makeBuildLayer, boolean build) {
-      // Don't use the specified buildDir for the new layer
-      options.buildLayerAbsDir = null;
+   public void addLayer(Layer layer, ExecutionContext ctx, boolean runMain, boolean setPackagePrefix, boolean saveModel, boolean makeBuildLayer, boolean build, boolean isActive) {
+      Layer oldBuildLayer = null;
+      int newLayerPos;
+      if (isActive) {
+         // Don't use the specified buildDir for the new layer
+         options.buildLayerAbsDir = null;
 
-      int newLayerPos = lastLayer == null ? 0 : lastLayer.layerPosition + 1;
-      Layer oldBuildLayer = buildLayer;
+         newLayerPos = lastLayer == null ? 0 : lastLayer.layerPosition + 1;
+         oldBuildLayer = buildLayer;
+      }
+      else {
+         newLayerPos = inactiveLayers.size();
+      }
 
       /* Now that we have defined the base layers, we'll inherit the package prefix and dynamic state */
       boolean baseIsDynamic = false;
 
-      layer.layerPosition = layers.size();
+      layer.layerPosition = isActive ? layers.size() : inactiveLayers.size();
 
       layer.initModel();
 
@@ -4627,54 +4638,59 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (pkgPrefix == null)
          layer.layerUniqueName = CTypeUtil.prefixPath(layer.packagePrefix, layer.layerDirName);
 
-      registerLayer(layer);
+      if (isActive) {
+         registerLayer(layer);
+         layers.add(layer);
+         // Do not start the layer here.  If it is started, we won't get into initSysClassLoader from updateBuildDir and lastStartedLayer
+         // does not get
+         ParseUtil.initComponent(layer);
 
-      layers.add(layer);
+         lastLayer = layer;
 
-      // Do not start the layer here.  If it is started, we won't get into initSysClassLoader from updateBuildDir and lastStartedLayer
-      // does not get
-      ParseUtil.initComponent(layer);
-
-      lastLayer = layer;
-
-      if (makeBuildLayer)
-         updateBuildDir(oldBuildLayer);
+         if (makeBuildLayer && isActive)
+            updateBuildDir(oldBuildLayer);
+      }
+      else {
+         registerInactiveLayer(layer);
+      }
 
       // Do this before we start the layer so that the layer's srcDirCache includes the layer file itself
       if (saveModel)
          layer.model.saveModel();
 
-      // Start these before we update them
-      startLayers(layer);
+      if (isActive) {
+         // Start these before we update them
+         startLayers(layer);
 
-      if (saveModel) {
-         addNewModel(layer.model, null, null, true);
-      }
-
-      ArrayList<ModelToUpdate> res = updateLayers(newLayerPos, ctx);
-
-      if (build)
-         buildIfNecessary(oldBuildLayer);
-      // For a newly created layer we should not have to build but do need to include the build dir in the sys class loader I think
-      else if (makeBuildLayer) {
-         layer.compiled = true;  // Since the layer is empty we can still consider it compiled... otherwise, won't get added to the sys class path in case we do put stuff there later
-         initSysClassLoader(layer, ClassLoaderMode.BUILD);
-      }
-
-      UpdateInstanceInfo updateInfo = newUpdateInstanceInfo();
-
-      if (res != null) {
-         for (int i = 0; i < res.size(); i++) {
-            ModelToUpdate mt = res.get(i);
-            refresh(mt.srcEnt, mt.oldModel, ctx, updateInfo);
+         if (saveModel) {
+            addNewModel(layer.model, null, null, true);
          }
+
+         ArrayList<ModelToUpdate> res = updateLayers(newLayerPos, ctx);
+
+         if (build)
+            buildIfNecessary(oldBuildLayer);
+         // For a newly created layer we should not have to build but do need to include the build dir in the sys class loader I think
+         else if (makeBuildLayer) {
+            layer.compiled = true;  // Since the layer is empty we can still consider it compiled... otherwise, won't get added to the sys class path in case we do put stuff there later
+            initSysClassLoader(layer, ClassLoaderMode.BUILD);
+         }
+
+         UpdateInstanceInfo updateInfo = newUpdateInstanceInfo();
+
+         if (res != null) {
+            for (int i = 0; i < res.size(); i++) {
+               ModelToUpdate mt = res.get(i);
+               refresh(mt.srcEnt, mt.oldModel, ctx, updateInfo);
+            }
+         }
+
+         // Now run initialization code gathered up during the update process
+         updateInfo.updateInstances(ctx);
+
+         if (runMain)
+            initStartupObjects(newLayerPos);
       }
-
-      // Now run initialization code gathered up during the update process
-      updateInfo.updateInstances(ctx);
-
-      if (runMain)
-         initStartupObjects(newLayerPos);
 
       notifyLayerAdded(layer);
    }
@@ -4703,7 +4719,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   public Layer createLayer(String layerName, String layerPackage, String[] extendsNames, boolean isDynamic, boolean isPublic, boolean isTransparent) {
+   public Layer createLayer(String layerName, String layerPackage, String[] extendsNames, boolean isDynamic, boolean isPublic, boolean isTransparent, boolean isActive, boolean saveLayer) {
       String layerSlashName = LayerUtil.fixLayerPathName(layerName);
       layerName = layerName.replace(FileUtil.FILE_SEPARATOR, ".");
       String rootFile = getNewLayerDir();
@@ -4716,13 +4732,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          throw new IllegalArgumentException("Layer: " + layerName + " exists at: " + file);
       Layer layer = new Layer();
       layer.layeredSystem = this;
+      layer.activated = isActive;
       layer.layerDirName = layerName;
       layer.layerBaseName = baseName;
       layer.layerPathName = pathName;
       layer.dynamic = isDynamic && !getCompiledOnly();
       layer.defaultModifier = isPublic ? "public" : null;
       layer.transparent = isTransparent;
-      layer.packagePrefix = layerPackage;
+      layer.packagePrefix = layerPackage == null ? "" : layerPackage;
       List<Layer> baseLayers = null;
 
       boolean buildBaseLayers = false;
@@ -4730,13 +4747,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (extendsNames != null) {
          layer.baseLayerNames = Arrays.asList(extendsNames);
 
-         int beforeSize = layers.size();
+         int beforeSize = isActive ? layers.size() : inactiveLayers.size();
+
+         LayerParamInfo paramInfo = new LayerParamInfo();
+         paramInfo.activate = isActive;
 
          // TODO: should we expose anyway to make these layers dynamic?
-         layer.baseLayers = baseLayers = initLayers(layer.baseLayerNames, newLayerDir, CTypeUtil.getPackageName(layer.layerDirName), false, new LayerParamInfo(), false);
+         layer.baseLayers = baseLayers = initLayers(layer.baseLayerNames, newLayerDir, CTypeUtil.getPackageName(layer.layerDirName), false, paramInfo, false);
 
          // If we added any layers which presumably are non-empty, we will need to do a build to be sure they are up to date
-         if (beforeSize != layers.size())
+         if (isActive && beforeSize != layers.size())
             buildBaseLayers = true;
 
          if (baseLayers != null) {
@@ -4744,7 +4764,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             for (Layer l:baseLayers) {
                // Add any base layers that are new... probably not reached?  Doesn't initLayers already add them?
                if (l != null && !layers.contains(l)) {
-                  addLayer(l, null, false, false, false, false, false);
+                  addLayer(l, null, false, false, false, false, false, isActive);
                }
                else if (l == null) {
                   System.err.println("*** No base layer: " + layer.baseLayerNames.get(li));
@@ -4758,7 +4778,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          System.out.println("Adding layer: " + layer.layerDirName + (baseLayers != null ? " extends: " + baseLayers : ""));
 
       // No need to build this layer but if we dragged in any base layers, we might need to build this one just to deal with them.
-      addLayer(layer, null, true, true, true, true, buildBaseLayers);
+      addLayer(layer, null, true, true, saveLayer, true, buildBaseLayers, isActive);
 
       return layer;
    }
@@ -4816,7 +4836,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public File getLayerFileInDir(String layerDir, String layerPathName) {
-      layerDir = makeAbsolute(layerDir);
+      layerDir = FileUtil.makeAbsolute(layerDir);
 
       String layerFileName;
       String layerTypeName;
@@ -4893,31 +4913,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
-   private String makeCanonical(String layerDir) throws IOException {
-      File layerDirFile = new File(layerDir);
-      layerDir = layerDirFile.getCanonicalPath();
-      return layerDir;
-   }
-
-   private String makeAbsolute(String layerDir) {
-      File layerDirFile = new File(layerDir);
-      if (!layerDirFile.isAbsolute()) {
-         try {
-            layerDir = layerDirFile.getCanonicalPath();
-         }
-         catch (IOException exc) {
-            throw new IllegalArgumentException("Invalid layer directory: '" + layerDir + "': " + exc);
-         }
-      }
-      return layerDir;
-   }
-
    private String mapLayerDirName(String layerDir) {
       if (layerDir.equals(".")) {
          layerDir = System.getProperty("user.dir");
       }
       else {
-         layerDir = makeAbsolute(layerDir);
+         layerDir = FileUtil.makeAbsolute(layerDir);
       }
       return layerDir;
    }
@@ -8004,7 +8005,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * on classes which were compiled during the first pass.  On the second pass, we are given the buildLayer and now
     * start anything not already started.
     */
-   private void startLayers(Layer genLayer) {
+   public void startLayers(Layer genLayer) {
       PerfMon.start("startLayers");
       /*
       if (genLayer != buildLayer) {
@@ -8014,13 +8015,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       else {
       */
-      if (genLayer.layerPosition < layers.size()) {
+      if (genLayer.layerPosition < (genLayer.activated ? layers.size() : inactiveLayers.size())) {
          for (int i = 0; i <= genLayer.layerPosition; i++) {
-            Layer l = layers.get(i);
+            Layer l = genLayer.activated ? layers.get(i) : inactiveLayers.get(i);
             l.ensureStarted(false);
          }
          for (int i = 0; i <= genLayer.layerPosition; i++) {
-            Layer l = layers.get(i);
+            Layer l = genLayer.activated ? layers.get(i) : inactiveLayers.get(i);
             l.ensureValidated(false);
          }
       }
@@ -12563,7 +12564,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public SrcEntry getSrcEntryForPath(String pathName, boolean activeLayers) {
       acquireDynLock(false);
 
+      pathName = FileUtil.makeAbsolute(pathName);
+
       try {
+         List<Layer> layersList = activeLayers ? layers : inactiveLayers;
+         for (Layer layer:layersList) {
+            SrcEntry layerEnt = layer.getSrcEntry(pathName);
+            if (layerEnt != null)
+               return layerEnt;
+         }
          if (layerPathDirs != null) {
             for (File layerPathDir:layerPathDirs) {
                String layerPath = layerPathDir.getPath();
@@ -12576,7 +12585,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                // In case we crossed over a sym-link, try it as absolute since we often canonicalize the layerPathDirs
                String origPathName = pathName;
                try {
-                  pathName = makeCanonical(pathName);
+                  pathName = FileUtil.makeCanonical(pathName);
                   if (pathName.startsWith(layerPath)) {
                      SrcEntry ent = getSrcEntryForPathDir(layerPath, pathName, activeLayers);
                      if (ent != null)

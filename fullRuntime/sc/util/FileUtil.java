@@ -703,4 +703,36 @@ public class FileUtil {
          System.err.println("*** Failed to remove: " + f);
    }
 
+   public static String makeAbsolute(String fileName) {
+      File file = new File(fileName);
+      if (!file.isAbsolute()) {
+         try {
+            return file.getCanonicalPath();
+         }
+         catch (IOException exc) {
+            return fileName;
+         }
+      }
+      return fileName;
+   }
+
+   public static String makeCanonical(String dir) throws IOException {
+      File layerDirFile = new File(dir);
+      dir = layerDirFile.getCanonicalPath();
+      return dir;
+   }
+
+   public static String makePathAbsolute(String path) {
+      String[] pathDirs = StringUtil.split(path, ':');
+      StringBuilder sb = new StringBuilder();
+      boolean first = true;
+      for (String pathDir:pathDirs) {
+         if (!first)
+            sb.append(":");
+         else
+            first = false;
+         sb.append(FileUtil.makeAbsolute(pathDir));
+      }
+      return sb.toString();
+   }
 }

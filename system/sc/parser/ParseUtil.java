@@ -853,4 +853,24 @@ public class ParseUtil  {
       }
       return null;
    }
+
+   public static LayeredSystem createSimpleParser(String classPath, String externalClassPath, String srcPath) {
+      LayeredSystem.Options options = new LayeredSystem.Options();
+      options.verbose = true;
+      options.installLayers = false;
+
+      LayeredSystem sys = new LayeredSystem(null, null, null, null, classPath, options, null, null, false, null);
+
+      /** Create a single layer to manage externalClasses and source files given to us to parse */
+      Layer sysLayer = sys.createLayer("sysLayer", null, null, false, false, false, false, false);
+      // Set the externalClassPath - i.e. those classes not loaded via the ClassLoader
+      sysLayer.externalClassPath = externalClassPath;
+
+      // Set the path for finding src files.   By default this is relative to the layer's dir so need to make it absolute
+      sysLayer.srcPath = FileUtil.makePathAbsolute(srcPath);
+
+      sys.startLayers(sysLayer);
+
+      return sys;
+   }
 }
