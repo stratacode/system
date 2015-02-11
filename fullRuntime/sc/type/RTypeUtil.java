@@ -524,7 +524,7 @@ public class RTypeUtil {
 
       if (toCheck.getReturnType().isAssignableFrom(res.getReturnType()))
          return res;
-      return res;
+      return toCheck;
    }
 
    public static Field getField(Class resultClass, String fieldName) {

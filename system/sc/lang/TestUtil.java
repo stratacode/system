@@ -7,16 +7,17 @@ package sc.lang;
 import sc.lang.java.JavaModel;
 import sc.lang.java.TransformUtil;
 import sc.lang.js.JSLanguage;
+import sc.layer.LayeredSystem;
+import sc.layer.SrcEntry;
 import sc.parser.*;
 import sc.util.ExtensionFilenameFilter;
 import sc.util.FileUtil;
+import sc.util.StringUtil;
 
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.StringReader;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 public class TestUtil {
 
@@ -122,25 +123,10 @@ public class TestUtil {
    };
 
    public static void main(String[] args) {
-      Language.registerLanguage(JavaLanguage.INSTANCE, "java");
-      Language.registerLanguage(SCLanguage.INSTANCE, "sc");
-      // This one is just for templates we process from Java code, i.e. as part of framework definitions.
-      Language.registerLanguage(TemplateLanguage.INSTANCE, "sctd");
-      // This is a real template, treated as a regular type in the system, either dynamic or compiled
-      Language.registerLanguage(TemplateLanguage.INSTANCE, "sct");
-      Language.registerLanguage(JSLanguage.INSTANCE, "js");
-      Language.registerLanguage(HTMLLanguage.INSTANCE, "schtml");
-      Language.registerLanguage(HTMLLanguage.INSTANCE, "html");
-      Language.registerLanguage(HTMLLanguage.INSTANCE, "scsp");
-      Language.registerLanguage(CSSLanguage.INSTANCE, "scss");
-      Language.registerLanguage(CSSLanguage.INSTANCE, "css");
 
-      boolean enableModelToString = false;
-      boolean enableStyle = false;
-      boolean finalGenerate = true;
+      TestOptions opts = new TestOptions();
+
       List<String> buildList = null;
-      boolean enablePartialValues = false;
-      int repeatCount = 1;
 
       for (int i = 0; i < args.length; i++) {
          if (args[i].length() == 0)
@@ -150,39 +136,97 @@ public class TestUtil {
                usage(args);
 
             String opt = args[i].substring(1);
-            if (opt.length() > 1)
-               usage(args);
             switch (opt.charAt(0)) {
                case 'm':
-                  enableModelToString = true;
+                  if (opt.length() > 1)
+                     usage(args);
+                  opts.enableModelToString = true;
+                  break;
+               case 'c':
+                  if (opt.equals("cp")) {
+                     if (args.length < i + 1)
+                        System.err.println("*** No classpath argument to -cp option. ");
+                     else {
+                        i++;
+                        opts.classPath = args[i];
+                     }
+                  }
+                  else {
+                     System.err.println("*** Unrecognized option: " + opt);
+                  }
+                  break;
+               case 'e':
+                  if (opt.equals("ep")) {
+                     if (args.length < i + 1)
+                        System.err.println("*** No classpath argument to -ep option. ");
+                     else {
+                        i++;
+                        opts.externalClassPath = args[i];
+                     }
+                  }
+                  else {
+                     System.err.println("*** Unrecognized option: " + opt);
+                  }
                   break;
                case 's':
-                  enableStyle = true;
+                  if (opt.equals("sp")) {
+                     if (args.length < i + 1)
+                        System.err.println("*** No srcPath argument to -sp option. ");
+                     else {
+                        i++;
+                        opts.srcPath = args[i];
+                     }
+                  }
+                  else if (opt.equals("s")) {
+                     opts.enableStyle = true;
+                  }
+                  else {
+                     System.err.println("*** Unrecognized option: " + opt);
+                  }
                   break;
                case 'd':
+                  if (opt.length() > 1)
+                     usage(args);
                   dumpStats = true;
                   break;
                case 'n':
+                  if (opt.length() > 1)
+                     usage(args);
                   verifyResults = false;
                   break;
                case 'f':
-                  finalGenerate = false;
+                  if (opt.length() > 1)
+                     usage(args);
+                  opts.finalGenerate = false;
                   break;
                case 'p':
-                  enablePartialValues = true;
+                  if (opt.length() > 1)
+                     usage(args);
+                  opts.enablePartialValues = true;
+                  break;
+               case 'l':
+                  if (opt.length() > 1)
+                     usage(args);
+                  opts.layerMode = true;
                   break;
                case 'r':
+                  if (opt.length() > 1)
+                     usage(args);
                   try {
                      if (args.length < i + 1)
                         System.err.println("*** No count argument to -r option for repeating the parse <n> times. ");
                      else {
                         i++;
-                        repeatCount = Integer.parseInt(args[i]);
+                        opts.repeatCount = Integer.parseInt(args[i]);
                      }
                   }
                   catch (NumberFormatException exc) {
                      System.err.println("*** bad value to repeat count");
                   }
+                  break;
+               default:
+                  System.err.println("*** Unrecognized option: " + opt);
+                  usage(args);
                   break;
             }
          }
@@ -193,7 +237,36 @@ public class TestUtil {
          }
       }
 
-      parseTestFiles(buildList == null ? inputFileNames : buildList.toArray(new String[0]), enableModelToString, enableStyle, finalGenerate, enablePartialValues, repeatCount);
+      // In layer mode, we pick up the LayeredSystem's languages
+      if (!opts.layerMode) {
+         Language.registerLanguage(JavaLanguage.INSTANCE, "java");
+         Language.registerLanguage(SCLanguage.INSTANCE, "sc");
+         // This one is just for templates we process from Java code, i.e. as part of framework definitions.
+         Language.registerLanguage(TemplateLanguage.INSTANCE, "sctd");
+         // This is a real template, treated as a regular type in the system, either dynamic or compiled
+         Language.registerLanguage(TemplateLanguage.INSTANCE, "sct");
+         Language.registerLanguage(JSLanguage.INSTANCE, "js");
+         Language.registerLanguage(HTMLLanguage.INSTANCE, "schtml");
+         Language.registerLanguage(HTMLLanguage.INSTANCE, "html");
+         Language.registerLanguage(HTMLLanguage.INSTANCE, "scsp");
+         Language.registerLanguage(CSSLanguage.INSTANCE, "scss");
+         Language.registerLanguage(CSSLanguage.INSTANCE, "css");
+      }
+      else {
+         if (opts.srcPath == null && buildList != null) {
+            LinkedHashSet<String> srcDirs = new LinkedHashSet<String>();
+            for (String buildFile:buildList) {
+               String parentDir = FileUtil.getParentPath(buildFile);
+               if (parentDir == null)
+                  srcDirs.add(".");
+               else
+                  srcDirs.add(parentDir);
+            }
+            opts.srcPath = StringUtil.arrayToPath(srcDirs.toArray());
+         }
+      }
+
+      parseTestFiles(buildList == null ? inputFileNames : buildList.toArray(new String[0]), opts);
 
       if (dumpStats) {
          System.out.println("*** Stats:");
@@ -211,7 +284,19 @@ public class TestUtil {
    static boolean verifyResults = true;
    static boolean dumpStats = false;
 
-   public static void parseTestFiles(Object[] inputFiles, boolean enableModelToString, boolean enableStyle, boolean finalGenerate, boolean enablePartialValues, int repeatCount) {
+   public static class TestOptions {
+      boolean enableModelToString = false;
+      boolean enableStyle = false;
+      boolean finalGenerate = true;
+      boolean enablePartialValues = false;
+      int repeatCount = 1;
+      boolean layerMode = false;
+      String classPath;
+      String externalClassPath;
+      String srcPath;
+   }
+
+   public static void parseTestFiles(Object[] inputFiles, TestOptions opts) {
       JavaLanguage.register();
       SCLanguage.register();
       
@@ -238,27 +323,61 @@ public class TestUtil {
             if (files == null)
                System.err.println("**** Unable to read directory: " + file);
             else
-               parseTestFiles(files, enableModelToString, enableStyle, finalGenerate, enablePartialValues, repeatCount);
+               parseTestFiles(files, opts);
             continue;
          }
+
+         Object result;
          String input = ParseUtil.readFileString(file);
          if (input == null) {
             System.out.println("*** Can't open file: " + fileName);
             continue;
          }
-         Language lang = Language.getLanguageByExtension(FileUtil.getExtension(file.getPath()));
-         if (lang == null)
-            throw new IllegalArgumentException("No language for: " + file.getPath());
+         Language lang;
+
+         String ext = FileUtil.getExtension(file.getPath());
+
          long startTime = System.currentTimeMillis();
-         Object result;
-         int ct = repeatCount;
+         int ct = opts.repeatCount;
          do {
-            result = lang.parse(fileName, new StringReader(input), lang.getStartParselet(), enablePartialValues);
+            // Parsing using the language directly - no layered system involved so we can only validate the grammar
+            if (!opts.layerMode) {
+               lang = Language.getLanguageByExtension(ext);
+               if (lang == null)
+                  throw new IllegalArgumentException("No language for: " + file.getPath());
+               result = lang.parse(fileName, new StringReader(input), lang.getStartParselet(), opts.enablePartialValues);
+            }
+            else {
+               LayeredSystem sys = ParseUtil.createSimpleParser(opts.classPath, opts.externalClassPath, opts.srcPath);
+               lang = (Language) sys.getFileProcessorForExtension(ext);
+
+               SrcEntry srcEnt = sys.getSrcEntryForPath(fileName, false);
+               if (srcEnt == null) {
+                  System.err.println("*** Unable to find srcFile: " + fileName + " in: " + opts.srcPath);
+                  result = null;
+               }
+               else {
+                  Object modelResult = sys.parseSrcFile(srcEnt, true);
+                  if (!(modelResult instanceof ParseError)) {
+                     result = ((ISemanticNode) modelResult).getParseNode();
+                     // Passed the parse phase
+                     if (modelResult instanceof JavaModel) {
+                        JavaModel model = (JavaModel) modelResult;
+                        ParseUtil.initAndStartComponent(model);
+                     }
+                     else {
+                        System.err.println("*** Parse result not a JavaModel: " + result);
+                     }
+                  }
+                  else // ParseError - handled below...
+                     result = modelResult;
+               }
+            }
          } while (--ct > 0);
 
          long parseResultTime = System.currentTimeMillis();
 
-         System.out.println("*** parsed: " + fileName + " " + repeatCount + (repeatCount == 1 ? " time" : " times") + " in: " + rangeToSecs(startTime, parseResultTime));
+         System.out.println("*** parsed: " + fileName + " " + opts.repeatCount + (opts.repeatCount == 1 ? " time" : " times") + " in: " + rangeToSecs(startTime, parseResultTime));
 
          if (verifyResults) {
             if (result == null || !input.equals(result.toString())) {
@@ -283,11 +402,11 @@ public class TestUtil {
 
                StringBuilder sb = new StringBuilder();
 
-               if (enableModelToString)
+               if (opts.enableModelToString)
                   System.out.println("Parsed model: " + (modelObj instanceof ISemanticNode ? ((ISemanticNode)modelObj).toModelString() : modelObj.toString()));
 
                //((JavaLanguage) lang).identifierExpression.trace = true;
-               if (enableStyle)
+               if (opts.enableStyle)
                   System.out.println("Styled output: " + ParseUtil.styleSemanticValue(modelObj, result));
 
                if (modelObj instanceof JavaModel) {
@@ -311,7 +430,7 @@ public class TestUtil {
 
                long generateStartTime = System.currentTimeMillis();
 
-               Object generateResult = lang.generate(modelObj, finalGenerate);
+               Object generateResult = lang.generate(modelObj, opts.finalGenerate);
                if (generateResult instanceof GenerateError)
                   System.err.println("**** FAILURE during generation: " + generateResult);
                else {
@@ -325,7 +444,7 @@ public class TestUtil {
                   FileUtil.saveStringAsFile(genFileName, sb.toString(), true);
 
                   System.out.println("*** processed: " + fileName + " bytes: " + sb.length() +
-                                      " generate: " + rangeToSecs(generateStartTime, generateResultTime));
+                          " generate: " + rangeToSecs(generateStartTime, generateResultTime));
 
                   Object reparsedResult = lang.parse(new StringReader(genResult));
                   if (reparsedResult instanceof ParseError)

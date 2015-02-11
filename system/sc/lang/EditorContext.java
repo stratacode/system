@@ -759,7 +759,7 @@ public class EditorContext extends ClientEditorContext {
 
 
    public Layer createLayer(String layerName, String layerPackage, String[] extendsNames, boolean isDynamic, boolean isPublic, boolean isTransparent, boolean addOp) {
-      Layer layer = system.createLayer(layerName, layerPackage, extendsNames, isDynamic, isPublic, isTransparent);
+      Layer layer = system.createLayer(layerName, layerPackage, extendsNames, isDynamic, isPublic, isTransparent, true, true);
       if (addOp) {
          addOp(new AddLayersOp(Collections.singletonList(layerName).toArray(new String[1]), isDynamic));
       }

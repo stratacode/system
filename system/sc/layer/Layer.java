@@ -2033,6 +2033,20 @@ public class Layer implements ILifecycle, LayerConstants {
       return res;
    }
 
+   public SrcEntry getSrcEntry(String absFileName) {
+      for (String dir:topLevelSrcDirs) {
+         if (absFileName.startsWith(dir)) {
+            String rest = absFileName.substring(dir.length());
+            while (rest.startsWith("/"))
+               rest = rest.substring(1);
+            File f = srcDirCache.get(rest);
+            if (f != null)
+               return new SrcEntry(this, absFileName, rest);
+         }
+      }
+      return null;
+   }
+
    /** List of suffixes to search for src files.  Right now this is only Java because zip files are only used for precompiled src. */
    private final String[] zipSrcSuffixes = {"java"};
 
