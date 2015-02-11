@@ -6,13 +6,15 @@ set -e
 
 STAGEDIR=/tmp/
 
+BUILDDIR=/tmp/scbuild
+rm -rf /tmp/scbuild
+
 if [ "$#" -eq 0 ]; then
-   BUILDDIR=/tmp/scbuild
    RESDIR=$STAGEDIR
 else
-   BUILDDIR="$1"
    RESDIR="$1"
 fi
+
 
 echo "Building StrataCode into: $BUILDDIR"
 
@@ -23,7 +25,7 @@ sc -c -a coreRuntime -da $BUILDDIR
 sc -c -a system -da $BUILDDIR
 
 # Now we package up the STAGEDIR/StrataCode directory.  
-rm -rf STAGEDIR/StrataCode
+rm -rf $STAGEDIR/StrataCode
 
 # old - top level build dir
 echo "cp -rf $BUILDDIR $STAGEDIR/StrataCode"
