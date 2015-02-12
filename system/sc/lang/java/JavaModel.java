@@ -281,7 +281,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          if (className.equals("*")) {
             String pkgName = CTypeUtil.getPackageName(impStr);
 
-            Set<String> filesInPkg = layeredSystem.getFilesInPackage(pkgName);
+            Set<String> filesInPkg = layeredSystem == null ? null : layeredSystem.getFilesInPackage(pkgName);
             if (filesInPkg != null) {
                for (String impName:filesInPkg) {
                   // A wildcard import should not override an explicit one
