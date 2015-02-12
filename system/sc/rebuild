@@ -1,3 +1,9 @@
 #!/bin/sh
 
 ../../makeSC.sh /jjv/vbuild/
+
+cd /jjv/vbuild
+rm -rf bin
+rm -rf StrataCode
+unzip StrataCode.zip
+mv StrataCode/bin bin
