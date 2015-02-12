@@ -5893,11 +5893,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return typeNames;
    }
 
-   public Set<String> getSrcTypeNames(boolean prependLayerPrefix, boolean includeInnerTypes, boolean restrictToLayer, boolean includeImports) {
+   public Set<String> getSrcTypeNames(boolean prependLayerPrefix, boolean includeInnerTypes, boolean restrictToLayer, boolean includeImports, boolean activeLayers) {
       TreeSet<String> typeNames = new TreeSet<String>();
 
-      for (int i = 0; i < layers.size(); i++) {
-         Layer layer = layers.get(i);
+      List<Layer> layerList = activeLayers ? layers : inactiveLayers;
+
+      for (int i = 0; i < layerList.size(); i++) {
+         Layer layer = layerList.get(i);
 
          if (layer.getVisibleInEditor())
             typeNames.addAll(layer.getSrcTypeNames(prependLayerPrefix, includeInnerTypes, restrictToLayer, includeImports));
