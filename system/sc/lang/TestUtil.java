@@ -348,7 +348,7 @@ public class TestUtil {
                result = lang.parse(fileName, new StringReader(input), lang.getStartParselet(), opts.enablePartialValues);
             }
             else {
-               LayeredSystem sys = ParseUtil.createSimpleParser(opts.classPath, opts.externalClassPath, opts.srcPath);
+               LayeredSystem sys = ParseUtil.createSimpleParser(opts.classPath, opts.externalClassPath, opts.srcPath, null);
                lang = (Language) sys.getFileProcessorForExtension(ext);
 
                SrcEntry srcEnt = sys.getSrcEntryForPath(fileName, false);
