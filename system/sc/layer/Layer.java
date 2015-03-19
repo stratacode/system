@@ -1170,7 +1170,7 @@ public class Layer implements ILifecycle, LayerConstants {
                }
             }
             else {
-               displayError("No files in global import: " + pkg);
+               error("No files in global import: " + pkg);
             }
          }
       }
@@ -1203,14 +1203,22 @@ public class Layer implements ILifecycle, LayerConstants {
       }
    }
 
-   public void displayError(String... args) {
+   public void error(String... args) {
+      reportMessage(MessageType.Error, args);
+   }
+
+   public void reportMessage(MessageType type, String... args) {
       StringBuilder sb = new StringBuilder();
-      sb.append("Error in layer: ");
+      sb.append(type);
+      sb.append(" in layer: ");
       sb.append(layerPathName);
       sb.append(": ");
       for (String arg:args)
          sb.append(arg);
-      System.err.println(sb.toString());
+      if (layeredSystem != null)
+         layeredSystem.reportMessage(type, sb);
+      else
+         System.err.println(sb);
    }
 
    private void addSrcFilesToCache(File dir, String prefix, ArrayList<ReplacedType> replacedTypes) {
@@ -1946,7 +1954,7 @@ public class Layer implements ILifecycle, LayerConstants {
                meth.invoke(ctx, null);
             }
             catch (Exception exc) {
-               displayError("Exception in layer's start method: ", exc.toString());
+               error("Exception in layer's start method: ", exc.toString());
                if (layeredSystem.options.verbose)
                   exc.printStackTrace();
                errorsStarting = true;
@@ -1964,10 +1972,25 @@ public class Layer implements ILifecycle, LayerConstants {
       return staticImportTypes.put(name, obj);
    }
 
+   private static void closeZips(ZipFile[] fileList) {
+      if (fileList == null)
+         return;
+      for (ZipFile zipFile : fileList) {
+         try {
+            if (zipFile != null)
+               zipFile.close();
+         } catch (IOException e) {}
+      }
+   }
+
    public void stop() {
       initialized = false;
       started = false;
       errorsStarting = false;
+      closeZips(externalZipFiles);
+      externalZipFiles = null;
+      closeZips(zipFiles);
+      zipFiles = null;
    }
 
    public String getLayerPathName() {
@@ -2034,6 +2057,7 @@ public class Layer implements ILifecycle, LayerConstants {
    }
 
    public SrcEntry getSrcEntry(String absFileName) {
+      checkIfStarted();
       for (String dir:topLevelSrcDirs) {
          if (absFileName.startsWith(dir)) {
             String rest = absFileName.substring(dir.length());

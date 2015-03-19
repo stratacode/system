@@ -14,6 +14,7 @@ import sc.lang.sc.ModifyDeclaration;
 import sc.lang.template.Template;
 import sc.lang.template.TemplateDeclaration;
 import sc.layer.IFileProcessorResult;
+import sc.layer.SrcEntry;
 import sc.obj.IComponent;
 import sc.layer.LayeredSystem;
 import sc.parser.ParseUtil;
@@ -124,6 +125,18 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
                // Need to add interfaces to the sub-types table so that we can update static and the new interface instance properties when they change
                m.layeredSystem.addSubType(implType, this);
+            }
+         }
+      }
+
+      if (getEnclosingType() == null && !isLayerType) {
+         JavaModel model = getJavaModel();
+         SrcEntry srcFile = model.getSrcFile();
+         // Some Java classes have more than one type in them?
+         if (srcFile != null && model.types != null && model.types.size() == 1 && model.types.get(0) == this) {
+            String fileName = CTypeUtil.getClassName(model.getSrcFile().getRelTypeName());
+            if (!fileName.equals(typeName)) {
+               displayError("Type name: " + typeName + " does not match file name: " + fileName + " for: ");
             }
          }
       }
@@ -1056,7 +1069,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
                else if (!ModelUtil.sameTypes(ModelUtil.getEnclosingType(member), this)) {
                   Object membType = ModelUtil.getPropertyType(member);
                   Object resType = ModelUtil.getPropertyType(res);
-                  // TODO: this needs to move into start and use displayError
+                  // TODO: this needs to move into start and use error
                   if (!ModelUtil.isAssignableFrom(membType, resType))
                      System.err.println("*** Error: inheriting a property from an interface whose type is not compatible with the type of the field of the same name in the base class");
                   else {

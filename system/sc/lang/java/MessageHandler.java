@@ -9,9 +9,31 @@ import sc.lang.MessageType;
 
 public class MessageHandler implements IMessageHandler {
    public String err;
-   public boolean isWarning;
-   public void reportMessage(String msg, String url, int line, int col, MessageType type) {
-      err = msg;
-      isWarning = type == MessageType.Warning;
+   public String warning;
+   public String info;
+   public String verbose;
+   public String sysDetails;
+   public void reportMessage(CharSequence msg, String url, int line, int col, MessageType type) {
+      String res = msg.toString();
+      switch (type) {
+         case Error:
+            err = res;
+            break;
+         case Warning:
+            warning = res;
+            break;
+         case Info:
+            info = res;
+            break;
+         case Debug:
+            verbose = res;
+            break;
+         case SysDetails:
+            sysDetails = res;
+            break;
+         default:
+            err = res;
+            break;
+      }
    }
 }

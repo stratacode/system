@@ -120,7 +120,7 @@ public class ModifyDeclaration extends TypeDeclaration {
             }
 
             if (modifyInherited && extendsTypes != null && extendsTypes.size() > 0) {
-               displayError("Modified type cannot extend an additional type: ");
+               displayError("Modifying inherited type: " + modifyTypeDecl.getFullTypeName() + " from: " + getEnclosingType().getFullTypeName() + " cannot extend another type: ");
             }
 
             JavaModel thisModel = getJavaModel();

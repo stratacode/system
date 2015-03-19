@@ -4,6 +4,7 @@
 
 package sc.classfile;
 
+import sc.lang.MessageType;
 import sc.lang.SemanticNode;
 import sc.lang.sc.ModifyDeclaration;
 import sc.layer.Layer;
@@ -13,6 +14,7 @@ import sc.type.*;
 import sc.util.CoalescedHashMap;
 import sc.util.FileUtil;
 import sc.lang.java.*;
+import sc.util.StringUtil;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -69,7 +71,10 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          return file.getCFClass();
       }
       catch (IOException exc) {
-         System.err.println("*** Error reading class: " + classFileName);
+         if (system != null)
+            system.error("*** Error reading class: " + classFileName);
+         else
+            System.err.println("*** Error reading class: " + classFileName);
          return null;
       }
       finally {
@@ -120,7 +125,10 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          return null;
       }
       catch (IOException exc) {
-         System.err.println("*** Error reading class: " + classPathName + " in zip: " + zipFile);
+         if (system != null)
+            system.error("Error reading class: " + classPathName + " in zip: " + zipFile);
+         else
+            System.err.println("Error reading class: " + classPathName + " in zip: " + zipFile);
          return null;
       }
       finally {
@@ -159,9 +167,12 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          int numInterfaces = implementsTypes.size();
          CoalescedHashMap<String,Object[]> implCache;
          for (int i = 0; i < numInterfaces; i++) {
-            implCache = ModelUtil.getMethodCache(implementsTypes.get(i));
-            if (implCache != null)
-               tableSize += implCache.size;
+            Object implType = implementsTypes.get(i);
+            if (implType != null) {
+               implCache = ModelUtil.getMethodCache(implType);
+               if (implCache != null)
+                  tableSize += implCache.size;
+            }
          }
       }
 
@@ -187,8 +198,11 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       if (implementsTypes != null) {
          CoalescedHashMap<String,Object[]> implCache;
          for (int k = 0; k < implementsTypes.size(); k++) {
-            implCache = ModelUtil.getMethodCache(implementsTypes.get(k));
-            mergeSuperTypeMethods(implCache);
+            Object implType = implementsTypes.get(k);
+            if (implType != null) {
+               implCache = ModelUtil.getMethodCache(implType);
+               mergeSuperTypeMethods(implCache);
+            }
          }
       }
 
@@ -222,8 +236,9 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
                String implTypeCFName = ((ClassType)sig.implementsTypes.get(i)).getCompiledTypeName();
                Object implType = system.getClassFromCFName(implTypeCFName, null);
                if (implType == null)
-                  System.out.println("*** Can't find interface: " + implTypeCFName);
-               implementsTypes.add(implType);
+                  error("Can't find interface: " + implTypeCFName);
+               else
+                  implementsTypes.add(implType);
             }
          }
          signature = null; // Throwing this away as we don't need it anymore...
@@ -238,7 +253,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
             for (int i = 0; i < numInterfaces; i++) {
                Object implType = system.getClassFromCFName(classFile.getInterfaceCFName(i), null);
                if (implType == null)
-                  System.out.println("*** Can't find interface: " + classFile.getInterfaceName(i));
+                  error("*** Can't find interface: " + classFile.getInterfaceName(i));
                implementsTypes.add(implType);
             }
          }
@@ -713,7 +728,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          String innerName = classFile.getInnerClassName(i);
          Object innerType = getInnerType(innerName, null);
          if (innerType == null)
-            System.err.println("*** Can't find inner type: " + innerName + " of: " + getTypeName());
+            error("Can't find inner type: " + innerName + " of: " + getTypeName());
          else if (modifier == null || ModelUtil.hasModifier(innerType, modifier))
             innerTypes.add(innerType);
       }
@@ -964,5 +979,23 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          }
       }
       return null;
+   }
+
+   public void error(CharSequence... args) {
+      reportMessage(MessageType.Error, args);
+   }
+
+   public void reportMessage(MessageType type, CharSequence... args) {
+      StringBuilder sb = new StringBuilder();
+      for (CharSequence arg:args)
+         sb.append(arg);
+      if (system != null)
+         system.reportMessage(type, sb);
+      else {
+         if (type == MessageType.Error)
+            System.err.println(StringUtil.arrayToString(args));
+         else
+            System.out.println(StringUtil.arrayToString(args));
+      }
    }
 }

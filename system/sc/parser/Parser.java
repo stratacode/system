@@ -110,7 +110,7 @@ public class Parser implements IString {
       }
       catch (IOException exc)
       {
-         parseError(currentParselet, "IO Error: {0}", currentIndex,currentIndex+bufSize, exc.toString());
+         parseError(currentParselet, null, null, "IO Error: {0}", currentIndex,currentIndex+bufSize, exc.toString());
          eof = true;
       }
    }
@@ -427,15 +427,7 @@ public class Parser implements IString {
    }
 
    public final ParseError parseError(String errorCode) {
-      return parseError(currentParselet, errorCode, (Object[])null);
-   }
-
-   public final ParseError parseError(Parselet parselet, String errorCode, Object... args) {
-      return parseError(parselet, errorCode, currentIndex, currentIndex, args);
-   }
-
-   public final ParseError parseError(Parselet parselet, String errorCode, int start, int end, Object... args) {
-      return parseError(parselet, null, null, errorCode, start, end, args);
+      return parseError(currentParselet, null, null, errorCode, currentIndex, currentIndex, (Object[])null);
    }
 
    public static boolean isBetterError(int currentStart, int currentEnd, int newStart, int newEnd, boolean replace) {

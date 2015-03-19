@@ -168,19 +168,29 @@ public abstract class Language implements IFileProcessor {
     * choose the size of the buffer, useful if you are parsing a small string or something.
     */
    public Object parse(String fileName, Reader reader, Parselet start, boolean enablePartialValues, boolean matchOnly, Object toPopulateInst, int bufSize) {
-      if (!start.initialized) {
-         ParseUtil.initAndStartComponent(start);
+      try {
+         if (!start.initialized) {
+            ParseUtil.initAndStartComponent(start);
+         }
+         Parser p = new Parser(this, reader, bufSize);
+         p.enablePartialValues = enablePartialValues;
+         p.matchOnly = matchOnly;
+         p.populateInst = toPopulateInst;
+         Object parseTree = p.parseStart(start);
+         if (parseTree instanceof IParseNode) {
+            if (!p.atEOF())
+               parseTree = p.wrapErrors();
+         }
+         return parseTree;
       }
-      Parser p = new Parser(this, reader, bufSize);
-      p.enablePartialValues = enablePartialValues;
-      p.matchOnly = matchOnly;
-      p.populateInst = toPopulateInst;
-      Object parseTree = p.parseStart(start);
-      if (parseTree instanceof IParseNode) {
-         if (!p.atEOF())
-            parseTree = p.wrapErrors();
+      finally {
+         try {
+            reader.close();
+         }
+         catch (IOException exc) {
+            System.err.println("*** Failed to close the reader for parsing: " + fileName + ": " + exc);
+         }
       }
-      return parseTree;
    }
 
    public Object parse(Reader reader, Parselet start) {

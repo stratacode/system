@@ -452,7 +452,7 @@ public abstract class JavaSemanticNode extends SemanticNode {
       TypeDeclaration enclosing = getEnclosingType();
       if (enclosing.isReferenceValueObject()) {
          if (info.get(enclosing) != null)
-            displayError("Cycle in object reference - illegal for non @Component types: ");
+            error("Cycle in object reference - illegal for non @Component types: ");
       }
       */
       String res = info.toString();

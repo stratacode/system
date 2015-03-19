@@ -68,7 +68,7 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
                   p.init(this);
                }
                else
-                  displayError("No scope processor registered for scope:" + scope.scopeName + " Registered scopes are: " + sys.getScopeNames() + " for ");
+                  error("No scope processor registered for scope:" + scope.scopeName + " Registered scopes are: " + sys.getScopeNames() + " for ");
             }
          }
       }
@@ -270,7 +270,7 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
                Annotation annot = (Annotation) mod;
                String annotTypeName = annot.getFullTypeName();
                JavaModel model = getJavaModel();
-               if (model == null)
+               if (model == null || model.layeredSystem == null)
                   return null;
                IAnnotationProcessor aproc = model.layeredSystem.getAnnotationProcessor(model.getLayer(), annotTypeName);
                if (aproc != null) {

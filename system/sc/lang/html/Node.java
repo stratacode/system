@@ -133,4 +133,12 @@ public abstract class Node extends JavaSemanticNode implements IDynObject, ISrcS
       }
    }
 
+   public boolean displayTypeError(String...args) {
+      if (errorArgs == null) {
+         errorArgs = args;
+         return super.displayTypeError(args);
+      }
+      return false;
+   }
+
 }

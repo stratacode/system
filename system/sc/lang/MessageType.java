@@ -4,9 +4,6 @@
 
 package sc.lang;
 
-/**
- * Created by jvroom on 9/3/14.
- */
 public enum MessageType {
-   Error, Warning, Info
+   Error, Warning, Info, Debug, SysDetails
 }

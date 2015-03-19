@@ -2649,6 +2649,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    public boolean isAdded() {
       return added;
    }
+
+   public boolean sameModel(ILanguageModel other) {
+      return other instanceof JavaModel && ((JavaModel) other).deepEquals(this);
+   }
 }
 
 

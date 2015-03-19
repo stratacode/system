@@ -98,8 +98,8 @@ public class LayerUtil implements LayerConstants {
          options.add(classPath);
          if (debug)
             options.add("-g");
-         options.add("-target");
-         options.add("1.5");
+         //options.add("-target");
+         //options.add("1.5");
 
          Iterable<? extends JavaFileObject> fileObjectsToCompile = fileManager.getJavaFileObjectsFromFiles(filesToCompile);
 
@@ -160,8 +160,8 @@ public class LayerUtil implements LayerConstants {
          args.add(classPath);
          if (debug)
             args.add("-g");
-         args.add("-target");
-         args.add("1.5");
+         // args.add("-target");
+         // args.add("1.5");
 
          try {
             ProcessBuilder pb = new ProcessBuilder(args);

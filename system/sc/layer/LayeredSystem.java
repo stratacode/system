@@ -361,14 +361,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          repositorySystem.setMessageHandler(handler);
    }
 
-   public void info(String infoMessage) {
-      if (messageHandler != null) {
-         messageHandler.reportMessage(infoMessage, null, -1, -1, MessageType.Info);
-      }
-      if (options.info)
-         System.out.println(infoMessage);
-   }
-
    public boolean isErrorViewed(String error, SrcEntry srcEnt, ISemanticNode node) {
       if (messageHandler != null) {
          LayerUtil.reportMessageToHandler(messageHandler, error, srcEnt, node, MessageType.Error);
@@ -677,7 +669,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public void disableLayer(Layer layer) {
       LayeredSystem mainSys = getMainLayeredSystem();
       if (peerMode && mainSys == this) {
-         System.out.println("*** Error - invalid main layered system");
+         error("*** Error - invalid main layered system");
          return;
       }
       if (peerMode) {
@@ -916,7 +908,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             disabledRuntimes = new ArrayList<String>();
          }
          else if (options.verbose)
-            System.out.println("Disable runtimes: " + disabledRuntimes);
+            verbose("Disable runtimes: " + disabledRuntimes);
       }
       else
          disabledRuntimes = parentSystem.disabledRuntimes;
@@ -1267,7 +1259,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // Build separate layers have to be activated when they are not excluded.
          if (layer.buildSeparate && !layer.excluded && !layers.contains(layer)) {
             if (layer.isStarted())
-               System.out.println("*** Error - started layer found that needs to be activated");
+               error("*** Error - started layer found that needs to be activated");
             layer.activated = true;
             layer.layerPosition = layers.size();
             registerLayer(layer);
@@ -1981,8 +1973,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          f.mkdirs();
       }
       if (info.buildDirName != null) {
-         if (options.info)
-            System.out.println("Building scrt.jar from class dir: " + info.buildDirName + " into: " + outJarName);
+         info("Building scrt.jar from class dir: " + info.buildDirName + " into: " + outJarName);
          if (getSystemBuildLayer(info.buildDirName) != null) {
             // TODO: need to do the merge of coreRuntime and fullRuntime and copy that to the runtime libs dir.
             // Make sure fullRuntime overrides coreRuntime.
@@ -2002,9 +1993,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             info.zipFileName = FileUtil.concat(zipDirName, "scrt.jar");
          }
 
-         System.out.println("Copying scrt.jar from: " + info.zipFileName + " to: " + outJarName);
+         info("Copying scrt.jar from: " + info.zipFileName + " to: " + outJarName);
          if (!FileUtil.copyFile(info.zipFileName, outJarName, true))
-            System.err.println("*** Attempt to copy sc runtime files from: " + info.zipFileName + " to lib directory: " + dir + " failed");
+            error("*** Attempt to copy sc runtime files from: " + info.zipFileName + " to lib directory: " + dir + " failed");
       }
    }
 
@@ -2021,13 +2012,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (srcDirFile.isDirectory()) {
-         if (options.info)
-            System.out.println("Building scrt-core-src.jar from src dir: " + srcDir + " into: " + outJarName);
+         info("Building scrt-core-src.jar from src dir: " + srcDir + " into: " + outJarName);
          if (LayerUtil.buildJarFile(srcDir, null, outJarName, null,  runtimePackages, /* userClassPath */ null, LayerUtil.SRC_JAR_FILTER, options.verbose) != 0)
             System.err.println("*** Failed trying to jar sc runtime src files into: " + outJarName + " from buildDir: " + srcDir);
       }
       else {
-         System.out.println("Copying scrt-core-src.jar from: " + srcDir + " to: " + outJarName);
+         info("Copying scrt-core-src.jar from: " + srcDir + " to: " + outJarName);
          if (!FileUtil.copyFile(srcDir, outJarName, true))
             System.err.println("*** Failed to copy sc runtime files from: " + srcDir + " to: " + dir);
       }
@@ -2055,7 +2045,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             FileUtil.copyAllFiles(srcDir, tempDirPath, true, LayerUtil.CLASSES_JAR_FILTER);
          }
          if (options.info)
-            System.out.println("Building sc.jar from src dirs: " + srcRoot + " into: " + outJarName);
+            info("Building sc.jar from src dirs: " + srcRoot + " into: " + outJarName);
          if (LayerUtil.buildJarFile(tempDir.getPath(), null, outJarName, null,  null, /* userClassPath */ null, LayerUtil.CLASSES_JAR_FILTER, options.verbose) != 0)
             System.err.println("*** Failed trying to jar sc runtime src files into: " + outJarName + " from buildDir: " + tempDirPath);
          else
@@ -2063,7 +2053,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       else {
          String srcDirPath = srcDirFile.getPath();
-         System.out.println("Copying scr.jar from: " + srcDirPath + " to: " + outJarName);
+         info("Copying scr.jar from: " + srcDirPath + " to: " + outJarName);
          if (!FileUtil.copyFile(srcDirPath, outJarName, true))
             System.err.println("*** Failed to copy sc runtime files from: " + srcDirPath + " to: " + outJarName);
       }
@@ -2198,9 +2188,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             URL[] layerURLs = getLayerClassURLs(sysLayer, lastPos, mode);
             if (layerURLs.length > 0) {
                if (options.verbose) {
-                  System.out.println("Added to classpath for runtime: " + getRuntimeName());
+                  verbose("Added to classpath for runtime: " + getRuntimeName());
                   for (URL url:layerURLs)
-                     System.out.println("   " + url);
+                     verbose("   " + url);
                }
                //buildClassLoader = URLClassLoader.newInstance(layerURLs, buildClassLoader);
                updateBuildClassLoader(new TrackingClassLoader(sysLayer, layerURLs, buildClassLoader, !mode.doLibs()));
@@ -2266,7 +2256,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       else {
          if (options.verbose)
-            System.out.println("Unable to modify system class loader - some runtime features may not work");
+            verbose("Unable to modify system class loader - some runtime features may not work");
       }
    }
 
@@ -3040,7 +3030,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      else if (opt.equals("opt:perfMon"))
                         PerfMon.enabled = true;
                      else
-                        System.out.println("*** Unrecognized option: " + opt);
+                        System.err.println("*** Unrecognized option: " + opt);
                   }
                   break;
                case 'f':
@@ -6190,7 +6180,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private LayerTypeIndex refreshLayerTypeIndex(String layerName, LayerTypeIndex layerTypeIndex, long lastModified) {
       File layerFile = getLayerFile(layerName);
       if (layerFile == null) {
-         System.err.println("*** Warning: layer found in type index - not in the layer path: " + layerName + ": " + layerPathDirs);
+         warning("Layer found in type index - not in the layer path: " + layerName + ": " + layerPathDirs);
          return null;
       }
       String pathName = layerFile.getParentFile().getPath();
@@ -6475,28 +6465,49 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          else {
             if (layer == null) {
-               // Fairly common to have invalid classpath entries but at least warn folks
+               // Fairly common to have invalid classpath entries but at least provide a verbose message
                if (options.verbose)
-                  displayWarning("No classPath entry: " + ldir);
+                  verbose("No classPath entry: " + ldir);
             }
             else
-               layer.displayError("No classPath entry: " + ldir);
+               layer.error("No classPath entry: " + ldir);
          }
       }
    }
 
-   public void displayError(String... args) {
+   public void reportMessage(MessageType type, CharSequence... args) {
       StringBuilder sb = new StringBuilder();
-      for (String arg:args)
+      for (CharSequence arg:args) {
          sb.append(arg);
-      System.err.println(sb.toString());
+      }
+      if (messageHandler != null)
+         messageHandler.reportMessage(sb, null, -1, -1, type);
+      else {
+         if (type == MessageType.Error)
+            System.err.println(sb);
+         else
+            System.out.println(sb);
+      }
    }
 
-   public void displayWarning(String... args) {
-      StringBuilder sb = new StringBuilder();
-      for (String arg:args)
-         sb.append(arg);
-      System.out.println(sb.toString());
+   public void sysDetails(CharSequence... args) {
+      reportMessage(MessageType.SysDetails, args);
+   }
+
+   public void verbose(CharSequence... args) {
+      reportMessage(MessageType.Debug, args);
+   }
+
+   public void info(CharSequence... args) {
+      reportMessage(MessageType.Info, args);
+   }
+
+   public void error(CharSequence... args) {
+      reportMessage(MessageType.Error, args);
+   }
+
+   public void warning(CharSequence... args) {
+      reportMessage(MessageType.Warning, args);
    }
 
    private List<ProcessBuilder> getProcessBuildersFromCommands(List<BuildCommandHandler> cmds, LayeredSystem sys, Object templateArg, Layer definedInLayer) {
@@ -6668,7 +6679,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   SrcEntry depEnt = bd.dependentFilesChanged.get(toGenEnt);
                   procReason = depEnt == null ? (bd.modifiedFiles.contains(toGenEnt) ? ": source file changed" : defaultReason) : ": dependent file changed: " + depEnt;
                }
-               System.out.println("Preparing " + toGenEnt + procReason + ", runtime: " + getRuntimeName());
+               verbose("Preparing " + toGenEnt + procReason + ", runtime: " + getRuntimeName());
             }
 
             modelObj = parseSrcType(toGenEnt, genLayer.getNextLayer(), false, true);
@@ -6678,8 +6689,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (!langModel.isAdded())
                addNewModel(langModel, genLayer.getNextLayer(), null, langModel instanceof JavaModel && ((JavaModel) langModel).isLayerModel);
 
-            if (options.verbose)
-               System.out.println("Preparing from model cache " + toGenEnt + ", runtime: " + getRuntimeName());
+            verbose("Preparing from model cache " + toGenEnt + ", runtime: " + getRuntimeName());
          }
       }
       // Parsed it and there was an error
@@ -6697,7 +6707,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // This happens now that we build previous layers, put their classes in so they are there for the next layer
             //if (!model.getLayer().annotationLayer && !genLayer.layerUniqueName.equals("sc") && getClass(modelTypeName) != null)
             //   System.err.println("*** Warning - generated type: " + modelTypeName + " exists in the system classpath ");
-            System.out.println("Preparing from cache " + toGenEnt);
+            verbose("Preparing from cache " + toGenEnt);
          }
       }
 
@@ -6811,8 +6821,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (!needsPhase(phase)) {
-         if (options.verbose)
-            System.out.println("Skipping startChangedModels " + phase + " phase");
+         verbose("Skipping startChangedModels " + phase + " phase");
          return GenerateCodeStatus.NoFilesToCompile;
       }
       // Nothing to generate or compile
@@ -6884,42 +6893,44 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (!systemDetailsDisplayed) {
             systemDetailsDisplayed = true;
 
-            System.out.println("Config - " + getRuntimeName() + " runtime ----");
-            System.out.println("Languages: " + Language.languages);
-            System.out.print("File types: ");
+            verbose("Config - " + getRuntimeName() + " runtime ----");
+            verbose("Languages: " + Language.languages);
+            StringBuilder fileTypes = new StringBuilder();
+            fileTypes.append("File types: ");
 
             boolean firstExt = true;
             for (Map.Entry<String,IFileProcessor[]> procEnt:fileProcessors.entrySet()) {
                String ext = procEnt.getKey();
                IFileProcessor[] procList = procEnt.getValue();
                if (!firstExt && !options.sysDetails)
-                  System.out.print(", ");
+                  fileTypes.append(", ");
                firstExt = false;
-               System.out.print("" + ext + " (");
+               fileTypes.append("" + ext + " (");
                boolean first = true;
                for (IFileProcessor ifp:procList) {
-                  if (!first) System.out.print(", ");
+                  if (!first) fileTypes.append(", ");
                   if (options.sysDetails)
-                     System.out.print(ifp);
+                     fileTypes.append(ifp);
                   else
-                     System.out.print(ifp.getDefinedInLayer());
+                     fileTypes.append(ifp.getDefinedInLayer());
                   first = false;
                }
-               System.out.print(")");
+               fileTypes.append(")");
                if (options.sysDetails)
-                  System.out.println();
+                  fileTypes.append(FileUtil.LINE_SEPARATOR);
             }
             for (Map.Entry<Pattern,IFileProcessor> procEnt:filePatterns.entrySet()) {
                Pattern pattern = procEnt.getKey();
                IFileProcessor proc = procEnt.getValue();
-               System.out.println("   pattern: " + pattern + ":" + proc);
+               fileTypes.append("   pattern: " + pattern + ":" + proc + FileUtil.LINE_SEPARATOR);
             }
 
-            System.out.println("Tag packages: " + tagPackageList);
-            System.out.println("----");
+            verbose(fileTypes);
+            verbose("Tag packages: " + tagPackageList);
+            verbose("----");
          }
 
-         System.out.println("Find changes: " + getRuntimeName() + " runtime -" + (genLayer == buildLayer ? " sys build layer: " : " pre build layer: ") + genLayer + " including: " + startedLayers);
+         verbose("Find changes: " + getRuntimeName() + " runtime -" + (genLayer == buildLayer ? " sys build layer: " : " pre build layer: ") + genLayer + " including: " + startedLayers);
       }
 
       // For each directory or src file we need to look at.  Top level directories are put into this list before we begin.
@@ -6988,7 +6999,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      DependencyEntry ent = deps.depList.get(d);
                      File entFile = new File(srcDir,ent.getEntryFileName());
                      if (!entFile.exists()) {
-                        System.out.println("*** Warning source file: " + ent.fileName + " was removed.");
+                        warning("source file: " + ent.fileName + " was removed.");
                         deps.removeDependencies(d);
                         depsChanged = true;
                         d--;
@@ -7031,13 +7042,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      boolean needsCompile = false;
 
                      if (needsGenerate && traceNeedsGenerate)
-                        System.out.print("Generating: " + srcFileName + " because of an error last compile.");
+                        verbose("Generating: " + srcFileName + " because of an error last compile.");
 
                      File srcFile = new File(srcDir, srcFileName);
                      String absSrcFileName = FileUtil.concat(srcDirName, srcFileName);
                      IFileProcessor proc = getFileProcessorForFileName(absSrcFileName, srcEnt.layer, null); // Either phase - just using this to determine the layer package
                      if (proc == null) {
-                        System.out.println("*** No processor for file in dependencies file: " + srcFileName);
+                        warning("No processor for file in dependencies file: " + srcFileName);
                         continue;
                      }
                      long srcLastModified = srcFile.lastModified();
@@ -7107,7 +7118,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                                     reason = " because source file changed";
                                  else
                                     reason = " ???";
-                                 System.out.println("Generating: " + srcFileName + reason);
+                                 verbose("Generating: " + srcFileName + reason);
                               }
                               needsGenerate = true;
                               inherited = false;
@@ -7146,8 +7157,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                               // to recompile this file.
                               else {
                                  if (genLayer.getPrevSrcFileIndex(genRelFileName) == null) {
-                                    if (options.verbose)
-                                       System.out.println("Missing inherited file: " + genRelFileName + " recompiling");
+                                    verbose("Missing inherited file: " + genRelFileName + " recompiling");
                                     needsGenerate = true;
                                     inherited = false;
                                     genFile.delete();
@@ -7184,7 +7194,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                            }
                            if (srcLastModified > lastBuildTime) {
                               if (traceNeedsGenerate) {
-                                 System.out.println("Generating: " + srcFileName + " because src changed since last build");
+                                 verbose("Generating: " + srcFileName + " because src changed since last build");
                               }
                               needsGenerate = true; // Need to reparse to update the dependencies - if copy is set, we should have a generated filei
                               isModified = true;
@@ -7209,7 +7219,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                            // If we are already generating this, skip the file system check.
                            if (toGenerate.contains(otherFileName)) {
                               if (traceNeedsGenerate) {
-                                 System.out.println("Generating: " + srcFileName + " because dependent file: " + otherFileName + " needs generation");
+                                 verbose("Generating: " + srcFileName + " because dependent file: " + otherFileName + " needs generation");
                               }
                               needsGenerate = true;
                               break;
@@ -7223,7 +7233,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                               // new dependencies.
                               if (otherFileLastModified > genFileLastModified || otherFileLastModified > lastBuildTime) {
                                  if (traceNeedsGenerate) {
-                                    System.out.println("Generating: " + srcFileName + " because: " + otherFileName + " is more recent than class or build");
+                                    verbose("Generating: " + srcFileName + " because: " + otherFileName + " is more recent than class or build");
                                  }
                                  needsGenerate = true;
                                  depSrcEnt = otherFileName;
@@ -7237,7 +7247,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         if (cachedModel != null && cachedModel instanceof JavaModel && ((JavaModel) cachedModel).getDependenciesChanged(incrCompile ? changedModels : null)) {
                            needsGenerate = true;
                            if (traceNeedsGenerate) {
-                              System.out.println("Generating: " + srcFileName + " - dependent type was overridden since the previous layered build");
+                              verbose("Generating: " + srcFileName + " - dependent type was overridden since the previous layered build");
                            }
                         }
                      }
@@ -7253,7 +7263,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         // If we have the option set so that on the first change
                         if (restartAllOnFirstChange(genLayer)) {
                            if (options.verbose)
-                              System.out.println("Detected changed file: " + srcFileName + " with build all per layer set - rebuilding all now.");
+                              verbose("Detected changed file: " + srcFileName + " with build all per layer set - rebuilding all now.");
                            return startChangedModels(genLayer, includeFiles, phase, separateOnly);
                         }
                         SrcEntry prevEnt;
@@ -7321,7 +7331,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                Object modelObj;
                if (skipFile) {
                   if (options.verbose)
-                     System.out.println("Skipping " + toGenEnt);
+                     verbose("Skipping " + toGenEnt);
                   modelObj = null;
                }
                else {
@@ -7336,7 +7346,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   IFileProcessorResult model = (IFileProcessorResult) modelObj;
 
                   if (model instanceof JavaModel && ((JavaModel) model).getLayeredSystem() != this)
-                     System.out.println("*** Error model is in the wrong system!");
+                     error("*** Error model is in the wrong system!");
 
                   // Needs to have the extension so build.properties and build.xml go through but also needs type prefix
                   //String processedName = toGenEnt.getTypeName() + "." + FileUtil.getExtension(toGenEnt.baseFileName);
@@ -7417,18 +7427,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // Print some info that's useful for diagnosing what gets recompiled and why on a rebuild.
       if (!genLayer.getBuildAllFiles() && options.verbose) {
          if (bd.modifiedFiles.size() == 0) {
-            System.out.println("No changed files detected");
+            verbose("No changed files detected");
             if (bd.dependentFilesChanged.size() > 0)
-               System.out.println("but do have dependent files that are changed: " + bd.dependentFilesChanged);
+               verbose("but do have dependent files that are changed: " + bd.dependentFilesChanged);
          }
          else {
-            System.out.println("Changed files:" + bd.modifiedFiles);
-            System.out.println("Dependent files: " + bd.dependentFilesChanged);
+            verbose("Changed files:" + bd.modifiedFiles);
+            verbose("Dependent files: " + bd.dependentFilesChanged);
          }
       }
 
       if (bd.numModelsToTransform > 0 && options.info)
-         System.out.println("Processing: " + bd.numModelsToTransform + " files in the " + getRuntimeName() + " runtime for build layer: " + genLayer.getLayerName());
+         info("Processing: " + bd.numModelsToTransform + " files in the " + getRuntimeName() + " runtime for build layer: " + genLayer.getLayerName());
 
       /** We also need to pre-compute the set of typeGroupChangedModels so that we can accurately determine the stale entries we have in the build info */
       /** TODO: This type group stuff is not quite right when dealing with incremental compiles
@@ -7485,7 +7495,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
          if (options.verbose) {
             if (buildStartTime != -1)
-               System.out.println("Parsed changes till layer: " + genLayer + " in: " + StringUtil.formatFloat((System.currentTimeMillis() - buildStartTime) / 1000.0));
+               verbose("Parsed changes till layer: " + genLayer + " in: " + StringUtil.formatFloat((System.currentTimeMillis() - buildStartTime) / 1000.0));
          }
 
          if (bd.anyError)
@@ -7547,8 +7557,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       boolean skipBuild = !genLayer.buildSeparate && separateOnly;
 
       if (!needsPhase(phase)) {
-         if (options.sysDetails)
-            System.out.println("No " + phase + " phase for " + getRuntimeName() + " runtime");
+         sysDetails("No " + phase + " phase for " + getRuntimeName() + " runtime");
          return GenerateCodeStatus.NoFilesToCompile;
       }
       // Nothing to generate or compile
@@ -7810,14 +7819,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                                  }
                               }
                               else if (genProc != null && genProc.getNeedsCompile()) {
-                                 if (options.sysDetails)
-                                    System.out.println("  (unchanged generated file: " + genFile.relFileName + " in layer " + genLayer + ")");
+                                 sysDetails("  (unchanged generated file: " + genFile.relFileName + " in layer " + genLayer + ")");
                                  File classFile = LayerUtil.getClassFile(genLayer, genFile);
                                  File genAbsFile = new File(genFile.absFileName);
                                  if (needsCompile) {
                                     if (!classFile.canRead() || classFile.lastModified() < genAbsFile.lastModified()) {
-                                       if (options.sysDetails)
-                                          System.out.println("  (recompiling as class file is out of date: " + genFile.relFileName + " in layer " + genLayer + ")");
+                                       sysDetails("  (recompiling as class file is out of date: " + genFile.relFileName + " in layer " + genLayer + ")");
                                        bd.toCompile.add(genFile);
                                     }
                                  }
@@ -7902,7 +7909,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   otherClassCache.remove(cSrcTypeName);
             }
             if (options.verbose) {
-               System.out.println("Compiling Java into build dir: " + genLayer.getBuildClassesDir() + ": " + (options.sysDetails ? bd.toCompile + " with classpath: " + classPath : bd.toCompile.size() + " files"));
+               verbose("Compiling Java into build dir: " + genLayer.getBuildClassesDir() + ": " + (options.sysDetails ? bd.toCompile + " with classpath: " + classPath : bd.toCompile.size() + " files"));
                if (messageHandler != null)
                   messageHandler.reportMessage("Compiling Java: " + bd.toCompile.size() + " files into " + genLayer.getBuildClassesDir(), null, -1, -1, MessageType.Info);
             }
@@ -8070,7 +8077,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // Maybe just need a releaseSystemClassLoader method and support only one at a time.  Could also
       // bootstrap all of StrataCode into the application class loader... would involve a restart after compile.
       if (systemClassLoader != null)
-         System.out.println("*** Warning: replacing system class loader!");
+         warning("replacing system class loader!");
       systemClassLoader = loader;
    }
 
@@ -8090,7 +8097,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public void setAutoSystemClassLoader(ClassLoader loader) {
       if (autoClassLoader) {
          if (options.verbose && loader != systemClassLoader)
-            System.out.println("Updating auto system class loader for thread: " + Thread.currentThread().getName());
+            verbose("Updating auto system class loader for thread: " + Thread.currentThread().getName());
 
          setSystemClassLoader(loader);
       }
@@ -8124,8 +8131,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public void flushTypeCache() {
-      if (options.sysDetails)
-         System.out.println("Flushing type cache");
+      sysDetails("Flushing type cache");
 
       // Don't need to do this when we clone the models before the transform.  When verbose is on, for now it's a diagnostic
       // TODO: we don't need this code with the clonedTransform mode
@@ -8533,7 +8539,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       IFileProcessor processor = getFileProcessorForFileName(srcEnt.relFileName, srcEnt.layer, null);
       if (processor != null) {
          if (options.verbose && !isLayer && !srcEnt.relFileName.equals("sc/layer/BuildInfo.sc") && (processor instanceof Language || options.sysDetails))
-            System.out.println("Reading: " + srcEnt.absFileName + " for runtime: " + getRuntimeName());
+            verbose("Reading: " + srcEnt.absFileName + " for runtime: " + getRuntimeName());
 
          /*
          if (srcEnt.absFileName.contains("coreRuntime") && srcEnt.absFileName.contains("Bind"))
@@ -8594,7 +8600,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                            if (!peerSys.isModelLoaded(srcEnt.absFileName)) {
                               if (peerLayer.started) {
                                  if (options.verbose)
-                                    System.out.println("Copying for runtime: " + peerSys.getRuntimeName());
+                                    verbose("Copying for runtime: " + peerSys.getRuntimeName());
                                  if (clonedModels == null)
                                     clonedModels = new ArrayList<JavaModel>();
                                  PerfMon.start("cloneForRuntime");
@@ -8602,7 +8608,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                                  PerfMon.end("cloneForRuntime");
                               }
                               else if (options.verbose)
-                                 System.out.println("Not copying: " + srcEnt.absFileName + " for runtime: " + peerSys.getRuntimeName() + " peer layer not started.");
+                                 verbose("Not copying: " + srcEnt.absFileName + " for runtime: " + peerSys.getRuntimeName() + " peer layer not started.");
                            }
                         }
                      }
@@ -8633,6 +8639,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          m = modelIndex.get(fn);
       else
          m = inactiveModelIndex.get(fn);
+
+      if (m == null) {
+         m = beingLoaded.get(srcEnt.absFileName);
+         if (m != null) {
+            if (m.getLayer() != srcEnt.layer)
+               m = null;
+         }
+      }
       return m;
    }
 
@@ -8732,7 +8746,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          updateModelIndex(layer, model, fn);
       }
       else
-         System.out.println("*** no src file for model");
+         warning("no src file for model");
    }
 
    boolean isModelLoaded(String absFileName) {
@@ -8768,7 +8782,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       if (beingLoaded.get(copySrcEnt.absFileName) != null || isModelLoaded(copySrcEnt.absFileName)) {
          if (options.verbose)
-            System.out.println("  - discarding cloned model - loaded lazily in order to process the base type");
+            verbose("  - discarding cloned model - loaded lazily in order to process the base type");
          return;
       }
 
@@ -9090,7 +9104,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          File f = new File(srcEnt.absFileName);
          if (!f.canRead()) {
             if (options.verbose)
-               System.out.println("No file: " + srcEnt.absFileName);
+               verbose("No file: " + srcEnt.absFileName);
             return null;
          }
          if (f.lastModified() == oldModel.getLastModifiedTime()) {
@@ -9127,9 +9141,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       if (options.verbose) {
          if (oldModel == null)
-            System.out.println("Processing new file: " + srcEnt.absFileName);
+            verbose("Processing new file: " + srcEnt.absFileName);
          else
-            System.out.println("Refreshing changed file: " + srcEnt.absFileName);
+            verbose("Refreshing changed file: " + srcEnt.absFileName);
       }
 
       // When we do an update, we may first build the layer.  In that case, the model will have been loaded in the build.
@@ -9224,7 +9238,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public void notifyModelListeners(JavaModel model) {
       if (model.removed) {
-         System.out.println("*** notifying removed listener");
+         warning("notifying removed listener");
          return;
       }
       for (IModelListener ml: modelListeners) {
@@ -9234,7 +9248,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public void notifyInnerTypeAdded(BodyTypeDeclaration innerType) {
       if (innerType.getJavaModel().removed) {
-         System.out.println("*** notifying removed inner listener");
+         warning("*** notifying removed inner listener");
          return;
       }
       for (IModelListener ml: modelListeners) {
@@ -9245,7 +9259,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public void notifyInnerTypeRemoved(BodyTypeDeclaration innerType) {
       if (innerType.getJavaModel().removed) {
-         System.out.println("*** notifying removed inner listener");
+         warning("*** notifying removed inner listener");
          return;
       }
       for (IModelListener ml: modelListeners) {
@@ -9339,8 +9353,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                boolean layerModelChanged;
                if (javaModel.isLayerModel)
                   layerModelChanged = layer.updateModel(javaModel);
+               // If it's a regular file, not a layer, we mark the layer as having changed if the last modified time is different or the models have physically different contents.
+               // the last modified time for a file edited in the IDE does not get updated until after we've updated the model here.  It is not cheap to identical models but it will
+               // save a refresh of all open files when you have only changed comments or whitespace.
                else
-                  layerModelChanged = true;
+                  layerModelChanged = oldModel.getLastModifiedTime() != model.getLastModifiedTime() || !oldModel.sameModel(model);
                if (layerModelChanged && externalModelIndex != null)
                   externalModelIndex.layerChanged(layer);
             }
@@ -9447,6 +9464,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public ILanguageModel getLanguageModel(SrcEntry srcEnt, boolean activeOrInactive, List<Layer.ModelUpdate> changedModels) {
       Layer layer = srcEnt.layer;
+
+      // If we are in the midst of loading this model via createFile, we cannot try to go back to the file manager and get the same file as it will recurse endlessly
+      ILanguageModel cachedModel = beingLoaded.get(srcEnt.absFileName);
+      if (cachedModel != null && cachedModel.getLayer() == srcEnt.layer)
+         return cachedModel;
       // We only inactive models to go through the external model index.
       if (externalModelIndex != null && (layer != null && !layer.activated)) {
          ILanguageModel extModel = externalModelIndex.lookupJavaModel(srcEnt);
@@ -9469,7 +9491,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                }
             }
             */
-            if (isActivated(srcEnt.layer)) {
+            if (isActivated(srcEnt.layer)) { System.err.println("*** not reached!!!");
                if (!extModel.isAdded())
                   addNewModel(extModel, srcEnt.layer.getNextLayer(), null, extModel instanceof JavaModel && ((JavaModel) extModel).isLayerModel);
             }
@@ -9551,7 +9573,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public void addTypeByName(Layer layer, String fullTypeName, TypeDeclaration toAdd, Layer fromLayer) {
       if (!layer.activated || (toAdd.getLayer() != null && !toAdd.getLayer().activated))
-         System.out.println("*** Error adding inactivated type to type system");
+         warning("*** Error adding inactivated type to type system");
       addToRootNameIndex(toAdd);
       TypeDeclarationCacheEntry tds = typesByName.get(fullTypeName);
       if (tds != null) {
@@ -9622,7 +9644,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       else {
-         System.out.println("*** remove type by name not in list");
+         warning("*** remove type by name not in list");
       }
    }
 
@@ -9837,6 +9859,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
+   public Object getSrcTypeDeclaration(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden, boolean srcOnly, Layer refLayer, boolean layerResolve) {
+      return getSrcTypeDeclaration(typeName, fromLayer, prependPackage, notHidden, srcOnly, refLayer, layerResolve, false);
+   }
+
    /** Retrieves a type declaration, usually the source definition with a given type name.  If fromLayer != null, it retrieves only types
     * defines below fromLayer (not including fromLayer).  If prependPackage is true, the name is resolved like a Java type name.  If
     * it is false, it is resolved like a file system path - where the type's package is not used in the type name.  If not hidden is true,
@@ -9848,7 +9874,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * If refLayer is supplied, it refers to the referring layer.  It's not ordinarily used in an active application but for an inactive layer, it
     * changes how the lookup is performed.
     */
-   public Object getSrcTypeDeclaration(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden, boolean srcOnly, Layer refLayer, boolean layerResolve) {
+   public Object getSrcTypeDeclaration(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden, boolean srcOnly, Layer refLayer, boolean layerResolve, boolean rootTypeOnly) {
       SrcEntry srcFile = null;
       TypeDeclaration decl;
       Object skippedDecl = null;
@@ -9940,9 +9966,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // else - we found this file in the model index but did not find it from this type name.  This happens
          // when the type name matches, but the package prefix does not.
       }
-      else {
+      else if (!rootTypeOnly) {
          return getInnerClassDeclaration(typeName, fromLayer, notHidden, srcOnly, refLayer, layerResolve);
       }
+      else
+         return null;
    }
 
    /** Returns false if there's no entry with this name - explicitly without parsing it if it's not already loaded */
@@ -10201,8 +10229,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   rootType = rootTypeObj;
             }
 
+            // Only look for the root type here - do not look for inner types.  Otherwise we do the same lookups repeatedly and we keep walking the rootFromLayer back each time.
             if (rootType == null)
-               rootType = getSrcTypeDeclaration(rootTypeName, rootFrom, true, notHidden, true, refLayer == null ? fromLayer : refLayer, layerResolve);
+               rootType = getSrcTypeDeclaration(rootTypeName, rootFrom, true, notHidden, true, refLayer == null ? fromLayer : refLayer, layerResolve, true);
 
             if (rootType != null) {
                String rootTypeActualName = ModelUtil.getTypeName(rootType);
@@ -10226,7 +10255,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      // we put it into the type system.
                      Layer declLayer = decl.getJavaModel().getLayer();
                      if (declLayer == null)
-                        System.out.println("*** Warning - adding inner type without a layer");
+                        warning("*** Warning - adding inner type without a layer");
 
                      if (declLayer == null || declLayer.activated)
                         addTypeByName(declLayer, CTypeUtil.prefixPath(rootTypeActualName, subTypeName), decl, fromLayer);
@@ -10251,7 +10280,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         // One weird case is where the annotation layer is source but we don't have the source for the inner class.  That's handled by the
                         // subTypeName.indexOf(".") test above.
                         if (++loopCt > 20) {
-                           System.out.println("*** Warning - loop finding inner type.");
+                           warning("loop finding inner type.");
                            loopCt = 0;
                            return null;
                         }
@@ -10753,6 +10782,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Object getClassFromCFName(String cfName, String className) {
+      if (cfName.contains("Comparable"))
+         System.out.println("***");
       Object res = otherClassCache.get(className);
       if (res == NullClassSentinel.class)
          return null;
@@ -11218,7 +11249,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             for (Layer bl:baseLayers) {
                if (bl == null) {
                   if (extendLayerTypes != null && extendLayerTypes.size() > li) {
-                     extendLayerTypes.get(li).displayError("No layer named: ", baseLayerNames.get(li), " in layer path: ", layerPath);
+                     extendLayerTypes.get(li).error("No layer named: ", baseLayerNames.get(li), " in layer path: ", layerPath);
                   }
                }
                li++;
@@ -11351,7 +11382,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
          int startPos = startLayer.layerPosition;
          if (startPos >= inactiveLayers.size()) {
-            System.out.println("*** Invalid layer position: " + startPos + " when starting layer: " + startLayer);
+            warning("*** Invalid layer position: " + startPos + " when starting layer: " + startLayer);
             return null;
          }
          for (int i = startPos; i > endPos; i--) {
@@ -11401,7 +11432,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          globalDynLock.readLock().lock();
       if (options.verboseLocks || options.verbose) {
          long duration = System.currentTimeMillis() - startTime;
-         if (duration > 300) {
+         if (duration > 1000) {
             System.err.println("Warning: waited: " + duration + " millis for lock on thread: " + Thread.currentThread().getName());
             if (duration > 2000 && Thread.currentThread().getName().contains("AWT-Event")) {
                System.err.println("*** stack of waiting thread: ");
@@ -11507,7 +11538,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (instMap != null) {
             Object res = instMap.remove(inst);
             if (res == null)
-               System.out.println("*** Can't find dyn instance to remove for type: " + typeName);
+               warning("*** Can't find dyn instance to remove for type: " + typeName);
             return res != null;
          }
          // else - we do not add the dynInstance for regular classes that are not components so this happens a lot
@@ -11660,7 +11691,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
 
             if (subType == td)
-               System.out.println("*** Recursive type!");
+               error("*** Recursive type!");
             else {
                // Now recursively add the sub-types of this type
                res = addSubTypes(subType, subInsts, res);
@@ -11925,11 +11956,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return;
 
       // Only print the first for info, print all for debug
-      if ((!staleCompiledModel && options.info) || options.verbose) {
-         System.out.print("* Warning: ");
+      boolean printInfo = (!staleCompiledModel && options.info);
+      if (printInfo || options.verbose) {
+         StringBuilder msg = new StringBuilder();
+         if (printInfo)
+           msg.append("* Warning: ");
          for (String r:reason)
-            System.out.print(r);
-         System.out.println();
+            msg.append(r);
+         msg.append(FileUtil.LINE_SEPARATOR);
+         if (printInfo)
+            info(msg);
+         else
+            verbose(msg);
       }
 
       if (staleCompiledInfo == null)
@@ -12023,7 +12061,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       TypeDeclaration toRefresh = getSrcTypeDeclaration(typeName, null, true);
       if (toRefresh == null) {
          if (options.verbose)
-              System.out.println("No type: " + typeName + " to refresh");
+              verbose("No type: " + typeName + " to refresh");
          return;
       }
 
@@ -12622,7 +12660,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public void registerDefaultAnnotationProcessor(String annotationTypeName, IAnnotationProcessor processor) {
       IAnnotationProcessor old = defaultAnnotationProcessors.put(annotationTypeName, processor);
       if (old != null && options.verbose) {
-         System.out.println("Default annotation processor for: " + annotationTypeName + " replaced: " + old + " with: " + processor);
+         verbose("Default annotation processor for: " + annotationTypeName + " replaced: " + old + " with: " + processor);
       }
    }
 
@@ -12633,12 +12671,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          startIx = refLayer == null ? layers.size() - 1 : refLayer.getLayerPosition();
 
          if (refLayer != null && refLayer.removed) {
-            System.out.println("*** removed layer in getAnnotationProcessor!");
+            warning("*** removed layer in getAnnotationProcessor!");
             return null;
          }
 
          if (startIx >= layers.size()) {
-            System.out.println("*** Out of range layer index in getAnnotationProcessor");
+            warning("*** Out of range layer index in getAnnotationProcessor");
             return null;
          }
 
