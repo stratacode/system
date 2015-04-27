@@ -8,6 +8,7 @@ import sc.lang.*;
 import sc.lang.js.JSFormatMode;
 import sc.lang.js.JSLanguage;
 import sc.parser.*;
+import sc.type.DynType;
 import sc.type.IBeanMapper;
 import sc.type.TypeUtil;
 
@@ -118,14 +119,14 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       if (errorArgs != null)
          return true;
 
-      IBeanMapper[] props = TypeUtil.getProperties(getClass());
-      for (int i = 0; i < props.length; i++) {
-         IBeanMapper prop = props[i];
-         if (isSemanticProperty(prop)) {
-            Object thisProp = TypeUtil.getPropertyValue(this, prop);
-            if (thisProp instanceof Statement && ((Statement) thisProp).anyError())
-               return true;
-         }
+      DynType type = TypeUtil.getPropertyCache(getClass());
+      IBeanMapper[] semanticProps = type.getSemanticPropertyList();
+
+      for (int i = 0; i < semanticProps.length; i++) {
+         IBeanMapper prop = semanticProps[i];
+         Object thisProp = TypeUtil.getPropertyValue(this, prop);
+         if (thisProp instanceof Statement && ((Statement) thisProp).anyError())
+            return true;
       }
       return false;
    }
@@ -170,6 +171,8 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
    public void addInitStatements(List<Statement> res, InitStatementsMode mode) {
    }
 
+   public void addReturnStatements(List<Statement> res) {
+   }
 
    public void setComment(String s) {
       throw new UnsupportedOperationException();

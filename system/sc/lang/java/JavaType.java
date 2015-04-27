@@ -4,11 +4,14 @@
 
 package sc.lang.java;
 
+import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
+import sc.layer.LayeredSystem;
 import sc.type.Type;
 import sc.util.StringUtil;
 
 import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.WildcardType;
 import java.util.List;
 import java.util.Set;
 
@@ -36,7 +39,11 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
    abstract String toCompiledString(Object refType);
 
    // Returns the TypeDeclaration or Class for this type
-   public abstract Object getTypeDeclaration();
+   public Object getTypeDeclaration() {
+      return getTypeDeclaration(null);
+   }
+
+   public abstract Object getTypeDeclaration(ITypeParamContext ctx);
 
    public int getNdims() {
       return arrayDimensions == null || arrayDimensions.length() == 0 ? -1 : arrayDimensions.length() >> 1;
@@ -76,11 +83,13 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
       return null;
    }
 
-   abstract public void initType(ITypeDeclaration definedInType, JavaSemanticNode node, boolean displayError, boolean isLayer);
+   abstract public void initType(LayeredSystem sys, ITypeDeclaration definedInType, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer);
 
    public static JavaType createJavaType(Object typeDeclaration) {
       String modelTypeName = ModelUtil.getTypeName(typeDeclaration);
-      return createJavaTypeFromName(modelTypeName);
+      JavaType res = createJavaTypeFromName(modelTypeName);
+      res.startWithType(typeDeclaration);
+      return res;
    }
 
    public static JavaType createJavaTypeFromName(String modelTypeName) {
@@ -116,6 +125,48 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
       return t;
    }
 
+   public static JavaType createFromParamType(Object type, ITypeParamContext ctx) {
+      JavaType[] typeParamsArr = null;
+      JavaType newType = null;
+      ITypeDeclaration typeCtx = ctx instanceof ITypeDeclaration ? (ITypeDeclaration) ctx : null;
+      if (ModelUtil.hasTypeParameters(type)) {
+         SemanticNodeList<JavaType> typeParams = new SemanticNodeList<JavaType>();
+         int numParams = ModelUtil.getNumTypeParameters(type);
+         for (int i = 0; i < numParams; i++) {
+            Object typeParam = ModelUtil.getTypeParameter(type, i);
+            if (typeParam instanceof WildcardType) {
+               typeParam = newType = ExtendsType.create((WildcardType) typeParam);
+               if (!newType.isBound() && ctx != null)
+                  newType.initType(ctx.getLayeredSystem(), typeCtx, null, ctx, true, false);
+            }
+            else if (ModelUtil.isTypeVariable(typeParam)) {
+               typeParam = ctx.getTypeForVariable(typeParam);
+            }
+            if (typeParam instanceof JavaType) {
+               JavaType javaType = (JavaType) typeParam;
+               javaType = javaType.resolveTypeParameters(ctx);
+               typeParams.add(javaType);
+            }
+            else {
+               newType = ClassType.create(ModelUtil.getTypeName(typeParam));
+               if (ctx != null)
+                  newType.initType(ctx.getLayeredSystem(), typeCtx, null, ctx, true, false);
+               typeParams.add(newType);
+            }
+         }
+         typeParamsArr = typeParams.toArray(new JavaType[typeParams.size()]);
+      }
+      else if (type instanceof WildcardType) {
+         newType = ExtendsType.create((WildcardType) type);
+         if (!newType.isBound() && ctx != null)
+            newType.initType(ctx.getLayeredSystem(), typeCtx, null, ctx, true, false);
+         return newType;
+      }
+      newType = createTypeFromTypeParams(type, typeParamsArr);
+      if (ctx != null)
+         newType.initType(ctx.getLayeredSystem(), typeCtx, null, ctx, true, false);
+      return newType;
+   }
 
    /** Wraps primitive types in an object type wrapper for use in data binding where we only pass around objects (for now at least) */
    public static Object createObjectType(Object dstPropType) {
@@ -197,13 +248,24 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
       }
    }
 
+   // Returns true if this is a type parameter (e.g. T)
    public boolean isTypeParameter() {
       return false;
    }
+
+   // Returns true if this is a type whose concrete type depends on the type context
+   public abstract boolean isParameterizedType();
 
    public void transformToJS() {
    }
 
    public abstract String toGenerateString();
 
+   public abstract JavaType resolveTypeParameters(ITypeParamContext t);
+
+   public abstract boolean isBound();
+
+   abstract void startWithType(Object type);
+
+   abstract Object definesTypeParameter(String typeParamName, ITypeParamContext ctx);
 }

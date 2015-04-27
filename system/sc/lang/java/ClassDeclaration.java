@@ -86,7 +86,7 @@ public class ClassDeclaration extends TypeDeclaration {
             JavaSemanticNode resolver = getEnclosingType();
             if (resolver == null)
                resolver = m;
-            extendsType.initType(this, resolver, false, isLayerType);
+            extendsType.initType(getLayeredSystem(), this, resolver, null, false, isLayerType);
 
             // Need to start the extends type as we need to dig into it
             Object extendsTypeDecl = getDerivedTypeDeclaration();

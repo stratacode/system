@@ -353,14 +353,14 @@ public class DynStubParameters extends AbstractTemplateParameters {
             // because the interface property will always use the getX.
             if (member != null && ModelUtil.isPropertyIs(member)) {
                PropertyDefinitionParameters prm = PropertyDefinitionParameters.create(propName);
-               prm.init(fieldObj, false);
+               prm.init(fieldObj, false, sys);
                cvtIsToGet.add(prm);
             }
             continue;
          }
 
          PropertyDefinitionParameters params = PropertyDefinitionParameters.create(propName);
-         params.init(fieldObj, true);
+         params.init(fieldObj, true, sys);
          res.add(params);
       }
       return res;

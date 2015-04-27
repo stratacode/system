@@ -254,7 +254,7 @@ public abstract class JavaSemanticNode extends SemanticNode {
          }
          if (pnode instanceof NewExpression) {
             NewExpression newEx = (NewExpression) pnode;
-            if (newEx.classBody != null) {
+            if (newEx.classBody != null && !newEx.lambdaExpression) {
                // When you have a value in the parameters for a new anonymous class, it's enclosing type is not the
                // anonymous class but instead the anonymous classes enclosing class.
                if (newEx.arguments != null) {
@@ -307,7 +307,7 @@ public abstract class JavaSemanticNode extends SemanticNode {
          }
          if (pnode instanceof NewExpression) {
             NewExpression newEx = (NewExpression) pnode;
-            if (newEx.classBody != null)
+            if (newEx.classBody != null && !newEx.lambdaExpression)
                return newEx.getAnonymousType(false);
          }
       }
@@ -335,6 +335,9 @@ public abstract class JavaSemanticNode extends SemanticNode {
             return null; // not in a method
          if (pnode instanceof AbstractMethodDefinition)
             return (AbstractMethodDefinition) pnode;
+         if (pnode instanceof LambdaExpression) {
+            return ((LambdaExpression) pnode).getLambdaMethod();
+         }
       }
       return null;
    }

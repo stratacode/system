@@ -40,6 +40,10 @@ public class NewExpression extends IdentifierExpression {
    public transient AnonClassDeclaration anonTypeTransformed;
    public transient Object constructor;
    public transient boolean isStaticContext;
+   /** True if this new expression is part of a lambda expression.  If so, it does not create a real type in the type system */
+   public transient boolean lambdaExpression = false;
+   /** The inferred type for this new expression (i.e. the target type) */
+   public transient Object inferredType;
 
    private boolean anonTypeInited = false;
 
@@ -119,9 +123,20 @@ public class NewExpression extends IdentifierExpression {
 
       super.start();
 
+      if (boundType != null && arguments != null) {
+         constructor = ModelUtil.declaresConstructor(boundType, arguments, null);
+         propagateInferredTypes();
+      }
+
       if (bindingDirection != null && bindingDirection.doForward() && bindingDirection.doReverse())
          displayError("Bi-directional bindings (the :=: operator) not supported for new expressions: ");
       classPropertyName = CTypeUtil.decapitalizePropertyName(CTypeUtil.getClassName(typeIdentifier));
+   }
+
+   private void propagateInferredTypes() {
+      if (constructor != null && arguments != null) {
+         propagateInferredArgs(this, constructor, arguments);
+      }
    }
 
    public void validate() {
@@ -130,10 +145,9 @@ public class NewExpression extends IdentifierExpression {
       super.validate();
 
       if (boundType != null && arguments != null) {
-         constructor = ModelUtil.declaresConstructor(boundType, arguments, null);
          if (constructor == null && arguments.size() > 0) {
             displayTypeError("Missing constructor in type: " + boundType + " for new expression: ");
-             ModelUtil.declaresConstructor(boundType, arguments, null);
+            ModelUtil.declaresConstructor(boundType, arguments, null);
          }
 
          if (constructor == null && arguments.size() == 0) {
@@ -305,8 +319,17 @@ public class NewExpression extends IdentifierExpression {
 
    public List<Object> evalTypeArguments() {
       ArrayList<Object> res = new ArrayList<Object>();
-      for (int i = 0; i < typeArguments.size(); i++) {
-         res.add(typeArguments.get(i).getTypeDeclaration());
+      // Handle the diamond operator: <> when this is specified, we inherit the type arguments from the inferredType
+      if (typeArguments.size() == 0 && inferredType != null) {
+         int numTypeParams = ModelUtil.getNumTypeParameters(inferredType);
+         for (int i = 0; i < numTypeParams; i++) {
+            res.add(ModelUtil.getTypeParameter(inferredType, i));
+         }
+      }
+      else {
+         for (int i = 0; i < typeArguments.size(); i++) {
+            res.add(typeArguments.get(i).getTypeDeclaration());
+         }
       }
       return res;
    }
@@ -921,5 +944,9 @@ public class NewExpression extends IdentifierExpression {
             st.addBreakpointNodes(res, srcStatement);
          }
       }
+   }
+
+   public void setInferredType(Object inferredType) {
+      this.inferredType = inferredType;
    }
 }

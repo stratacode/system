@@ -19,7 +19,7 @@ public interface IMethodDefinition extends IMember {
 
    JavaType[] getParameterJavaTypes();
 
-   Object getTypeDeclaration(List<? extends ITypedObject> args);
+   Object getTypeDeclaration(List<? extends ITypedObject> args, boolean resolve);
 
    String getPropertyName();
 
@@ -46,4 +46,6 @@ public interface IMethodDefinition extends IMember {
    Object[] getExceptionTypes();
 
    String getThrowsClause();
+
+   Object[] getMethodTypeParameters();
 }

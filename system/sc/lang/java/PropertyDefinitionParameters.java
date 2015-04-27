@@ -4,10 +4,11 @@
 
 package sc.lang.java;
 
+import sc.layer.LayeredSystem;
 import sc.type.CTypeUtil;
 
 public class PropertyDefinitionParameters {
-   public String fieldModifiers, getModifiers, setModifiers; // Modifier values for each
+   public String fieldModifiers, getModifiers, setModifiers, setIndexedModifiers; // Modifier values for each
    public boolean bindable;              // True if this field definition needs to be bindable
    public String propertyTypeName;       // The class name of the field
    public String setTypeName;            // The type name for the setX method just in case it's different from the getX
@@ -30,6 +31,7 @@ public class PropertyDefinitionParameters {
    public boolean sendEvent = true;
    public String preReturn;
    public String postReturn;
+   public boolean useIndexSetForArrays = true;
 
    public static PropertyDefinitionParameters create(String propName) {
       PropertyDefinitionParameters pdp = new PropertyDefinitionParameters();
@@ -40,10 +42,11 @@ public class PropertyDefinitionParameters {
       return pdp;
    }
 
-   public void init(Object fieldObj, boolean doObjConvert) {
+   public void init(Object fieldObj, boolean doObjConvert, LayeredSystem sys) {
       // Need to get absolute type names here because we do not do the imports from the model because we never resolved the interface fields in this model
       setTypeName = propertyTypeName = ModelUtil.getAbsoluteGenericTypeName(ModelUtil.getEnclosingType(fieldObj), fieldObj, true);
       Object propType = ModelUtil.getPropertyType(fieldObj);
+      useIndexSetForArrays = sys.useIndexSetForArrays;
 
       if (doObjConvert) {
          if (ModelUtil.isPrimitive(propType)) {
@@ -67,5 +70,11 @@ public class PropertyDefinitionParameters {
       }
       getModifiers = TransformUtil.removeModifiers(ModelUtil.modifiersToString(fieldObj, true, true, false, false, true, JavaSemanticNode.MemberType.GetMethod), TransformUtil.fieldOnlyModifiers);
       setModifiers = TransformUtil.removeModifiers(ModelUtil.modifiersToString(fieldObj, true, true, false, false, true, JavaSemanticNode.MemberType.SetMethod), TransformUtil.fieldOnlyModifiers);
+      if (getNeedsIndexedSetter())
+         setIndexedModifiers = TransformUtil.removeModifiers(ModelUtil.modifiersToString(fieldObj, false, true, false, false, true, JavaSemanticNode.MemberType.SetIndexed), TransformUtil.fieldOnlyModifiers);
+   }
+
+   public boolean getNeedsIndexedSetter() {
+      return useIndexSetForArrays && arrayDimensions != null && arrayDimensions.length() == 2;
    }
 }

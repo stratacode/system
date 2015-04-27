@@ -454,7 +454,7 @@ public class OrderedChoice extends NestedParselet  {
    }
 
    static final GenerateError REPEAT_NODE_ERROR = new GenerateError("Repeat node passed a non-list value");
-   static final GenerateError NO_MATCH_ERROR = new GenerateError("No match for node in choice");
+   static public final GenerateError NO_MATCH_ERROR = new GenerateError("No match for node in choice");
 
    /**
     * For the OrderedChoice, we have to figure out which choice was gnenerated.

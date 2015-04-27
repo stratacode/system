@@ -306,6 +306,18 @@ public class ModifyDeclaration extends TypeDeclaration {
          getEnclosingType().setNeedsDynamicStub(true);
       }
 
+      if (extendsBoundTypes != null && extendsBoundTypes.length > 0) {
+         Object extType = extendsBoundTypes[0];
+         if (extType != null && modifyTypeDecl instanceof TypeDeclaration) {
+            TypeDeclaration baseTypeDecl = (TypeDeclaration) modifyTypeDecl;
+            Object modifyType = baseTypeDecl.getExtendsTypeDeclaration();
+            if (modifyType != null && !ModelUtil.isAssignableFrom(modifyType, extType)) {
+               // Is this an error or a warning?  We let you replace the class and break the contract - should we let you replace the extends type?   or should this be a strict option on the layer?
+               displayTypeError("Modify extends incompatible type - ", ModelUtil.getClassName(extType), " should extend existing extends: ", ModelUtil.getClassName(modifyType), " for: ");
+            }
+         }
+      }
+
       super.validate();
    }
 
@@ -476,7 +488,8 @@ public class ModifyDeclaration extends TypeDeclaration {
             JavaSemanticNode resolver = getEnclosingType();
             if (resolver == null)
                resolver = getJavaModel();
-            extendsType.initType(this, resolver, false, isLayerType);
+            LayeredSystem sys = layer != null ? layer.layeredSystem : getLayeredSystem();
+            extendsType.initType(sys, this, resolver, null, false, isLayerType);
 
             // Need to start the extends type as we need to dig into it
             Object extendsTypeDecl = extendsBoundTypes[i++] = extendsType.getTypeDeclaration();
@@ -487,7 +500,6 @@ public class ModifyDeclaration extends TypeDeclaration {
                }
                else if (layer != null) {
                   String layerTypeName = extendsType.getFullTypeName();
-                  LayeredSystem sys = layer.layeredSystem;
 
                   // Do errors for the layer def file when it gets started - skip this for peerMode.  The checkPeers flag here does not work because we only set them
                   // after we've initialized the layers so this is too late.
@@ -915,6 +927,8 @@ public class ModifyDeclaration extends TypeDeclaration {
                   baseTypeDecl.modifyExtendsType(newExt);
                   any = true;
                }
+               else
+                  System.out.println("*** Warning - ignoring modify extends class during transform");
             }
          }
       }
@@ -928,8 +942,15 @@ public class ModifyDeclaration extends TypeDeclaration {
          }
       }
 
+      any = mergeModifiersInto(baseType) || any;
+
+      return any;
+   }
+
+   boolean mergeModifiersInto(BodyTypeDeclaration baseType) {
       // We don't merge the default access level here - just accessing something in a public layer should not
       // make it public
+      boolean any = false;
       if (baseType.mergeModifiers(this, true, false))
          any = true;
       if (autoComponent == null || autoComponent)
@@ -1361,8 +1382,11 @@ public class ModifyDeclaration extends TypeDeclaration {
       }
 
       // move over the body for the last guy
-      if (newType)
+      if (newType) {
          subType.setProperty("body", body);
+
+         mergeModifiersInto(subType);
+      }
       else
          mergeDefinitionsInto(subType, true);
 
@@ -1470,9 +1494,9 @@ public class ModifyDeclaration extends TypeDeclaration {
       return getFullTypeName();
    }
 
-   public boolean isAssignableFrom(ITypeDeclaration other) {
+   public boolean isAssignableFrom(ITypeDeclaration other, boolean assignmentSemantics) {
       Object extType = getDerivedTypeDeclaration();
-      return ModelUtil.isAssignableFrom(extType, other);
+      return ModelUtil.isAssignableFrom(extType, other, assignmentSemantics, null);
    }
 
    public boolean isAssignableTo(ITypeDeclaration other) {
@@ -1517,13 +1541,13 @@ public class ModifyDeclaration extends TypeDeclaration {
       return getEnclosingType() != null && isStaticType();
    }
 
-   public boolean implementsType(String fullTypeName) {
-      if (super.implementsType(fullTypeName))
+   public boolean implementsType(String fullTypeName, boolean assignment) {
+      if (super.implementsType(fullTypeName, assignment))
          return true;
 
       if (extendsBoundTypes != null) {
          for (Object implType:extendsBoundTypes) {
-            if (implType != null && ModelUtil.implementsType(implType, fullTypeName))
+            if (implType != null && ModelUtil.implementsType(implType, fullTypeName, assignment))
                return true;
          }
       }

@@ -5,9 +5,7 @@
 package sc.lang;
 
 import sc.lang.java.*;
-import sc.layer.IFileProcessorResult;
 import sc.layer.LayeredSystem;
-import sc.layer.SrcEntry;
 import sc.obj.Constant;
 import sc.type.TypeUtil;
 import sc.parser.*;
@@ -87,8 +85,11 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
                 new Sequence("ExtendsType(questionMark,*)",OPTIONAL, questionMark,
                              new Sequence("(operator,typeArgument)", OPTIONAL, new SemanticTokenChoice("extends", "super"), argType)));
 
-   Sequence typeArguments = new Sequence("<typeArguments>(,[],[],)", lessThan, typeArgument,
-                                         new Sequence("(,[])", OPTIONAL | REPEAT, comma, typeArgument), greaterThanSkipOnError);
+   Sequence typeArgumentList = new Sequence("([],[])", OPTIONAL, typeArgument, new Sequence("(,[])", OPTIONAL | REPEAT, comma, typeArgument));
+   Sequence typeArguments = new Sequence("<typeArguments>(,.,)", lessThan, typeArgumentList, greaterThanSkipOnError);
+   {
+      typeArguments.ignoreEmptyList = false;
+   }
    public Sequence optTypeArguments = new Sequence("(.)", OPTIONAL, typeArguments);
 
    public Sequence classOrInterfaceType =
@@ -102,18 +103,23 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    Sequence typeList = new Sequence("([],[])", type, new Sequence("(,[])", OPTIONAL | REPEAT, comma, type));
 
    // Forward declarations see below for definition
-   public Sequence expression = new ChainedResultSequence("<expression>(lhs,.)") {
+   public Sequence assignmentExpression = new ChainedResultSequence("(lhs,.)");
+   // Java8 Only
+   public Sequence lambdaExpression = new Sequence("LambdaExpression(lambdaParams,,lambdaBody)");
+
+   public OrderedChoice expression = new OrderedChoice(lambdaExpression, assignmentExpression) {
       public Object generate(GenerateContext ctx, Object value) {
          if (!fastGenExpressions)
             return super.generate(ctx, value);
          //if (!ctx.finalGeneration)
          //   return super.generate(ctx, value);
          if (!(value instanceof Expression))
-            return ctx.error(this, ACCEPT_ERROR, value, 0);
+            return ctx.error(this, NO_MATCH_ERROR, value, 0);
 
          return ((Expression) value).toGenerateString();
       }
    };
+
    {
       expression.disableTagMode = true;
    }
@@ -147,7 +153,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    Sequence classCreatorRest = new Sequence("(arguments, classBody)", arguments, new Sequence("(.)", OPTIONAL, classBody));
    OrderedChoice typeOrQuestion = new OrderedChoice(argType,questionMark);
    Sequence simpleTypeArguments = new Sequence("(,[],)", OPTIONAL, lessThan,
-           new Sequence("([],[])", typeOrQuestion, new Sequence("(,[])",OPTIONAL | REPEAT, comma, typeOrQuestion))
+           new Sequence("([],[])", OPTIONAL, typeOrQuestion, new Sequence("(,[])",OPTIONAL | REPEAT, comma, typeOrQuestion))
            , greaterThanSkipOnError);
    Sequence innerCreator =
            new Sequence("NewExpression(typeArguments, typeIdentifier, *)", simpleTypeArguments, identifier, classCreatorRest);
@@ -166,23 +172,31 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    SymbolChoice integerTypeSuffix = new SymbolChoice(OPTIONAL, "l","L");
    public SymbolChoice floatTypeSuffix = new SymbolChoice("f","F","d","D");
-   Sequence exponent = new Sequence("('', '', '')", new SymbolChoice("e","E"), new SymbolChoice(OPTIONAL, "+", "-"), digits);
+   public Symbol notUnderscore = new Symbol(LOOKAHEAD | NOT, "_");
+   Sequence exponent = new Sequence("('', '',,'')", new SymbolChoice("e","E"), new SymbolChoice(OPTIONAL, "+", "-"), notUnderscore, digits);
    Sequence optExponent = new Sequence("('')", OPTIONAL, exponent);
    Sequence optFloatTypeSuffix = new Sequence("('')", OPTIONAL, floatTypeSuffix);
 
    SymbolChoice hexPrefix = new SymbolChoice("0x","0X");
-   Sequence hexLiteral = new Sequence("(hexPrefix,hexValue)", hexPrefix, hexDigits);
-   Sequence octalLiteral = new Sequence("(octal,octalValue)", new Symbol("0"), octalDigits);
+   Sequence hexLiteral = new Sequence("(hexPrefix,,hexValue)", hexPrefix, notUnderscore, hexDigits);
+   SymbolChoice binaryPrefix = new SymbolChoice("0b","0B");
+   // Aded in Java7
+   Sequence binaryLiteral = new Sequence("(binaryPrefix,,binaryValue)", binaryPrefix, notUnderscore, binaryDigits);
+   Sequence octalLiteral = new Sequence("(octal,,octalValue)", new Symbol("0"), notUnderscore, octalDigits);
 
+   {
+      // Java7 let's you put an _ inside of the literal.
+      addDigitChar("_", 0);
+   }
    Sequence decimalLiteral = new Sequence("(decimalValue)", new OrderedChoice(new Symbol("0"), new Sequence("('','')", nonZeroDigit, optDigits)));
 
    public OrderedChoice floatingPointLiteral = new OrderedChoice(
-         new Sequence("('','','','','')", digits, period, new Sequence("('')", OPTIONAL, digits), optExponent, optFloatTypeSuffix),
-         new Sequence("('','','','')", period, digits, optExponent, optFloatTypeSuffix),
-         new Sequence("('','','')", digits, exponent, optFloatTypeSuffix),
-         new Sequence("('','','')", digits, optExponent, floatTypeSuffix),
-         new Sequence("('','','','')", hexPrefix, hexDigits, new Sequence("('','')", OPTIONAL, period, new Sequence("('')", OPTIONAL, hexDigits)),
-                      new Sequence("('','','','')", new SymbolChoice("p","P"), new Symbol(OPTIONAL, "-"), digits, optFloatTypeSuffix)));
+         new Sequence("(,'','','','','')", notUnderscore, digits, period, new Sequence("(,'')", OPTIONAL, notUnderscore, digits), optExponent, optFloatTypeSuffix),
+         new Sequence("('',,'','','')", period, notUnderscore, digits, optExponent, optFloatTypeSuffix),
+         new Sequence("(,'','','')", notUnderscore, digits, exponent, optFloatTypeSuffix),
+         new Sequence("(,'','','')", notUnderscore, digits, optExponent, floatTypeSuffix),
+         new Sequence("('',,'','','')", hexPrefix, notUnderscore, hexDigits, new Sequence("('','')", OPTIONAL, period, new Sequence("('')", OPTIONAL, hexDigits)),
+                      new Sequence("('','',,'','')", new SymbolChoice("p","P"), new Symbol(OPTIONAL, "-"), notUnderscore, digits, optFloatTypeSuffix)));
 
    // We put a lookahead check for a digit or . all of the first chars in a floating point literal.  
    Sequence fasterFloatingPointLiteral = new Sequence("FloatLiteral(,value)", fpChar, floatingPointLiteral);
@@ -209,7 +223,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
                                         new SymbolChoice(NOT, "\\", "'", EOF)),
                       singleQuote);
 
-   public Sequence integerLiteral = new Sequence("IntegerLiteral(*,typeSuffix)", new OrderedChoice(hexLiteral, octalLiteral, decimalLiteral),
+   public Sequence integerLiteral = new Sequence("IntegerLiteral(*,typeSuffix)", new OrderedChoice(hexLiteral, binaryLiteral, octalLiteral, decimalLiteral),
                                           integerTypeSuffix);
 
    // One up front lookahead check to be sure the first char is for an integer before going into the choice
@@ -274,12 +288,20 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    Sequence classValueExpression = new Sequence("ClassValueExpression(typeIdentifier, arrayBrackets, )", typeIdentifier, openCloseSqBrackets, new KeywordSpace(".class"));
 
+   // Java8 Only
+   Sequence methodReference = new Sequence("MethodReference(reference,,typeArguments, methodName)");
+
    public IndexedChoice primary = new IndexedChoice("<primary>");
    {
       primary.put("(", parenExpression);
       primary.put("new", newExpression);
-      // TODO: try reversing the order of the last two as identifierExpression is way more common
       primary.addDefault(literal, classValueExpression, identifierExpression);
+      // Caching because MethodReference may well match a primary then reject it - removing this one slows down nested expressions exponentially
+      primary.cacheResults = true;
+
+      // Matching typeIdentifier - which can be either a type or an identifier expression first.  That type picks the right one at runtime.  After that we match type,
+      // then primary since a type name can match more than a primary expression in some cases.
+      methodReference.set(new OrderedChoice(new Sequence("TypeExpression(typeIdentifier,)", typeIdentifier, new Symbol(LOOKAHEAD, "::")), type, primary), new SymbolSpace("::"), optTypeArguments, new OrderedChoice(identifier, newKeyword));
    }
 
    // Forward
@@ -290,7 +312,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    // TODO: combine these for a speedup
    OrderedChoice castExpression = new OrderedChoice(
          new Sequence("CastExpression(,type,,expression)", openParen, primitiveType, closeParen, unaryExpression),
-         new Sequence("CastExpression(,type,,expression)", openParen, type, closeParen, unaryExpressionNotPlusMinus));
+         new Sequence("CastExpression(,type,,expression)", openParen, type, closeParen, new OrderedChoice(lambdaExpression, unaryExpressionNotPlusMinus)));
 
    IndexedChoice selector = new IndexedChoice("<selector>");
    {
@@ -320,7 +342,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       unaryExpressionNotPlusMinus.put("~", new Sequence("UnaryExpression(operator,expression)", new SemanticTokenChoice("~"), unaryExpression));
       unaryExpressionNotPlusMinus.put("!", new Sequence("UnaryExpression(operator,expression)", new SemanticTokenChoice("!"), unaryExpression));
       unaryExpressionNotPlusMinus.put("(",  castExpression);
-      unaryExpressionNotPlusMinus.addDefault(primaryExpression);
+      unaryExpressionNotPlusMinus.addDefault(methodReference, primaryExpression);
 
       // TODO: do these symbols need to be broken out and ordered in separate sequences to get the right precedence rules?
       unaryExpression.put("+", prefixUnaryExpression);
@@ -358,10 +380,23 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    OrderedChoice elementValue =
            new OrderedChoice("<elementValue>", expression, annotation, elementValueArrayInitializer);
 
-   public Sequence assignmentExpression = new Sequence("AssignmentExpression(operator, rhs)", OPTIONAL, assignmentOperator, expression);
+   Sequence inferredParameters = new Sequence("(,[],)", openParen, new Sequence("([],[])", OPTIONAL, identifier, new Sequence("(,[])", OPTIONAL | REPEAT, comma, identifier)), closeParenSkipOnError);
+
+   // Forward reference
+   Sequence formalParameters = new Sequence("<parameters>(,.,)");
+
+   public OrderedChoice lambdaParameters = new OrderedChoice(identifier, formalParameters, inferredParameters);
+   public OrderedChoice lambdaBody = new OrderedChoice(expression, block);
 
    {
-      expression.set(conditionalExpression, assignmentExpression);
+      lambdaParameters.ignoreEmptyList = false;
+      lambdaExpression.set(lambdaParameters, new SymbolSpace("->"), lambdaBody);
+   }
+
+   Sequence assignment = new Sequence("AssignmentExpression(operator, rhs)", OPTIONAL, assignmentOperator, expression);
+
+   {
+      assignmentExpression.set(conditionalExpression, assignment);
    }
 
    {
@@ -391,11 +426,12 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    OrderedChoice typeOrVoid = new OrderedChoice(type, voidType);
 
+   // Java8 - 'default' added for default methods
    KeywordChoice modifierKeywords = new KeywordChoice(true, "public", "protected", "private", "abstract",
-                   "static", "final", "strictfp", "native", "synchronized", "transient", "volatile");
+                   "static", "final", "strictfp", "native", "synchronized", "transient", "volatile", "default");
    public OrderedChoice modifiers = new OrderedChoice("<modifiers>([],[])", REPEAT | OPTIONAL, modifierKeywords, annotation);
 
-   Sequence variableDeclaratorId = new Sequence("(variableName,arrayDimensions)", identifier, openCloseSqBrackets);
+   public Sequence variableDeclaratorId = new Sequence("(variableName,arrayDimensions)", identifier, openCloseSqBrackets);
 
    public Sequence qualifiedType =
          new Sequence("ClassType(typeName, chainedTypes)", identifier,
@@ -413,14 +449,18 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    {
       formalParameterDecls.add(variableModifiers, type, formalParameterDeclRest);
    }
-   Sequence formalParameters = new Sequence("<parameters>(,.,)", openParen, formalParameterDecls, closeParenSkipOnError);
    {
+      formalParameters.set(openParen, formalParameterDecls, closeParenSkipOnError);
       formalParameters.ignoreEmptyList = false;
    }
 
+   // Java8 Only
+   Sequence catchParameterExtraTypes = new Sequence("(,[])", OPTIONAL | REPEAT, new SymbolSpace("|"), type);
+   public Sequence catchParameter = new Sequence("CatchParameter(,variableModifiers, type, extraTypes, *,)", openParen,
+            variableModifiers, type, catchParameterExtraTypes, variableDeclaratorId, closeParenSkipOnError);
+
    // Exposed as part of the language api using this name
    public Sequence parameters = formalParameterDecls;
-
 
    // Forward declarations
    public OrderedChoice variableInitializer = new OrderedChoice("<variableInitializer>");
@@ -471,6 +511,8 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    private KeywordSpace whileKeyword = new KeywordSpace("while");
 
+   Sequence tryResources = new Sequence("(,[],[],)", OPTIONAL, openParen, localVariableDeclaration, new Sequence("(,[])", REPEAT, semicolonEOL, localVariableDeclaration), closeParenSkipOnError);
+
    Sequence doStatement =
       new Sequence("WhileStatement(operator,statement,,expression,)", new KeywordSpace("do"), statement,
       whileKeyword, parenExpression, semicolonEOL);
@@ -487,11 +529,11 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       statement.put("do", doStatement);
       // Note: this does not enforce the try must have one catch or finally rule.
       statement.put("try",
-         new Sequence("TryStatement(,statements,*)", new KeywordSpace("try"), block,
+         new Sequence("TryStatement(, resources, statements,*)", new KeywordSpace("try"), tryResources, block,
                       new Sequence("(catchStatements,finallyStatement)",
                          new Sequence("([])", OPTIONAL | REPEAT,
                                new Sequence("CatchStatement(,parameters,statements)",  new KeywordSpace("catch"),
-                                            formalParameters, block)),
+                                            catchParameter, block)),
                          new Sequence("FinallyStatement(,statements)", OPTIONAL, new KeywordSpace("finally"), block))));
       statement.put("switch", new Sequence("SwitchStatement(,expression,,statements,)", 
                     new KeywordSpace("switch"), parenExpression, openBraceEOL, switchBlockStatementGroups, closeBraceEOL));

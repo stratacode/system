@@ -44,11 +44,16 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return ModelUtil.getExtendsJavaType(baseType);
    }
 
-   public boolean isAssignableFrom(ITypeDeclaration other) {
+   public List<?> getImplementsTypes() {
+      Object[] res = ModelUtil.getImplementsJavaTypes(baseType);
+      return res == null ? null : Arrays.asList(res);
+   }
+
+   public boolean isAssignableFrom(ITypeDeclaration other, boolean assignmentSemantics) {
       if (other instanceof ParamTypeDeclaration) {
          ParamTypeDeclaration otherParamType = ((ParamTypeDeclaration) other);
          Object otherBaseType = otherParamType.baseType;
-         if (!ModelUtil.isAssignableFrom(baseType, otherBaseType))
+         if (!ModelUtil.isAssignableFrom(baseType, otherBaseType, assignmentSemantics, null))
             return false;
 
          // TODO: Need to skip to find the most specific version of the other base type which matches to ensure the type parameters match.
@@ -56,7 +61,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
          // I feel like we need to remap the type parameters we are given in some cases as they may move around and probably can't always get around skipping them until we find the most specific extends type as done here.
          do {
             Object otherBaseTypeExtends = ModelUtil.getExtendsClass(otherBaseType);
-            if (otherBaseTypeExtends != null && ModelUtil.isAssignableFrom(baseType, otherBaseTypeExtends) && otherBaseTypeExtends instanceof ParamTypeDeclaration) {
+            if (otherBaseTypeExtends != null && ModelUtil.isAssignableFrom(baseType, otherBaseTypeExtends, assignmentSemantics, null) && otherBaseTypeExtends instanceof ParamTypeDeclaration) {
                otherParamType = (ParamTypeDeclaration) otherBaseTypeExtends;
                otherBaseType = otherParamType.baseType;
             }
@@ -87,7 +92,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
          return true;
       }
       else {
-         return ModelUtil.isAssignableFrom(baseType, other);
+         return ModelUtil.isAssignableFrom(baseType, other, assignmentSemantics, null);
       }
    }
 
@@ -174,7 +179,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
    public Object definesMethod(String name, List<? extends Object> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed) {
       // assert ctx == null; ??? this fails unfortunately...
       Object method = ModelUtil.definesMethod(baseType, name, parametersOrExpressions, this, refType, isTransformed);
-      if (method != null && ModelUtil.hasParameterizedReturnType(method))
+      if (method != null && ModelUtil.isParameterizedMethod(method))
          return new ParamTypedMethod(method, this);
       return method;
    }
@@ -208,7 +213,23 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
    public Object getType(int position) {
       if (position == -1)
          return null;
-      return types.get(position);
+      if (position >= types.size()) {
+         System.out.println("*** Invalid type parameter position");
+         return null;
+      }
+      Object res = types.get(position);
+      /*
+      if (res instanceof JavaType) {
+         res = ((JavaType) res).getTypeDeclaration();
+         if (res == null)
+            return Object.class;
+      }
+      */
+      //if (ModelUtil.isTypeVariable(res)) {
+         // Not Doing this here because we need this parameter at a higher level in the code - to resolve it elsewhere from getParameterizedReturnType
+         //return ModelUtil.getTypeParameterDefault(res);
+      //}
+      return res;
    }
 
    public Object getDefaultType(int position) {
@@ -220,16 +241,39 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return type;
    }
 
-   public Object getTypeDeclarationForParam(String name) {
-      for (int i = 0; i < typeParams.size(); i++)
-         if (ModelUtil.getTypeParameterName(typeParams.get(i)).equals(name))
-            return types.get(i);
+   public Object getTypeForVariable(Object typeVar) {
+      // Is this type parameter bound to the type for this type context?  It might be a method type parameter or for a different type
+      Object srcType = ModelUtil.getTypeParameterDeclaration(typeVar);
+      if (ModelUtil.isAssignableFrom(srcType, baseType)) {
+         return ModelUtil.resolveTypeParameter(srcType, this, ModelUtil.getTypeParameterName(typeVar));
+      }
+      else {
+         return typeVar;
+      }
+   }
+
+   public Object getTypeDeclarationForParam(String name, Object tvar, boolean resolve) {
+      if (tvar != null) {
+         Object decl = ModelUtil.getTypeParameterDeclaration(tvar);
+         // Need to rule out the method at least - also checking isAssignable just because it should be assignable
+         if (ModelUtil.isMethod(decl) || !ModelUtil.isAssignableFrom(decl, baseType))
+            return null;
+      }
+      for (int i = 0; i < typeParams.size(); i++) {
+         if (ModelUtil.getTypeParameterName(typeParams.get(i)).equals(name)) {
+            Object res = types.get(i);
+            if (resolve && ModelUtil.isTypeVariable(res)) {
+               res = ModelUtil.getTypeParameterDefault(res);
+            }
+            return res;
+         }
+      }
       return null;
    }
 
-   public boolean implementsType(String otherTypeName) {
+   public boolean implementsType(String otherTypeName, boolean assignment) {
       // TODO: should we verify that our parameters match if the other type has assigned params too?
-      return ModelUtil.implementsType(baseType, otherTypeName);
+      return ModelUtil.implementsType(baseType, otherTypeName, assignment);
    }
 
    public Object getInheritedAnnotation(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
@@ -283,10 +327,19 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
    }
 
    public Object findTypeDeclaration(String typeName, boolean addExternalReference) {
+      Object res = null;
       if (definedInType != null)
-         return definedInType.findTypeDeclaration(typeName, addExternalReference);
+         res = definedInType.findTypeDeclaration(typeName, addExternalReference);
       else
-         return system.getTypeDeclaration(typeName);
+         res = system.getTypeDeclaration(typeName);
+      if (res != null)
+         return res;
+      if (typeParams != null) {
+         for (Object typeParam:typeParams)
+            if (ModelUtil.getTypeParameterName(typeParam).equals(typeName))
+               return typeParam;
+      }
+      return null;
    }
 
    public JavaModel getJavaModel() {
@@ -304,7 +357,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       List<Object> result = new ArrayList<Object>(baseMethods.length);
       for (int i = 0; i < baseMethods.length; i++) {
          Object meth = baseMethods[i];
-         if (ModelUtil.hasParameterizedReturnType(meth))
+         if (ModelUtil.isParameterizedMethod(meth))
             result.add(new ParamTypedMethod(meth, this));
          else
             result.add(meth);
@@ -464,4 +517,29 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return new ParamTypeDeclaration(system, new ArrayList<Object>(typeParams), new ArrayList<Object>(types), baseType);
    }
 
+   public void setTypeParameter(String varName, Object type) {
+      if (typeParams != null) {
+         int i = 0;
+         for (Object typeParam : typeParams) {
+            if (ModelUtil.isTypeVariable(typeParam) && ModelUtil.getTypeParameterName(typeParam).equals(varName)) {
+               types.set(i, type);
+               return;
+            }
+            i++;
+         }
+      }
+      System.err.println("*** Failed to augment parameterized type with computed type parameter: " + varName);
+   }
+
+   public boolean hasUnboundParameters() {
+      if (types == null)
+         return false;
+      for (Object type:types) {
+         if (type == null)
+            return true;
+         if (type instanceof JavaType && ((JavaType) type).getTypeDeclaration() == null)
+            return true;
+      }
+      return false;
+   }
 }

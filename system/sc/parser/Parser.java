@@ -19,6 +19,8 @@ import java.util.*;
 public class Parser implements IString {
    public final static boolean ENABLE_STATS = false;
 
+   private final static boolean ENABLE_RESULT_TRACE = false;
+
    Language language;
 
    /** For languages like HTML which are not context free grammar, the parse nodes maintain additional information, like the current tag stack, used for matching the grammar */
@@ -304,7 +306,7 @@ public class Parser implements IString {
       boolean disableDebug = false;
       if (parselet.negated)
          negatedCt++;
-      if (parselet.trace) {
+      if (parselet.trace && ENABLE_RESULT_TRACE) {
          if (traceCt == 0 && !language.debug) {
             disableDebug = true;
             language.debug = true;
@@ -355,7 +357,7 @@ public class Parser implements IString {
          currentParselet = saveParselet;
          lastStartIndex = saveLastStartIndex;
 
-         if (disableDebug)
+         if (ENABLE_RESULT_TRACE && disableDebug)
             language.debug = false;
          if (parselet.trace)
             traceCt--;

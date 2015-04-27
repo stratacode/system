@@ -110,7 +110,7 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
       return parameterJavaTypes;
    }
 
-   public Object getTypeDeclaration(List<? extends ITypedObject> args) {
+   public Object getTypeDeclaration(List<? extends ITypedObject> args, boolean resolve) {
       // TODO: get type parameters and return the parameterized type here if the match
       return getReturnType();
    }
@@ -188,6 +188,10 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
 
    public String getThrowsClause() {
       return ModelUtil.typesToThrowsClause(getExceptionTypes());
+   }
+
+   public Object[] getMethodTypeParameters() {
+      return parameterJavaTypes;
    }
 
    public String toString() {

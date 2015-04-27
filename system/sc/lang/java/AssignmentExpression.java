@@ -93,6 +93,10 @@ public class AssignmentExpression extends TwoOperatorExpression {
       if (lhs != null && rhs != null) {
          boolean useGenericTypes = true;
          Object lhsType = useGenericTypes ? lhs.getGenericType() : lhs.getTypeDeclaration();
+
+         // Need to do this to initialize the lambda expression before we try to get the tyep of the rhs
+         rhs.setInferredType(lhsType);
+
          Object rhsType = useGenericTypes ? rhs.getGenericType() : rhs.getTypeDeclaration();
          if (lhsType != null && rhsType != null && !ModelUtil.isAssignableFrom(lhsType, rhsType, true, null)) {
             if (selfOperator != null && selfOperator.equals("+") && ModelUtil.isString(lhsType)) {

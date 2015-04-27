@@ -5,6 +5,7 @@
 package sc.lang.java;
 
 import sc.lang.ISrcStatement;
+import sc.lang.SemanticNodeList;
 
 import java.util.Collections;
 import java.util.List;
@@ -13,6 +14,8 @@ import java.util.Set;
 public class TryStatement extends Statement implements IBlockStatement {
    public List<Statement> statements;
    public List<CatchStatement> catchStatements;
+   // Java 7 auto-close resources
+   public SemanticNodeList<VariableStatement> resources;
    public FinallyStatement finallyStatement;
 
    public transient int frameSize;
@@ -154,5 +157,19 @@ public class TryStatement extends Statement implements IBlockStatement {
 
    public boolean childIsTopLevelStatement(Statement child) {
       return true;
+   }
+
+   public void addReturnStatements(List<Statement> res) {
+      if (statements != null) {
+         for (Statement statement:statements)
+            statement.addReturnStatements(res);
+      }
+      if (catchStatements != null) {
+         for (Statement st:catchStatements) {
+            st.addReturnStatements(res);
+         }
+      }
+      if (finallyStatement != null)
+         finallyStatement.addReturnStatements(res);
    }
 }

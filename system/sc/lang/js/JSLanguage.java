@@ -48,6 +48,10 @@ public class JSLanguage extends SCLanguage implements IParserConstants {
       formalParameterDecls.setName("<formalParameterDecls>Parameter(*):(.)");
       formalParameterDecls.set(formalParameterDeclRest);
 
+      // Also need to redefine the catchParameter since it's has Type1 | TYPE2 which makes it different than formalParameters
+      catchParameter.setName("CatchParameter(,*,)");
+      catchParameter.set(openParen, variableDeclaratorId, closeParenSkipOnError);
+
       // JS does not support the 'l' or "L" suffix
       integerLiteral.setName("IntegerLiteral(*)");
       integerLiteral.remove(1);

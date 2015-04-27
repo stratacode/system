@@ -1351,7 +1351,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       Object populateInst = parser.populateInst;
       if (populateInst != null) {
          if (resultDynType != null) {
-            if (populateInst instanceof IDynObject && resultDynType.isAssignableFrom((ITypeDeclaration) ((IDynObject) populateInst).getDynType()))
+            if (populateInst instanceof IDynObject && resultDynType.isAssignableFrom((ITypeDeclaration) ((IDynObject) populateInst).getDynType(), false))
                return populateInst;
          }
          else if (theClass.isAssignableFrom(populateInst.getClass()))

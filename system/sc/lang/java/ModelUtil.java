@@ -36,6 +36,7 @@ import sc.parser.*;
 
 import java.io.File;
 import java.io.StringReader;
+import java.lang.annotation.ElementType;
 import java.lang.reflect.*;
 import java.lang.reflect.Type;
 import java.util.*;
@@ -98,7 +99,7 @@ public class ModelUtil {
       return typeToClass(getVariableTypeDeclaration(varObj));
    }
 
-   public static CoalescedHashMap initMethodTypeParameters(Object[] typeParameters, Object[] genericParamTypes, List<Expression> arguments) {
+   public static CoalescedHashMap initMethodTypeParameters(Object[] typeParameters, Object[] genericParamTypes, List<Expression> arguments, Object retType, Object retInferredType) {
       if (typeParameters == null)
          return new CoalescedHashMap(0);
 
@@ -111,76 +112,100 @@ public class ModelUtil {
 
       int argSize = arguments.size();
 
-      for (int i = 0; i < genericParamTypes.length; i++) {
-         Object genParam = genericParamTypes[i];
+      if (genericParamTypes != null) {
 
-         boolean isGenArray = ModelUtil.isGenericArray(genParam);
+         // Resolve any type parameters we can from the types of the arguments to the method
+         for (int i = 0; i < genericParamTypes.length; i++) {
+            Object genParam = genericParamTypes[i];
 
-         Object argType;
-         if (i >= argSize) {
-            break;
-         }
-         else {
-            Expression argExpr = arguments.get(i);
-            argType = arguments.get(i).getGenericType();
-         }
-         if (argType == null)
-            continue;
+            boolean isGenArray = ModelUtil.isGenericArray(genParam);
 
-         boolean repeating = false;
-         if (isGenArray && i == genericParamTypes.length - 1) {
-            if (ModelUtil.isGenericArray(genParam) && !ModelUtil.isArray(argType)) {
-               genParam = ModelUtil.getGenericComponentType(genParam);
-               repeating = true;
+            Object argType;
+            Object paramArgType;
+            if (i >= argSize) {
+               break;
+            } else {
+               Expression argExpr = arguments.get(i);
+               argType = argExpr.getGenericType();
+               paramArgType = argExpr.getGenericArgumentType();
             }
-         }
+            if (argType == null)
+               continue;
 
-         if (!repeating) {
-            while (isGenArray) {
-               genParam = ModelUtil.getGenericComponentType(genParam);
-               argType = ModelUtil.getArrayComponentType(argType);
-               if (argType == null)
-                  break;
-               isGenArray = ModelUtil.isGenericArray(genParam);
+            boolean repeating = false;
+            if (isGenArray && i == genericParamTypes.length - 1) {
+               if (ModelUtil.isGenericArray(genParam) && !ModelUtil.isArray(argType)) {
+                  genParam = ModelUtil.getGenericComponentType(genParam);
+                  repeating = true;
+               }
             }
-         }
 
-         if (ModelUtil.isTypeVariable(genParam)) {
-            paramMap.put(getTypeParameterName(genParam), argType);
+            if (!repeating) {
+               while (isGenArray) {
+                  genParam = ModelUtil.getGenericComponentType(genParam);
+                  argType = ModelUtil.getArrayComponentType(argType);
+                  if (argType == null)
+                     break;
+                  isGenArray = ModelUtil.isGenericArray(genParam);
+               }
+            }
+
+            addTypeParamDefinitions(paramMap, genParam, argType, paramArgType);
          }
-         else if (ModelUtil.isParameterizedType(genParam)) {
-            int numTypeParams = getNumTypeParameters(genParam);
-            for (int atpIndex = 0; atpIndex < numTypeParams; atpIndex++) {
-               Object atp = getTypeParameter(genParam, atpIndex);
-               if (ModelUtil.isTypeVariable(atp)) {
-                  String argParamName = ModelUtil.getTypeParameterName(atp);
-                  Object curParamType = paramMap.get(argParamName);
-                  if (curParamType == null)
-                     ; // This happens sometimes - when we are not albe to map the parameter type.
-                  else {
-                     // Special case - Class<E> - e.g. <E extends Enum<E>> EnumSet<E> allOf(Class<E> elementType)
-                     if (ModelUtil.getTypeName(genParam).equals("java.lang.Class") && DynUtil.isType(argType)) {
-                        // assert curParamType.isAssignableFrom(atp)
-                        Object paramArgType = arguments.get(i).getGenericArgumentType();
-                        if (ModelUtil.isAssignableFrom(curParamType, paramArgType)) {
-                           argType = paramArgType;
-                           paramMap.put(argParamName, argType);
-                        }
+      }
+
+      // For Java 7 and Java 8 the targetType or inferredType of the method call can bind more parameters
+      if (retInferredType != null && retType != null) {
+         addTypeParamDefinitions(paramMap, retType, retInferredType, retInferredType);
+      }
+
+      return paramMap;
+   }
+
+   private static void addTypeParamDefinitions(CoalescedHashMap paramMap, Object genParam, Object argType, Object paramArgType) {
+      if (ModelUtil.isTypeVariable(genParam)) {
+         paramMap.put(getTypeParameterName(genParam), argType);
+      }
+      else if (ModelUtil.isParameterizedType(genParam)) {
+         int numTypeParams = getNumTypeParameters(genParam);
+         for (int atpIndex = 0; atpIndex < numTypeParams; atpIndex++) {
+            Object atp = getTypeParameter(genParam, atpIndex);
+
+            if (ModelUtil.isTypeVariable(atp)) {
+               String argParamName = ModelUtil.getTypeParameterName(atp);
+               Object curParamType = paramMap.get(argParamName);
+               if (curParamType == null)
+                  ; // This happens sometimes - when we are not albe to map the parameter type.
+               else {
+                  // Special case - Class<E> - e.g. <E extends Enum<E>> EnumSet<E> allOf(Class<E> elementType)
+                  if (ModelUtil.getTypeName(genParam).equals("java.lang.Class") && DynUtil.isType(argType)) {
+                     // assert curParamType.isAssignableFrom(atp)
+                     if (ModelUtil.isAssignableFrom(curParamType, paramArgType)) {
+                        argType = paramArgType;
+                        paramMap.put(argParamName, argType);
                      }
-                     else {
-                        int paramPos = ModelUtil.getTypeParameterPosition(curParamType, argParamName);
+                  }
+                  else {
+                     int paramPos = ModelUtil.getTypeParameterPosition(curParamType, argParamName);
+                     if (paramPos != -1) {
                         if (hasTypeParameters(argType)) {
                            Object paramType = getTypeParameter(argType, paramPos);
                            paramMap.put(argParamName, paramType);
                         }
                      }
+                     // else - could be a method parameter
                   }
+               }
+            }
+            else {
+               Object typeVar = getTypeVariable(genParam, atpIndex);
+               if (ModelUtil.isTypeVariable(typeVar)) {
+                  paramMap.put(ModelUtil.getTypeParameterName(typeVar), atp);
                }
             }
          }
       }
 
-      return paramMap;
    }
 
    public static boolean isGenericArray(Object genArray) {
@@ -197,23 +222,22 @@ public class ModelUtil {
          throw new UnsupportedOperationException();
    }
 
-   public static Object getMethodTypeDeclaration(Object typeContext, Object varObj, List<Expression> arguments, JavaModel model) {
-      Object type = getMethodTypeDeclarationInternal(typeContext, varObj, arguments, model);
+   public static Object getMethodTypeDeclaration(Object typeContext, Object varObj, List<Expression> arguments, JavaModel model, Object inferredType) {
+      Object type = getMethodTypeDeclarationInternal(typeContext, varObj, arguments, model, inferredType);
       if (type instanceof Class)
          return mapClassToType((Class) type, model);
       return type;
    }
 
-   private static Object getMethodTypeDeclarationInternal(Object typeContext, Object varObj, List<Expression> arguments, JavaModel model) {
+   private static Object getMethodTypeDeclarationInternal(Object typeContext, Object varObj, List<Expression> arguments, JavaModel model, Object inferredType) {
       if (varObj == null)
          return null;
-      if (varObj instanceof Method) {
-         Method meth = (Method) varObj;
-         TypeVariable<Method>[] tps;
-         if ((tps = meth.getTypeParameters()) != null && tps.length > 0) {
-            Type[] genParamTypes = meth.getGenericParameterTypes();
+      if (varObj instanceof Method || varObj instanceof IMethodDefinition) {
+         Object[] tps = ModelUtil.getMethodTypeParameters(varObj);
 
-            Object genRetType = meth.getGenericReturnType();
+         Object genRetType = ModelUtil.getParameterizedReturnType(varObj, arguments, false);
+         if (tps != null && tps.length > 0) {
+            Object[] genParamTypes = ModelUtil.getGenericParameterTypes(varObj);
 
             boolean isTypeVariable = ModelUtil.isTypeVariable(genRetType);
 
@@ -223,7 +247,7 @@ public class ModelUtil {
             boolean isParamType = hasTypeParameters(genRetType);
             boolean isArrayType = isGenericArray(genRetType);
             if (isParamType || isArrayType || isTypeVariable) {
-               CoalescedHashMap paramMap = initMethodTypeParameters(tps, genParamTypes, arguments);
+               CoalescedHashMap paramMap = initMethodTypeParameters(tps, genParamTypes, arguments, genRetType, inferredType);
 
                if (isTypeVariable) {
                   String retParamName = ModelUtil.getTypeParameterName(genRetType);
@@ -259,7 +283,7 @@ public class ModelUtil {
                         String paramName = ModelUtil.getTypeParameterName(typeParam);
                         Object paramMappedType = paramMap.get(paramName);
 
-                        Object argMappedType = getTypeDeclFromType(typeContext, typeParam, false, sys);
+                        Object argMappedType = getTypeDeclFromType(typeContext, typeParam, false, sys, false);
                         if (paramMappedType == null) {
                            if (argMappedType != null && !ModelUtil.isTypeVariable(argMappedType)) {
                              // assert paramMappedType != null && paramMappedType.isAssignableFrom(argMappedType)
@@ -270,10 +294,10 @@ public class ModelUtil {
                         typeDefs.add(paramMappedType);
                      }
                      else
-                        typeDefs.add(getTypeDeclFromType(typeContext, typeParam, false, sys));
+                        typeDefs.add(getTypeDeclFromType(typeContext, typeParam, false, sys, false));
                   }
                   return new ParamTypeDeclaration(sys,
-                                    getTypeParameters(getTypeDeclFromType(typeContext, retType, true, sys)),
+                                    getTypeParameters(getTypeDeclFromType(typeContext, retType, true, sys, false)),
                                     typeDefs, ModelUtil.getParamTypeBaseType(retType));
                }
 
@@ -287,38 +311,44 @@ public class ModelUtil {
                   return retType;
             }
          }
-         return getTypeDeclFromType(typeContext, meth.getGenericReturnType(), false, model.getLayeredSystem());
+         if (varObj instanceof Method)
+            return getTypeDeclFromType(typeContext, genRetType, false, model.getLayeredSystem(), false);
+         // Note: we are passing the arguments in here but I think they are only used for the case handled above.  There's code to handle type parameters
+         // in there, but not parameters defined at the method level.
+         else {
+            return getTypeDeclFromType(typeContext, ((IMethodDefinition) varObj).getTypeDeclaration(arguments, false), false, model.getLayeredSystem(), false);
+         }
       }
-      else if (varObj instanceof IMethodDefinition)
-         return getTypeDeclFromType(typeContext, ((IMethodDefinition) varObj).getTypeDeclaration(arguments), false, model.getLayeredSystem());
       // MethodDefinition implements ITypedObject - don't reorder
       else  if (varObj instanceof ITypedObject)
          return ((ITypedObject) varObj).getTypeDeclaration();
       else if (varObj instanceof IBeanMapper)
-         return getTypeDeclFromType(typeContext, ((IBeanMapper) varObj).getGenericType(), false, model.getLayeredSystem());
+         return getTypeDeclFromType(typeContext, ((IBeanMapper) varObj).getGenericType(), false, model.getLayeredSystem(), false);
       // Weird case - when you have a newX method which resolves against an untransformed reference - i.e. X has no newX method, it resolves to X.
-      else if (varObj instanceof ClassDeclaration)
+      else if (varObj instanceof ITypeDeclaration)
          return varObj;
       throw new UnsupportedOperationException();
    }
 
-   public static Object getTypeDeclFromType(Object typeContext, Object type, boolean classOnly, LayeredSystem sys) {
+   public static Object getTypeDeclFromType(Object typeContext, Object type, boolean classOnly, LayeredSystem sys, boolean bindUnboundParams) {
       if (type instanceof Class)
          return type;
       else if (ModelUtil.hasTypeParameters(type)) {
          if (classOnly)
-            return getTypeDeclFromType(typeContext, ModelUtil.getParamTypeBaseType(type), true, sys);
+            return getTypeDeclFromType(typeContext, ModelUtil.getParamTypeBaseType(type), true, sys, bindUnboundParams);
          else {
             int numTypeParameters = ModelUtil.getNumTypeParameters(type);
             Object[] types = new Object[numTypeParameters];
             for (int i = 0; i < numTypeParameters; i++) {
-               types[i] = getTypeDeclFromType(typeContext, ModelUtil.getTypeParameter(type, i), classOnly, sys);
-               if (types[i] instanceof TypeVariable) {
-                  types[i] = getTypeParameterDefault(types[i]);
+               types[i] = getTypeDeclFromType(typeContext, ModelUtil.getTypeParameter(type, i), classOnly, sys, bindUnboundParams);
+               if (ModelUtil.isTypeVariable(types[i]) && bindUnboundParams) {
+                  // If we do this in a simple method declaration, we lose the type parameter - later in some cases we need that type parameter
+                  // to bind it to the type context for the method invocation.
+                  types[i] = ModelUtil.getTypeParameterDefault(types[i]);
                   //types[i] = getTypeDeclFromType(typeContext, ModelUtil.getTypeParameter(type, i), classOnly, sys);
                }
             }
-            return new ParamTypeDeclaration(sys, getTypeParameters(getTypeDeclFromType(typeContext, type, true, sys)), Arrays.asList(types), ModelUtil.getParamTypeBaseType(type));
+            return new ParamTypeDeclaration(sys, getTypeParameters(getTypeDeclFromType(typeContext, type, true, sys, bindUnboundParams)), Arrays.asList(types), ModelUtil.getParamTypeBaseType(type));
          }
       }
       else if (type instanceof GenericArrayType) {
@@ -330,7 +360,7 @@ public class ModelUtil {
             gat = (GenericArrayType) gat.getGenericComponentType();
          }
          int[] dims = new int[ndim];
-         Object compTypeDecl = getTypeDeclFromType(typeContext, compType, true, sys);
+         Object compTypeDecl = getTypeDeclFromType(typeContext, compType, true, sys, bindUnboundParams);
          if (ModelUtil.isTypeVariable(compTypeDecl))
             compTypeDecl = ModelUtil.getTypeParameterDefault(compTypeDecl);
          if (compTypeDecl instanceof ParamTypeDeclaration)
@@ -340,27 +370,31 @@ public class ModelUtil {
       else if (ModelUtil.isTypeVariable(type)) {
          String tvName = ModelUtil.getTypeParameterName(type);
          if (typeContext != null) {
-            Object genericType = getParameterizedType(typeContext, JavaSemanticNode.MemberType.Field);
+            Object genericType = typeContext instanceof ITypeParamContext ? typeContext : getParameterizedType(typeContext, JavaSemanticNode.MemberType.Field);
             if (genericType != null) {
-               if (ModelUtil.hasTypeParameters(genericType)) {
-
-                  int numTypeParams = ModelUtil.getNumTypeParameters(genericType);
-                  int pix;
-                  Object typeParam = null;
-                  for (pix = 0; pix < numTypeParams; pix++) {
-                     typeParam = ModelUtil.getTypeVariable(genericType, pix);
-                     if (ModelUtil.isTypeVariable(typeParam) && ModelUtil.getTypeParameterName(typeParam).equals(tvName))
-                        break;
+               // Either a ParamTypeDeclaration or a ParamMethodDeclaration
+               Object paramDecl = ModelUtil.getTypeParameterDeclaration(type);
+               if (!ModelUtil.isMethod(paramDecl) && ModelUtil.isAssignableFrom(paramDecl, genericType)) {
+                  if (genericType instanceof ITypeParamContext) {
+                     return ((ITypeParamContext) genericType).getTypeDeclarationForParam(tvName, type, bindUnboundParams);
                   }
+                  if (ModelUtil.hasTypeParameters(genericType)) {
+                     int numTypeParams = ModelUtil.getNumTypeParameters(genericType);
+                     int pix;
+                     Object typeParam = null;
+                     for (pix = 0; pix < numTypeParams; pix++) {
+                        typeParam = ModelUtil.getTypeVariable(genericType, pix);
+                        if (ModelUtil.isTypeVariable(typeParam) && ModelUtil.getTypeParameterName(typeParam).equals(tvName))
+                           break;
+                     }
 
 
-                  if (pix != numTypeParams)
-                     return ModelUtil.getTypeParameter(genericType, pix);
-                  // else - in some cases, the type variable is just not bound, like when we are inside of a parameterized class.
-               }
-               else if (genericType instanceof ParamTypeDeclaration) {
-                  ParamTypeDeclaration ptd = (ParamTypeDeclaration) genericType;
-                  return ptd.getTypeDeclarationForParam(ModelUtil.getTypeParameterName(type));
+                     if (pix != numTypeParams)
+                        return ModelUtil.getTypeParameter(genericType, pix);
+                     // else - in some cases, the type variable is just not bound, like when we are inside of a parameterized class.
+                  }
+                  else
+                     return getTypeParameterDefault(type);
                }
             }
          }
@@ -372,10 +406,20 @@ public class ModelUtil {
          return type;
       else if (type instanceof WildcardType) {
          // TODO: need to figure out how to really deal with this
-         return getTypeDeclFromType(typeContext, ((WildcardType) type).getUpperBounds()[0], classOnly, sys);
+         return getTypeDeclFromType(typeContext, ((WildcardType) type).getUpperBounds()[0], classOnly, sys, bindUnboundParams);
       }
       if (type == null)
          return null;
+      else
+         throw new UnsupportedOperationException();
+   }
+
+   public static Object getTypeParameterDeclaration(Object type) {
+      if (type instanceof TypeVariable)
+         return ((TypeVariable) type).getGenericDeclaration();
+      else if (type instanceof TypeParameter) {
+         return ((TypeParameter) type).getGenericDeclaration();
+      }
       else
          throw new UnsupportedOperationException();
    }
@@ -389,6 +433,9 @@ public class ModelUtil {
       else if (type instanceof ITypeDeclaration) {
          List<Object> methods = ((ITypeDeclaration) type).getAllMethods(modifier, hasModifier, isDyn, overridesComp);
          return methods == null ? null : methods.toArray(new Object[methods.size()]);
+      }
+      else if (type instanceof ParameterizedType) {
+         return getAllMethods(((ParameterizedType) type).getRawType(), modifier, hasModifier, isDyn, overridesComp);
       }
       else
          return null;
@@ -690,6 +737,10 @@ public class ModelUtil {
 
       Object[] c1Types = ModelUtil.getParameterTypes(c1);
       Object[] c2Types = ModelUtil.getParameterTypes(c2);
+      return parametersMatch(c1Types, c2Types);
+   }
+
+   public static boolean parametersMatch(Object[] c1Types, Object[] c2Types) {
       int c1Len = c1Types == null ? 0 : c1Types.length;
       int checkLen = c2Types == null ? 0 : c2Types.length;
       if (c1Len != checkLen)
@@ -703,7 +754,7 @@ public class ModelUtil {
             if (c1Arg == c2Arg)
                continue;
 
-            if (sameTypes(c1Arg, c1Arg))
+            if (sameTypes(c1Arg, c2Arg))
                continue;
 
             if (ModelUtil.isAssignableFrom(c1Arg, c2Arg))
@@ -803,6 +854,8 @@ public class ModelUtil {
 
       if (typeObj1 == null || typeObj2 == null)
          return false;
+      if (typeObj1 == LambdaExpression.LAMBDA_INFERRED_TYPE || typeObj2 == LambdaExpression.LAMBDA_INFERRED_TYPE)
+         return true;
 
       // Need to include the dims at least to differentiate Object[] from Object
       return ModelUtil.getTypeName(typeObj1, true).equals(ModelUtil.getTypeName(typeObj2, true));
@@ -1128,6 +1181,8 @@ public class ModelUtil {
       else if (arrayType instanceof IArrayTypeDeclaration) {
          return true;
       }
+      else if (arrayType instanceof GenericArrayType)
+         return true;
       return false;
    }
 
@@ -1159,6 +1214,8 @@ public class ModelUtil {
          ParameterizedType pt = (ParameterizedType) paramType;
          return pt.getActualTypeArguments().length;
       }
+      else if (paramType instanceof Class || paramType instanceof ITypeDeclaration)
+         return 0;
       else throw new UnsupportedOperationException();
    }
 
@@ -1293,13 +1350,15 @@ public class ModelUtil {
          if (type2 instanceof ITypeDeclaration) {
             // In this case, we need to invert the direction of the test.  Let's see if our TypeDeclaration
             // implements a type with the same name.
-            return ((ITypeDeclaration) type2).implementsType(((Class) type1).getName());
+            return ((ITypeDeclaration) type2).implementsType(((Class) type1).getName(), assignmentSemantics);
          }
          else if (type2 instanceof Class) {
             return ((Class) type1).isAssignableFrom((Class) type2);
          }
          else if (type2 == null)
             return false;
+         else if (type2 == LambdaExpression.LAMBDA_INFERRED_TYPE)
+            return true;
          else
             throw new UnsupportedOperationException();
       }
@@ -1311,7 +1370,7 @@ public class ModelUtil {
          if (!(type2 instanceof ITypeDeclaration))
             System.out.println("*** Error - invalid type to isAssignable method");
          ITypeDeclaration decl2 = (ITypeDeclaration) type2;
-         return decl1.isAssignableFrom(decl2);
+         return decl1.isAssignableFrom(decl2, assignmentSemantics);
       }
       else if (type1 == null)
          return false;
@@ -1394,9 +1453,9 @@ public class ModelUtil {
       }
    }
 
-   public static boolean implementsType(Object implType, String fullTypeName) {
+   public static boolean implementsType(Object implType, String fullTypeName, boolean assignment) {
       if (implType instanceof ITypeDeclaration)
-         return ((ITypeDeclaration) implType).implementsType(fullTypeName);
+         return ((ITypeDeclaration) implType).implementsType(fullTypeName, assignment);
       else {
          Class implClass = (Class) implType;
 
@@ -1536,6 +1595,20 @@ public class ModelUtil {
       }
    }
 
+   public static EnumSet<ElementType> getAnnotationTargets(Object annot) {
+      if (annot instanceof Annotation) {
+         annot = ((Annotation) annot).boundType;
+         if (annot == null)
+            return null;
+      }
+      Object targetAnnot = ModelUtil.getAnnotation(annot, "java.lang.annotation.Target");
+      targetAnnot = ModelUtil.getAnnotationSingleValue(targetAnnot);
+      if (targetAnnot instanceof java.lang.annotation.ElementType[]) {
+         return EnumSet.copyOf(Arrays.asList((ElementType[]) targetAnnot));
+      }
+      return null;
+   }
+
    public static Object getAnnotationValue(Object annotation, String s) {
       if (annotation instanceof IAnnotation)
          return ((IAnnotation) annotation).getAnnotationValue(s);
@@ -1627,7 +1700,7 @@ public class ModelUtil {
                      paramType = parameterTypes[j+paramStart];
                   if (types[j] != null && !ModelUtil.isAssignableFrom(paramType, types[j], false, ctx)) {
                      // Repeating parameters... if the last parameter is an array match if the component type matches
-                     if (j >= last && ModelUtil.isArray(paramType)) {
+                     if (j >= last && ModelUtil.isArray(paramType) && ModelUtil.isVarArgs(toCheck)) {
                         if (!ModelUtil.isAssignableFrom(ModelUtil.getArrayComponentType(paramType), types[j], false, ctx)) {
                            break;
                         }
@@ -2619,8 +2692,9 @@ public class ModelUtil {
       // The identifier can resolve to a "field" but the param typed member is a get method
       if (boundType instanceof ParamTypedMember) {
          boundType = ((ParamTypedMember) boundType).getMemberObject();
-         return boundType instanceof MethodDefinition &&
-                 ((MethodDefinition) boundType).hasSetMethod();
+         if (boundType instanceof MethodDefinition &&
+                 ((MethodDefinition) boundType).hasSetMethod())
+            return true;
       }
       if (boundType instanceof PropertyAssignment)
          boundType = ((PropertyAssignment) boundType).getAssignedProperty();
@@ -2907,6 +2981,8 @@ public class ModelUtil {
          return ((IMethodDefinition) method).isSetIndexMethod();
       else if (method instanceof Method)
          return RTypeUtil.isSetIndexMethod((Method) method);
+      else if (method instanceof VariableDefinition)
+         return false;
       else
          throw new UnsupportedOperationException();
    }
@@ -2973,6 +3049,12 @@ public class ModelUtil {
       return typeObj.toString();
    }
 
+   public static String toDeclarationString(Object typeObj) {
+      if (typeObj instanceof SemanticNode)
+         return ((SemanticNode) typeObj).toDeclarationString();
+      return typeObj.toString();
+   }
+
    public static String argumentsToString(List<? extends ITypedObject> arguments) {
       if (arguments == null)
          return "(null)";
@@ -3020,14 +3102,39 @@ public class ModelUtil {
       return types;
    }
 
+   public static boolean isParameterizedMethod(Object method) {
+      return hasParameterizedReturnType(method) || hasParameterizedArguments(method);
+   }
+
    public static boolean hasParameterizedReturnType(Object method) {
       if (method instanceof Method) {
          Type returnType = ((Method) method).getGenericReturnType();
-         return returnType instanceof TypeVariable;
+         return returnType instanceof TypeVariable || returnType instanceof ParameterizedType;
       }
       else if (method instanceof IMethodDefinition) {
          Object retType = ((IMethodDefinition) method).getReturnType();
          return retType instanceof TypeParameter || ModelUtil.hasUnboundTypeParameters(retType);
+      }
+      throw new UnsupportedOperationException();
+   }
+
+   public static boolean hasParameterizedArguments(Object method) {
+      if (method instanceof Method) {
+         Type[] paramTypes = ((Method) method).getGenericParameterTypes();
+         for (Type paramType:paramTypes)
+            if (paramType instanceof TypeVariable)
+               return true;
+         return false;
+      }
+      else if (method instanceof IMethodDefinition) {
+         JavaType[] paramTypes = ((IMethodDefinition) method).getParameterJavaTypes();
+         if (paramTypes != null) {
+            for (JavaType paramType:paramTypes) {
+               if (ModelUtil.hasUnboundTypeParameters(paramType))
+                  return true;
+            }
+         }
+         return false;
       }
       throw new UnsupportedOperationException();
    }
@@ -3062,8 +3169,9 @@ public class ModelUtil {
             return member;
          else if (member instanceof Method)
             return ((Method) member).getGenericReturnType();
-         else if (member instanceof IMethodDefinition)
+         else if (member instanceof IMethodDefinition) {
             return ((IMethodDefinition) member).getReturnType();
+         }
          else if (member instanceof Class)
             return member;
          // Either ParamTypeDeclaration or ParameterizedType
@@ -3078,18 +3186,18 @@ public class ModelUtil {
       throw new UnsupportedOperationException();
    }
 
-   public static Object getParameterizedReturnType(Object method) {
+   public static Object getParameterizedReturnType(Object method, List<? extends ITypedObject> arguments, boolean resolve) {
       if (method instanceof Method)
          return ((Method) method).getGenericReturnType();
       else if (method instanceof IMethodDefinition)
-         return ((IMethodDefinition) method).getReturnType();
+         return ((IMethodDefinition) method).getTypeDeclaration(arguments, resolve);
       throw new UnsupportedOperationException();
    }
 
    // This defines a more general form
    public static boolean isParameterizedType(Object type) {
       // TODO: should we include ClassTypes here with type arguments?
-      return type instanceof TypeParameter || type instanceof ParameterizedType || type instanceof TypeVariable;
+      return type instanceof TypeParameter || type instanceof ParameterizedType || type instanceof TypeVariable || type instanceof ParamTypeDeclaration;
    }
 
    public static boolean isTypeVariable(Object type) {
@@ -3266,7 +3374,7 @@ public class ModelUtil {
       else if (ModelUtil.isTypeVariable(genType)) {
          String varName = ModelUtil.getTypeParameterName(genType);
 
-         Object res = ModelUtil.resolveTypeParameter(srcType, resultType, varName);
+         Object res = ModelUtil.resolveTypeParameterName(srcType, resultType, varName);
          if (res == null)
             return null;
          if (ModelUtil.isTypeVariable(res))
@@ -3286,31 +3394,51 @@ public class ModelUtil {
          throw new UnsupportedOperationException();
    }
 
+   /** Computes the list of classes which map the base type 'srcType' to the sub type resultType.  For interfaces we check the implements types. */
    public static List<Object> getExtendsJavaTypePath(Object srcType, Object resultType) {
       List<Object> res = null;
-      while (resultType != null && srcType != resultType) {
+      boolean sameTypes = false;
+      while (resultType != null && !(sameTypes = ModelUtil.sameTypes(srcType, resultType))) {
          if (res == null)
             res = new ArrayList<Object>();
 
          Object next = ModelUtil.getSuperclass(resultType);
-         if (next != null)
+         if (next != null && ModelUtil.isAssignableFrom(srcType, next)) {
             res.add(ModelUtil.getExtendsJavaType(resultType));
+         }
+         else {
+            next = null;
+            Object[] ifaces = ModelUtil.getImplementsTypeDeclarations(resultType);
+            Object[] ifaceJavaTypes = ModelUtil.getImplementsJavaTypes(resultType);
+            if (ifaces != null) {
+               for (int i = 0; i < ifaces.length; i++) {
+                  Object ifaceType = ifaces[i];
+                  Object ifaceJavaType = ifaceJavaTypes[i];
+                  if (ifaceType != null && ModelUtil.isAssignableFrom(srcType, ifaceType)) {
+                     next = ifaceType;
+                     res.add(ifaceJavaType);
+                     break;
+                  }
+               }
+            }
+         }
          resultType = next;
       }
-      if (resultType != srcType)
+      if (!sameTypes)
          System.out.println("*** did not find expected path between types");
       return res;
    }
 
-   public static Object resolveTypeParameter(Object srcType, Object resultType, String typeParamName) {
+   public static Object resolveTypeParameterName(Object srcType, Object resultType, String typeParamName) {
       int srcIx = ModelUtil.getTypeParameterPosition(srcType, typeParamName);
       if (srcIx == -1) {
          System.err.println("*** Unresolveable type parameter!");
          return null;
       }
       List<Object> extTypes = getExtendsJavaTypePath(srcType, resultType);
-      if (extTypes == null || extTypes.size() == 0)
+      if (extTypes == null || extTypes.size() == 0) {
          return getTypeParameters(srcType).get(srcIx);
+      }
 
       Object nextType;
       for (int i = extTypes.size()-1; i >= 0; i--) {
@@ -3338,16 +3466,60 @@ public class ModelUtil {
       return typeParamName;
    }
 
+   public static Object resolveTypeParameter(Object srcType, ITypeParamContext resultType, String typeParamName) {
+      int srcIx = ModelUtil.getTypeParameterPosition(srcType, typeParamName);
+      if (srcIx == -1) {
+         // This might be a method type parameter which is not yet defined
+         return Object.class;
+      }
+      List<Object> extTypes = getExtendsJavaTypePath(srcType, resultType);
+      if (extTypes == null || extTypes.size() == 0) {
+         return resultType.getType(srcIx);
+      }
+
+      Object nextType;
+      for (int i = extTypes.size()-1; i >= 0; i--) {
+         Object ext = extTypes.get(i);
+         List<?> typeArgs = ModelUtil.getTypeArguments(ext);
+         if (typeArgs == null)
+            return null;
+         Object typeArg = typeArgs.get(srcIx);
+         if (typeArg instanceof JavaType) {
+            typeArg = ((JavaType) typeArg).getTypeDeclaration();
+         }
+         if (ModelUtil.isTypeVariable(typeArg)) {
+            typeParamName = ModelUtil.getTypeParameterName(typeArg);
+
+            if (i == 0)
+               nextType = resultType;
+            else {
+               nextType = extTypes.get(i-1);
+               if (nextType instanceof JavaType)
+                  nextType = ((JavaType) nextType).getTypeDeclaration();
+            }
+
+            srcIx = ModelUtil.getTypeParameterPosition(nextType, typeParamName);
+         }
+         else
+            return typeArg;
+      }
+      return resultType.getType(srcIx);
+   }
+
    public static List<?> getTypeArguments(Object extJavaType) {
       if (extJavaType instanceof JavaType) {
          return ((JavaType) extJavaType).getResolvedTypeArguments();
       }
       else if (extJavaType instanceof Type) {
-         System.out.println("*** TODO: retrieve typeArguments from compiled type");
+         if (extJavaType instanceof ParameterizedType) {
+            return Arrays.asList(((ParameterizedType) extJavaType).getActualTypeArguments());
+         }
+         else {
+            throw new UnsupportedOperationException();
+         }
       }
       else
          throw new UnsupportedOperationException();
-      return null;
    }
 
    public static String getAbsoluteGenericTypeName(Object resultType, Object member, boolean includeDims) {
@@ -3659,6 +3831,17 @@ public class ModelUtil {
          throw new UnsupportedOperationException();
    }
 
+   public static Object[] getImplementsJavaTypes(Object type) {
+      if (type instanceof Class)
+         return ((Class) type).getGenericInterfaces();
+      else if (type instanceof ITypeDeclaration) {
+         List<?> res = ((ITypeDeclaration) type).getImplementsTypes();
+         return res == null ? null : res.toArray();
+      }
+      else
+         throw new UnsupportedOperationException();
+   }
+
    public static Object[] getCompiledImplTypes(Object type) {
       if (type instanceof Class)
          return ((Class) type).getInterfaces();
@@ -3733,6 +3916,17 @@ public class ModelUtil {
       throw new UnsupportedOperationException("Invalid property type: " + fieldDef);
    }
 
+   /** Returns true for a Java field which has the same name as one of its methods - used for JS.  Only works for source types currently. */
+   public static boolean isFieldShadowedByMethod(Object obj) {
+      if (obj instanceof ParamTypedMember) {
+         obj = ((ParamTypedMember) obj).member;
+      }
+      if (obj instanceof VariableDefinition) {
+         return ((VariableDefinition) obj).shadowedByMethod;
+      }
+      return false;
+   }
+
    public static Layer getLayerForMember(LayeredSystem sys, Object member) {
       return getLayerForType(sys, getEnclosingType(member));
    }
@@ -3796,8 +3990,11 @@ public class ModelUtil {
          return ((Class) obj).isInterface();
       else if (obj instanceof CFClass)
          return ((CFClass) obj).isInterface();
+      else if (obj instanceof ParameterizedType) {
+         return ModelUtil.isInterface(((ParameterizedType) obj).getRawType());
+      }
       else
-         return obj instanceof TypeDeclaration && ((TypeDeclaration) obj).getDeclarationType() == DeclarationType.INTERFACE;
+         return obj instanceof ITypeDeclaration && ((ITypeDeclaration) obj).getDeclarationType() == DeclarationType.INTERFACE;
    }
 
    public static boolean isAnnotation(Object obj) {
@@ -4775,7 +4972,7 @@ public class ModelUtil {
       else if (method instanceof Constructor)
          return ((Constructor) method).getDeclaringClass();
       else if (method instanceof Method)
-         return ((Method) method).getReturnType();
+         return ((Method) method).getReturnType(); // TODO: generic type here?
       else
          throw new UnsupportedOperationException();
    }
@@ -4786,7 +4983,7 @@ public class ModelUtil {
       else if (method instanceof Constructor)
          return ((Constructor) method).getDeclaringClass();
       else if (method instanceof Method)
-         return ((Method) method).getReturnType();
+         return ((Method) method).getGenericReturnType();
       else
          throw new UnsupportedOperationException();
    }
@@ -4798,6 +4995,21 @@ public class ModelUtil {
          return ((Method) method).getParameterTypes();
       else if (method instanceof Constructor)
          return ((Constructor) method).getParameterTypes();
+      else
+         throw new UnsupportedOperationException();
+   }
+
+   public static Object[] getGenericParameterTypes(Object method) {
+      if (method instanceof IMethodDefinition)
+         return ((IMethodDefinition) method).getParameterTypes();
+      else if (method instanceof Method)
+         return ((Method) method).getGenericParameterTypes();
+      else if (method instanceof Constructor)
+         return ((Constructor) method).getGenericParameterTypes();
+      // It's a getX method for an object
+      else if (method instanceof ITypeDeclaration) {
+         return new Object[] {};
+      }
       else
          throw new UnsupportedOperationException();
    }
@@ -5322,6 +5534,8 @@ public class ModelUtil {
    }
 
    public static boolean isCompiledMethod(Object override) {
+      if (override instanceof ParamTypedMethod)
+         return isCompiledMethod(((ParamTypedMethod) override).method);
       return override instanceof Method || override instanceof CFMethod || ((override instanceof MethodDefinition) && !((MethodDefinition) override).isDynamicType());
    }
 
@@ -5738,29 +5952,54 @@ public class ModelUtil {
          }
          return -1;
       }
+      // We need to map this parameter position into the type params for memberType given
+      // a type parameter in fromType.  First need to find the base class or interface
+      // which defines this method.
       else {
          Object extType = ModelUtil.getExtendsClass(fromType);
-         int pos = evalParameterPosition(extType, memberType, typeParam);
-         if (pos == -1) {
-            return -1;
+         Object extJavaType = ModelUtil.getExtendsJavaType(fromType);
+         if (extType != null && ModelUtil.isAssignableFrom(memberType, extType)) {
+            int pos = evalParamPositionForBaseClass(fromType, extType, extJavaType, memberType, typeParam);
+            if (pos != -1)
+               return pos;
          }
-         else {
-            Object extJavaType = ModelUtil.getExtendsJavaType(fromType);
-            Object typeArg = ModelUtil.getTypeArgument(extJavaType, pos);
-            ClassType ct;
-            if (typeArg instanceof ClassType && (ct = (ClassType) typeArg).type instanceof TypeParameter)
-               typeArg = ct.type;
-            if (ModelUtil.isTypeVariable(typeArg)) {
-               List<?> tps = ModelUtil.getTypeParameters(fromType);
-               if (tps == null)
-                  return -1;
-               int i = 0;
-               for (Object o:tps) {
-                  String tpN = ModelUtil.getTypeParameterName(o);
-                  if (tpN.equals(typeParam))
-                     return i;
-                  i++;
+         Object[] ifaces = ModelUtil.getImplementsTypeDeclarations(fromType);
+         Object[] ifaceJavaTypes = ModelUtil.getImplementsJavaTypes(fromType);
+         if (ifaces != null) {
+            for (int i = 0; i < ifaces.length; i++) {
+               Object ifaceType = ifaces[i];
+               Object ifaceJavaType = ifaceJavaTypes[i];
+               if (ifaceType != null && ModelUtil.isAssignableFrom(memberType, ifaceType)) {
+                  int pos = evalParamPositionForBaseClass(fromType, ifaceType, ifaceJavaType, memberType, typeParam);
+                  if (pos != -1)
+                     return pos;
                }
+            }
+         }
+      }
+      return -1;
+   }
+
+   private static int evalParamPositionForBaseClass(Object fromType, Object extType, Object extJavaType, Object memberType, String typeParam) {
+      int pos = evalParameterPosition(extType, memberType, typeParam);
+      if (pos == -1) {
+         return -1;
+      }
+      else {
+         Object typeArg = ModelUtil.getTypeArgument(extJavaType, pos);
+         ClassType ct;
+         if (typeArg instanceof ClassType && (ct = (ClassType) typeArg).type instanceof TypeParameter)
+            typeArg = ct.type;
+         if (ModelUtil.isTypeVariable(typeArg)) {
+            List<?> tps = ModelUtil.getTypeParameters(fromType);
+            if (tps == null)
+               return -1;
+            int i = 0;
+            for (Object o:tps) {
+               String tpN = ModelUtil.getTypeParameterName(o);
+               if (tpN.equals(typeParam))
+                  return i;
+               i++;
             }
          }
       }
@@ -5770,6 +6009,15 @@ public class ModelUtil {
    public static Object getTypeArgument(Object javaType, int ix) {
       if (javaType instanceof ClassType)
          return ((ClassType) javaType).getTypeArgument(ix);
+      else if (javaType instanceof ParameterizedType) {
+         ParameterizedType pt = (ParameterizedType) javaType;
+         Object[] actual = pt.getActualTypeArguments();
+         if (actual == null || ix >= actual.length)
+            return null;
+         return actual[ix];
+         //Object res = getTypeVariable(pt.getRawType(), ix);
+         //Object res2 = ModelUtil.getTypeVariable(javaType, ix);
+      }
       else
          return null;
    }
@@ -6182,5 +6430,24 @@ public class ModelUtil {
             }
          }
       }
+   }
+
+   public static boolean isDefaultMethod(Object meth) {
+      if (meth instanceof IMethodDefinition)
+         return ((IMethodDefinition) meth).hasModifier("default");
+      else if (meth instanceof Method)
+         return ((Method) meth).isDefault();
+      throw new UnsupportedOperationException();
+   }
+
+   public static Object[] getMethodTypeParameters(Object method) {
+      if (method instanceof IMethodDefinition) {
+         return ((IMethodDefinition) method).getMethodTypeParameters();
+      }
+      else if (method instanceof Method) {
+         return ((Method) method).getTypeParameters();
+      }
+      else
+         throw new UnsupportedOperationException();
    }
 }

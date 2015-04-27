@@ -26,6 +26,7 @@ import sc.bind.IBinding;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
 import java.util.*;
 
 public class IdentifierExpression extends ArgumentsExpression {
@@ -64,6 +65,8 @@ public class IdentifierExpression extends ArgumentsExpression {
    transient boolean referenceInitializer;
 
    transient boolean jsTransformed = false;
+
+   transient Object inferredType;
 
    public static IdentifierExpression create(IString... args) {
       IdentifierExpression ie = new IdentifierExpression();
@@ -481,10 +484,52 @@ public class IdentifierExpression extends ArgumentsExpression {
             if (bindingDirection.doForward() && boundTypes[last] != null && (ModelUtil.getAnnotation(boundTypes[last], "BindSettings") == null))
                displayTypeError("Reverse binding defined for method expression where the method: " + identifiers.get(last).toString() + " does not have BindSettings(reverseMethod) set on it");
          }
+
+         propagateInferredTypes();
       }
 
       } finally {
          PerfMon.end("resolveIdentifierExpression");
+      }
+   }
+
+   static void propagateInferredArgs(Expression rootExpr, Object meth, List<Expression> arguments) {
+      Object[] paramTypes = ModelUtil.getGenericParameterTypes(meth);
+      int i = 0;
+      int plen = paramTypes == null ? 0 : paramTypes.length;
+      int last = plen - 1;
+      int argLen = arguments.size();
+      if (plen != argLen) {
+         // If the last guy is not a repeating parameter, it can't match
+         if (last < 0 || !ModelUtil.isVarArgs(meth) || !ModelUtil.isArray(paramTypes[last]) || argLen < last) {
+            rootExpr.displayError("Mismatching parameter types to method invocation.");
+            return;
+         }
+      }
+
+      if (paramTypes != null) {
+         for (Expression arg : arguments) {
+            Object pType = i >= plen ? paramTypes[plen-1] : paramTypes[i];
+            Object useType = pType;
+            // Handling repeating parameters - it's a varargs method and the last element is an array
+            if (i >= last && ModelUtil.isVarArgs(meth)) {
+               if (ModelUtil.isArray(pType))
+                  useType = ModelUtil.getArrayComponentType(pType);
+            }
+            arg.setInferredType(useType);
+            i++;
+         }
+      }
+   }
+
+   private void propagateInferredTypes() {
+      if (identifiers == null || this instanceof NewExpression || arguments == null)
+         return;
+
+      int len = identifiers.size();
+      Object boundType = boundTypes[len-1];
+      if (boundType != null && ModelUtil.isMethod(boundType)) {
+         propagateInferredArgs(this, boundType, arguments);
       }
    }
 
@@ -531,7 +576,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          // To determine if a property is bindable, we need to be able to walk backwards in the type tree to
          // look for bindable annotations.  This means we cant' do this in the start process cause things back
          // there are still starting up.
-         checkForBindableField(this, ident, idTypes, boundTypes, arguments, bindingDirection, i);
+         checkForBindableField(this, ident, idTypes, boundTypes, arguments, bindingDirection, i, inferredType);
       }
    }
 
@@ -918,21 +963,21 @@ public class IdentifierExpression extends ArgumentsExpression {
     * that type to where the field/get-set are defined and add the proper get set as needed.
     */
    static private void checkForBindableField(Expression expr, String propertyName, IdentifierType[] idTypes, Object[] boundTypes,
-                                             List<Expression> arguments, BindingDirection bindingDirection, int ix) {
+                                             List<Expression> arguments, BindingDirection bindingDirection, int ix, Object inferredType) {
 
       if (bindingDirection != null) {
          Object referenceType;
          if (ix == 0)
             referenceType = expr.findMemberOwner(propertyName, MemberType.PropertyGetSet);
          else
-            referenceType = getTypeForIdentifier(idTypes, boundTypes, arguments, ix-1, expr.getJavaModel());
+            referenceType = getTypeForIdentifier(idTypes, boundTypes, arguments, ix-1, expr.getJavaModel(), inferredType);
 
          if (expr.getJavaModel() == null) {
             System.err.println("*** expression missing model in checkinForBindableField!");
             return;
          }
          // Any binding requires dynamic access to the member but if it's a forward binding, its a real binding, not referenceOnly=true
-         makeBindable(expr, propertyName, idTypes[ix], boundTypes[ix], getTypeForIdentifier(idTypes, boundTypes, arguments, ix, expr.getJavaModel()),
+         makeBindable(expr, propertyName, idTypes[ix], boundTypes[ix], getTypeForIdentifier(idTypes, boundTypes, arguments, ix, expr.getJavaModel(), inferredType),
                       referenceType, !bindingDirection.doForward(), true);
       }
    }
@@ -977,7 +1022,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (last == -1)
          return findMemberOwner(identifiers.get(0).toString(), MemberType.PropertyGetSet);
       else
-         return getTypeForIdentifier(idTypes, boundTypes, arguments, last, getJavaModel());
+         return getTypeForIdentifier(idTypes, boundTypes, arguments, last, getJavaModel(), inferredType);
    }
 
    /** Returns the type which is referring to the value of this expression */
@@ -985,7 +1030,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (identifiers == null || identifiers.size() == 1)
          return null;
       int last = identifiers.size()-2;
-      return getTypeForIdentifier(idTypes, boundTypes, arguments, last, getJavaModel());
+      return getTypeForIdentifier(idTypes, boundTypes, arguments, last, getJavaModel(), inferredType);
    }
 
    /** For "a.b.c", returns an expression which evaluates "a.b" */
@@ -1118,7 +1163,8 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (ModelUtil.isTypeVariable(currentType))
          currentType = ModelUtil.getTypeParameterDefault(currentType);
 
-      if (ModelUtil.isParameterizedType(currentType))
+      // Do not use isParameterizedType here - we want ParamTypeDeclaration to be treated as an ITypeDeclaration
+      if (currentType instanceof ParameterizedType)
          currentType = ModelUtil.getParamTypeBaseType(currentType);
 
       ITypeDeclaration enclosingType = expr.getEnclosingIType();
@@ -2669,7 +2715,7 @@ public class IdentifierExpression extends ArgumentsExpression {
    }
 
    public Object getTypeForIdentifier(int ix) {
-      Object type = getTypeForIdentifier(idTypes, boundTypes, arguments, ix, getJavaModel());
+      Object type = getTypeForIdentifier(idTypes, boundTypes, arguments, ix, getJavaModel(), inferredType);
       // TODO: Change ComponentImpl below to some private class cause this is now a sentinel and will not work if it's an actual class people use.
       // It's used to workaround the fact that we resolve the @Component methods before the base class is transformed.  They get resolved to this
       // special class.  Now we need to map it back in these special cases.  Perhaps the preInit, etc. methods should be generated and put
@@ -2685,7 +2731,7 @@ public class IdentifierExpression extends ArgumentsExpression {
    }
 
    public Object getGenericTypeForIdentifier(int ix) {
-      return getGenericTypeForIdentifier(idTypes, boundTypes, arguments, ix, getJavaModel(), null);
+      return getGenericTypeForIdentifier(idTypes, boundTypes, arguments, ix, getJavaModel(), null, inferredType);
    }
 
    public boolean getLHSAssignmentTyped() {
@@ -2696,7 +2742,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       return idTypes[last] == IdentifierType.MethodInvocation && ModelUtil.isLHSTypedMethod(boundTypes[last]);
    }
 
-   static Object getGenericTypeForIdentifier(IdentifierType[] idTypes, Object[] boundTypes, List<Expression> arguments, int ix, JavaModel model, Object rootType) {
+   static Object getGenericTypeForIdentifier(IdentifierType[] idTypes, Object[] boundTypes, List<Expression> arguments, int ix, JavaModel model, Object rootType, Object inferredType) {
       if (boundTypes == null)
          return null;
       if (idTypes[ix] != null) {
@@ -2720,8 +2766,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             case MethodInvocation:
                // If ix > 0 and ix - 1's type has type parameters (either a field like List<X> or a method List<X> get(...).
                // need to apply the method's type parameters against the ones in the previous type.
-               // TODO: make generic
-               return resolveType(ModelUtil.getMethodTypeDeclaration(rootType != null ? rootType : getTypeContext(idTypes, boundTypes, ix), boundTypes[ix], arguments, model), ix, idTypes);
+               return resolveType(ModelUtil.getMethodTypeDeclaration(rootType != null ? rootType : getTypeContext(idTypes, boundTypes, ix), boundTypes[ix], arguments, model, inferredType), ix, idTypes);
             case SetVariable:
                return resolveType(ModelUtil.getSetMethodPropertyType(boundTypes[ix], model), ix, idTypes);
             case EnumName:
@@ -2738,7 +2783,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       return type;
    }
 
-   static Object getTypeForIdentifier(IdentifierType[] idTypes, Object[] boundTypes, List<Expression> arguments, int ix, JavaModel model) {
+   static Object getTypeForIdentifier(IdentifierType[] idTypes, Object[] boundTypes, List<Expression> arguments, int ix, JavaModel model, Object inferredType) {
       if (boundTypes == null)
          return null;
       if (idTypes[ix] != null) {
@@ -2762,7 +2807,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             case RemoteMethodInvocation:
                // If ix > 0 and ix - 1's type has type parameters (either a field like List<X> or a method List<X> get(...).
                // need to apply the method's type parameters against the ones in the previous type.
-               return resolveType(ModelUtil.getMethodTypeDeclaration(getTypeContext(idTypes, boundTypes, ix), boundTypes[ix], arguments, model), ix, idTypes);
+               return resolveType(ModelUtil.getMethodTypeDeclaration(getTypeContext(idTypes, boundTypes, ix), boundTypes[ix], arguments, model, inferredType), ix, idTypes);
             case SetVariable:
                return resolveType(ModelUtil.getSetMethodPropertyType(boundTypes[ix], model), ix, idTypes);
             case EnumName:
@@ -3523,14 +3568,27 @@ public class IdentifierExpression extends ArgumentsExpression {
 
             // If either the field or the method is static, use the class directly
             if (!bd.isStatic && !ModelUtil.hasModifier(methodType, "static")) {
-               if (ModelUtil.isAssignableFrom(methodDeclaringClass, getEnclosingType())) {
+               TypeDeclaration enclType = getEnclosingType();
+               if (ModelUtil.isAssignableFrom(methodDeclaringClass, enclType)) {
                   methodClass = IdentifierExpression.create("getClass");
                   bindArgs.add(IdentifierExpression.create("this"));
                }
                // Method is defined in an enclosing class - need to prefix with the type and add a new argument
                // as the method lives on a different object than the destination property
                else {
-                  String methodClassName = ModelUtil.getTypeName(methodDeclaringClass);
+                  // This type name must be in this type hierarchy - can't be using a base-classes type name here so walk up until we find the
+                  // right type and use that name.
+                  TypeDeclaration outerType = enclType.getEnclosingType();
+                  do {
+                     if (outerType == null || ModelUtil.isAssignableFrom(methodDeclaringClass, outerType)) {
+                        break;
+                     }
+                     outerType = outerType.getEnclosingType();
+                  } while (outerType != null);
+                  if (outerType == null) {
+                     System.err.println("*** Unable to find declaring class: " + methodDeclaringClass + " in enclosing type hierarchy");
+                  }
+                  String methodClassName = ModelUtil.getTypeName(outerType);
                   methodClass = IdentifierExpression.create(methodClassName, "this", "getClass");
                   bindArgs.add(IdentifierExpression.create(methodClassName, "this"));
                }
@@ -3980,6 +4038,15 @@ public class IdentifierExpression extends ArgumentsExpression {
             if (varType != null) {
                types.add(varType);
             }
+            Object boundType = boundTypes[i];
+            if (idTypes != null && boundType != null) {
+               switch (idTypes[i]) {
+                  case MethodInvocation:
+                  case FieldName:
+                     types.add(ModelUtil.getEnclosingType(boundType));
+                     break;
+               }
+            }
          }
       // Is this used anyplace?
       if (innerCreator != null)
@@ -4095,12 +4162,9 @@ public class IdentifierExpression extends ArgumentsExpression {
             //}
          }
 
-         if (idTypes[i] == IdentifierType.FieldName && boundTypes[i] instanceof VariableDefinition) {
-            VariableDefinition fieldVar = (VariableDefinition) boundTypes[i];
-            if (fieldVar.shadowedByMethod) {
-               if (!str.startsWith(JSUtil.ShadowedPropertyPrefix))
-                  identifiers.set(i, new PString(JSUtil.ShadowedPropertyPrefix + str));
-            }
+         if (idTypes[i] == IdentifierType.FieldName && ModelUtil.isFieldShadowedByMethod(boundTypes[i])) {
+            if (!str.startsWith(JSUtil.ShadowedPropertyPrefix))
+               identifiers.set(i, new PString(JSUtil.ShadowedPropertyPrefix + str));
          }
 
          if (idTypes[i] == IdentifierType.MethodInvocation || idTypes[i] == IdentifierType.RemoteMethodInvocation) {
@@ -4678,5 +4742,9 @@ public class IdentifierExpression extends ArgumentsExpression {
             return true;
       }
       return false;
+   }
+
+   public void setInferredType(Object inferredType) {
+      this.inferredType = inferredType;
    }
 }

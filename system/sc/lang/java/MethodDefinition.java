@@ -207,11 +207,11 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       return type.getAbsoluteGenericTypeName(resultType, includeDims);
    }
 
-   public Object getTypeDeclaration(List<? extends ITypedObject> arguments) {
+   public Object getTypeDeclaration(List<? extends ITypedObject> arguments, boolean resolve) {
       if (override && type == null) {
          Object prev = getPreviousDefinition();
          if (prev instanceof IMethodDefinition)
-            return ((IMethodDefinition) prev).getTypeDeclaration(arguments);
+            return ((IMethodDefinition) prev).getTypeDeclaration(arguments, resolve);
          else
             return ModelUtil.getReturnType(prev);
       }
@@ -225,7 +225,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          List<Parameter> paramList = parameters.getParameterList();
          for (int i = 0; i < paramList.size(); i++) {
             Object paramType = paramList.get(i).getTypeDeclaration();
-            if (paramType != null) {
+            if (paramType != null && ModelUtil.isTypeVariable(paramType)) {
                String paramArgName = ModelUtil.getTypeParameterName(paramType);
                if (paramArgName != null && paramArgName.equals(rtParam.name)) {
                   if (i >= arguments.size()) // No value for a repeating parameter?
@@ -245,28 +245,30 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          ParamTypeDeclaration returnTypePT = (ParamTypeDeclaration) returnType;
          ParamTypeDeclaration result = returnTypePT.copy();
          for (TypeParameter tp:typeParameters) {
-            List<Parameter> paramList = parameters.getParameterList();
-            for (int i = 0; i < paramList.size(); i++) {
-               Object paramType = paramList.get(i).getTypeDeclaration();
-               List<?> typeParams = ModelUtil.getTypeParameters(paramType);
-               if (typeParams != null) {
-                  for (int j = 0; j < typeParams.size(); j++) {
-                     Object typeParam = typeParams.get(j);
-                     int paramPos = ModelUtil.getTypeParameterPosition(typeParam);
-                     if (paramPos == tp.getPosition()) {
-                        // Special case to handle foo.class -> Class<T> construct.
-                        if (ModelUtil.getParamTypeBaseType(paramType) == Class.class) {
-                           Object paramExpr = arguments.get(i);
-                           // Need the actual class itself, not the type of the expression (which in this case is class)
-                           if (paramExpr instanceof ClassValueExpression) {
-                              ClassValueExpression pe = (ClassValueExpression) paramExpr;
-                              result.types.set(j, pe.resolveClassType());
+            if (parameters != null) {
+               List<Parameter> paramList = parameters.getParameterList();
+               for (int i = 0; i < paramList.size(); i++) {
+                  Object paramType = paramList.get(i).getTypeDeclaration();
+                  List<?> typeParams = ModelUtil.getTypeParameters(paramType);
+                  if (typeParams != null) {
+                     for (int j = 0; j < typeParams.size(); j++) {
+                        Object typeParam = typeParams.get(j);
+                        int paramPos = ModelUtil.getTypeParameterPosition(typeParam);
+                        if (paramPos == tp.getPosition()) {
+                           // Special case to handle foo.class -> Class<T> construct.
+                           if (ModelUtil.getParamTypeBaseType(paramType) == Class.class) {
+                              Object paramExpr = arguments.get(i);
+                              // Need the actual class itself, not the type of the expression (which in this case is class)
+                              if (paramExpr instanceof ClassValueExpression) {
+                                 ClassValueExpression pe = (ClassValueExpression) paramExpr;
+                                 result.types.set(j, pe.resolveClassType());
+                              }
+                              // else - a runtime class.  We don't get additional type info from that.
                            }
-                           // else - a runtime class.  We don't get additional type info from that.
-                        }
-                        // If it's a type variable itself, it's not changing the return type.
-                        else if (!ModelUtil.isTypeVariable(typeParam)) {
-                           System.err.println("*** unhandled case with param type methods");
+                           // If it's a type variable itself, it's not changing the return type.
+                           else if (!ModelUtil.isTypeVariable(typeParam)) {
+                              System.err.println("*** unhandled case with param type methods");
+                           }
                         }
                      }
                   }
@@ -553,4 +555,31 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       return body == null;
    }
 
+   public Object getInferredReturnType() {
+      Object retType = null;
+      if (body != null) {
+         ArrayList<Statement> returns = new ArrayList<Statement>();
+         body.addReturnStatements(returns);
+         if (returns.size() > 0) {
+            for (int i = 0; i < returns.size(); i++) {
+               ReturnStatement ret = (ReturnStatement) returns.get(i);
+               if (ret.expression != null) {
+                  Object newRetType = ret.expression.getTypeDeclaration();
+                  if (newRetType != null) {
+                     if (retType == null)
+                        retType = newRetType;
+                     else
+                        retType = ModelUtil.findCommonSuperClass(newRetType, retType);
+                  }
+               }
+            }
+         }
+      }
+      return retType;
+   }
+
+   /** Does this method's body get stripped out during the transform? */
+   public boolean suppressInterfaceMethod() {
+      return body != null && !hasModifier("static") && !hasModifier("default");
+   }
 }

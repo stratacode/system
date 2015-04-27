@@ -4,6 +4,11 @@
 
 package sc.lang.java;
 
+import sc.layer.LayeredSystem;
+
+import java.lang.reflect.Type;
+import java.lang.reflect.WildcardType;
+
 public class ExtendsType extends JavaType {
    public boolean questionMark;
    public String operator;
@@ -71,14 +76,14 @@ public class ExtendsType extends JavaType {
       return sb.toString();
    }
 
-   public Object getTypeDeclaration() {
+   public Object getTypeDeclaration(ITypeParamContext ctx) {
       if (typeArgument == null)
          return Object.class;
-      return typeArgument.getTypeDeclaration();
+      return typeArgument.getTypeDeclaration(ctx);
    }
 
-   public void initType(ITypeDeclaration itd, JavaSemanticNode node, boolean displayError, boolean isLayer) {
-      typeArgument.initType(itd, node, displayError, isLayer);
+   public void initType(LayeredSystem sys, ITypeDeclaration itd, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer) {
+      typeArgument.initType(sys, itd, node, ctx, displayError, isLayer);
    }
 
    public String getBaseSignature() {
@@ -101,5 +106,62 @@ public class ExtendsType extends JavaType {
             sb.append(typeArgument.toGenerateString());
       }
       return sb.toString();
+   }
+
+   public String toString() {
+      return toGenerateString();
+   }
+
+   @Override
+   public JavaType resolveTypeParameters(ITypeParamContext t) {
+      JavaType newTypeArg = typeArgument.resolveTypeParameters(t);
+      if (newTypeArg != typeArgument) {
+         ExtendsType extType = new ExtendsType();
+         extType.parentNode = parentNode;
+         extType.operator = operator;
+         extType.questionMark = questionMark;
+         extType.setProperty("typeArgument", newTypeArg);
+         return extType;
+      }
+      return this;
+   }
+
+   @Override
+   void startWithType(Object type) {
+   }
+
+   public boolean isParameterizedType() {
+      return true;
+   }
+
+   public static ExtendsType create(WildcardType type) {
+      ExtendsType res = new ExtendsType();
+      String typeName = type.getTypeName();
+      int opIx = typeName.indexOf("extends");
+      if (opIx != -1) {
+         res.operator = "extends";
+      }
+      else {
+         opIx = typeName.indexOf("super");
+         if (opIx != -1)
+            res.operator = "super";
+      }
+      res.questionMark = typeName.contains("?");
+      if (opIx != -1) {
+         String extName = typeName.substring(opIx + 1 + res.operator.length());
+         res.setProperty("typeArgument", ClassType.createJavaTypeFromName(extName));
+      }
+      return res;
+   }
+
+   public boolean isBound() {
+      return typeArgument == null || typeArgument.isBound();
+   }
+
+   public Object definesTypeParameter(String typeParam, ITypeParamContext ctx) {
+      if (typeArgument == null)
+         return null;
+      // TODO: anything else to do here?
+      return typeArgument.definesTypeParameter(typeParam, ctx);
    }
 }

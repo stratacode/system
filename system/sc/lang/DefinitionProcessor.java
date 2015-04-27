@@ -15,6 +15,13 @@ import java.util.EnumSet;
  * which has compile time behavior.
  */
 public abstract class DefinitionProcessor implements IDefinitionProcessor {
+
+   /**
+    * Allows you to group the types attached to this definition into a single global list.
+    * If this is set on an annotation processor associated with a method
+    * Field, etc. the enclosing type is added to the group.   From the type, you can find the list of methods or fields
+    * or whatever in the type inside of your template.
+    */
    public String typeGroupName;
 
    /** If set to true, and definition is an object, do not generate the static getX method.  Treat it as a class for code-gen purposes */
@@ -73,8 +80,10 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
 
    public void start(Definition def) {
       if (typeGroupName != null) {
-         if (!(def instanceof TypeDeclaration))
-            def.displayError(toErrorString() + " only allowed on class/object for: ");
+         if (!(def instanceof TypeDeclaration)) {
+            if (!(def instanceof TypedDefinition))
+                def.displayError(toErrorString() + " only allowed on class/object, field, method for: ");
+         }
          else
             typeGroupMemberStarted((TypeDeclaration) def);
          // We wait to add the type group member till "process".  This let's us cull members for any types we know we'll process.
@@ -144,6 +153,14 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
          if (createOnStartup) {
             bi.addTypeGroupMember(ModelUtil.getTypeName(def), BuildInfo.StartupGroupName);
          }
+      }
+      // For methods, fields, etc. we will add the enclosing type as the type group member.  We can then use the type
+      // to collect the methods or whatever that have this annotation.
+      else if (def instanceof TypedDefinition && typeGroupName != null) {
+         LayeredSystem sys = def.getLayeredSystem();
+         BuildInfo bi = sys.buildInfo;
+         TypeDeclaration enclType = ((TypedDefinition) def).getEnclosingType();
+         bi.addTypeGroupMember(enclType.getFullTypeName(), typeGroupName);
       }
    }
 

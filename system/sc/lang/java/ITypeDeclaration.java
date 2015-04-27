@@ -13,7 +13,7 @@ import java.util.EnumSet;
 import java.util.List;
 
 public interface ITypeDeclaration {
-   boolean isAssignableFrom(ITypeDeclaration other);
+   boolean isAssignableFrom(ITypeDeclaration other, boolean assignmentSemantics);
    boolean isAssignableTo(ITypeDeclaration other);
 
    boolean isAssignableFromClass(Class other);
@@ -52,7 +52,7 @@ public interface ITypeDeclaration {
 
    Object getInnerType(String name, TypeContext ctx);
 
-   boolean implementsType(String otherTypeName);
+   boolean implementsType(String otherTypeName, boolean assignment);
 
    /** Returns the first occurrence of the specified annotation on the types in the type hierarchy */
    Object getInheritedAnnotation(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve);
@@ -65,6 +65,8 @@ public interface ITypeDeclaration {
    Object getExtendsTypeDeclaration();
 
    Object getExtendsType();
+
+   List<?> getImplementsTypes();
 
    List<Object> getAllMethods(String modifier, boolean hasModifier, boolean isDyn, boolean overridesComp);
 

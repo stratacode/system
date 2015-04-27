@@ -19,6 +19,38 @@ import java.util.*;
 public class ArrayInitializer extends Expression {
    public SemanticNodeList<Expression> initializers;
 
+   private transient Object inferredType;
+
+   public void start() {
+      super.start();
+   }
+
+   public void setInferredType(Object type) {
+      super.setInferredType(type);
+
+      inferredType = type;
+
+
+      if (type != null) {
+         Object componentType = ModelUtil.getArrayComponentType(type);
+         if (initializers != null && componentType != null) {
+            for (Expression init:initializers) {
+               init.setInferredType(componentType);
+            }
+
+            for (Expression init:initializers) {
+               Object initType = init.getTypeDeclaration();
+               // Using assignment semantics to get more flexible type conversions
+               if (!ModelUtil.isAssignableFrom(componentType, initType, true, null)) {
+                  displayError("Array element type mismatch - Expected " + ModelUtil.getTypeName(componentType) + " found: " + ModelUtil.getTypeName(initType) + " for: ");
+                  initType = init.getTypeDeclaration();
+                  boolean res = ModelUtil.isAssignableFrom(componentType, initType, true, null);
+               }
+            }
+         }
+      }
+   }
+
    public Object eval(Class expectedType, ExecutionContext ctx) {
       boolean expectedCollection = expectedType != null && Collection.class.isAssignableFrom(expectedType);
       if (initializers == null && bindingDirection == null) {
@@ -116,7 +148,33 @@ public class ArrayInitializer extends Expression {
    }
 
    public Object getTypeDeclaration() {
-      return null; // TODO: need a way to easily add a dimension onto the type of the coerced type of the initializers.
+      Object initType = null;
+      if (initializers == null)
+         return null;
+      for (Expression expr:initializers) {
+         Object newType = expr.getTypeDeclaration();
+         if (newType != NullLiteral.NULL_TYPE) {
+            if (initType == null)
+               initType = newType;
+            else
+               initType = ModelUtil.findCommonSuperClass(initType, newType);
+         }
+      }
+      if (initType == null)
+         return null; // TODO: do we need a new type for {null} - an array with null?
+      if (inferredType == null || ModelUtil.isArray(inferredType))
+         return ArrayTypeDeclaration.create(initType, "[]", getEnclosingType());
+      else if (ModelUtil.isAssignableFrom(List.class, inferredType)) {
+         //return new ParamTypeDeclaration(getEnclosingType(), ModelUtil.getTypeParameters(List.class), Collections.singletonList(initType), inferredType);
+         return inferredType;
+      }
+      else if (ModelUtil.isAssignableFrom(Set.class, inferredType)) {
+         //return new ParamTypeDeclaration(getEnclosingType(), ModelUtil.getTypeParameters(Set.class), Collections.singletonList(initType), inferredType);
+         return inferredType;
+      }
+      else {
+         return ArrayTypeDeclaration.create(initType, "[]", getEnclosingType());
+      }
    }
 
    public void visitTypeReferences(CycleInfo info, TypeContext ctx) {

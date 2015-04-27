@@ -24,6 +24,13 @@ public class QuestionMarkExpression extends Expression {
       getTypeDeclaration();
    }
 
+   public void setInferredType(Object type) {
+      if (trueChoice != null)
+         trueChoice.setInferredType(type);
+      if (falseChoice != null)
+         falseChoice.setInferredType(type);
+   }
+
    public Object eval(Class expectedType, ExecutionContext ctx) {
       if (bindingDirection != null)
          return initBinding(expectedType, ctx);

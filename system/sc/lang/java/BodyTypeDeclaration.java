@@ -1086,7 +1086,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
          // To prevent infinite loops, we set redirected when going through the extends chain.  Clear it for the
          // second and subsequent levels - they might need to go back to an overridden type.
-         redirected = false;
+         redirected = !ModelUtil.sameTypes(type, ModelUtil.getEnclosingType(nextType));
          type = nextType;
       } while (ix != -1);
 
@@ -3411,7 +3411,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          Object[] argValues = ModelUtil.constructorArgListToValues(superType, arguments, ctx, null);
          return constructInstance(ctx, null, argValues, false);
       }
-      else {
+      else { // We have a dynamic constructor
          ConstructorDefinition superConDef = (ConstructorDefinition) superCon;
          // If there's a chained super call, delegate the construction till that
          if (superConDef.callsSuper()) {
@@ -5896,7 +5896,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          allValues = addObjectToArray(outerObj, allValues);
 
       Object inst = PTypeUtil.createInstance(compClass, null, allValues);
-      initDynInstance(inst, ctx, false, outerObj);
+      if (inst != null)
+         initDynInstance(inst, ctx, false, outerObj);
 
       return inst;
    }
@@ -6385,7 +6386,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                Object extendsCompType = ModelUtil.getCompiledClass(extendsType);
                if (extendsCompType == null || extendsCompType == IDynObject.class)
                   return emptyObjectArray;
-               if (ModelUtil.declaresConstructor(extendsType, null, null) != null || ModelUtil.getConstructors(extendsType, null) == null) { // Extending a dynamic type - just use that guys class if there's a zero arg constructor
+
+               TypeDeclaration extendsTypeDecl = extendsType instanceof TypeDeclaration ? (TypeDeclaration) extendsType : null;
+
+               // Extending a dynamic type - just use that guys class if there's a zero arg constructor.  If this type is a dynamic stub it should have a matching
+               // constructor.  If it inherits the compiled class and has no super() call, it must be using a default constructor so clear out the args.
+               if (ModelUtil.declaresConstructor(extendsType, null, null) != null || ModelUtil.getConstructors(extendsType, null) == null ||
+                       (extendsTypeDecl != null && !extendsTypeDecl.isDynamicStub(false) && extendsTypeDecl.usesDefaultConstructor())) {
 
                   return emptyObjectArray; // This assumes that we do not have a super call which is transforming the args and so using a zero arg constructor of the extends class
                }
@@ -6403,6 +6410,18 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
       }
       return args;
+   }
+
+   /** Is this a compiled dynamic stub constructor - which takes just the TypeDeclaration as the first parameter? */
+   boolean usesDefaultConstructor() {
+      Object[] constrs = getConstructors(null);
+      if (constrs == null || constrs.length == 0)
+         return true;
+      for (Object constr:constrs) {
+         if (constr instanceof ConstructorDefinition && !((ConstructorDefinition) constr).callsSuper())
+            return true;
+      }
+      return false;
    }
 
    List<JavaType> mapTypeArgsForExtends(List<JavaType> typeArgs) {
@@ -6498,6 +6517,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public JavaType getExtendsType() {
+      return null;
+   }
+
+   public List<?> getImplementsTypes() {
       return null;
    }
 

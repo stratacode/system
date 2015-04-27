@@ -211,6 +211,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public boolean usePropertyMappers = true;    /* Frameworks like Javascript don't need the property mapper optimization */
 
+   public boolean useIndexSetForArrays = true;  // Should we generate a setX(int ix, Object elem) for an array property to allow element-by-element updates
+
    public boolean includeSrcInClassPath = false;  /* Frameworks like GWT require the generated src to be included in the classpath for compilation, DevMode etc. */
 
    public IRuntimeProcessor runtimeProcessor = null; /** Hook to inject new runtimes like javascript, etc. which processor Java */
@@ -1379,7 +1381,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
          }
          else if (options.verbose)
-            System.out.println("Skipping install - starting with no layers");
+            verbose("Skipping install - starting with no layers");
       }
       return true;
    }
@@ -2643,6 +2645,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public IBeanMapper getPropertyMapping(Object type, String dstPropName) {
+      if (type instanceof ClientTypeDeclaration)
+         type = ((ClientTypeDeclaration) type).getOriginal();
       return ModelUtil.getPropertyMapping(type, dstPropName);
    }
 
@@ -3407,7 +3411,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
 
          if (options.verbose) {
-            System.out.println("Prepared runtime: " + StringUtil.formatFloat((System.currentTimeMillis() - sys.sysStartTime)/1000.0));
+            sys.verbose("Prepared runtime: " + StringUtil.formatFloat((System.currentTimeMillis() - sys.sysStartTime)/1000.0));
          }
 
          if (options.runClass != null) {
@@ -3435,7 +3439,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
 
          if (options.verbose) {
-            System.out.println("Run completed in: " + StringUtil.formatFloat((System.currentTimeMillis() - sys.sysStartTime)/1000.0));
+            sys.verbose("Run completed in: " + StringUtil.formatFloat((System.currentTimeMillis() - sys.sysStartTime)/1000.0));
          }
 
       }
@@ -3719,7 +3723,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
             else {
                if (!layer.compiled)
-                  info("\nCompiling " + runtimeName + " runtime " + (layer.dynamic ? "dynamic " : "") + "separate layer: " + layer.layerUniqueName + " using " + StringUtil.insertLinebreaks(LayerUtil.layersToNewlineString(layers.subList(0, layer.layerPosition)), 120) + " into: " + layer.buildDir);
+                  info("\nCompiling " + runtimeName + " runtime " + (layer.dynamic ? "dynamic " : "") + "separate layer: " + layer.layerUniqueName + (options.verbose || options.verboseLayers ? " using " + StringUtil.insertLinebreaks(LayerUtil.layersToNewlineString(layers.subList(0, layer.layerPosition)), 120) : "") + " into: " + layer.buildDir);
                else
                   info("Rebuilding " + runtimeName + " runtime " + (layer.dynamic ? "dynamic " : "") + "separate layer: " + layer.layerUniqueName);
 
@@ -5917,12 +5921,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // find the classes in the boot class path.
       if (packageIndex.get("java/awt") == null) {
          String bootPath = System.getProperty("sun.boot.class.path");
+         if (bootPath == null)
+            System.err.println("*** No boot classpath found in properties: " + System.getProperties());
          String[] pathEntries = StringUtil.split(bootPath, FileUtil.PATH_SEPARATOR);
+         boolean jdkFound = false;
          // Only add the JDK.  This is needed for importing "*" on system packages.
          for (String p:pathEntries) {
-            if (p.contains("classes.jar") || p.contains("Classes.jar"))
+            if (p.contains("classes.jar") || p.contains("Classes.jar") || p.contains("rt.jar")) {
+               jdkFound = true;
                addPathToIndex(null, p);
+            }
          }
+         if (!jdkFound)
+            System.err.println("*** Did not find classes.jar or rt.jar in sun.booth.class.path for JDK imports: " + pathEntries);
       }
    }
 
@@ -6485,8 +6496,22 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       else {
          if (type == MessageType.Error)
             System.err.println(sb);
-         else
+         else {
+            switch (type) {
+               case Warning:
+               case Info:
+                  break;
+               case Debug:
+                  if (!options.verbose)
+                     return;
+                  break;
+               case SysDetails:
+                  if (!options.sysDetails)
+                     return;
+                  break;
+            }
             System.out.println(sb);
+         }
       }
    }
 
@@ -7813,7 +7838,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                               if (prevSrc != null && Arrays.equals(prevSrc.hash, hash)) {
                                  if (genProc.getInheritFiles()) {
                                     if (options.verbose)
-                                       System.out.println("File: " + genFile.relFileName + " in layer: " + genLayer + " inheriting previous version at: " + genLayer.getPrevSrcFileLayer(genFile.relFileName));
+                                       verbose("File: " + genFile.relFileName + " in layer: " + genLayer + " inheriting previous version at: " + genLayer.getPrevSrcFileLayer(genFile.relFileName));
                                     FileUtil.renameFile(genFile.absFileName, FileUtil.replaceExtension(genFile.absFileName, Language.INHERIT_SUFFIX));
                                     LayerUtil.removeFileAndClasses(genFile.absFileName);
                                  }
@@ -7898,7 +7923,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          boolean compileFailed = false;
 
          if (options.verbose) {
-            System.out.println("Generation completed in: " + StringUtil.formatFloat((System.currentTimeMillis() - buildStartTime)/1000.0));
+            verbose("Generation completed in: " + StringUtil.formatFloat((System.currentTimeMillis() - buildStartTime)/1000.0));
          }
          if (phase == BuildPhase.Process && !options.noCompile && !skipBuild) {
             // Need to remove any null sentinels we might have registered
@@ -10782,8 +10807,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Object getClassFromCFName(String cfName, String className) {
-      if (cfName.contains("Comparable"))
-         System.out.println("***");
       Object res = otherClassCache.get(className);
       if (res == NullClassSentinel.class)
          return null;

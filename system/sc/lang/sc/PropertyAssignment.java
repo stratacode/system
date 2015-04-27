@@ -103,8 +103,9 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
          // Check to be sure the initializer is compatible with the property
          // Skip this test for reverse-only bindings
          if (initializer != null && (bindingDirection == null || bindingDirection.doForward())) {
-            Object initType = initializer.getGenericType();
             Object propType = isSetMethod ? ModelUtil.getSetMethodPropertyType(assignedProperty) : ModelUtil.getVariableTypeDeclaration(assignedProperty);
+            initializer.setInferredType(propType);
+            Object initType = initializer.getGenericType();
             if (initType != null && propType != null &&
                 !ModelUtil.isAssignableFrom(propType, initType, true, null)) {
                displayTypeError("Type mismatch - assignment to property with type: " + ModelUtil.getTypeName(propType, true, true) + " does not match expression type: " + ModelUtil.getTypeName(initType, true, true) + " for: ");

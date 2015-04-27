@@ -82,4 +82,11 @@ public class TypeParameter extends JavaSemanticNode implements ITypedObject {
       if (extendsType != null)
          extendsType.addDependentTypes(types);
    }
+
+   public Object getGenericDeclaration() {
+      Object def = getEnclosingMethod();
+      if (def != null)
+         return def;
+      return getEnclosingType();
+   }
 }

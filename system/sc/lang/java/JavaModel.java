@@ -53,9 +53,6 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    transient Map<String,Object> typeIndex = new HashMap<String,Object>();
 
-   // Type parameter names
-   transient Map<String,TypeParameter> typeParameters = new HashMap<String,TypeParameter>();
-
    transient Object userData;
 
    /** A flag used in the IDE when the userData has been mapped */
@@ -280,7 +277,6 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          String className = CTypeUtil.getClassName(impStr);
          if (className.equals("*")) {
             String pkgName = CTypeUtil.getPackageName(impStr);
-
             Set<String> filesInPkg = layeredSystem == null ? null : layeredSystem.getFilesInPackage(pkgName);
             if (filesInPkg != null) {
                for (String impName:filesInPkg) {
@@ -768,22 +764,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return externalReferences;
    }
 
-   public void addTypeParameter(String name, TypeParameter tp) {
-      if (typeParameters == null)
-         typeParameters = new HashMap<String,TypeParameter>();
-      typeParameters.put(name, tp);
-   }
-
-   public TypeParameter getTypeParameter(String typeName) {
-      return typeParameters.get(typeName);
-   }
-
    public Object definesType(String typeName, TypeContext ctx) {
       // This is a "get" not a "find" because we are only looking for types defined in this model.
       Object res = getTypeDeclaration(typeName);
-      if (res != null)
-         return res;
-      res = getTypeParameter(typeName);
       if (res != null)
          return res;
 
@@ -2384,7 +2367,6 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
          copy.definedTypesByName = definedTypesByName;
          copy.typeIndex = typeIndex;
-         copy.typeParameters = typeParameters;
          copy.computedPackagePrefix = computedPackagePrefix;
          copy.temporary = true;
          copy.reverseDeps = reverseDeps;

@@ -59,4 +59,8 @@ public class ForStatement extends Statement {
    public boolean childIsTopLevelStatement(Statement child) {
       return child == statement;
    }
+
+   public void addReturnStatements(List<Statement> res) {
+      statement.addReturnStatements(res);
+   }
 }

@@ -8,6 +8,7 @@ import sc.lang.DynEnumConstant;
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
 import sc.layer.LayeredSystem;
+import sc.parser.ParseUtil;
 
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
@@ -96,10 +97,10 @@ public class EnumDeclaration extends TypeDeclaration {
    public void unregister() {
    }
 
-   public boolean implementsType(String fullTypeName) {
+   public boolean implementsType(String fullTypeName, boolean assignment) {
       if (fullTypeName.equals("java.lang.Enum"))
          return true;
-      return super.implementsType(fullTypeName);
+      return super.implementsType(fullTypeName, assignment);
    }
 
    /** For this type only we add the enum constants as properties */
@@ -253,6 +254,8 @@ public class EnumDeclaration extends TypeDeclaration {
                constr.setProperty("parameters", Parameter.create(newTypes.toArray(new Object[newTypes.size()]), newNames.toArray(new String[newNames.size()])));
                addEnumSuperCall(constr);
                enumCl.addBodyStatement(constr);
+
+               ParseUtil.restartComponent(constr);
             }
          }
       }

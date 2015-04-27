@@ -109,9 +109,33 @@ public class LayerUtil implements LayerConstants {
             java.io.PrintStream printer = result ? System.out : System.err;
             String message = diagnostic.getMessage(Locale.getDefault());
             if (!result && !suppressedCompilerMessages.contains(message)) {
-               if (messageHandler != null)
-                  messageHandler.reportMessage(message, null, -1, -1, MessageType.Error);
-               printer.println(message);
+               long lineNumber = diagnostic.getLineNumber();
+               long column = diagnostic.getColumnNumber();
+               Object source = diagnostic.getSource();
+               if (source instanceof FileObject) {
+                  Object name = ((FileObject) source).getName();
+                  if (name != null)
+                     source = name;
+               }
+               else if (source == null)
+                  source = "";
+               if (messageHandler != null) {
+                  MessageType type = MessageType.Error;
+                  switch (diagnostic.getKind()) {
+                     case ERROR:
+                        type = MessageType.Error;
+                        break;
+                     case WARNING:
+                        type = MessageType.Warning;
+                        break;
+                  }
+                  messageHandler.reportMessage(message, source.toString(), (int) lineNumber, (int) column, type);
+               }
+               if (lineNumber != -1)
+                  printer.println(source.toString() + ": line: " + lineNumber + " column: " + column + ": " + message);
+               else
+                  printer.println(message);
+
             }
             printer.flush();
          }

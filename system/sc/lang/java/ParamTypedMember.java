@@ -24,8 +24,7 @@ public class ParamTypedMember implements ITypedObject, IDefinition {
    public Object getTypeDeclaration() {
       Object parameterizedType = ModelUtil.getParameterizedType(member, mtype);
       if (ModelUtil.isTypeVariable(parameterizedType)) {
-         int paramPos = ModelUtil.getTypeParameterPosition(parameterizedType);
-         return paramTypeDecl.getType(paramPos);
+         return paramTypeDecl.getTypeForVariable(parameterizedType);
       }
       return parameterizedType;
    }

@@ -76,6 +76,10 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return null;
    }
 
+   public List<?> getImplementsTypes() {
+      return implementsTypes;
+   }
+
    public JavaType getDeclaredExtendsType() {
       return null;
    }
@@ -103,9 +107,6 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
       if (m != null) {
          m.addTypeDeclaration(getFileRelativeTypeName(), this);
-         if (typeParameters != null)
-            for (TypeParameter tp:typeParameters)
-               m.addTypeParameter(tp.name, tp);
       }
 
       super.initialize();
@@ -238,7 +239,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    }
 
    public boolean isComponentType() {
-      return isAutoComponent() || implementsType("sc.obj.IComponent") || implementsType("sc.obj.IAltComponent");
+      return isAutoComponent() || implementsType("sc.obj.IComponent", false) || implementsType("sc.obj.IAltComponent", false);
    }
 
    private Object resolveExtendsType(JavaType extendsType) {
@@ -246,7 +247,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       JavaSemanticNode resolver = getEnclosingType();
       if (resolver == null)
          resolver = getJavaModel();
-      extendsType.initType(this, resolver, false, isLayerType);
+      extendsType.initType(getLayeredSystem(), this, resolver, null, false, isLayerType);
 
 
       // Need to start the extends type as we need to dig into it
@@ -266,15 +267,6 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
          return;
       typeInfoInitialized = true;
       JavaModel m = getJavaModel();
-
-      // Weird case here.  We should usually be initialized here but in generating a tag class, we need to get the extends
-      // type for the template to find the extends elements.  We haven't finished the type and so do not want to initialize it.
-      // but to get the extends element we need to be sure type parameters are registered.  This means these guys will get added twice
-      // but it's a hashmap so no big deal.
-      if (!initialized && typeParameters != null) {
-         for (TypeParameter tp:typeParameters)
-            m.addTypeParameter(tp.name, tp);
-      }
 
       if (implementsTypes != null && m != null) {
          implementsBoundTypes = new Object[implementsTypes.size()];
@@ -300,6 +292,18 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    }
 
    protected void completeInitTypeInfo() {
+   }
+
+   public Object definesType(String name, TypeContext ctx) {
+      Object res = super.definesType(name, ctx);
+      if (res != null)
+         return res;
+      if (typeParameters != null) {
+         for (TypeParameter param:typeParameters)
+            if (name.equals(param.name))
+               return param;
+      }
+      return null;
    }
 
    private boolean isAnnotationDefinition() {
@@ -563,7 +567,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       }
    }
 
-   public boolean isAssignableFrom(ITypeDeclaration other) {
+   public boolean isAssignableFrom(ITypeDeclaration other, boolean assignmentSemantics) {
       if (other instanceof ArrayTypeDeclaration)
          return false;
       return other.isAssignableTo(this);
@@ -675,7 +679,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return this;
    }
 
-   public boolean implementsType(String fullTypeName) {
+   public boolean implementsType(String fullTypeName, boolean assignment) {
       String fte = getFullTypeName();
       if (fte != null && ModelUtil.typeNamesEqual(fte, fullTypeName))
          return true;
@@ -684,7 +688,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
       if (implementsBoundTypes != null) {
          for (Object implType:implementsBoundTypes) {
-            if (implType != null && ModelUtil.implementsType(implType, fullTypeName))
+            if (implType != null && ModelUtil.implementsType(implType, fullTypeName, assignment))
                return true;
          }
       }
@@ -692,13 +696,13 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       // If our annotations add any interfaces consider those as part of this type
       Object[] scopeIfaces = getScopeInterfaces();
       for (Object iface:scopeIfaces) {
-         if (ModelUtil.implementsType(iface, fullTypeName))
+         if (ModelUtil.implementsType(iface, fullTypeName, assignment))
             return true;
       }
 
       Object ext = getDerivedTypeDeclaration();
       if (ext != null) {
-         if (ModelUtil.implementsType(ext, fullTypeName))
+         if (ModelUtil.implementsType(ext, fullTypeName, assignment))
             return true;
       }
 
@@ -1238,7 +1242,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       Object typeRef = getDerivedTypeDeclaration();
       while (typeRef != null) {
          if (typeRef instanceof ParamTypeDeclaration) {
-            Object paramType = ((ParamTypeDeclaration) typeRef).getTypeDeclarationForParam(childTypeParameter);
+            Object paramType = ((ParamTypeDeclaration) typeRef).getTypeDeclarationForParam(childTypeParameter, null, true);
             if (paramType != null)
                return ModelUtil.getTypeName(paramType);
          }

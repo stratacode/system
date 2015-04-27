@@ -20,9 +20,15 @@ public class ScpRepositoryManager extends AbstractRepositoryManager {
    public String doInstall(RepositorySource src) {
       ArrayList<String> args = new ArrayList<String>();
       String resFile = src.pkg.installedRoot;
+      String srcURL = src.url;
+      boolean isZip = srcURL.endsWith(".jar") || srcURL.endsWith(".zip");
+      if (isZip) {
+         resFile = FileUtil.addExtension(resFile, FileUtil.getExtension(srcURL));
+      }
       args.add("scp");
-      args.add("-r");
-      args.add(src.url);
+      if (!isZip)
+         args.add("-r");
+      args.add(srcURL);
       args.add(resFile);
       if (info)
          info("Running: " + argsToString(args));
@@ -30,13 +36,8 @@ public class ScpRepositoryManager extends AbstractRepositoryManager {
       if (res == null)
          return "Error: failed to run install command";
       if (src.unzip) {
-         String noSuffix = FileUtil.removeExtension(resFile);
-         if (noSuffix.equals(resFile))
-            System.err.println("*** Unzip option specified for package: " + src.pkg.packageName + " but rootFile: " + resFile + " is missing the .zip or .jar suffix.");
-         else {
-            if (!FileUtil.unzip(res, noSuffix))
-               return "Failed to unzip: " + res + " into: " + noSuffix;
-         }
+         if (!FileUtil.unzip(resFile, src.pkg.installedRoot))
+            return "Failed to unzip: " + src.pkg.installedRoot + " into: " + resFile;
       }
       if (info)
          info("Completed: " + argsToString(args));

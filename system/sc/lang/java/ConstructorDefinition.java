@@ -50,7 +50,7 @@ public class ConstructorDefinition extends AbstractMethodDefinition {
    }
 
 
-   public Object getTypeDeclaration(List<? extends ITypedObject> args) {
+   public Object getTypeDeclaration(List<? extends ITypedObject> args, boolean resolve) {
       return null;
    }
 

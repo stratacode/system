@@ -114,6 +114,18 @@ public class Parameter extends AbstractVariable implements IVariable {
       }
    }
 
+   public Object[] getParameterTypes() {
+      Object[] parameterTypes = null;
+      int num = getNumParameters();
+      if (num == 0)
+         return null;
+      parameterTypes = new Object[num];
+      List<Parameter> paramList = getParameterList();
+      for (int i = 0; i < num; i++)
+         parameterTypes[i] = paramList.get(i).getTypeDeclaration();
+      return parameterTypes;
+   }
+
    public JavaType[] getParameterJavaTypes() {
       if (nextParameter == null)
          return new JavaType[] {type};

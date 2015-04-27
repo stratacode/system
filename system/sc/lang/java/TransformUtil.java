@@ -545,6 +545,7 @@ public class TransformUtil {
          }
       }
       */
+      objType.dependentTypes = null;
       PerfMon.end("addObjectDefinition");
    }
 
@@ -682,8 +683,8 @@ public class TransformUtil {
            "      <%=isStatic ? \"static \" : null%>{ set<%=upperPropertyName%>(<%=initializer%>); }\n" +
            "   <% } %>\n" +
            "<% } %> " +
-           "<% if (arrayDimensions != null && arrayDimensions.length() == 2) { %>\n" +
-           "   <%=setModifiers%> void set<%=upperPropertyName%>(int index, <%=setTypeName%> _<%=lowerPropertyName%>Elem) {\n" +
+           "<% if (needsIndexedSetter) { %>\n" +
+           "   <%=setIndexedModifiers%> void set<%=upperPropertyName%>(int index, <%=setTypeName%> _<%=lowerPropertyName%>Elem) {\n" +
            "      <%=lowerPropertyName%>[index] = _<%=lowerPropertyName%>Elem;\n" +
            "      sc.bind.Bind.sendEvent(sc.bind.IListener.ARRAY_ELEMENT_CHANGED, <%=!isStatic ? \"this\" : enclosingTypeName + \".class\"%>, <%=propertyMappingName%>, index);\n" +
            "   }\n" +
@@ -840,13 +841,18 @@ public class TransformUtil {
       if (typeDeclaration.propertiesToMakeBindable != null && typeDeclaration.propertiesToMakeBindable.get(origPropName) != null)
          return;
 
+      LayeredSystem sys = typeDeclaration.getLayeredSystem();
+
+      if (sys != null)
+         params.useIndexSetForArrays = sys.useIndexSetForArrays;
+
       // Skipping interfaces here.  We want to only find implementation methods that we have to rename or contend with if we are converting a field and there are already get/set methods in the same type.
       // This is like the "makeBindable" case but we use declares not defines cause we only want to modify get/set methods if they are defined in this same type.  In the makeBindable case we are really
       // remapping the existing property.   For the field case, the code is declaring a new property that should hide the base classes property based on Java's rules.  If however they define a field and get/set methods
       // in the same type, we need to remap them.  This layers on binding on top of the existing get/set methods.
       // TODO: as an optimization we should recognize trivial get/set methods and just insert the sendEvent call instead of adding all of that code.
-      Object getMethod = params.getMethod = typeDeclaration.declaresMember(origPropName, JavaSemanticNode.MemberType.GetMethodSet, null, null);
-      Object setMethod = params.setMethod = typeDeclaration.declaresMember(origPropName, JavaSemanticNode.MemberType.SetMethodSet, null, null);
+      params.getMethod = typeDeclaration.declaresMember(origPropName, JavaSemanticNode.MemberType.GetMethodSet, null, null);
+      params.setMethod = typeDeclaration.declaresMember(origPropName, JavaSemanticNode.MemberType.SetMethodSet, null, null);
 
       params.arrayDimensions = field.type.arrayDimensions;
 
@@ -1051,6 +1057,9 @@ public class TransformUtil {
       params.getModifiers = removeModifiers(ModelUtil.modifiersToString(getMethod == null ? definition : getMethod, true, true, false, false, false, JavaSemanticNode.MemberType.GetMethod), fieldOnlyModifiers);
       params.setModifiers = removeModifiers(ModelUtil.modifiersToString(setMethod == null ? definition : setMethod, true, true, false, false, false, JavaSemanticNode.MemberType.SetMethod), fieldOnlyModifiers);
 
+      if (params.getNeedsIndexedSetter()) // Not including annotations here because for JPA and datanucleus in particular, @Lob and other annotations on an array will cause it to try and enhance the setIndexed method which leads to a verify error
+         params.setIndexedModifiers = removeModifiers(ModelUtil.modifiersToString(setMethod == null ? definition : setMethod, false, true, false, false, false, JavaSemanticNode.MemberType.SetMethod), fieldOnlyModifiers);
+
       if (bindable && ModelUtil.getBindableAnnotation(variableDef == null ? definition : variableDef) == null) {
          // TODO: eliminate two of these?
          params.setModifiers = "@sc.bind.Bindable(manual=true) " + removeModifiers(params.setModifiers, bindableModifiers);
@@ -1097,6 +1106,7 @@ public class TransformUtil {
 
       params.propertyTypeName = ModelUtil.getGenericTypeName(typeDeclaration, getMethod == null ? variableDef : getMethod, true);
       params.overrideField = variableDef != null;
+      params.useIndexSetForArrays = typeDeclaration.getLayeredSystem().useIndexSetForArrays;
 
       int aix = params.propertyTypeName.indexOf("[");
       if (aix != -1) {

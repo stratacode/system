@@ -117,7 +117,7 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
              otherP = ((ITypedObject) otherP).getTypeDeclaration();
 
          // Null entry means match
-         if (otherP == null || thisP == null)
+         if (otherP == null || thisP == null || otherP == LambdaExpression.LAMBDA_INFERRED_TYPE)
             continue;
 
          // Take a conservative approach... if types are not available, just match
@@ -377,7 +377,8 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       if (sb.length() != 0 && sb.charAt(sb.length()-1) != ' ')
          sb.append(" ");
       sb.append(toMethodDeclString());
-      TypeDeclaration enclType = getEnclosingType();
+      // Do not convert NewExpression's to anon types in toString()
+      BodyTypeDeclaration enclType = getStructuralEnclosingType();
       if (enclType != null) {
          sb.append(" in " );
          sb.append(enclType.typeName);
@@ -404,12 +405,8 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
    }
 
    public Object[] getParameterTypes() {
-      int num;
-      if (parameterTypes == null && parameters != null && (num = parameters.getNumParameters()) > 0) {
-         parameterTypes = new Object[num];
-         List<Parameter> paramList = parameters.getParameterList();
-         for (int i = 0; i < num; i++)
-            parameterTypes[i] = paramList.get(i).getTypeDeclaration();
+      if (parameterTypes == null && parameters != null && parameters.getNumParameters() > 0) {
+         parameterTypes = parameters.getParameterTypes();
       }
       return parameterTypes;
    }
@@ -639,5 +636,16 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
 
    public boolean needsEnclosingClass() {
       return true;
+   }
+
+   public Object[] getMethodTypeParameters() {
+      if (typeParameters == null)
+         return null;
+      return typeParameters.toArray();
+   }
+
+   public void stop() {
+      super.stop();
+      parameterTypes = null;
    }
 }

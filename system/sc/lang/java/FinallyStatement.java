@@ -73,4 +73,10 @@ public class FinallyStatement extends NonIndentedStatement implements IBlockStat
    public boolean childIsTopLevelStatement(Statement child) {
       return true;
    }
+
+   public void addReturnStatements(List<Statement> res) {
+      if (statements != null)
+         for (Statement st:statements)
+            st.addReturnStatements(res);
+   }
 }

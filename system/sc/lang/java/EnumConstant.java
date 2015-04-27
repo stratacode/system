@@ -56,7 +56,7 @@ public class EnumConstant extends BodyTypeDeclaration {
       return res;
    }
 
-   public boolean isAssignableFrom(ITypeDeclaration other) {
+   public boolean isAssignableFrom(ITypeDeclaration other, boolean assignmentSemantics) {
       return other == this; 
    }
 
@@ -72,14 +72,14 @@ public class EnumConstant extends BodyTypeDeclaration {
       return getEnclosingType();
    }
 
-   public boolean implementsType(String otherTypeName) {
+   public boolean implementsType(String otherTypeName, boolean assignment) {
       String fte = getFullTypeName();
       if (fte != null && fte.equals(otherTypeName))
          return true;
 
       Object ext = getDerivedTypeDeclaration();
       if (ext != null) {
-         if (ModelUtil.implementsType(ext, otherTypeName))
+         if (ModelUtil.implementsType(ext, otherTypeName, assignment))
             return true;
       }
       return false;

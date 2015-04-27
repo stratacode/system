@@ -4,6 +4,8 @@
 
 package sc.lang.java;
 
+import java.util.List;
+
 public class ReturnStatement extends ExpressionStatement {
    public static ReturnStatement create(Expression expr) {
       ReturnStatement st = new ReturnStatement();
@@ -19,14 +21,20 @@ public class ReturnStatement extends ExpressionStatement {
       AbstractMethodDefinition method = getEnclosingMethod();
       Object methodReturnType;
 
-      if (expression != null && (returnType = expression.getGenericType()) != null && method != null && method.type != null &&
-          (methodReturnType = method.type.getTypeDeclaration()) != null &&
-          // Verified at least that non-assignmentSemantics are too strict, i.e. method declared as char returning 0.
-         !ModelUtil.isAssignableFrom(methodReturnType, returnType, true, null)) {
-         if (!ModelUtil.hasUnboundTypeParameters(returnType)) {
-            displayTypeError("Type mismatch - method return type: " + ModelUtil.getTypeName(methodReturnType, true, true) + " does not match expression type: " + ModelUtil.getTypeName(returnType, true, true) + " for: ");
-            returnType = expression.getGenericType();
-            ModelUtil.isAssignableFrom((methodReturnType = method.type.getTypeDeclaration()), returnType, true, null);
+      if (expression != null && method != null && method.type != null &&
+          (methodReturnType = method.type.getTypeDeclaration()) != null) {
+
+         // Need to propagate our type to the lambda expressions before we can accurately get our type.
+         expression.setInferredType(methodReturnType);
+
+         returnType = expression.getGenericType();
+         // Verified at least that non-assignmentSemantics are too strict, i.e. method declared as char returning 0.
+         if (returnType != null && !ModelUtil.isAssignableFrom(methodReturnType, returnType, true, null)) {
+            if (!ModelUtil.hasUnboundTypeParameters(returnType)) {
+               displayTypeError("Type mismatch - method return type: " + ModelUtil.getTypeName(methodReturnType, true, true) + " does not match expression type: " + ModelUtil.getTypeName(returnType, true, true) + " for: ");
+               returnType = expression.getGenericType();
+               ModelUtil.isAssignableFrom((methodReturnType = method.type.getTypeDeclaration()), returnType, true, null);
+            }
          }
       }
 
@@ -45,5 +53,9 @@ public class ReturnStatement extends ExpressionStatement {
 
    public boolean canInsertStatementBefore(Expression fromExpr) {
       return false;
+   }
+
+   public void addReturnStatements(List<Statement> res) {
+      res.add(this);
    }
 }

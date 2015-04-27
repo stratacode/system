@@ -135,8 +135,9 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
 
       // Check to be sure the initializer is compatible with the property
       if (initializer != null) {
-         Object initType = initializer.getGenericType();
          Object varType = getTypeDeclaration();
+         initializer.setInferredType(varType);
+         Object initType = initializer.getGenericType();
          if (initType != null && varType != null && !ModelUtil.isAssignableFrom(varType, initType, true, null) && (bindingDirection == null || bindingDirection.doForward())) {
             if (!ModelUtil.hasUnboundTypeParameters(initType)) {
                displayTypeError("Type mismatch - assignment to variable with type: " + ModelUtil.getTypeName(varType, true, true) + " does not match expression type: " + ModelUtil.getTypeName(initType, true, true) + " for: ");

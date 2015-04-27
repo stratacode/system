@@ -80,4 +80,9 @@ public abstract class ChainedExpression extends Expression {
          expression.addBreakpointNodes(res, srcStatement);
       }
    }
+
+   public void setInferredType(Object type) {
+      if (expression != null)
+         expression.setInferredType(type);
+   }
 }

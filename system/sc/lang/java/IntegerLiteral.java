@@ -10,9 +10,11 @@ public class IntegerLiteral extends AbstractLiteral {
    private static final int DECIMAL = 0;
    private static final int OCTAL = 1;
    private static final int HEX = 2;
+   private static final int BINARY = 3;
 
    public String hexPrefix;  // Ox or OX
    public String typeSuffix; // l or L
+   public String binaryPrefix; // 0b or 0B
 
    // Not part of the language model directly but we need to copy it etc so it's not transient
    public int valueType;
@@ -56,6 +58,14 @@ public class IntegerLiteral extends AbstractLiteral {
       return value;
    }
 
+   public void setBinaryValue(String hv) {
+      valueType = BINARY;
+      value = hv;
+   }
+   public String getBinaryValue() {
+      return value;
+   }
+
    public void setOctalValue(String ov) {
       valueType = OCTAL;
       value = ov;
@@ -73,16 +83,28 @@ public class IntegerLiteral extends AbstractLiteral {
    }
 
    public void initialize() {
+      super.initialize();
       try {
+         String toParse = value;
+         if (toParse.contains("_")) {
+            if (toParse.endsWith("_")) {
+               displayError("Invalid integer literal - ends with '_'");
+            }
+            toParse = value.replace("_", "");
+         }
+
          switch (valueType) {
             case HEX:
-               longValue = Long.parseLong(value, 16);
+               longValue = Long.parseLong(toParse, 16);
                break;
             case OCTAL:
-               longValue = Long.parseLong(value, 8);
+               longValue = Long.parseLong(toParse, 8);
                break;
             case DECIMAL:
-               longValue = Long.parseLong(value, 10);
+               longValue = Long.parseLong(toParse, 10);
+               break;
+            case BINARY:
+               longValue = Long.parseLong(toParse, 2);
                break;
          }
       }
@@ -110,17 +132,21 @@ public class IntegerLiteral extends AbstractLiteral {
    }
 
    public String toGenerateString() {
-      if (hexPrefix == null && typeSuffix == null && valueType == DECIMAL)
+      if (hexPrefix == null && typeSuffix == null && binaryPrefix == null && valueType == DECIMAL)
          return value;
       else {
          StringBuilder sb = new StringBuilder();
          if (hexPrefix != null)
             sb.append(hexPrefix);
+         else if (binaryPrefix != null)
+            sb.append(binaryPrefix);
          else if (valueType != DECIMAL) {
             if (valueType == OCTAL)
                sb.append("0");
             else if (valueType == HEX)
                sb.append("0x");
+            else if (valueType == BINARY)
+               sb.append("0b");
          }
          sb.append(value);
          JavaLanguage jl = getJavaLanguage();
@@ -129,4 +155,16 @@ public class IntegerLiteral extends AbstractLiteral {
          return sb.toString();
       }
    }
+
+   public static void transformNumberToJS(AbstractLiteral literal) {
+      if (literal.value != null && literal.value.contains("_")) {
+         literal.setProperty("value", literal.value.replace("_", ""));
+      }
+   }
+
+   public Statement transformToJS() {
+      transformNumberToJS(this);
+      return this;
+   }
+
 }

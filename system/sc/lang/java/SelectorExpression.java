@@ -29,6 +29,7 @@ public class SelectorExpression extends ChainedExpression {
    transient Object[] boundTypes;
    transient boolean isAssignment;
    transient boolean referenceInitializer;
+   transient Object inferredType;
 
    public static SelectorExpression create(Expression baseExpr, Selector... selectors) {
       SelectorExpression selExpr = new SelectorExpression();
@@ -55,12 +56,14 @@ public class SelectorExpression extends ChainedExpression {
          boundTypes = new Object[sz];
 
          Object currentType = expression.getGenericType();
+         Object origCurrentType = null;
          for (int i = 0; i < selectors.size(); i++) {
             Selector sel = selectors.get(i);
             if (currentType == null) {
                idTypes[i] = IdentifierExpression.IdentifierType.Unknown;
             }
             else {
+               origCurrentType = currentType;
                if (sel instanceof VariableSelector) {
                   VariableSelector vsel = (VariableSelector) sel;
                   String nextName = vsel.identifier;
@@ -77,7 +80,11 @@ public class SelectorExpression extends ChainedExpression {
                   else {
                      IdentifierExpression.bindNextIdentifier(this, currentType, nextName, i, idTypes, boundTypes,
                                     vsel.isAssignment, vsel.arguments != null, vsel.arguments, bindingDirection, false);
-                     currentType = IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, vsel.arguments, i, getJavaModel(), currentType);
+                     currentType = IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, vsel.arguments, i, getJavaModel(), currentType, inferredType);
+                  }
+                  if (vsel.arguments != null && boundTypes[i] != null) {
+                     IdentifierExpression.propagateInferredArgs(this, boundTypes[i], vsel.arguments);
+                     currentType = IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, vsel.arguments, i, getJavaModel(), origCurrentType, inferredType);
                   }
                }
                else if (sel instanceof ArraySelector) {
@@ -283,7 +290,7 @@ public class SelectorExpression extends ChainedExpression {
    public Object getTypeDeclaration(int ix) {
       if (boundTypes == null)
          return null;
-      return IdentifierExpression.getTypeForIdentifier(idTypes, boundTypes, getArguments(ix), ix, getJavaModel());
+      return IdentifierExpression.getTypeForIdentifier(idTypes, boundTypes, getArguments(ix), ix, getJavaModel(), inferredType);
    }
 
    public Object getGenericType() {
@@ -294,7 +301,7 @@ public class SelectorExpression extends ChainedExpression {
 
       int last = selectors.size()-1;
       // TODO: isn't this just boundTypes[last]?
-      return IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, getArguments(last), last, getJavaModel(), last == 0 ? expression.getGenericType() : getGenericTypeForSelector(last-1, null));
+      return IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, getArguments(last), last, getJavaModel(), last == 0 ? expression.getGenericType() : getGenericTypeForSelector(last-1, null), inferredType);
    }
 
    private Object getGenericTypeForSelector(int i, Object currentType) {
@@ -304,7 +311,7 @@ public class SelectorExpression extends ChainedExpression {
       Selector sel = selectors.get(i);
       if (sel instanceof VariableSelector) {
          VariableSelector vsel = (VariableSelector) sel;
-         return IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, vsel.arguments, i, getJavaModel(), currentType);
+         return IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, vsel.arguments, i, getJavaModel(), currentType, inferredType);
       }
       else if (sel instanceof ArraySelector) {
          ArraySelector asel = (ArraySelector) sel;
@@ -975,5 +982,9 @@ public class SelectorExpression extends ChainedExpression {
       if (isThisExpression() && getEnclosingType() != getTypeDeclaration())
          return true;
       return false;
+   }
+
+   public void setInferredType(Object inferredType) {
+      this.inferredType = inferredType;
    }
 }

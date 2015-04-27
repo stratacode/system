@@ -121,4 +121,13 @@ public class IfStatement extends NonIndentedStatement {
       }
       return sb.toString();
    }
+
+   public void addReturnStatements(List<Statement> res) {
+      if (trueStatement != null) {
+         trueStatement.addReturnStatements(res);
+      }
+      if (falseStatement != null) {
+         falseStatement.addReturnStatements(res);
+      }
+   }
 }

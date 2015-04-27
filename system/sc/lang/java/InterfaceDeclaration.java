@@ -76,7 +76,7 @@ public class InterfaceDeclaration extends TypeDeclaration {
             JavaSemanticNode resolver = getEnclosingType();
             if (resolver == null)
                resolver = getJavaModel();
-            extendsType.initType(this, resolver, false, isLayerType);
+            extendsType.initType(getLayeredSystem(), this, resolver, null, false, isLayerType);
 
             // Need to start the extends type as we need to dig into it
             Object extendsTypeDecl = extendsBoundTypes[i++] = extendsType.getTypeDeclaration();
@@ -137,13 +137,13 @@ public class InterfaceDeclaration extends TypeDeclaration {
       return null;
    }
 
-   public boolean implementsType(String fullTypeName) {
-      if (super.implementsType(fullTypeName))
+   public boolean implementsType(String fullTypeName, boolean assignment) {
+      if (super.implementsType(fullTypeName, assignment))
          return true;
 
       if (extendsBoundTypes != null) {
          for (Object implType:extendsBoundTypes) {
-            if (implType != null && ModelUtil.implementsType(implType, fullTypeName))
+            if (implType != null && ModelUtil.implementsType(implType, fullTypeName, assignment))
                return true;
          }
       }
@@ -305,7 +305,7 @@ public class InterfaceDeclaration extends TypeDeclaration {
             // Handle non-empty methods by moving them to the hiddenBody and getting rid of the body for the interface itself
             else if (st instanceof MethodDefinition) {
                MethodDefinition meth = (MethodDefinition) st;
-               if (meth.body != null) {
+               if (meth.suppressInterfaceMethod()) {
                   addToHiddenBody((Statement) meth.deepCopy(CopyNormal, null));
                   meth.setProperty("body", null);
                }
@@ -323,8 +323,7 @@ public class InterfaceDeclaration extends TypeDeclaration {
             if (st instanceof MethodDefinition) {
                MethodDefinition meth = (MethodDefinition) st;
                // For methods which have an implementation, we preserve them in hidden body and then nix the body
-               // for the .java version.
-               if (meth.body != null) {
+               if (meth.suppressInterfaceMethod()) {
                   addToHiddenBody((Statement) st.deepCopy(CopyNormal, null));
                   meth.setProperty("body", null);
                   any = true;
@@ -374,6 +373,10 @@ public class InterfaceDeclaration extends TypeDeclaration {
 
    public Object[] getImplementsTypeDeclarations() {
       return extendsBoundTypes;
+   }
+
+   public List<?> getImplementsTypes() {
+      return extendsTypes;
    }
 
    public List<Object> getCompiledIFields() {

@@ -945,4 +945,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       return null;
    }
 
+   public void setInferredType(Object type) {
+
+   }
 }

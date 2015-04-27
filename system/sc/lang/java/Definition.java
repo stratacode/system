@@ -11,8 +11,10 @@ import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.obj.ScopeDefinition;
 
+import java.lang.annotation.ElementType;
 import java.lang.reflect.AnnotatedElement;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 
@@ -419,6 +421,18 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
             else if (type == MemberType.SetMethod || type == MemberType.GetMethod)
               return true;
          }
+         EnumSet<ElementType> targets = ModelUtil.getAnnotationTargets(annot);
+         if (targets != null) {
+            switch (type) {
+               case GetMethod:
+               case SetMethod:
+               case SetIndexed:
+                  return targets.contains(ElementType.METHOD);
+               case Field:
+                  return targets.contains(ElementType.FIELD);
+            }
+         }
+         // TODO: is this a valid default?
          return type == MemberType.Field;
       }
       else {
@@ -429,6 +443,8 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
                return p.setOnSetMethod();
             case Field:
                return p.setOnField();
+            case SetIndexed:
+               return false; // TODO - do we need an option here?
             default:
                throw new UnsupportedOperationException();
          }

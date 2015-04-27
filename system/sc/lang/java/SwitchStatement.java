@@ -202,4 +202,11 @@ public class SwitchStatement extends Statement implements IBlockStatement {
    public List<Statement> getBlockStatements() {
       return statements;
    }
+
+   public void addReturnStatements(List<Statement> res) {
+      if (statements != null) {
+         for (Statement statement:statements)
+            statement.addReturnStatements(res);
+      }
+   }
 }

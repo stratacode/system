@@ -251,6 +251,9 @@ public class PTypeUtil {
             return Modifier.isNative(modifiers);
          case 'i':
             return Modifier.isInterface(modifiers);
+         // Java8 only
+         case 'd': // default - applied to methods only when they are the default method
+            return def instanceof Method && ((Method) def).isDefault();
       }
       throw new UnsupportedOperationException();
    }
@@ -436,8 +439,9 @@ public class PTypeUtil {
       else
          ctor = RTypeUtil.getConstructorFromTypeSignature(resultClass, paramSig);
       if (ctor == null) {
-         System.err.println("*** No constructor: " + resultClass + "(" + Arrays.asList(params) + ")");
-         return null;
+         String message = "*** No constructor: " + resultClass + "(" + Arrays.asList(params) + ")";
+         System.err.println(message);
+         throw new IllegalArgumentException(message);
       }
       try {
          return ctor.newInstance(params);
@@ -684,8 +688,16 @@ public class PTypeUtil {
                      mapper.ownerType = resultClass;
                }
 
-               if (!isStatic && mapper.instPosition == -1)
-                  mapper.instPosition = pos++;
+               // For non-interfaces we need to store the absolute position for the property if we inherited the dynamic marker position.
+               if (!isStatic) {
+                  if (mapper.instPosition == -1) {
+                     mapper.instPosition = pos++;
+                  }
+                  else if (!isInterface && mapper.instPosition == IBeanMapper.DYNAMIC_LOOKUP_POSITION) {
+                     mapper.instPosition = pos++;
+                     cache.dynLookupCount--;
+                  }
+               }
 
                // Do this after we've assigned the positions
                if (cloned)

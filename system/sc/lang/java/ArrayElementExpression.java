@@ -139,8 +139,11 @@ public class ArrayElementExpression extends IdentifierExpression {
    }
 
    public boolean needsSetMethod() {
-      if (arrayDimensions == null || arrayDimensions.size() == 1)
-         return super.needsSetMethod();
+      if (arrayDimensions == null || arrayDimensions.size() == 1) {
+         Object assignedProp = getAssignedProperty();
+         // Used to do this for any setX method but we really need to be sure there's an indexed method - e.g. set(int, value) method
+         return assignedProp != null && ModelUtil.isSetIndexMethod(assignedProp);
+      }
       return false;
    }
 

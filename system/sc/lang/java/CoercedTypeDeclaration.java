@@ -38,11 +38,16 @@ public class CoercedTypeDeclaration implements ITypeDeclaration {
       return ModelUtil.getExtendsJavaType(baseType);
    }
 
-   public boolean isAssignableFrom(ITypeDeclaration other) {
-      if (ModelUtil.isAssignableFrom(baseType, other))
+   public List<?> getImplementsTypes() {
+      Object[] res = ModelUtil.getImplementsJavaTypes(baseType);
+      return res == null ? null : Arrays.asList(res);
+   }
+
+   public boolean isAssignableFrom(ITypeDeclaration other, boolean assignmentSemantics) {
+      if (ModelUtil.isAssignableFrom(baseType, other, assignmentSemantics, null))
            return true;
       for (Object iface:interfaces)
-         if (ModelUtil.isAssignableFrom(iface, other))
+         if (ModelUtil.isAssignableFrom(iface, other, assignmentSemantics, null))
             return true;
       return false;
    }
@@ -130,9 +135,9 @@ public class CoercedTypeDeclaration implements ITypeDeclaration {
       return ModelUtil.getInnerType(baseType, name, ctx);
    }
 
-   public boolean implementsType(String otherTypeName) {
+   public boolean implementsType(String otherTypeName, boolean assignment) {
       // TODO: should we verify that our parameters match if the other type has assigned params too?
-      return ModelUtil.implementsType(baseType, otherTypeName);
+      return ModelUtil.implementsType(baseType, otherTypeName, assignment);
    }
 
    public Object getInheritedAnnotation(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {

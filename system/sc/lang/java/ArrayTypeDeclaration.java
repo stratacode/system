@@ -11,6 +11,7 @@ import sc.type.*;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 
@@ -42,11 +43,21 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
       definedInType = dit;
    }
 
+   /** Handles nested array inside of array */
+   public static ArrayTypeDeclaration create(Object compType, String arrayDims, ITypeDeclaration dit) {
+      if (compType instanceof ArrayTypeDeclaration) {
+         ArrayTypeDeclaration prevArr = (ArrayTypeDeclaration) compType;
+         arrayDims = prevArr.arrayDimensions + arrayDims;
+         compType = prevArr.getComponentType();
+      }
+      return new ArrayTypeDeclaration(dit, compType, arrayDims);
+   }
+
    public static ArrayTypeDeclaration create(Object compType, int ndim, ITypeDeclaration dit) {
       return new ArrayTypeDeclaration(dit, compType, JavaType.getDimsStr(ndim));
    }
 
-   public boolean isAssignableFrom(ITypeDeclaration other) {
+   public boolean isAssignableFrom(ITypeDeclaration other, boolean assignmentSemantics) {
       //if (other instanceof TypeDeclaration || other instanceof CFClass || other instanceof ParamTypeDeclaration || other instanceof EnumConstant)
       //   return false;
 
@@ -55,7 +66,7 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
 
       ArrayTypeDeclaration otherTD = (ArrayTypeDeclaration) other;
       
-      return ModelUtil.isAssignableFrom(componentType, otherTD.componentType) && otherTD.arrayDimensions.equals(arrayDimensions);
+      return ModelUtil.isAssignableFrom(componentType, otherTD.componentType, assignmentSemantics, null) && otherTD.arrayDimensions.equals(arrayDimensions);
    }
 
    public boolean isAssignableTo(ITypeDeclaration other) {
@@ -157,7 +168,7 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
       return null;
    }
 
-   public boolean implementsType(String otherTypeName) {
+   public boolean implementsType(String otherTypeName, boolean assignment) {
       int ix = otherTypeName.indexOf("[");
       if (ix == -1)
          return false;
@@ -174,7 +185,7 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
          if (otherNdim > ourNdim) {
             String otherTypeCompName = otherTypeName.substring(ourNdim);
 
-            return ModelUtil.implementsType(componentType, otherTypeCompName);
+            return ModelUtil.implementsType(componentType, otherTypeCompName, assignment);
          }
 
          String arrayTypeName = otherTypeName.substring(otherNdim, otherNdim + 1);
@@ -186,12 +197,12 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
          else
             otherComponentType = t.primitiveClass;
 
-         return ModelUtil.isAssignableFrom(otherComponentType, componentType);
+         return ModelUtil.isAssignableFrom(otherComponentType, componentType, assignment, null);
 
       }
       else {
          return arrayDimensions.length() == otherTypeName.length()-ix &&
-                ModelUtil.implementsType(componentType, otherTypeName);
+                ModelUtil.implementsType(componentType, otherTypeName, assignment);
       }
    }
 
@@ -217,6 +228,11 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
 
    public Object getExtendsType() {
       return ModelUtil.getExtendsJavaType(componentType);
+   }
+
+   public List<?> getImplementsTypes() {
+      Object res = ModelUtil.getImplementsJavaTypes(componentType);
+      return res == null ? null : Arrays.asList(res);
    }
 
    public boolean isTypeParameter() {

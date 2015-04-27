@@ -297,7 +297,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       }
    }
 
-   public boolean isAssignableFrom(ITypeDeclaration other) {
+   public boolean isAssignableFrom(ITypeDeclaration other, boolean assignmentSemantics) {
       if (other instanceof ArrayTypeDeclaration)
          return false;
       return other.isAssignableTo(this);
@@ -519,7 +519,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       return null;
    }
 
-   public boolean implementsType(String otherName) {
+   public boolean implementsType(String otherName, boolean assignment) {
       if (!started)
          start();
 
@@ -533,7 +533,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
             if (otherName.equals(interfaceName))
                return true;
             Object implType = implementsTypes.get(i);
-            if (implType != null && ModelUtil.implementsType(implType, otherName))
+            if (implType != null && ModelUtil.implementsType(implType, otherName, assignment))
                return true;
          }
       }
@@ -541,7 +541,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          String extendsName = classFile.getExtendsTypeName();
          if (extendsName.equals(otherName))
             return true;
-         return ModelUtil.implementsType(extendsType, otherName);
+         return ModelUtil.implementsType(extendsType, otherName, assignment);
       }
       return false;
    }
@@ -602,6 +602,10 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
 
    public Object getExtendsType() {
       return extendsType;
+   }
+
+   public List<?> getImplementsTypes() {
+      return implementsTypes;
    }
 
    public CoalescedHashMap getMethodCache() {
@@ -781,7 +785,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
    }
 
    public boolean isComponentType() {
-      return implementsType("sc.obj.IComponent");
+      return implementsType("sc.obj.IComponent", false);
    }
 
    public DynType getPropertyCache() {

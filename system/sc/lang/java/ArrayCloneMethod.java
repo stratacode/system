@@ -14,7 +14,7 @@ public class ArrayCloneMethod extends WrapperMethod {
       this.javaModel = model;
    }
 
-   public Object getTypeDeclaration(List<? extends ITypedObject> args) {
+   public Object getTypeDeclaration(List<? extends ITypedObject> args, boolean resolve) {
       return arrayType;
    }
 

@@ -64,8 +64,8 @@ public class Sequence extends NestedParselet  {
    }
 
    public Object parse(Parser parser) {
-      if (trace && parser.enablePartialValues)
-         System.out.println("*** tracing sequence parse");
+      if (trace)
+         System.out.println("*** parse sequence: " + this + " at " + parser.currentIndex);
 
       if (repeat)
          return parseRepeatingSequence(parser, false, null);
@@ -114,7 +114,7 @@ public class Sequence extends NestedParselet  {
 
                // If we failed to complete this sequence, and we are in "error handling" mode, try to re-parse the previous sequence by extending it.
                // Some sequences collapse all values into a single child (e.g. blockComment).  For those, we can't support this optimization.
-               if (i > 0 && value != null && value.children.size() >= i) {
+               if (i > 0 && value != null && value.children != null && value.children.size() >= i) {
                   int prevIx = i - 1;
                   Parselet prevParselet = parselets.get(prevIx);
                   Object oldValue = value.children.get(prevIx);

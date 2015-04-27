@@ -38,7 +38,14 @@ public class FloatLiteral extends AbstractLiteral {
    public void initialize() {
       if (value != null) {
          try {
-            doubleValue = Double.valueOf(value);
+            String toParse = value;
+            if (toParse.contains("_")) {
+               if (toParse.endsWith("_")) {
+                  displayError("Invalid float literal - ends with '_'");
+               }
+               toParse = value.replace("_", "");
+            }
+            doubleValue = Double.valueOf(toParse);
          }
          catch (NumberFormatException exc) {
             displayError("Invalid number value for floating point literal: ", value + ": ");
@@ -76,6 +83,7 @@ public class FloatLiteral extends AbstractLiteral {
    }
 
    public Statement transformToJS() {
+      IntegerLiteral.transformNumberToJS(this);
       // JS does not support the float/double suffix
       if (value.endsWith("f") || value.endsWith("F") || value.endsWith("d") || value.endsWith("D"))
          value = value.substring(0, value.length()-1);

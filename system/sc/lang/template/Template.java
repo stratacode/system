@@ -93,8 +93,8 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
       return super.findMember(name, mtype, fromChild, refType, ctx, skipIfaces);
    }
 
-   public boolean isAssignableFrom(ITypeDeclaration other) {
-      return ModelUtil.isAssignableFrom(rootType, other);
+   public boolean isAssignableFrom(ITypeDeclaration other, boolean assignmentSemantics) {
+      return ModelUtil.isAssignableFrom(rootType, other, assignmentSemantics, null);
    }
 
    public boolean isAssignableTo(ITypeDeclaration other) {
@@ -227,10 +227,10 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
       return ModelUtil.getInnerType(rootType, name, ctx);
    }
 
-   public boolean implementsType(String otherTypeName) {
+   public boolean implementsType(String otherTypeName, boolean assignment) {
       if (rootType == null)
          return false;
-      return ModelUtil.implementsType(rootType, otherTypeName);
+      return ModelUtil.implementsType(rootType, otherTypeName, assignment);
    }
 
    public Object getInheritedAnnotation(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
@@ -261,6 +261,13 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
       if (rootType == null)
          return null;
       return ModelUtil.getExtendsJavaType(rootType);
+   }
+
+   public List<?> getImplementsTypes() {
+      if (rootType == null)
+         return null;
+      Object res = ModelUtil.getImplementsJavaTypes(rootType);
+      return res == null ? null : Arrays.asList(res);
    }
 
    public List<Object> getAllMethods(String modifier, boolean hasModifier, boolean isDyn, boolean overridesComp) {

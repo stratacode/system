@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import sc.layer.LayeredSystem;
 import sc.type.Type;
 
 public class PrimitiveType extends JavaType {
@@ -93,11 +94,11 @@ public class PrimitiveType extends JavaType {
       return typeName;
    }
 
-   public Object getTypeDeclaration() {
+   public Object getTypeDeclaration(ITypeParamContext ctx) {
       return getRuntimeClass();
    }
 
-   public void initType(ITypeDeclaration itd, JavaSemanticNode node, boolean displayError, boolean isLayer) {}
+   public void initType(LayeredSystem sys, ITypeDeclaration itd, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer) {}
 
    public String getBaseSignature() {
       return getSignatureCode();
@@ -129,7 +130,28 @@ public class PrimitiveType extends JavaType {
       return typeName;
    }
 
+   @Override
+   public JavaType resolveTypeParameters(ITypeParamContext t) {
+      return this;
+   }
+
+   @Override
+   void startWithType(Object type) {
+   }
+
    public String getAbsoluteBaseTypeName() {
       return getFullBaseTypeName();
+   }
+
+   public boolean isParameterizedType() {
+      return false;
+   }
+
+   public boolean isBound() {
+      return true;
+   }
+
+   public Object definesTypeParameter(String typeParamName, ITypeParamContext ctx) {
+      return null;
    }
 }

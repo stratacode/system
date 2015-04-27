@@ -108,6 +108,10 @@ public class VariableSelector extends Selector {
       return sb.toString();
    }
 
+   public String toString() {
+      return toGenerateString();
+   }
+
    public VariableSelector deepCopy(int options, IdentityHashMap<Object, Object> oldNewMap) {
       VariableSelector res = (VariableSelector) super.deepCopy(options, oldNewMap);
 

@@ -27,6 +27,8 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
    public SymbolChoice nonZeroDigit = new SymbolChoice(NOERROR);
    public SymbolChoice hexDigits = new SymbolChoice(REPEAT | NOERROR);
    public SymbolChoice hexDigit = new SymbolChoice(NOERROR);
+   public SymbolChoice binaryDigits = new SymbolChoice(REPEAT | NOERROR);
+   public SymbolChoice binaryDigit = new SymbolChoice(NOERROR);
    public SymbolChoice octalDigits = new SymbolChoice(REPEAT | NOERROR);
    public SymbolChoice octalDigit = new SymbolChoice();
    public Sequence optOctalDigit = new Sequence(OPTIONAL | NOERROR, octalDigit);
@@ -35,22 +37,31 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
 
    public String [] hexLetters = {"a", "b", "c", "d", "e", "f"};
 
+   public void addDigitChar(String s, int i) {
+      digits.addExpectedValue(s);
+      optDigits.addExpectedValue(s);
+      hexDigits.addExpectedValue(s);
+      hexDigit.addExpectedValue(s);
+      fpChar.addExpectedValue(s);
+      intChar.addExpectedValue(s);
+      if (i < 8)
+      {
+         octalDigits.addExpectedValue(s);
+         octalDigit.addExpectedValue(s);
+      }
+      if (i != 0)
+         nonZeroDigit.addExpectedValue(s);
+      if (i < 2) {
+         binaryDigits.addExpectedValue(s);
+         binaryDigit.addExpectedValue(s);
+      }
+
+   }
+
    {
       for (int i = 0; i < 10; i++) {
          String s = String.valueOf(i);
-         digits.addExpectedValue(s);
-         optDigits.addExpectedValue(s);
-         hexDigits.addExpectedValue(s);
-         hexDigit.addExpectedValue(s);
-         fpChar.addExpectedValue(s);
-         intChar.addExpectedValue(s);
-         if (i < 8)
-         {
-            octalDigits.addExpectedValue(s);
-            octalDigit.addExpectedValue(s);
-         }
-         if (i != 0)
-            nonZeroDigit.addExpectedValue(s);
+         addDigitChar(s, i);
       }
       for (String hexLetter : hexLetters) {
          hexDigits.addExpectedValue(hexLetter);
@@ -253,8 +264,6 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
 
    Sequence optIdentifier = new Sequence("(.)", OPTIONAL, identifier);
 
-   // TODO: this should probably be a new JavaType - change imports, etc. so we do not
-   // have to reparse in the model.
    public Sequence qualifiedIdentifier = new Sequence("('','')", identifier,
            new Sequence("('','')", OPTIONAL | REPEAT, new SymbolSpace("."), identifier));
 
