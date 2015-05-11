@@ -294,7 +294,7 @@ public class ClassType extends JavaType {
          JavaType typeArg = typeArgs.get(i);
          Object argType = typeArg.getTypeDeclaration(ctx);
          if (argType == null)
-            typeDefs.add(typeArg);
+            typeDefs.add(null); // An unresolved type?  Do not put ClassTypes here but are there any cases we need a TypeVariable?
          else
             typeDefs.add(argType);
       }

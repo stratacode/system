@@ -270,7 +270,7 @@ public abstract class Language implements IFileProcessor {
       String absFileName = fileName;
       // TODO: this is a hack!  Add a new parameter or maybe disabled:layerName?
       if (layerName != null) {
-         Layer layer = sys.getActiveOrInactiveLayerByPath(layerName, null, layerEnabled);
+         Layer layer = sys.getActiveOrInactiveLayerByPathSync(layerName, null, layerEnabled);
          if (layer == null) {
             System.err.println("No layer named: " + layerName + " for styleFile method");
             return null;

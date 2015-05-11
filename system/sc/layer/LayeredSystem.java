@@ -1150,6 +1150,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                peerLayerPath = newLayerDir;
             LayeredSystem peerSys = new LayeredSystem(null, procLayerNames, explicitDynLayers, peerLayerPath, rootClassPath, options, proc, this, false, externalModelIndex);
 
+            // The LayeredSystem needs at least the main layered system in its peer list to initialize the layers.  We'll reset this later to include all of the layeredSystems.
+            if (peerSys.peerSystems == null) {
+               ArrayList<LayeredSystem> tempPeerList = new ArrayList<LayeredSystem>();
+               tempPeerList.add(this);
+               peerSys.peerSystems = tempPeerList;
+            }
+
             // Propagate any properties which directly go across to all peers
             if (!autoClassLoader)
                peerSys.setFixedSystemClassLoader(systemClassLoader);
@@ -1724,7 +1731,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (dynamicByDefault) {
          lpi.explicitDynLayers = new ArrayList<String>();
          // We support either . or / as separate for layer names so be sure to match both
-         for (String initLayer:initLayerNames) {
+         for (String initLayer : initLayerNames) {
             lpi.explicitDynLayers.add(initLayer.replace(".", "/"));
             lpi.explicitDynLayers.add(initLayer.replace("/", "."));
             if (allDynamic)
@@ -4589,104 +4596,110 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public void addLayer(Layer layer, ExecutionContext ctx, boolean runMain, boolean setPackagePrefix, boolean saveModel, boolean makeBuildLayer, boolean build, boolean isActive) {
-      Layer oldBuildLayer = null;
-      int newLayerPos;
-      if (isActive) {
-         // Don't use the specified buildDir for the new layer
-         options.buildLayerAbsDir = null;
+      try {
+         acquireDynLock(false);
+         Layer oldBuildLayer = null;
+         int newLayerPos;
+         if (isActive) {
+            // Don't use the specified buildDir for the new layer
+            options.buildLayerAbsDir = null;
 
-         newLayerPos = lastLayer == null ? 0 : lastLayer.layerPosition + 1;
-         oldBuildLayer = buildLayer;
-      }
-      else {
-         newLayerPos = inactiveLayers.size();
-      }
-
-      /* Now that we have defined the base layers, we'll inherit the package prefix and dynamic state */
-      boolean baseIsDynamic = false;
-
-      layer.layerPosition = isActive ? layers.size() : inactiveLayers.size();
-
-      layer.initModel();
-
-      String pkgPrefix = null;
-      if (setPackagePrefix && layer.baseLayers != null) {
-         for (Layer baseLayer:layer.baseLayers) {
-            if (baseLayer.dynamic)
-               baseIsDynamic = true;
-            if (StringUtil.isEmpty(layer.packagePrefix) && !StringUtil.isEmpty(baseLayer.packagePrefix)) {
-               pkgPrefix = baseLayer.packagePrefix;
-               break;
-            }
+            newLayerPos = lastLayer == null ? 0 : lastLayer.layerPosition + 1;
+            oldBuildLayer = buildLayer;
          }
-         if (pkgPrefix != null) {
-            layer.model.setComputedPackagePrefix(pkgPrefix);
-            layer.packagePrefix = pkgPrefix;
+         else {
+            newLayerPos = inactiveLayers.size();
+         }
+
+         /* Now that we have defined the base layers, we'll inherit the package prefix and dynamic state */
+         boolean baseIsDynamic = false;
+
+         layer.layerPosition = isActive ? layers.size() : inactiveLayers.size();
+
+         layer.initModel();
+
+         String pkgPrefix = null;
+         if (setPackagePrefix && layer.baseLayers != null) {
+            for (Layer baseLayer:layer.baseLayers) {
+               if (baseLayer.dynamic)
+                  baseIsDynamic = true;
+               if (StringUtil.isEmpty(layer.packagePrefix) && !StringUtil.isEmpty(baseLayer.packagePrefix)) {
+                  pkgPrefix = baseLayer.packagePrefix;
+                  break;
+               }
+            }
+            if (pkgPrefix != null) {
+               layer.model.setComputedPackagePrefix(pkgPrefix);
+               layer.packagePrefix = pkgPrefix;
+               layer.layerUniqueName = CTypeUtil.prefixPath(layer.packagePrefix, layer.layerDirName);
+            }
+
+            layer.dynamic = !layer.compiledOnly && !getCompiledOnly() && (layer.dynamic || baseIsDynamic);
+         }
+
+         // Needs to be set before registerLayer but after we have a definite package prefix
+         if (pkgPrefix == null)
             layer.layerUniqueName = CTypeUtil.prefixPath(layer.packagePrefix, layer.layerDirName);
+
+         if (isActive) {
+            registerLayer(layer);
+            layers.add(layer);
+            // Do not start the layer here.  If it is started, we won't get into initSysClassLoader from updateBuildDir and lastStartedLayer
+            // does not get
+            ParseUtil.initComponent(layer);
+
+            lastLayer = layer;
+
+            if (makeBuildLayer && isActive)
+               updateBuildDir(oldBuildLayer);
+         }
+         else {
+            registerInactiveLayer(layer);
          }
 
-         layer.dynamic = !layer.compiledOnly && !getCompiledOnly() && (layer.dynamic || baseIsDynamic);
-      }
+         // Do this before we start the layer so that the layer's srcDirCache includes the layer file itself
+         if (saveModel)
+            layer.model.saveModel();
 
-      // Needs to be set before registerLayer but after we have a definite package prefix
-      if (pkgPrefix == null)
-         layer.layerUniqueName = CTypeUtil.prefixPath(layer.packagePrefix, layer.layerDirName);
+         if (isActive) {
+            // Start these before we update them
+            startLayers(layer);
 
-      if (isActive) {
-         registerLayer(layer);
-         layers.add(layer);
-         // Do not start the layer here.  If it is started, we won't get into initSysClassLoader from updateBuildDir and lastStartedLayer
-         // does not get
-         ParseUtil.initComponent(layer);
-
-         lastLayer = layer;
-
-         if (makeBuildLayer && isActive)
-            updateBuildDir(oldBuildLayer);
-      }
-      else {
-         registerInactiveLayer(layer);
-      }
-
-      // Do this before we start the layer so that the layer's srcDirCache includes the layer file itself
-      if (saveModel)
-         layer.model.saveModel();
-
-      if (isActive) {
-         // Start these before we update them
-         startLayers(layer);
-
-         if (saveModel) {
-            addNewModel(layer.model, null, null, true);
-         }
-
-         ArrayList<ModelToUpdate> res = updateLayers(newLayerPos, ctx);
-
-         if (build)
-            buildIfNecessary(oldBuildLayer);
-         // For a newly created layer we should not have to build but do need to include the build dir in the sys class loader I think
-         else if (makeBuildLayer) {
-            layer.compiled = true;  // Since the layer is empty we can still consider it compiled... otherwise, won't get added to the sys class path in case we do put stuff there later
-            initSysClassLoader(layer, ClassLoaderMode.BUILD);
-         }
-
-         UpdateInstanceInfo updateInfo = newUpdateInstanceInfo();
-
-         if (res != null) {
-            for (int i = 0; i < res.size(); i++) {
-               ModelToUpdate mt = res.get(i);
-               refresh(mt.srcEnt, mt.oldModel, ctx, updateInfo);
+            if (saveModel) {
+               addNewModel(layer.model, null, null, true);
             }
+
+            ArrayList<ModelToUpdate> res = updateLayers(newLayerPos, ctx);
+
+            if (build)
+               buildIfNecessary(oldBuildLayer);
+            // For a newly created layer we should not have to build but do need to include the build dir in the sys class loader I think
+            else if (makeBuildLayer) {
+               layer.compiled = true;  // Since the layer is empty we can still consider it compiled... otherwise, won't get added to the sys class path in case we do put stuff there later
+               initSysClassLoader(layer, ClassLoaderMode.BUILD);
+            }
+
+            UpdateInstanceInfo updateInfo = newUpdateInstanceInfo();
+
+            if (res != null) {
+               for (int i = 0; i < res.size(); i++) {
+                  ModelToUpdate mt = res.get(i);
+                  refresh(mt.srcEnt, mt.oldModel, ctx, updateInfo);
+               }
+            }
+
+            // Now run initialization code gathered up during the update process
+            updateInfo.updateInstances(ctx);
+
+            if (runMain)
+               initStartupObjects(newLayerPos);
          }
 
-         // Now run initialization code gathered up during the update process
-         updateInfo.updateInstances(ctx);
-
-         if (runMain)
-            initStartupObjects(newLayerPos);
+         notifyLayerAdded(layer);
       }
-
-      notifyLayerAdded(layer);
+      finally {
+         releaseDynLock(false);
+      }
    }
 
    private void notifyLayerAdded(Layer layer) {
@@ -4865,8 +4878,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     */
    private List<Layer> initLayers(List<String> layerNames, String relDir, String relPath, boolean markDynamic, LayerParamInfo lpi, boolean specified) {
       List<Layer> layers = new ArrayList<Layer>();
-      initializingLayers = true;
       try {
+         acquireDynLock(false);
+         initializingLayers = true;
          for (String layerName:layerNames) {
             Layer l = initLayer(layerName, relDir, relPath, markDynamic, lpi);
             layers.add(l);
@@ -4876,6 +4890,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       finally {
          initializingLayers = false;
+         releaseDynLock(false);
       }
       return layers;
    }
@@ -6071,6 +6086,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      try {
                         SysTypeIndex sysIdx = layerSys.typeIndex;
                         LayerListTypeIndex idx = layer.activated ? sysIdx.activeTypeIndex : sysIdx.inactiveTypeIndex;
+                        if (writeLocked == 0) {
+                           System.err.println("*** Modifying type index without write lock");
+                           new Throwable().printStackTrace();
+                        }
                         idx.typeIndex.put(layerName, layer.layerTypeIndex);
                         refreshedLayers.add(layerName);
                      }
@@ -6079,32 +6098,41 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      }
                   }
                   else {
-                     LayerTypeIndex layerTypeIndex = readTypeIndexFile(typeIndexIdent, layerName);
-                     if (layerTypeIndex == null) {
-                        // ?? huh we just listed out the file - rebuild it from scratch.
-                        layerTypeIndex = buildLayerTypeIndex(layerName);
-                        refreshedLayers.add(layerName);
-                     }
-                     else {
-                        switch (options.typeIndexMode) {
-                           case Refresh:
-                              layerTypeIndex = refreshLayerTypeIndex(layerName, layerTypeIndex, new File(FileUtil.concat(typeIndexDir.getPath(), indexFileName)).lastModified());
-                              refreshedLayers.add(layerName);
-                              break;
-                           default:
-                              break;
+                     acquireDynLock(false);
+                     try {
+                        LayerTypeIndex layerTypeIndex = readTypeIndexFile(typeIndexIdent, layerName);
+                        if (layerTypeIndex == null) {
+                           // ?? huh we just listed out the file - rebuild it from scratch.
+                           layerTypeIndex = buildLayerTypeIndex(layerName);
+                           refreshedLayers.add(layerName);
+                        } else {
+                           switch (options.typeIndexMode) {
+                              case Refresh:
+                                 layerTypeIndex = refreshLayerTypeIndex(layerName, layerTypeIndex, new File(FileUtil.concat(typeIndexDir.getPath(), indexFileName)).lastModified());
+                                 refreshedLayers.add(layerName);
+                                 break;
+                              default:
+                                 break;
+                           }
                         }
-                     }
-                     if (layerTypeIndex != null)
-                        curTypeIndex.inactiveTypeIndex.typeIndex.put(layerName, layerTypeIndex);
-                     else
-                        curTypeIndex.inactiveTypeIndex.typeIndex.remove(layerName);
-                     if (layerTypeIndex != null && layerTypeIndex.langExtensions != null)
-                        customSuffixes.addAll(Arrays.asList(layerTypeIndex.langExtensions));
+                        if (writeLocked == 0) {
+                           System.err.println("*** Modifying type index without write lock");
+                           new Throwable().printStackTrace();
+                        }
+                        if (layerTypeIndex != null)
+                           curTypeIndex.inactiveTypeIndex.typeIndex.put(layerName, layerTypeIndex);
+                        else
+                           curTypeIndex.inactiveTypeIndex.typeIndex.remove(layerName);
+                        if (layerTypeIndex != null && layerTypeIndex.langExtensions != null)
+                           customSuffixes.addAll(Arrays.asList(layerTypeIndex.langExtensions));
 
-                     // The process of getting a layer may have created this runtime so use it as soon as it becomes available.
-                     if (curSys == null)
-                        curSys = findSystemFromTypeIndexIdent(typeIndexIdent);
+                        // The process of getting a layer may have created this runtime so use it as soon as it becomes available.
+                        if (curSys == null)
+                           curSys = findSystemFromTypeIndexIdent(typeIndexIdent);
+                     }
+                     finally {
+                        releaseDynLock(false);
+                     }
                   }
                }
             }
@@ -6277,23 +6305,30 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public LayerTypeIndex buildLayerTypeIndex(String layerName) {
-      Layer layer = getInactiveLayerSync(layerName, true, true, false);
-      if (layer == null) {
-         System.err.println("*** Unable to index layer: " + layerName);
-         return null;
-      }
-      else if (layer.disabled) {
-         return null;
-      }
-      else if (!layer.excluded && layer.layeredSystem == this) {
-         layer.initAllTypeIndex();
-         typeIndex.inactiveTypeIndex.typeIndex.put(layerName, layer.layerTypeIndex);
-         return layer.layerTypeIndex;
-      }
-      else { // For excluded layers, hand it off to the layer's layered system
-         if (layer.layeredSystem != this) {
-            return layer.layeredSystem.buildLayerTypeIndex(layerName);
+      try {
+         acquireDynLock(false);
+         Layer layer = getInactiveLayer(layerName, true, true, false);
+         if (layer == null) {
+            System.err.println("*** Unable to index layer: " + layerName);
+            return null;
+         } else if (layer.disabled) {
+            return null;
+         } else if (!layer.excluded && layer.layeredSystem == this) {
+            layer.initAllTypeIndex();
+            if (writeLocked == 0) {
+               System.err.println("*** Modifying type index without write lock");
+               new Throwable().printStackTrace();
+            }
+            typeIndex.inactiveTypeIndex.typeIndex.put(layerName, layer.layerTypeIndex);
+            return layer.layerTypeIndex;
+         } else { // For excluded layers, hand it off to the layer's layered system
+            if (layer.layeredSystem != this) {
+               return layer.layeredSystem.buildLayerTypeIndex(layerName);
+            }
          }
+      }
+      finally {
+         releaseDynLock(false);
       }
       return null;
    }
@@ -8532,6 +8567,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             ILanguageModel newModel = (ILanguageModel) res;
             if (!dummy)
                markBeingLoadedModel(srcEnt, newModel);
+            else
+               newModel.setTemporary(true);
             try {
                initModel(srcEnt.layer, modTimeStart, newModel, srcEnt.isLayerFile(), false);
             }
@@ -11442,6 +11479,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return urls.toArray(new URL[urls.size()]);
    }
 
+   static int readLocked, writeLocked;
+
    public void acquireDynLock(boolean readOnly) {
       long startTime = 0;
       if (options.verbose || options.verboseLocks)
@@ -11449,10 +11488,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (options.verboseLocks) {
          System.out.println("Acquiring system dyn lock for read-only: " + readOnly + " thread: " + Thread.currentThread().getName() + ": runtime: " + getRuntimeName());
       }
-      if (!readOnly)
+      if (!readOnly) {
          globalDynLock.writeLock().lock();
-      else
+         writeLocked++;
+      }
+      else {
          globalDynLock.readLock().lock();
+         readLocked++;
+      }
       if (options.verboseLocks || options.verbose) {
          long duration = System.currentTimeMillis() - startTime;
          if (duration > 1000) {
@@ -11468,10 +11511,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public void releaseDynLock(boolean readOnly) {
       if (options.verboseLocks)
          System.out.println("Releasing system dyn lock for read-only: " + readOnly + " thread: " + Thread.currentThread().getName() + ": runtime: " + getRuntimeName());
-      if (!readOnly)
+      if (!readOnly) {
+         writeLocked--;
          globalDynLock.writeLock().unlock();
-      else
+      }
+      else {
+         readLocked--;
          globalDynLock.readLock().unlock();
+      }
    }
 
    public Lock getDynReadLock() {
@@ -12297,6 +12344,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // else - error -
       }
       return layer;
+   }
+
+   public Layer getActiveOrInactiveLayerByPathSync(String layerPath, String prefix, boolean enabled) {
+      try {
+         acquireDynLock(false);
+         return getActiveOrInactiveLayerByPath(layerPath, prefix, enabled);
+      }
+      finally {
+         releaseDynLock(false);
+      }
    }
 
    public Layer getActiveOrInactiveLayerByPath(String layerPath, String prefix, boolean enabled) {

@@ -77,6 +77,8 @@ public interface ILanguageModel extends IFileProcessorResult {
 
    boolean isAdded();
 
+   void setTemporary(boolean temp);
+
    Object getUserData();
 
    /** An optimization - returns true if the other is the exact same model,  Returns false if you are not sure. */

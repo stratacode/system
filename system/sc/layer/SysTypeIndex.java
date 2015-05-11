@@ -88,6 +88,10 @@ public class SysTypeIndex {
 
 
    public void addMatchingGlobalNames(String prefix, Set<String> candidates, boolean retFullTypeName) {
+      if (inactiveTypeIndex.sys.writeLocked == 0) {
+         System.err.println("*** Modifying type index without write lock");
+         new Throwable().printStackTrace();
+      }
       // For each type in the type index, add the type if it matches
       for (Map.Entry<String,LayerTypeIndex> typeIndexEnt:inactiveTypeIndex.typeIndex.entrySet()) {
          //String layerName = typeIndexEnt.getKey();

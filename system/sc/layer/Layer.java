@@ -1771,6 +1771,11 @@ public class Layer implements ILifecycle, LayerConstants {
       if (sysIndex == null)
          sysIndex = layeredSystem.typeIndex = new SysTypeIndex(layeredSystem);
       LayerListTypeIndex useTypeIndex = activated ? sysIndex.activeTypeIndex : sysIndex.inactiveTypeIndex;
+      if (layeredSystem.writeLocked == 0) {
+         System.err.println("Updating type index without write lock: ");
+         new Throwable().printStackTrace();;
+      }
+
       useTypeIndex.typeIndex.put(getLayerName(), layerTypeIndex);
       layerTypeIndex.baseLayerNames = baseLayerNames == null ? null : baseLayerNames.toArray(new String[baseLayerNames.size()]);
    }

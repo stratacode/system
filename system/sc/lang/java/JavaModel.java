@@ -2628,6 +2628,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       added = v;
    }
 
+   public void setTemporary(boolean v) {
+      temporary = v;
+   }
+
    public boolean isAdded() {
       return added;
    }

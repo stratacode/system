@@ -244,6 +244,9 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
    public Object getTypeForVariable(Object typeVar) {
       // Is this type parameter bound to the type for this type context?  It might be a method type parameter or for a different type
       Object srcType = ModelUtil.getTypeParameterDeclaration(typeVar);
+      if (ModelUtil.isMethod(srcType)) {
+         srcType = ModelUtil.getReturnType(srcType);
+      }
       if (ModelUtil.isAssignableFrom(srcType, baseType)) {
          return ModelUtil.resolveTypeParameter(srcType, this, ModelUtil.getTypeParameterName(typeVar));
       }
