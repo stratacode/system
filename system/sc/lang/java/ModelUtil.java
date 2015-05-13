@@ -820,7 +820,7 @@ public class ModelUtil {
 
       if (ModelUtil.isAssignableFrom(ModelUtil.getReturnType(c2), ModelUtil.getReturnType(c1)))
          return c1;
-      return c1;
+      return c2;
    }
 
    /** isSameType might be a better name? */
