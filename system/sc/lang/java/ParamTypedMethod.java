@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 
 import java.lang.reflect.Method;
@@ -20,12 +21,16 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
    JavaType[] paramJavaTypes;
    Object[] paramTypes;
 
-   public ParamTypedMethod(Object meth, ITypeParamContext paramTypeDeclaration) {
+   // This is the type declaration which defines the use of this param typed method
+   ITypeDeclaration definedInType;
+
+   public ParamTypedMethod(Object meth, ITypeParamContext paramTypeDeclaration, ITypeDeclaration definedInType) {
       if (meth == null)
          System.out.println("*** Warning null method for method typed parameter");
       method = meth;
       paramTypeDecl = paramTypeDeclaration;
       methodTypeParams = ModelUtil.getMethodTypeParameters(method);
+      this.definedInType = definedInType;
    }
 
    public Object getTypeDeclaration() {
@@ -267,5 +272,13 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
 
    public LayeredSystem getLayeredSystem() {
       return paramTypeDecl.getLayeredSystem();
+   }
+
+   public Layer getRefLayer() {
+      return definedInType != null ? definedInType.getLayer() : paramTypeDecl.getRefLayer();
+   }
+
+   public ITypeDeclaration getDefinedInType() {
+      return definedInType;
    }
 }

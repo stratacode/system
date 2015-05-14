@@ -203,6 +203,10 @@ public class CoercedTypeDeclaration implements ITypeDeclaration {
       throw new UnsupportedOperationException();
    }
 
+   public Layer getLayer() {
+      return ModelUtil.getLayerForType(null, baseType);
+   }
+
    public LayeredSystem getLayeredSystem() {
       throw new UnsupportedOperationException();
    }

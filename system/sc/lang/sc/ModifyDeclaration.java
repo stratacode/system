@@ -1434,6 +1434,12 @@ public class ModifyDeclaration extends TypeDeclaration {
             inst = RTypeUtil.createInstance((Class) inst);
          }
       }
+      initLayerInstance(inst, prefix, inheritedPrefix);
+
+      return inst;
+   }
+
+   public void initLayerInstance(Object inst, String prefix, boolean inheritedPrefix) {
       // For the layer object, we need to set the package prefix before we try to use the object in initDynamicInstance.
       if (prefix != null) {
          if (inst instanceof Layer) {
@@ -1454,8 +1460,6 @@ public class ModifyDeclaration extends TypeDeclaration {
          }
       }
       initDynamicInstance(inst);
-
-      return inst;
    }
 
    // We don't have to do anything here except add us to our output - while the parent is being transformed...

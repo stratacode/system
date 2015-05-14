@@ -1010,12 +1010,41 @@ public class Layer implements ILifecycle, LayerConstants {
          lpi.activate = activated;
          // TODO: we are resetting the Layer properties based on the new model but really need to first reset them to the defaults.
          // or should we just create a new Layer instance and then update the Layer object references in all of the dependent models, or use a "removeLayer" and "removed" flag?
-         modelType.initDynamicInstance(this);
+         String prefix = model.getPackagePrefix();
+         layerModel.initLayerInstance(this, prefix, getInheritedPrefix(baseLayers, prefix, newModel));
+         //modelType.initDynamicInstance(this);
          initLayerModel((JavaModel) model, lpi, layerDirName, false, false, dynamic);
          initImports();
          initImportCache();
       }
       return reInit;
+   }
+
+   public static boolean getBaseIsDynamic(List<Layer> baseLayers) {
+      /* Now that we have defined the base layers, we'll inherit the package prefix and dynamic state */
+      boolean baseIsDynamic = false;
+      if (baseLayers != null) {
+         for (Layer baseLayer:baseLayers) {
+            if (baseLayer.dynamic)
+               baseIsDynamic = true;
+         }
+      }
+      return baseIsDynamic;
+   }
+
+   public static boolean getInheritedPrefix(List<Layer> baseLayers, String prefix, JavaModel model) {
+      boolean inheritedPrefix = false;
+      if (baseLayers != null) {
+         for (Layer baseLayer:baseLayers) {
+            if (prefix == null && baseLayer.packagePrefix != null && baseLayer.exportPackage) {
+               prefix = baseLayer.packagePrefix;
+               model.setComputedPackagePrefix(prefix);
+               inheritedPrefix = true;
+               break;
+            }
+         }
+      }
+      return inheritedPrefix;
    }
 
    private void initImports() {

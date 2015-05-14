@@ -85,7 +85,7 @@ public abstract class BaseLambdaExpression extends Expression {
       }
 
       if (ModelUtil.isParameterizedMethod(ifaceMeth) && ModelUtil.hasTypeParameters(inferredType)) {
-         ifaceMeth = new ParamTypedMethod(ifaceMeth, (ITypeParamContext) inferredType);
+         ifaceMeth = new ParamTypedMethod(ifaceMeth, (ITypeParamContext) inferredType, getEnclosingType());
       }
 
       ITypeParamContext typeCtx = inferredType instanceof ITypeParamContext ? (ITypeParamContext) inferredType : null;
@@ -298,7 +298,7 @@ public abstract class BaseLambdaExpression extends Expression {
    public void setInferredType(Object parentType) {
       // Convert between the ParameterizedType and ParamTypeDeclaration
       if (parentType instanceof ParameterizedType)
-         parentType = ModelUtil.getTypeDeclFromType(parentType, parentType, false, getLayeredSystem(), true);
+         parentType = ModelUtil.getTypeDeclFromType(parentType, parentType, false, getLayeredSystem(), true, getEnclosingType());
       inferredType = parentType;
       if (needsStart) {
          needsStart = false;

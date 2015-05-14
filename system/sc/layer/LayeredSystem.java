@@ -2862,6 +2862,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       /** Do a rebuild automatically when a page is refreshed.  Good for development since each page refresh will recompile and update the server and javascript code.  If a restart is required you are notified.  Bad for production because it's very expensive. */
       @Constant public boolean autoRefresh = true;
 
+      @Constant public boolean retryAfterFailedBuild = false;
+
       @Constant String testPattern = null;
 
       /** Argument to control what happens after the command is run, e.g. it can specify the URL of the page to open. */
@@ -3496,7 +3498,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private boolean syncInited = false;
 
    private boolean promptUserRetry() {
-      if (cmd == null)
+      if (cmd == null || !options.retryAfterFailedBuild)
          return false;
 
       do {
@@ -11321,20 +11323,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       /* Now that we have defined the base layers, we'll inherit the package prefix and dynamic state */
-      boolean baseIsDynamic = false;
-      boolean inheritedPrefix = false;
-      if (baseLayers != null) {
-         for (Layer baseLayer:baseLayers) {
-            if (baseLayer.dynamic)
-               baseIsDynamic = true;
-            if (prefix == null && baseLayer.packagePrefix != null && baseLayer.exportPackage) {
-               prefix = baseLayer.packagePrefix;
-               model.setComputedPackagePrefix(prefix);
-               inheritedPrefix = true;
-               break;
-            }
-         }
-      }
+      boolean baseIsDynamic = Layer.getBaseIsDynamic(baseLayers);
+      boolean inheritedPrefix = Layer.getInheritedPrefix(baseLayers, prefix, model);
 
       prefix = model.getPackagePrefix();
       if (!lpi.activate)

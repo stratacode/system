@@ -91,6 +91,8 @@ public interface ITypeDeclaration {
 
    JavaModel getJavaModel();
 
+   Layer getLayer();
+
    LayeredSystem getLayeredSystem();
 
    /**

@@ -300,6 +300,10 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
       return definedInType.getJavaModel();
    }
 
+   public Layer getLayer() {
+      return definedInType != null ? definedInType.getLayer() : null;
+   }
+
    public LayeredSystem getLayeredSystem() {
       return definedInType.getLayeredSystem();
    }

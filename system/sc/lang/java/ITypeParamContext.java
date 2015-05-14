@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 
 public interface ITypeParamContext {
@@ -18,4 +19,8 @@ public interface ITypeParamContext {
    public Object getTypeDeclarationForParam(String tvarName, Object tvar, boolean resolve);
 
    public LayeredSystem getLayeredSystem();
+
+   public Layer getRefLayer();
+
+   public ITypeDeclaration getDefinedInType();
 }

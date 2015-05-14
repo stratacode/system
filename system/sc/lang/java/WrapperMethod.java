@@ -35,7 +35,7 @@ public abstract class WrapperMethod implements IMethodDefinition {
    }
 
    public Object getTypeDeclaration(List<? extends ITypedObject> args, boolean resolve) {
-      return ModelUtil.getMethodTypeDeclaration(null, wrapped, (List<Expression>) args, javaModel, null);
+      return ModelUtil.getMethodTypeDeclaration(null, wrapped, (List<Expression>) args, javaModel, null, null);
    }
 
    public String getPropertyName() {

@@ -970,14 +970,14 @@ public class IdentifierExpression extends ArgumentsExpression {
          if (ix == 0)
             referenceType = expr.findMemberOwner(propertyName, MemberType.PropertyGetSet);
          else
-            referenceType = getTypeForIdentifier(idTypes, boundTypes, arguments, ix-1, expr.getJavaModel(), inferredType);
+            referenceType = getTypeForIdentifier(idTypes, boundTypes, arguments, ix-1, expr.getJavaModel(), inferredType, expr.getEnclosingType());
 
          if (expr.getJavaModel() == null) {
             System.err.println("*** expression missing model in checkinForBindableField!");
             return;
          }
          // Any binding requires dynamic access to the member but if it's a forward binding, its a real binding, not referenceOnly=true
-         makeBindable(expr, propertyName, idTypes[ix], boundTypes[ix], getTypeForIdentifier(idTypes, boundTypes, arguments, ix, expr.getJavaModel(), inferredType),
+         makeBindable(expr, propertyName, idTypes[ix], boundTypes[ix], getTypeForIdentifier(idTypes, boundTypes, arguments, ix, expr.getJavaModel(), inferredType, expr.getEnclosingType()),
                       referenceType, !bindingDirection.doForward(), true);
       }
    }
@@ -1022,7 +1022,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (last == -1)
          return findMemberOwner(identifiers.get(0).toString(), MemberType.PropertyGetSet);
       else
-         return getTypeForIdentifier(idTypes, boundTypes, arguments, last, getJavaModel(), inferredType);
+         return getTypeForIdentifier(idTypes, boundTypes, arguments, last, getJavaModel(), inferredType, getEnclosingType());
    }
 
    /** Returns the type which is referring to the value of this expression */
@@ -1030,7 +1030,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (identifiers == null || identifiers.size() == 1)
          return null;
       int last = identifiers.size()-2;
-      return getTypeForIdentifier(idTypes, boundTypes, arguments, last, getJavaModel(), inferredType);
+      return getTypeForIdentifier(idTypes, boundTypes, arguments, last, getJavaModel(), inferredType, getEnclosingType());
    }
 
    /** For "a.b.c", returns an expression which evaluates "a.b" */
@@ -2715,7 +2715,7 @@ public class IdentifierExpression extends ArgumentsExpression {
    }
 
    public Object getTypeForIdentifier(int ix) {
-      Object type = getTypeForIdentifier(idTypes, boundTypes, arguments, ix, getJavaModel(), inferredType);
+      Object type = getTypeForIdentifier(idTypes, boundTypes, arguments, ix, getJavaModel(), inferredType, getEnclosingType());
       // TODO: Change ComponentImpl below to some private class cause this is now a sentinel and will not work if it's an actual class people use.
       // It's used to workaround the fact that we resolve the @Component methods before the base class is transformed.  They get resolved to this
       // special class.  Now we need to map it back in these special cases.  Perhaps the preInit, etc. methods should be generated and put
@@ -2731,7 +2731,7 @@ public class IdentifierExpression extends ArgumentsExpression {
    }
 
    public Object getGenericTypeForIdentifier(int ix) {
-      return getGenericTypeForIdentifier(idTypes, boundTypes, arguments, ix, getJavaModel(), null, inferredType);
+      return getGenericTypeForIdentifier(idTypes, boundTypes, arguments, ix, getJavaModel(), null, inferredType, getEnclosingType());
    }
 
    public boolean getLHSAssignmentTyped() {
@@ -2742,7 +2742,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       return idTypes[last] == IdentifierType.MethodInvocation && ModelUtil.isLHSTypedMethod(boundTypes[last]);
    }
 
-   static Object getGenericTypeForIdentifier(IdentifierType[] idTypes, Object[] boundTypes, List<Expression> arguments, int ix, JavaModel model, Object rootType, Object inferredType) {
+   static Object getGenericTypeForIdentifier(IdentifierType[] idTypes, Object[] boundTypes, List<Expression> arguments, int ix, JavaModel model, Object rootType, Object inferredType, ITypeDeclaration definedInType) {
       if (boundTypes == null)
          return null;
       if (idTypes[ix] != null) {
@@ -2766,7 +2766,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             case MethodInvocation:
                // If ix > 0 and ix - 1's type has type parameters (either a field like List<X> or a method List<X> get(...).
                // need to apply the method's type parameters against the ones in the previous type.
-               return resolveType(ModelUtil.getMethodTypeDeclaration(rootType != null ? rootType : getTypeContext(idTypes, boundTypes, ix), boundTypes[ix], arguments, model, inferredType), ix, idTypes);
+               return resolveType(ModelUtil.getMethodTypeDeclaration(rootType != null ? rootType : getTypeContext(idTypes, boundTypes, ix), boundTypes[ix], arguments, model, inferredType, definedInType), ix, idTypes);
             case SetVariable:
                return resolveType(ModelUtil.getSetMethodPropertyType(boundTypes[ix], model), ix, idTypes);
             case EnumName:
@@ -2783,7 +2783,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       return type;
    }
 
-   static Object getTypeForIdentifier(IdentifierType[] idTypes, Object[] boundTypes, List<Expression> arguments, int ix, JavaModel model, Object inferredType) {
+   static Object getTypeForIdentifier(IdentifierType[] idTypes, Object[] boundTypes, List<Expression> arguments, int ix, JavaModel model, Object inferredType, ITypeDeclaration definedInType) {
       if (boundTypes == null)
          return null;
       if (idTypes[ix] != null) {
@@ -2807,7 +2807,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             case RemoteMethodInvocation:
                // If ix > 0 and ix - 1's type has type parameters (either a field like List<X> or a method List<X> get(...).
                // need to apply the method's type parameters against the ones in the previous type.
-               return resolveType(ModelUtil.getMethodTypeDeclaration(getTypeContext(idTypes, boundTypes, ix), boundTypes[ix], arguments, model, inferredType), ix, idTypes);
+               return resolveType(ModelUtil.getMethodTypeDeclaration(getTypeContext(idTypes, boundTypes, ix), boundTypes[ix], arguments, model, inferredType, definedInType), ix, idTypes);
             case SetVariable:
                return resolveType(ModelUtil.getSetMethodPropertyType(boundTypes[ix], model), ix, idTypes);
             case EnumName:

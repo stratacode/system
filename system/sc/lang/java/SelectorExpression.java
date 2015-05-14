@@ -80,11 +80,11 @@ public class SelectorExpression extends ChainedExpression {
                   else {
                      IdentifierExpression.bindNextIdentifier(this, currentType, nextName, i, idTypes, boundTypes,
                                     vsel.isAssignment, vsel.arguments != null, vsel.arguments, bindingDirection, false);
-                     currentType = IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, vsel.arguments, i, getJavaModel(), currentType, inferredType);
+                     currentType = IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, vsel.arguments, i, getJavaModel(), currentType, inferredType, getEnclosingType());
                   }
                   if (vsel.arguments != null && boundTypes[i] != null) {
                      IdentifierExpression.propagateInferredArgs(this, boundTypes[i], vsel.arguments);
-                     currentType = IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, vsel.arguments, i, getJavaModel(), origCurrentType, inferredType);
+                     currentType = IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, vsel.arguments, i, getJavaModel(), origCurrentType, inferredType, getEnclosingType());
                   }
                }
                else if (sel instanceof ArraySelector) {
@@ -290,7 +290,7 @@ public class SelectorExpression extends ChainedExpression {
    public Object getTypeDeclaration(int ix) {
       if (boundTypes == null)
          return null;
-      return IdentifierExpression.getTypeForIdentifier(idTypes, boundTypes, getArguments(ix), ix, getJavaModel(), inferredType);
+      return IdentifierExpression.getTypeForIdentifier(idTypes, boundTypes, getArguments(ix), ix, getJavaModel(), inferredType, getEnclosingType());
    }
 
    public Object getGenericType() {
@@ -301,7 +301,7 @@ public class SelectorExpression extends ChainedExpression {
 
       int last = selectors.size()-1;
       // TODO: isn't this just boundTypes[last]?
-      return IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, getArguments(last), last, getJavaModel(), last == 0 ? expression.getGenericType() : getGenericTypeForSelector(last-1, null), inferredType);
+      return IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, getArguments(last), last, getJavaModel(), last == 0 ? expression.getGenericType() : getGenericTypeForSelector(last-1, null), inferredType, getEnclosingType());
    }
 
    private Object getGenericTypeForSelector(int i, Object currentType) {
@@ -311,7 +311,7 @@ public class SelectorExpression extends ChainedExpression {
       Selector sel = selectors.get(i);
       if (sel instanceof VariableSelector) {
          VariableSelector vsel = (VariableSelector) sel;
-         return IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, vsel.arguments, i, getJavaModel(), currentType, inferredType);
+         return IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, vsel.arguments, i, getJavaModel(), currentType, inferredType, getEnclosingType());
       }
       else if (sel instanceof ArraySelector) {
          ArraySelector asel = (ArraySelector) sel;

@@ -769,6 +769,10 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       return null;
    }
 
+   public Layer getLayer() {
+      return null;
+   }
+
    public LayeredSystem getLayeredSystem() {
       return system;
    }

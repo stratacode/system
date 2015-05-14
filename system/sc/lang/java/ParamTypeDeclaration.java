@@ -180,7 +180,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       // assert ctx == null; ??? this fails unfortunately...
       Object method = ModelUtil.definesMethod(baseType, name, parametersOrExpressions, this, refType, isTransformed);
       if (method != null && ModelUtil.isParameterizedMethod(method))
-         return new ParamTypedMethod(method, this);
+         return new ParamTypedMethod(method, this, definedInType);
       return method;
    }
 
@@ -349,8 +349,16 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return definedInType.getJavaModel();
    }
 
+   public Layer getLayer() {
+     return definedInType != null ? definedInType.getLayer() : null;
+   }
+
    public LayeredSystem getLayeredSystem() {
       return system;
+   }
+
+   public Layer getRefLayer() {
+      return definedInType != null ? definedInType.getLayer() : null;
    }
 
    private List<Object> parameterizeMethodList(Object[] baseMethods) {
@@ -361,7 +369,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       for (int i = 0; i < baseMethods.length; i++) {
          Object meth = baseMethods[i];
          if (ModelUtil.isParameterizedMethod(meth))
-            result.add(new ParamTypedMethod(meth, this));
+            result.add(new ParamTypedMethod(meth, this, definedInType));
          else
             result.add(meth);
       }
@@ -517,7 +525,10 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
    }
 
    public ParamTypeDeclaration copy() {
-      return new ParamTypeDeclaration(system, new ArrayList<Object>(typeParams), new ArrayList<Object>(types), baseType);
+      if (definedInType != null)
+         return new ParamTypeDeclaration(definedInType, new ArrayList<Object>(typeParams), new ArrayList<Object>(types), baseType);
+      else
+         return new ParamTypeDeclaration(system, new ArrayList<Object>(typeParams), new ArrayList<Object>(types), baseType);
    }
 
    public void setTypeParameter(String varName, Object type) {
@@ -544,5 +555,9 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
             return true;
       }
       return false;
+   }
+
+   public ITypeDeclaration getDefinedInType() {
+      return definedInType;
    }
 }

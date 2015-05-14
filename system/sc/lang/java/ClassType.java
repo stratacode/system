@@ -378,7 +378,7 @@ public class ClassType extends JavaType {
          type = it.findTypeDeclaration(fullTypeName, true);
       }
       else if (sys != null) {
-         type = sys.getTypeDeclaration(fullTypeName);
+         type = sys.getTypeDeclaration(fullTypeName, false, ctx == null ? null : ctx.getRefLayer(), false);
       }
 
       // When looking up type parameters, typically the it is the ParamTypeDeclaration but if it's a param method, it won't be so we need to
@@ -421,8 +421,12 @@ public class ClassType extends JavaType {
          else {
             if (it != null)
                type = new ParamTypeDeclaration(it, typeParams, typeDefs, type);
-            else
-               type = new ParamTypeDeclaration(sys, typeParams, typeDefs, type);
+            else {
+               if (ctx != null && ctx.getDefinedInType() != null)
+                  type = new ParamTypeDeclaration(ctx.getDefinedInType(), typeParams, typeDefs, type);
+               else
+                  type = new ParamTypeDeclaration(sys, typeParams, typeDefs, type);
+            }
          }
       }
 

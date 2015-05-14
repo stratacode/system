@@ -340,7 +340,11 @@ public class NewExpression extends IdentifierExpression {
          return type;
       if (type == null)
          return null;
-      return new ParamTypeDeclaration(getLayeredSystem(), ModelUtil.getTypeParameters(type), evalTypeArguments(), type);
+      ITypeDeclaration enclType = getEnclosingType();
+      if (enclType != null)
+         return new ParamTypeDeclaration(enclType, ModelUtil.getTypeParameters(type), evalTypeArguments(), type);
+      else
+         return new ParamTypeDeclaration(getLayeredSystem(), ModelUtil.getTypeParameters(type), evalTypeArguments(), type);
    }
 
    protected boolean inNewMethod() {

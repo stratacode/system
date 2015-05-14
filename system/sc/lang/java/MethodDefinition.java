@@ -364,13 +364,17 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                                     FileUtil.LINE_SEPARATOR +
                                     command +
                                     FileUtil.LINE_SEPARATOR +
+                                    "SC_EXIT_STATUS=$?" +
+                                    FileUtil.LINE_SEPARATOR +
                                     "while expr $? = 33; do" +
                                     FileUtil.LINE_SEPARATOR +
                                     "   " + restartCommand +
                                     FileUtil.LINE_SEPARATOR +
+                                    "SC_EXIT_STATUS=$?" +
+                                    FileUtil.LINE_SEPARATOR +
                                     "done" +
                                     FileUtil.LINE_SEPARATOR +
-                                    "";
+                                    "exit $SC_EXIT_STATUS";
                   }
                   else {
                      ExecCommandParameters params = new ExecCommandParameters();
