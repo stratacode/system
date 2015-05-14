@@ -171,7 +171,7 @@ public class PTypeUtil {
 
    public static IBeanMapper getPropertyMapping(Class beanClass, String propName) {
       DynType cache = TypeUtil.getPropertyCache(beanClass);
-      return (BeanMapper) cache.getPropertyMapper(propName);
+      return cache.getPropertyMapper(propName);
    }
 
    /** Abstraction around thread local cause GWT does not implement it */
@@ -253,7 +253,20 @@ public class PTypeUtil {
             return Modifier.isInterface(modifiers);
          // Java8 only
          case 'd': // default - applied to methods only when they are the default method
-            return def instanceof Method && ((Method) def).isDefault();
+            return isDefaultMethod(def);
+      }
+      throw new UnsupportedOperationException();
+   }
+
+   public static boolean isDefaultMethod(Object meth) {
+      //return meth instanceof Method && ((Method) meth).isDefault();
+      if (meth instanceof Method) {
+         // Handle Java8 dependency using reflection so we can run on Java6 as well
+         IBeanMapper mapper = getPropertyMapping(Method.class, "default");
+         if (mapper != null) {
+            return (Boolean) mapper.getPropertyValue(meth);
+         }
+         return false;
       }
       throw new UnsupportedOperationException();
    }

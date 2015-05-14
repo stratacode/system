@@ -6443,8 +6443,14 @@ public class ModelUtil {
    public static boolean isDefaultMethod(Object meth) {
       if (meth instanceof IMethodDefinition)
          return ((IMethodDefinition) meth).hasModifier("default");
+         /*
       else if (meth instanceof Method)
          return ((Method) meth).isDefault();
+         */
+      else if (meth instanceof Method) {
+         return PTypeUtil.isDefaultMethod(meth);
+      }
+                
       throw new UnsupportedOperationException();
    }
 

@@ -136,7 +136,7 @@ public class ExtendsType extends JavaType {
 
    public static ExtendsType create(WildcardType type) {
       ExtendsType res = new ExtendsType();
-      String typeName = type.getTypeName();
+      String typeName = type.toString(); // In Java8 We can use getTypeName() which does the same thing
       int opIx = typeName.indexOf("extends");
       if (opIx != -1) {
          res.operator = "extends";
