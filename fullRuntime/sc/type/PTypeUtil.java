@@ -258,13 +258,14 @@ public class PTypeUtil {
       throw new UnsupportedOperationException();
    }
 
+   static IBeanMapper methodDefaultMapper = getPropertyMapping(Method.class, "default");
+
    public static boolean isDefaultMethod(Object meth) {
       //return meth instanceof Method && ((Method) meth).isDefault();
       if (meth instanceof Method) {
          // Handle Java8 dependency using reflection so we can run on Java6 as well
-         IBeanMapper mapper = getPropertyMapping(Method.class, "default");
-         if (mapper != null) {
-            return (Boolean) mapper.getPropertyValue(meth);
+         if (methodDefaultMapper != null) {
+            return (Boolean) methodDefaultMapper.getPropertyValue(meth);
          }
          return false;
       }
