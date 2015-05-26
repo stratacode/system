@@ -49,26 +49,42 @@ public class TypeParameter extends JavaSemanticNode implements ITypedObject {
           !ModelUtil.isAssignableFrom(extType, otherType, false, ctx))
          return false;
       if (ctx != null) {
-         Object thisType = ctx.getDefaultType(this.getPosition());
+         Object thisType = ctx.getTypeForVariable(this, true);
          if (thisType == this) {
-            System.out.println("*** Error! recursive reference in isAssignableFrom.");
-            return false;
+            thisType = ModelUtil.getTypeParameterDefault(this);
          }
          if (thisType != null)
             return ModelUtil.isAssignableFrom(thisType, otherType, false, ctx);
       }
-      return ModelUtil.isAssignableFrom(Object.class, otherType);
+      // Type parameters can match anything right?  For primitive types, they are automatically boxed to the object type.  Should we just return true here?
+      return ModelUtil.isAssignableFrom(Object.class, otherType) || ModelUtil.isPrimitive(otherType);
    }
+
+   static int count = 0;
 
    public boolean isAssignableTo(Object otherType, ITypeParamContext ctx) {
       if (ctx != null) {
-         Object thisType = ctx.getType(this.getPosition());
+         Object thisType = ctx.getTypeForVariable(this, true);
 
          // No binding for this type parameter... see if the
          if (thisType == this)
             return ModelUtil.isAssignableFrom(otherType, Object.class);
-         if (thisType != null)
-            return ModelUtil.isAssignableFrom(otherType, thisType, false, ctx);
+         if (thisType != null) {
+            if (ModelUtil.isTypeVariable(thisType)) {
+               Object thisDefault = ctx.getTypeDeclarationForParam(ModelUtil.getTypeParameterName(thisType), thisType, true);
+               if (thisDefault == null || ModelUtil.isTypeVariable(thisDefault))
+                  return true;
+            }
+            if (count > 10)
+               System.out.println("***");
+            try {
+               count++;
+               return ModelUtil.isAssignableFrom(otherType, thisType, false, ctx);
+            }
+            finally {
+               count--;
+            }
+         }
       }
       return otherType == this || ModelUtil.isAssignableFrom(Object.class, otherType);
    }
@@ -88,5 +104,22 @@ public class TypeParameter extends JavaSemanticNode implements ITypedObject {
       if (def != null)
          return def;
       return getEnclosingType();
+   }
+
+   public String toGenerateString() {
+      StringBuilder sb = new StringBuilder();
+      if (name != null)
+         sb.append(name);
+      else
+         sb.append("<null-type-parameter>");
+      if (extendsType != null) {
+         sb.append("? extends ");
+         sb.append(extendsType.toGenerateString());
+      }
+      return sb.toString();
+   }
+
+   public String toString() {
+      return toGenerateString();
    }
 }

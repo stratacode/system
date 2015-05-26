@@ -8,6 +8,7 @@ import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
 
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
@@ -140,6 +141,18 @@ public class TryStatement extends Statement implements IBlockStatement {
 
    public List<Statement> getBlockStatements() {
       return statements;
+   }
+
+   public Object definesMember(String name, EnumSet<MemberType> mtype, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {
+      if (mtype.contains(MemberType.Variable) && resources != null) {
+         for (VariableStatement v:resources) {
+            Object res = v.definesMember(name, mtype, refType, ctx, skipIfaces, isTransformed);
+            if (res != null)
+               return res;
+         }
+         return super.definesMember(name, mtype, refType, ctx, skipIfaces, isTransformed);
+      }
+      return super.definesMember(name, mtype, refType, ctx, skipIfaces, isTransformed);
    }
 
    public void addBreakpointNodes(List<ISrcStatement> res, ISrcStatement toFind) {

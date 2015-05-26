@@ -239,7 +239,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    }
 
    public boolean isComponentType() {
-      return isAutoComponent() || implementsType("sc.obj.IComponent", false) || implementsType("sc.obj.IAltComponent", false);
+      return isAutoComponent() || implementsType("sc.obj.IComponent", false, false) || implementsType("sc.obj.IAltComponent", false, false);
    }
 
    private Object resolveExtendsType(JavaType extendsType) {
@@ -247,7 +247,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       JavaSemanticNode resolver = getEnclosingType();
       if (resolver == null)
          resolver = getJavaModel();
-      extendsType.initType(getLayeredSystem(), this, resolver, null, false, isLayerType);
+      extendsType.initType(getLayeredSystem(), this, resolver, null, false, isLayerType, null);
 
 
       // Need to start the extends type as we need to dig into it
@@ -434,13 +434,13 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return !isLayerType && !isDynamicType();
    }
 
-   public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed) {
-      Object v = super.definesMethod(name, types, ctx, refType, isTransformed);
+   public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly) {
+      Object v = super.definesMethod(name, types, ctx, refType, isTransformed, staticOnly);
       if (v != null)
          return v;
 
       if (modelType != null) {
-         v = modelType.definesMethod(name, types, ctx, refType, isTransformed);
+         v = modelType.definesMethod(name, types, ctx, refType, isTransformed, staticOnly);
          if (v != null)
             return v;
       }
@@ -449,7 +449,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
       if (implementsBoundTypes != null) {
          for (Object impl:implementsBoundTypes) {
-            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed)) != null)
+            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly)) != null)
                return v;
          }
       }
@@ -570,6 +570,10 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    public boolean isAssignableFrom(ITypeDeclaration other, boolean assignmentSemantics) {
       if (other instanceof ArrayTypeDeclaration)
          return false;
+      if (other == null) {
+         System.out.println("***");
+         return true;
+      }
       return other.isAssignableTo(this);
    }
 
@@ -679,7 +683,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return this;
    }
 
-   public boolean implementsType(String fullTypeName, boolean assignment) {
+   public boolean implementsType(String fullTypeName, boolean assignment, boolean allowUnbound) {
       String fte = getFullTypeName();
       if (fte != null && ModelUtil.typeNamesEqual(fte, fullTypeName))
          return true;
@@ -688,7 +692,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
       if (implementsBoundTypes != null) {
          for (Object implType:implementsBoundTypes) {
-            if (implType != null && ModelUtil.implementsType(implType, fullTypeName, assignment))
+            if (implType != null && ModelUtil.implementsType(implType, fullTypeName, assignment, allowUnbound))
                return true;
          }
       }
@@ -696,13 +700,13 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       // If our annotations add any interfaces consider those as part of this type
       Object[] scopeIfaces = getScopeInterfaces();
       for (Object iface:scopeIfaces) {
-         if (ModelUtil.implementsType(iface, fullTypeName, assignment))
+         if (ModelUtil.implementsType(iface, fullTypeName, assignment, allowUnbound))
             return true;
       }
 
       Object ext = getDerivedTypeDeclaration();
       if (ext != null) {
-         if (ModelUtil.implementsType(ext, fullTypeName, assignment))
+         if (ModelUtil.implementsType(ext, fullTypeName, assignment, allowUnbound))
             return true;
       }
 
@@ -1124,7 +1128,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
                if (ModelUtil.isPropertyIs(member)) {
                   String getName = "get" + CTypeUtil.capitalizePropertyName(propName);
                   Object membType = ModelUtil.getPropertyType(member);
-                  Object existingMeth = definesMethod(getName, null, null, null, true);
+                  Object existingMeth = definesMethod(getName, null, null, null, true, false);
                   if (existingMeth == null || existingMeth == res || ModelUtil.isAbstractMethod(existingMeth)) {
                      MethodDefinition meth = new MethodDefinition();
                      meth.name = getName;

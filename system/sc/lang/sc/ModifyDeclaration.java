@@ -489,7 +489,7 @@ public class ModifyDeclaration extends TypeDeclaration {
             if (resolver == null)
                resolver = getJavaModel();
             LayeredSystem sys = layer != null ? layer.layeredSystem : getLayeredSystem();
-            extendsType.initType(sys, this, resolver, null, false, isLayerType);
+            extendsType.initType(sys, this, resolver, null, false, isLayerType, null);
 
             // Need to start the extends type as we need to dig into it
             Object extendsTypeDecl = extendsBoundTypes[i++] = extendsType.getTypeDeclaration();
@@ -628,20 +628,20 @@ public class ModifyDeclaration extends TypeDeclaration {
       return null;
    }
 
-   public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed) {
-      Object v = super.definesMethod(name, types, ctx, refType, isTransformed);
+   public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly) {
+      Object v = super.definesMethod(name, types, ctx, refType, isTransformed, staticOnly);
       if (v != null)
          return v;
 
       if (extendsBoundTypes != null) {
          for (Object impl:extendsBoundTypes) {
-            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed)) != null)
+            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly)) != null)
                return v;
          }
       }
       if (impliedRoots != null) {
          for (Object impl:impliedRoots) {
-            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed)) != null)
+            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly)) != null)
                return v;
          }
       }
@@ -1545,13 +1545,13 @@ public class ModifyDeclaration extends TypeDeclaration {
       return getEnclosingType() != null && isStaticType();
    }
 
-   public boolean implementsType(String fullTypeName, boolean assignment) {
-      if (super.implementsType(fullTypeName, assignment))
+   public boolean implementsType(String fullTypeName, boolean assignment, boolean allowUnbound) {
+      if (super.implementsType(fullTypeName, assignment, allowUnbound))
          return true;
 
       if (extendsBoundTypes != null) {
          for (Object implType:extendsBoundTypes) {
-            if (implType != null && ModelUtil.implementsType(implType, fullTypeName, assignment))
+            if (implType != null && ModelUtil.implementsType(implType, fullTypeName, assignment, allowUnbound))
                return true;
          }
       }

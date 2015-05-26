@@ -72,14 +72,14 @@ public class EnumConstant extends BodyTypeDeclaration {
       return getEnclosingType();
    }
 
-   public boolean implementsType(String otherTypeName, boolean assignment) {
+   public boolean implementsType(String otherTypeName, boolean assignment, boolean allowUnbound) {
       String fte = getFullTypeName();
       if (fte != null && fte.equals(otherTypeName))
          return true;
 
       Object ext = getDerivedTypeDeclaration();
       if (ext != null) {
-         if (ModelUtil.implementsType(ext, otherTypeName, assignment))
+         if (ModelUtil.implementsType(ext, otherTypeName, assignment, allowUnbound))
             return true;
       }
       return false;

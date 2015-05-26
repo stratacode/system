@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Set;
 
 public class MethodReference extends BaseLambdaExpression {
-   public Object reference; // Either a TypeExpression, JavaType or an Expression
+   public JavaSemanticNode reference; // Either a TypeExpression, JavaType or an Expression
    public SemanticNodeList<JavaType> typeArguments;
    public String methodName;
 
@@ -93,8 +93,17 @@ public class MethodReference extends BaseLambdaExpression {
    }
 
    @Override
-   Object getLambdaParameters(Object methObj) {
-      Parameter res = Parameter.create(ModelUtil.getParameterTypes(methObj),ModelUtil.getParameterNames(methObj));
+   Object getLambdaParameters(Object methObj, ITypeParamContext ctx) {
+      Object[] ptypes = ModelUtil.getParameterTypes(methObj, true);
+      Object[] resTypes = ptypes == null ? null : new Object[ptypes.length];
+      if (ptypes != null) {
+         for (int i = 0; i < ptypes.length; i++) {
+            resTypes[i] = ptypes[i];
+            if (ModelUtil.isTypeVariable(resTypes[i]))
+               resTypes[i] = ModelUtil.getTypeParameterDefault(resTypes[i]);
+         }
+      }
+      Parameter res = Parameter.create(resTypes,ModelUtil.getParameterNames(methObj), ctx);
       if (res != null)
          res.parentNode = this;
       return res;
@@ -127,16 +136,16 @@ public class MethodReference extends BaseLambdaExpression {
       }
       else {
          Object res = null;
-         Object[] paramTypes = ModelUtil.getParameterTypes(inferredTypeMethod);
+         Object[] paramTypes = ModelUtil.getParameterTypes(inferredTypeMethod, true);
          Object returnType = ModelUtil.getReturnType(inferredTypeMethod);
          // Find the method in the list which matches the type parameters of the inferred type method
          // First pass is to look for a method where all of the parameters match each other
          for (Object meth:meths) {
-            if (ModelUtil.parametersMatch(ModelUtil.getParameterTypes(meth), paramTypes) && ModelUtil.isAssignableFrom(returnType, ModelUtil.getReturnType(meth))) {
+            if (ModelUtil.parametersMatch(ModelUtil.getParameterTypes(meth, true), paramTypes) && ModelUtil.isAssignableFrom(returnType, ModelUtil.getReturnType(meth))) {
                if (res == null)
                   res = meth;
                else
-                  res = ModelUtil.pickMoreSpecificMethod(meth, res, paramTypes);
+                  res = ModelUtil.pickMoreSpecificMethod(res, meth, paramTypes);
             }
          }
          // Second case is used when the first parameter
@@ -146,19 +155,25 @@ public class MethodReference extends BaseLambdaExpression {
             System.arraycopy(paramTypes, 1, nextParamTypes, 0, newLen);
             for (Object meth:meths) {
                Object methReturnType = ModelUtil.getReturnType(meth);
-               if (!ModelUtil.isAssignableFrom(paramTypes[0], methReturnType))
+
+               //if (!ModelUtil.isAssignableFrom(paramTypes[0], methReturnType))
+               //   continue;
+
+               if (!ModelUtil.isAssignableFrom(refType, paramTypes[0]))
                   continue;
-               Object[] refParamTypes = ModelUtil.getParameterTypes(meth);
+               Object[] refParamTypes = ModelUtil.getParameterTypes(meth, true);
                if (ModelUtil.parametersMatch(refParamTypes, nextParamTypes)) {
                   if (res == null)
                      res = meth;
                   else
-                     res = ModelUtil.pickMoreSpecificMethod(meth, res, nextParamTypes);
+                     res = ModelUtil.pickMoreSpecificMethod(res, meth, nextParamTypes);
                }
             }
             paramInstance = res != null;
          }
          referenceMethod = res;
+         if (res == null)
+            System.out.println("***");
       }
    }
 
@@ -221,5 +236,13 @@ public class MethodReference extends BaseLambdaExpression {
 
    public String getExprType() {
       return "method reference";
+   }
+
+   public String toGenerateString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append(reference.toGenerateString());
+      sb.append("::");
+      sb.append(methodName);
+      return sb.toString();
    }
 }

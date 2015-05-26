@@ -92,7 +92,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       Object modType = methodType.getDerivedTypeDeclaration();
       if (extendsType == null)
          extendsType = Object.class;
-      Object overridden = ModelUtil.definesMethod(extendsType, name, getParameterList(), null, null, false);
+      Object overridden = ModelUtil.definesMethod(extendsType, name, getParameterList(), null, null, false, false);
       superMethod = overridden;
       if (overridden instanceof MethodDefinition) {
          MethodDefinition superMeth = (MethodDefinition) overridden;
@@ -126,7 +126,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          if (overridden == null && methodType.implementsBoundTypes != null) {
             Object implMeth;
             for (Object impl:methodType.implementsBoundTypes) {
-               implMeth = ModelUtil.definesMethod(impl, name, getParameterList(), null, null, false);
+               implMeth = ModelUtil.definesMethod(impl, name, getParameterList(), null, null, false, false);
                if (implMeth != null && ModelUtil.isCompiledMethod(implMeth)) {
                   methodType.setNeedsDynamicStub(true);
                   overridesCompiled = true;
@@ -135,7 +135,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          }
 
          if (modType != extendsType) {
-            overridden = ModelUtil.definesMethod(modType, name, getParameterList(), null, null, false);
+            overridden = ModelUtil.definesMethod(modType, name, getParameterList(), null, null, false, false);
             if (overridden instanceof MethodDefinition) {
                MethodDefinition overMeth = (MethodDefinition) overridden;
                if (overMeth == this)
@@ -248,7 +248,8 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             if (parameters != null) {
                List<Parameter> paramList = parameters.getParameterList();
                for (int i = 0; i < paramList.size(); i++) {
-                  Object paramType = paramList.get(i).getTypeDeclaration();
+                  Parameter nextParam = paramList.get(i);
+                  Object paramType = nextParam.getTypeDeclaration();
                   List<?> typeParams = ModelUtil.getTypeParameters(paramType);
                   if (typeParams != null) {
                      for (int j = 0; j < typeParams.size(); j++) {
@@ -261,7 +262,8 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                               // Need the actual class itself, not the type of the expression (which in this case is class)
                               if (paramExpr instanceof ClassValueExpression) {
                                  ClassValueExpression pe = (ClassValueExpression) paramExpr;
-                                 result.types.set(j, pe.resolveClassType());
+                                 Object classType = pe.resolveClassType();
+                                 result.types.set(j, classType);
                               }
                               // else - a runtime class.  We don't get additional type info from that.
                            }
@@ -270,6 +272,12 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                               System.err.println("*** unhandled case with param type methods");
                            }
                         }
+                     }
+                  }
+                  else if (paramType instanceof ArrayTypeDeclaration) {
+                     Object componentType = ((ArrayTypeDeclaration) paramType).getComponentType();
+                     if (ModelUtil.isTypeVariable(componentType)) {
+
                      }
                   }
                }
@@ -453,12 +461,12 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
 
       Object res;
       if (ext != null) {
-         res = ModelUtil.definesMethod(ext, name, getParameterList(), null, null, false);
+         res = ModelUtil.definesMethod(ext, name, getParameterList(), null, null, false, false);
          if (res != null)
             return res;
       }
       if (ext != base && base != null) {
-         res = ModelUtil.definesMethod(base, name, getParameterList(), null, null, false);
+         res = ModelUtil.definesMethod(base, name, getParameterList(), null, null, false, false);
          if (res != null)
             return res;
       }
@@ -547,7 +555,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       while (subTypes.hasNext()) {
          TypeDeclaration subType = subTypes.next();
 
-         Object result = subType.declaresMethod(name, ptypes, null, enclType);
+         Object result = subType.declaresMethod(name, ptypes, null, enclType, false);
          if (result instanceof MethodDefinition)
             res.add(result);
 
@@ -569,7 +577,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                ReturnStatement ret = (ReturnStatement) returns.get(i);
                if (ret.expression != null) {
                   Object newRetType = ret.expression.getTypeDeclaration();
-                  if (newRetType != null) {
+                  if (newRetType != null && newRetType != NullLiteral.NULL_TYPE) {
                      if (retType == null)
                         retType = newRetType;
                      else

@@ -13,7 +13,7 @@ import java.util.List;
  * This is used when there are type arguments to the method.
  */
 public class TypedMethodExpression extends IdentifierExpression {
-   public String typedIdentifier;
+   public String typedIdentifier; // the name of the method being called with explicit type parameters
    public List<JavaType> typeArguments;
 
    // Because the typedIdentifier is an extra identifier but not stored in identifiers we need to tweak the
@@ -37,11 +37,13 @@ public class TypedMethodExpression extends IdentifierExpression {
    }
 
    public void refreshBoundTypes() {
+      super.refreshBoundTypes();
       for (JavaType jt:typeArguments)
          jt.refreshBoundType();
    }
 
    public int transformTemplate(int ix, boolean statefulContext) {
+      super.transformTemplate(ix, statefulContext);
       for (JavaType jt:typeArguments)
          ix = jt.transformTemplate(ix, statefulContext);
       return ix;

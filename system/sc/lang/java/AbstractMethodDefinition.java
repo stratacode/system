@@ -72,11 +72,18 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       return super.findMember(memberName, type, this, refType, ctx, skipIfaces);
    }
 
-   public Object definesMethod(String methodName, List<?> methParams, ITypeParamContext ctx, Object refType, boolean isTransformed) {
+   public Object definesMethod(String methodName, List<?> methParams, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly) {
       if (name != null && methodName.equals(name)) {
          if (parametersMatch(methParams, ctx)) {
-            if (refType == null || ModelUtil.checkAccess(refType, this))
+            // In Java, it's possible to have static and non-static methods with the identical signature.  If we are calling this from a static
+            // context, we need to disambiguate them by the context of the caller
+            if (staticOnly && !hasModifier("static"))
+               return null;
+            if (refType == null || ModelUtil.checkAccess(refType, this)) {
+               if (typeParameters != null)
+                  return new ParamTypedMethod(this, ctx, getEnclosingType(), methParams);
                return this;
+            }
          }
       }
       return null;
@@ -100,6 +107,11 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
             return false;
       }
 
+      /*
+      if (name.equals("apply") && ctx instanceof ParamTypeDeclaration && ctx.toString().contains("Function5"))
+         System.out.println("***");
+      */
+
       for (int i = 0; i < otherSize; i++) {
          Object otherP = otherParams.get(i);
          Parameter thisP;
@@ -117,11 +129,12 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
              otherP = ((ITypedObject) otherP).getTypeDeclaration();
 
          // Null entry means match
-         if (otherP == null || thisP == null || otherP == LambdaExpression.LAMBDA_INFERRED_TYPE)
+         if (otherP == null || thisP == null || otherP instanceof BaseLambdaExpression.LambdaInferredType)
             continue;
 
          // Take a conservative approach... if types are not available, just match
-         if (thisType != null && thisType != otherP && !ModelUtil.isAssignableFrom(thisType, otherP, false, ctx)) {
+         boolean allowUnbound = otherP instanceof ParamTypeDeclaration && ((ParamTypeDeclaration) otherP).unboundInferredType;
+         if (thisType != null && thisType != otherP && !ModelUtil.isAssignableFrom(thisType, otherP, false, ctx, allowUnbound)) {
             if (i >= last && repeatingLast) {
                if (!ModelUtil.isAssignableFrom(ModelUtil.getArrayComponentType(thisType), otherP, false, ctx)) {
                   return false;
@@ -139,7 +152,28 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
          for (TypeParameter tp:typeParameters)
             if (tp.name.equals(typeName))
                return tp;
+
+      Object res;
+      if ((res = definesType(typeName, ctx)) != null) {
+         return res;
+      }
       return super.findType(typeName, refType, ctx);
+   }
+
+   public Object definesType(String name, TypeContext ctx) {
+      if (body != null) {
+         List<Statement> statements = body.statements;
+         if (statements != null) {
+            for (Statement st:statements) {
+               if (st instanceof TypeDeclaration) {
+                  TypeDeclaration td = (TypeDeclaration) st;
+                  if (td.typeName.equals(name))
+                     return td;
+               }
+            }
+         }
+      }
+      return null;
    }
 
    public Definition modifyDefinition(BodyTypeDeclaration base, boolean doMerge, boolean inTransformed) {
@@ -401,10 +435,10 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       // compiled.
       if (isDynMethod())
          return this;
-      return ModelUtil.definesMethod(ModelUtil.getCompiledClass(getDeclaringType()), name, getParameterList(), null, null, false);
+      return ModelUtil.definesMethod(ModelUtil.getCompiledClass(getDeclaringType()), name, getParameterList(), null, null, false, false);
    }
 
-   public Object[] getParameterTypes() {
+   public Object[] getParameterTypes(boolean bound) {
       if (parameterTypes == null && parameters != null && parameters.getNumParameters() > 0) {
          parameterTypes = parameters.getParameterTypes();
       }

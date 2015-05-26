@@ -410,16 +410,16 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       return false;
    }
 
-   public Object definesMethod(String name, List<?> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed) {
+   public Object definesMethod(String name, List<?> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly) {
       if (!started)
          start();
 
-      Object meth = ModelUtil.getMethod(this, name, refType, ctx, ModelUtil.varListToTypes(parametersOrExpressions));
+      Object meth = ModelUtil.getMethod(this, name, refType, ctx, staticOnly, ModelUtil.varListToTypes(parametersOrExpressions));
       if (meth != null)
          return meth;
 
       if (extendsType != null) {
-         meth = ModelUtil.definesMethod(extendsType, name, parametersOrExpressions, ctx, refType, isTransformed);
+         meth = ModelUtil.definesMethod(extendsType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly);
          if (meth != null)
             return meth;
       }
@@ -428,7 +428,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          for (int i = 0; i < numInterfaces; i++) {
             Object implType = implementsTypes.get(i);
             if (implType != null) {
-               meth = ModelUtil.definesMethod(implType, name, parametersOrExpressions, ctx, refType, isTransformed);
+               meth = ModelUtil.definesMethod(implType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly);
                if (meth != null)
                   return meth;
             }
@@ -519,7 +519,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       return null;
    }
 
-   public boolean implementsType(String otherName, boolean assignment) {
+   public boolean implementsType(String otherName, boolean assignment, boolean allowUnbound) {
       if (!started)
          start();
 
@@ -533,7 +533,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
             if (otherName.equals(interfaceName))
                return true;
             Object implType = implementsTypes.get(i);
-            if (implType != null && ModelUtil.implementsType(implType, otherName, assignment))
+            if (implType != null && ModelUtil.implementsType(implType, otherName, assignment, allowUnbound))
                return true;
          }
       }
@@ -541,7 +541,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          String extendsName = classFile.getExtendsTypeName();
          if (extendsName.equals(otherName))
             return true;
-         return ModelUtil.implementsType(extendsType, otherName, assignment);
+         return ModelUtil.implementsType(extendsType, otherName, assignment, allowUnbound);
       }
       return false;
    }
@@ -789,7 +789,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
    }
 
    public boolean isComponentType() {
-      return implementsType("sc.obj.IComponent", false);
+      return implementsType("sc.obj.IComponent", false, false);
    }
 
    public DynType getPropertyCache() {

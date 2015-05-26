@@ -88,19 +88,19 @@ public class HTMLLanguage extends TemplateLanguage {
     * Script tags are treated separately - the bodies are not escaped so that you can embed Javascript, or Java code in them with out escaping the
     * keyword characters. Unescaped tags cannot have child tags.
     */
-   static final String[] UNESCAPED_TAGS = {"script"};
+   private static final String[] UNESCAPED_TAGS = {"script"};
 
-   static HashSet<String> UNESCAPED_SET = new HashSet<String>(Arrays.asList(UNESCAPED_TAGS));
+   HashSet<String> UNESCAPED_SET = new HashSet<String>(Arrays.asList(UNESCAPED_TAGS));
 
    /** Some HTML tags imply indentation - those are matched by a separate parselet so that we can generate nicely formatted HTML from the model */
-   static final String[] INDENTED_TAGS = {"html", "head", "body", "table", "tr", "td", "script"};
+   private static final String[] INDENTED_TAGS = {"html", "head", "body", "table", "tr", "td", "script"};
 
-   public static Set<String> INDENTED_SET = new HashSet<String>(Arrays.asList(INDENTED_TAGS));
+   public Set<String> INDENTED_SET = new HashSet<String>(Arrays.asList(INDENTED_TAGS));
 
    // Do not indent the children but do add a newline on the end
-   static final String[] NEWLINE_TAGS = {"input", "title", "a", "link", "h1", "h2", "h3", "h4", "p"};
+   private static final String[] NEWLINE_TAGS = {"input", "title", "a", "link", "h1", "h2", "h3", "h4", "p"};
 
-   public static Set<String> NEWLINE_SET = new HashSet<String>(Arrays.asList(NEWLINE_TAGS));
+   public Set<String> NEWLINE_SET = new HashSet<String>(Arrays.asList(NEWLINE_TAGS));
 
    public HashSet getUnescapedTags() {
       return UNESCAPED_SET;
@@ -126,18 +126,18 @@ public class HTMLLanguage extends TemplateLanguage {
 
    };
 
-   public IndexedChoice htmlSpacing = new IndexedChoice(REPEAT | OPTIONAL | NOERROR);
+   public IndexedChoice tagSpacing = new IndexedChoice(REPEAT | OPTIONAL | NOERROR);
    {
-      htmlSpacing.put(" ", whiteSpace);
-      htmlSpacing.put("\t", whiteSpace);
-      htmlSpacing.put("\f", whiteSpace);
-      htmlSpacing.put("\r", whiteSpace);
-      htmlSpacing.put("\n", whiteSpace);
+      tagSpacing.put(" ", whiteSpace);
+      tagSpacing.put("\t", whiteSpace);
+      tagSpacing.put("\f", whiteSpace);
+      tagSpacing.put("\r", whiteSpace);
+      tagSpacing.put("\n", whiteSpace);
 
-      htmlSpacing.generateParseNode = new SpacingParseNode(htmlSpacing, false);
+      tagSpacing.generateParseNode = new SpacingParseNode(tagSpacing, false);
    }
 
-   public Sequence htmlSpacingEOL = new Sequence("('')", htmlSpacing) {
+   public Sequence tagSpacingEOL = new Sequence("('')", tagSpacing) {
       {
          generateParseNode = new NewlineParseNode(" ") {
             public void format(FormatContext ctx) {
@@ -193,7 +193,7 @@ public class HTMLLanguage extends TemplateLanguage {
    }
 
    // This is broken out so that we can cache it efficiently between the different types of tagName sequences.
-   public Sequence tagName = new Sequence("('','',)", tagNameChar, new Sequence("('')", REPEAT | OPTIONAL, tagNameChar), htmlSpacing);
+   public Sequence tagName = new Sequence("('','',)", tagNameChar, new Sequence("('')", REPEAT | OPTIONAL, tagNameChar), tagSpacing);
    {
       tagName.cacheResults = true;
       identifier.cacheResults = true;
@@ -267,7 +267,7 @@ public class HTMLLanguage extends TemplateLanguage {
    }
 
    /** Matches tags which have matching open and close tags */
-   public Sequence htmlTreeTagName = new TagNameSequence(TagNameMatchType.EscapedOpen);
+   public Sequence treeTagName = new TagNameSequence(TagNameMatchType.EscapedOpen);
    /** Matches the script tag which suppresses escaping of less than and greater than signs */
    public Sequence unescapedTreeTagName = new TagNameSequence(TagNameMatchType.UnescapedOpen);
    /** Matches any tag - as a cleanup when no other parselets match */
@@ -288,7 +288,7 @@ public class HTMLLanguage extends TemplateLanguage {
    Parselet attributeValue =  new OrderedChoice(attributeValueLiteral, attributeValueSQLiteral);
 
    public Sequence tagAttributeValue = new Sequence ("(,value)", OPTIONAL, equalSign, attributeValue);
-   public Sequence tagAttribute = new Sequence("Attr(name, *,)", 0, anyTagName, tagAttributeValue, htmlSpacing);
+   public Sequence tagAttribute = new Sequence("Attr(name, *,)", 0, anyTagName, tagAttributeValue, tagSpacing);
    public Sequence tagAttributes = new Sequence("([])", OPTIONAL | REPEAT, tagAttribute);
    {
       // Here we are skipping any incomplete attributes (e.g. id=) till we hit the end of close tag or the start of the next tag
@@ -296,7 +296,7 @@ public class HTMLLanguage extends TemplateLanguage {
       tagAttributes.skipOnErrorParselet = createSkipOnErrorParselet("/", "<", ">", Symbol.EOF);
       tagAttributes.cacheResults = true;
    }
-   // TODO: how do we deal with appending newlines after the start tag?  Used to having htmlSpacingEOL here but that ate up the space in the content.  Need features of htmlSpacingEOL perhaps when processing the endTagChar?
+   // TODO: how do we deal with appending newlines after the start tag?  Used to having tagSpacingEOL here but that ate up the space in the content.  Need features of tagSpacingEOL perhaps when processing the endTagChar?
    Sequence simpleTag = new Sequence("Element(,tagName,attributeList,selfClose,)", beginTagChar, anyTagName, tagAttributes, new Sequence("('')", OPTIONAL, closeTagChar), endTagChar);
    {
       simpleTag.enableTagMode = true;
@@ -327,17 +327,17 @@ public class HTMLLanguage extends TemplateLanguage {
 
 
    // Like the regular template body declarations, the script tag can have template expressions, statements, etc. but not sub-tags
-   OrderedChoice unescapedBodyDeclarations = new OrderedChoice("([],[],[],[],[])", OPTIONAL | REPEAT, htmlComment, templateExpression, templateDeclaration, templateStatement, unescapedTemplateString);
+   OrderedChoice unescapedBodyDeclarations = new OrderedChoice("([],[],[],[],[])", OPTIONAL | REPEAT, tagComment, templateExpression, templateDeclaration, templateStatement, unescapedTemplateString);
 
    // script tag and any others which do not allow sub-tags
    Sequence unescapedTreeTag = new TagStartSequence(unescapedTreeTagName, unescapedBodyDeclarations);
-   Sequence treeTag = new TagStartSequence(htmlTreeTagName, templateBodyDeclarations);
+   Sequence treeTag = new TagStartSequence(treeTagName, templateBodyDeclarations);
 
    SymbolSpace controlStart = new SymbolSpace("<!");
 
    Sequence controlTag = new Sequence("ControlTag(,docTypeName,docTypeValue,)", controlStart, anyTagName, anyTagName, endTagChar);
 
-   OrderedChoice htmlTag = new OrderedChoice(treeTag, unescapedTreeTag, simpleTag, controlTag) {
+   OrderedChoice anyTag = new OrderedChoice(treeTag, unescapedTreeTag, simpleTag, controlTag) {
       /** For a performance tuning, reject this match quickly if there's no < sign. */
       public Object parse(Parser parser) {
          if (parser.peekInputChar(0) != '<')
@@ -347,23 +347,25 @@ public class HTMLLanguage extends TemplateLanguage {
       }
    };
    {
+      // The Tag language does a lot of re-parsing tags strings, etc. due to the nested nature of the grammar - especially when
+      // you do not have a matching close tag.  Just by caching the results though, this re-parsing is much faster.
       templateStatement.cacheResults = true;
       templateExpression.cacheResults = true;
       templateDeclaration.cacheResults = true;
       templateString.cacheResults = true;
-      htmlComment.cacheResults = true;
-      htmlTag.cacheResults = true;
+      tagComment.cacheResults = true;
+      anyTag.cacheResults = true;
       unescapedTemplateString.cacheResults = true;
 
       templateString.add("<");
       templateString.add(">");
 
-      // Insert the HTML specific declarations - an html tag
+      // Insert the Tag language specific declarations - in this case, the only new thing we are parsing is a tag
       templateBodyDeclarations.setName("([],[],[],[],[],[])");
-      templateBodyDeclarations.put("<", htmlTag);
+      templateBodyDeclarations.put("<", anyTag);
 
       simpleTemplateDeclarations.setName("([],[],[])");
-      simpleTemplateDeclarations.add(1, htmlTag);
+      simpleTemplateDeclarations.add(1, anyTag);
    }
 
    public HTMLLanguage() {

@@ -24,7 +24,7 @@ public class LambdaExpression extends BaseLambdaExpression {
    public Object lambdaParams; // An identifier, e.g. x -> y, Parameter list (int a, int b) -> y, or SemanticNodeList<IString> (a, b) -> y
    public Statement lambdaBody; // Either an expression or a BlockStatement
 
-   public Object getLambdaParameters(Object meth) {
+   public Object getLambdaParameters(Object meth, ITypeParamContext ctx) {
       return lambdaParams;
    }
 
@@ -77,5 +77,11 @@ public class LambdaExpression extends BaseLambdaExpression {
          }
       }
       return super.findMember(memberName, type, this, refType, ctx, skipIfaces);
+   }
+
+   protected void propagateInferredType(Object type) {
+      if (lambdaBody instanceof Expression) {
+         ((Expression) lambdaBody).setInferredType(type);
+      }
    }
 }

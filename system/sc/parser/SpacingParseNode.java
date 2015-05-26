@@ -115,8 +115,9 @@ public class SpacingParseNode extends FormattingParseNode {
                         if (sv instanceof Element)
                            sv = ((Element) sv).tagName;
                         if (PString.isString(sv)) {
-                           boolean indent = HTMLLanguage.INDENTED_SET.contains(sv.toString());
-                           boolean newLine = HTMLLanguage.NEWLINE_SET.contains(sv.toString());
+                           HTMLLanguage htmlLang = HTMLLanguage.getHTMLLanguage();
+                           boolean indent = htmlLang.INDENTED_SET.contains(sv.toString());
+                           boolean newLine = htmlLang.NEWLINE_SET.contains(sv.toString());
                            if (indent || newLine) {
                               SemanticNode node = ctx.getNextSemanticNode();
                               if (node == null) {

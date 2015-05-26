@@ -51,6 +51,10 @@ public class SelectorExpression extends ChainedExpression {
 
       int sz;
 
+      // The root expression in a selector does not have an inferred type.  This is just to trigger the propagation of inferred types
+      // since it's the only case where a sub-expression does not have an inferred type.
+      //expression.setInferredType(null);
+
       if (selectors != null && (sz = selectors.size()) > 0) {
          idTypes = new IdentifierExpression.IdentifierType[sz];
          boundTypes = new Object[sz];
@@ -73,13 +77,16 @@ public class SelectorExpression extends ChainedExpression {
                   }
                   else if (nextName.equals("super")) {
                      idTypes[i] = IdentifierExpression.IdentifierType.SuperExpression;
-                     boundTypes[i] = ModelUtil.getExtendsClass(currentType);
-                     if (boundTypes[i] == null)
-                        displayError("No super class for type: " + currentType + " for 'super' ");
+                     boundTypes[i] = currentType;
+                     if (ModelUtil.getExtendsClass(currentType) != null)
+                        System.err.println("*** check prefixed super");
+                     //boundTypes[i] = ModelUtil.getExtendsClass(currentType);
+                     //if (boundTypes[i] == null)
+                     //   displayError("No super class for type: " + currentType + " for 'super' ");
                   }
                   else {
                      IdentifierExpression.bindNextIdentifier(this, currentType, nextName, i, idTypes, boundTypes,
-                                    vsel.isAssignment, vsel.arguments != null, vsel.arguments, bindingDirection, false);
+                                    vsel.isAssignment, vsel.arguments != null, vsel.arguments, bindingDirection, false, inferredType);
                      currentType = IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, vsel.arguments, i, getJavaModel(), currentType, inferredType, getEnclosingType());
                   }
                   if (vsel.arguments != null && boundTypes[i] != null) {
@@ -987,4 +994,10 @@ public class SelectorExpression extends ChainedExpression {
    public void setInferredType(Object inferredType) {
       this.inferredType = inferredType;
    }
+
+   // We propagate to arguments in VariableSelectors but not to the root expression
+   public boolean propagatesInferredType(Expression child) {
+      return child != expression;
+   }
+
 }

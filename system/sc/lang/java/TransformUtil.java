@@ -514,7 +514,7 @@ public class TransformUtil {
          }
 
          // Check if this method is already implemented in this type.  If it's implemented in a base type, we still generate the method to pick up new children
-         if (objType.declaresMethod("getObjChildren", objChildrenParameters, null, null) == null) {
+         if (objType.declaresMethod("getObjChildren", objChildrenParameters, null, null, false) == null) {
             String getObjCodeToInsert = evalTemplate(parameters, getObjChildrenDefinitionTemplate());
 
             parseClassBodySnippet(objType, getObjCodeToInsert, applyToHiddenBody, -1, null, objType);
@@ -1140,7 +1140,7 @@ public class TransformUtil {
       int numParams;
       if (ptypes != null && ptypes.length > 0) {
          numParams = ptypes.length;
-         redirMethod.setProperty("parameters", Parameter.create(ptypes, pnames = ModelUtil.getParameterNames(meth)));
+         redirMethod.setProperty("parameters", Parameter.create(ptypes, pnames = ModelUtil.getParameterNames(meth), null));
       }
       else
          numParams = 0;

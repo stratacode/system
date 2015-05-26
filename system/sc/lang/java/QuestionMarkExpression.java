@@ -31,6 +31,10 @@ public class QuestionMarkExpression extends Expression {
          falseChoice.setInferredType(type);
    }
 
+   public boolean propagatesInferredType(Expression child) {
+      return child == trueChoice || child == falseChoice;
+   }
+
    public Object eval(Class expectedType, ExecutionContext ctx) {
       if (bindingDirection != null)
          return initBinding(expectedType, ctx);

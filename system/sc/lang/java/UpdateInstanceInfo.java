@@ -27,7 +27,7 @@ public class UpdateInstanceInfo {
 
    public static class UpdateType extends UpdateAction {
       void doAction(ExecutionContext ctx) {
-         if (baseType.implementsType("sc.obj.TypeUpdateHandler", false)) {
+         if (baseType.implementsType("sc.obj.TypeUpdateHandler", false, false)) {
             Iterator insts = baseType.getLayeredSystem().getInstancesOfTypeAndSubTypes(baseType.getFullTypeName());
             while (insts.hasNext()) {
                Object inst = insts.next();

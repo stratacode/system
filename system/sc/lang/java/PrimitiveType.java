@@ -98,7 +98,7 @@ public class PrimitiveType extends JavaType {
       return getRuntimeClass();
    }
 
-   public void initType(LayeredSystem sys, ITypeDeclaration itd, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer) {}
+   public void initType(LayeredSystem sys, ITypeDeclaration itd, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer, Object typeParam) {}
 
    public String getBaseSignature() {
       return getSignatureCode();
@@ -151,7 +151,7 @@ public class PrimitiveType extends JavaType {
       return true;
    }
 
-   public Object definesTypeParameter(String typeParamName, ITypeParamContext ctx) {
+   public Object definesTypeParameter(Object typeParamName, ITypeParamContext ctx) {
       return null;
    }
 }

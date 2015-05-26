@@ -757,7 +757,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
             Object fieldType = ModelUtil.getPropertyType(def);
             Object methType = ModelUtil.getPropertyType(currentMethod);
             // An indexed setter
-            Object[] pTypes = currentMethod.getParameterTypes();
+            Object[] pTypes = currentMethod.getParameterTypes(false);
             if (pTypes != null && pTypes.length == 2) {
                if (ModelUtil.isArray(fieldType)) {
                   Object pType = ModelUtil.getArrayComponentType(fieldType);
@@ -917,6 +917,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
    }
 
    public String toGenerateString() {
+      System.err.println("*** - expression does not implemnt toGenerateString: " + getClass().getName());
       throw new UnsupportedOperationException();
    }
 
@@ -946,6 +947,31 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
    }
 
    public void setInferredType(Object type) {
+   }
 
+   public boolean propagatesInferredType(Expression child) {
+      return false;
+   }
+
+   public boolean hasInferredType() {
+      ISemanticNode parent = parentNode;
+      while (parent != null) {
+         if (parent instanceof Expression)
+            return ((Expression) parent).propagatesInferredType(this);
+         if (parent instanceof ReturnStatement)
+            return true;
+         if (parent instanceof VariableDefinition)
+            return true;
+         if (parent instanceof VariableStatement)
+            return true;
+         if (parent instanceof PropertyAssignment)
+            return true;
+         if (parent instanceof IBlockStatement)
+            return false;
+         if (parent instanceof ITypeDeclaration)
+            return false;
+         parent = parent.getParentNode();
+      }
+      return false;
    }
 }

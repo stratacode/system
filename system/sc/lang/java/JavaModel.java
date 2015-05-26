@@ -1852,14 +1852,14 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    public Object findMethod(String name, List<? extends Object> params, Object fromChild, Object refType) {
       Object v;
 
-      if ((v = definesMethod(name, params, null, refType, nonTransformedModel != null)) != null)
+      if ((v = definesMethod(name, params, null, refType, nonTransformedModel != null, false)) != null)
          return v;
 
       // If this is an inner type, we still need to check the parent
       return super.findMethod(name, params, this, refType);
    }
 
-   public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed) {
+   public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly) {
       Object v;
       Object type = null;
 
@@ -1876,11 +1876,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       }
 
       if (type != null) {
-         v = ModelUtil.definesMethod(type, name, types, ctx, refType, isTransformed);
+         v = ModelUtil.definesMethod(type, name, types, ctx, refType, isTransformed, staticOnly);
          if (v != null && ModelUtil.hasModifier(v, "static"))
             return v;
       }
-      return super.definesMethod(name, types, ctx, refType, isTransformed);
+      return super.definesMethod(name, types, ctx, refType, isTransformed, staticOnly);
    }
 
    public boolean needsCompile() {

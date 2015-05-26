@@ -19,6 +19,7 @@ import sc.layer.deps.*;
 import sc.lifecycle.ILifecycle;
 import sc.obj.*;
 import sc.parser.*;
+import sc.repos.RepositoryPackage;
 import sc.repos.RepositorySystem;
 import sc.sync.SyncManager;
 import sc.sync.SyncOptions;
@@ -259,6 +260,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public List<TypeGroupDep> typeGroupDeps = new ArrayList<TypeGroupDep>();
 
    public RepositorySystem repositorySystem;
+   public HashMap<String,RepositoryPackage> repositoryPackages = new HashMap<String,RepositoryPackage>();
 
    public boolean useCanonicalPaths = false;
 
@@ -4111,7 +4113,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       Object[] args = new Object[] {processCommandArgs(runClassArgs)};
       if (type != null && ModelUtil.isDynamicType(type)) {
-         Object meth = ModelUtil.getMethod(type, "main", RTypeUtil.MAIN_ARG);
+         Object meth = ModelUtil.getMethod(type, "main", null, null, false, RTypeUtil.MAIN_ARG);
          if (!ModelUtil.hasModifier(meth, "static"))
             System.err.println("*** Main method missing 'static' modifier: " + runClass);
          else {
@@ -5490,18 +5492,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (addOrigBuild && origBuildDir != null) {
          addQuotedPath(sb, origBuildDir);
       }
-      return sb.toString() + FileUtil.PATH_SEPARATOR + rootClassPath;
       /*
-      systemClasses = packageIndex.get("java/lang");
-      if (systemClasses == null)
+      HashMap<String,PackageEntry> tempSystemClasses = packageIndex.get("java/lang");
+      if (tempSystemClasses == null)
          System.err.println("*** Unable to find jar in classpath defining clasess in java.lang");
       else {
          // Generates the built-in list of classes
-         for (String cl:systemClasses) {
+         for (String cl:tempSystemClasses.keySet()) {
             System.out.println("   \"" + cl + "\",");
          }
       }
       */
+      return sb.toString() + FileUtil.PATH_SEPARATOR + rootClassPath;
    }
 
    public boolean isValidLayersDir(String dirName) {
@@ -5872,6 +5874,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       "NoSuchFieldError",
       "Appendable",
       "ArrayIndexOutOfBoundsException",
+      "FunctionalInterface",
+      "SafeVarargs",
+      "ClassValue",
+      "AutoCloseable",
+      "BootstrapMethodError",
+      "ReflectiveOperationException"
    };
    static {
       for (String cl:systemClassNames)
@@ -6934,8 +6942,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      if (!startedLayers.contains(layer))
                         startedLayers.add(layer);
                   }
-                  SrcEntry newSrcEnt = new SrcEntry(layer, layer.layerPathName, "", "");
-                  bd.addSrcEntry(-1, newSrcEnt);
+                  layer.addBuildDirs(bd);
 
                   // For the common build dir case, only consider the guy generated once we've built the common build layer
                   if (phase == BuildPhase.Process)

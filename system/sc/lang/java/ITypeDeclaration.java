@@ -40,7 +40,7 @@ public interface ITypeDeclaration {
 
    boolean isDynamicStub(boolean includeExtends);
 
-   Object definesMethod(String name, List<?> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed);
+   Object definesMethod(String name, List<?> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly);
 
    Object declaresConstructor(List<?> parametersOrExpressions, ITypeParamContext ctx);
 
@@ -52,7 +52,7 @@ public interface ITypeDeclaration {
 
    Object getInnerType(String name, TypeContext ctx);
 
-   boolean implementsType(String otherTypeName, boolean assignment);
+   boolean implementsType(String otherTypeName, boolean assignment, boolean allowUnbound);
 
    /** Returns the first occurrence of the specified annotation on the types in the type hierarchy */
    Object getInheritedAnnotation(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve);

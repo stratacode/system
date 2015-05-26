@@ -69,8 +69,8 @@ public class BoundType extends JavaType {
       return getFirstType().getTypeDeclaration(ctx);
    }
 
-   public void initType(LayeredSystem sys, ITypeDeclaration itd, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer) {
-      getFirstType().initType(sys, itd, node, ctx, displayError, isLayer);
+   public void initType(LayeredSystem sys, ITypeDeclaration itd, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer, Object typeParam) {
+      getFirstType().initType(sys, itd, node, ctx, displayError, isLayer, typeParam);
    }
 
    public String getBaseSignature() {
@@ -156,7 +156,7 @@ public class BoundType extends JavaType {
       return true;
    }
 
-   public Object definesTypeParameter(String typeParam, ITypeParamContext ctx) {
+   public Object definesTypeParameter(Object typeParam, ITypeParamContext ctx) {
       if (baseType == null)
          return null;
       // TODO: anything else to do here?

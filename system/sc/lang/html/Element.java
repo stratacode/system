@@ -346,7 +346,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
    }
 
    boolean isIndented() {
-      return HTMLLanguage.INDENTED_SET.contains(tagName);
+      return HTMLLanguage.getHTMLLanguage().INDENTED_SET.contains(tagName);
    }
 
    public boolean isAbstract() {

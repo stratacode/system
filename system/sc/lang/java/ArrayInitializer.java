@@ -51,6 +51,10 @@ public class ArrayInitializer extends Expression {
       }
    }
 
+   public boolean propagatesInferredType(Expression child) {
+      return true;
+   }
+
    public Object eval(Class expectedType, ExecutionContext ctx) {
       boolean expectedCollection = expectedType != null && Collection.class.isAssignableFrom(expectedType);
       if (initializers == null && bindingDirection == null) {

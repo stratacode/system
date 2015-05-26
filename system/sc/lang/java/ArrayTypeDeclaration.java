@@ -38,6 +38,8 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
    private final static DynType arrayPropertyCache = TypeUtil.getPropertyCache(OBJECT_ARRAY_CLASS);
 
    public ArrayTypeDeclaration(ITypeDeclaration dit, Object comp, String arrayDims) {
+      if (comp == null)
+         System.out.println("***");
       componentType = comp;
       arrayDimensions = arrayDims;
       definedInType = dit;
@@ -137,8 +139,8 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
       return arrayDimensions.length() >> 1;
    }
 
-   public Object definesMethod(String name, List<? extends Object> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed) {
-      Object res = ModelUtil.definesMethod(OBJECT_ARRAY_CLASS, name, parametersOrExpressions, ctx, refType, isTransformed);
+   public Object definesMethod(String name, List<? extends Object> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly) {
+      Object res = ModelUtil.definesMethod(OBJECT_ARRAY_CLASS, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly);
       // The clone method in an array declaration seems to magically know the return value is an array even though reflection on the class does not detect a clone method.
       if (name.equals("clone")) {
          return new ArrayCloneMethod(this, res, definedInType.getJavaModel());
@@ -168,7 +170,7 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
       return null;
    }
 
-   public boolean implementsType(String otherTypeName, boolean assignment) {
+   public boolean implementsType(String otherTypeName, boolean assignment, boolean allowUnbound) {
       int ix = otherTypeName.indexOf("[");
       if (ix == -1)
          return false;
@@ -185,7 +187,7 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
          if (otherNdim > ourNdim) {
             String otherTypeCompName = otherTypeName.substring(ourNdim);
 
-            return ModelUtil.implementsType(componentType, otherTypeCompName, assignment);
+            return ModelUtil.implementsType(componentType, otherTypeCompName, assignment, allowUnbound);
          }
 
          String arrayTypeName = otherTypeName.substring(otherNdim, otherNdim + 1);
@@ -197,12 +199,12 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
          else
             otherComponentType = t.primitiveClass;
 
-         return ModelUtil.isAssignableFrom(otherComponentType, componentType, assignment, null);
+         return ModelUtil.isAssignableFrom(otherComponentType, componentType, assignment, null, allowUnbound);
 
       }
       else {
          return arrayDimensions.length() == otherTypeName.length()-ix &&
-                ModelUtil.implementsType(componentType, otherTypeName, assignment);
+                ModelUtil.implementsType(componentType, otherTypeName, assignment, allowUnbound);
       }
    }
 
@@ -236,7 +238,7 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
    }
 
    public boolean isTypeParameter() {
-      return componentType instanceof TypeParameter || ModelUtil.isGenericArray(componentType);
+      return ModelUtil.isTypeVariable(componentType) || ModelUtil.isGenericArray(componentType);
    }
 
    public boolean isAssignableFromClass(Class classComponentType) {

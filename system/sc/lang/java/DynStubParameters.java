@@ -1009,7 +1009,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
       }
 
       Object findSuperMethod(Object type, List<Object> paramList) {
-         return ModelUtil.definesMethod(type, ModelUtil.getMethodName(method), paramList, null, null, false);
+         return ModelUtil.definesMethod(type, ModelUtil.getMethodName(method), paramList, null, null, false, false);
       }
 
       public MethodBindSettings getBindSettings() {

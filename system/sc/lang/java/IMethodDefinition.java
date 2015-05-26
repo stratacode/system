@@ -15,7 +15,7 @@ public interface IMethodDefinition extends IMember {
 
    Object getReturnJavaType();
 
-   Object[] getParameterTypes();
+   Object[] getParameterTypes(boolean bound);
 
    JavaType[] getParameterJavaTypes();
 

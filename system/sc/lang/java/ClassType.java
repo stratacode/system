@@ -31,7 +31,10 @@ public class ClassType extends JavaType {
    private transient String compiledTypeName;
    transient Object[] errorArgs;
 
-   private final static Object FAILED_TO_INIT_SENTINEL = "Invalid type sentinel";
+   public final static Object FAILED_TO_INIT_SENTINEL = "Invalid type sentinel";
+
+   /** Sentinel used to refer to a parameter type whose accurate type is not known until the inferred type has been propagated.  */
+   public final static JavaType UNBOUND_INFERRED_TYPE = ClassType.create("__unboundInferredType__");
 
    public static JavaType create(String... arr) {
       // This really messes things up with the parselets system - there can't be a ClassType("int") as per the grammar - so make sure to create the right type.
@@ -45,6 +48,8 @@ public class ClassType extends JavaType {
          arr[arr.length-1] = arr[arr.length-1].substring(0,ix);
       }
       String arg = arr[0];
+      if (arg.equals("<null>"))
+         System.err.println("*** Creating ClassType from null name");
       if (arg.indexOf(".") != -1) {
          String[] firstList = StringUtil.split(arg, '.');
          root.typeName = firstList[0];
@@ -111,7 +116,7 @@ public class ClassType extends JavaType {
       // pre-init of the "type" will have fixed that already a different way).
       ITypeDeclaration itype = getEnclosingIType();
       if (itype != null && type == null)
-         initType(itype.getLayeredSystem(), itype, this, null, true, false);
+         initType(itype.getLayeredSystem(), itype, this, null, true, false, null);
       super.start();
    }
 
@@ -235,7 +240,7 @@ public class ClassType extends JavaType {
       if (type == null) {
          ITypeDeclaration itd = getEnclosingIType();
          if (itd != null) {
-            initType(itd.getLayeredSystem(), itd, this, ctx, true, false);
+            initType(itd.getLayeredSystem(), itd, this, ctx, true, false, null);
          }
       }
       if (type == FAILED_TO_INIT_SENTINEL)
@@ -246,7 +251,7 @@ public class ClassType extends JavaType {
          type = td.resolve(true);
       }
       else if (ctx != null && ModelUtil.isTypeVariable(type)) {
-         Object newType = ctx.getTypeForVariable(type);
+         Object newType = ctx.getTypeForVariable(type, true);
          if (newType != null)
             return newType;
       }
@@ -293,8 +298,9 @@ public class ClassType extends JavaType {
       for (int i = 0; i < typeArgs.size(); i++) {
          JavaType typeArg = typeArgs.get(i);
          Object argType = typeArg.getTypeDeclaration(ctx);
-         if (argType == null)
+         if (argType == null) {
             typeDefs.add(null); // An unresolved type?  Do not put ClassTypes here but are there any cases we need a TypeVariable?
+         }
          else
             typeDefs.add(argType);
       }
@@ -339,7 +345,7 @@ public class ClassType extends JavaType {
     * Initializes this type from the model and node specified.  The ClassDeclaration needs to resolve the type
     * name using itself, so that it will not recursively check the type that is being initialized.
     */
-   public void initType(LayeredSystem sys, ITypeDeclaration it, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer) {
+   public void initType(LayeredSystem sys, ITypeDeclaration it, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer, Object typeParam) {
       if (chained)
          return; // Don't need to init if we are just part of someone else's type
 
@@ -384,7 +390,12 @@ public class ClassType extends JavaType {
       // When looking up type parameters, typically the it is the ParamTypeDeclaration but if it's a param method, it won't be so we need to
       // look up the type parameter for the method explicitly here.
       if (type == null && it == null && ctx != null) {
-         type = ctx.getTypeDeclarationForParam(fullTypeName, null, true);
+         type = ctx.getTypeDeclarationForParam(fullTypeName, null, false);
+         // An unresolvable type parameter which we've manually created.  Just use the type parameter
+         // as the type so we know it's essentially an unbound type.
+         if (type == null && typeParam != null) {
+            type = typeParam;
+         }
       }
 
       if (type == null) { // not a relative name
@@ -706,6 +717,12 @@ public class ClassType extends JavaType {
    }
 
    public boolean isTypeParameter() {
+      if (type == null) {
+         if (!isInitialized())
+            initialize();
+         if (!isStarted() && type == null)
+            start();
+      }
       return ModelUtil.isTypeVariable(type);
    }
 
@@ -871,8 +888,23 @@ public class ClassType extends JavaType {
    }
 
    public JavaType resolveTypeParameters(ITypeParamContext t) {
+      if (type instanceof ExtendsType.LowerBoundsTypeDeclaration) {
+         ExtendsType.LowerBoundsTypeDeclaration superWildcard = ((ExtendsType.LowerBoundsTypeDeclaration) type);
+         Object baseType = superWildcard.getBaseType();
+
+         if (ModelUtil.isTypeVariable(baseType)) {
+            Object newType = t.getTypeForVariable(baseType, false);
+            if (newType != null && newType != baseType) {
+               superWildcard = new ExtendsType.LowerBoundsTypeDeclaration(newType);
+            }
+         }
+         return ExtendsType.createSuper(superWildcard, t);
+      }
       if (isTypeParameter()) {
-         JavaType res = ClassType.createJavaType(t.getTypeForVariable(type));
+         Object typeParam = t.getTypeForVariable(type, false);
+         if (typeParam == null)
+            typeParam = type;
+         JavaType res = ClassType.createJavaType(typeParam);
          res.parentNode = parentNode;
          return res;
       }
@@ -910,11 +942,11 @@ public class ClassType extends JavaType {
       return type != null && type != FAILED_TO_INIT_SENTINEL;
    }
 
-   public Object definesTypeParameter(String typeParam, ITypeParamContext ctx) {
+   public Object definesTypeParameter(Object typeParam, ITypeParamContext ctx) {
       if (type == null)
          return null;
-      if (isTypeParameter() && ModelUtil.getTypeParameterName(type).equals(typeParam))
-         return resolveTypeParameters(ctx);
+      if (isTypeParameter() && ModelUtil.sameTypeParameters(type, typeParam))
+         return ctx != null ? resolveTypeParameters(ctx) : this;
       // TODO: deal with array dimensions here - for each dimension, unwrap one level of ArrayTypeDeclaration wrapper.
       return null;
    }

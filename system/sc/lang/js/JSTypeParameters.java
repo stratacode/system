@@ -671,7 +671,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
    }
 
    public String getUpdateInstSuper() {
-      if (type.implementsType("sc.obj.ITypeUpdateHandler", false)) {
+      if (type.implementsType("sc.obj.ITypeUpdateHandler", false, false)) {
          if (getRuntimeTypeName().equals(getExtendsClass())) {
             // Error rather than printing out code that will infinite loop.
             System.out.println("*** Error - invalid extends for update inst in JS conversion");

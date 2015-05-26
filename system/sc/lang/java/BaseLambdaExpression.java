@@ -8,9 +8,12 @@ import sc.lang.ILanguageModel;
 import sc.lang.ISemanticNode;
 import sc.lang.JavaLanguage;
 import sc.lang.SemanticNodeList;
+import sc.layer.Layer;
+import sc.layer.LayeredSystem;
 import sc.parser.IString;
 import sc.parser.PString;
 import sc.parser.ParseUtil;
+import sc.type.DynType;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.WildcardType;
@@ -32,7 +35,7 @@ public abstract class BaseLambdaExpression extends Expression {
    /** This is the implementation we generate of the inferredTypeMethod */
    transient MethodDefinition lambdaMethod;
 
-   abstract Object getLambdaParameters(Object methObj);
+   abstract Object getLambdaParameters(Object methObj, ITypeParamContext ctx);
    abstract Statement getLambdaBody(Object methObj);
    abstract String getExprType();
 
@@ -40,23 +43,32 @@ public abstract class BaseLambdaExpression extends Expression {
       inferredTypeMethod = methObj;
    }
 
-   void initNewExpression() {
-      if (inferredType == null) {
-         // TODO: will this happen?
-         displayError("No inferredType for lambda expression: ");
-         return;
-      }
+   public boolean lambdaParametersMatch(Object type) {
+      Object ifaceMeth = getInterfaceMethod(type, false);
+      if (ifaceMeth == null)
+         return false;
 
+      Object lambdaParams = getLambdaParameters(ifaceMeth, null);
+
+      if (!parametersMatch(lambdaParams, ifaceMeth)) {
+         return false;
+      }
+      return true;
+   }
+
+   Object getInterfaceMethod(Object inferredType, boolean errors) {
       if (!ModelUtil.isInterface(inferredType)) {
-         displayError("Type for lambda expression must be an interface with one method: ");
-         return;
+         if (errors)
+            displayError("Type for lambda expression must be an interface with one method: ");
+         return null;
       }
 
       Object[] methods = ModelUtil.getAllMethods(inferredType, null, false, false, false);
       Object ifaceMeth = null;
       if (methods == null) {
-         displayError("Type for lambda expression has no methods: ");
-         return;
+         if (errors)
+            displayError("Type for lambda expression has no methods: ");
+         return null;
       }
       else if (methods.length != 1) {
          for (Object meth:methods) {
@@ -67,8 +79,14 @@ public abstract class BaseLambdaExpression extends Expression {
             if (ModelUtil.hasModifier(meth, "static"))
                continue;
             if (ifaceMeth != null) {
-               displayError("Type for lambda expression must have only one method.  Interface " + ModelUtil.getTypeName(inferredType) + " has both: " + ModelUtil.toDeclarationString(ifaceMeth) + " and " + ModelUtil.toDeclarationString(meth));
-               return;
+               // Pick the later method?  Does it matter which we pick here?
+               if (ModelUtil.overridesMethod(ifaceMeth, meth))
+                  ifaceMeth = meth;
+               else {
+                  if (errors)
+                     displayError("Type for lambda expression must have only one method.  Interface " + ModelUtil.getTypeName(inferredType) + " has both: " + ModelUtil.toDeclarationString(ifaceMeth) + " and " + ModelUtil.toDeclarationString(meth) + " for: ");
+                  return null;
+               }
             }
             else
                ifaceMeth = meth;
@@ -77,27 +95,45 @@ public abstract class BaseLambdaExpression extends Expression {
       else
          ifaceMeth = methods[0];
 
+      return ifaceMeth;
+   }
+
+   void initNewExpression() {
+      if (inferredType == null) {
+         // TODO: will this happen?
+         displayError("No inferredType for lambda expression: ");
+         return;
+      }
+
+      Object ifaceMeth = getInterfaceMethod(inferredType, true);
+      if (ifaceMeth == null) {
+         return;
+      }
+
       updateInferredTypeMethod(ifaceMeth);
-
-      Object lambdaParams = getLambdaParameters(ifaceMeth);
-      if (!parametersMatch(lambdaParams, ifaceMeth)) {
-         displayError("Mismatch between lambda method: " + ModelUtil.getMethodName(ifaceMeth) + " and " + getExprType() + " parameters: " + getParamString(lambdaParams) + " and: " + ModelUtil.toDeclarationString(ifaceMeth));
-      }
-
-      if (ModelUtil.isParameterizedMethod(ifaceMeth) && ModelUtil.hasTypeParameters(inferredType)) {
-         ifaceMeth = new ParamTypedMethod(ifaceMeth, (ITypeParamContext) inferredType, getEnclosingType());
-      }
 
       ITypeParamContext typeCtx = inferredType instanceof ITypeParamContext ? (ITypeParamContext) inferredType : null;
 
+      Object lambdaParams = getLambdaParameters(ifaceMeth, typeCtx);
+      if (!parametersMatch(lambdaParams, ifaceMeth)) {
+         displayError("Mismatch between lambda method: " + ModelUtil.getMethodName(ifaceMeth) + " and " + getExprType() + " parameters: " + getParamString(lambdaParams) + " and: " + ModelUtil.toDeclarationString(ifaceMeth));
+         boolean x = parametersMatch(lambdaParams, ifaceMeth);
+      }
+
+      if (ModelUtil.isParameterizedMethod(ifaceMeth) && ModelUtil.hasTypeParameters(inferredType) && !(ifaceMeth instanceof ParamTypedMethod)) {
+         ifaceMeth = new ParamTypedMethod(ifaceMeth, (ITypeParamContext) inferredType, getEnclosingType(), null);
+      }
+
       newExpr = new NewExpression();
       newExpr.lambdaExpression = true;
+      newExpr.setProperty("arguments", new SemanticNodeList());
       newExpr.setProperty("typeIdentifier", ModelUtil.getTypeName(inferredType));
       SemanticNodeList<Statement> classBody = new SemanticNodeList<Statement>();
 
       MethodDefinition newMeth = new MethodDefinition();
       newMeth.name = ModelUtil.getMethodName(ifaceMeth);
-      newMeth.setProperty("parameters", parameters = createLambdaParams(lambdaParams, ifaceMeth));
+
+      newMeth.setProperty("parameters", parameters = createLambdaParams(lambdaParams, ifaceMeth, typeCtx));
       newMeth.setProperty("type", JavaType.createFromParamType(ModelUtil.getParameterizedReturnType(ifaceMeth, null, true), typeCtx));
       lambdaMethod = newMeth;
 
@@ -136,24 +172,40 @@ public abstract class BaseLambdaExpression extends Expression {
       Object ifaceMethReturnType = ModelUtil.getReturnJavaType(ifaceMeth);
       if (ModelUtil.isParameterizedType(ifaceMethReturnType) && inferredType instanceof ParamTypeDeclaration && ((ParamTypeDeclaration) inferredType).hasUnboundParameters()) {
          Object methodReturnType = newMeth.getInferredReturnType();
+         if (methodReturnType != null) {
+            ParamTypeDeclaration paramType = (ParamTypeDeclaration) inferredType;
 
-         ParamTypeDeclaration paramType = (ParamTypeDeclaration) inferredType;
+            if (ModelUtil.isTypeVariable(ifaceMethReturnType)) {
+               String typeParamName = ModelUtil.getTypeParameterName(ifaceMethReturnType);
 
-         if (ModelUtil.isTypeVariable(ifaceMethReturnType)) {
-            String typeParamName = ModelUtil.getTypeParameterName(ifaceMethReturnType);
+               // The owner type of ifaceMeth may be a subclass of paramType and so we need to map the parameters.
 
-            // The owner type of ifaceMeth may be a subclass of paramType and so we need to map the parameters.
-
-            if (!ModelUtil.sameTypes(paramType, ModelUtil.getEnclosingType(ifaceMeth))) {
-               // TODO: need to map type parameters from one type to the other...
-               System.out.println("*** Unsupported type parameters case");
+               if (!ModelUtil.sameTypes(paramType, ModelUtil.getEnclosingType(ifaceMeth))) {
+                  // TODO: need to map type parameters from one type to the other...
+                  //System.out.println("*** Unsupported type parameters case");
+               }
+               paramType.setTypeParameter(typeParamName, methodReturnType);
             }
-            paramType.setTypeParameter(typeParamName, methodReturnType);
+            else if (ifaceMethReturnType instanceof ExtendsType) {
+               System.out.println("***");
+            }
+            else if (ModelUtil.isParameterizedType(ifaceMethReturnType))
+               System.out.println("***"); // TODO: do we need to do extraction and setting of type parameters here
          }
       }
 
       // Setting these after we've added any type parameters whose type is inferred form the method's return type
-      newMeth.setProperty("type", JavaType.createFromParamType(ModelUtil.getParameterizedReturnType(ifaceMeth, null, true), typeCtx));
+      Object paramReturnType = ModelUtil.getParameterizedReturnType(ifaceMeth, null, false);
+      if (ModelUtil.isTypeVariable(paramReturnType)) {
+         if (typeCtx != null) {
+            paramReturnType = typeCtx.getTypeForVariable(paramReturnType, true);
+         }
+         if (ModelUtil.isTypeVariable(paramReturnType))
+            paramReturnType = ModelUtil.getTypeParameterDefault(paramReturnType);
+      }
+      else if (paramReturnType instanceof ExtendsType.LowerBoundsTypeDeclaration)
+         paramReturnType = ((ExtendsType.LowerBoundsTypeDeclaration) paramReturnType).getBaseType();
+      newMeth.setProperty("type", JavaType.createFromParamType(paramReturnType, typeCtx));
       if (ModelUtil.hasTypeParameters(inferredType)) {
          SemanticNodeList<JavaType> typeParams = new SemanticNodeList<JavaType>();
          int numParams = ModelUtil.getNumTypeParameters(inferredType);
@@ -161,7 +213,7 @@ public abstract class BaseLambdaExpression extends Expression {
             Object typeParam = ModelUtil.getTypeParameter(inferredType, i);
             if (typeParam instanceof JavaType)
                typeParams.add((JavaType) ((JavaType) typeParam).deepCopy(ISemanticNode.CopyNormal, null));
-            else if (typeParam instanceof WildcardType || typeParam instanceof ParameterizedType) {
+            else if (typeParam instanceof WildcardType || typeParam instanceof ParameterizedType || typeParam instanceof ExtendsType.LowerBoundsTypeDeclaration) {
                typeParams.add((JavaType.createFromParamType(typeParam, inferredType instanceof ITypeParamContext ? (ITypeParamContext) inferredType : null)));
             }
             else
@@ -169,10 +221,16 @@ public abstract class BaseLambdaExpression extends Expression {
          }
          newExpr.setProperty("typeArguments", typeParams);
       }
+
+      propagateInferredType(inferredType);
+   }
+
+   protected void propagateInferredType(Object type) {
+
    }
 
    private static boolean parametersMatch(Object lambdaParams, Object meth) {
-      Object[] params = ModelUtil.getParameterTypes(meth);
+      Object[] params = ModelUtil.getGenericParameterTypes(meth, true);
       // One parameter special case for lambda's
       if (PString.isString(lambdaParams)) {
          return params.length == 1;
@@ -195,7 +253,8 @@ public abstract class BaseLambdaExpression extends Expression {
    }
 
    String getParamString(Object lambdaParams) {
-      return (lambdaParams == null ? "()" : lambdaParams instanceof IString ? lambdaParams : ParseUtil.toLanguageString(JavaLanguage.getJavaLanguage().lambdaParameters, (ISemanticNode) lambdaParams)).toString();
+      return (lambdaParams == null ? "()" : (lambdaParams instanceof IString ? lambdaParams :
+              ParseUtil.toLanguageString(JavaLanguage.getJavaLanguage().lambdaParameters, (ISemanticNode) lambdaParams)).toString());
    }
 
    public MethodDefinition getLambdaMethod() {
@@ -221,7 +280,7 @@ public abstract class BaseLambdaExpression extends Expression {
       super.validate();
    }
 
-   private static Parameter createLambdaParams(Object params, Object meth) {
+   private static Parameter createLambdaParams(Object params, Object meth, ITypeParamContext ctx) {
       ArrayList<String> names = new ArrayList<String>();
 
       if (PString.isString(params)) {
@@ -243,9 +302,16 @@ public abstract class BaseLambdaExpression extends Expression {
          throw new UnsupportedOperationException();
       }
 
-      Object[] methTypes = ModelUtil.getParameterTypes(meth);
-
-      return Parameter.create(methTypes, names.toArray(new String[names.size()]));
+      Object[] methTypes = ModelUtil.getGenericParameterTypes(meth, true);
+      Object[] resMethTypes = methTypes == null ? null : new Object[methTypes.length];
+      if (methTypes != null) {
+         for (int i = 0; i < methTypes.length; i++) {
+            resMethTypes[i] = methTypes[i];
+            if (ModelUtil.isTypeVariable(resMethTypes[i]))
+               resMethTypes[i] = ModelUtil.getTypeParameterDefault(resMethTypes[i]);
+         }
+      }
+      return Parameter.create(resMethTypes, names.toArray(new String[names.size()]), ctx);
    }
 
    @Override
@@ -256,11 +322,11 @@ public abstract class BaseLambdaExpression extends Expression {
 
    public Object getTypeDeclaration() {
       if (inferredType == null)
-         return LAMBDA_INFERRED_TYPE;
+         return new LambdaInferredType(this);
       if (newExpr == null)
          initNewExpression();
       if (newExpr == null)
-         return LAMBDA_INFERRED_TYPE;
+         return new LambdaInferredType(this);
       return inferredType;
    }
 
@@ -303,6 +369,297 @@ public abstract class BaseLambdaExpression extends Expression {
       if (needsStart) {
          needsStart = false;
          super.start();
+      }
+   }
+
+   public static class LambdaInferredType implements ITypeDeclaration {
+      BaseLambdaExpression rootExpr;
+
+      public LambdaInferredType(BaseLambdaExpression baseLambda) {
+         rootExpr = baseLambda;
+      }
+
+      @Override
+      public boolean isAssignableFrom(ITypeDeclaration other, boolean assignmentSemantics) {
+         return false;
+      }
+
+      @Override
+      public boolean isAssignableTo(ITypeDeclaration other) {
+         return false;
+      }
+
+      @Override
+      public boolean isAssignableFromClass(Class other) {
+         return false;
+      }
+
+      @Override
+      public String getTypeName() {
+         return "Object";
+      }
+
+      @Override
+      public String getFullTypeName(boolean includeDims, boolean includeTypeParams) {
+         return "java.lang.Object";
+      }
+
+      @Override
+      public String getFullTypeName() {
+         return "java.lang.Object";
+      }
+
+      @Override
+      public String getFullBaseTypeName() {
+         return "java.lang.Object";
+      }
+
+      @Override
+      public String getInnerTypeName() {
+         return null;
+      }
+
+      @Override
+      public Class getCompiledClass() {
+         return null;
+      }
+
+      @Override
+      public String getCompiledClassName() {
+         return null;
+      }
+
+      @Override
+      public String getCompiledTypeName() {
+         return null;
+      }
+
+      @Override
+      public Object getRuntimeType() {
+         return null;
+      }
+
+      @Override
+      public boolean isDynamicType() {
+         return false;
+      }
+
+      @Override
+      public boolean isDynamicStub(boolean includeExtends) {
+         return false;
+      }
+
+      @Override
+      public Object definesMethod(String name, List<?> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly) {
+         return null;
+      }
+
+      @Override
+      public Object declaresConstructor(List<?> parametersOrExpressions, ITypeParamContext ctx) {
+         return null;
+      }
+
+      @Override
+      public Object definesConstructor(List<?> parametersOrExpressions, ITypeParamContext ctx, boolean isTransformed) {
+         return null;
+      }
+
+      @Override
+      public Object definesMember(String name, EnumSet<MemberType> type, Object refType, TypeContext ctx) {
+         return null;
+      }
+
+      @Override
+      public Object definesMember(String name, EnumSet<MemberType> type, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {
+         return null;
+      }
+
+      @Override
+      public Object getInnerType(String name, TypeContext ctx) {
+         return null;
+      }
+
+      @Override
+      public boolean implementsType(String otherTypeName, boolean assignment, boolean allowUnbound) {
+         // At this stage, we do not know if we implement the type.  Returning true, because we need to match essentially any type during
+         // the type checking process, until the inferred type is set and we can really determine our type.  We might need to push some
+         // operations to the 'validate' stage where this inferredType will definiteily have been set if they depend on an accurate result here.
+         return true;
+      }
+
+      @Override
+      public Object getInheritedAnnotation(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
+         return null;
+      }
+
+      @Override
+      public ArrayList<Object> getAllInheritedAnnotations(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
+         return null;
+      }
+
+      @Override
+      public Object getDerivedTypeDeclaration() {
+         return null;
+      }
+
+      @Override
+      public Object getExtendsTypeDeclaration() {
+         return null;
+      }
+
+      @Override
+      public Object getExtendsType() {
+         return null;
+      }
+
+      @Override
+      public List<?> getImplementsTypes() {
+         return null;
+      }
+
+      @Override
+      public List<Object> getAllMethods(String modifier, boolean hasModifier, boolean isDyn, boolean overridesComp) {
+         return null;
+      }
+
+      @Override
+      public List<Object> getMethods(String methodName, String modifier, boolean includeExtends) {
+         return null;
+      }
+
+      @Override
+      public List<Object> getAllProperties(String modifier, boolean includeAssigns) {
+         return null;
+      }
+
+      @Override
+      public List<Object> getAllFields(String modifier, boolean hasModifier, boolean dynamicOnly, boolean includeObjs, boolean includeAssigns, boolean includeModified) {
+         return null;
+      }
+
+      @Override
+      public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly) {
+         return null;
+      }
+
+      @Override
+      public DeclarationType getDeclarationType() {
+         return null;
+      }
+
+      @Override
+      public Object getClass(String className, boolean useImports) {
+         return null;
+      }
+
+      @Override
+      public Object findTypeDeclaration(String typeName, boolean addExternalReference) {
+         return null;
+      }
+
+      @Override
+      public JavaModel getJavaModel() {
+         return rootExpr.getJavaModel();
+      }
+
+      @Override
+      public Layer getLayer() {
+         return rootExpr.getJavaModel().getLayer();
+      }
+
+      @Override
+      public LayeredSystem getLayeredSystem() {
+         return rootExpr.getLayeredSystem();
+      }
+
+      @Override
+      public List<?> getClassTypeParameters() {
+         return null;
+      }
+
+      @Override
+      public Object[] getConstructors(Object refType) {
+         return new Object[0];
+      }
+
+      @Override
+      public boolean isComponentType() {
+         return false;
+      }
+
+      @Override
+      public DynType getPropertyCache() {
+         return null;
+      }
+
+      @Override
+      public boolean isEnumeratedType() {
+         return false;
+      }
+
+      @Override
+      public Object getEnumConstant(String nextName) {
+         return null;
+      }
+
+      @Override
+      public boolean isCompiledProperty(String name, boolean fieldMode, boolean interfaceMode) {
+         return false;
+      }
+
+      @Override
+      public List<JavaType> getCompiledTypeArgs(List<JavaType> typeArgs) {
+         return null;
+      }
+
+      @Override
+      public boolean needsOwnClass(boolean checkComponents) {
+         return false;
+      }
+
+      @Override
+      public boolean isDynamicNew() {
+         return false;
+      }
+
+      @Override
+      public void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode) {
+
+      }
+
+      @Override
+      public void clearDynFields(Object inst, ExecutionContext ctx) {
+
+      }
+
+      @Override
+      public Object[] getImplementsTypeDeclarations() {
+         return new Object[0];
+      }
+
+      @Override
+      public Object[] getAllImplementsTypeDeclarations() {
+         return new Object[0];
+      }
+
+      @Override
+      public boolean isRealType() {
+         return false;
+      }
+
+      @Override
+      public void staticInit() {
+
+      }
+
+      @Override
+      public boolean isTransformedType() {
+         return false;
+      }
+
+      @Override
+      public Object getArrayComponentType() {
+         return null;
       }
    }
 }

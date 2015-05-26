@@ -83,7 +83,7 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
                    new Sequence("('',)", new Symbol("--"), new Symbol(NOT | LOOKAHEAD, ">")),
                    new Sequence("('',)", new Symbol("-"), new Symbol(NOT | LOOKAHEAD, "-")),
                    new Sequence("('',)", new Symbol(NOT, "-"), new Symbol(LOOKAHEAD, Symbol.ANYCHAR)));
-   Sequence htmlComment = new Sequence("HTMLComment(,commentBody,)", new Symbol(START_HTML_COMMENT), htmlCommentBody, new Symbol(END_HTML_COMMENT));
+   Sequence tagComment = new Sequence("HTMLComment(,commentBody,)", new Symbol(START_HTML_COMMENT), htmlCommentBody, new Symbol(END_HTML_COMMENT));
    SymbolChoice templateString = new SymbolChoice(NOT | REPEAT, START_HTML_COMMENT, END_HTML_COMMENT, START_EXP_DELIMITER, START_CODE_DELIMITER, END_DELIMITER, EOF);
    {
       templateString.styleName = "templateString";
@@ -98,7 +98,7 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
    // In terms of order here - need templateDeclaration <%! ahead of templateStatement <% - otherwise risk matching <% !foo := bar %> before we match <%! foo := bar %>
    public IndexedChoice templateBodyDeclarations = new IndexedChoice("([],[],[],[],[])", OPTIONAL | REPEAT);
    {
-      templateBodyDeclarations.put(START_HTML_COMMENT, htmlComment);
+      templateBodyDeclarations.put(START_HTML_COMMENT, tagComment);
       templateBodyDeclarations.put(START_EXP_DELIMITER, templateExpression);
       templateBodyDeclarations.put(START_DECL_DELIMITER, templateDeclaration);
       templateBodyDeclarations.put(START_CODE_DELIMITER, templateStatement);

@@ -72,8 +72,8 @@ public class EnumDeclaration extends TypeDeclaration {
       }
    }
 
-   public Object declaresMethod(String name, List<? extends Object> types, ITypeParamContext ctx, Object refType) {
-      Object o = super.declaresMethod(name, types, ctx, refType);
+   public Object declaresMethod(String name, List<? extends Object> types, ITypeParamContext ctx, Object refType, boolean staticOnly) {
+      Object o = super.declaresMethod(name, types, ctx, refType, staticOnly);
       if (o != null)
          return o;
 
@@ -91,16 +91,16 @@ public class EnumDeclaration extends TypeDeclaration {
       // the values and valueOf methods.   For other methods, get the runtime type.  if it is a dynamic enum type,
       // we use DynEnumConstant.class to get the method.  For static ones, return the method on the enum class itself.
       
-      return ModelUtil.definesMethod(DynEnumConstant.class, name, types, ctx, refType, false);
+      return ModelUtil.definesMethod(DynEnumConstant.class, name, types, ctx, refType, false, staticOnly);
    }
 
    public void unregister() {
    }
 
-   public boolean implementsType(String fullTypeName, boolean assignment) {
+   public boolean implementsType(String fullTypeName, boolean assignment, boolean allowUnbound) {
       if (fullTypeName.equals("java.lang.Enum"))
          return true;
-      return super.implementsType(fullTypeName, assignment);
+      return super.implementsType(fullTypeName, assignment, allowUnbound);
    }
 
    /** For this type only we add the enum constants as properties */
@@ -236,7 +236,7 @@ public class EnumDeclaration extends TypeDeclaration {
 
                ArrayList<Object> newTypes = new ArrayList<Object>();
                ArrayList<String> newNames = new ArrayList<String>();
-               Object[] oldTypes = constr.getParameterTypes();
+               Object[] oldTypes = constr.getParameterTypes(false);
                String[] oldNames = constr.parameters.getParameterNames();
 
                for (int i = 0; i < defaultConstrParamNames.length; i++) {
@@ -251,7 +251,7 @@ public class EnumDeclaration extends TypeDeclaration {
                   }
                }
 
-               constr.setProperty("parameters", Parameter.create(newTypes.toArray(new Object[newTypes.size()]), newNames.toArray(new String[newNames.size()])));
+               constr.setProperty("parameters", Parameter.create(newTypes.toArray(new Object[newTypes.size()]), newNames.toArray(new String[newNames.size()]), null));
                addEnumSuperCall(constr);
                enumCl.addBodyStatement(constr);
 
@@ -276,7 +276,7 @@ public class EnumDeclaration extends TypeDeclaration {
    static ConstructorDefinition newEnumConstructor(String typeName) {
       ConstructorDefinition constr = new ConstructorDefinition();
       constr.name = typeName;
-      constr.setProperty("parameters", Parameter.create(defaultConstrParamTypes, defaultConstrParamNames));
+      constr.setProperty("parameters", Parameter.create(defaultConstrParamTypes, defaultConstrParamNames, null));
       addEnumSuperCall(constr);
       return constr;
    }

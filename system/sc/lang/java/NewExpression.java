@@ -42,8 +42,6 @@ public class NewExpression extends IdentifierExpression {
    public transient boolean isStaticContext;
    /** True if this new expression is part of a lambda expression.  If so, it does not create a real type in the type system */
    public transient boolean lambdaExpression = false;
-   /** The inferred type for this new expression (i.e. the target type) */
-   public transient Object inferredType;
 
    private boolean anonTypeInited = false;
 
@@ -134,6 +132,7 @@ public class NewExpression extends IdentifierExpression {
    }
 
    private void propagateInferredTypes() {
+      // TODO: do we need to stage this if we are in a nested expression and inferredtype has not been set yet (see IdentifierExpression or just inherit from that)
       if (constructor != null && arguments != null) {
          propagateInferredArgs(this, constructor, arguments);
       }
@@ -180,12 +179,12 @@ public class NewExpression extends IdentifierExpression {
 
    public Object findMethod(String name, List<? extends Object> params, Object fromChild, Object refType) {
       if (classBody != null && classBody.indexOf(fromChild) != -1) {
-         Object v = BodyTypeDeclaration.findMethodInBody(classBody, name, params, null, refType);
+         Object v = BodyTypeDeclaration.findMethodInBody(classBody, name, params, null, refType, false);
          if (v != null)
             return v;
 
          if (boundType != null) {
-            v = ModelUtil.definesMethod(boundType, name, params, null, refType, ModelUtil.isTransformedType(boundType));
+            v = ModelUtil.definesMethod(boundType, name, params, null, refType, ModelUtil.isTransformedType(boundType), false);
             if (v != null)
                return v;
          }
@@ -391,7 +390,7 @@ public class NewExpression extends IdentifierExpression {
                if (accessClass != null) {
                   String name = cl.getName().replace('$', '.');
                   String methodName = "new" + CTypeUtil.capitalizePropertyName(CTypeUtil.getClassName(name));
-                  Object method = ModelUtil.definesMethod(accessClass, methodName, arguments, null, null, true);
+                  Object method = ModelUtil.definesMethod(accessClass, methodName, arguments, null, null, true, false);
                   if (method != null) {
                      Object[] params = ModelUtil.expressionListToValues(arguments, ctx);
                      Object thisObj = ctx.findThisType(accessClass);
@@ -948,9 +947,5 @@ public class NewExpression extends IdentifierExpression {
             st.addBreakpointNodes(res, srcStatement);
          }
       }
-   }
-
-   public void setInferredType(Object inferredType) {
-      this.inferredType = inferredType;
    }
 }

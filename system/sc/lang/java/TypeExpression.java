@@ -82,4 +82,8 @@ public class TypeExpression extends Statement {
          ParseUtil.realInitAndStartComponent(this);
       return type != null ? type : expression;
    }
+
+   public String toGenerateString() {
+      return typeIdentifier;
+   }
 }

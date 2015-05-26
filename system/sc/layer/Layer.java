@@ -740,6 +740,16 @@ public class Layer implements ILifecycle, LayerConstants {
       return null;
    }
 
+   public void addBuildDirs(LayeredSystem.BuildState bd) {
+      if (topLevelSrcDirs == null) {
+         System.err.println("***");
+      }
+      for (String topLevelSrcDir:topLevelSrcDirs) {
+         SrcEntry newSrcEnt = new SrcEntry(this, topLevelSrcDir, "", "");
+         bd.addSrcEntry(-1, newSrcEnt);
+      }
+   }
+
    public enum LayerEnabledState {
       Enabled, Disabled, NotSet
    }
@@ -3282,6 +3292,10 @@ public class Layer implements ILifecycle, LayerConstants {
       return !annotationLayer && ((finalLayer && (compiled || changedModelsDetected)) || (!liveDynamicTypes && layeredSystem.systemCompiled));
    }
 
+   public RepositoryPackage getRepositoryPackage(String pkgName) {
+      return layeredSystem.repositoryPackages.get(pkgName);
+   }
+
    public RepositoryPackage addRepositoryPackage(String pkgName, String repositoryTypeName, String url, boolean unzip) {
       if (repositoryPackages == null)
          repositoryPackages = new ArrayList<RepositoryPackage>();
@@ -3304,6 +3318,7 @@ public class Layer implements ILifecycle, LayerConstants {
                pkg.update();
             }
          }
+         layeredSystem.repositoryPackages.put(pkgName, pkg);
          return pkg;
       }
       else

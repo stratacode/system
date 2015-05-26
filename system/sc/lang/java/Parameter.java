@@ -14,14 +14,14 @@ public class Parameter extends AbstractVariable implements IVariable {
    public boolean repeatingParameter;
    public Parameter nextParameter;
 
-   public static Parameter create(Object[] types, String[] names) {
+   public static Parameter create(Object[] types, String[] names, ITypeParamContext ctx) {
       if (types == null || types.length == 0)
           return null;
       Parameter curr = null, first = null;
       int i = 0;
       for (Object type:types) {
          Parameter next = new Parameter();
-         next.setProperty("type", ClassType.create(ModelUtil.getTypeName(type)));
+         next.setProperty("type", JavaType.createFromParamType(type, ctx));
          next.variableName = names[i++];
          if (curr == null)
             first = curr = next;

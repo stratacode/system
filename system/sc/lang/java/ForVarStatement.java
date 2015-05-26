@@ -54,8 +54,8 @@ public class ForVarStatement extends ForStatement implements IVariable {
       super.start();
       if (type != null && expression != null) {
          Object exprType = expression.getGenericType();
-         if (exprType != null && !ModelUtil.isArray(exprType) && !ModelUtil.isAssignableFrom(Collection.class, exprType)) {
-            displayTypeError("For loop - expression after the ':' must be an array or a java.util.Collection");
+         if (exprType != null && !ModelUtil.isArray(exprType) && !ModelUtil.isAssignableFrom(Iterable.class, exprType)) {
+            displayTypeError("For loop - expression after the ':' must be an array or a java.lang.Iterable");
          }
          else {
             Object componentType = ModelUtil.getArrayOrListComponentType(exprType);
