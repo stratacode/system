@@ -39,7 +39,7 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
 
    public ArrayTypeDeclaration(ITypeDeclaration dit, Object comp, String arrayDims) {
       if (comp == null)
-         System.out.println("***");
+         System.out.println("*** Error null array component type");
       componentType = comp;
       arrayDimensions = arrayDims;
       definedInType = dit;

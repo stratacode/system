@@ -7,7 +7,6 @@ package sc.lang.java;
 import sc.layer.Layer;
 import sc.type.*;
 import sc.layer.LayeredSystem;
-import sc.util.CoalescedHashMap;
 
 import java.util.*;
 
@@ -33,6 +32,8 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       system = sys;
       typeParams = typeParameters;
       baseType = baseTypeDecl;
+      if (typeParameters.size() != typeDefs.size())
+         System.out.println("***");
       int ix = 0;
       types = typeDefs;
       // When dealing with type parameters Type<int> always becomes Type<Integer>
@@ -97,6 +98,8 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
             if (!ModelUtil.isTypeVariable(typeParam) && !ModelUtil.isAssignableFrom(typeParam, otherTypeParam))
                return false;
             if (types != null && otherParamType.types != null) {
+               if (i == 0 && types.size() == 0)
+                  System.out.println("***");
                Object type = types.get(i);
                if (i >= otherParamType.types.size())
                   return false;
@@ -562,17 +565,17 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
          return new ParamTypeDeclaration(system, new ArrayList<Object>(typeParams), new ArrayList<Object>(types), baseType);
    }
 
-   public void addMappedTypeParameters(CoalescedHashMap paramMap) {
+   public void addMappedTypeParameters(Map<TypeParamKey,Object> paramMap) {
       if (typeParamMapping != null) {
          for (TypeParamMap typeParamMap:typeParamMapping) {
             Object mappedType = typeParamMap.toVar;
-            Object value = paramMap.get(ModelUtil.getTypeParameterName(mappedType));
+            Object value = paramMap.get(new TypeParamKey(mappedType));
             if (value != null) {
                if (!ModelUtil.isTypeVariable(value)) {
-                  String typeParamName = ModelUtil.getTypeParameterName(typeParamMap.fromVar);
-                  Object oldValue = paramMap.get(typeParamName);
+                  TypeParamKey fromVarKey = new TypeParamKey(typeParamMap.fromVar);
+                  Object oldValue = paramMap.get(fromVarKey);
                   if (oldValue == null)
-                     paramMap.put(typeParamName, value);
+                     paramMap.put(fromVarKey, value);
                   else {
                      if (!ModelUtil.sameTypes(oldValue, value)) {
                         // TODO: we already have a definition for this parameter - how do we reconcile?

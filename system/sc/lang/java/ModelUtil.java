@@ -99,17 +99,17 @@ public class ModelUtil {
       return typeToClass(getVariableTypeDeclaration(varObj));
    }
 
-   public static CoalescedHashMap initMethodTypeParameters(Object[] typeParameters, Object[] genericParamTypes, List<Expression> arguments, Object retType, Object retInferredType) {
+   public static Map<TypeParamKey,Object> initMethodTypeParameters(Object[] typeParameters, Object[] genericParamTypes, List<Expression> arguments, Object retType, Object retInferredType) {
       if (typeParameters == null)
-         return new CoalescedHashMap(0);
+         return new HashMap<TypeParamKey,Object>(2);
 
-      CoalescedHashMap paramMap = new CoalescedHashMap(typeParameters.length);
+      Map<TypeParamKey,Object> paramMap = new HashMap<TypeParamKey,Object>(2*typeParameters.length);
       for (Object tp:typeParameters) {
          Object boundType = ModelUtil.getTypeParameterDefault(tp);
          if (boundType == null || boundType.equals("<null>"))
             System.out.println("***");
          if (boundType != Object.class)
-            paramMap.put(ModelUtil.getTypeParameterName(tp), boundType);
+            paramMap.put(new TypeParamKey(tp), boundType);
       }
 
       int argSize = arguments.size();
@@ -165,11 +165,11 @@ public class ModelUtil {
    }
 
    // TODO: We are using names here - shouldn't we really use keys based off of the definition-type and param-name as a combination?
-   private static void addTypeParamDefinitions(CoalescedHashMap paramMap, Object genParam, Object argType, Object paramArgType) {
+   private static void addTypeParamDefinitions(Map<TypeParamKey,Object> paramMap, Object genParam, Object argType, Object paramArgType) {
       if (argType.equals("<null>"))
          System.out.println("***");
       if (ModelUtil.isTypeVariable(genParam)) {
-         paramMap.put(getTypeParameterName(genParam), argType);
+         paramMap.put(new TypeParamKey(genParam), argType);
       }
       else if (genParam instanceof ExtendsType.LowerBoundsTypeDeclaration) {
          System.out.println("***");
@@ -181,7 +181,7 @@ public class ModelUtil {
 
             if (ModelUtil.isTypeVariable(atp)) {
                String argParamName = ModelUtil.getTypeParameterName(atp);
-               Object curParamType = paramMap.get(argParamName);
+               Object curParamType = paramMap.get(new TypeParamKey(atp));
                if (curParamType == null)
                   ; // This happens sometimes - when we are not able to map the parameter type.
                else {
@@ -190,7 +190,7 @@ public class ModelUtil {
                      // assert curParamType.isAssignableFrom(atp)
                      if (ModelUtil.isAssignableFrom(curParamType, paramArgType)) {
                         argType = paramArgType;
-                        paramMap.put(argParamName, argType);
+                        paramMap.put(new TypeParamKey(atp), argType);
                      }
                   }
                   else if (!(curParamType instanceof WildcardType)) {
@@ -198,7 +198,7 @@ public class ModelUtil {
                      if (paramPos != -1) {
                         if (hasTypeParameters(argType)) {
                            Object paramType = getTypeParameter(argType, paramPos);
-                           paramMap.put(argParamName, paramType);
+                           paramMap.put(new TypeParamKey(atp), paramType);
                         }
                      }
                      // else - could be a method parameter
@@ -208,7 +208,7 @@ public class ModelUtil {
             else {
                Object typeVar = getTypeVariable(genParam, atpIndex);
                if (ModelUtil.isTypeVariable(typeVar)) {
-                  paramMap.put(ModelUtil.getTypeParameterName(typeVar), atp);
+                  paramMap.put(new TypeParamKey(typeVar), atp);
                }
             }
          }
@@ -261,11 +261,11 @@ public class ModelUtil {
             boolean isParamType = hasTypeParameters(genRetType);
             boolean isArrayType = isGenericArray(genRetType);
             if (isParamType || isArrayType || isTypeVariable) {
-               CoalescedHashMap paramMap = initMethodTypeParameters(tps, genParamTypes, arguments, genRetType, inferredType);
+               Map<TypeParamKey,Object> paramMap = initMethodTypeParameters(tps, genParamTypes, arguments, genRetType, inferredType);
 
                if (isTypeVariable) {
                   String retParamName = ModelUtil.getTypeParameterName(genRetType);
-                  Object retParamType = paramMap.get(retParamName);
+                  Object retParamType = paramMap.get(new TypeParamKey(genRetType));
                   if (retParamType != null) {
                      genRetType = retParamType;
                      isParamType = hasTypeParameters(genRetType);
@@ -295,7 +295,8 @@ public class ModelUtil {
                      Object typeParam = getTypeParameter(retType, i);
                      if (ModelUtil.isTypeVariable(typeParam)) {
                         String paramName = ModelUtil.getTypeParameterName(typeParam);
-                        Object paramMappedType = paramMap.get(paramName);
+                        TypeParamKey paramKey = new TypeParamKey(typeParam);
+                        Object paramMappedType = paramMap.get(paramKey);
 
                         Object argMappedType = getTypeDeclFromType(typeContext, typeParam, false, sys, false, definedInType);
                         if (paramMappedType == null) {
@@ -303,7 +304,7 @@ public class ModelUtil {
                               paramMappedType = argMappedType;
                               if (!ModelUtil.isTypeVariable(argMappedType)) {
                                  // assert paramMappedType != null && paramMappedType.isAssignableFrom(argMappedType)
-                                 paramMap.put(paramName, argMappedType);
+                                 paramMap.put(paramKey, argMappedType);
                               }
                            }
                         }
@@ -327,7 +328,7 @@ public class ModelUtil {
                }
 
                if (retType != null && isTypeVariable(retType)) {
-                  Object paramType = paramMap.get(ModelUtil.getTypeParameterName(retType));
+                  Object paramType = paramMap.get(new TypeParamKey(retType));
                   if (ndim == 0)
                      return paramType;
                   if (paramType == null) {
@@ -3623,6 +3624,7 @@ public class ModelUtil {
       else if (ModelUtil.isTypeVariable(genType)) {
          String varName = ModelUtil.getTypeParameterName(genType);
 
+         // TODO: replace this with resolveTypeParameter
          Object res = ModelUtil.resolveTypeParameterName(srcType, resultType, varName);
          if (res == null)
             return null;
@@ -3678,6 +3680,7 @@ public class ModelUtil {
       return res;
    }
 
+   /** TODO - replace this with resolveTypeParameter */
    public static Object resolveTypeParameterName(Object srcType, Object resultType, String typeParamName) {
       int srcIx = ModelUtil.getTypeParameterPosition(srcType, typeParamName);
       if (srcIx == -1) {
@@ -3715,6 +3718,49 @@ public class ModelUtil {
             return typeArg;
       }
       return typeParamName;
+   }
+
+   public static Object resolveTypeParameter(Object srcType, Object resultType, Object typeParam) {
+      String typeParamName = ModelUtil.getTypeParameterName(typeParam);
+      int srcIx = ModelUtil.getTypeParameterPosition(srcType, typeParamName);
+      if (srcIx == -1) {
+         System.err.println("*** Unresolveable type parameter!");
+         return null;
+      }
+      List<Object> extTypes = getExtendsJavaTypePath(srcType, resultType);
+      if (extTypes == null || extTypes.size() == 0) {
+         return getTypeParameters(srcType).get(srcIx);
+      }
+
+      Object res = typeParam;
+
+      Object nextType;
+      for (int i = extTypes.size()-1; i >= 0; i--) {
+         Object ext = extTypes.get(i);
+         List<?> typeArgs = ModelUtil.getTypeArguments(ext);
+         if (typeArgs == null)
+            return null;
+         Object typeArg = typeArgs.get(srcIx);
+         if (ModelUtil.isTypeVariable(typeArg)) {
+            res = typeArg;
+            typeParamName = ModelUtil.getTypeParameterName(res);
+
+            if (i == 0)
+               nextType = resultType;
+            else {
+               nextType = extTypes.get(i-1);
+               if (nextType instanceof JavaType)
+                  nextType = ((JavaType) nextType).getTypeDeclaration();
+            }
+
+            srcIx = ModelUtil.getTypeParameterPosition(nextType, typeParamName);
+         }
+         else if (typeArg instanceof ExtendsType.LowerBoundsTypeDeclaration)
+            System.out.println("***");
+         else
+            return typeArg;
+      }
+      return res;
    }
 
    public static Object resolveTypeParameter(Object srcType, ITypeParamContext resultType, String typeParamName) {
@@ -6749,6 +6795,13 @@ public class ModelUtil {
          if (baseType == null || ModelUtil.isTypeVariable(baseType) || ModelUtil.isUnboundSuper(baseType))
             return true;
       }
+      return false;
+   }
+
+   public static boolean overridesMethodInType(Object type, Object meth) {
+      Object[] paramTypes = ModelUtil.getGenericParameterTypes(meth, false);
+      if (getMethod(type, ModelUtil.getMethodName(meth), null, null, false, paramTypes) != null)
+         return true;
       return false;
    }
 }

@@ -83,17 +83,32 @@ public abstract class BaseLambdaExpression extends Expression {
                if (ModelUtil.overridesMethod(ifaceMeth, meth))
                   ifaceMeth = meth;
                else {
-                  if (errors)
-                     displayError("Type for lambda expression must have only one method.  Interface " + ModelUtil.getTypeName(inferredType) + " has both: " + ModelUtil.toDeclarationString(ifaceMeth) + " and " + ModelUtil.toDeclarationString(meth) + " for: ");
-                  return null;
+                  if (ModelUtil.overridesMethodInType(Object.class, ifaceMeth))
+                     ifaceMeth = meth;
+                  else if (!ModelUtil.overridesMethodInType(Object.class, meth)) {
+                     if (errors)
+                        displayError("Type for lambda expression must have only one method.  Interface " + ModelUtil.getTypeName(inferredType) + " has both: " + ModelUtil.toDeclarationString(ifaceMeth) + " and " + ModelUtil.toDeclarationString(meth) + " for: ");
+                     return null;
+                  }
                }
             }
             else
                ifaceMeth = meth;
          }
+         if (ifaceMeth == null) {
+            if (errors) {
+               if (methods.length == 0)
+                  displayError("Lambda expression's inferred type: " + inferredType.toString() + " does not have any methods for: ");
+               else
+                  displayError("Lambda expression's inferred type: " + inferredType.toString() + " does not have suitable methods: " + methods + " for: ");
+            }
+         }
       }
-      else
+      else // TODO need to validate that this is not abstract
          ifaceMeth = methods[0];
+
+      if (ifaceMeth == null && errors)
+         System.out.println("***");
 
       return ifaceMeth;
    }
@@ -107,6 +122,7 @@ public abstract class BaseLambdaExpression extends Expression {
 
       Object ifaceMeth = getInterfaceMethod(inferredType, true);
       if (ifaceMeth == null) {
+         System.err.println("*** No interface method for lambda expressoin: ");
          return;
       }
 
@@ -180,9 +196,14 @@ public abstract class BaseLambdaExpression extends Expression {
 
                // The owner type of ifaceMeth may be a subclass of paramType and so we need to map the parameters.
 
-               if (!ModelUtil.sameTypes(paramType, ModelUtil.getEnclosingType(ifaceMeth))) {
+               Object methType = ModelUtil.getEnclosingType(ifaceMeth);
+
+               if (!ModelUtil.sameTypes(paramType, methType)) {
                   // TODO: need to map type parameters from one type to the other...
                   //System.out.println("*** Unsupported type parameters case");
+                  // We know that typeParamName is a type parameter for methType, but we need to convert to the type parameter for methType
+                  Object typeParamRes = ModelUtil.resolveTypeParameter(methType, paramType, ifaceMethReturnType);
+                  typeParamName = ModelUtil.getTypeParameterName(typeParamRes);
                }
                paramType.setTypeParameter(typeParamName, methodReturnType);
             }

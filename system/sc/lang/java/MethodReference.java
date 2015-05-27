@@ -172,8 +172,9 @@ public class MethodReference extends BaseLambdaExpression {
             paramInstance = res != null;
          }
          referenceMethod = res;
+         // TODO: better error message here - we can display the two different signatures that should match.
          if (res == null)
-            System.out.println("***");
+            displayError("No reference method for method reference: ");
       }
    }
 

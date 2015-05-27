@@ -316,13 +316,21 @@ public class NewExpression extends IdentifierExpression {
       }
    }
 
-   public List<Object> evalTypeArguments() {
+   public List<Object> evalTypeArguments(Object type) {
       ArrayList<Object> res = new ArrayList<Object>();
       // Handle the diamond operator: <> when this is specified, we inherit the type arguments from the inferredType
-      if (typeArguments.size() == 0 && inferredType != null) {
-         int numTypeParams = ModelUtil.getNumTypeParameters(inferredType);
-         for (int i = 0; i < numTypeParams; i++) {
-            res.add(ModelUtil.getTypeParameter(inferredType, i));
+      if (typeArguments.size() == 0) {
+         if (inferredType != null) {
+            int numTypeParams = ModelUtil.getNumTypeParameters(inferredType);
+            for (int i = 0; i < numTypeParams; i++) {
+               res.add(ModelUtil.getTypeParameter(inferredType, i));
+            }
+         }
+         else {
+            List<?> typeParams = ModelUtil.getTypeParameters(type);
+            for (int i = 0; i < typeParams.size(); i++) {
+               res.add(typeParams.get(i));
+            }
          }
       }
       else {
@@ -341,9 +349,9 @@ public class NewExpression extends IdentifierExpression {
          return null;
       ITypeDeclaration enclType = getEnclosingType();
       if (enclType != null)
-         return new ParamTypeDeclaration(enclType, ModelUtil.getTypeParameters(type), evalTypeArguments(), type);
+         return new ParamTypeDeclaration(enclType, ModelUtil.getTypeParameters(type), evalTypeArguments(type), type);
       else
-         return new ParamTypeDeclaration(getLayeredSystem(), ModelUtil.getTypeParameters(type), evalTypeArguments(), type);
+         return new ParamTypeDeclaration(getLayeredSystem(), ModelUtil.getTypeParameters(type), evalTypeArguments(type), type);
    }
 
    protected boolean inNewMethod() {
