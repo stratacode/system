@@ -107,11 +107,6 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
             return false;
       }
 
-      /*
-      if (name.equals("apply") && ctx instanceof ParamTypeDeclaration && ctx.toString().contains("Function5"))
-         System.out.println("***");
-      */
-
       for (int i = 0; i < otherSize; i++) {
          Object otherP = otherParams.get(i);
          Parameter thisP;

@@ -59,7 +59,7 @@ public abstract class BaseLambdaExpression extends Expression {
    Object getInterfaceMethod(Object inferredType, boolean errors) {
       if (!ModelUtil.isInterface(inferredType)) {
          if (errors)
-            displayError("Type for lambda expression must be an interface with one method: ");
+            displayError("Type for lambda expression: " + ModelUtil.getTypeName(inferredType) + " is not an interface");
          return null;
       }
 
@@ -106,9 +106,6 @@ public abstract class BaseLambdaExpression extends Expression {
       }
       else // TODO need to validate that this is not abstract
          ifaceMeth = methods[0];
-
-      if (ifaceMeth == null && errors)
-         System.out.println("***");
 
       return ifaceMeth;
    }

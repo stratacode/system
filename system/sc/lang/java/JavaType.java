@@ -41,17 +41,17 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
 
    // Returns the TypeDeclaration or Class for this type
    public Object getTypeDeclaration() {
-      return getTypeDeclaration(null);
+      return getTypeDeclaration(null, false);
    }
 
-   public abstract Object getTypeDeclaration(ITypeParamContext ctx);
+   public abstract Object getTypeDeclaration(ITypeParamContext ctx, boolean resolve);
 
    public int getNdims() {
       return arrayDimensions == null || arrayDimensions.length() == 0 ? -1 : arrayDimensions.length() >> 1;
    }
 
    public String getAbsoluteBaseTypeName() {
-      Object type = getTypeDeclaration();
+      Object type = getTypeDeclaration(null, true);
       if (type != null)
          return ModelUtil.getTypeName(type, false);
       else

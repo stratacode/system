@@ -4,8 +4,11 @@
 
 package sc.lang.java;
 
+import sc.parser.IString;
 import sc.parser.IStyleAdapter;
+import sc.parser.PString;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -16,11 +19,28 @@ public class TypedMethodExpression extends IdentifierExpression {
    public String typedIdentifier; // the name of the method being called with explicit type parameters
    public List<JavaType> typeArguments;
 
+   // This contains a copy of identifiers with typeIdentifier appended.
+   private transient List<IString> aidentifiers;
+
+   public List<IString> getAllIdentifiers() {
+      if (aidentifiers == null) {
+         aidentifiers = new ArrayList<IString>(identifiers == null ? 1 : identifiers.size() + 1);
+         if (identifiers != null)
+            aidentifiers.addAll(identifiers);
+         if (typedIdentifier == null)
+            return null;
+         aidentifiers.add(PString.toPString(typedIdentifier));
+      }
+      return aidentifiers;
+   }
+
    // Because the typedIdentifier is an extra identifier but not stored in identifiers we need to tweak the
    // algorithm used by IdentifierExpression in computing the reference for this identifier.
+   /*
    protected int offset() {
       return 0;
    }
+   */
 
    public boolean isReferenceInitializer() {
       return false;

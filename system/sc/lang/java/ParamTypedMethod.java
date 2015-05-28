@@ -121,8 +121,14 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
                   // There are times when we need to bind the type parameter to the type of the argument passed to the method.
                   if (boundJavaTypes != null && i < boundJavaTypes.length) {
                      JavaType boundJavaType = boundJavaTypes[i];
-                     if (boundJavaType != null)
-                        return boundJavaType.getTypeDeclaration(); // pass in type context here?
+                     if (boundJavaType != null) {
+                        Object res = boundJavaType.getTypeDeclaration(); // pass in type context here?
+                        // An array type in the last slot of a method defined like Arrays.toArray(T... value) really means
+                        // that T is assigned to the component type, not the array type.
+                        if (i == boundJavaTypes.length - 1 && ModelUtil.isVarArgs(method) && ModelUtil.isArray(res))
+                           return ModelUtil.getArrayComponentType(res);
+                        return res;
+                     }
                   }
                   return type;
                }
@@ -249,7 +255,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
       Object[] res = new Object[len];
       for (int i =  0; i < len; i++) {
          JavaType paramJavaType = javaTypes[i];
-         res[i] = paramJavaType.getTypeDeclaration(bound ? this : null);
+         res[i] = paramJavaType.getTypeDeclaration(bound ? this : null, false);
          if (res[i] instanceof ClassType) {
             res[i] = javaTypes[i].getTypeDeclaration();
          }
@@ -452,7 +458,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
                   Object res = resolveMethodTypeParameter(typeVarName, typeParam);
                   if (res == null) {
                      if (typeParam instanceof JavaType)
-                        return ((JavaType) typeParam).getTypeDeclaration(paramTypeDecl); // Is it right to pass paramTypeDecl here?
+                        return ((JavaType) typeParam).getTypeDeclaration(paramTypeDecl, false); // Is it right to pass paramTypeDecl here?
                      return typeParam; // An unresolved type parameter - return the type param since it at least matched.
                   }
                   if (res instanceof JavaType) {
@@ -488,7 +494,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
    public LayeredSystem getLayeredSystem() {
       if (definedInType != null)
          return definedInType.getLayeredSystem();
-      else if (paramTypeDecl != this)
+      else if (paramTypeDecl != null)
          return paramTypeDecl.getLayeredSystem();
       return null;
    }

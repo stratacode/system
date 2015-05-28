@@ -832,6 +832,8 @@ public class ModelUtil {
       if (c1 == null)
          return c2;
 
+      Object defaultType = c2;
+
       // First an exact match of parameter types overrides - e.g. Math.abs(int)
       if (types != null) {
          Object[] c1Types = ModelUtil.getParameterTypes(c1);
@@ -839,7 +841,7 @@ public class ModelUtil {
          int c1Len = c1Types == null ? 0 : c1Types.length;
          int checkLen = c2Types == null ? 0 : c2Types.length;
          if (c1Len != checkLen)
-            return c1Len > checkLen ? c2 : c1;
+            defaultType = c1Len > checkLen ? c2 : c1;
 
          // First if any of the parameters is a lambda expression, we need to ensure the
          // lambda expression parameters match the parameters of the single-interface method
@@ -847,8 +849,10 @@ public class ModelUtil {
          for (int i = 0; i < types.length; i++) {
             Object arg = types[i];
             if (arg instanceof BaseLambdaExpression.LambdaInferredType) {
-               Object c1Arg = c1Types[i];
-               Object c2Arg = c2Types[i];
+               boolean repeat1Arg = c1Types.length <= i;
+               boolean repeat2Arg = c2Types.length <= i;
+               Object c1Arg = repeat1Arg ? c1Types[c1Types.length] : c1Types[i];
+               Object c2Arg = repeat2Arg ? c2Types[c2Types.length] : c2Types[i];
 
                boolean c2Interface = ModelUtil.isInterface(c2Arg);
                BaseLambdaExpression lambda = ((BaseLambdaExpression.LambdaInferredType) arg).rootExpr;
@@ -868,8 +872,10 @@ public class ModelUtil {
 
          for (int i = 0; i < types.length; i++) {
             Object arg = types[i];
-            Object c1Arg = c1Types[i];
-            Object c2Arg = c2Types[i];
+            boolean repeat1Arg = c1Types.length <= i;
+            boolean repeat2Arg = c2Types.length <= i;
+            Object c1Arg = repeat1Arg ? c1Types[c1Types.length] : c1Types[i];
+            Object c2Arg = repeat2Arg ? c2Types[c2Types.length] : c2Types[i];
 
             if (c1Arg == c2Arg)
                continue;
@@ -907,7 +913,7 @@ public class ModelUtil {
             // If the arg is an array pick the array type
             else if (argIsArray && ModelUtil.isArray(c2Arg) && !ModelUtil.isArray(c1Arg))
                return c2;
-            return c1;
+            return defaultType;
          }
       }
 
@@ -920,7 +926,7 @@ public class ModelUtil {
 
       if (ModelUtil.isAssignableFrom(ModelUtil.getReturnType(c2), ModelUtil.getReturnType(c1)))
          return c1;
-      return c2;
+      return defaultType;
    }
 
    /** isSameType might be a better name? */
@@ -3441,7 +3447,10 @@ public class ModelUtil {
       if (type instanceof WildcardType)
          return ((WildcardType) type).getUpperBounds()[0];
       else if (type instanceof ExtendsType) {
-         return ((ExtendsType) type).typeArgument.getTypeDeclaration();
+         ExtendsType ext = ((ExtendsType) type);
+         if (ext.typeArgument == null)
+            return Object.class;
+         return ext.typeArgument.getTypeDeclaration();
       }
       else
          throw new UnsupportedOperationException();
@@ -5322,6 +5331,20 @@ public class ModelUtil {
          throw new UnsupportedOperationException();
    }
 
+   /** Just like the above but removes the outer-instance parameter which is present in java.lang.reflect.Constructor's getParameterTypes. */
+   public static Object[] getActualParameterTypes(Object method, boolean bound) {
+      Object[] res = getGenericParameterTypes(method, bound);
+      if (res == null)
+         return null;
+
+      if ((method instanceof Constructor) && getEnclosingInstType(getEnclosingType(method)) != null) {
+         Object[] newRes = new Object[res.length-1];
+         System.arraycopy(res, 1, newRes, 0, newRes.length);
+         res = newRes;
+      }
+      return res;
+   }
+
    public static Object[] getParameterJavaTypes(Object method) {
       if (method instanceof IMethodDefinition)
          return ((IMethodDefinition) method).getParameterJavaTypes();
@@ -6802,6 +6825,15 @@ public class ModelUtil {
       Object[] paramTypes = ModelUtil.getGenericParameterTypes(meth, false);
       if (getMethod(type, ModelUtil.getMethodName(meth), null, null, false, paramTypes) != null)
          return true;
+      return false;
+   }
+
+   public static boolean isOuterType(TypeDeclaration enclosingType, Object currentType) {
+      while (enclosingType != null) {
+         if (ModelUtil.sameTypes(enclosingType, currentType))
+            return true;
+         enclosingType = enclosingType.getEnclosingType();
+      }
       return false;
    }
 }

@@ -9,6 +9,7 @@ import sc.lang.*;
 import sc.lang.js.JSLanguage;
 import sc.lang.sc.PropertyAssignment;
 import sc.layer.LayeredSystem;
+import sc.parser.IString;
 import sc.parser.ParseError;
 import sc.parser.ParseUtil;
 import sc.type.CTypeUtil;
@@ -307,9 +308,10 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
           */
          if (ae.lhs instanceof IdentifierExpression) {
             IdentifierExpression ie = (IdentifierExpression) ae.lhs;
-            int ieSize = ie.identifiers.size();
+            List<IString> idents = ie.getAllIdentifiers();
+            int ieSize = idents.size();
             if (ieSize == 2) {
-               bd.thisObjectPrefix = ie.identifiers.get(0).toString();
+               bd.thisObjectPrefix = idents.get(0).toString();
             }
             // Verified that at least one of these cases works
             //else if (ieSize != 1)
@@ -319,8 +321,9 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
             SelectorExpression sel = (SelectorExpression) ae.lhs;
             if (sel.selectors.size() == 1 && sel.expression instanceof IdentifierExpression) {
                IdentifierExpression prefixExpr = (IdentifierExpression) sel.expression;
-               if (prefixExpr.identifiers.size() == 1) {
-                  bd.thisObjectPrefix = prefixExpr.identifiers.get(0).toString();
+               List<IString> idents = prefixExpr.getAllIdentifiers();
+               if (idents.size() == 1) {
+                  bd.thisObjectPrefix = idents.get(0).toString();
                   if (prefixExpr.arguments != null) {
                      bd.thisObjectArguments = (SemanticNodeList) prefixExpr.arguments.deepCopy(ISemanticNode.CopyNormal, null);
                   }

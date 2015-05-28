@@ -88,17 +88,17 @@ public class HTMLLanguage extends TemplateLanguage {
     * Script tags are treated separately - the bodies are not escaped so that you can embed Javascript, or Java code in them with out escaping the
     * keyword characters. Unescaped tags cannot have child tags.
     */
-   private static final String[] UNESCAPED_TAGS = {"script"};
+   private final String[] UNESCAPED_TAGS = {"script"};
 
    HashSet<String> UNESCAPED_SET = new HashSet<String>(Arrays.asList(UNESCAPED_TAGS));
 
    /** Some HTML tags imply indentation - those are matched by a separate parselet so that we can generate nicely formatted HTML from the model */
-   private static final String[] INDENTED_TAGS = {"html", "head", "body", "table", "tr", "td", "script"};
+   private final String[] INDENTED_TAGS = {"html", "head", "body", "table", "tr", "td", "script"};
 
    public Set<String> INDENTED_SET = new HashSet<String>(Arrays.asList(INDENTED_TAGS));
 
    // Do not indent the children but do add a newline on the end
-   private static final String[] NEWLINE_TAGS = {"input", "title", "a", "link", "h1", "h2", "h3", "h4", "p"};
+   private final String[] NEWLINE_TAGS = {"input", "title", "a", "link", "h1", "h2", "h3", "h4", "p"};
 
    public Set<String> NEWLINE_SET = new HashSet<String>(Arrays.asList(NEWLINE_TAGS));
 

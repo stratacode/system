@@ -81,18 +81,18 @@ public class ExtendsType extends JavaType {
       return sb.toString();
    }
 
-   public Object getTypeDeclaration(ITypeParamContext ctx) {
+   public Object getTypeDeclaration(ITypeParamContext ctx, boolean resolve) {
       if (typeArgument == null)
          return Object.class;
       if (operator != null && operator.equals("super")) {
-         Object typeDecl = typeArgument.getTypeDeclaration(ctx);
+         Object typeDecl = typeArgument.getTypeDeclaration(ctx, resolve);
          if (typeDecl == null)
             return Object.class;
          if (typeDecl instanceof LowerBoundsTypeDeclaration)
             return typeDecl;
          return new LowerBoundsTypeDeclaration(typeDecl);
       }
-      return typeArgument.getTypeDeclaration(ctx);
+      return typeArgument.getTypeDeclaration(ctx, resolve);
    }
 
    public static class LowerBoundsTypeDeclaration extends WrappedTypeDeclaration {
@@ -180,6 +180,8 @@ public class ExtendsType extends JavaType {
 
    @Override
    public JavaType resolveTypeParameters(ITypeParamContext t) {
+      if (typeArgument == null)
+         return this;
       JavaType newTypeArg = typeArgument.resolveTypeParameters(t);
       // This LowerBounds marker will already create the extends type so just return that
       if (typeArgument instanceof ClassType && ((ClassType) typeArgument).type instanceof LowerBoundsTypeDeclaration)

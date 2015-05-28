@@ -2513,16 +2513,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       addBuildCommand(BuildPhase.Process, BuildCommandTypes.Run, bch);
    }
 
-   /**
-    * Adds commands that are executed just after the supplied phase.  Args can be templates like addPreBuildCommand.
-    */
-   public void addRunCommand(String checkTypeGroup, String...args) {
-      BuildCommandHandler bch = new BuildCommandHandler();
-      bch.args = args;
-      bch.checkTypeGroup = checkTypeGroup;
-      addBuildCommand(BuildPhase.Process, BuildCommandTypes.Run, bch);
-   }
-
    public void addTestCommand(BuildCommandHandler handler) {
       addBuildCommand(BuildPhase.Process, BuildCommandTypes.Test, handler);
    }
@@ -2533,16 +2523,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public void addTestCommand(String...args) {
       BuildCommandHandler bch = new BuildCommandHandler();
       bch.args = args;
-      addBuildCommand(BuildPhase.Process, BuildCommandTypes.Test, bch);
-   }
-
-   /**
-    * Adds commands that are executed just after the supplied phase.  Args can be templates like addPreBuildCommand.
-    */
-   public void addTestCommand(String checkTypeGroup, String...args) {
-      BuildCommandHandler bch = new BuildCommandHandler();
-      bch.args = args;
-      bch.checkTypeGroup = checkTypeGroup;
       addBuildCommand(BuildPhase.Process, BuildCommandTypes.Test, bch);
    }
 
@@ -8385,8 +8365,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public void addAllFiles(Layer layer, Set<SrcEntry> toGenerate, File srcDir, String srcDirName, String srcPath, BuildPhase phase, BuildState bd) {
       String [] fileNames = srcDir.list();
-      if (fileNames == null)
+      if (fileNames == null) {
+         error("Invalid src directory: " + srcDir);
          return;
+      }
       for (int f = 0; f < fileNames.length; f++) {
          if (layer.excludedFile(fileNames[f], srcPath))
             continue;

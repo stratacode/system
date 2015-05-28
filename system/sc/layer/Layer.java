@@ -740,13 +740,18 @@ public class Layer implements ILifecycle, LayerConstants {
       return null;
    }
 
+   /** Adds the top level src directories for  */
    public void addBuildDirs(LayeredSystem.BuildState bd) {
-      if (topLevelSrcDirs == null) {
-         System.err.println("***");
+      if (topLevelSrcDirs == null || topLevelSrcDirs.size() == 0) {
+         warn("No srcPath entries for layer: ", this.toString());
       }
-      for (String topLevelSrcDir:topLevelSrcDirs) {
-         SrcEntry newSrcEnt = new SrcEntry(this, topLevelSrcDir, "", "");
-         bd.addSrcEntry(-1, newSrcEnt);
+      else {
+         for (String topLevelSrcDir : topLevelSrcDirs) {
+            if (!FileUtil.isAbsolutePath(topLevelSrcDir))
+               topLevelSrcDir = FileUtil.concat(layerPathName, topLevelSrcDir);
+            SrcEntry newSrcEnt = new SrcEntry(this, topLevelSrcDir, "", "");
+            bd.addSrcEntry(-1, newSrcEnt);
+         }
       }
    }
 
@@ -1244,6 +1249,10 @@ public class Layer implements ILifecycle, LayerConstants {
 
    public void error(String... args) {
       reportMessage(MessageType.Error, args);
+   }
+
+   public void warn(String...args) {
+      reportMessage(MessageType.Warning, args);
    }
 
    public void reportMessage(MessageType type, String... args) {

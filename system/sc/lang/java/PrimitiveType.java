@@ -94,7 +94,7 @@ public class PrimitiveType extends JavaType {
       return typeName;
    }
 
-   public Object getTypeDeclaration(ITypeParamContext ctx) {
+   public Object getTypeDeclaration(ITypeParamContext ctx, boolean resolve) {
       return getRuntimeClass();
    }
 

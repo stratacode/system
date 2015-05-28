@@ -926,7 +926,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                         }
                      }
                   }
-                  else if (!(depType instanceof PrimitiveType) && !(depType instanceof TypeVariable))
+                  else if (!isCompiledInType(depType))
                      System.err.println("*** Warning: unrecognized js type: " + type.typeName + " depends on compiled thing: " + depType);
                }
 
@@ -2257,7 +2257,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                               //   System.err.println("*** Warning: js type: " + type.typeName + " depends on compiled class: " + depType);
                            }
                         }
-                        else if (!(depType instanceof PrimitiveType) && !(depType instanceof TypeVariable))
+                        else if (!isCompiledInType(depType))
                            System.err.println("*** Warning: unrecognized js type: " + type.typeName + " depends on compiled thing: " + depType);
                      }
                      else {
@@ -2282,6 +2282,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          }
          typesInFile.put(jsEnt, Boolean.TRUE);
       }
+   }
+
+   private boolean isCompiledInType(Object depType) {
+      return ((depType instanceof PrimitiveType) || (depType instanceof TypeVariable) || (ModelUtil.isWildcardType(depType)) || ModelUtil.isUnboundSuper(depType));
    }
 
    private void addCompiledTypesToFile(String typeName, Map<JSFileEntry,Boolean> typesInFile, String rootLibFile, Layer genLayer, StringBuilder jsFileBody, Set<String> typesInSameFile) {

@@ -6,6 +6,9 @@ package sc.lang.java;
 
 import sc.lang.ISemanticNode;
 import sc.layer.LayeredSystem;
+import sc.parser.IString;
+
+import java.util.List;
 
 public class SwitchLabel extends ExpressionStatement {
    public int getNestingDepth() {
@@ -29,7 +32,8 @@ public class SwitchLabel extends ExpressionStatement {
       SwitchStatement sw = getSwitch();
       if (sw.isEnum && expression instanceof IdentifierExpression) {
          IdentifierExpression ie = (IdentifierExpression) expression;
-         int sz = ie.identifiers.size();
+         List<IString> idents = ie.getAllIdentifiers();
+         int sz = idents.size();
          Object boundType = ie.boundTypes[sz-1];
 
          // If this is just 'case EnumName' we need to make it 'case EnumType.EnumName' for JS since Java adds the type automatically

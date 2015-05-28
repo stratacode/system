@@ -232,7 +232,7 @@ public class ClassType extends JavaType {
       return false;
    }
 
-   public Object getTypeDeclaration(ITypeParamContext ctx) {
+   public Object getTypeDeclaration(ITypeParamContext ctx, boolean resolve) {
       // We should only be accessing the top level ClassType's type declaration
       // since the chained types are just part of this definition.
       assert !chained;
@@ -246,16 +246,21 @@ public class ClassType extends JavaType {
       if (type == FAILED_TO_INIT_SENTINEL)
          return null;
 
+      Object res = type;
+
       if (type instanceof TypeDeclaration) {
          TypeDeclaration td = (TypeDeclaration) type;
          type = td.resolve(true);
+         res = type;
       }
       else if (ctx != null && ModelUtil.isTypeVariable(type)) {
          Object newType = ctx.getTypeForVariable(type, true);
          if (newType != null)
-            return newType;
+            res = newType;
       }
-      return type;
+      if (resolve && ModelUtil.isTypeVariable(res))
+         return ModelUtil.getTypeParameterDefault(res);
+      return res;
    }
 
    public void setTypeDeclaration(Object typeObj) {
@@ -297,7 +302,7 @@ public class ClassType extends JavaType {
       List<Object> typeDefs = new ArrayList<Object>(typeArgs.size());
       for (int i = 0; i < typeArgs.size(); i++) {
          JavaType typeArg = typeArgs.get(i);
-         Object argType = typeArg.getTypeDeclaration(ctx);
+         Object argType = typeArg.getTypeDeclaration(ctx, false);
          if (argType == null) {
             typeDefs.add(null); // An unresolved type?  Do not put ClassTypes here but are there any cases we need a TypeVariable?
          }

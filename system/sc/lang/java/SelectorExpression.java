@@ -77,12 +77,18 @@ public class SelectorExpression extends ChainedExpression {
                   }
                   else if (nextName.equals("super")) {
                      idTypes[i] = IdentifierExpression.IdentifierType.SuperExpression;
-                     boundTypes[i] = currentType;
-                     if (ModelUtil.getExtendsClass(currentType) != null)
-                        System.err.println("*** check prefixed super");
-                     //boundTypes[i] = ModelUtil.getExtendsClass(currentType);
-                     //if (boundTypes[i] == null)
-                     //   displayError("No super class for type: " + currentType + " for 'super' ");
+                     // You can prefix super in two different situations for different reasons.  One is to refer to the super of an enclosing class.
+                     // In this case, the prefix is the enclosing type and we want to get the super class of that type.
+                     // The second is from an interface default method which implements more than one interface, and where you want to call another default
+                     // method on one of those interfaces.  Here the prefix to super that you specify is the interface whose method you should call.
+                     if (ModelUtil.isOuterType(getEnclosingType(), currentType)) {
+                        boundTypes[i] = ModelUtil.getExtendsClass(currentType);
+                        if (boundTypes[i] == null)
+                           displayError("No super class for type: " + currentType + " for 'super' ");
+                     }
+                     else {
+                        boundTypes[i] = currentType;
+                     }
                   }
                   else {
                      IdentifierExpression.bindNextIdentifier(this, currentType, nextName, i, idTypes, boundTypes,
