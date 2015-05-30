@@ -406,7 +406,12 @@ public class ClassType extends JavaType {
       if (type == null) { // not a relative name
          if (it != null)
             type = it.findTypeDeclaration(fullTypeName, true);
-         if (type == null) {
+      }
+
+      if (type == null) {
+         if (typeParam != null)
+            type = typeParam;
+         else {
             type = FAILED_TO_INIT_SENTINEL;
             if (displayError) {
                displayTypeError("No type: ", getFullTypeName(), " for ");
@@ -899,7 +904,7 @@ public class ClassType extends JavaType {
 
          if (ModelUtil.isTypeVariable(baseType)) {
             Object newType = t.getTypeForVariable(baseType, false);
-            if (newType != null && newType != baseType) {
+            if (newType != null && newType != baseType && !(newType instanceof ExtendsType.LowerBoundsTypeDeclaration)) {
                superWildcard = new ExtendsType.LowerBoundsTypeDeclaration(newType);
             }
          }

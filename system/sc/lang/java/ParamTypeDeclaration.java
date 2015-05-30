@@ -32,8 +32,6 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       system = sys;
       typeParams = typeParameters;
       baseType = baseTypeDecl;
-      if (typeParameters.size() != typeDefs.size())
-         System.out.println("***");
       int ix = 0;
       types = typeDefs;
       // When dealing with type parameters Type<int> always becomes Type<Integer>
@@ -46,8 +44,6 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
             i++;
          }
       }
-      if (types != null && types.size() > 0 && types.get(0) != null && types.get(0) == Integer.TYPE)
-         System.out.println("***");
    }
 
    public Object getDerivedTypeDeclaration() {
@@ -98,8 +94,6 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
             if (!ModelUtil.isTypeVariable(typeParam) && !ModelUtil.isAssignableFrom(typeParam, otherTypeParam))
                return false;
             if (types != null && otherParamType.types != null) {
-               if (i == 0 && types.size() == 0)
-                  System.out.println("***");
                Object type = types.get(i);
                if (i >= otherParamType.types.size())
                   return false;
@@ -270,13 +264,10 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
          // DEBUG-start
          Object meth = srcType;
          srcType = ModelUtil.getReturnType(meth);
-         if (ModelUtil.isAssignableFrom(srcType, baseType)) {
-            Object oldRes = ModelUtil.resolveTypeParameter(srcType, this, ModelUtil.getTypeParameterName(typeVar));
-            if (oldRes != typeVar && oldRes != Object.class && !ModelUtil.hasTypeVariables(oldRes))
-               System.out.println("***");
-
+         //if (ModelUtil.isAssignableFrom(srcType, baseType)) {
+         //   Object oldRes = ModelUtil.resolveTypeParameter(srcType, this, ModelUtil.getTypeParameterName(typeVar));
             //return oldRes; // TODO: remove me.
-         }
+         //}
          // DEBUG-end
 
          return typeVar;
@@ -583,10 +574,10 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
                   }
                }
                else if (value instanceof ExtendsType.LowerBoundsTypeDeclaration) {
-                  System.out.println("***");
+                  System.out.println("*** Unknown lower bounds type (5)");
                }
                else if (ModelUtil.isWildcardType(value))
-                  System.out.println("***");
+                  System.out.println("*** Unknown wildcard type");
             }
          }
       }

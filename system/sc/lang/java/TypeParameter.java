@@ -60,8 +60,6 @@ public class TypeParameter extends JavaSemanticNode implements ITypedObject {
       return ModelUtil.isAssignableFrom(Object.class, otherType) || ModelUtil.isPrimitive(otherType);
    }
 
-   static int count = 0;
-
    public boolean isAssignableTo(Object otherType, ITypeParamContext ctx) {
       if (ctx != null) {
          Object thisType = ctx.getTypeForVariable(this, true);
@@ -75,15 +73,7 @@ public class TypeParameter extends JavaSemanticNode implements ITypedObject {
                if (thisDefault == null || ModelUtil.isTypeVariable(thisDefault))
                   return true;
             }
-            if (count > 10)
-               System.out.println("***");
-            try {
-               count++;
-               return ModelUtil.isAssignableFrom(otherType, thisType, false, ctx);
-            }
-            finally {
-               count--;
-            }
+            return ModelUtil.isAssignableFrom(otherType, thisType, false, ctx);
          }
       }
       return otherType == this || ModelUtil.isAssignableFrom(Object.class, otherType);

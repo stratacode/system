@@ -571,7 +571,6 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       if (other instanceof ArrayTypeDeclaration)
          return false;
       if (other == null) {
-         System.out.println("***");
          return true;
       }
       return other.isAssignableTo(this);

@@ -107,7 +107,7 @@ public class ModelUtil {
       for (Object tp:typeParameters) {
          Object boundType = ModelUtil.getTypeParameterDefault(tp);
          if (boundType == null || boundType.equals("<null>"))
-            System.out.println("***");
+            System.out.println("*** Null type parameter default");
          if (boundType != Object.class)
             paramMap.put(new TypeParamKey(tp), boundType);
       }
@@ -164,15 +164,13 @@ public class ModelUtil {
       return paramMap;
    }
 
-   // TODO: We are using names here - shouldn't we really use keys based off of the definition-type and param-name as a combination?
    private static void addTypeParamDefinitions(Map<TypeParamKey,Object> paramMap, Object genParam, Object argType, Object paramArgType) {
-      if (argType.equals("<null>"))
-         System.out.println("***");
       if (ModelUtil.isTypeVariable(genParam)) {
          paramMap.put(new TypeParamKey(genParam), argType);
       }
       else if (genParam instanceof ExtendsType.LowerBoundsTypeDeclaration) {
-         System.out.println("***");
+         if (!ModelUtil.isUnboundSuper(genParam))
+            System.out.println("*** Unkown extends lower bounds type");
       }
       else if (ModelUtil.isParameterizedType(genParam)) {
          int numTypeParams = getNumTypeParameters(genParam);
@@ -525,8 +523,8 @@ public class ModelUtil {
       if (!StringUtil.equalStrings(subName, superName))
          return false;
 
-      Object[] subParamTypes = ModelUtil.getParameterTypes(subTypeMethod);
-      Object[] superParamTypes = ModelUtil.getParameterTypes(superTypeMethod);
+      Object[] subParamTypes = ModelUtil.getParameterTypes(subTypeMethod, true);
+      Object[] superParamTypes = ModelUtil.getParameterTypes(superTypeMethod, true);
 
       int numSub = subParamTypes == null ? 0 : subParamTypes.length;
       int numSuper = superParamTypes == null ? 0 : superParamTypes.length;
@@ -1846,7 +1844,7 @@ public class ModelUtil {
          if (paramType instanceof JavaType)
             parameterTypes[i] = (JavaType) paramType;
          else if (paramType != null)
-            parameterTypes[i] = JavaType.createFromParamType(paramType, ctx);
+            parameterTypes[i] = JavaType.createFromParamType(paramType, ctx, null);
          else
             parameterTypes[i] = null;
       }
@@ -3722,7 +3720,7 @@ public class ModelUtil {
             srcIx = ModelUtil.getTypeParameterPosition(nextType, typeParamName);
          }
          else if (typeArg instanceof ExtendsType.LowerBoundsTypeDeclaration)
-            System.out.println("***");
+            System.out.println("*** Unknown lower bounds type 3");
          else
             return typeArg;
       }
@@ -3765,7 +3763,7 @@ public class ModelUtil {
             srcIx = ModelUtil.getTypeParameterPosition(nextType, typeParamName);
          }
          else if (typeArg instanceof ExtendsType.LowerBoundsTypeDeclaration)
-            System.out.println("***");
+            System.out.println("*** Unknown lower bounds type 2");
          else
             return typeArg;
       }
@@ -3809,7 +3807,7 @@ public class ModelUtil {
             srcIx = ModelUtil.getTypeParameterPosition(nextType, typeParamName);
          }
          else if (typeArg instanceof ExtendsType.LowerBoundsTypeDeclaration)
-            System.out.println("***");
+            System.out.println("*** Unknown lower bounds type");
          else
             return typeArg;
       }
@@ -5014,6 +5012,9 @@ public class ModelUtil {
          return ((VariableDefinition) def).getPreviousDefinition();
       else if (def instanceof MethodDefinition)
          return ((MethodDefinition) def).getPreviousDefinition();
+      else if (def instanceof ParamTypedMember) {
+         return getPreviousDefinition(((ParamTypedMember) def).getMemberObject());
+      }
       throw new UnsupportedOperationException();
    }
 

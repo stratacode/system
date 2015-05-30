@@ -251,7 +251,7 @@ public class EnumDeclaration extends TypeDeclaration {
                   }
                }
 
-               constr.setProperty("parameters", Parameter.create(newTypes.toArray(new Object[newTypes.size()]), newNames.toArray(new String[newNames.size()]), null));
+               constr.setProperty("parameters", Parameter.create(newTypes.toArray(new Object[newTypes.size()]), newNames.toArray(new String[newNames.size()]), null, this));
                addEnumSuperCall(constr);
                enumCl.addBodyStatement(constr);
 
@@ -260,7 +260,7 @@ public class EnumDeclaration extends TypeDeclaration {
          }
       }
       else {
-         ConstructorDefinition constr = newEnumConstructor(typeName);
+         ConstructorDefinition constr = newEnumConstructor(typeName, this);
          enumCl.addBodyStatement(constr);
       }
 
@@ -273,10 +273,10 @@ public class EnumDeclaration extends TypeDeclaration {
       return enumCl;
    }
 
-   static ConstructorDefinition newEnumConstructor(String typeName) {
+   static ConstructorDefinition newEnumConstructor(String typeName, ITypeDeclaration definedInType) {
       ConstructorDefinition constr = new ConstructorDefinition();
       constr.name = typeName;
-      constr.setProperty("parameters", Parameter.create(defaultConstrParamTypes, defaultConstrParamNames, null));
+      constr.setProperty("parameters", Parameter.create(defaultConstrParamTypes, defaultConstrParamNames, null, definedInType));
       addEnumSuperCall(constr);
       return constr;
    }

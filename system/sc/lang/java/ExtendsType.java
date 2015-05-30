@@ -99,7 +99,7 @@ public class ExtendsType extends JavaType {
       LowerBoundsTypeDeclaration(Object lbType) {
          super(lbType);
          if (lbType instanceof LowerBoundsTypeDeclaration)
-            System.out.println("***");
+            System.err.println("*** Error - nested lower bounds type");
       }
 
       @Override
@@ -238,9 +238,7 @@ public class ExtendsType extends JavaType {
       res.questionMark = true;
 
       if (argType.baseType != null) {
-         Object baseType = JavaType.createFromParamType(argType.baseType, ctx);
-         if (baseType instanceof ExtendsType)
-            System.out.println("***");
+         Object baseType = JavaType.createFromParamType(argType.baseType, ctx, null);
          res.setProperty("typeArgument", baseType);
       }
       return res;

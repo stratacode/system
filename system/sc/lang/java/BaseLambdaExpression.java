@@ -146,8 +146,10 @@ public abstract class BaseLambdaExpression extends Expression {
       MethodDefinition newMeth = new MethodDefinition();
       newMeth.name = ModelUtil.getMethodName(ifaceMeth);
 
-      newMeth.setProperty("parameters", parameters = createLambdaParams(lambdaParams, ifaceMeth, typeCtx));
-      newMeth.setProperty("type", JavaType.createFromParamType(ModelUtil.getParameterizedReturnType(ifaceMeth, null, true), typeCtx));
+      ITypeDeclaration enclType = getEnclosingType();
+
+      newMeth.setProperty("parameters", parameters = createLambdaParams(lambdaParams, ifaceMeth, typeCtx, enclType));
+      newMeth.setProperty("type", JavaType.createFromParamType(ModelUtil.getParameterizedReturnType(ifaceMeth, null, true), typeCtx, enclType));
       lambdaMethod = newMeth;
 
       // Always public since they are in an interface
@@ -205,10 +207,10 @@ public abstract class BaseLambdaExpression extends Expression {
                paramType.setTypeParameter(typeParamName, methodReturnType);
             }
             else if (ifaceMethReturnType instanceof ExtendsType) {
-               System.out.println("***");
+               System.out.println("*** Unknown extends reference");
             }
             else if (ModelUtil.isParameterizedType(ifaceMethReturnType))
-               System.out.println("***"); // TODO: do we need to do extraction and setting of type parameters here
+               System.out.println("*** Unknown parameterized type"); // TODO: do we need to do extraction and setting of type parameters here
          }
       }
 
@@ -223,7 +225,7 @@ public abstract class BaseLambdaExpression extends Expression {
       }
       else if (paramReturnType instanceof ExtendsType.LowerBoundsTypeDeclaration)
          paramReturnType = ((ExtendsType.LowerBoundsTypeDeclaration) paramReturnType).getBaseType();
-      newMeth.setProperty("type", JavaType.createFromParamType(paramReturnType, typeCtx));
+      newMeth.setProperty("type", JavaType.createFromParamType(paramReturnType, typeCtx, enclType));
       if (ModelUtil.hasTypeParameters(inferredType)) {
          SemanticNodeList<JavaType> typeParams = new SemanticNodeList<JavaType>();
          int numParams = ModelUtil.getNumTypeParameters(inferredType);
@@ -232,7 +234,7 @@ public abstract class BaseLambdaExpression extends Expression {
             if (typeParam instanceof JavaType)
                typeParams.add((JavaType) ((JavaType) typeParam).deepCopy(ISemanticNode.CopyNormal, null));
             else if (typeParam instanceof WildcardType || typeParam instanceof ParameterizedType || typeParam instanceof ExtendsType.LowerBoundsTypeDeclaration) {
-               typeParams.add((JavaType.createFromParamType(typeParam, inferredType instanceof ITypeParamContext ? (ITypeParamContext) inferredType : null)));
+               typeParams.add((JavaType.createFromParamType(typeParam, inferredType instanceof ITypeParamContext ? (ITypeParamContext) inferredType : null, null)));
             }
             else
                typeParams.add(ClassType.create(ModelUtil.getTypeName(typeParam)));
@@ -298,7 +300,7 @@ public abstract class BaseLambdaExpression extends Expression {
       super.validate();
    }
 
-   private static Parameter createLambdaParams(Object params, Object meth, ITypeParamContext ctx) {
+   private static Parameter createLambdaParams(Object params, Object meth, ITypeParamContext ctx, ITypeDeclaration definedInType) {
       ArrayList<String> names = new ArrayList<String>();
 
       if (PString.isString(params)) {
@@ -325,11 +327,13 @@ public abstract class BaseLambdaExpression extends Expression {
       if (methTypes != null) {
          for (int i = 0; i < methTypes.length; i++) {
             resMethTypes[i] = methTypes[i];
+            if (resMethTypes[i] instanceof ExtendsType.LowerBoundsTypeDeclaration)
+               resMethTypes[i] = ((ExtendsType.LowerBoundsTypeDeclaration) resMethTypes[i]).getBaseType();
             if (ModelUtil.isTypeVariable(resMethTypes[i]))
                resMethTypes[i] = ModelUtil.getTypeParameterDefault(resMethTypes[i]);
          }
       }
-      return Parameter.create(resMethTypes, names.toArray(new String[names.size()]), ctx);
+      return Parameter.create(resMethTypes, names.toArray(new String[names.size()]), ctx, definedInType);
    }
 
    @Override

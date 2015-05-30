@@ -135,6 +135,9 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
                if (boundJavaTypes != null && i < boundJavaTypes.length) {
                   JavaType boundJavaType = boundJavaTypes[i];
                   if (boundJavaType != null) {
+                     // Do we have an actual bound value for this type parameter - if so, return it without checking the inferredType.
+                     // If this is any type of unbound type parameter expression - e.g. ? super T we need to check for T in the inferredtype
+                     // and so should not return.
                      type = extractTypeParameter(paramJavaType, paramJavaType.getTypeDeclaration(), boundJavaType.getTypeDeclaration(), typeVar);
                      if (type != null)
                         return type;
@@ -188,6 +191,9 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
          if (ModelUtil.isWildcardType(paramJavaType) && ModelUtil.isSuperWildcard(paramJavaType)) {
             Object paramBounds = ModelUtil.getWildcardLowerBounds(paramJavaType);
             if (ModelUtil.isTypeVariable(paramBounds) && ModelUtil.sameTypeParameters(paramBounds, typeVar)) {
+               // Don't return unbound things -
+               if (ModelUtil.isTypeVariable(boundType) || ModelUtil.isUnboundSuper(boundType))
+                  return null;
                if (typeVar != boundType)
                   return boundType;
             }
@@ -259,8 +265,6 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
          if (res[i] instanceof ClassType) {
             res[i] = javaTypes[i].getTypeDeclaration();
          }
-         if (res[i] instanceof ClassType)
-            System.out.println("***");
          if (res[i] == null)
             System.out.println("*** Warning - null value for parameter type");
       }
@@ -305,11 +309,11 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
          for (int i = 0; i < len; i++) {
             Object paramType = paramTypes[i];
             if (paramType instanceof ExtendsType.LowerBoundsTypeDeclaration)
-               System.out.println("***");
+               System.out.println("*** Unknown lower bounds type (6)");
             if (ModelUtil.hasTypeVariables(paramType)) {
                paramType = resolveTypeParameter(paramType, false);
             }
-            JavaType javaType = JavaType.createFromParamType(paramType, this);
+            JavaType javaType = JavaType.createFromParamType(paramType, this, null);
             if (javaType.isParameterizedType()) {
                JavaType newVal = javaType.resolveTypeParameters(this);
                if (newVal != null) {
@@ -319,8 +323,6 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
                   }
                   javaType = newVal;
                }
-               else
-                  System.out.println("***");
             }
             res[i] = javaType;
          }
@@ -349,7 +351,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
          JavaType[] res = paramJavaTypes = new JavaType[len];
          for (int i = 0; i < len; i++) {
             Object paramType = paramTypes[i];
-            JavaType javaType = JavaType.createFromParamType(paramType, this);
+            JavaType javaType = JavaType.createFromParamType(paramType, this, null);
             res[i] = javaType;
          }
          return res;
@@ -480,8 +482,6 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
             else {
                res = null;
             }
-            if (res instanceof JavaType)
-               System.out.println("***");
             if (resolve && res != null && ModelUtil.hasTypeVariables(res)) {
                return ModelUtil.getTypeParameterDefault(res);
             }
@@ -504,6 +504,8 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
    }
 
    public ITypeDeclaration getDefinedInType() {
+      if (definedInType == null && paramTypeDecl != null)
+         return paramTypeDecl.getDefinedInType();
       return definedInType;
    }
 

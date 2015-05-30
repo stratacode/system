@@ -43,6 +43,8 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
       componentType = comp;
       arrayDimensions = arrayDims;
       definedInType = dit;
+      if (dit == null)
+         System.out.println("*** No defined in type for ArrayTypeDeclaration");
    }
 
    /** Handles nested array inside of array */

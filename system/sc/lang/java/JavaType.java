@@ -95,8 +95,6 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
 
    public static JavaType createJavaTypeFromName(String modelTypeName) {
       int ndims = 0;
-      if (modelTypeName == null)
-         System.out.println("***");
       if (modelTypeName.endsWith("]")) {
          int ix;
          ndims = (modelTypeName.length() - (ix = modelTypeName.indexOf("["))) >> 1;
@@ -128,10 +126,10 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
       return t;
    }
 
-   public static JavaType createFromParamType(Object type, ITypeParamContext ctx) {
+   public static JavaType createFromParamType(Object type, ITypeParamContext ctx, ITypeDeclaration definedInType) {
       JavaType[] typeParamsArr = null;
       JavaType newType = null;
-      ITypeDeclaration typeCtx = ctx instanceof ITypeDeclaration ? (ITypeDeclaration) ctx : null;
+      ITypeDeclaration typeCtx = ctx instanceof ITypeDeclaration ? (ITypeDeclaration) ctx : ctx != null ? ctx.getDefinedInType() : definedInType;
       if (ModelUtil.hasTypeParameters(type)) {
          SemanticNodeList<JavaType> typeParams = new SemanticNodeList<JavaType>();
          int numParams = ModelUtil.getNumTypeParameters(type);
@@ -149,7 +147,7 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
                Object baseType = td.getBaseType();
                if (ModelUtil.isTypeVariable(baseType)) {
                   newTypeParam = ctx != null ? ctx.getTypeForVariable(baseType, false) : null;
-                  if (newTypeParam != null)
+                  if (newTypeParam != null && !(newTypeParam instanceof ExtendsType.LowerBoundsTypeDeclaration))
                      typeParam = new ExtendsType.LowerBoundsTypeDeclaration(newTypeParam);
                }
                else {
@@ -160,7 +158,7 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
             else if (typeParam instanceof GenericArrayType) {
                GenericArrayType gat = (GenericArrayType) typeParam;
                java.lang.reflect.Type componentType = gat.getGenericComponentType();
-               newType = createFromParamType(componentType, ctx);
+               newType = createFromParamType(componentType, ctx, definedInType);
                newType.setProperty("arrayDimensions", "[]");
                typeParam = newType;
             }
@@ -175,14 +173,10 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
                typeParams.add(javaType);
             }
             else {
-               if (typeParam == null)
-                  System.out.println("***");
                String typeName = ModelUtil.getTypeName(typeParam);
-               if (typeName.contains("missing type"))
-                  System.out.println("***");
                newType = ClassType.create(typeName);
                if (ctx != null)
-                  newType.initType(ctx.getLayeredSystem(), typeCtx, null, ctx, true, false, null);
+                  newType.initType(ctx.getLayeredSystem(), typeCtx, null, ctx, true, false, typeParam);
                typeParams.add(newType);
             }
          }
@@ -205,7 +199,7 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
          newType = ClassType.create(ModelUtil.getTypeName(compType));
          newType.arrayDimensions = arrDims.toString();
          if (ctx != null)
-            newType.initType(ctx.getLayeredSystem(), typeCtx, null, ctx, true, false, null);
+            newType.initType(ctx.getLayeredSystem(), typeCtx, null, ctx, true, false, compType);
          return newType;
       }
       else if (type instanceof ExtendsType.LowerBoundsTypeDeclaration) {
