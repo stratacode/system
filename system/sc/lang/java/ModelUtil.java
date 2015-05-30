@@ -1090,6 +1090,12 @@ public class ModelUtil {
       if (lhsType == rhsType)
          return lhsType;
 
+      if (lhsType instanceof BaseLambdaExpression.LambdaInferredType) {
+         return rhsType; // Either another inferred type or the real type
+      }
+      else if (rhsType instanceof BaseLambdaExpression.LambdaInferredType)
+         return lhsType;
+
       // When comparing against Null, always use the other guy
       if (lhsType == NullLiteral.NULL_TYPE)
          return rhsType;
