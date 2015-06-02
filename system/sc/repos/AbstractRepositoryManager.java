@@ -4,9 +4,8 @@
 
 package sc.repos;
 
-import sc.lang.IMessageHandler;
-import sc.lang.MessageType;
-import sc.layer.LayeredSystem;
+import sc.util.IMessageHandler;
+import sc.util.MessageType;
 import sc.util.FileUtil;
 
 import java.io.File;

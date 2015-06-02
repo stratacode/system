@@ -614,7 +614,12 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
       }
    }
 
-   private Element getSingleFileElement(StringBuilder preTagContent) {
+   /**
+    * For HTML/XML files, this returns the main tag which defines the body of the document.  If there is more than
+    * one top-level tag, null is returned.  Any control tags which precedes the tag can be returned in the
+    * supplied StringBuilder (or pass in null and that content is discarded).
+    */
+   public Element getSingleFileElement(StringBuilder preTagContent) {
       Element theElem = null;
       if (templateDeclarations == null)
          return null;

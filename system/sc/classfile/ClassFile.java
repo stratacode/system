@@ -4,8 +4,6 @@
 
 package sc.classfile;
 
-import sc.lang.IMessageHandler;
-import sc.lang.MessageType;
 import sc.lang.java.AccessLevel;
 import sc.lang.java.IDefinition;
 import sc.lang.java.JavaSemanticNode;
@@ -15,7 +13,6 @@ import sc.layer.LayeredSystem;
 import sc.type.RTypeUtil;
 import sc.util.CoalescedHashMap;
 import sc.util.IntCoalescedHashMap;
-import sc.util.StringUtil;
 
 import java.io.*;
 import java.lang.reflect.Modifier;

@@ -18,10 +18,7 @@ import sc.lang.template.*;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.obj.*;
-import sc.parser.Language;
-import sc.parser.PString;
-import sc.parser.ParseError;
-import sc.parser.ParseUtil;
+import sc.parser.*;
 import sc.sync.ISyncInit;
 import sc.sync.SyncManager;
 import sc.type.CTypeUtil;
@@ -1905,6 +1902,25 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       return false;
    }
 
+   public String getSimpleChildValue(String childName) {
+      Element[] childTags = getChildTagsWithName(childName);
+      if (childTags == null)
+         return null;
+      if (childTags.length != 1)
+         throw new IllegalArgumentException("Multiple child tags: " + childName + " expecting only one");
+      return childTags[0].getBodyAsString();
+   }
+
+   public String getBodyAsString() {
+      if (children == null)
+         return null;
+      StringBuilder sb = new StringBuilder();
+      // TODO: deal with template values here?
+      for (Object child:children) {
+         sb.append(child);
+      }
+      return sb.toString();
+   }
 
    static class AddChildResult {
       boolean needsSuper = false;

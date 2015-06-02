@@ -4,8 +4,7 @@
 
 package sc.repos;
 
-import sc.lang.IMessageHandler;
-import sc.layer.LayeredSystem;
+import sc.util.IMessageHandler;
 import sc.util.FileUtil;
 
 import java.util.ArrayList;

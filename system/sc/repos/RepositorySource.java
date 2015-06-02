@@ -5,11 +5,11 @@
 package sc.repos;
 
 public class RepositorySource {
-   IRepositoryManager repository;
-   String url;
-   boolean unzip;
+   public IRepositoryManager repository;
+   public String url;
+   public boolean unzip;
 
-   RepositoryPackage pkg;
+   public RepositoryPackage pkg;
 
    public RepositorySource(IRepositoryManager mgr, String url, boolean unzip) {
       this.repository = mgr;

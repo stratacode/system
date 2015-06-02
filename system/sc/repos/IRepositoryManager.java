@@ -4,7 +4,7 @@
 
 package sc.repos;
 
-import sc.lang.IMessageHandler;
+import sc.util.IMessageHandler;
 
 /**
  */

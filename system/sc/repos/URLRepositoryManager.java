@@ -4,9 +4,9 @@
 
 package sc.repos;
 
-import sc.lang.IMessageHandler;
-import sc.layer.LayeredSystem;
+import sc.util.IMessageHandler;
 import sc.util.FileUtil;
+import sc.util.URLUtil;
 
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -27,50 +27,6 @@ public class URLRepositoryManager extends AbstractRepositoryManager {
    }
 
    public String doInstall(RepositorySource src) {
-      URL url;
-      FileOutputStream fos;
-      ReadableByteChannel rbc;
-      String fileName;
-      try {
-         url = new URL(src.url);
-         if (info)
-            info("Downloading url: " + src.url + " into: " + src.pkg.installedRoot);
-         rbc = Channels.newChannel(url.openStream());
-         fileName = src.pkg.installedRoot;
-         if (src.unzip)
-            fileName = FileUtil.addExtension(fileName, "zip");
-         fos = new FileOutputStream(fileName);
-      }
-      catch (MalformedURLException exc) {
-         return "Bad url: " + src.url + " error: " + exc.toString();
-      }
-      catch (FileNotFoundException fexc) {
-         return "Unable to create output file: " + src.pkg.installedRoot + " error: " + fexc.toString();
-      }
-      catch (IOException ioexc) {
-         return "Error opening url: " + src.url + " error: " + ioexc.toString();
-      }
-      try {
-         long numBytes = fos.getChannel().transferFrom(rbc, 0, Long.MAX_VALUE);
-         if (numBytes <= 0)
-            return "Download returned no data: " + numBytes + " bytes returned";
-      }
-      catch (IOException exc) {
-         return "Error downloading from URL: " + src.url + " details: " + exc.toString();
-      }
-
-      if (info)
-         info("Completed download of url: " + src.url + " into: " + src.pkg.installedRoot);
-
-      if (src.unzip) {
-         String noSuffix = FileUtil.removeExtension(fileName);
-         if (noSuffix.equals(fileName))
-            System.err.println("*** Zip files must have a suffix of .zip or .jar: " + fileName);
-         else {
-            if (!FileUtil.unzip(fileName, noSuffix))
-               return "Failed to unzip: " + fileName + " into: " + noSuffix;
-         }
-      }
-      return null;
+      return URLUtil.saveURLToFile(src.url, src.pkg.installedRoot, src.unzip, messageHandler);
    }
 }

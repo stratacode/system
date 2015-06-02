@@ -4,8 +4,8 @@
 
 package sc.repos;
 
-import sc.lang.IMessageHandler;
-import sc.layer.LayeredSystem;
+import sc.util.IMessageHandler;
+import sc.repos.mvn.MvnRepositoryManager;
 
 import java.util.TreeMap;
 
@@ -21,6 +21,7 @@ public class RepositorySystem {
       addRepositoryManager(new ScpRepositoryManager("scp", packageRoot, handler, info));
       addRepositoryManager(new GitRepositoryManager("git", packageRoot, handler, info));
       addRepositoryManager(new URLRepositoryManager("url", packageRoot, handler, info));
+      addRepositoryManager(new MvnRepositoryManager("mvn", packageRoot, handler, info));
    }
 
    public IRepositoryManager[] repositories;

@@ -18,6 +18,8 @@ import sc.sync.SyncOptions;
 import sc.type.CTypeUtil;
 import sc.type.TypeUtil;
 import sc.util.FileUtil;
+import sc.util.IMessageHandler;
+import sc.util.MessageHandler;
 import sc.util.StringUtil;
 import sc.lang.sc.ModifyDeclaration;
 import sc.lang.sc.OverrideAssignment;

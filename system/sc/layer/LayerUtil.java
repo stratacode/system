@@ -13,10 +13,7 @@ import sc.repos.RepositoryPackage;
 import sc.repos.RepositorySource;
 import sc.repos.RepositorySystem;
 import sc.type.CTypeUtil;
-import sc.util.ExtensionFilenameFilter;
-import sc.util.FileUtil;
-import sc.util.PatternFilenameFilter;
-import sc.util.StringUtil;
+import sc.util.*;
 
 import javax.tools.*;
 import java.io.*;

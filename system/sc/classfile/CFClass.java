@@ -4,7 +4,7 @@
 
 package sc.classfile;
 
-import sc.lang.MessageType;
+import sc.util.MessageType;
 import sc.lang.SemanticNode;
 import sc.lang.sc.ModifyDeclaration;
 import sc.layer.Layer;

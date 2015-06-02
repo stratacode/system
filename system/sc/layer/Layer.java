@@ -25,10 +25,7 @@ import sc.sync.SyncOptions;
 import sc.sync.SyncProperties;
 import sc.type.CTypeUtil;
 import sc.type.RTypeUtil;
-import sc.util.FileUtil;
-import sc.util.IdentityWrapper;
-import sc.util.PerfMon;
-import sc.util.StringUtil;
+import sc.util.*;
 
 import java.io.*;
 import java.util.*;
