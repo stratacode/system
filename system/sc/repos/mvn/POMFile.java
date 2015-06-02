@@ -43,12 +43,15 @@ public class POMFile extends XMLFileFormat {
          return false;
       }
 
+      // TODO - process inherited POMs and sub-modules - read the other POM file and populate hash-tables
+      // with keys for the things that can be overridden.   Propagate variables from the nested file to here
+
       return true;
    }
 
    public static final String DEFAULT_SCOPE = "compile";
 
-   public List<String> getDependencies(String scope) {
+   public List<MvnDescriptor> getDependencies(String scope) {
       if (scope == null)
          scope = DEFAULT_SCOPE;
       Element[] deps = projElement.getChildTagsWithName("dependencies");
@@ -56,7 +59,7 @@ public class POMFile extends XMLFileFormat {
          return Collections.emptyList();
       if (deps.length > 1)
          MessageHandler.error(msg, "Multiple tags with dependencies - should be only one");
-      ArrayList<String> res = new ArrayList<String>();
+      ArrayList<MvnDescriptor> res = new ArrayList<MvnDescriptor>();
       Element[] depTags = deps[0].getChildTagsWithName("dependency");
       if (depTags != null) {
          for (Element depTag:depTags) {
@@ -64,14 +67,18 @@ public class POMFile extends XMLFileFormat {
             if (depScope == null)
                depScope = DEFAULT_SCOPE;
             if (scope.equals(depScope)) {
-               String groupId = depTag.getSimpleChildValue("groupId");
-               String artifactId = depTag.getSimpleChildValue("artifactId");
-               String version = depTag.getSimpleChildValue("version");
-               res.add(MvnRepositoryManager.toURL(groupId, artifactId, version));
+               String groupId = getTagValue(depTag, "groupId");
+               String artifactId = getTagValue(depTag, "artifactId");
+               String version = getTagValue(depTag, "version");
+               res.add(new MvnDescriptor(groupId, artifactId, version));
             }
          }
       }
       return res;
    }
 
+   public String getTagValue(Element tag, String valName) {
+      // TODO: substitute variables here
+      return tag.getSimpleChildValue(valName);
+   }
 }

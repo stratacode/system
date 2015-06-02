@@ -7,8 +7,10 @@ package sc.util;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLConnection;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 
@@ -58,7 +60,15 @@ public class URLUtil {
       try {
          url = new URL(urlPath);
          MessageHandler.info(msg, "Downloading url: " + urlPath + " into: " + fileName);
-         rbc = Channels.newChannel(url.openStream());
+         URLConnection conn = url.openConnection();
+         if (conn instanceof HttpURLConnection) {
+            HttpURLConnection hconn = (HttpURLConnection) conn;
+            ((HttpURLConnection) conn).setInstanceFollowRedirects(true);
+            ((HttpURLConnection) conn).setFollowRedirects(true);
+            System.out.println("*** " + hconn.getResponseCode());
+            System.out.println("*** " + hconn.getHeaderField("Location"));
+         }
+         rbc = Channels.newChannel(conn.getInputStream());
          if (unzip)
             fileName = FileUtil.addExtension(fileName, "zip");
          fos = new FileOutputStream(fileName);
@@ -92,5 +102,6 @@ public class URLUtil {
                return "Failed to unzip: " + fileName + " into: " + noSuffix;
          }
       }
+      return null;
    }
 }

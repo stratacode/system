@@ -22,8 +22,8 @@ import java.nio.channels.Channels;
  * From there they are transfered to the installedRoot, which is then typically unzipped.
  */
 public class URLRepositoryManager extends AbstractRepositoryManager {
-   public URLRepositoryManager(String managerName, String rootDir, IMessageHandler handler, boolean info) {
-      super(managerName, rootDir, handler, info);
+   public URLRepositoryManager(RepositorySystem sys, String managerName, String rootDir, IMessageHandler handler, boolean info) {
+      super(sys, managerName, rootDir, handler, info);
    }
 
    public String doInstall(RepositorySource src) {

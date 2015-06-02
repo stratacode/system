@@ -260,7 +260,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public List<TypeGroupDep> typeGroupDeps = new ArrayList<TypeGroupDep>();
 
    public RepositorySystem repositorySystem;
-   public HashMap<String,RepositoryPackage> repositoryPackages = new HashMap<String,RepositoryPackage>();
 
    public boolean useCanonicalPaths = false;
 

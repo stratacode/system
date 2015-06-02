@@ -6,6 +6,8 @@ package sc.repos;
 
 import sc.util.FileUtil;
 
+import java.util.ArrayList;
+
 /**
  * Represents a third party package that's managed by a RepositoryManager
  */
@@ -18,12 +20,20 @@ public class RepositoryPackage {
    RepositorySource[] sources;
    RepositorySource currentSource;
 
+   // Optional list of dependencies this package has on other packages
+   public ArrayList<RepositoryPackage> dependencies;
+
    public String installedRoot;
 
    public String fileName = null;
 
    public RepositoryPackage(IRepositoryManager mgr, String pkgName, RepositorySource src) {
-      this.fileName = this.packageName = pkgName;
+      this(mgr, pkgName, pkgName, src);
+   }
+
+   public RepositoryPackage(IRepositoryManager mgr, String pkgName, String fileName, RepositorySource src) {
+      this.fileName = fileName;
+      this.packageName = pkgName;
       this.sources = new RepositorySource[1];
       src.pkg = this;
       this.sources[0] = src;
@@ -79,4 +89,31 @@ public class RepositoryPackage {
       installedRoot = resName;
    }
 
+   public void addNewSource(RepositorySource repoSrc) {
+      if (repoSrc.equals(currentSource))
+         return;
+
+      RepositorySource[] newSrcs = new RepositorySource[sources.length + 1];
+      System.arraycopy(sources, 0, newSrcs, 0, sources.length);
+      newSrcs[sources.length] = repoSrc;
+      sources = newSrcs;
+   }
+
+   public String getClassPath() {
+      StringBuilder sb = new StringBuilder();
+      if (installed) {
+         sb.append(installedRoot);
+         if (dependencies != null) {
+            for (RepositoryPackage depPkg : dependencies) {
+               String depCP = depPkg.getClassPath();
+               if (depCP != null && depCP.length() > 0) {
+                  sb.append(":");
+                  sb.append(depCP);
+               }
+            }
+         }
+         return sb.toString();
+      }
+      return null;
+   }
 }

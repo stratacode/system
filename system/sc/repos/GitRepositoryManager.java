@@ -12,8 +12,8 @@ import java.util.ArrayList;
 /**
  */
 public class GitRepositoryManager extends AbstractRepositoryManager {
-   public GitRepositoryManager(String managerName, String rootDir, IMessageHandler handler, boolean info) {
-      super(managerName, rootDir, handler, info);
+   public GitRepositoryManager(RepositorySystem sys, String managerName, String rootDir, IMessageHandler handler, boolean info) {
+      super(sys, managerName, rootDir, handler, info);
    }
 
    public String doInstall(RepositorySource src) {

@@ -335,6 +335,7 @@ public class HTMLLanguage extends TemplateLanguage {
 
    SymbolSpace controlStart = new SymbolSpace("<!");
 
+   // Parses <!DOCTYPE html>
    Sequence controlTag = new Sequence("ControlTag(,docTypeName,docTypeValue,)", controlStart, anyTagName, anyTagName, endTagChar);
 
    OrderedChoice anyTag = new OrderedChoice(treeTag, unescapedTreeTag, simpleTag, controlTag) {

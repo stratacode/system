@@ -20,6 +20,7 @@ import sc.parser.ParseUtil;
 import sc.repos.IRepositoryManager;
 import sc.repos.RepositoryPackage;
 import sc.repos.RepositorySource;
+import sc.repos.RepositorySystem;
 import sc.sync.SyncManager;
 import sc.sync.SyncOptions;
 import sc.sync.SyncProperties;
@@ -3299,32 +3300,23 @@ public class Layer implements ILifecycle, LayerConstants {
    }
 
    public RepositoryPackage getRepositoryPackage(String pkgName) {
-      return layeredSystem.repositoryPackages.get(pkgName);
+      return layeredSystem.repositorySystem.packages.get(pkgName);
    }
 
    public RepositoryPackage addRepositoryPackage(String pkgName, String repositoryTypeName, String url, boolean unzip) {
       if (repositoryPackages == null)
          repositoryPackages = new ArrayList<RepositoryPackage>();
 
-      IRepositoryManager mgr = layeredSystem.repositorySystem.getRepositoryManager(repositoryTypeName);
+      RepositorySystem repoSys = layeredSystem.repositorySystem;
+      IRepositoryManager mgr = repoSys.getRepositoryManager(repositoryTypeName);
       if (mgr != null) {
+
          RepositorySource repoSrc = new RepositorySource(mgr, url, unzip);
-         RepositoryPackage pkg = new RepositoryPackage(mgr, pkgName, repoSrc);
+         // Add this as a new source.  This will create the package if this is the first definition or add it
+         // as a new source if it already exists.
+         RepositoryPackage pkg = repoSys.addPackageSource(mgr, pkgName, pkgName, repoSrc, !disabled);
          repositoryPackages.add(pkg);
 
-         if (!disabled) {
-            // We do the install and update immediately after they are added so that the layer definition file has
-            // access to the installed state, to for example, list the contents of the lib directory to get the jar files
-            // to add to the classpath.
-            String err = pkg.install();
-            if (err != null) {
-               System.err.println("Failed to install repository package: " + pkg.packageName + " for layer: " + this + " error: " + err);
-            }
-            else if (layeredSystem.options.updateSystem) {
-               pkg.update();
-            }
-         }
-         layeredSystem.repositoryPackages.put(pkgName, pkg);
          return pkg;
       }
       else

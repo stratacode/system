@@ -16,4 +16,10 @@ public class RepositorySource {
       this.url = url;
       this.unzip = unzip;
    }
+
+   public boolean equals(Object other) {
+      if (!(other instanceof RepositorySource))
+         return false;
+      return ((RepositorySource) other).url.equals(url);
+   }
 }

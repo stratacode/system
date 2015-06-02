@@ -15,6 +15,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
    public String managerName;
    public String packageRoot;
 
+   public RepositorySystem system;
    public IMessageHandler messageHandler;
    public boolean info;
 
@@ -34,7 +35,8 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       return packageRoot;
    }
 
-   public AbstractRepositoryManager(String mn, String reposRoot, IMessageHandler handler, boolean info) {
+   public AbstractRepositoryManager(RepositorySystem sys, String mn, String reposRoot, IMessageHandler handler, boolean info) {
+      this.system = sys;
       this.managerName = mn;
       packageRoot = reposRoot;
 
