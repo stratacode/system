@@ -10,6 +10,7 @@ import sc.util.MessageType;
 import sc.util.FileUtil;
 
 import java.io.File;
+import java.util.Date;
 import java.util.List;
 
 public abstract class AbstractRepositoryManager implements IRepositoryManager {
@@ -22,7 +23,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
 
    public boolean active = true;
 
-   public final static String INSTALLED_TAG_DIR_NAME = "_installed";
+   public final static String REPLACED_DIR_NAME = ".replacedPackages";
 
    public boolean isActive() {
       return active;
@@ -74,6 +75,17 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
             info("Package: " + src.pkg.packageName + " uptodate");
          return null;
       }
+
+      // If we are installing on top of an existing directory, rename the old directory in the backup folder
+      if (rootDirExists && !isEmptyDir(rootFile)) {
+         Date curTime = new Date();
+         String backupDir = FileUtil.concat(packageRoot, REPLACED_DIR_NAME, src.pkg.packageName + curTime.getHours() + "." + curTime.getMinutes());
+         new File(backupDir).mkdirs();
+         if (info)
+            info("Backing up package: " + src.pkg.packageName + " into: " + backupDir);
+         FileUtil.renameFile(src.pkg.installedRoot, backupDir);
+         rootFile.mkdirs();
+      }
       if (info)
          info("Installing package: " + src.pkg.packageName + " from: " + src.url);
       String err = doInstall(src);
@@ -88,6 +100,16 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
          //FileUtil.saveStringAsFile(tagFile, String.valueOf(System.currentTimeMillis()), true);
       }
       return null;
+   }
+
+   boolean isEmptyDir(File f) {
+      String[] contents = f.list();
+      if (contents != null) {
+         for (String fileName : contents)
+            if (!fileName.startsWith("."))
+               return false;
+      }
+      return true;
    }
 
    public abstract String doInstall(RepositorySource src);

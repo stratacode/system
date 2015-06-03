@@ -455,8 +455,12 @@ public class FileUtil {
 
    private final static int BUFFER_SIZE = 64*1024;
 
-   public static boolean unzip(String zipFile, String resName) {
-      String zipRes = exec(null, true, "unzip", zipFile, "-d", resName);
+   /**
+    * Warning - this method will just hang if there are files that need to be overwritten.  You can pass in "overwrite=true" to fix this but it's
+    * best to rename the existing directory.
+    */
+   public static boolean unzip(String zipFile, String resName, boolean overwrite) {
+      String zipRes = overwrite ? exec(null, true, "unzip", "-o", zipFile, "-d", resName) : exec(null, true, "unzip", zipFile, "-d", resName);
       if (zipRes == null) {
          System.err.println("*** zip failed");
          return false;

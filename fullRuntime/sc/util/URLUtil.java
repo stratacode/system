@@ -59,6 +59,8 @@ public class URLUtil {
       ReadableByteChannel rbc;
       try {
          url = new URL(urlPath);
+         if (unzip)
+            fileName = FileUtil.addExtension(fileName, "zip");
          MessageHandler.info(msg, "Downloading url: " + urlPath + " into: " + fileName);
          URLConnection conn = url.openConnection();
          if (conn instanceof HttpURLConnection) {
@@ -69,8 +71,6 @@ public class URLUtil {
             System.out.println("*** " + hconn.getHeaderField("Location"));
          }
          rbc = Channels.newChannel(conn.getInputStream());
-         if (unzip)
-            fileName = FileUtil.addExtension(fileName, "zip");
          fos = new FileOutputStream(fileName);
       }
       catch (MalformedURLException exc) {
@@ -101,7 +101,7 @@ public class URLUtil {
          if (noSuffix.equals(fileName))
             MessageHandler.error(msg, "Zip files must have a suffix of .zip or .jar: ", fileName);
          else {
-            if (!FileUtil.unzip(fileName, noSuffix))
+            if (!FileUtil.unzip(fileName, noSuffix, false))
                return "Failed to unzip: " + fileName + " into: " + noSuffix;
          }
       }

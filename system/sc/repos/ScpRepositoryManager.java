@@ -35,7 +35,7 @@ public class ScpRepositoryManager extends AbstractRepositoryManager {
       if (res == null)
          return "Error: failed to run install command";
       if (src.unzip) {
-         if (!FileUtil.unzip(resFile, src.pkg.installedRoot))
+         if (!FileUtil.unzip(resFile, src.pkg.installedRoot, false))
             return "Failed to unzip: " + src.pkg.installedRoot + " into: " + resFile;
       }
       if (info)
