@@ -6,6 +6,7 @@ package sc.repos;
 
 import sc.util.IMessageHandler;
 import sc.repos.mvn.MvnRepositoryManager;
+import sc.util.MessageHandler;
 
 import java.util.HashMap;
 import java.util.TreeMap;
@@ -21,8 +22,12 @@ public class RepositorySystem {
 
    public HashMap<String,RepositoryPackage> packages = new HashMap<String,RepositoryPackage>();
 
+   public IMessageHandler msg;
+
    public RepositorySystem(String rootDir, IMessageHandler handler, boolean info) {
       packageRoot = rootDir;
+
+      msg = handler;
 
       addRepositoryManager(new ScpRepositoryManager(this, "scp", packageRoot, handler, info));
       addRepositoryManager(new GitRepositoryManager(this, "git", packageRoot, handler, info));
@@ -49,7 +54,35 @@ public class RepositorySystem {
       }
    }
 
-   public RepositoryPackage addPackageSource(IRepositoryManager mgr, String pkgName, String fileName, RepositorySource repoSrc, boolean enabled) {
+   public RepositoryPackage addPackage(String url, boolean install) {
+      int ix = url.indexOf(":");
+      if (ix == 0) {
+         MessageHandler.error(msg, "addRepoitoryPackage - invalid URL - missing type://values");
+         return null;
+      }
+      String repositoryTypeName = url.substring(0, ix);
+      IRepositoryManager mgr = getRepositoryManager(repositoryTypeName);
+      if (mgr == null) {
+         MessageHandler.error(msg, "No repository with name: " + repositoryTypeName + " for add package");
+         return null;
+      }
+
+      RepositoryPackage pkg = mgr.createPackage(url);
+      if (pkg == null)
+         return null;
+      RepositoryPackage oldPkg = packages.get(pkg.packageName);
+      if (oldPkg != null) {
+         oldPkg.addNewSource(pkg.currentSource);
+         return oldPkg;
+      }
+      packages.put(pkg.packageName, pkg);
+      if (install) {
+         installPackage(pkg);
+      }
+      return pkg;
+   }
+
+   public RepositoryPackage addPackageSource(IRepositoryManager mgr, String pkgName, String fileName, RepositorySource repoSrc, boolean install) {
       RepositoryPackage pkg;
       pkg = packages.get(pkgName);
       if (pkg == null) {
@@ -60,18 +93,24 @@ public class RepositorySystem {
          pkg.addNewSource(repoSrc);
       }
 
-      if (enabled && !pkg.installed) {
+      if (install) {
+         installPackage(pkg);
+      }
+      return pkg;
+   }
+
+   public void installPackage(RepositoryPackage pkg) {
+      if (!pkg.installed) {
          // We do the install and update immediately after they are added so that the layer definition file has
          // access to the installed state, to for example, list the contents of the lib directory to get the jar files
          // to add to the classpath.
          String err = pkg.install();
          if (err != null) {
-            System.err.println("Failed to install repository package: " + pkg.packageName + " for layer: " + this + " error: " + err);
+            MessageHandler.error(msg, "Failed to install repository package: " + pkg.packageName + " for layer: " + this + " error: " + err);
          }
          else if (updateSystem) {
             pkg.update();
          }
       }
-      return pkg;
    }
 }

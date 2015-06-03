@@ -110,7 +110,7 @@ public class HTMLLanguage extends TemplateLanguage {
    Symbol beginTagChar = new Symbol("<");
    Symbol endTagChar = new Symbol(SKIP_ON_ERROR, ">");
 
-   public static boolean validTagChar(char c) {
+   public boolean validTagChar(char c) {
       return Character.isLetterOrDigit(c) || c == '-' || c == ':';
    }
 
@@ -123,7 +123,21 @@ public class HTMLLanguage extends TemplateLanguage {
             return null;
          return "Not a valid character for the inside of a tag name";
       }
+   };
 
+   public boolean validStartTagChar(char c) {
+      return Character.isLetter(c) || c == ':';
+   }
+
+   public Symbol startTagNameChar = new Symbol(0, Symbol.ANYCHAR) {
+      protected String accept(SemanticContext ctx, Object value, int startIx, int endIx) {
+         IString str = PString.toIString(value);
+         if (str == null)
+            return "Tag names must be non null";
+         if (str.length() == 1 && validStartTagChar(str.charAt(0)))
+            return null;
+         return "Not a valid character for start of a tag name";
+      }
    };
 
    public IndexedChoice tagSpacing = new IndexedChoice(REPEAT | OPTIONAL | NOERROR);
@@ -193,7 +207,7 @@ public class HTMLLanguage extends TemplateLanguage {
    }
 
    // This is broken out so that we can cache it efficiently between the different types of tagName sequences.
-   public Sequence tagName = new Sequence("('','',)", tagNameChar, new Sequence("('')", REPEAT | OPTIONAL, tagNameChar), tagSpacing);
+   public Sequence tagName = new Sequence("('','',)", startTagNameChar, new Sequence("('')", REPEAT | OPTIONAL, tagNameChar), tagSpacing);
    {
       tagName.cacheResults = true;
       identifier.cacheResults = true;
@@ -259,7 +273,7 @@ public class HTMLLanguage extends TemplateLanguage {
                break;
          }
 
-         // Not doing the tag name stack during the generate
+         // This is called for both parsing and generation.  We are not doing the tag name stack during the generate
          if (startIx != -1 && (matchType == TagNameMatchType.UnescapedOpen || matchType == TagNameMatchType.EscapedOpen))
             ((HTMLSemanticContext) ctx).addEntry(value, startIx, endIx);
          return null;

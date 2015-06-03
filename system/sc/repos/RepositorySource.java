@@ -4,8 +4,10 @@
 
 package sc.repos;
 
-public class RepositorySource {
-   public IRepositoryManager repository;
+import java.io.Serializable;
+
+public class RepositorySource implements Serializable {
+   public transient IRepositoryManager repository;
    public String url;
    public boolean unzip;
 

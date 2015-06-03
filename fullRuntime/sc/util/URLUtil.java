@@ -55,7 +55,7 @@ public class URLUtil {
 
    public static String saveURLToFile(String urlPath, String fileName, boolean unzip, IMessageHandler msg) {
       URL url;
-      FileOutputStream fos;
+      FileOutputStream fos = null;
       ReadableByteChannel rbc;
       try {
          url = new URL(urlPath);
@@ -89,6 +89,9 @@ public class URLUtil {
       }
       catch (IOException exc) {
          return "Error downloading from URL: " + urlPath + " details: " + exc.toString();
+      }
+      finally {
+         FileUtil.safeClose(fos);
       }
 
       MessageHandler.info(msg, "Completed download of url: " + urlPath + " into: ", fileName);

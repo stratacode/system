@@ -5,6 +5,7 @@
 package sc.repos;
 
 import sc.util.IMessageHandler;
+import sc.util.MessageHandler;
 import sc.util.MessageType;
 import sc.util.FileUtil;
 
@@ -16,7 +17,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
    public String packageRoot;
 
    public RepositorySystem system;
-   public IMessageHandler messageHandler;
+   public IMessageHandler msg;
    public boolean info;
 
    public boolean active = true;
@@ -40,13 +41,13 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       this.managerName = mn;
       packageRoot = reposRoot;
 
-      this.messageHandler = handler;
+      this.msg = handler;
       this.info = info;
    }
 
    public String install(RepositorySource src) {
       // Putting this into the installed root so it more reliably gets removed if the folder itself is removed
-      File tagFile = new File(src.pkg.installedRoot, ".scPackageInstalled");
+      File tagFile = new File(src.pkg.installedRoot, ".scPkgInstallInfo");
       File rootFile = new File(src.pkg.installedRoot);
       // TODO: right now, we are only installing directories but would we ever install files as well?
       boolean rootDirExists = rootFile.canRead() || rootFile.isDirectory();
@@ -55,13 +56,9 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
          new File(rootParent).mkdirs();
       long installedTime = -1;
       if (rootDirExists && tagFile.canRead()) {
-         String tag = FileUtil.readFirstLine(tagFile);
-         try {
-            installedTime = Long.parseLong(tag);
-         }
-         catch (NumberFormatException exc) {
-            System.err.println("*** Failed to parse timestamp time for: " + tagFile + " exc: " + exc);
-         }
+         RepositoryPackage oldPkg = RepositoryPackage.readFromFile(tagFile);
+         if (oldPkg != null && src.pkg.updateFromSaved(oldPkg))
+            installedTime = oldPkg.installedTime;
       }
       long packageTime = getLastModifiedTime(src);
       // No last modified time for this source... assume it's up to date unless it's not installed
@@ -86,7 +83,9 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
          return err;
       }
       else {
-         FileUtil.saveStringAsFile(tagFile, String.valueOf(System.currentTimeMillis()), true);
+         src.pkg.installedTime = System.currentTimeMillis();
+         src.pkg.saveToFile(tagFile);
+         //FileUtil.saveStringAsFile(tagFile, String.valueOf(System.currentTimeMillis()), true);
       }
       return null;
    }
@@ -94,8 +93,8 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
    public abstract String doInstall(RepositorySource src);
 
    public void info(String infoMessage) {
-      if (messageHandler != null) {
-         messageHandler.reportMessage(infoMessage, null, -1, -1, MessageType.Info);
+      if (msg != null) {
+         msg.reportMessage(infoMessage, null, -1, -1, MessageType.Info);
       }
       if (info)
          System.out.println(infoMessage);
@@ -121,6 +120,12 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
    }
 
    public void setMessageHandler(IMessageHandler handler) {
-      this.messageHandler = handler;
+      this.msg = handler;
+   }
+
+   public RepositoryPackage createPackage(String url) {
+      // TODO: can we support this URL scheme for other repositories?
+      MessageHandler.error(msg, "URL based packages not supported for repository type: " + getClass().getName());
+      return null;
    }
 }

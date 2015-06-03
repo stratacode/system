@@ -5,17 +5,7 @@
 package sc.repos;
 
 import sc.util.IMessageHandler;
-import sc.util.FileUtil;
 import sc.util.URLUtil;
-
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-
-import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.nio.channels.ReadableByteChannel;
-import java.nio.channels.Channels;
 
 /**
  * For this RepoistoryManager, packages are stored from the URL and downloaded via the URL protocol handler built into Java.
@@ -27,6 +17,11 @@ public class URLRepositoryManager extends AbstractRepositoryManager {
    }
 
    public String doInstall(RepositorySource src) {
-      return URLUtil.saveURLToFile(src.url, src.pkg.installedRoot, src.unzip, messageHandler);
+      return URLUtil.saveURLToFile(src.url, src.pkg.installedRoot, src.unzip, msg);
+   }
+
+   @Override
+   public RepositoryPackage createPackage(String url) {
+      return null;
    }
 }

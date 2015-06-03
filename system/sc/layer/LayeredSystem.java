@@ -6336,9 +6336,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public LayerTypeIndex readTypeIndexFile(String typeIndexIdent, String layerName) {
       File typeIndexFile = new File(getTypeIndexFileName(typeIndexIdent, layerName));
+      ObjectInputStream ois = null;
+      FileInputStream fis = null;
       try {
-         ObjectInputStream ios = new ObjectInputStream(new FileInputStream(typeIndexFile));
-         Object res = ios.readObject();
+         ois = new ObjectInputStream(fis = new FileInputStream(typeIndexFile));
+         Object res = ois.readObject();
          if (res instanceof LayerTypeIndex) {
             return (LayerTypeIndex) res;
          }
@@ -6354,6 +6356,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       catch (ClassNotFoundException exc) {
          System.out.println("*** can't read typeIndex file: " + exc);
+      }
+      finally {
+         FileUtil.safeClose(ois);
+         FileUtil.safeClose(fis);
       }
       return null;
    }

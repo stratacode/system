@@ -23,6 +23,9 @@ public class MvnDescriptor {
 
    public static MvnDescriptor fromURL(String url) {
       MvnDescriptor desc = new MvnDescriptor();
+      int ix = url.indexOf("://");
+      if (ix != -1)
+         url = url.substring(ix+3);
       desc.version = URLUtil.getFileName(url);
       String rest = URLUtil.getParentPath(url);
       desc.artifactId = URLUtil.getFileName(rest);
@@ -38,7 +41,8 @@ public class MvnDescriptor {
       return groupId + "/" + artifactId;
    }
 
+   // relative to the pkg directory which already has group-id and artifact-id
    public String getJarFileName() {
-      return FileUtil.addExtension(FileUtil.concat(groupId, artifactId + "-" + version), "jar");
+      return FileUtil.addExtension(artifactId + "-" + version, "jar");
    }
 }

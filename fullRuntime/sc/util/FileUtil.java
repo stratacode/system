@@ -74,23 +74,24 @@ public class FileUtil {
    }
 
    public static byte[] getFileAsBytes(String fileName) {
+      FileInputStream is = null;
       try {
          File f = new File(fileName);
          long len = f.length();
          byte [] buffer = new byte[(int) len];
-         FileInputStream is = new FileInputStream(fileName);
+         is = new FileInputStream(fileName);
          if (is.read(buffer) != len)
             throw new IllegalArgumentException("Unable to read all of file: " + fileName + ": len");
          return buffer;
       }
-      catch (FileNotFoundException exc)
-      {
+      catch (FileNotFoundException exc) {
          throw new IllegalArgumentException("File not found: " + exc);
-
       }
-      catch (IOException exc)
-      {
+      catch (IOException exc) {
          throw new IllegalArgumentException("Error reading file: " + exc);
+      }
+      finally {
+         safeClose(is);
       }
    }
 
@@ -523,6 +524,15 @@ public class FileUtil {
       catch (IOException exc) {
          System.err.println("*** can't read zip file: " + zipFile + ": " + exc);
          return false;
+      }
+   }
+
+   public static void safeClose(Closeable fis) {
+      try {
+         if (fis != null)
+            fis.close();
+      }
+      catch (IOException exc) {
       }
    }
 

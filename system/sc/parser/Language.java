@@ -170,7 +170,11 @@ public abstract class Language implements IFileProcessor {
    public Object parse(String fileName, Reader reader, Parselet start, boolean enablePartialValues, boolean matchOnly, Object toPopulateInst, int bufSize) {
       try {
          if (!start.initialized) {
-            ParseUtil.initAndStartComponent(start);
+            // First make sure the language is initialized
+            initialize();
+            // This parselet may not be reachable from the graph we have definining language so start it individually if necessary
+            if (!start.initialized)
+               ParseUtil.initAndStartComponent(start);
          }
          Parser p = new Parser(this, reader, bufSize);
          p.enablePartialValues = enablePartialValues;
@@ -451,6 +455,7 @@ public abstract class Language implements IFileProcessor {
    /** Hook into the LayeredSystem's build process */
    public Object process(SrcEntry file, boolean enablePartialValues) {
       if (file.isZip()) {
+         // This is closed inside of the parse method
          InputStream input = file.getInputStream();
          if (input == null) {
             throw new IllegalArgumentException("Unable to open zip file: " + file);

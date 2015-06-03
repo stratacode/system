@@ -28,6 +28,7 @@ public class XMLFileFormat {
 
    public boolean parse() {
       XMLLanguage lang = XMLLanguage.getXMLLanguage();
+      lang.initialize();
       Object parseRes = lang.parse(fileName, false);
       if (parseRes instanceof ParseError) {
          error("Failed to parse POM file: " + ((ParseError) parseRes).errorStringWithLineNumbers(new File(fileName)));

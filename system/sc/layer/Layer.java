@@ -1609,9 +1609,11 @@ public class Layer implements ILifecycle, LayerConstants {
    private HashMap<String,SrcIndexEntry> readBuildSrcIndex() {
       File buildSrcFile = new File(buildSrcDir, BUILD_SRC_INDEX_FILE);
       if (buildSrcFile.canRead()) {
+         ObjectInputStream ois = null;
+         FileInputStream fis = null;
          try {
-            ObjectInputStream ios = new ObjectInputStream(new FileInputStream(buildSrcFile));
-            HashMap<String, SrcIndexEntry> res = (HashMap<String, SrcIndexEntry>) ios.readObject();
+            ois = new ObjectInputStream(fis = new FileInputStream(buildSrcFile));
+            HashMap<String, SrcIndexEntry> res = (HashMap<String, SrcIndexEntry>) ois.readObject();
             if (traceBuildSrcIndex) {
                System.out.println("Read buildSrcIndex for: " + this + " runtime: " + this.layeredSystem.getRuntimeName());
                if (res != null) {
@@ -1631,6 +1633,10 @@ public class Layer implements ILifecycle, LayerConstants {
          }
          catch (ClassNotFoundException exc) {
             System.out.println("*** can't read build srcFile: " + exc);
+         }
+         finally {
+            FileUtil.safeClose(ois);
+            FileUtil.safeClose(fis);
          }
       }
       return new HashMap<String,SrcIndexEntry>();
@@ -1853,9 +1859,11 @@ public class Layer implements ILifecycle, LayerConstants {
    private HashSet<String> readDynTypeIndex() {
       File dynTypeIndexFile = new File(buildSrcDir, layeredSystem.getDynTypeIndexFile());
       if (dynTypeIndexFile.canRead()) {
+         ObjectInputStream ois = null;
+         FileInputStream fis = null;
          try {
-            ObjectInputStream ios = new ObjectInputStream(new FileInputStream(dynTypeIndexFile));
-            HashSet<String> res = (HashSet<String>) ios.readObject();
+            ois = new ObjectInputStream(fis = new FileInputStream(dynTypeIndexFile));
+            HashSet<String> res = (HashSet<String>) ois.readObject();
             if (res != null) {
                return res;
             }
@@ -1869,6 +1877,10 @@ public class Layer implements ILifecycle, LayerConstants {
          }
          catch (ClassNotFoundException exc) {
             System.out.println("*** can't read dyn type index: " + exc);
+         }
+         finally {
+            FileUtil.safeClose(ois);
+            FileUtil.safeClose(fis);
          }
       }
       return null;
@@ -3303,7 +3315,16 @@ public class Layer implements ILifecycle, LayerConstants {
       return layeredSystem.repositorySystem.packages.get(pkgName);
    }
 
+   public RepositoryPackage addRepositoryPackage(String url) {
+      RepositorySystem repoSys = layeredSystem.repositorySystem;
+      return repoSys.addPackage(url, !disabled);
+   }
+
    public RepositoryPackage addRepositoryPackage(String pkgName, String repositoryTypeName, String url, boolean unzip) {
+      return addRepositoryPackage(pkgName, pkgName, repositoryTypeName, url, unzip);
+   }
+
+   public RepositoryPackage addRepositoryPackage(String pkgName, String fileName, String repositoryTypeName, String url, boolean unzip) {
       if (repositoryPackages == null)
          repositoryPackages = new ArrayList<RepositoryPackage>();
 
@@ -3314,7 +3335,7 @@ public class Layer implements ILifecycle, LayerConstants {
          RepositorySource repoSrc = new RepositorySource(mgr, url, unzip);
          // Add this as a new source.  This will create the package if this is the first definition or add it
          // as a new source if it already exists.
-         RepositoryPackage pkg = repoSys.addPackageSource(mgr, pkgName, pkgName, repoSrc, !disabled);
+         RepositoryPackage pkg = repoSys.addPackageSource(mgr, pkgName, fileName, repoSrc, !disabled);
          repositoryPackages.add(pkg);
 
          return pkg;

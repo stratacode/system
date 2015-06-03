@@ -66,10 +66,18 @@ public class IndexedChoice extends OrderedChoice {
     *  Instead of testing each rule (and doing a string compare for each rule), this will do an 
     *  indexed lookup to select the proper rule.  Internally we use the efficient SymbolChoice
     *  to peek ahead into the stream to see if we have a token which matches the input stream.
+    *
+    *  If you call this more than once, the order in which you register parselets for the given key
+    *  is used to determine the order in which they are tested.  internally, for each key, we build
+    *  a list of the parselet indexes required so we can rapidly select the right choices.
     */
-   public void put(String key, Parselet parselet)
-   {
-      int slotIx = parselets.size();
+   public void put(String key, Parselet parselet) {
+      // Adding the same parselet against more than one key is ok but don't add that twice to the global list.
+      int slotIx = parselets.indexOf(parselet);
+      if (slotIx == -1) {
+         slotIx = parselets.size();
+         parselets.add(parselet);
+      }
 
       OrderedChoice.MatchResult l;
 
@@ -96,10 +104,25 @@ public class IndexedChoice extends OrderedChoice {
             l.add(i, parselet);
          }
       }
-      // Adding the same parselet against more than one key is ok but don't add that twice to the global list.
-      if (!parselets.contains(parselet))
-         parselets.add(parselet);
    }
+
+   /**
+    * When inheriting a grammar from a base language, you may need to replace one parselet for another one.
+    * This method is useful if you have a new child parselet for the same indexed key as the old one.
+    */
+   public void replace(Parselet oldParselet, Parselet newParselet) {
+      int oldIx;
+      for (oldIx = 0; oldIx < parselets.size(); oldIx++) {
+         if (parselets.get(oldIx) == oldParselet)
+            break;
+      }
+      if (oldIx == parselets.size())
+         System.err.println("*** Replace parselet in IndexedChoice failed to find parselet to replace: " + oldParselet + " language: " + getLanguage());
+      else {
+         parselets.set(oldIx, newParselet);
+      }
+   }
+
 
    public void addDefault(Parselet... toAdd)
    {

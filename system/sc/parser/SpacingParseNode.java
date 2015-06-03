@@ -85,7 +85,7 @@ public class SpacingParseNode extends FormattingParseNode {
             switch (nextChar) {
                case '/':
                   // Close tag for an HTML tag should not indent
-                  if (ctx.tagMode && HTMLLanguage.validTagChar(prevChar))
+                  if (ctx.tagMode && HTMLLanguage.getHTMLLanguage().validTagChar(prevChar))
                      return;
                   break;
                case '=':

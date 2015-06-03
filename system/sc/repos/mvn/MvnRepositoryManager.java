@@ -50,18 +50,21 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       if (!found)
          return "Maven pom file: " + desc.groupId + "/" + desc.artifactId + "/" + desc.version + " not found in repositories: " + repositories;
 
-      POMFile pomFile = new POMFile(pomFileName, messageHandler);
+      POMFile pomFile = new POMFile(pomFileName, msg);
       if (!pomFile.parse())
          return "Failed to parse maven POM: " + pomFileName;
 
       List<MvnDescriptor> depURLs = pomFile.getDependencies(null);
       if (depURLs != null) {
+         ArrayList<RepositoryPackage> depPackages = new ArrayList<RepositoryPackage>();
          for (MvnDescriptor depDesc : depURLs) {
             String pkgName = depDesc.getPackageName();
             RepositorySource depSrc = new RepositorySource(this, depDesc.getURL(), false);
             // This will add and install the package
-            system.addPackageSource(this, pkgName, depDesc.getJarFileName(), depSrc, true);
+            RepositoryPackage pkg = system.addPackageSource(this, pkgName, depDesc.getJarFileName(), depSrc, true);
+            depPackages.add(pkg);
          }
+         src.pkg.dependencies = depPackages;
       }
 
       String jarFileName = FileUtil.concat(src.pkg.installedRoot, desc.getJarFileName());
@@ -79,7 +82,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          String pomURL = repo.getFileURL(desc.groupId, desc.artifactId, desc.version, remoteExt);
          String resDir = FileUtil.getParentPath(resFileName);
          new File(resDir).mkdirs();
-         String res = URLUtil.saveURLToFile(pomURL, resFileName, false, messageHandler);
+         String res = URLUtil.saveURLToFile(pomURL, resFileName, false, msg);
          if (res == null) { // If success we break
             found = true;
             break;
@@ -89,4 +92,10 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
 
    }
 
+   @Override
+   public RepositoryPackage createPackage(String url) {
+      MvnDescriptor desc = MvnDescriptor.fromURL(url);
+      RepositorySource src = new RepositorySource(this, url, false);
+      return new RepositoryPackage(this, desc.getPackageName(), desc.getJarFileName(), src);
+   }
 }

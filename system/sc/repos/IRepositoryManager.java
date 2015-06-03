@@ -20,4 +20,6 @@ public interface IRepositoryManager {
    public String getPackageRoot();
 
    public void setMessageHandler(IMessageHandler handler);
+
+   public RepositoryPackage createPackage(String url);
 }

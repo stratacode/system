@@ -2519,10 +2519,12 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       else {
          String jsBuildInfoFile = FileUtil.concat(system.buildDir, JS_BUILD_INFO_FILE);
          File f = new File(jsBuildInfoFile);
+         ObjectInputStream ois = null;
+         FileInputStream fis = null;
          if (f.canRead()) {
             try {
-               ObjectInputStream ios = new ObjectInputStream(new FileInputStream(f));
-               JSBuildInfo res = (JSBuildInfo) ios.readObject();
+               ois = new ObjectInputStream(fis = new FileInputStream(f));
+               JSBuildInfo res = (JSBuildInfo) ois.readObject();
                if (res != null) {
                   jsBuildInfo = res;
 
@@ -2544,6 +2546,15 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                System.out.println("*** can't read js build info file: " + exc);
                f.delete();
             }
+            finally {
+               try {
+                  if (ois != null)
+                     ois.close();
+                  if (fis != null)
+                     fis.close();
+               }
+               catch (IOException exc) {}
+            }
          }
          else if (system.options.verbose)
             System.out.println("*** Missing jsBuildInfoFile: " + jsBuildInfoFile + " building all files");
@@ -2556,12 +2567,23 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    public void saveRuntime() {
       File jsBuildInfoFile = new File(system.buildDir, JS_BUILD_INFO_FILE);
 
+      ObjectOutputStream os = null;
+      FileOutputStream fos = null;
       try {
-         ObjectOutputStream os = new ObjectOutputStream(new FileOutputStream(jsBuildInfoFile));
+         os = new ObjectOutputStream(fos = new FileOutputStream(jsBuildInfoFile));
          os.writeObject(jsBuildInfo);
       }
       catch (IOException exc) {
          System.out.println("*** can't write js build info file for incremental builds: " + jsBuildInfo + ":" + exc);
+      }
+      finally {
+         try {
+            if (os != null)
+               os.close();
+            if (fos != null)
+               fos.close();
+         }
+         catch (IOException exc) {}
       }
    }
 

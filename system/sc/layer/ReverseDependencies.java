@@ -252,9 +252,11 @@ public class ReverseDependencies implements Serializable {
    public static ReverseDependencies readReverseDeps(String revDepsFileName, ReverseDependencies reverseDeps) {
       File revDepsFile = new File(revDepsFileName);
       if (revDepsFile.canRead()) {
+         ObjectInputStream ois = null;
+         FileInputStream fis = null;
          try {
-            ObjectInputStream ios = new ObjectInputStream(new FileInputStream(revDepsFile));
-            ReverseDependencies res = (ReverseDependencies) ios.readObject();
+            ois = new ObjectInputStream(fis = new FileInputStream(revDepsFile));
+            ReverseDependencies res = (ReverseDependencies) ois.readObject();
             if (res != null) {
                if (reverseDeps != null) {
                   reverseDeps.addDeps(res);
@@ -275,6 +277,10 @@ public class ReverseDependencies implements Serializable {
          }
          catch (ClassNotFoundException exc) {
             System.out.println("*** can't read build reverse deps: " + exc);
+         }
+         finally {
+            FileUtil.safeClose(ois);
+            FileUtil.safeClose(fis);
          }
       }
       return reverseDeps;

@@ -5,15 +5,19 @@
 package sc.repos;
 
 import sc.util.FileUtil;
+import sc.util.StringUtil;
 
+import java.io.*;
 import java.util.ArrayList;
 
 /**
  * Represents a third party package that's managed by a RepositoryManager
  */
-public class RepositoryPackage {
+public class RepositoryPackage implements Serializable {
    /** A unique name of this package within the layered system */
    public String packageName;
+
+   public long installedTime;
 
    public boolean installed = false;
 
@@ -85,7 +89,7 @@ public class RepositoryPackage {
       if (fileName == null)
          resName = mgr.getPackageRoot();
       else
-         resName = FileUtil.concat(mgr.getPackageRoot(), fileName);
+         resName = FileUtil.concat(mgr.getPackageRoot(), packageName);
       installedRoot = resName;
    }
 
@@ -102,7 +106,8 @@ public class RepositoryPackage {
    public String getClassPath() {
       StringBuilder sb = new StringBuilder();
       if (installed) {
-         sb.append(installedRoot);
+         if (fileName != null)
+            sb.append(FileUtil.concat(installedRoot, fileName));
          if (dependencies != null) {
             for (RepositoryPackage depPkg : dependencies) {
                String depCP = depPkg.getClassPath();
@@ -115,5 +120,70 @@ public class RepositoryPackage {
          return sb.toString();
       }
       return null;
+   }
+
+   public static RepositoryPackage readFromFile(File f) {
+      ObjectInputStream ios = null;
+      FileInputStream fis = null;
+      try {
+         ios = new ObjectInputStream(fis = new FileInputStream(f));
+         RepositoryPackage res = (RepositoryPackage) ios.readObject();
+         return res;
+      }
+      catch (InvalidClassException exc) {
+         System.err.println("RepositoryPackage saved info - version changed");
+         f.delete();
+      }
+      catch (IOException exc) {
+         System.err.println("Failed to read RepositoryPackage info file: " + exc);
+         f.delete();
+      }
+      catch (ClassNotFoundException exc) {
+         System.err.println("Error reading RepositoryPackage info file: " + exc);
+         f.delete();
+      }
+      finally {
+         FileUtil.safeClose(fis);
+         FileUtil.safeClose(ios);
+      }
+      return null;
+   }
+
+   // Check for any changes in the package - if so, we'll re-install.  Otherwise, we'll
+   // update this package with the saved info.
+   public boolean updateFromSaved(RepositoryPackage oldPkg) {
+      if (!packageName.equals(oldPkg.packageName))
+         return false;
+      if (!StringUtil.equalStrings(fileName, oldPkg.fileName))
+         return false;
+
+      if (sources.length != oldPkg.sources.length)
+         return false;
+
+      for (int i = 0; i < sources.length; i++)
+         if (!sources[i].equals(oldPkg.sources[i]))
+            return false;
+
+      // These fields are computed during the install so we update them here when we skip the install
+      dependencies = oldPkg.dependencies;
+      currentSource = oldPkg.currentSource;
+
+      return true;
+   }
+
+   public void saveToFile(File tagFile) {
+      ObjectOutputStream os = null;
+      FileOutputStream fos = null;
+      try {
+         os = new ObjectOutputStream(fos = new FileOutputStream(tagFile));
+         os.writeObject(this);
+      }
+      catch (IOException exc) {
+         System.err.println("Unable to write RepositoryPackage info file: " + tagFile + ": " + exc);
+      }
+      finally {
+         FileUtil.safeClose(os);
+         FileUtil.safeClose(fos);
+      }
    }
 }
