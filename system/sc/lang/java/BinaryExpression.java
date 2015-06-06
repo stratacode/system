@@ -38,7 +38,7 @@ public class BinaryExpression extends Expression {
    transient boolean isNestedExpr; // True if this node is a child of another BinaryExpression
 
    enum OperatorType {
-      Arithmetic, Conditional, InstanceOf
+      Arithmetic, Conditional, InstanceOf, BooleanArithmetic
    }
 
    static OperatorType getOperatorType(String operator) {
@@ -51,8 +51,9 @@ public class BinaryExpression extends Expression {
          case '%':
          case '+':
          case '-':
-         case '^':
             return OperatorType.Arithmetic;
+         case '^':
+            return OperatorType.BooleanArithmetic;
          case '<':
          case '>':
             if (operator.length() == 1 || operator.charAt(1) == '=')
@@ -65,7 +66,7 @@ public class BinaryExpression extends Expression {
          case '&':
          case '|':
             if (operator.length() == 1)
-               return OperatorType.Arithmetic;
+               return OperatorType.BooleanArithmetic;
             else
                return OperatorType.Conditional;
          default:
@@ -169,11 +170,27 @@ public class BinaryExpression extends Expression {
 
       OperatorType type = getOperatorType(operator);
 
+      Object lhsType, rhsType;
       switch (type) {
          case InstanceOf:
             break;
+         case BooleanArithmetic:
+            boolean lhsIsBoolean = ModelUtil.isBoolean(lhsType = lhs.getTypeDeclaration());
+            boolean rhsIsBoolean = ModelUtil.isBoolean(rhsType = getRhsExpr().getTypeDeclaration());
+
+            boolean both = lhsIsBoolean != rhsIsBoolean;
+
+            if (!lhsIsBoolean || !rhsIsBoolean) {
+               boolean lhsIsInt = ModelUtil.isAnInteger(lhsType);
+               boolean rhsIsInt = ModelUtil.isAnInteger(rhsType);
+
+               both = both && (lhsIsInt == rhsIsInt);
+               if (!lhsIsInt || !rhsIsInt) {
+                  getErrorRoot().displayError("Bitwise operator: " + operator + " types invalid: " + ModelUtil.getTypeName(lhsType) + " and " + ModelUtil.getTypeName(rhsType) + " should be either boolean or integer types");
+               }
+            }
+            break;
          case Arithmetic:
-            Object lhsType, rhsType;
 
             /* Note: treating characters like numbers for arithmetic stuff because you can use them like ints */
             boolean lhsIsNumber = ModelUtil.isANumber(lhsType = lhs.getTypeDeclaration()) || ModelUtil.isCharacter(lhsType);
@@ -285,6 +302,7 @@ public class BinaryExpression extends Expression {
             expr = InstanceOfExpression.create(lhs, ((InstanceOfOperand) op).rhs, true);
             break;
          case Arithmetic:
+         case BooleanArithmetic:
             expr = ArithmeticExpression.create(lhs, operator, ((BinaryOperand) op).rhs, true);
             break;
          case Conditional:
@@ -315,6 +333,7 @@ public class BinaryExpression extends Expression {
             expr = InstanceOfExpression.create(lhs, (JavaType) rhs, true);
             break;
          case Arithmetic:
+         case BooleanArithmetic:
             expr = ArithmeticExpression.create(lhs, op, (Expression) rhs, true);
             break;
          case Conditional:
@@ -420,7 +439,7 @@ public class BinaryExpression extends Expression {
          return initBinding(expectedType, ctx);
 
       OperatorType opType = getOperatorType(operator);
-      if (opType == OperatorType.Arithmetic)
+      if (opType == OperatorType.Arithmetic || opType == OperatorType.BooleanArithmetic)
          return DynUtil.evalArithmeticExpression(operator, expectedType, lhs.eval(expectedType, ctx), getRhsExpr().eval(expectedType, ctx));
       else if (opType == OperatorType.Conditional) {
          Object lhsVal;
@@ -450,7 +469,7 @@ public class BinaryExpression extends Expression {
       }
 
       OperatorType opType = getOperatorType(op);
-      if (opType == OperatorType.Arithmetic) {
+      if (opType == OperatorType.Arithmetic || opType == OperatorType.BooleanArithmetic) {
          if (rhsExpr == null)
             rhsExpr = getRhsExpr();
          if (lhsExpr == null)
@@ -545,7 +564,7 @@ public class BinaryExpression extends Expression {
 
    public String getBindingTypeName() {
       OperatorType opType = getOperatorType(operator);
-      if (opType == OperatorType.Arithmetic)
+      if (opType == OperatorType.Arithmetic || opType == OperatorType.BooleanArithmetic)
          return nestedBinding ? "arithP" : "arith";
       else if (opType == OperatorType.Conditional)
          return nestedBinding ? "conditionP" : "condition";

@@ -1253,6 +1253,10 @@ public class Layer implements ILifecycle, LayerConstants {
       reportMessage(MessageType.Warning, args);
    }
 
+   public void verbose(String...args) {
+      reportMessage(MessageType.Debug, args);
+   }
+
    public void reportMessage(MessageType type, String... args) {
       StringBuilder sb = new StringBuilder();
       sb.append(type);
@@ -1397,6 +1401,12 @@ public class Layer implements ILifecycle, LayerConstants {
          }
       }
 
+      if (repositoryPackages != null && !disabled) {
+         for (RepositoryPackage pkg:repositoryPackages) {
+            layeredSystem.repositorySystem.installPackage(pkg);
+         }
+      }
+
       // First start the model so that it can set up our paths etc.
       if (model != null)
          ParseUtil.startComponent(model);
@@ -1458,6 +1468,11 @@ public class Layer implements ILifecycle, LayerConstants {
       else {
          String [] srcList = srcPath.split(FileUtil.PATH_SEPARATOR);
          topLevelSrcDirs = Arrays.asList(srcList);
+         if (layeredSystem.options.verbose) {
+            verbose("Layer: " + this + " custom src path:");
+            for (String srcDir:topLevelSrcDirs)
+               verbose("   " + srcDir);
+         }
       }
 
       layerTypeIndex.topLevelSrcDirs = topLevelSrcDirs.toArray(new String[topLevelSrcDirs.size()]);
@@ -3324,18 +3339,20 @@ public class Layer implements ILifecycle, LayerConstants {
       return addRepositoryPackage(pkgName, pkgName, repositoryTypeName, url, unzip);
    }
 
+   /** Adds this repository package to the system.  If you are calling this from the start method, the repository is installed right
+    * away.  If you call it in the initialize method, downstream layers have a chance to modify the package before it's installed - right
+    * before the start method of the layer is called. */
    public RepositoryPackage addRepositoryPackage(String pkgName, String fileName, String repositoryTypeName, String url, boolean unzip) {
-      if (repositoryPackages == null)
-         repositoryPackages = new ArrayList<RepositoryPackage>();
-
       RepositorySystem repoSys = layeredSystem.repositorySystem;
       IRepositoryManager mgr = repoSys.getRepositoryManager(repositoryTypeName);
       if (mgr != null) {
+         if (repositoryPackages == null)
+            repositoryPackages = new ArrayList<RepositoryPackage>();
 
          RepositorySource repoSrc = new RepositorySource(mgr, url, unzip);
          // Add this as a new source.  This will create the package if this is the first definition or add it
          // as a new source if it already exists.
-         RepositoryPackage pkg = repoSys.addPackageSource(mgr, pkgName, fileName, repoSrc, !disabled);
+         RepositoryPackage pkg = repoSys.addPackageSource(mgr, pkgName, fileName, repoSrc, started && !disabled);
          repositoryPackages.add(pkg);
 
          return pkg;

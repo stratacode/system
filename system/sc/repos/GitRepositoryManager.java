@@ -15,21 +15,24 @@ public class GitRepositoryManager extends AbstractRepositoryManager {
    public GitRepositoryManager(RepositorySystem sys, String managerName, String rootDir, IMessageHandler handler, boolean info) {
       super(sys, managerName, rootDir, handler, info);
    }
-
    public String doInstall(RepositorySource src) {
+      return gitInstall(src, this);
+   }
+
+   public static String gitInstall(RepositorySource src, AbstractRepositoryManager mgr) {
       ArrayList<String> args = new ArrayList<String>();
       args.add("git");
       args.add("clone");
       args.add(src.url);
       String resDir = src.pkg.installedRoot;
       args.add(resDir);
-      if (info)
-         info("Running git install: " + argsToString(args));
+      if (mgr.info)
+         mgr.info("Running git install: " + mgr.argsToString(args));
       String res = FileUtil.execCommand(args, null);
       if (res == null)
          return "Error: failed to run install command";
-      if (info)
-         info("Completed git install: " + argsToString(args));
+      if (mgr.info)
+         mgr.info("Completed git install: " + mgr.argsToString(args));
       return null;
    }
 }

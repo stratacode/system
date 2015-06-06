@@ -15,23 +15,26 @@ public class Symbol extends Parselet {
 
    public Symbol(String id, int options, String ev) {
       super(id, options);
+      initSymbol(ev);
+   }
+
+   private void initSymbol(String ev) {
       expectedValue = ArrString.toArrString(ev);
       if (expectedValue != null)
          expectedValueLength = expectedValue.length();
+      // For negated repeat we can only advance 1 char at a time or we'll only reject the symbol if we hit it on a boundary
+      if (negated && repeat && expectedValueLength > 1)
+         expectedValueLength = 1;
    }
 
    public Symbol(int options, String ev) {
       super(options);
-      expectedValue = ArrString.toArrString(ev);
-      if (expectedValue != null)
-         expectedValueLength = expectedValue.length();
+      initSymbol(ev);
    }
 
    public Symbol(String ev) {
       super();
-      expectedValue = ArrString.toArrString(ev);
-      if (expectedValue != null)
-         expectedValueLength = expectedValue.buf.length;
+      initSymbol(ev);
    }
 
    /** Number of chars this symbol should consume if not repeating */

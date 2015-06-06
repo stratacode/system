@@ -47,6 +47,8 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
    }
 
    public String install(RepositorySource src) {
+      if (src == null || src.pkg == null || src.pkg.installedRoot == null)
+         System.out.println("***");
       // Putting this into the installed root so it more reliably gets removed if the folder itself is removed
       File tagFile = new File(src.pkg.installedRoot, ".scPkgInstallInfo");
       File rootFile = new File(src.pkg.installedRoot);
@@ -58,7 +60,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       long installedTime = -1;
       if (rootDirExists && tagFile.canRead()) {
          RepositoryPackage oldPkg = RepositoryPackage.readFromFile(tagFile);
-         if (oldPkg != null && src.pkg.updateFromSaved(oldPkg))
+         if (oldPkg != null && !system.reinstallSystem && src.pkg.updateFromSaved(oldPkg))
             installedTime = oldPkg.installedTime;
       }
       long packageTime = getLastModifiedTime(src);
@@ -79,7 +81,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       // If we are installing on top of an existing directory, rename the old directory in the backup folder
       if (rootDirExists && !isEmptyDir(rootFile)) {
          Date curTime = new Date();
-         String backupDir = FileUtil.concat(packageRoot, REPLACED_DIR_NAME, src.pkg.packageName + curTime.getHours() + "." + curTime.getMinutes());
+         String backupDir = FileUtil.concat(packageRoot, REPLACED_DIR_NAME, src.pkg.packageName + "." + curTime.getHours() + "." + curTime.getMinutes());
          new File(backupDir).mkdirs();
          if (info)
             info("Backing up package: " + src.pkg.packageName + " into: " + backupDir);
@@ -149,5 +151,13 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       // TODO: can we support this URL scheme for other repositories?
       MessageHandler.error(msg, "URL based packages not supported for repository type: " + getClass().getName());
       return null;
+   }
+
+   public RepositoryPackage createPackage(IRepositoryManager mgr, String packageName, String fileName, RepositorySource src) {
+      return new RepositoryPackage(mgr, packageName, fileName, src);
+   }
+
+   public String toString() {
+      return managerName;
    }
 }

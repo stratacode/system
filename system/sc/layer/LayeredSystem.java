@@ -741,6 +741,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       globalImports.put("Bindable", ImportDeclaration.create("sc.bind.Bindable"));
    }
 
+   private Map<String,ImportDeclaration> globalLayerImports = new HashMap<String, ImportDeclaration>();
+   {
+      globalLayerImports.put("LayeredSystem", ImportDeclaration.create("sc.layer.LayeredSystem"));
+      globalLayerImports.put("FileUtil", ImportDeclaration.create("sc.util.FileUtil"));
+      globalLayerImports.put("RepositoryPackage", ImportDeclaration.create("sc.repos.RepositoryPackage"));
+   }
+
    // The globally scoped objects which have been defined.
    Map<String,Object> globalObjects = new HashMap<String,Object>();
 
@@ -984,7 +991,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (!peerMode)
-         this.repositorySystem = new RepositorySystem(getStrataCodeDir("pkgs"), messageHandler, options.verbose);
+         this.repositorySystem = new RepositorySystem(getStrataCodeDir("pkgs"), messageHandler, options.verbose, options.reinstall, options.update);
       else {
          this.repositorySystem = parentSystem.repositorySystem;
          messageHandler = parentSystem.messageHandler;
@@ -2889,6 +2896,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       /** Should we install default layers if we can't find them in the layer path? */
       @Constant public boolean installLayers = true;
+
+      /** Should we reinstall all packages */
+      @Constant public boolean reinstall;
+
+      /** Should we update all packages */
+      @Constant public boolean update;
    }
 
    @MainSettings(produceJar = true, produceScript = true, execName = "bin/sc", debug = false, maxMemory = 1024)
@@ -3108,6 +3121,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      restartArg = false;
                      i = -1;
                   }
+                  else if (opt.equals("ri"))
+                     options.reinstall = true;
                   else if (opt.equals("r")) {
                      if (i == args.length - 1)
                         System.err.println("*** missing arg to run -r option");
@@ -3939,7 +3954,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                if (options.verbose) {
                   // Dump errors again because otherwise they are mixed into the verbose messages and harder to find
                   if (viewedErrors.size() > 0) {
-                     System.err.println(getRuntimeName() + " runtime errors: ");
+                     System.err.println("Summary of errors compiling " + getRuntimeName() + " runtime");
                      System.err.println(LayerUtil.errorsToString(viewedErrors));
                   }
                   if (peerSystems != null) {
@@ -10518,6 +10533,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       return globalImports.get(typeName);
+   }
+
+   public ImportDeclaration getLayerImport(String typeName) {
+      return globalLayerImports.get(typeName);
+   }
+
+   /**
+    * Use this to add an import that will only be valid for processing all layer definition files.
+    */
+   public void addLayerImport(String importedName, boolean isStatic) {
+      ImportDeclaration impDecl = ImportDeclaration.create(importedName);
+      impDecl.staticImport = isStatic;
+      globalLayerImports.put(CTypeUtil.getClassName(importedName), impDecl);
    }
 
    public boolean isImported(String srcTypeName) {

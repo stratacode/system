@@ -209,7 +209,8 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    Symbol singleQuote = new Symbol("'");
    Symbol doubleQuote = new Symbol("\"");
 
-   public Parselet escapedString = new OrderedChoice("('','')", OPTIONAL | REPEAT, escapeSequence, new SymbolChoice(NOT, "\\", "\"", "\n", EOF));
+   public SymbolChoice escapedStringBody = new SymbolChoice(NOT, "\\", "\"", "\n", EOF);
+   public Parselet escapedString = new OrderedChoice("('','')", OPTIONAL | REPEAT, escapeSequence, escapedStringBody);
    public Parselet escapedSingleQuoteString = new OrderedChoice("('','')", OPTIONAL | REPEAT, escapeSequence, new SymbolChoice(NOT, "\\", "\'", "\n", EOF));
    {
       escapedString.styleName = escapedSingleQuoteString.styleName = "string";

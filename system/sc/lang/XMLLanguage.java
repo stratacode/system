@@ -13,8 +13,15 @@ public class XMLLanguage extends HTMLLanguage {
    SymbolSpace xmlControlStart = new SymbolSpace("<?xml");
    SymbolSpace xmlControlClose = new SymbolSpace("?>");
 
+   private final static String CDATA_START = "<![CDATA[", CDATA_END = "]]>";
+   Sequence cdataString = new Sequence("(,'',)", new Symbol(CDATA_START), new Symbol(NOT | REPEAT, CDATA_END), new Symbol(CDATA_END));
+
    public boolean validTagChar(char c) {
       return Character.isLetterOrDigit(c) || c == '-' || c == ':' || c == '_' || c == '.';
+   }
+
+   public boolean validStartTagChar(char c) {
+      return super.validStartTagChar(c) || c == '_';
    }
 
    Sequence xmlControlTag = new Sequence("XMLControlTag(,attributeList,)", OPTIONAL, xmlControlStart, tagAttributes, xmlControlClose);
@@ -24,8 +31,17 @@ public class XMLLanguage extends HTMLLanguage {
       INDENTED_SET.clear();
       NEWLINE_SET.clear();
 
+      // In some XML files at least, the newline is allowed in the body
+      escapedStringBody.removeExpectedValue("\n");
+
+      // For some reason some XML files do things like &lt;strong>Site&lt;/strong>
+      templateString.removeExpectedValue(">");
+
       // All XML tags are tree tags.
       templateBodyDeclarations.replace(anyTag, treeTag);
+      templateBodyDeclarations.put(CDATA_START, cdataString);
+      templateBodyDeclarations.setName("([],[],[],[],[],[],[])");
+
       simpleTemplateDeclarations.set(1, treeTag);
 
       template.setName("XMLTemplate(, xmlControl, *, templateDeclarations,)");

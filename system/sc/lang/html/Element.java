@@ -541,6 +541,21 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       return res.toArray(new Element[res.size()]);
    }
 
+   public Element[] getChildTags() {
+      ArrayList<Element> res = new ArrayList<Element>();
+      addAllTags(res, hiddenChildren);
+      addAllTags(res, children);
+      return res.toArray(new Element[res.size()]);
+   }
+
+   private void addAllTags(List<Element> res, List<Object> childList) {
+      if (childList != null) {
+         for (Object child:childList)
+            if (child instanceof Element)
+               res.add((Element) child);
+      }
+   }
+
    private static ArrayList<Element> addElementChild(Element child, ArrayList<Element> res, String name) {
       if (child.getRawObjectName().equals(name)) {
          if (res == null) {
@@ -1909,6 +1924,16 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       if (childTags.length != 1)
          throw new IllegalArgumentException("Multiple child tags: " + childName + " expecting only one");
       return childTags[0].getBodyAsString();
+   }
+
+   public Element getSingleChildTag(String name) {
+      Element[] childTags = getChildTagsWithName(name);
+      if (childTags == null || childTags.length == 0)
+         return null;
+      if (childTags.length > 1) {
+         displayError("Multiple tags with name: " + name + " when only one is expected for: ");
+      }
+      return childTags[0];
    }
 
    public String getBodyAsString() {

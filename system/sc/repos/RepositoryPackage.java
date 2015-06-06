@@ -9,6 +9,8 @@ import sc.util.StringUtil;
 
 import java.io.*;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 
 /**
  * Represents a third party package that's managed by a RepositoryManager
@@ -20,6 +22,8 @@ public class RepositoryPackage implements Serializable {
    public long installedTime;
 
    public boolean installed = false;
+   public boolean definesClasses = true;
+   public boolean includeTests = false;
 
    RepositorySource[] sources;
    RepositorySource currentSource;
@@ -57,13 +61,15 @@ public class RepositoryPackage implements Serializable {
       StringBuilder errors = null;
       for (RepositorySource src:sources) {
          if (src.repository.isActive()) {
+            // Mark as installed to prevent recursive installs
+            installed = true;
             String err = src.repository.install(src);
             if (err == null) {
-               installed = true;
                currentSource = src;
                break;
             }
             else {
+               installed = false;
                if (errors == null)
                   errors = new StringBuilder();
                errors.append(err);
@@ -100,26 +106,32 @@ public class RepositoryPackage implements Serializable {
       RepositorySource[] newSrcs = new RepositorySource[sources.length + 1];
       System.arraycopy(sources, 0, newSrcs, 0, sources.length);
       newSrcs[sources.length] = repoSrc;
+      repoSrc.pkg = this;
       sources = newSrcs;
    }
 
    public String getClassPath() {
       StringBuilder sb = new StringBuilder();
       if (installed) {
-         if (fileName != null)
-            sb.append(FileUtil.concat(installedRoot, fileName));
-         if (dependencies != null) {
-            for (RepositoryPackage depPkg : dependencies) {
-               String depCP = depPkg.getClassPath();
-               if (depCP != null && depCP.length() > 0) {
-                  sb.append(":");
-                  sb.append(depCP);
-               }
-            }
-         }
-         return sb.toString();
+         LinkedHashSet<String> cp = new LinkedHashSet<String>();
+         addToClassPath(cp);
+         return StringUtil.arrayToPath(cp.toArray());
       }
       return null;
+   }
+
+   private void addToClassPath(HashSet<String> classPath) {
+      String fileToUse = getClassPathFileName();
+      if (fileToUse != null && definesClasses) {
+         String entry = FileUtil.concat(installedRoot, fileToUse);
+         classPath.add(entry);
+      }
+
+      if (dependencies != null) {
+         for (RepositoryPackage depPkg : dependencies) {
+            depPkg.addToClassPath(classPath);
+         }
+      }
    }
 
    public static RepositoryPackage readFromFile(File f) {
@@ -131,7 +143,7 @@ public class RepositoryPackage implements Serializable {
          return res;
       }
       catch (InvalidClassException exc) {
-         System.err.println("RepositoryPackage saved info - version changed");
+         System.err.println("RepositoryPackage saved info - version changed: " + exc);
          f.delete();
       }
       catch (IOException exc) {
@@ -157,9 +169,11 @@ public class RepositoryPackage implements Serializable {
       if (!StringUtil.equalStrings(fileName, oldPkg.fileName))
          return false;
 
-      if (sources.length != oldPkg.sources.length)
+      if (sources.length > oldPkg.sources.length)
          return false;
 
+      // Just check that the original sources match.  sources right now only has those added in the layer def files - not those that will be added
+      // via dependencies if we install.
       for (int i = 0; i < sources.length; i++)
          if (!sources[i].equals(oldPkg.sources[i]))
             return false;
@@ -185,5 +199,19 @@ public class RepositoryPackage implements Serializable {
          FileUtil.safeClose(os);
          FileUtil.safeClose(fos);
       }
+   }
+
+   public String toString() {
+      return packageName;
+   }
+
+   /**
+    * There's a file name that's set as part of the package but sometimes this name will
+    * change based on the source.  If we have two different versions of the same component.
+    *
+    * If this method returns null, this package has no class path entry.
+    */
+   public String getClassPathFileName() {
+      return currentSource != null ? currentSource.getClassPathFileName() : fileName;
    }
 }

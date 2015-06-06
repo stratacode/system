@@ -24,4 +24,9 @@ public class RepositorySource implements Serializable {
          return false;
       return ((RepositorySource) other).url.equals(url);
    }
+
+   /** If the version number is in the file name, it will be different for each source */
+   public String getClassPathFileName() {
+      return pkg.fileName;
+   }
 }

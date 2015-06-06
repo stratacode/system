@@ -249,6 +249,7 @@ public class TestUtil {
          Language.registerLanguage(HTMLLanguage.INSTANCE, "schtml");
          Language.registerLanguage(HTMLLanguage.INSTANCE, "html");
          Language.registerLanguage(HTMLLanguage.INSTANCE, "scsp");
+         Language.registerLanguage(XMLLanguage.INSTANCE, "xml");
          Language.registerLanguage(CSSLanguage.INSTANCE, "scss");
          Language.registerLanguage(CSSLanguage.INSTANCE, "css");
       }

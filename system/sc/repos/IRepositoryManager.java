@@ -11,6 +11,7 @@ import sc.util.IMessageHandler;
 public interface IRepositoryManager {
    /** Returns null if successful, otherwise an error message. */
    public String install(RepositorySource toInstall);
+
    /** Returns null if successful, otherwise an error message. */
    public String update(RepositorySource toInstall);
    public boolean isActive();
@@ -22,4 +23,6 @@ public interface IRepositoryManager {
    public void setMessageHandler(IMessageHandler handler);
 
    public RepositoryPackage createPackage(String url);
+
+   public RepositoryPackage createPackage(IRepositoryManager mgr, String packageName, String fileName, RepositorySource src);
 }

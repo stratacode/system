@@ -57,6 +57,10 @@ public class SymbolChoice extends Parselet {
       addExpectedValues(values);
    }
 
+   public void removeExpectedValue(String v) {
+      expectedValues.remove(PString.toIString(v));
+   }
+
    public void addExpectedValues(String [] values) {
       List<IString> l =  Arrays.asList(PString.toPString(values));
       if (allChars) {

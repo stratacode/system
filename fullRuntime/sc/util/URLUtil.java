@@ -67,8 +67,8 @@ public class URLUtil {
             HttpURLConnection hconn = (HttpURLConnection) conn;
             ((HttpURLConnection) conn).setInstanceFollowRedirects(true);
             ((HttpURLConnection) conn).setFollowRedirects(true);
-            System.out.println("*** " + hconn.getResponseCode());
-            System.out.println("*** " + hconn.getHeaderField("Location"));
+            MessageHandler.info(msg, "Response: " + hconn.getResponseCode());
+            //System.out.println("*** " + hconn.getHeaderField("Location"));
          }
          rbc = Channels.newChannel(conn.getInputStream());
          fos = new FileOutputStream(fileName);

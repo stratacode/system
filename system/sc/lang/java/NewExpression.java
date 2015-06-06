@@ -312,7 +312,10 @@ public class NewExpression extends IdentifierExpression {
          int ndim = arrayDimensions.size();
          if (ndim == 0)
             ndim = 1;
-         return new ArrayTypeDeclaration(getJavaModel().getModelTypeDeclaration(), boundType, StringUtil.repeat("[]", ndim));
+         Object type = boundType;
+         if (type == null) // undefined reference - don't inject a null type into the system
+            type = Object.class;
+         return new ArrayTypeDeclaration(getJavaModel().getModelTypeDeclaration(), type, StringUtil.repeat("[]", ndim));
       }
    }
 
@@ -523,6 +526,8 @@ public class NewExpression extends IdentifierExpression {
          if (isStaticContext = isStatic())
             anonType.addModifier("static");
          anonType.addModifier("public");
+         if (boundType == null)
+            boundType = Object.class;
          JavaType baseType = ClassType.create(ModelUtil.getTypeName(boundType));
          if (ModelUtil.isInterface(boundType)) {
             SemanticNodeList impl = new SemanticNodeList(2);

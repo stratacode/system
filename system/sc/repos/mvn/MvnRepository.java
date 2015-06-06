@@ -15,6 +15,10 @@ public class MvnRepository {
    }
 
    public String getFileURL(String groupId, String artifactId, String version, String extension) {
+      if (groupId == null) {
+         System.out.println("***");
+         groupId = "null";
+      }
       return baseURL + URLUtil.concat(groupId.replace('.', '/'), artifactId, version, FileUtil.addExtension(artifactId + "-" + version, extension));
    }
 

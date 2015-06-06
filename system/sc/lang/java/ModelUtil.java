@@ -103,8 +103,9 @@ public class ModelUtil {
       Map<TypeParamKey,Object> paramMap = new HashMap<TypeParamKey,Object>(2*typeParameters.length);
       for (Object tp:typeParameters) {
          Object boundType = ModelUtil.getTypeParameterDefault(tp);
-         if (boundType == null || boundType.equals("<null>"))
-            System.out.println("*** Null type parameter default");
+         // This happens with undefined references
+         //if (boundType == null || boundType.equals("<null>"))
+         //   System.out.println("*** Null type parameter default");
          if (boundType != Object.class)
             paramMap.put(new TypeParamKey(tp), boundType);
       }

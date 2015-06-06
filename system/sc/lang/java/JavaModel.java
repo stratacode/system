@@ -432,6 +432,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             return autoImported.identifier;
          }
       }
+      if (isLayerModel && layeredSystem != null) {
+         ImportDeclaration decl = layeredSystem.getLayerImport(name);
+         if (decl != null && !decl.staticImport)
+            return decl.identifier;
+      }
       return null;
    }
 
