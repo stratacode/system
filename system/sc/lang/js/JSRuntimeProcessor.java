@@ -445,9 +445,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       ArrayList<SrcEntry> resFiles = new ArrayList<SrcEntry>();
       if (model instanceof JavaModel) {
          JavaModel javaModel = (JavaModel) model;
-         String srcFileName = javaModel.getSrcFile().relFileName;
+         SrcEntry srcEnt = javaModel.getSrcFile();
 
-         IFileProcessor proc = system.getFileProcessorForFileName(srcFileName, genLayer, BuildPhase.Process);
+         IFileProcessor proc = system.getFileProcessorForSrcEnt(srcEnt, BuildPhase.Process);
 
          // First transform to Java but the java files are not part of the build themselves so just ignore them here
          List<SrcEntry> javaFiles = model.getProcessedFiles(genLayer, buildSrcDir, generate);
@@ -699,7 +699,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       if (postStarted)
          return;
 
-      IFileProcessor proc = system.getFileProcessorForFileName(model.getSrcFile().relFileName, td.getLayer(), BuildPhase.Process);
+      IFileProcessor proc = system.getFileProcessorForSrcEnt(model.getSrcFile(), BuildPhase.Process);
       if (proc instanceof TemplateLanguage) {
          TemplateLanguage tl = (TemplateLanguage) proc;
          if (!tl.needsJavascript)

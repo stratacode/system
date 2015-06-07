@@ -289,6 +289,9 @@ public class Layer implements ILifecycle, LayerConstants {
    // Cached list of top level src directories - usually just the layer's directory path
    private List<String> topLevelSrcDirs;
 
+   /** Maintains an optional list of mappings between a path prefix */
+   private List<SrcPathType> srcPathTypes;
+
    // Cached list of all directories in this layer that contain source
    private List<String> srcDirs = new ArrayList<String>();
 
@@ -1254,7 +1257,13 @@ public class Layer implements ILifecycle, LayerConstants {
    }
 
    public void verbose(String...args) {
-      reportMessage(MessageType.Debug, args);
+      StringBuilder sb = new StringBuilder();
+      for (String arg:args)
+         sb.append(arg);
+      if (layeredSystem != null)
+         layeredSystem.reportMessage(MessageType.Debug, sb);
+      else
+         System.out.println(sb);
    }
 
    public void reportMessage(MessageType type, String... args) {
@@ -1295,10 +1304,10 @@ public class Layer implements ILifecycle, LayerConstants {
          if (prefix.equals("") && fn.equals(layerBaseName))
             continue;
          String ext = FileUtil.getExtension(fn);
-         IFileProcessor proc = ext == null ? null : layeredSystem.getFileProcessorForExtension(ext, this, null);
+         String srcPath = FileUtil.concat(prefix, fn);
+         IFileProcessor proc = ext == null ? null : layeredSystem.getFileProcessorForExtension(ext, f.getPath(), true, this, null);
 
          if (proc != null && proc.isParsed()) {
-            String srcPath = FileUtil.concat(prefix, fn);
             // Register under both the name with and without the suffix
             srcDirCache.put(srcPath, f);
             srcDirCache.put(FileUtil.removeExtension(srcPath), f);
@@ -1363,6 +1372,12 @@ public class Layer implements ILifecycle, LayerConstants {
       String absPrefix = FileUtil.concat(packagePrefix.replace('.', '/'), srcEnt.getRelDir());
       layeredSystem.removeFromPackageIndex(layerPathName, this, false, true, absPrefix, srcEnt.baseFileName);
       // TODO: any reason to remove the dirIndex entry?
+   }
+
+   private static class SrcPathType {
+      String pathPrefix;
+      String srcType;
+      boolean relative;
    }
 
    private static class ReplacedType {
@@ -1470,8 +1485,10 @@ public class Layer implements ILifecycle, LayerConstants {
          topLevelSrcDirs = Arrays.asList(srcList);
          if (layeredSystem.options.verbose) {
             verbose("Layer: " + this + " custom src path:");
-            for (String srcDir:topLevelSrcDirs)
-               verbose("   " + srcDir);
+            for (String srcDir:topLevelSrcDirs) {
+               String srcPathType = getSrcPathType(srcDir, true);
+               verbose("   " + srcDir + (srcPathType != null ? " srcPathType: " + srcPathType : ""));
+            }
          }
       }
 
@@ -1680,6 +1697,8 @@ public class Layer implements ILifecycle, LayerConstants {
           *  layer which contains the original source file.  We don't have that info, but better to consider the
           *  processor than ignore because it's a dynamic layer.
           */
+          // TODO: NULL is no good for the layer here - should store the layer in the build src index so we can accurately
+         // compute the info below.  Maybe we put the layer name in the SrcIndexEntry
          IFileProcessor proc = layeredSystem.getFileProcessorForFileName(path, null, BuildPhase.Process);
          String srcDir = proc == null ? buildSrcDir : proc.getOutputDirToUse(layeredSystem, buildSrcDir, buildDir);
          String fileName = FileUtil.concat(srcDir, path);
@@ -3332,7 +3351,11 @@ public class Layer implements ILifecycle, LayerConstants {
 
    public RepositoryPackage addRepositoryPackage(String url) {
       RepositorySystem repoSys = layeredSystem.repositorySystem;
-      return repoSys.addPackage(url, !disabled);
+      RepositoryPackage pkg = repoSys.addPackage(url, !disabled);
+      if (repositoryPackages == null)
+         repositoryPackages = new ArrayList<RepositoryPackage>();
+      repositoryPackages.add(pkg);
+      return pkg;
    }
 
    public RepositoryPackage addRepositoryPackage(String pkgName, String repositoryTypeName, String url, boolean unzip) {
@@ -3522,6 +3545,87 @@ public class Layer implements ILifecycle, LayerConstants {
       layerTypeIndex = null;
       origBuildLayer = null;
       buildInfo = null;
+   }
+
+   /**
+    *  Adds a new src path with the optional srcPathType.  The srcPathType specifies the nature of the files under this
+    * directory - e.g. for web/** the srcPathType is 'web'.   The default type for normal source files is null.
+    * */
+   public void addSrcPath(String srcPath, String srcPathType) {
+      boolean abs = FileUtil.isAbsolutePath(srcPath);
+      // Relative paths are already in the default src path (layerPathName)
+      if (abs) {
+         if (this.srcPath != null) {
+            this.srcPath = this.srcPath + ":" + srcPath;
+         } else
+            this.srcPath = layerPathName + ":" + srcPath;
+      }
+      if (srcPathType != null) {
+         SrcPathType type = new SrcPathType();
+         type.srcType = srcPathType;
+         type.pathPrefix = srcPath;
+         type.relative = !abs;
+         if (srcPathTypes == null)
+            srcPathTypes = new ArrayList<SrcPathType>();
+         srcPathTypes.add(type);
+      }
+   }
+
+   public String getSrcPathType(String fileName, boolean abs) {
+      if (srcPathTypes != null) {
+         for (SrcPathType srcPathType : srcPathTypes) {
+            if (srcPathType.relative) {
+               if (abs) {
+                  if (fileName.startsWith(layerPathName)) {
+                     if (prefixMatches(srcPathType.pathPrefix, fileName.substring(layerPathName.length() + 1)))
+                        return srcPathType.srcType;
+                  }
+               } else {
+                  if (prefixMatches(srcPathType.pathPrefix, fileName))
+                     return srcPathType.srcType;
+               }
+            } else {
+               if (abs) {
+                  if (prefixMatches(srcPathType.pathPrefix, fileName))
+                     return srcPathType.srcType;
+               }
+            }
+         }
+      }
+      if (baseLayers != null) {
+         for (Layer baseLayer:baseLayers) {
+            String res = baseLayer.getSrcPathType(fileName, abs);
+            if (res != null)
+               return res;
+         }
+      }
+      return null;
+   }
+
+   public String getSrcPathType(SrcEntry srcEnt) {
+      for (SrcPathType srcPathType:srcPathTypes) {
+         if (srcPathType.relative) {
+            if (prefixMatches(srcPathType.pathPrefix, srcEnt.getRelDir()))
+               return srcPathType.srcType;
+         }
+         else {
+            if (prefixMatches(srcPathType.pathPrefix, srcEnt.absFileName))
+               return srcPathType.srcType;
+         }
+      }
+      if (baseLayers != null) {
+         for (Layer baseLayer:baseLayers) {
+            String res = baseLayer.getSrcPathType(srcEnt);
+            if (res != null)
+               return res;
+         }
+      }
+      return null;
+   }
+
+   private boolean prefixMatches(String prefix, String path) {
+      // Assumes prefix has a trailing '/' and we are not matching directories
+      return path.startsWith(prefix);
    }
 }
 

@@ -5,7 +5,9 @@
 package sc.layer;
 
 import sc.util.FileUtil;
+import sc.util.StringUtil;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 
 /**
@@ -25,11 +27,14 @@ public class LayerFileProcessor implements IFileProcessor {
    /** If true, add the layer's package prefix onto the path name of the file in the layer to get the generated/copied file. */
    public boolean prependLayerPackage = true;
 
-   /** Consider the resulting file part of the generated source and store it in the buildSrcDir of the layer. */
+   /** If true, use the resulting file part of the generated source and store it in the buildSrcDir of the layer. */
    public boolean useSrcDir = true;
 
    /** If true, store the file in the directory used for java classes */
    public boolean useClassesDir = false;
+
+   /** Optionally set to restrict this processor to only working on files with a given type - e.g. files in the web directory are marked as 'web' files and have different processors. */
+   public String[] srcPathTypes;
 
    /**
     * The layer which defines this processor.  Only layers which extend the definedInLayer can use this processor.
@@ -67,6 +72,22 @@ public class LayerFileProcessor implements IFileProcessor {
 
    private boolean producesTypes = false;
 
+   public static class PathMapEntry {
+      public String fromDir;
+      public String toDir;
+   }
+
+   private ArrayList<PathMapEntry> pathMapTable;
+
+   public void addPathMap(String fromDir, String toDir) {
+      if (pathMapTable == null) {
+         pathMapTable = new ArrayList<PathMapEntry>();
+      }
+      PathMapEntry ent = new PathMapEntry();
+      ent.fromDir = fromDir;
+      ent.toDir = toDir;
+      pathMapTable.add(ent);
+   }
 
    public void validate() {
       if (useSrcDir && useClassesDir) {
@@ -115,6 +136,15 @@ public class LayerFileProcessor implements IFileProcessor {
       if (skipSrcPathPrefix != null && relFileName.startsWith(skipSrcPathPrefix))
          relFileName = relFileName.substring(skipSrcPathPrefix.length() + 1);
 
+      if (pathMapTable != null) {
+         for (PathMapEntry pathMapEnt:pathMapTable) {
+            String fromDir = pathMapEnt.fromDir;
+            if (relFileName.startsWith(fromDir)) {
+               relFileName = FileUtil.concat(pathMapEnt.toDir, relFileName.substring(fromDir.length()));
+            }
+         }
+      }
+
       return FileUtil.concat(templatePrefix == null ? null : templatePrefix,
               FileUtil.concat(prependLayerPackage ? srcEnt.layer.getPackagePath() : null, relFileName));
    }
@@ -128,6 +158,23 @@ public class LayerFileProcessor implements IFileProcessor {
               (useSrcDir ? buildSrcDir :
                       useClassesDir ? sys.buildClassesDir :
                               (useCommonBuildDir ? sys.commonBuildDir : layerBuildDir)) : outputDir;
+   }
+
+   public FileEnabledState enabledForPath(String pathName, Layer fileLayer, boolean abs) {
+      // TODO: We should not be passing in null here in general
+      if (fileLayer == null)
+         return FileEnabledState.Enabled;
+      String filePathType = fileLayer.getSrcPathType(pathName, abs);
+      if (srcPathTypes != null) {
+         for (int i = 0; i < srcPathTypes.length; i++) {
+            boolean res = StringUtil.equalStrings(srcPathTypes[i], filePathType);
+            if (res)
+               return FileEnabledState.Enabled;
+         }
+      }
+      else if (filePathType == null)
+         return FileEnabledState.Enabled;
+      return FileEnabledState.NotEnabled;
    }
 
    public FileEnabledState enabledFor(Layer layer) {

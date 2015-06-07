@@ -76,10 +76,14 @@ public class RepositorySystem {
          return null;
       RepositoryPackage oldPkg = packages.get(pkg.packageName);
       if (oldPkg != null) {
-         oldPkg.addNewSource(pkg.currentSource);
-         return oldPkg;
+         oldPkg.addNewSource(pkg.sources[0]);
+         if (oldPkg.installed)
+            return oldPkg;
+         else
+            pkg = oldPkg;
       }
-      packages.put(pkg.packageName, pkg);
+      else
+         packages.put(pkg.packageName, pkg);
       if (install) {
          installPackage(pkg);
       }

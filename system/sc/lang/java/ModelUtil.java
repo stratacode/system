@@ -248,8 +248,6 @@ public class ModelUtil {
             Object[] genParamTypes = ModelUtil.getGenericParameterTypes(varObj, true);
 
             boolean isTypeVariable = ModelUtil.isTypeVariable(genRetType);
-            if (genRetType instanceof ExtendsType.LowerBoundsTypeDeclaration)
-               System.out.println("***");
 
             // Refine the return type using the type parameters as a guide.  First we bind the
             // type parameters to the arguments supplied, then resolve the type and map that to our

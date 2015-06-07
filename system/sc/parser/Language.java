@@ -11,6 +11,7 @@ import sc.type.RTypeUtil;
 import sc.util.FileUtil;
 import sc.type.TypeUtil;
 import sc.util.PerfMon;
+import sc.util.StringUtil;
 
 import java.io.*;
 import java.util.Collection;
@@ -64,6 +65,13 @@ public abstract class Language implements IFileProcessor {
 
    public Layer definedInLayer;    // If you add a language in a layer, set this to that layer so that previous layers
                                   // will not see the language definitions
+
+   /**
+    * The optional name you can set to specify which types of files this language operates on - when the extension is used
+    * by different implementations for different parts of your file tree.   You can register with the layer, a set of srcPathTypes.
+    * The default of 'null' matches all src files in the layer which are not explicitly marked with a different type.
+    */
+   public String[] srcPathTypes;
 
    public boolean disableProcessing = false;
    public boolean exportProcessing = true;  // You can add a language private to a specific layer by setting this to false
@@ -506,6 +514,20 @@ public abstract class Language implements IFileProcessor {
 
       return (exportProcessing ? layerPos >= definedInPos :
               layerPos == definedInPos) ? FileEnabledState.Enabled : FileEnabledState.NotEnabled;
+   }
+
+   public FileEnabledState enabledForPath(String pathName, Layer fileLayer, boolean abs) {
+      String filePathType = fileLayer.getSrcPathType(pathName, abs);
+      if (srcPathTypes != null) {
+         for (int i = 0; i < srcPathTypes.length; i++) {
+            boolean res = StringUtil.equalStrings(srcPathTypes[i], filePathType);
+            if (res)
+               return FileEnabledState.Enabled;
+         }
+      }
+      else if (filePathType == null)
+         return FileEnabledState.Enabled;
+      return FileEnabledState.NotEnabled;
    }
 
    public int getLayerPosition() {

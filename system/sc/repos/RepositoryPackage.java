@@ -24,6 +24,7 @@ public class RepositoryPackage implements Serializable {
    public boolean installed = false;
    public boolean definesClasses = true;
    public boolean includeTests = false;
+   public boolean includeRuntime = false;
 
    RepositorySource[] sources;
    RepositorySource currentSource;
@@ -103,6 +104,11 @@ public class RepositoryPackage implements Serializable {
       if (repoSrc.equals(currentSource))
          return;
 
+      for (RepositorySource oldSrc:sources) {
+         if (repoSrc.equals(oldSrc))
+            return;
+      }
+
       RepositorySource[] newSrcs = new RepositorySource[sources.length + 1];
       System.arraycopy(sources, 0, newSrcs, 0, sources.length);
       newSrcs[sources.length] = repoSrc;
@@ -181,6 +187,7 @@ public class RepositoryPackage implements Serializable {
       // These fields are computed during the install so we update them here when we skip the install
       dependencies = oldPkg.dependencies;
       currentSource = oldPkg.currentSource;
+      definesClasses = oldPkg.definesClasses;
 
       return true;
    }

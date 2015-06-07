@@ -132,10 +132,12 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
 
    private final static String[] defaultScopes = {POMFile.DEFAULT_SCOPE};
    private final static String[] testScopes = {POMFile.DEFAULT_SCOPE, "test"};
+   private final static String[] allScopes = {POMFile.DEFAULT_SCOPE, "test", "runtime"};
+   private final static String[] runtimeScopes = {POMFile.DEFAULT_SCOPE, "runtime"};
    private String[] getScopesToBuild(RepositoryPackage pkg) {
       if (pkg.includeTests)
-         return testScopes;
-      return defaultScopes;
+         return pkg.includeRuntime ? allScopes : testScopes;
+      return pkg.includeRuntime ? runtimeScopes : defaultScopes;
    }
 
    Object installPOM(MvnDescriptor desc, RepositoryPackage pkg) {

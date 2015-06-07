@@ -746,6 +746,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       globalLayerImports.put("LayeredSystem", ImportDeclaration.create("sc.layer.LayeredSystem"));
       globalLayerImports.put("FileUtil", ImportDeclaration.create("sc.util.FileUtil"));
       globalLayerImports.put("RepositoryPackage", ImportDeclaration.create("sc.repos.RepositoryPackage"));
+      globalLayerImports.put("LayerFileProcessor", ImportDeclaration.create("sc.layer.LayerFileProcessor"));
    }
 
    // The globally scoped objects which have been defined.
@@ -6718,7 +6719,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * a dependent file has changed, or the file was modified but if neither of these cases is true, the caller can provide a more specific reason. */
    private Object startModel(SrcEntry toGenEnt, Layer genLayer, boolean incrCompile, BuildState bd, BuildPhase phase, String defaultReason) {
       Object modelObj;
-      IFileProcessor proc = getFileProcessorForFileName(toGenEnt.relFileName, toGenEnt.layer, phase);
+      IFileProcessor proc = getFileProcessorForSrcEnt(toGenEnt, phase);
       if (proc == null)
          return null; // possibly not processed in this phase
       if (proc.getProducesTypes()) {
@@ -7521,7 +7522,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
        * */
       if (typeGroupDeps != null && phase == BuildPhase.Process && changedModels.size() > 0 && !separateOnly) {
          for (TypeGroupDep dep:typeGroupDeps) {
-            IFileProcessor depProc = getFileProcessorForFileName(dep.relFileName, genLayer, BuildPhase.Process);
+            IFileProcessor depProc = getFileProcessorForFileName(dep.relFileName, genLayer, null);
             if (depProc == null) {
                System.err.println("*** No file processor registered for type group dependency: " + dep.relFileName + " for group: " + dep.typeGroupName);
             }
@@ -7681,7 +7682,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
          if (typeGroupDeps != null && phase == BuildPhase.Process && changedModels.size() > 0 && !separateOnly) {
             for (TypeGroupDep dep:typeGroupDeps) {
-               IFileProcessor depProc = getFileProcessorForFileName(dep.relFileName, genLayer, BuildPhase.Process);
+               IFileProcessor depProc = getFileProcessorForFileName(dep.relFileName, genLayer, null);
                if (depProc == null) {
                   System.err.println("*** No file processor registered for type group dependency: " + dep.relFileName + " for group: " + dep.typeGroupName);
                }
@@ -7827,7 +7828,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      for (SrcEntry genFile:generatedFiles) {
                         byte[] hash = genFile.hash;
                         // Getting the processor for the generated file.  Passing in null for the phase as we just need to know whether to inherit or compile the files
-                        IFileProcessor genProc = getFileProcessorForFileName(genFile.relFileName, genLayer, null);
+                        IFileProcessor genProc = getFileProcessorForSrcEnt(genFile, null);
                         if (genProc == null)
                            System.err.println("*** Missing file processor for generated file: " + genFile.relFileName);
                         if (hash != null) {
@@ -8390,12 +8391,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return;
       }
       for (int f = 0; f < fileNames.length; f++) {
-         if (layer.excludedFile(fileNames[f], srcPath))
+         String fileName = fileNames[f];
+         if (layer.excludedFile(fileName, srcPath))
             continue;
-         IFileProcessor proc = getFileProcessorForFileName(FileUtil.concat(srcPath, fileNames[f]), layer, phase);
-         if (proc != null && !fileNames[f].equals(layer.layerBaseName)) {
+         IFileProcessor proc = getFileProcessorForFileName(FileUtil.concat(srcPath, fileName), FileUtil.concat(srcDirName, fileName), layer, phase);
+         if (proc != null && !fileName.equals(layer.layerBaseName)) {
             SrcEntry prevEnt;
-            SrcEntry newSrcEnt = new SrcEntry(layer, srcDirName, srcPath,  fileNames[f], proc.getPrependLayerPackage());
+            SrcEntry newSrcEnt = new SrcEntry(layer, srcDirName, srcPath,  fileName, proc.getPrependLayerPackage());
             // Just in case we've previously skipped over a file for this type, need to add the most specific one.
             if ((prevEnt = bd.unchangedFiles.get(newSrcEnt.getTypeName())) != null) {
                newSrcEnt = prevEnt;
@@ -8403,9 +8405,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             toGenerate.add(newSrcEnt);
          }
          else {
-            File subFile = new File(srcDirName, fileNames[f]);
+            File subFile = new File(srcDirName, fileName);
             if (subFile.isDirectory())
-               toGenerate.add(new SrcEntry(layer, srcDirName, srcPath,  fileNames[f], proc == null || proc.getPrependLayerPackage()));
+               toGenerate.add(new SrcEntry(layer, srcDirName, srcPath,  fileName, proc == null || proc.getPrependLayerPackage()));
          }
       }
    }
@@ -8492,14 +8494,24 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public IFileProcessor getFileProcessorForExtension(String ext) {
-      return getFileProcessorForExtension(ext, null, null);
+      return getFileProcessorForExtension(ext, null, false, null, null);
    }
 
-   public IFileProcessor getFileProcessorForExtension(String ext, Layer srcLayer, BuildPhase phase) {
+   public IFileProcessor getFileProcessorForExtension(String ext, String fileName, boolean abs, Layer srcLayer, BuildPhase phase) {
       IFileProcessor[] procs = fileProcessors.get(ext);
       if (procs != null) {
          for (IFileProcessor proc:procs) {
             if (phase == null || phase == proc.getBuildPhase()) {
+               if (fileName != null) {
+                  switch (proc.enabledForPath(fileName, srcLayer, abs)) {
+                     case Enabled:
+                        return proc;
+                     case Disabled:
+                        return null;
+                     case NotEnabled:
+                        continue;
+                  }
+               }
                switch (proc.enabledFor(srcLayer)) {
                   case Enabled:
                      return proc;
@@ -8517,7 +8529,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
+   public IFileProcessor getFileProcessorForSrcEnt(SrcEntry srcEnt, BuildPhase phase) {
+      return getFileProcessorForFileName(srcEnt.relFileName, srcEnt.absFileName, srcEnt.layer, phase);
+   }
+
    public IFileProcessor getFileProcessorForFileName(String fileName, Layer fromLayer, BuildPhase phase) {
+      return getFileProcessorForFileName(fileName, null, fromLayer, phase);
+   }
+
+   public IFileProcessor getFileProcessorForFileName(String fileName, String absFileName, Layer fromLayer, BuildPhase phase) {
       IFileProcessor res;
       if (filePatterns.size() > 0) {
          for (Map.Entry<Pattern,IFileProcessor> ent:filePatterns.entrySet()) {
@@ -8531,7 +8551,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       String ext = FileUtil.getExtension(fileName);
-      return getFileProcessorForExtension(ext, fromLayer, phase);
+      if (absFileName != null)
+         return getFileProcessorForExtension(ext, absFileName, true, fromLayer, phase);
+      else
+         return getFileProcessorForExtension(ext, fileName, false, fromLayer, phase);
    }
 
    public Object parseSrcFile(SrcEntry srcEnt, boolean reportErrors) {
@@ -8544,7 +8567,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     */
    public Object parseSrcBuffer(SrcEntry srcEnt, boolean enablePartialValues, String buffer, boolean dummy) {
       long modTimeStart = srcEnt.getLastModified();
-      IFileProcessor processor = getFileProcessorForFileName(srcEnt.relFileName, srcEnt.layer, null);
+      IFileProcessor processor = getFileProcessorForSrcEnt(srcEnt, null);
       if (processor instanceof Language) {
          Language lang = (Language) processor;
          Object result = lang.parseString(srcEnt.absFileName, buffer, enablePartialValues);
@@ -8609,7 +8632,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
 
-      IFileProcessor processor = getFileProcessorForFileName(srcEnt.relFileName, srcEnt.layer, null);
+      IFileProcessor processor = getFileProcessorForSrcEnt(srcEnt, null);
       if (processor != null) {
          if (options.verbose && !isLayer && !srcEnt.relFileName.equals("sc/layer/BuildInfo.sc") && (processor instanceof Language || options.sysDetails))
             verbose("Reading: " + srcEnt.absFileName + " for runtime: " + getRuntimeName());
