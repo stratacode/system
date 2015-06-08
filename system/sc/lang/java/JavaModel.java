@@ -1234,8 +1234,16 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       SrcEntry src = getSrcFiles().get(0);
 
       // Don't try to transform if we have errors or we processed an element in an annotation layer.
-      if (src.layer.annotationLayer || hasErrors())
-         return Collections.emptyList();
+      if (src.layer.annotationLayer || hasErrors()) {
+         TypeDeclaration modelType = getModelTypeDeclaration();
+         if (!(modelType instanceof ModifyDeclaration))
+            return Collections.emptyList();
+         ModifyDeclaration modType = (ModifyDeclaration) modelType;
+         if (!(modType.getDerivedTypeDeclaration() instanceof TypeDeclaration)) {
+            return Collections.emptyList();
+         }
+         // else - we are modifying a source type from an annotation layer so treat this normally
+      }
       boolean didTransform;
       String transformedResult = null;
       List<SrcEntry> innerObjStubs = null;

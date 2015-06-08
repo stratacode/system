@@ -6981,8 +6981,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   if (!first) fileTypes.append(", ");
                   if (options.sysDetails)
                      fileTypes.append(ifp);
-                  else
+                  else {
                      fileTypes.append(ifp.getDefinedInLayer());
+                     String[] srcPathTypes = ifp.getSrcPathTypes();
+                     if (srcPathTypes != null) {
+                        fileTypes.append("[");
+                        fileTypes.append(StringUtil.arrayToString(srcPathTypes));
+                        fileTypes.append("]");
+                     }
+                  }
                   first = false;
                }
                fileTypes.append(")");

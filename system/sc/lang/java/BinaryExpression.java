@@ -175,18 +175,20 @@ public class BinaryExpression extends Expression {
          case InstanceOf:
             break;
          case BooleanArithmetic:
-            boolean lhsIsBoolean = ModelUtil.isBoolean(lhsType = lhs.getTypeDeclaration());
-            boolean rhsIsBoolean = ModelUtil.isBoolean(rhsType = getRhsExpr().getTypeDeclaration());
+            lhsType = lhs.getTypeDeclaration();
+            rhsType = rhsType = getRhsExpr().getTypeDeclaration();
 
-            boolean both = lhsIsBoolean != rhsIsBoolean;
+            if (lhsType != null && rhsType != null) {
+               boolean lhsIsBoolean = ModelUtil.isBoolean(lhsType);
+               boolean rhsIsBoolean = ModelUtil.isBoolean(rhsType);
 
-            if (!lhsIsBoolean || !rhsIsBoolean) {
-               boolean lhsIsInt = ModelUtil.isAnInteger(lhsType);
-               boolean rhsIsInt = ModelUtil.isAnInteger(rhsType);
+               if (!lhsIsBoolean || !rhsIsBoolean) {
+                  boolean lhsIsInt = ModelUtil.isAnInteger(lhsType);
+                  boolean rhsIsInt = ModelUtil.isAnInteger(rhsType);
 
-               both = both && (lhsIsInt == rhsIsInt);
-               if (!lhsIsInt || !rhsIsInt) {
-                  getErrorRoot().displayError("Bitwise operator: " + operator + " types invalid: " + ModelUtil.getTypeName(lhsType) + " and " + ModelUtil.getTypeName(rhsType) + " should be either boolean or integer types");
+                  if (!lhsIsInt || !rhsIsInt) {
+                     getErrorRoot().displayError("Bitwise operator: " + operator + " types invalid: " + ModelUtil.getTypeName(lhsType) + " and " + ModelUtil.getTypeName(rhsType) + " both sides should be either boolean or integers for: ");
+                  }
                }
             }
             break;

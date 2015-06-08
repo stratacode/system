@@ -689,4 +689,8 @@ public abstract class Language implements IFileProcessor {
    public boolean isParsed() {
       return true;
    }
+
+   public String[] getSrcPathTypes() {
+      return srcPathTypes;
+   }
 }

@@ -59,4 +59,6 @@ public interface IFileProcessor {
 
    /** Returns true for Language implementations that are parseable. */
    boolean isParsed();
+
+   public String[] getSrcPathTypes();
 }

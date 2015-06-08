@@ -77,6 +77,7 @@ public class LayerFileProcessor implements IFileProcessor {
       public String toDir;
    }
 
+   /*
    private ArrayList<PathMapEntry> pathMapTable;
 
    public void addPathMap(String fromDir, String toDir) {
@@ -88,6 +89,7 @@ public class LayerFileProcessor implements IFileProcessor {
       ent.toDir = toDir;
       pathMapTable.add(ent);
    }
+   */
 
    public void validate() {
       if (useSrcDir && useClassesDir) {
@@ -136,6 +138,7 @@ public class LayerFileProcessor implements IFileProcessor {
       if (skipSrcPathPrefix != null && relFileName.startsWith(skipSrcPathPrefix))
          relFileName = relFileName.substring(skipSrcPathPrefix.length() + 1);
 
+      /*
       if (pathMapTable != null) {
          for (PathMapEntry pathMapEnt:pathMapTable) {
             String fromDir = pathMapEnt.fromDir;
@@ -144,6 +147,7 @@ public class LayerFileProcessor implements IFileProcessor {
             }
          }
       }
+      */
 
       return FileUtil.concat(templatePrefix == null ? null : templatePrefix,
               FileUtil.concat(prependLayerPackage ? srcEnt.layer.getPackagePath() : null, relFileName));
@@ -224,11 +228,15 @@ public class LayerFileProcessor implements IFileProcessor {
 
    public String toString() {
       StringBuilder sb = new StringBuilder();
-      sb.append("LayerFileProcessor: definedInLayer: " + definedInLayer + " for phase: " + buildPhase + " prependLayerPackage=" + prependLayerPackage + " outputDir=" + outputDir + " templatePrefix=" + templatePrefix + " useCommonBuildDir=" + useCommonBuildDir);
+      sb.append("LayerFileProcessor: definedInLayer: " + definedInLayer + " for phase: " + buildPhase + " prependLayerPackage=" + prependLayerPackage + " outputDir=" + outputDir + " templatePrefix=" + templatePrefix + " useCommonBuildDir=" + useCommonBuildDir + " srcPathTypes=" + StringUtil.arrayToString(srcPathTypes));
       return sb.toString();
    }
 
    public boolean isParsed() {
       return false;
+   }
+
+   public String[] getSrcPathTypes() {
+      return srcPathTypes;
    }
 }

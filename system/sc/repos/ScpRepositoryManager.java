@@ -7,6 +7,7 @@ package sc.repos;
 import sc.util.IMessageHandler;
 import sc.util.FileUtil;
 
+import java.io.File;
 import java.util.ArrayList;
 
 /**
@@ -27,8 +28,18 @@ public class ScpRepositoryManager extends AbstractRepositoryManager {
       args.add("scp");
       if (!isZip)
          args.add("-r");
-      args.add(srcURL);
-      args.add(resFile);
+      // Want to eliminate the extra directory - so we are copying one to the other
+      // "cp" and rsync support a trailing / here to mean copy the directory but not so with scp so we need to use
+      // the wildcard
+      if (!isZip) {
+         new File(resFile).mkdirs();
+         args.add(srcURL + "/*");
+         args.add(resFile + "/");
+      }
+      else {
+         args.add(srcURL);
+         args.add(resFile);
+      }
       if (info)
          info("Running: " + argsToString(args));
       String res = FileUtil.execCommand(args, null);
