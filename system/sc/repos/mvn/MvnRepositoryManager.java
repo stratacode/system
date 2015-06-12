@@ -5,10 +5,7 @@
 package sc.repos.mvn;
 
 import sc.repos.*;
-import sc.util.FileUtil;
-import sc.util.IMessageHandler;
-import sc.util.MessageHandler;
-import sc.util.URLUtil;
+import sc.util.*;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -48,7 +45,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
    public HashMap<String,POMFile> pomCache = new HashMap<String,POMFile>();
 
    @Override
-   public String doInstall(RepositorySource src) {
+   public String doInstall(RepositorySource src, DependencyContext ctx) {
       String url = src.url;
 
       MvnDescriptor desc;
@@ -56,15 +53,15 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       MvnRepositoryPackage pkg = (MvnRepositoryPackage) src.pkg;
 
       if (installRepository != null) {
-         installRepository.doInstall(src);
+         installRepository.doInstall(src, ctx);
          // This is the src repository and so does not need to go into classpath
          src.pkg.definesClasses = false;
-         pomFileRes = POMFile.readPOM(FileUtil.concat(src.pkg.installedRoot, "pom.xml"), this);
+         pomFileRes = POMFile.readPOM(FileUtil.concat(src.pkg.installedRoot, "pom.xml"), this, ctx);
          desc = null;
       }
       else {
          desc = MvnDescriptor.fromURL(url);
-         pomFileRes = installPOM(desc, src.pkg);
+         pomFileRes = installPOM(desc, src.pkg, ctx, false);
          src.pkg.definesClasses = true;
       }
 
@@ -73,7 +70,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
 
       pkg.pomFile = (POMFile) pomFileRes;
 
-      installDependencies(src);
+      installDependencies(src, ctx);
 
       if (desc != null && !desc.depsOnly) {
          // Install the JAR file
@@ -87,7 +84,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       return null;
    }
 
-   private String installDependencies(RepositorySource src) {
+   String initDependencies(RepositorySource src, DependencyContext ctx) {
       MvnRepositoryPackage pkg = (MvnRepositoryPackage) src.pkg;
 
       POMFile pomFile = pkg.pomFile;
@@ -97,16 +94,30 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          if (depDescs != null) {
             ArrayList<RepositoryPackage> depPackages = new ArrayList<RepositoryPackage>();
 
+            info(StringUtil.indent(DependencyContext.val(ctx)) + "Initializing dependencies for: " + pkg.packageName);
+
             List<MvnDescriptor> exclusions = null;
             if (src instanceof MvnRepositorySource) {
                exclusions = ((MvnRepositorySource) src).desc.exclusions;
             }
-            for (MvnDescriptor depDesc : depDescs) {
+            for (int i = 0; i < depDescs.size(); i++) {
+               MvnDescriptor depDesc = depDescs.get(i);
+               // TODO: should we be validating that we have some version of this package?
+               if (depDesc.version == null) {
+                  depDescs.remove(i);
+                  i--;
+                  continue;
+               }
                if (exclusions != null) {
                   boolean excluded = false;
-                  for (MvnDescriptor exclDesc:exclusions) {
+                  for (MvnDescriptor exclDesc : exclusions) {
                      if (exclDesc.matches(depDesc)) {
                         excluded = true;
+                        // Need to remove these because right now we do not save/restore the MvnDescriptor which stores
+                        // the exclusions.  We'll just get rid of them from the dependencies list so they don't interfere
+                        // when we load the stored dependencies.
+                        depDescs.remove(i);
+                        i--;
                         break;
                      }
                   }
@@ -119,14 +130,37 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
                // For optional, maybe it's just left off the list.   so we don't get here.  For excluded, we
                // Sometimes we just don't have a version - no use trying to install it with null
                if (depDesc.version != null)
-                  depPackages.add(depDesc.getOrCreatePackage((MvnRepositoryManager) system.getRepositoryManager("mvn"), true));
+                  depPackages.add(depDesc.getOrCreatePackage((MvnRepositoryManager) system.getRepositoryManager("mvn"), false, DependencyContext.child(ctx), true));
             }
             src.pkg.dependencies = depPackages;
+
+            info(StringUtil.indent(DependencyContext.val(ctx)) + "Done initializing dependencies for: " + pkg.packageName);
          }
       }
-      else
-         return "POMFile for package: " + pkg.packageName + " not available - unable to install tests";
 
+
+      return null;
+   }
+
+   // Need to install the dependencies after all of them have been collected.  That's so that the sources array gets sorted properly.
+   private String installDependencies(RepositorySource src, DependencyContext ctx) {
+      MvnRepositoryPackage pkg = (MvnRepositoryPackage) src.pkg;
+
+      ArrayList<RepositoryPackage> depPackages = src.pkg.dependencies;
+      if (depPackages == null) {
+         String err = initDependencies(src, ctx);
+         if (err != null)
+            return err;
+         depPackages = src.pkg.dependencies;
+      }
+
+      if (depPackages != null) {
+         info(StringUtil.indent(DependencyContext.val(ctx)) + "Installing dependencies for: " + pkg.packageName);
+         for (RepositoryPackage depPkg:depPackages) {
+            system.installPackage(depPkg, DependencyContext.child(ctx));
+         }
+         info(StringUtil.indent(DependencyContext.val(ctx)) + "Done installing dependencies for: " + pkg.packageName);
+      }
       return null;
    }
 
@@ -140,15 +174,17 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       return pkg.includeRuntime ? runtimeScopes : defaultScopes;
    }
 
-   Object installPOM(MvnDescriptor desc, RepositoryPackage pkg) {
+   Object installPOM(MvnDescriptor desc, RepositoryPackage pkg, DependencyContext ctx, boolean checkExists) {
       String pomFileName = FileUtil.concat(pkg.installedRoot, "pom.xml");
-      boolean found = installMvnFile(desc, pomFileName, "pom");
-      if (!found) {
-         pomCache.put(pomFileName, POMFile.NULL_SENTINEL);
-         return "Maven pom file: " + desc.groupId + "/" + desc.artifactId + "/" + desc.version + " not found in repositories: " + repositories;
+      if (!checkExists || !new File(pomFileName).canRead()) {
+         boolean found = installMvnFile(desc, pomFileName, "pom");
+         if (!found) {
+            pomCache.put(pomFileName, POMFile.NULL_SENTINEL);
+            return "Maven pom file: " + desc.groupId + "/" + desc.artifactId + "/" + desc.version + " not found in repositories: " + repositories;
+         }
       }
 
-      POMFile pomFile = POMFile.readPOM(pomFileName, this);
+      POMFile pomFile = POMFile.readPOM(pomFileName, this, ctx);
       if (pomFile == null) {
          pomCache.put(pomFileName, POMFile.NULL_SENTINEL);
          return "Failed to parse maven POM: " + pomFileName;
@@ -183,7 +219,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       return new MvnRepositoryPackage(mgr, packageName, fileName, src);
    }
 
-   public POMFile getPOMFile(MvnDescriptor desc, RepositoryPackage pkg) {
+   public POMFile getPOMFile(MvnDescriptor desc, RepositoryPackage pkg, DependencyContext ctx) {
       String pomFileName = FileUtil.concat(pkg.installedRoot, "pom.xml");
       POMFile res = pomCache.get(pomFileName);
       if (res != null) {
@@ -191,7 +227,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
             return null;
          return res;
       }
-      Object pomRes = installPOM(desc, pkg);
+      Object pomRes = installPOM(desc, pkg, ctx, true);
       if (pomRes instanceof String) {
          MessageHandler.error(msg, (String) pomRes);
          return null;

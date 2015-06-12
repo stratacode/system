@@ -4,6 +4,7 @@
 
 package sc.repos.mvn;
 
+import sc.repos.DependencyContext;
 import sc.repos.RepositoryPackage;
 import sc.lang.html.Element;
 import sc.lang.xml.XMLFileFormat;
@@ -18,7 +19,7 @@ import java.util.List;
 
 /** Handles parsing and data model of the Maven POM file (pom.xml) */
 public class POMFile extends XMLFileFormat {
-   public static final POMFile NULL_SENTINEL = new POMFile(null, null);
+   public static final POMFile NULL_SENTINEL = new POMFile(null, null, null);
 
    MvnRepositoryManager mgr;
 
@@ -32,15 +33,18 @@ public class POMFile extends XMLFileFormat {
 
    ArrayList<MvnDescriptor> dependencyManagement;
 
+   DependencyContext depCtx;
+
    public String packaging;
 
-   public POMFile(String fileName, MvnRepositoryManager mgr) {
+   public POMFile(String fileName, MvnRepositoryManager mgr, DependencyContext ctx) {
       super(fileName, mgr == null ? null : mgr.msg);
       this.mgr = mgr;
+      depCtx = ctx;
    }
 
-   public static POMFile readPOM(String fileName, MvnRepositoryManager mgr) {
-      POMFile file = new POMFile(fileName, mgr);
+   public static POMFile readPOM(String fileName, MvnRepositoryManager mgr, DependencyContext depCtx) {
+      POMFile file = new POMFile(fileName, mgr, depCtx);
       // Need to put this before we try to parse it - in case we resolve another recursive reference during the parsing
       mgr.pomCache.put(fileName, file);
       if (file.parse())
@@ -98,10 +102,10 @@ public class POMFile extends XMLFileFormat {
       if (parent != null) {
          MvnDescriptor parentDesc = MvnDescriptor.getFromTag(this, parent, false);
          parentDesc.pomOnly = true; // This reference only requires the POM - not the jar or deps
-         RepositoryPackage parentPackage = parentDesc.getOrCreatePackage(mgr, false);
+         RepositoryPackage parentPackage = parentDesc.getOrCreatePackage(mgr, false, DependencyContext.child(depCtx), false);
          // TODO: check for recursive references here!
          if (parentPackage != null) {
-            parentPOM = mgr.getPOMFile(parentDesc, parentPackage);
+            parentPOM = mgr.getPOMFile(parentDesc, parentPackage, DependencyContext.child(depCtx));
          }
       }
       // TODO: else - there is a default POM but so far, we don't need any of the contents since it's all concerned with the build
@@ -124,9 +128,9 @@ public class POMFile extends XMLFileFormat {
                if (parentName != null)
                   moduleName = CTypeUtil.prefixPath(CTypeUtil.getPackageName(parentName), moduleName);
                MvnDescriptor desc = new MvnDescriptor(getProperty("project.groupId"), moduleName, getProperty("project.version"));
-               RepositoryPackage pkg = desc.getOrCreatePackage(mgr, false);
+               RepositoryPackage pkg = desc.getOrCreatePackage(mgr, false, depCtx, false);
                if (pkg != null) {
-                  POMFile modPOM = mgr.getPOMFile(desc, pkg);
+                  POMFile modPOM = mgr.getPOMFile(desc, pkg, depCtx);
                   if (modPOM != null)
                      modulePOMs.add(modPOM);
                }

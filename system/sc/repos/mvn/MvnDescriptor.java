@@ -1,6 +1,7 @@
 package sc.repos.mvn;
 
 import sc.lang.html.Element;
+import sc.repos.DependencyContext;
 import sc.repos.RepositoryPackage;
 import sc.repos.RepositorySource;
 import sc.util.FileUtil;
@@ -104,20 +105,37 @@ public class MvnDescriptor {
       return desc;
    }
 
-   public RepositoryPackage getOrCreatePackage(MvnRepositoryManager mgr, boolean install) {
+   public RepositoryPackage getOrCreatePackage(MvnRepositoryManager mgr, boolean install, DependencyContext ctx, boolean initDeps) {
       String pkgName = getPackageName();
-      RepositorySource depSrc = new MvnRepositorySource(mgr, getURL(), false, this);
+      RepositorySource depSrc = new MvnRepositorySource(mgr, getURL(), false, this, ctx);
       // This will add and install the package
       RepositoryPackage pkg = mgr.system.addPackageSource(mgr, pkgName, getJarFileName(), depSrc, install);
+
+      // TODO: since dependencies are potentially different for different sources - should we store the in the src itself and compute them once for
+      // each source?  right now we are traversing dependencies on the first source we hit and using them for all.
+      if (initDeps && pkg.dependencies == null) {
+         POMFile pomFile = mgr.getPOMFile(this, pkg, ctx);
+         if (pkg instanceof MvnRepositoryPackage)
+            ((MvnRepositoryPackage) pkg).pomFile = pomFile;
+         mgr.initDependencies(pkg.currentSource, ctx);
+      }
       return pkg;
    }
 
    // GroupId and artifactId are required.  The others only default to being equal if not specified.
    public boolean matches(MvnDescriptor other) {
-      return other.groupId.equals(groupId) && other.artifactId.equals(artifactId) &&
-              (version == null || other.version == null || StringUtil.equalStrings(version, other.version)) &&
-              (type == null || other.type == null || StringUtil.equalStrings(type, other.type)) &&
-              (classifier == null || other.classifier == null || StringUtil.equalStrings(classifier, other.classifier));
+      return strMatches(other.groupId, groupId) && strMatches(other.artifactId, artifactId) &&
+              (version == null || other.version == null || strMatches(version, other.version)) &&
+              (type == null || other.type == null || strMatches(type, other.type)) &&
+              (classifier == null || other.classifier == null || strMatches(classifier, other.classifier));
+   }
+
+   public boolean strMatches(String a, String b) {
+      if (a == b)
+         return true;
+      if (a == null || b == null)
+         return false;
+      return a.equals("*") || b.equals("*") || a.equals(b);
    }
 
    public String toString() {

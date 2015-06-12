@@ -85,7 +85,7 @@ public class RepositorySystem {
       else
          packages.put(pkg.packageName, pkg);
       if (install) {
-         installPackage(pkg);
+         installPackage(pkg, null);
       }
       return pkg;
    }
@@ -109,17 +109,42 @@ public class RepositorySystem {
       }
 
       if (install) {
-         installPackage(pkg);
+         installPackage(pkg, null);
       }
       return pkg;
    }
 
-   public void installPackage(RepositoryPackage pkg) {
+   public RepositoryPackage addPackage(IRepositoryManager mgr, RepositoryPackage newPkg, boolean install, DependencyContext ctx) {
+      RepositoryPackage pkg;
+      String pkgName = newPkg.packageName;
+      pkg = packages.get(pkgName);
+      if (pkg == null) {
+         pkg = newPkg;
+         packages.put(pkgName, pkg);
+      }
+      else {
+         for (RepositorySource src : newPkg.sources)
+            pkg.addNewSource(src);
+         // We may first encounter a package from a Maven module reference - where we are not installing the package.  That's a weaker reference
+         // than if we are installing it so use this new reference.
+         if (!pkg.installed && install) {
+            RepositorySource newSrc = newPkg.currentSource == null ? newPkg.sources[0] : newPkg.currentSource;
+            pkg.updateCurrentSource(newSrc);
+         }
+      }
+
+      if (install) {
+         installPackage(pkg, ctx);
+      }
+      return pkg;
+   }
+
+   public void installPackage(RepositoryPackage pkg, DependencyContext ctx) {
       if (!pkg.installed) {
          // We do the install and update immediately after they are added so that the layer definition file has
          // access to the installed state, to for example, list the contents of the lib directory to get the jar files
          // to add to the classpath.
-         String err = pkg.install();
+         String err = pkg.install(ctx);
          if (err != null) {
             MessageHandler.error(msg, "Failed to install repository package: " + pkg.packageName + " error: " + err);
          }

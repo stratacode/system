@@ -33,6 +33,8 @@ public class XMLLanguage extends HTMLLanguage {
 
       // In some XML files at least, the newline is allowed in the body
       escapedStringBody.removeExpectedValue("\n");
+      // Also backslash
+      escapedStringBody.removeExpectedValue("\\");
 
       // For some reason some XML files do things like &lt;strong>Site&lt;/strong>
       templateString.removeExpectedValue(">");

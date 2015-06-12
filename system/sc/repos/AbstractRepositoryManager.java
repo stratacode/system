@@ -4,10 +4,7 @@
 
 package sc.repos;
 
-import sc.util.IMessageHandler;
-import sc.util.MessageHandler;
-import sc.util.MessageType;
-import sc.util.FileUtil;
+import sc.util.*;
 
 import java.io.File;
 import java.util.Date;
@@ -37,6 +34,10 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       return packageRoot;
    }
 
+   public RepositorySystem getRepositorySystem() {
+      return system;
+   }
+
    public AbstractRepositoryManager(RepositorySystem sys, String mn, String reposRoot, IMessageHandler handler, boolean info) {
       this.system = sys;
       this.managerName = mn;
@@ -46,9 +47,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       this.info = info;
    }
 
-   public String install(RepositorySource src) {
-      if (src == null || src.pkg == null || src.pkg.installedRoot == null)
-         System.out.println("***");
+   public String install(RepositorySource src, DependencyContext ctx) {
       // Putting this into the installed root so it more reliably gets removed if the folder itself is removed
       File tagFile = new File(src.pkg.installedRoot, ".scPkgInstallInfo");
       File rootFile = new File(src.pkg.installedRoot);
@@ -59,8 +58,8 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
          new File(rootParent).mkdirs();
       long installedTime = -1;
       if (rootDirExists && tagFile.canRead()) {
-         RepositoryPackage oldPkg = RepositoryPackage.readFromFile(tagFile);
-         if (oldPkg != null && !system.reinstallSystem && src.pkg.updateFromSaved(oldPkg))
+         RepositoryPackage oldPkg = RepositoryPackage.readFromFile(tagFile, this);
+         if (oldPkg != null && !system.reinstallSystem && src.pkg.updateFromSaved(this, oldPkg, true, ctx))
             installedTime = oldPkg.installedTime;
       }
       long packageTime = getLastModifiedTime(src);
@@ -89,8 +88,8 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
          rootFile.mkdirs();
       }
       if (info)
-         info("Installing package: " + src.pkg.packageName + " from: " + src.url);
-      String err = doInstall(src);
+         info(StringUtil.indent(DependencyContext.val(ctx)) + "Installing package: " + src.pkg.packageName + " from: " + src.url);
+      String err = doInstall(src, ctx);
       if (err != null) {
          tagFile.delete();
          System.err.println("Installing package: " + src.pkg.packageName + " failed: " + err);
@@ -114,7 +113,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       return true;
    }
 
-   public abstract String doInstall(RepositorySource src);
+   public abstract String doInstall(RepositorySource src, DependencyContext ctx);
 
    public void info(String infoMessage) {
       if (msg != null) {

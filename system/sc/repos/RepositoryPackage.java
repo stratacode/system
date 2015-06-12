@@ -26,8 +26,8 @@ public class RepositoryPackage implements Serializable {
    public boolean includeTests = false;
    public boolean includeRuntime = false;
 
-   RepositorySource[] sources;
-   RepositorySource currentSource;
+   public RepositorySource[] sources;
+   public RepositorySource currentSource;
 
    // Optional list of dependencies this package has on other packages
    public ArrayList<RepositoryPackage> dependencies;
@@ -57,16 +57,16 @@ public class RepositoryPackage implements Serializable {
       updateInstallRoot(mgr);
    }
 
-   public String install() {
+   public String install(DependencyContext ctx) {
       installed = false;
       StringBuilder errors = null;
       for (RepositorySource src:sources) {
          if (src.repository.isActive()) {
             // Mark as installed to prevent recursive installs
             installed = true;
-            String err = src.repository.install(src);
+            String err = src.repository.install(src, ctx);
             if (err == null) {
-               currentSource = src;
+               updateCurrentSource(src);
                break;
             }
             else {
@@ -101,17 +101,46 @@ public class RepositoryPackage implements Serializable {
    }
 
    public void addNewSource(RepositorySource repoSrc) {
-      if (repoSrc.equals(currentSource))
+      if (repoSrc.equals(currentSource)) {
+         repoSrc.ctx = DependencyContext.merge(repoSrc.ctx, currentSource.ctx);
          return;
+      }
 
+      int i = 0;
       for (RepositorySource oldSrc:sources) {
-         if (repoSrc.equals(oldSrc))
+         if (repoSrc.equals(oldSrc)) {
+            DependencyContext newCtx = DependencyContext.merge(repoSrc.ctx, oldSrc.ctx);
+            if (newCtx != oldSrc.ctx) {
+               oldSrc.ctx = newCtx;
+               for (int j = 0; j < i; j++) {
+                  if (DependencyContext.hasPriority(oldSrc.ctx, sources[j].ctx)) {
+                     RepositorySource tmp = sources[j];
+                     sources[j] = oldSrc;
+                     oldSrc = tmp;
+                  }
+               }
+               sources[i] = oldSrc;
+            }
             return;
+         }
+         i++;
       }
 
       RepositorySource[] newSrcs = new RepositorySource[sources.length + 1];
-      System.arraycopy(sources, 0, newSrcs, 0, sources.length);
-      newSrcs[sources.length] = repoSrc;
+
+      int j = 0;
+      boolean found = false;
+      for (i = 0; i < sources.length; i++) {
+         if (!found && DependencyContext.hasPriority(repoSrc.ctx, sources[i].ctx)) {
+            newSrcs[j] = repoSrc;
+            j++;
+            found = true;
+         }
+         newSrcs[j] = sources[i];
+         j++;
+      }
+      if (j < newSrcs.length)
+         newSrcs[j] = repoSrc;
       repoSrc.pkg = this;
       sources = newSrcs;
    }
@@ -140,12 +169,26 @@ public class RepositoryPackage implements Serializable {
       }
    }
 
-   public static RepositoryPackage readFromFile(File f) {
+   public void init(IRepositoryManager mgr) {
+      if (sources != null) {
+         for (RepositorySource src:sources)
+            src.init(mgr.getRepositorySystem());
+      }
+      if (dependencies != null) {
+         for (RepositoryPackage pkg:dependencies)
+            pkg.init(mgr);
+      }
+      // Clearing this out since we need to potentially reinstall this package
+      installed = false;
+   }
+
+   public static RepositoryPackage readFromFile(File f, IRepositoryManager mgr) {
       ObjectInputStream ios = null;
       FileInputStream fis = null;
       try {
          ios = new ObjectInputStream(fis = new FileInputStream(f));
          RepositoryPackage res = (RepositoryPackage) ios.readObject();
+         res.init(mgr);
          return res;
       }
       catch (InvalidClassException exc) {
@@ -169,7 +212,7 @@ public class RepositoryPackage implements Serializable {
 
    // Check for any changes in the package - if so, we'll re-install.  Otherwise, we'll
    // update this package with the saved info.
-   public boolean updateFromSaved(RepositoryPackage oldPkg) {
+   public boolean updateFromSaved(IRepositoryManager mgr, RepositoryPackage oldPkg, boolean install, DependencyContext ctx) {
       if (!packageName.equals(oldPkg.packageName))
          return false;
       if (!StringUtil.equalStrings(fileName, oldPkg.fileName))
@@ -185,8 +228,19 @@ public class RepositoryPackage implements Serializable {
             return false;
 
       // These fields are computed during the install so we update them here when we skip the install
-      dependencies = oldPkg.dependencies;
-      currentSource = oldPkg.currentSource;
+      ArrayList<RepositoryPackage> oldDeps = oldPkg.dependencies;
+      if (oldDeps != null) {
+         RepositorySystem sys = mgr.getRepositorySystem();
+         for (int i = 0; i < oldDeps.size(); i++) {
+            RepositoryPackage oldDep = oldDeps.get(i);
+            RepositoryPackage canonDep = sys.addPackage(mgr, oldDep, install, ctx);
+            if (canonDep != oldDep)
+               oldDeps.set(i, canonDep);
+         }
+      }
+      dependencies = oldDeps;
+
+      updateCurrentSource(oldPkg.currentSource);
       definesClasses = oldPkg.definesClasses;
 
       return true;
@@ -220,5 +274,11 @@ public class RepositoryPackage implements Serializable {
     */
    public String getClassPathFileName() {
       return currentSource != null ? currentSource.getClassPathFileName() : fileName;
+   }
+
+   public void updateCurrentSource(RepositorySource src) {
+      currentSource = src;
+      if (src != null)
+         fileName = src.getClassPathFileName();
    }
 }

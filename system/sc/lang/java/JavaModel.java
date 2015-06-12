@@ -289,6 +289,12 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                globalTypes.add(CTypeUtil.getPackageName(impStr));
             }
          }
+         /*
+          * TODO: Try this out so we can an error if an import does not match a file in the classpath
+         else if (getTypeDeclaration(className) == null) {
+            displayWarning("No import: " + className + " for: ");
+         }
+         */
          importsByName.put(className, impStr);
       }
    }

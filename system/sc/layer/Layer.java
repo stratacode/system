@@ -1418,7 +1418,7 @@ public class Layer implements ILifecycle, LayerConstants {
 
       if (repositoryPackages != null && !disabled) {
          for (RepositoryPackage pkg:repositoryPackages) {
-            layeredSystem.repositorySystem.installPackage(pkg);
+            layeredSystem.repositorySystem.installPackage(pkg, null);
          }
       }
 
@@ -3356,6 +3356,31 @@ public class Layer implements ILifecycle, LayerConstants {
          repositoryPackages = new ArrayList<RepositoryPackage>();
       repositoryPackages.add(pkg);
       return pkg;
+   }
+
+   public void installPackage(String url) {
+      installPackages(new String[] {url});
+   }
+
+   public void installPackages(String[] urlList) {
+      RepositoryPackage[] pkgList = new RepositoryPackage[urlList.length];
+      int i = 0;
+      for (String url:urlList) {
+         pkgList[i] = addRepositoryPackage(url);
+         i++;
+      }
+      if (!disabled) {
+         for (RepositoryPackage pkg : pkgList) {
+            if (pkg.installedRoot != null) {
+               String cp = pkg.getClassPath();
+               if (classPath == null)
+                  classPath = cp;
+               else
+                  classPath = classPath + ":" + cp;
+            }
+            // TODO: should we also let a package add to the src path?  What about directory prefixes and file types?
+         }
+      }
    }
 
    public RepositoryPackage addRepositoryPackage(String pkgName, String repositoryTypeName, String url, boolean unzip) {
