@@ -183,8 +183,8 @@ public class BinaryExpression extends Expression {
                boolean rhsIsBoolean = ModelUtil.isBoolean(rhsType);
 
                if (!lhsIsBoolean || !rhsIsBoolean) {
-                  boolean lhsIsInt = ModelUtil.isAnInteger(lhsType);
-                  boolean rhsIsInt = ModelUtil.isAnInteger(rhsType);
+                  boolean lhsIsInt = ModelUtil.isAnInteger(lhsType) || ModelUtil.isCharacter(lhsType);
+                  boolean rhsIsInt = ModelUtil.isAnInteger(rhsType) || ModelUtil.isCharacter(rhsType);
 
                   if (!lhsIsInt || !rhsIsInt) {
                      getErrorRoot().displayError("Bitwise operator: " + operator + " types invalid: " + ModelUtil.getTypeName(lhsType) + " and " + ModelUtil.getTypeName(rhsType) + " both sides should be either boolean or integers for: ");
