@@ -151,6 +151,14 @@ public class TestUtil {
                         opts.classPath = args[i];
                      }
                   }
+                  else if (opt.equals("cn")) {
+                     if (args.length < i + 1)
+                        System.err.println("*** No class name argument to -cn option. ");
+                     else {
+                        i++;
+                        opts.findClassName = args[i];
+                     }
+                  }
                   else {
                      System.err.println("*** Unrecognized option: " + opt);
                   }
@@ -269,6 +277,20 @@ public class TestUtil {
 
       parseTestFiles(buildList == null ? inputFileNames : buildList.toArray(new String[0]), opts);
 
+      if (opts.findClassName != null) {
+         if (opts.system == null)
+            System.err.println("*** -cn option only works with -l option");
+         else {
+            Object res = opts.system.getClass(opts.findClassName, false);
+            if (res == null) {
+               System.err.println("*** Find class name: " + opts.findClassName + " not found");
+            }
+            else {
+               System.out.println("Success - found " + opts.findClassName + ": " + res);
+            }
+         }
+      }
+
       if (dumpStats) {
          System.out.println("*** Stats:");
          System.out.println(Parser.getStatInfo(JavaLanguage.INSTANCE.compilationUnit));
@@ -292,9 +314,12 @@ public class TestUtil {
       boolean enablePartialValues = false;
       int repeatCount = 1;
       boolean layerMode = false;
+      // If layerMode = true, the LayeredSystem used
+      LayeredSystem system;
       String classPath;
       String externalClassPath;
       String srcPath;
+      String findClassName;
    }
 
    public static void parseTestFiles(Object[] inputFiles, TestOptions opts) {
@@ -351,6 +376,7 @@ public class TestUtil {
             else {
                LayeredSystem sys = ParseUtil.createSimpleParser(opts.classPath, opts.externalClassPath, opts.srcPath, null);
                lang = (Language) sys.getFileProcessorForExtension(ext);
+               opts.system = sys;
 
                SrcEntry srcEnt = sys.getSrcEntryForPath(fileName, false);
                if (srcEnt == null) {

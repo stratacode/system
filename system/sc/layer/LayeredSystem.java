@@ -2816,7 +2816,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       @Constant public boolean noCompile;
       /** Controls debug level verbose messages */
       @Constant public boolean verbose = false;
+      /** Print the basic layer stack info at startup.  Very useful for seeing which runtimes and layers are created for your app. */
       @Constant public boolean verboseLayers = false;
+      /** Diagnose issues finding classes (e.g. to trace adding entries to the package index) */
+      @Constant public boolean verboseClasses = false;
       @Constant public boolean verboseLocks = false;
       @Constant public boolean info = true;
       /** Controls whether java files compiled by this system debuggable */
