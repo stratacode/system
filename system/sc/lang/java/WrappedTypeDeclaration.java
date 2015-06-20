@@ -313,4 +313,8 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
          return ModelUtil.getArrayComponentType(baseType);
       return null;
    }
+
+   public boolean isLayerType() {
+      return false;
+   }
 }

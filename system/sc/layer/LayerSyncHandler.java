@@ -59,4 +59,10 @@ public class LayerSyncHandler extends SyncHandler {
       }
       return super.restoreInstance(syncInst);
    }
+
+   public Object getObjectType(Object changedObj) {
+      if (changedObj instanceof Layer)
+         return Layer.class;
+      return super.getObjectType(changedObj);
+   }
 }

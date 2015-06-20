@@ -585,6 +585,11 @@ public abstract class BaseLambdaExpression extends Expression {
       }
 
       @Override
+      public boolean isLayerType() {
+         return false;
+      }
+
+      @Override
       public Layer getLayer() {
          return rootExpr.getJavaModel().getLayer();
       }

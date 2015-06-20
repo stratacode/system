@@ -341,6 +341,8 @@ public class ModifyDeclaration extends TypeDeclaration {
    private TypeDeclaration getModifyType() {
       JavaModel thisModel = getJavaModel();
       String fullTypeName = getFullTypeName();
+      if (isLayerType)
+         return null;
       return temporaryType ? thisModel.layeredSystem.getSrcTypeDeclaration(fullTypeName, null, true) : thisModel.getPreviousDeclaration(fullTypeName);
    }
 
@@ -397,7 +399,9 @@ public class ModifyDeclaration extends TypeDeclaration {
             // For the layer object, it is registered as a global object.  Look it up with resolveName and just assign
             // the class to avoid the error.
             if (modifyClass == null)  {
-               if (thisModel.isLayerModel) {
+               TypeDeclaration enclType = getEnclosingType();
+               // If this is the top-level type in the layer, resolve it as a layer
+               if (thisModel.isLayerModel && enclType == null) {
                   Object obj = thisModel.resolveName(fullTypeName, false);
                   // Originally the layer is initially registered under its type name - it gets renamed once after init
                   if (obj == null)
@@ -419,7 +423,6 @@ public class ModifyDeclaration extends TypeDeclaration {
                   }
                }
                else {
-                  TypeDeclaration enclType = getEnclosingType();
                   if (enclType != null && enclType.isEnumeratedType()) {
                      enumConstant = true;
                   }
@@ -437,8 +440,11 @@ public class ModifyDeclaration extends TypeDeclaration {
                modifyTypeDecl = modifyType;
 
             JavaModel modifiedModel = modifyType.getJavaModel();
-            if (modifiedModel.isLayerModel)
-               isLayerType = true;
+            if (modifiedModel.isLayerModel) {
+               // A modify type inside of a layer definition is not a layer type - only the layer type itself.
+               if (getEnclosingType() == null)
+                  isLayerType = true;
+            }
          }
       }
 
@@ -515,24 +521,26 @@ public class ModifyDeclaration extends TypeDeclaration {
          }
       }
 
-      String extTypeName = getExtendsTypeName();
-      if (extTypeName != null) {
-         JavaModel model = getJavaModel();
-         if (model != null && !model.isLayerModel && model.layeredSystem != null && model.getLayer() != null) {
-            // Make sure to resolve the extends type of this modified type from the current layer.
-            // The case is:  A(L1) modifies A(L0)   A(L0) extends B(L0).   When we start A(L1) we need to make
-            // sure that B(L1) has been started or we'll assume it just extends B(L0)
-            Layer modelLayer = model.getLayer();
-            if (!modelLayer.disabled) {
-               Object td = model.layeredSystem.getSrcTypeDeclaration(extTypeName, modelLayer.getNextLayer(), true, false, true, modelLayer, false);
-               if (td != null) {
-                  ParseUtil.initComponent(td);
-                  if (isStarted())
-                     ParseUtil.startComponent(td);  // Only start here if we're already started.  Otherwise, we end up starting too soon when initializing extends types.
-                  else if (typeInfoInitialized && td instanceof TypeDeclaration)
-                     ((TypeDeclaration) td).initTypeInfo();
-                  if (isValidated())
-                     ParseUtil.validateComponent(td);
+      if (!isLayerType) {
+         String extTypeName = getExtendsTypeName();
+         if (extTypeName != null) {
+            JavaModel model = getJavaModel();
+            if (model != null && !model.isLayerModel && model.layeredSystem != null && model.getLayer() != null) {
+               // Make sure to resolve the extends type of this modified type from the current layer.
+               // The case is:  A(L1) modifies A(L0)   A(L0) extends B(L0).   When we start A(L1) we need to make
+               // sure that B(L1) has been started or we'll assume it just extends B(L0)
+               Layer modelLayer = model.getLayer();
+               if (!modelLayer.disabled) {
+                  Object td = model.layeredSystem.getSrcTypeDeclaration(extTypeName, modelLayer.getNextLayer(), true, false, true, modelLayer, false);
+                  if (td != null) {
+                     ParseUtil.initComponent(td);
+                     if (isStarted())
+                        ParseUtil.startComponent(td);  // Only start here if we're already started.  Otherwise, we end up starting too soon when initializing extends types.
+                     else if (typeInfoInitialized && td instanceof TypeDeclaration)
+                        ((TypeDeclaration) td).initTypeInfo();
+                     if (isValidated())
+                        ParseUtil.validateComponent(td);
+                  }
                }
             }
          }
@@ -547,7 +555,16 @@ public class ModifyDeclaration extends TypeDeclaration {
       return getInternalExtendsType(true);
    }
 
+   // for layer types which can extend more than one type
+   public Object[] getExtendsTypeDeclarations() {
+      return extendsBoundTypes;
+   }
+
    private JavaType getInternalExtendsType(boolean declared) {
+      if (isLayerType) {
+         // layers use multiple extendsTypes. Generally this method should be called for layer
+         return null;
+      }
       if (!extendsInvalid && extendsTypes != null && extendsTypes.size() == 1)
          return extendsTypes.get(0);
       if (!typeInitialized)
@@ -1440,15 +1457,19 @@ public class ModifyDeclaration extends TypeDeclaration {
    }
 
    public void initLayerInstance(Object inst, String prefix, boolean inheritedPrefix) {
-      // For the layer object, we need to set the package prefix before we try to use the object in initDynamicInstance.
-      if (prefix != null) {
-         if (inst instanceof Layer) {
-            Layer linst = (Layer) inst;
-            isLayerType = true;
+      if (inst instanceof Layer) {
+         Layer linst = (Layer) inst;
+         isLayerType = true;
 
-            // Need to init this first from the configuration so users can shut it off
-            initDynamicProperty(inst, "inheritPackage");
-            initDynamicProperty(inst, "exportPackage");
+         // Need to init this first from the configuration so users can shut it off
+         initDynamicProperty(inst, "inheritPackage");
+         initDynamicProperty(inst, "exportPackage");
+
+         // Setting this here so it's defined before we init the dynamic properties.
+         linst.model = getJavaModel();
+
+         // For the layer object, we need to set the package prefix before we try to use the object in initDynamicInstance.
+         if (prefix != null) {
             if (linst.inheritPackage || !inheritedPrefix) {
                linst.packagePrefix = prefix;
                String lname = linst.getLayerUniqueName();
@@ -1824,7 +1845,9 @@ public class ModifyDeclaration extends TypeDeclaration {
             modProps = null;
       }
       modProps = ModelUtil.mergeProperties(modProps, declProps, true);
-      if (extendsBoundTypes != null && modProps != null) {
+      // For layer types - when we are computing the dynamic properties for this instance, do not include the extendsBoundTypes.  Those properties in sub-layers
+      // are not considered fields in this layer since we have different layer instances.
+      if (extendsBoundTypes != null && modProps != null && (!isLayerType || !dynamicOnly)) {
          // The case where there's a type that is modified with a new extends class that comes from a compiled layer, overriding a property originally defined in the dynamic layer.
          for (Object extType:extendsBoundTypes) {
             for (int i = 0; i < modProps.size(); i++) {

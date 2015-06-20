@@ -5,6 +5,8 @@
 package sc.layer;
 
 import sc.classfile.CFClass;
+import sc.dyn.IDynChildManager;
+import sc.dyn.IDynObject;
 import sc.lang.*;
 import sc.lang.sc.IScopeProcessor;
 import sc.lang.sc.SCModel;
@@ -12,6 +14,7 @@ import sc.lang.sc.PropertyAssignment;
 import sc.lifecycle.ILifecycle;
 import sc.lang.sc.ModifyDeclaration;
 import sc.lang.java.*;
+import sc.obj.CompilerSettings;
 import sc.obj.Constant;
 import sc.obj.GlobalScopeDefinition;
 import sc.obj.SyncMode;
@@ -26,6 +29,7 @@ import sc.sync.SyncOptions;
 import sc.sync.SyncProperties;
 import sc.type.CTypeUtil;
 import sc.type.RTypeUtil;
+import sc.type.TypeUtil;
 import sc.util.*;
 
 import java.io.*;
@@ -48,9 +52,15 @@ import java.util.zip.ZipFile;
  * start method.  By setting properties in your Layer, implementing the initialize and start methods
  * you have a variety of ways to alter the behavior of how your project is built and run.
  */
-public class Layer implements ILifecycle, LayerConstants {
+@CompilerSettings(dynChildManager="sc.layer.LayerDynChildManager")
+public class Layer implements ILifecycle, LayerConstants, IDynObject {
    public final static Layer ANY_LAYER = new Layer();
    public final static Layer ANY_INACTIVE_LAYER = new Layer();
+
+   DynObject dynObj;
+
+   /** The list of child components - e.g. file processors, repository packages, that are defined for this layer. */
+   ArrayList<Object> children;
 
    /** The name of the layer used to find it in the layer path dot separated, e.g. groupName.dirName */
    @Constant public String layerDirName;
@@ -102,7 +112,7 @@ public class Layer implements ILifecycle, LayerConstants {
 
    /** The integer position of the layer in the list of layers */
    @Constant
-   int layerPosition;
+   public int layerPosition;
 
    /** Any set of dependent classes code in this layer requires */
    public String classPath;
@@ -278,7 +288,7 @@ public class Layer implements ILifecycle, LayerConstants {
    public boolean copyPlainJavaFiles = true;
 
    /** Set by the system to the full path to the directory containing LayerName.sc (layerFileName = layerPathName + layerBaseName) */
-   @Constant String layerPathName;
+   public @Constant String layerPathName;
 
    /** Just the LayerName.sc part */
    @Constant public String layerBaseName;
@@ -754,6 +764,120 @@ public class Layer implements ILifecycle, LayerConstants {
             bd.addSrcEntry(-1, newSrcEnt);
          }
       }
+   }
+
+   public boolean definesProperty(String propName) {
+      initDynObj();
+      if (dynObj != null) {
+         if (dynObj.getDynType().isDynProperty(propName)) {
+            return true;
+         }
+      }
+      return false;
+      //return TypeUtil.getPropertyMapping(Layer.class, propName) != null;
+   }
+
+   public boolean hasProperty(String propName) {
+      if (definesProperty(propName))
+         return true;
+      if (baseLayers != null) {
+         for (Layer baseLayer:baseLayers)
+            if (baseLayer.hasProperty(propName))
+               return true;
+      }
+      return false;
+   }
+
+   @Override
+   public Object getProperty(String propName) {
+      initDynObj();
+      if (dynObj != null) {
+         if (definesProperty(propName)) {
+            return dynObj.getProperty(propName);
+         }
+         if (baseLayers != null) {
+            for (Layer base:baseLayers) {
+               if (base.hasProperty(propName))
+                  return base.getProperty(propName);
+            }
+         }
+      }
+      return TypeUtil.getPropertyValueFromName(this, propName);
+   }
+
+   public Object getProperty(int propIndex) {
+      initDynObj();
+      if (dynObj == null)
+         return null;
+      return dynObj.getPropertyFromWrapper(this, propIndex);
+   }
+
+   public <_TPROP> _TPROP getTypedProperty(String propName, Class<_TPROP> propType) {
+      initDynObj();
+      if (dynObj == null)
+         return null;
+      return (_TPROP) dynObj.getPropertyFromWrapper(this, propName);
+   }
+   public void addProperty(Object propType, String propName, Object initValue) {
+      initDynObj();
+      dynObj.addProperty(propType, propName, initValue);
+   }
+
+   public void setProperty(String propName, Object value, boolean setField) {
+      initDynObj();
+      if (dynObj == null)
+         TypeUtil.setPropertyFromName(this, propName, value);
+      else if (definesProperty(propName))
+         dynObj.setPropertyFromWrapper(this, propName, value, setField);
+      else {
+         if (baseLayers != null) {
+            for (Layer base : baseLayers) {
+               if (base.hasProperty(propName)) {
+                  base.setProperty(propName, value, setField);
+                  return;
+               }
+            }
+         }
+         TypeUtil.setPropertyFromName(this, propName, value);
+      }
+   }
+   public void setProperty(int propIndex, Object value, boolean setField) {
+      initDynObj();
+      if (dynObj == null) {
+         if (propIndex == DynObject.OUTER_INSTANCE_SLOT) {
+            // In this case parentNode should equal value.  It happens when we create a compiled DOM node class via the
+            // dynamic runtime.  In this case, the parent node has already been defined via the compiled runtime.
+            return;
+         }
+         else
+            throw new IllegalArgumentException("No dynamic property: " + propIndex);
+      }
+      dynObj.setProperty(propIndex, value, setField);
+   }
+   public Object invoke(String methodName, String paramSig, Object... args) {
+      initDynObj();
+      return dynObj.invokeFromWrapper(this, methodName, paramSig, args);
+   }
+   public Object invoke(int methodIndex, Object... args) {
+      initDynObj();
+      return dynObj.invokeFromWrapper(this, methodIndex, args);
+   }
+
+   @Override
+   public Object getDynType() {
+      return model == null ? null : model.getModelTypeDeclaration();
+   }
+
+   @Override
+   public void setDynType(Object type) {
+      initDynObj();
+      if (dynObj != null)
+         dynObj.setTypeFromWrapper(this, type);
+   }
+
+   @Override
+   public boolean hasDynObject() {
+      return model != null;
    }
 
    public enum LayerEnabledState {
@@ -3298,12 +3422,6 @@ public class Layer implements ILifecycle, LayerConstants {
 
    public void initSync() {
       int globalScopeId = GlobalScopeDefinition.getGlobalScopeDefinition().scopeId;
-      SyncManager.addSyncType(Layer.class,
-             new SyncProperties(null, null,
-                     new Object[]{"packagePrefix", "defaultModifier", "dynamic", "hidden", "compiledOnly", "transparent",
-                                  "baseLayerNames", "layerPathName", "layerBaseName", "layerDirName", "layerUniqueName",
-                                  "layerPosition", "codeType", "codeFunction", "dependentLayers"},
-                     null, SyncOptions.SYNC_INIT_DEFAULT,  globalScopeId));
       SyncManager.addSyncInst(this, true, true, null);
    }
 
@@ -3651,6 +3769,13 @@ public class Layer implements ILifecycle, LayerConstants {
    private boolean prefixMatches(String prefix, String path) {
       // Assumes prefix has a trailing '/' and we are not matching directories
       return path.startsWith(prefix);
+   }
+
+   private void initDynObj() {
+      if (dynObj == null) {
+         if (model != null)
+            dynObj = new DynObject(model.getModelTypeDeclaration());
+      }
    }
 }
 

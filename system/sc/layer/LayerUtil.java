@@ -497,6 +497,8 @@ public class LayerUtil implements LayerConstants {
             first = opAppend(sb, "build separate", first);
          if (l.isBuildLayer())
             first = opAppend(sb, "build", first);
+         if (l.annotationLayer)
+            first = opAppend(sb, "annotation", first);
          if (l.finalLayer)
             first = opAppend(sb, "finalLayer", first);
          if (l.excludeRuntimes != null)

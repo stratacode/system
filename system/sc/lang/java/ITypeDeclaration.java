@@ -91,6 +91,8 @@ public interface ITypeDeclaration {
 
    JavaModel getJavaModel();
 
+   boolean isLayerType();
+
    Layer getLayer();
 
    LayeredSystem getLayeredSystem();
@@ -129,6 +131,7 @@ public interface ITypeDeclaration {
 
    Object[] getAllImplementsTypeDeclarations();
 
+   /** Return false for any types, such as lambda expressions, or intermediate template fragments which are not included in the type hierarchy (name and enclosing type) */
    boolean isRealType();
 
    void staticInit();

@@ -7,6 +7,7 @@ package sc.lang.js;
 import sc.dyn.RDynUtil;
 import sc.lang.SemanticNodeList;
 import sc.lang.java.*;
+import sc.lang.sc.ModifyDeclaration;
 import sc.lang.sc.PropertyAssignment;
 import sc.layer.LayeredSystem;
 import sc.parser.FormatContext;
@@ -824,6 +825,22 @@ public class JSTypeParameters extends ObjectTypeParameters {
                runtimeTypeName = ModelUtil.getRuntimeTypeName(extType);
             }
          }
+      }
+      // Layer when synchronized are not defined relative to the base layers.
+      if (syncTemplate && type instanceof ModifyDeclaration) {
+         ModifyDeclaration modType = (ModifyDeclaration) type;
+         Object modModType;
+         do {
+            modModType = modType.getModifiedType();
+            // Sometimes we are modifying multiple levels before the layer base type.
+            if (modModType instanceof ModifyDeclaration && ((ModifyDeclaration) modModType).isLayerType)
+               runtimeTypeName = "sc.layer.Layer";
+            if (modModType instanceof ModifyDeclaration) {
+               modType = ((ModifyDeclaration) modModType);
+            }
+            else
+               modType = null;
+         } while (modType != null);
       }
       if (runtimeTypeName == null) {
          runtimeTypeName = ModelUtil.getRuntimeTypeName(type);

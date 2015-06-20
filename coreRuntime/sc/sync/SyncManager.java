@@ -11,6 +11,7 @@ import sc.obj.*;
 import sc.type.CTypeUtil;
 import sc.type.PTypeUtil;
 import sc.util.IdentityWrapper;
+import sun.plugin.javascript.navig4.Layer;
 
 import java.util.*;
 
@@ -812,10 +813,17 @@ public class SyncManager {
          if (obj instanceof String)
             return new SyncHandler(obj, this);
 
-         Object type = DynUtil.isType(obj) ? obj.getClass() : DynUtil.getType(obj);
+         boolean isType = DynUtil.isType(obj);
+         Object type = isType ? obj.getClass() : DynUtil.getType(obj);
          Class handlerClass = syncHandlerRegistry.get(type);
-         if (handlerClass == null)
+         // For Layer objects they are not types but we do want to use Layer.class to find the handler
+         if (handlerClass == null && !isType) {
+            handlerClass = syncHandlerRegistry.get(obj.getClass());
+         }
+
+         if (handlerClass == null) {
             return new SyncHandler(obj, this);
+         }
          else
             return (SyncHandler) DynUtil.createInstance(handlerClass, "Ljava/lang/Object;Lsc/sync/SyncManager$SyncContext;", obj, this);
       }

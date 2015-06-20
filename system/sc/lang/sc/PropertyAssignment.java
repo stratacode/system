@@ -14,6 +14,7 @@ import sc.lang.SemanticNodeList;
 import sc.lang.html.Attr;
 import sc.layer.Layer;
 import sc.obj.IObjectId;
+import sc.type.IBeanMapper;
 import sc.type.TypeUtil;
 import sc.lang.java.*;
 import sc.parser.*;
@@ -91,7 +92,13 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
             // Get the member again with no reference type
             Object errorProp = encType.definesMember(propertyName, mtype, null, null);
             if (errorProp != null) {
-               displayTypeError("Inaccessible property: " + propertyName + " in type: " + ModelUtil.getTypeName(ModelUtil.getEnclosingType(errorProp)) + " has protection: " + ModelUtil.getAccessLevel(errorProp, false) + " for: ");
+               MemberType checkType;
+               // Figure out whether it's a field, get or set method which failed so we give the right error
+               if (errorProp instanceof IBeanMapper) {
+                  errorProp = ((IBeanMapper) errorProp).getSetSelector();
+               }
+               checkType = ModelUtil.isField(errorProp) ? MemberType.Field : (mtype.contains(MemberType.GetMethod) ? MemberType.GetMethod : MemberType.SetMethod);
+               displayTypeError("Inaccessible property: " + propertyName + " in type: " + ModelUtil.getTypeName(ModelUtil.getEnclosingType(errorProp)) + " has access level: " + ModelUtil.getAccessLevelString(errorProp, false, checkType) + " for: ");
             }
             else {
                displayTypeError("No property: ", propertyName, " in type: ", getEnclosingType().getFullTypeName(), " for ");

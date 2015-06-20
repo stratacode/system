@@ -560,13 +560,14 @@ public class SyncLayer {
       SyncHandler syncHandler = parentContext.getSyncHandler(changedObj);
 
       String changedObjName = syncHandler.getObjectBaseName(null, this);
+      String changedObjFullName = syncHandler.getObjectName();
 
       ArrayList<String> currentObjNames = changeCtx.currentObjNames;
 
       // isNew should not be set for property changes when the current object is set or already serialized.
-      boolean isNew = (syncHandler.isNewInstance() || (initialLayer && change instanceof SyncNewObj)) && !currentObjNames.contains(changedObjName) && createdTypes != null && !createdTypes.contains(changedObjName) && !(change instanceof SyncMethodResult);
+      boolean isNew = (syncHandler.isNewInstance() || (initialLayer && change instanceof SyncNewObj)) && !currentObjNames.contains(changedObjName) && createdTypes != null && !createdTypes.contains(changedObjFullName) && !(change instanceof SyncMethodResult);
       Object[] newArgs = change instanceof SyncNewObj ? ((SyncNewObj) change).args : isNew ? parentContext.getNewArgs(changedObj) : null;
-      Object changedObjType = DynUtil.isType(changedObj) ? changedObj.getClass() : DynUtil.getType(changedObj);
+      Object changedObjType = syncHandler.getObjectType(changedObj);
       String objTypeName = DynUtil.getTypeName(changedObjType, false);
       objName = null;
 
@@ -799,7 +800,7 @@ public class SyncLayer {
          // and avoid the extra hash map but I think there's value in being able to serlialize more than once before we mark the sync as completed.
          // If the remote side does not get data, we may need to resync with further changes, meaning we need to serialize again.
          if (createdTypes != null)
-            createdTypes.add(changedObjName);
+            createdTypes.add(changedObjFullName);
       }
 
       if (change instanceof SyncPropChange) {

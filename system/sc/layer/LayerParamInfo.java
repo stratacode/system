@@ -4,6 +4,7 @@
 
 package sc.layer;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -12,6 +13,8 @@ import java.util.List;
 class LayerParamInfo {
    List<String> explicitDynLayers;
    List<String> recursiveDynLayers;
+   // All layers created in this operation
+   ArrayList<Layer> createdLayers = new ArrayList<Layer>();
    boolean markExtendsDynamic;
    boolean activate = true;
    boolean enabled = true;

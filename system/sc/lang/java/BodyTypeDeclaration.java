@@ -1322,8 +1322,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (pnode instanceof JavaModel || pnode instanceof TemplateStatement) {
          res = CTypeUtil.prefixPath(getJavaModel().getPackagePrefix(), typeName);
       }
-      else if (pnode instanceof ITypeDeclaration)
-         res = ((ITypeDeclaration) pnode).getFullTypeName() + innerTypeSep + typeName;
+      else if (pnode instanceof ITypeDeclaration) {
+         ITypeDeclaration itd = (ITypeDeclaration) pnode;
+         // We put all inner types found in layer def files into a single name-space.
+         // We could use the layer's package prefix?  If so, we probably need a way for one layer to set other
+         // layer's properties so you are not limited what you can do in a layer def file.
+         String parentName = itd.isLayerType() ? "sys.layerCore" : itd.getFullTypeName();
+         res = parentName + innerTypeSep + typeName;
+      }
       else if (pnode instanceof BlockStatement)
          res = null;
       else if (pnode == null)
@@ -1675,6 +1681,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
                // We might also have compiled the A.B relationship into a base class but where the subobj is a dynamic type (hence the simple compiledProperty above fails)
                if (dynamicOnly && subObj.isDynCompiledObject())
+                  continue;
+
+               // For layers any types which are not defined explicitly in our layer are not physically counted as properties.
+               if (dynamicOnly && isLayerType && subObj instanceof ModifyDeclaration)
                   continue;
 
                // Make sure to use the override type so dynamic types point to the most specific type member
@@ -2029,7 +2039,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
          else {
             // Get only the dynamic fields here - any inherited compiled fields are managed by the
-            // parent type
+            // parent type.   For layers, we do not include fields from the extends types since those
+            // fields we inherit through the Layer's baseLayers explicitly.
             List fields = getAllFields("static", false, true, true, false, true);
             instFields = fields == null ? emptyObjectArray : fields.toArray();
          }
@@ -2142,8 +2153,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return TypeUtil.EMPTY_ARRAY;
 
       if (staticFields == null) {
-         if (!isStarted())
-            ModelUtil.ensureStarted(this, true);
+        // We used to start here but for layer types at least, we can't start the type this early.  We need to resolve the
+        // fields so we can create the layer instance, then build separate layers, then once those are in the classpath we
+        // start the layers that depend on those types.
+        // if (!isStarted())
+        //    ModelUtil.ensureStarted(this, true);
 
          ArrayList<Object> fields = new ArrayList<Object>();
          addStaticFields(fields);
@@ -2426,6 +2440,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return staticFieldMap.get(propName);
    }
 
+   public boolean isDynProperty(String propName) {
+      return getDynInstPropertyIndex(propName) != -1 || getDynStaticFieldIndex(propName) != -1;
+   }
+
    public void setDynStaticField(int ix, Object value) {
       getStaticValues()[ix] = value;
    }
@@ -2542,6 +2560,28 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return pos;
    }
 
+   // Layers inherit properties differently than regular extends or implements.  All of the properties use dynamic lookup so the
+   // positions do not matter.
+   private int addLayerTypePropertyCache(DynType superCache, int pos) {
+      if (superCache.properties == null)
+         return pos;
+
+      for (int i = 0; i < superCache.properties.keyTable.length; i++) {
+         String propertyName = (String) superCache.properties.keyTable[i];
+         if (propertyName != null) {
+            IBeanMapper inherit = (IBeanMapper) superCache.properties.valueTable[i];
+
+            // We add inherited properties which are not part of the Layer object itself as dynamic lookup so we can do multiple inheritance
+            if (inherit.getPropertyPosition() == IBeanMapper.DYNAMIC_LOOKUP_POSITION) {
+               propertyCache.addProperty(inherit);
+            }
+            if (inherit.getPropertyPosition() >= pos)
+               pos = inherit.getPropertyPosition() + 1;
+         }
+      }
+      return pos;
+   }
+
    public Object[] getAllImplementsTypeDeclarations() {
       return getImplementsTypeDeclarations();
    }
@@ -2565,22 +2605,31 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
          // First populate from the super-class so that all of our slot positions are consistent.  Need to use the CompiledExtendsType here because
          // for modify inherited types, we need to treat the modify type as the x
-         Object extType = getExtendsTypeDeclaration();
-         Object modType = getDerivedTypeDeclaration();
-         Object[] implementTypes = getImplementsTypeDeclarations();
-         DynType[] implDynTypes = null;
+         Object extType = null;
+         Object[] extTypes = null;
          boolean isModified = false;
-         // This is only different for modified types - just easier to put the code all in one place though
-         if (modType == extType) {
-            modType = null;
-            isModified = true;
+         DynType[] implDynTypes = null;
+         DynType[] extDynTypes = null;
+         Object modType = getDerivedTypeDeclaration();
+         if (isLayerType) {
+            extTypes = getExtendsTypeDeclarations();
          }
-         // If both are not null, always make sure extType is the main one
-         else if (extType == null && modType != null) {
-            extType = modType;
-            modType = null;
-            isModified = true;
+         else {
+            extType = getExtendsTypeDeclaration();
+            // This is only different for modified types - just easier to put the code all in one place though
+            if (modType == extType) {
+               modType = null;
+               isModified = true;
+            }
+            // If both are not null, always make sure extType is the main one
+            else if (extType == null && modType != null) {
+               extType = modType;
+               modType = null;
+               isModified = true;
+            }
          }
+
+         Object[] implementTypes = getImplementsTypeDeclarations();
 
          // Make sure we switch to the class version if we are compiled.  Since this is the runtime description
          // we don't want to get field references for things which have had get/set methods created.
@@ -2605,27 +2654,43 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             }
          }
 
+         if (extTypes != null) {
+            int i = 0;
+            extDynTypes = new DynType[extTypes.length];
+            for (Object etype:extTypes) {
+               if (etype != null) {
+                  DynType exType = ModelUtil.getPropertyCache(etype);
+                  extDynTypes[i] = exType;
+                  ifaceCount += exType.propertyCount;
+                  ifaceStaticCount += exType.staticPropertyCount;
+               }
+               i++;
+            }
+
+         }
+
          DynType superType = null;
          DynType modTypeCache = modType == null ? null : ModelUtil.getPropertyCache(modType);
 
          int baseCount = getMemberCount() + ifaceCount + ifaceStaticCount;
+
+         int modCount = modTypeCache == null ? 0 : modTypeCache.propertyCount + modTypeCache.staticPropertyCount;
          if (extType != null) {
-            if (extType != null)
-               superType = ModelUtil.getPropertyCache(extType);
-            int modCount = modTypeCache == null ? 0 : modTypeCache.propertyCount + modTypeCache.staticPropertyCount;
+            superType = ModelUtil.getPropertyCache(extType);
 
             propertyCache = cache = new DynType(null, modCount + superType.propertyCount + superType.staticPropertyCount + baseCount, 0);
 
             // First process extended properties - which we essentially underlay on this type if it is modified
             pos = addSuperTypePropertyCache(superType, pos, isModified, false);
-            // Now process the modified types properties (if any)
-            if (modTypeCache != null) {
-               // Passing the last arg as true the extends type is part of the modify, i.e. is defined after the modify type but should have precedence over the modify type
-               pos = addSuperTypePropertyCache(modTypeCache, pos, true, (this instanceof ModifyDeclaration) && ((ModifyDeclaration) this).extendsTypes != null);
-            }
          }
-         else
-            propertyCache = cache = new DynType(getFullTypeName(), null, baseCount, 0);
+         else {
+            propertyCache = cache = new DynType(getFullTypeName(), null, modCount + baseCount, 0);
+         }
+         // Now process the modified types properties (if any)
+         if (modTypeCache != null) {
+            // Passing the last arg as true the extends type is part of the modify, i.e. is defined after the modify type but should have precedence over the modify type
+            pos = addSuperTypePropertyCache(modTypeCache, pos, true, (this instanceof ModifyDeclaration) && ((ModifyDeclaration) this).extendsTypes != null);
+         }
 
 
          // Java does not let us reflect this in the normal way as a field so it is treated specially.
@@ -2642,9 +2707,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
          boolean isInterface = getDeclarationType() == DeclarationType.INTERFACE;
 
+         // Note: cache.propertyCount is set in addPropertiesInBody
+
          addPropertiesInBody(body, cache, superType, isInterface);
          /* Scopes a.b transformations add to the set of properties from their definition so account for those here */
          addPropertiesInBody(hiddenBody, cache, superType, isInterface);
+
+         pos = cache.propertyCount;
 
          // Need to do these at the end so that we do not assign new positions for any interface properties which
          // are defined in the body or base type.
@@ -2652,6 +2721,16 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             for (DynType ifType:implDynTypes)
                pos = addInterfaceTypePropertyCache(ifType, pos);
          }
+
+         // Since all layer properties use dynamic lookup the indexes don't have to be consistent for each type (hopefully - since that's not possible for multiple inheritance)
+         if (extTypes != null) {
+            for (DynType layerType:extDynTypes) {
+               if (layerType != null)
+                  pos = addLayerTypePropertyCache(layerType, pos);
+            }
+         }
+
+         cache.propertyCount = pos;
 
       }
       catch (Error e) {
@@ -2698,7 +2777,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                         newMapper.ownerType = this;
                      }
                      else {
-                        if (isInterface)
+                        if (isInterface || isLayerType)
                            newMapper.instPosition = IBeanMapper.DYNAMIC_LOOKUP_POSITION;
                         else
                            newMapper.instPosition = pos++;
@@ -2794,7 +2873,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                      newMapper.ownerType = this;
                   }
                   else {
-                     if (isInterface)
+                     if (isInterface || isLayerType)
                         newMapper.instPosition = IBeanMapper.DYNAMIC_LOOKUP_POSITION;
                      else
                         newMapper.instPosition = pos++;
@@ -2819,7 +2898,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                         System.err.println("*** bad inherit of static property");
                   }
                   if (!isStatic && newMapper.instPosition == -1) {
-                     if (isInterface)
+                     if (isInterface || isLayerType)
                         newMapper.instPosition = IBeanMapper.DYNAMIC_LOOKUP_POSITION;
                      else
                         newMapper.instPosition = pos++;
@@ -2907,6 +2986,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public Object getExtendsTypeDeclaration() {
+      return null;
+   }
+
+   public Object[] getExtendsTypeDeclarations() {
       return null;
    }
 
@@ -3156,8 +3239,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    private Object initLazyInnerObject(Object obj, BodyTypeDeclaration innerType, int dynIndex, boolean isInstance) {
       // Because we don't update references stored in non-lazily initted references during the update operation,
       // we have to do it lazily here.
-      if (innerType.replacedByType != null)
-         innerType = innerType.replacedByType;
+      innerType = innerType.resolve(true);
       ExecutionContext ctx = new ExecutionContext(getJavaModel());
       if (isInstance)
          ctx.pushCurrentObject(obj);
@@ -3618,6 +3700,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    private boolean needsDynamicStubForExtends() {
+      if (isLayerType)
+         return false;
       Object extendsType = getCompiledExtendsTypeDeclaration();
       if (extendsType == null) {
          extendsType = getCompiledImplements();
@@ -6818,6 +6902,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (started)
          return;
 
+      // Don't start the model types for excluded layers - they'll be started in other runtimes
+      if (isLayerType && layer != null && layer.excluded)
+         return;
+
       super.start();
 
       if (hiddenBody != null)
@@ -6840,6 +6928,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public void validate() {
       if (validated) return;
+
+      // Don't start the model types for excluded layers - they'll be started in other runtimes
+      if (isLayerType && layer != null && layer.excluded)
+         return;
 
       super.validate();
 
@@ -6915,9 +7007,23 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          idx.lastModified = model.getLastModifiedTime();
       }
       Object extType;
-      if ((extType = getExtendsTypeDeclaration()) != null) {
-         baseTypes = new ArrayList<String>();
-         baseTypes.add(ModelUtil.getTypeName(extType));
+      if (isLayerType) {
+         Object[] exts = getExtendsTypeDeclarations();
+         if (exts != null) {
+            for (Object ext:exts) {
+               if (ext != null) {
+                  if (baseTypes == null)
+                     baseTypes = new ArrayList<String>();
+                  baseTypes.add(ModelUtil.getTypeName(ext));
+               }
+            }
+         }
+      }
+      else {
+         if ((extType = getExtendsTypeDeclaration()) != null) {
+            baseTypes = new ArrayList<String>();
+            baseTypes.add(ModelUtil.getTypeName(extType));
+         }
       }
       Object[] impls = getImplementsTypeDeclarations();
       if (impls != null) {
@@ -7017,7 +7123,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode) {
       Object derivedType = getDerivedTypeDeclaration();
-      Object extType = getExtendsTypeDeclaration();
+      Object extType = isLayerType ? null : getExtendsTypeDeclaration();
 
       /**
        * If the extends type is dynamic or it's an object which did not turn into a class... instead its definitions
@@ -7110,7 +7216,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       Object overrideDef = accessBase == null ? null : ModelUtil.definesMember(accessBase, typeName, MemberType.GetMethodSet, null, null);
       // For modify types, it might inherit the property from its extends as well
       if (overrideDef == null) {
-         Object extType = accessClass.getExtendsTypeDeclaration();
+         // TODO: do we want to support this feature with layers?  If so, need to use getExtendsTypeDeclarations here
+         Object extType = accessClass.isLayerType ? null : accessClass.getExtendsTypeDeclaration();
          if (extType != null && extType != accessBase)
             overrideDef = ModelUtil.definesMember(extType, typeName, MemberType.GetMethodSet, null, null);
       }
@@ -7124,7 +7231,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (!ModelUtil.isDynamicType(this) && ModelUtil.getEnclosingInstType(this) != null)
          return true;
 
-      Object extType = getExtendsTypeDeclaration();
+      Object extType = isLayerType ? null : getExtendsTypeDeclaration();
 
       // If we inherit an inner type from our base class that is compiled we need to define getX methods.
       if (extType != null && ModelUtil.getEnclosingType(extType) != null && !ModelUtil.isDynamicType(extType)) {
@@ -7261,7 +7368,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
       }
 
-      Object extType = getExtendsTypeDeclaration();
+      Object extType = isLayerType ? null : getExtendsTypeDeclaration();
       if (extType instanceof TypeDeclaration && extType != derivedType) {
          TypeDeclaration extTD = (TypeDeclaration) extType;
          if (!isAnEnclosingType(extTD) && extTD.needsSync()) {
@@ -7363,7 +7470,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       Object derived = getDerivedTypeDeclaration();
       if (derived != null)
          addDerivedProcessModifiers(derived);
-      Object ext = getExtendsTypeDeclaration();
+      Object ext = isLayerType ? null : getExtendsTypeDeclaration();
       if (ext != null && ext != derived)
          addDerivedProcessModifiers(ext);
       if (subTypeProcessors != null) {
@@ -7844,9 +7951,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if (scopeName != null)
             return scopeName;
       }
-      Object ext = getExtendsTypeDeclaration();
-      if (ext != derived && ext != null)
-         return ModelUtil.getScopeName(ext);
+      if (!isLayerType) {
+         Object ext = getExtendsTypeDeclaration();
+         if (ext != derived && ext != null)
+            return ModelUtil.getScopeName(ext);
+      }
 
       return null;
    }
@@ -8260,5 +8369,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             return true;
       }
       return false;
+   }
+
+   public boolean isLayerType() {
+      return isLayerType;
    }
 }

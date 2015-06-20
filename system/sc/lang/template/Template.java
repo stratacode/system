@@ -1516,4 +1516,8 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
          }
       }
    }
+
+   public boolean isLayerType() {
+      return false;
+   }
 }

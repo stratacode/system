@@ -2429,6 +2429,14 @@ public class ModelUtil {
       return getAccessLevel(def, explicitOnly, null);
    }
 
+   public static String getAccessLevelString(Object def, boolean explicitOnly, JavaSemanticNode.MemberType type) {
+      AccessLevel level = getAccessLevel(def, explicitOnly, type);
+      if (level == null)
+         return "package-private";
+      else
+         return level.toString().toLowerCase();
+   }
+
    public static AccessLevel getAccessLevel(Object def, boolean explicitOnly, JavaSemanticNode.MemberType mtype) {
       if (def instanceof IDefinition)
          return ((IDefinition) def).getAccessLevel(explicitOnly);
@@ -4580,8 +4588,11 @@ public class ModelUtil {
    }
 
    public static Object[] getFields(Object typeObj, String modifier, boolean hasModifier, boolean dynamicOnly, boolean includeObjs, boolean includeAssigns, boolean includeModified) {
-      if (typeObj instanceof Class)
+      if (typeObj instanceof Class) {
+         if (dynamicOnly)
+            return null;
          return RTypeUtil.getFields((Class) typeObj, modifier, hasModifier);
+      }
       else if (typeObj instanceof ITypeDeclaration) {
          List<Object> props = ((ITypeDeclaration) typeObj).getAllFields(modifier, hasModifier, dynamicOnly, includeObjs, includeAssigns, includeModified);
          return props == null ? null : props.toArray(new Object[props.size()]);

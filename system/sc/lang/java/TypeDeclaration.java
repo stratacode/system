@@ -468,6 +468,10 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
                return v;
          }
       }
+
+      if (isLayerType && layer != null && layer.excluded)
+         return null;
+
       IDefinitionProcessor[] procs = getDefinitionProcessors();
       if (procs != null) {
          for (IDefinitionProcessor proc:procs)
@@ -780,6 +784,8 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       boolean doValidate = isValidated();
       boolean incrNest = false;
       JavaSemanticNode extendsNode = extendsModel == null ? extendsType : extendsModel;
+      if (extendsModel.layer != null && extendsModel.isLayerModel && extendsModel.layer.excluded)
+         return;
       // Do nothing if the type or model is already at the level we need it
       if ((!doValidate && extendsNode.isStarted()) || (doValidate && extendsNode.isValidated()))
          return;

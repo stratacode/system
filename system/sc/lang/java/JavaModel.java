@@ -758,15 +758,19 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          }
       }
       definedTypesByName.put(typeName, type);
-      // Also register this for the package prefix
-      if (getPackagePrefix() != null) {
-         String fullTypeName = type.getFullTypeName();
-         if (fullTypeName != null) {
-            typeIndex.put(fullTypeName, type);
+      // Not using the typeIndex for layer models or sync models which use a custom resolver.  Maybe we just need to check
+      // the custom resolver before the typeIndex, but with this, we register a Layer type which ends up extending itself.
+      if (!isLayerModel && customResolver == null) {
+         // Also register this for the package prefix
+         if (getPackagePrefix() != null) {
+            String fullTypeName = type.getFullTypeName();
+            if (fullTypeName != null) {
+               typeIndex.put(fullTypeName, type);
+            }
          }
+         // TODO: should we be adding this to the types member?  Not sure they always belong in the language model.
+         typeIndex.put(typeName, type);
       }
-      // TODO: should we be adding this to the types member?  Not sure they always belong in the language model.
-      typeIndex.put(typeName, type);
    }
 
    public Set<String> getExternalReferences() {
@@ -774,6 +778,15 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public Object definesType(String typeName, TypeContext ctx) {
+      // In the custom resolver case, if we have something like object log4j extends log4j we need to resolve log4j to exclude
+      // the current type.  If there's more than one component in the name this is not a problem but for serialization we should
+      // allow the base type name to be the same as the id.  We also could work around this in the serialization - by picking a new
+      // obj name if the names are the same?
+      if (customResolver != null) {
+         Object res = customResolver.resolveType(getPackagePrefix(), typeName, false, null);
+         if (res != null)
+            return res;
+      }
       // This is a "get" not a "find" because we are only looking for types defined in this model.
       Object res = getTypeDeclaration(typeName);
       if (res != null)
@@ -926,7 +939,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public TypeDeclaration getPreviousDeclaration(String fullClassName) {
-      if (layeredSystem == null || isLayerModel)
+      if (layeredSystem == null)
          return null;
       Layer layer = getLayer();
       return (TypeDeclaration) layeredSystem.getSrcTypeDeclaration(fullClassName, layer, prependLayerPackage, false, true, layer, isLayerModel);
@@ -2075,6 +2088,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    public boolean readReverseDeps(Layer buildLayer) {
       TypeDeclaration modelType = getModelTypeDeclaration();
+
+      if (modelType == null)
+         return false;
 
       LayeredSystem sys = modelType.getLayeredSystem();
 

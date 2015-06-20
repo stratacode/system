@@ -248,4 +248,9 @@ public class SyncHandler {
          }
       }
    }
+
+   /** A hook so you can replace the base type used for recreating the type on the other side.  It can return a TypeDeclaration or Class */
+   public Object getObjectType(Object changedObj) {
+      return DynUtil.isType(changedObj) ? changedObj.getClass() : DynUtil.getType(changedObj);
+   }
 }

@@ -455,6 +455,7 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
 
    public static Object getParentInstance(Object srcObj) {
       // For non-static inner instances, we store the outer object as the first slot
+      // If we were not created with a src type declaration though, the dynamic type does not define our parent.
       if (srcObj instanceof IDynObject && ((IDynObject) srcObj).hasDynObject())
          return ((IDynObject) srcObj).getProperty(OUTER_INSTANCE_SLOT);
       else {

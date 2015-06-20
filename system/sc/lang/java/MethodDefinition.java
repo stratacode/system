@@ -88,7 +88,8 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       if (methodType == null) {
          return;
       }
-      Object extendsType = methodType.getExtendsTypeDeclaration();
+      // TODO: not sure how or whether we should inherit methods from downstream layers.  Right now, the eerived type will be Layer.class which is the base at least.
+      Object extendsType = methodType.isLayerType ? null : methodType.getExtendsTypeDeclaration();
       Object modType = methodType.getDerivedTypeDeclaration();
       if (extendsType == null)
          extendsType = Object.class;

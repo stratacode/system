@@ -374,6 +374,11 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return definedInType.getJavaModel();
    }
 
+   @Override
+   public boolean isLayerType() {
+      return false;
+   }
+
    public Layer getLayer() {
      return definedInType != null ? definedInType.getLayer() : null;
    }

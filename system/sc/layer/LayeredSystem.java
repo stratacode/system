@@ -191,8 +191,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public int layerDynStartPos = -1; /* The index of the first dynamic layer (or -1 if all layers are compiled) */
 
-   private boolean initializingLayers = false;
-
    /** Have any errors occurred in this system since it's been running?  */
    public boolean anyErrors = false;
 
@@ -747,6 +745,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       globalLayerImports.put("FileUtil", ImportDeclaration.create("sc.util.FileUtil"));
       globalLayerImports.put("RepositoryPackage", ImportDeclaration.create("sc.repos.RepositoryPackage"));
       globalLayerImports.put("LayerFileProcessor", ImportDeclaration.create("sc.layer.LayerFileProcessor"));
+      globalLayerImports.put("CodeType", ImportDeclaration.create("sc.layer.CodeType"));
+      globalLayerImports.put("CodeFunction", ImportDeclaration.create("sc.layer.CodeFunction"));
    }
 
    // The globally scoped objects which have been defined.
@@ -1734,39 +1734,47 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
 
    private void initLayersWithNames(List<String> initLayerNames, boolean dynamicByDefault, boolean allDynamic, List<String> recursiveDyn, boolean specifiedLayers, boolean explicitLayers) {
-      PerfMon.start("initLayers");
-      LayerParamInfo lpi = new LayerParamInfo();
-      lpi.explicitLayers = explicitLayers;
-      if (dynamicByDefault) {
-         lpi.explicitDynLayers = new ArrayList<String>();
-         // We support either . or / as separate for layer names so be sure to match both
-         for (String initLayer : initLayerNames) {
-            lpi.explicitDynLayers.add(initLayer.replace(".", "/"));
-            lpi.explicitDynLayers.add(initLayer.replace("/", "."));
-            if (allDynamic)
-               lpi.explicitDynLayers.add("<all>");
+      try {
+         acquireDynLock(false);
+         PerfMon.start("initLayers");
+         LayerParamInfo lpi = new LayerParamInfo();
+         lpi.explicitLayers = explicitLayers;
+         if (dynamicByDefault) {
+            lpi.explicitDynLayers = new ArrayList<String>();
+            // We support either . or / as separate for layer names so be sure to match both
+            for (String initLayer : initLayerNames) {
+               lpi.explicitDynLayers.add(initLayer.replace(".", "/"));
+               lpi.explicitDynLayers.add(initLayer.replace("/", "."));
+               if (allDynamic)
+                  lpi.explicitDynLayers.add("<all>");
+            }
          }
-      }
-      if (recursiveDyn != null) {
-         ArrayList<String> aliases = new ArrayList<String>();
-         for (int i = 0; i < recursiveDyn.size(); i++) {
-            String exLayer = recursiveDyn.get(i);
-            exLayer = FileUtil.removeTrailingSlash(exLayer);
-            aliases.add(exLayer.replace(".", "/"));
-            aliases.add(exLayer.replace("/", "."));
+         if (recursiveDyn != null) {
+            ArrayList<String> aliases = new ArrayList<String>();
+            for (int i = 0; i < recursiveDyn.size(); i++) {
+               String exLayer = recursiveDyn.get(i);
+               exLayer = FileUtil.removeTrailingSlash(exLayer);
+               aliases.add(exLayer.replace(".", "/"));
+               aliases.add(exLayer.replace("/", "."));
+            }
+            aliases.addAll(recursiveDyn);
+            lpi.recursiveDynLayers = aliases;
+            if (lpi.explicitDynLayers == null) // Recursive layers should also be explicitly made dynamic
+               lpi.explicitDynLayers = lpi.recursiveDynLayers;
+            else
+               lpi.explicitDynLayers.addAll(lpi.recursiveDynLayers);
          }
-         aliases.addAll(recursiveDyn);
-         lpi.recursiveDynLayers = aliases;
-         if (lpi.explicitDynLayers == null) // Recursive layers should also be explicitly made dynamic
-            lpi.explicitDynLayers = lpi.recursiveDynLayers;
-         else
-            lpi.explicitDynLayers.addAll(lpi.recursiveDynLayers);
+         List<Layer> resLayers = initLayers(initLayerNames, null, null, dynamicByDefault, lpi, specifiedLayers);
+         if (resLayers == null || resLayers.contains(null)) {
+            throw new IllegalArgumentException("Can't initialize init layers: " + initLayerNames);
+         }
+         // In the first pass we create each layer, then once all are created we initialize them in order, then we start them in order
+         initializeLayers(lpi);
+         PerfMon.end("initLayers");
       }
-      List<Layer> resLayers = initLayers(initLayerNames, null, null, dynamicByDefault, lpi, specifiedLayers);
-      if (resLayers == null || resLayers.contains(null)) {
-         throw new IllegalArgumentException("Can't initialize init layers: " + initLayerNames);
+      finally {
+         releaseDynLock(false);
       }
-      PerfMon.end("initLayers");
    }
 
    private void initBuildDir() {
@@ -3589,7 +3597,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          SyncManager.addSyncHandler(BeanMapper.class, LayerSyncHandler.class);
          SyncManager.addSyncHandler(BeanIndexMapper.class, LayerSyncHandler.class);
          SyncManager.addSyncHandler(Template.class, LayerSyncHandler.class);
+         SyncManager.addSyncHandler(Layer.class, LayerSyncHandler.class);
 
+         SyncManager.addSyncType(Layer.class,
+                 new SyncProperties(null, null,
+                         new Object[]{"packagePrefix", "defaultModifier", "dynamic", "hidden", "compiledOnly", "transparent",
+                                 "baseLayerNames", "layerPathName", "layerBaseName", "layerDirName", "layerUniqueName",
+                                 "layerPosition", "codeType", "codeFunction", "dependentLayers"},
+                         null, SyncOptions.SYNC_INIT_DEFAULT,  globalScopeId));
          for (Layer l:layers)
             l.initSync();
 
@@ -4202,7 +4217,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       else
          layer.packagePrefix = prefix == null ? "" : prefix;
 
-      addLayer(layer, null, runMain, false, true, true, false, true);
+      LayerParamInfo paramInfo = new LayerParamInfo();
+      addLayer(layer, null, runMain, false, true, true, false, true, paramInfo);
    }
 
    public EditorContext getDefaultEditorContext() {
@@ -4431,6 +4447,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       processNowVisibleLayers(invisLayers);
 
+      // TODO: remove?  is this redundant now?
       for (Layer layer:layersToInit) {
          notifyLayerAdded(layer);
       }
@@ -4597,7 +4614,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   public void addLayer(Layer layer, ExecutionContext ctx, boolean runMain, boolean setPackagePrefix, boolean saveModel, boolean makeBuildLayer, boolean build, boolean isActive) {
+   public void addLayer(Layer layer, ExecutionContext ctx, boolean runMain, boolean setPackagePrefix, boolean saveModel, boolean makeBuildLayer, boolean build, boolean isActive, LayerParamInfo lpi) {
       try {
          acquireDynLock(false);
          Layer oldBuildLayer = null;
@@ -4664,6 +4681,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             layer.model.saveModel();
 
          if (isActive) {
+            initializeLayers(lpi);
+
             // Start these before we update them
             startLayers(layer);
 
@@ -4697,7 +4716,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                initStartupObjects(newLayerPos);
          }
 
-         notifyLayerAdded(layer);
+         lpi.createdLayers.add(layer);
       }
       finally {
          releaseDynLock(false);
@@ -4729,67 +4748,83 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Layer createLayer(String layerName, String layerPackage, String[] extendsNames, boolean isDynamic, boolean isPublic, boolean isTransparent, boolean isActive, boolean saveLayer) {
-      String layerSlashName = LayerUtil.fixLayerPathName(layerName);
-      layerName = layerName.replace(FileUtil.FILE_SEPARATOR, ".");
-      String rootFile = getNewLayerDir();
-      String pathName;
-      String baseName;
-      pathName = FileUtil.concat(rootFile, layerSlashName);
-      baseName = FileUtil.getFileName(pathName) + SCLanguage.STRATACODE_SUFFIX;
-      File file = new File(FileUtil.concat(pathName, baseName));
-      if (file.exists())
-         throw new IllegalArgumentException("Layer: " + layerName + " exists at: " + file);
-      Layer layer = new Layer();
-      layer.layeredSystem = this;
-      layer.activated = isActive;
-      layer.layerDirName = layerName;
-      layer.layerBaseName = baseName;
-      layer.layerPathName = pathName;
-      layer.dynamic = isDynamic && !getCompiledOnly();
-      layer.defaultModifier = isPublic ? "public" : null;
-      layer.transparent = isTransparent;
-      layer.packagePrefix = layerPackage == null ? "" : layerPackage;
-      List<Layer> baseLayers = null;
-
-      boolean buildBaseLayers = false;
-
-      if (extendsNames != null) {
-         layer.baseLayerNames = Arrays.asList(extendsNames);
-
-         int beforeSize = isActive ? layers.size() : inactiveLayers.size();
+      Layer layer;
+      try {
+         acquireDynLock(false);
+         String layerSlashName = LayerUtil.fixLayerPathName(layerName);
+         layerName = layerName.replace(FileUtil.FILE_SEPARATOR, ".");
+         String rootFile = getNewLayerDir();
+         String pathName;
+         String baseName;
+         pathName = FileUtil.concat(rootFile, layerSlashName);
+         baseName = FileUtil.getFileName(pathName) + SCLanguage.STRATACODE_SUFFIX;
+         File file = new File(FileUtil.concat(pathName, baseName));
+         if (file.exists())
+            throw new IllegalArgumentException("Layer: " + layerName + " exists at: " + file);
+         layer = new Layer();
+         layer.layeredSystem = this;
+         layer.activated = isActive;
+         layer.layerDirName = layerName;
+         layer.layerBaseName = baseName;
+         layer.layerPathName = pathName;
+         layer.dynamic = isDynamic && !getCompiledOnly();
+         layer.defaultModifier = isPublic ? "public" : null;
+         layer.transparent = isTransparent;
+         layer.packagePrefix = layerPackage == null ? "" : layerPackage;
+         List<Layer> baseLayers = null;
 
          LayerParamInfo paramInfo = new LayerParamInfo();
          paramInfo.activate = isActive;
 
-         // TODO: should we expose anyway to make these layers dynamic?
-         layer.baseLayers = baseLayers = initLayers(layer.baseLayerNames, newLayerDir, CTypeUtil.getPackageName(layer.layerDirName), false, paramInfo, false);
+         boolean buildBaseLayers = false;
 
-         // If we added any layers which presumably are non-empty, we will need to do a build to be sure they are up to date
-         if (isActive && beforeSize != layers.size())
-            buildBaseLayers = true;
+         if (extendsNames != null) {
+            layer.baseLayerNames = Arrays.asList(extendsNames);
 
-         if (baseLayers != null) {
-            int li = 0;
-            for (Layer l:baseLayers) {
-               // Add any base layers that are new... probably not reached?  Doesn't initLayers already add them?
-               if (l != null && !layers.contains(l)) {
-                  addLayer(l, null, false, false, false, false, false, isActive);
+            int beforeSize = isActive ? layers.size() : inactiveLayers.size();
+
+            // TODO: should we expose a way to make these layers dynamic?
+            layer.baseLayers = baseLayers = initLayers(layer.baseLayerNames, newLayerDir, CTypeUtil.getPackageName(layer.layerDirName), false, paramInfo, false);
+
+            // If we added any layers which presumably are non-empty, we will need to do a build to be sure they are up to date
+            if (isActive && beforeSize != layers.size())
+               buildBaseLayers = true;
+
+            if (baseLayers != null) {
+               int li = 0;
+               for (Layer l:baseLayers) {
+                  // Add any base layers that are new... probably not reached?  Doesn't initLayers already add them?
+                  if (l != null && !layers.contains(l)) {
+                     addLayer(l, null, false, false, false, false, false, isActive, paramInfo);
+                  }
+                  else if (l == null) {
+                     System.err.println("*** No base layer: " + layer.baseLayerNames.get(li));
+                  }
+                  li++;
                }
-               else if (l == null) {
-                  System.err.println("*** No base layer: " + layer.baseLayerNames.get(li));
-               }
-               li++;
             }
          }
+
+         if (options.info)
+            System.out.println("Adding layer: " + layer.layerDirName + (baseLayers != null ? " extends: " + baseLayers : ""));
+
+         // No need to build this layer but if we dragged in any base layers, we might need to build this one just to deal with them.
+         addLayer(layer, null, true, true, saveLayer, true, buildBaseLayers, isActive, paramInfo);
+
       }
-
-      if (options.info)
-         System.out.println("Adding layer: " + layer.layerDirName + (baseLayers != null ? " extends: " + baseLayers : ""));
-
-      // No need to build this layer but if we dragged in any base layers, we might need to build this one just to deal with them.
-      addLayer(layer, null, true, true, saveLayer, true, buildBaseLayers, isActive);
-
+      finally {
+         releaseDynLock(false);
+      }
       return layer;
+   }
+
+   private void initializeLayers(LayerParamInfo paramInfo) {
+      for (Layer initLayer:paramInfo.createdLayers) {
+         // This is to be consistent with other code paths - but don't we always init inactive layers?
+         if (initLayer.activated)
+            ParseUtil.initComponent(initLayer);
+         notifyLayerAdded(initLayer);
+      }
    }
 
 
@@ -4880,19 +4915,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     */
    private List<Layer> initLayers(List<String> layerNames, String relDir, String relPath, boolean markDynamic, LayerParamInfo lpi, boolean specified) {
       List<Layer> layers = new ArrayList<Layer>();
-      try {
-         acquireDynLock(false);
-         initializingLayers = true;
-         for (String layerName:layerNames) {
-            Layer l = initLayer(layerName, relDir, relPath, markDynamic, lpi);
-            layers.add(l);
-            if (specified && !specifiedLayers.contains(l) && l != null)
-               specifiedLayers.add(l);
-         }
-      }
-      finally {
-         initializingLayers = false;
-         releaseDynLock(false);
+      for (String layerName:layerNames) {
+         Layer l = initLayer(layerName, relDir, relPath, markDynamic, lpi);
+         layers.add(l);
+         if (specified && !specifiedLayers.contains(l) && l != null)
+            specifiedLayers.add(l);
+         lpi.createdLayers.add(l);
       }
       return layers;
    }
@@ -5098,7 +5126,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          */
       }
 
-      if (lpi == null || layer.activated) {
+      if (layer.activated) {
          registerLayer(layer);
 
          // Our first dynamic layer goes on the end but we start tracking it there
@@ -5179,9 +5207,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                layers.add(layer);
             }
          }
-         ParseUtil.initComponent(layer);
-
-         notifyLayerAdded(layer);
       }
       else {
          registerInactiveLayer(layer);
@@ -5189,18 +5214,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       return layer;
    }
-
-   /*
-   public void insertLayer(String layerName, int position) {
-      if (!initializingLayers)
-         throw new IllegalArgumentException("insertLayer must be called from a Layer's initialize method");
-
-      Layer toInsert = findLayer(layerName);
-      if (position >= layers.size())
-         throw new IllegalArgumentException("Invalid position for layer: " + position + " must be less than the current layers size: " + layers.size());
-      layers.add(position, layerName);
-   }
-   */
 
    public void registerLayer(Layer layer) {
       String layerName = layer.getLayerName();
@@ -10018,6 +10031,21 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (srcFile == null)
          srcFile = getSrcFileFromTypeName(typeName, true, fromLayer, prependPackage, null, refLayer, layerResolve);
 
+      if (srcFile == null && layerResolve) {
+         Layer layer = getLayerByDirName(typeName);
+         if (layer != null && layer.model != null) {
+            decl = layer.model.getModelTypeDeclaration();
+            if (decl != null)
+               return decl;
+         }
+         layer = refLayer == null || refLayer.activated ? pendingActiveLayers.get(typeName) : pendingInactiveLayers.get(typeName);
+         if (layer != null && layer.model != null) {
+            decl = layer.model.getModelTypeDeclaration();
+            if (decl != null)
+               return decl;
+         }
+      }
+
       if (srcFile != null) {
          // When notHidden is set, we do not load types which are in hidden layers
          if (notHidden && !srcFile.layer.getVisibleInEditor())
@@ -10338,6 +10366,24 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // Only look for the root type here - do not look for inner types.  Otherwise we do the same lookups repeatedly and we keep walking the rootFromLayer back each time.
             if (rootType == null)
                rootType = getSrcTypeDeclaration(rootTypeName, rootFrom, true, notHidden, true, refLayer == null ? fromLayer : refLayer, layerResolve, true);
+
+            if (rootType == null && layerResolve && rootTypeName.equals("sys.layerCore")) {
+               List<Layer> layersList = refLayer == null ? layers : refLayer.getLayersList();
+               // If we are initializing the fromLayer's layer def objects it is not in the list yet
+               int pos = fromLayer == null || !fromLayer.isInitialized() ? layersList.size()-1 : fromLayer.layerPosition - 1;
+
+               for (int l = pos; l >= 0; l--) {
+                  Layer searchLayer = layersList.get(l);
+                  if (searchLayer.model != null) {
+                     TypeDeclaration layerType = searchLayer.model.getModelTypeDeclaration();
+                     if (layerType != null) {
+                        Object declObj = ModelUtil.getInnerType(layerType, subTypeName, null);
+                        if (declObj != null)
+                           return declObj;
+                     }
+                  }
+               }
+            }
 
             if (rootType != null) {
                String rootTypeActualName = ModelUtil.getTypeName(rootType);
@@ -11132,7 +11178,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public boolean isObject(Object obj) {
       if (objectNameIndex.get(obj) != null)
          return true;
-      return ModelUtil.isObjectType(DynUtil.getSType(obj));
+      // Layers are declared as Object type but for sync we need to treat them as on demand
+      return ModelUtil.isObjectType(DynUtil.getSType(obj)) && !(obj instanceof Layer);
    }
 
    public String getObjectName(Object obj) {
@@ -11172,7 +11219,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return true;
       if (objectNameIndex.get(obj) == null) {
          // Also check for a compiled object annotation - needed for when liveDynamicTypes is disabled and we are not tracking the objects
-         if (!ModelUtil.isObjectType(DynUtil.getSType(obj)))
+         Object typeObj = DynUtil.getSType(obj);
+         // Layers define themselves as of type Object but are not rooted objects since we can't access them from a static reference.
+         if (!ModelUtil.isObjectType(typeObj) || ((typeObj instanceof ModifyDeclaration) && ((ModifyDeclaration) typeObj).isLayerType))
             return false;
       }
       Object outer = DynUtil.getOuterObject(obj);
