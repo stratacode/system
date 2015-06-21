@@ -11,7 +11,6 @@ import sc.obj.*;
 import sc.type.CTypeUtil;
 import sc.type.PTypeUtil;
 import sc.util.IdentityWrapper;
-import sun.plugin.javascript.navig4.Layer;
 
 import java.util.*;
 
