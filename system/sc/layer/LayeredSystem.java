@@ -726,7 +726,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** For a layerUniqueName in this runtime which was a build layer, store the old buildDir - usually the layers buildDir unless we started the system with -d buildDir.  In that case, we need to reset the layer.buildDir back to the old value so things work right */
    private Map<String,String> loadedBuildLayers = new TreeMap<String,String>();
 
-   private String origBuildDir; // Track the original build directory, where we do the full compile.  After the orig build layer is removed, this guy will still need to go into the class path because it contains all of the non-build layer compiled assets.
+   String origBuildDir; // Track the original build directory, where we do the full compile.  After the orig build layer is removed, this guy will still need to go into the class path because it contains all of the non-build layer compiled assets.
 
    private Map<String,ImportDeclaration> globalImports = new HashMap<String,ImportDeclaration>();
    {
@@ -781,6 +781,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public File buildSrcDirFile;
    /** Set to the directory where classes are stored */
    public String buildClassesDir;
+
+   /** Used to hold dyn stubs we need to build to process and create the layers - i.e. before the build layer is defined */
+   public Layer coreBuildLayer;
 
    public String newLayerDir = null; // Directory for creating new layers
 
@@ -945,9 +948,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       layerPath = layerPathNames;
       initLayerPath();
 
+      // Sets the coreBuildLayer - used for storing dynamic stubs needed for the layer init process
+      LayerUtil.initCoreBuildLayer(this);
+
       // Do this before we init the layers so they can see the classes in the system layer
       initClassIndex(rootClassPath);
       initSysClassLoader(null, ClassLoaderMode.LIBS);
+      initSysClassLoader(coreBuildLayer, ClassLoaderMode.BUILD);
 
       if (startInterpreter)
          cmd = new JLineInterpreter(this);
@@ -2149,7 +2156,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * in the system classpath so it uses this method to add a new directory
     */
    public void addSystemClassDir(String dir) {
-      URL url = FileUtil.newFileURL(appendSlashIfNecessary(dir));
+      URL url = FileUtil.newFileURL(LayerUtil.appendSlashIfNecessary(dir));
       URL[] urls = new URL[1];
       urls[0] = url;
 
@@ -2250,11 +2257,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             for (int i = sysLayer.layerPosition; i >= 0; i--) {
                Layer layer = layers.get(i);
                if (layer.isBuildLayer() && layer.compiled)
-                  addToSystemClassPath(appendSlashIfNecessary(layer.buildDir));
+                  addToSystemClassPath(LayerUtil.appendSlashIfNecessary(layer.buildDir));
                if (layer.classDirs != null) {
                   for (int j = 0; j < layer.classDirs.size(); j++) {
                      String dir = layer.classDirs.get(j);
-                     addToSystemClassPath(appendSlashIfNecessary(dir));
+                     addToSystemClassPath(LayerUtil.appendSlashIfNecessary(dir));
                   }
                }
             }
@@ -5469,39 +5476,22 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return layerPathIndex.get(layerPath);
    }
 
-   private void addQuotedPath(StringBuilder sb, String path) {
-      sb.append(FileUtil.PATH_SEPARATOR);
-      if (path.indexOf(' ') != -1) {
-         // this actually breaks the compile if there are spaces in it.
-         //sb.append('"');
-         sb.append(path);
-         //sb.append('"');
-      }
-      else
-         sb.append(path);
-   }
 
    public String getClassPathForLayer(Layer startLayer, String useBuildDir) {
       StringBuilder sb = new StringBuilder();
       boolean addOrigBuild = true;
       sb.append(useBuildDir); // Our build dir overrides all other directories
-      for (int i = startLayer.layerPosition; i >= 0; i--) {
-         Layer layer = layers.get(i);
-         if (layer.classPath != null && !layer.disabled && !layer.excluded) {
-            for (int j = 0; j < layer.classDirs.size(); j++) {
-               String dir = layer.classDirs.get(j);
-               addQuotedPath(sb, dir);
-            }
-         }
-         String layerClasses = layer.getBuildClassesDir();
-         if (!layerClasses.equals(useBuildDir) && layer.isBuildLayer()) {
-            addQuotedPath(sb, layerClasses);
-            if (layerClasses.equals(origBuildDir))
-               addOrigBuild = false;
+      if (startLayer == coreBuildLayer) {
+         addOrigBuild = startLayer.appendClassPath(sb, useBuildDir, addOrigBuild);
+      }
+      else {
+         for (int i = startLayer.layerPosition; i >= 0; i--) {
+            Layer layer = layers.get(i);
+            addOrigBuild = layer.appendClassPath(sb, useBuildDir, addOrigBuild);
          }
       }
       if (addOrigBuild && origBuildDir != null) {
-         addQuotedPath(sb, origBuildDir);
+         LayerUtil.addQuotedPath(sb, origBuildDir);
       }
       /*
       HashMap<String,PackageEntry> tempSystemClasses = packageIndex.get("java/lang");
@@ -11473,15 +11463,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
-   String appendSlashIfNecessary(String dir) {
-      File f = new File(dir);
-      if (f.isDirectory()) {
-         if (!dir.endsWith(FileUtil.FILE_SEPARATOR))
-            return dir + FileUtil.FILE_SEPARATOR;
-      }
-      return dir;
-   }
-
    List<Layer> mapLayerNamesToLayers(String relPath, List<String> baseLayerNames, boolean activated) {
       List<Layer> baseLayers = new ArrayList<Layer>();
       if (baseLayerNames == null)
@@ -11515,7 +11496,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       List<String> classDirs = layer.classDirs;
       if (classDirs != null && layer.includeForProcess(processDefinition)) {
          for (int j = 0; j < classDirs.size(); j++) {
-            urls.add(FileUtil.newFileURL(appendSlashIfNecessary(classDirs.get(j))));
+            urls.add(FileUtil.newFileURL(LayerUtil.appendSlashIfNecessary(classDirs.get(j))));
          }
       }
       if (checkBaseLayers) {
@@ -11529,7 +11510,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    URL[] getLayerClassURLs(Layer startLayer, int endPos, ClassLoaderMode mode) {
-      List<URL> urls = new ArrayList<URL>();
+      ArrayList<URL> urls = new ArrayList<URL>();
       if (!startLayer.activated) {
          if (mode.doBuild())
             return null;
@@ -11547,26 +11528,31 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       else {
-         int startPos = startLayer.layerPosition;
-         for (int i = startPos; i > endPos; i--) {
-            Layer layer = layers.get(i);
-            if (mode.doBuild()) {
-               // Only include the buildDir for build layers that have been compiled.  If the startLayer
-               // uses "buildSeparate", we only include this build layer if it is directly extended by
-               // the buildSeparate layer.
-               if (layer.buildDir != null && layer.isBuildLayer() && layer.compiled &&
-                   (!startLayer.buildSeparate || layer == startLayer || startLayer.extendsLayer(layer))) {
+         if (startLayer == coreBuildLayer) {
+            if (mode.doLibs())
+               addClassURLs(urls, startLayer, false);
+            if (mode.doBuild())
+               startLayer.appendBuildURLs(urls);
+         }
+         else {
+            int startPos = startLayer.layerPosition;
+            for (int i = startPos; i > endPos; i--) {
+               Layer layer = layers.get(i);
+               if (mode.doBuild()) {
+                  // Only include the buildDir for build layers that have been compiled.  If the startLayer
+                  // uses "buildSeparate", we only include this build layer if it is directly extended by
+                  // the buildSeparate layer.
+                  if (layer.buildDir != null && layer.isBuildLayer() && layer.compiled &&
+                      (!startLayer.buildSeparate || layer == startLayer || startLayer.extendsLayer(layer))) {
 
-                  if (layer == buildLayer || !options.buildAllLayers) {
-                     urls.add(FileUtil.newFileURL(appendSlashIfNecessary(layer.getBuildClassesDir())));
-                     layer.compiledInClassPath = true;
-                     if (!layer.buildDir.equals(layer.buildSrcDir) && includeSrcInClassPath)
-                        urls.add(FileUtil.newFileURL(appendSlashIfNecessary(layer.buildSrcDir)));
+                     if (layer == buildLayer || !options.buildAllLayers) {
+                        layer.appendBuildURLs(urls);
+                     }
                   }
                }
-            }
-            if (mode.doLibs()) {
-               addClassURLs(urls, layer, false);
+               if (mode.doLibs()) {
+                  addClassURLs(urls, layer, false);
+               }
             }
          }
       }

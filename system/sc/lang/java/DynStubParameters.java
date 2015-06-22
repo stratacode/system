@@ -254,7 +254,6 @@ public class DynStubParameters extends AbstractTemplateParameters {
 
    // Return a simple wrapper around the info the template needs to generate the dynamic stub class
    public DynConstructor[] getConstructors(boolean componentDef) {
-
       // When generating newX methods, if this is an inner class type, we already put the newX method in the enclosing
       // type.  Regular constructors still go in the inner class (componentDef = false).   Objects also need the newX
       // so that we can construct them at runtime when the getX method is not generated.
@@ -268,7 +267,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
      // Object[] constrs = extTypeDecl == null ? null : ModelUtil.getConstructors(extTypeDecl, objType);
       Object[] constrs = ModelUtil.getConstructors(objType, objType);
       if (constrs == null) {
-         Object ctor = objTypeDecl != null ? objTypeDecl.getPropagatedConstructor() : null;
+         Object ctor = ModelUtil.getPropagatedConstructor(sys, objType, objTypeDecl);
          if (ctor != null)
             constrs = new Object[] {ctor};
       }

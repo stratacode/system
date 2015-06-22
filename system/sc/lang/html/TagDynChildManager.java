@@ -7,6 +7,10 @@ package sc.lang.html;
 import sc.lang.SemanticNodeList;
 
 public class TagDynChildManager implements sc.dyn.IDynChildManager {
+   public boolean getInitChildrenOnCreate() {
+      return true;
+   }
+
    public void initChildren(Object parentObj, Object[] newChildren) {
       Element parent = (Element) parentObj;
       if (parent.children == null) {

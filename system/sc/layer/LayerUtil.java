@@ -22,6 +22,30 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 public class LayerUtil implements LayerConstants {
+
+   // This is a build layer we use to hold any generated files required for the layer definition files themselves - i.e.
+   // before we've set up the build layer itself.  This will only be needed if we have compiled stubs required for starting
+   // the layers themselves.
+   public static Layer initCoreBuildLayer(LayeredSystem sys) {
+      Layer layer = new Layer();
+      sys.coreBuildLayer = layer;
+      layer.layeredSystem = sys;
+      layer.layerUniqueName = layer.layerDirName = "sys.core.build";
+      layer.layerBaseName = "build.sc";
+      layer.layerPathName = FileUtil.concat(sys.getNewLayerDir(), "sys", "core", "build");
+      layer.dynamic = false;
+      layer.defaultModifier = "public";
+      layer.buildLayer = true;
+      layer.initBuildDir();
+      layer.makeBuildLayer();
+      layer.initialize();
+      layer.start();
+      layer.validate();
+      // We need these in the classes directory so we can load the dynamic stubs
+      layer.compiled = true;
+      return layer;
+   }
+
    public static class LayeredSystemPtr {
       public LayeredSystem system;
       public LayeredSystemPtr(LayeredSystem sys) {
@@ -667,6 +691,28 @@ public class LayerUtil implements LayerConstants {
       //RepositoryPackage pkg = new RepositoryPackage("layers", new RepositorySource(mgr, "ssh://vsgit@stratacode.com/home/git/vs/layers", false));
       String err = pkg.install(null);
       return err;
+   }
+
+
+   public static void addQuotedPath(StringBuilder sb, String path) {
+      sb.append(FileUtil.PATH_SEPARATOR);
+      if (path.indexOf(' ') != -1) {
+         // this actually breaks the compile if there are spaces in it.
+         //sb.append('"');
+         sb.append(path);
+         //sb.append('"');
+      }
+      else
+         sb.append(path);
+   }
+
+   public static String appendSlashIfNecessary(String dir) {
+      File f = new File(dir);
+      if (f.isDirectory()) {
+         if (!dir.endsWith(FileUtil.FILE_SEPARATOR))
+            return dir + FileUtil.FILE_SEPARATOR;
+      }
+      return dir;
    }
 
 }

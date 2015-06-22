@@ -700,27 +700,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    Object getPropagatedConstructor() {
-      Object compilerSettings = getInheritedAnnotation("sc.obj.CompilerSettings");
-      if (compilerSettings != null) {
-         String pConstructor = (String) ModelUtil.getAnnotationValue(compilerSettings, "propagateConstructor");
-         Object[] propagateConstructorArgs;
-
-         if (pConstructor != null && pConstructor.length() > 0) {
-            String[] argTypeNames = StringUtil.split(pConstructor, ',');
-            propagateConstructorArgs = new Object[argTypeNames.length];
-            JavaModel m = getJavaModel();
-            for (int i = 0; i < argTypeNames.length; i++) {
-               propagateConstructorArgs[i] = m.findTypeDeclaration(argTypeNames[i], false);
-               if (propagateConstructorArgs[i] == null)
-                  displayError("Bad value to CompilerSettings.propagateConstructor annotation " + pConstructor + " no type: " + argTypeNames[i]);
-               List constParams = propagateConstructorArgs == null ? null : Arrays.asList(propagateConstructorArgs);
-               return definesConstructor(constParams, null, false);
-            }
-         }
-      }
-      return null;
+      return ModelUtil.getPropagatedConstructor(getLayeredSystem(), this, this);
    }
-
 
    public Object getConstructorFromSignature(String sig) {
       Object[] cstrs = getConstructors(null);
@@ -3098,9 +3079,6 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public void initDynComponent(Object inst, ExecutionContext ctx, boolean doInit, Object outerObj, boolean initSyncInst) {
-      if (isLayerType)
-         return;
-
       IDynChildManager mgr = getDynChildManager();
       int numChildren = 0;
       Object[] children = null;
@@ -3138,7 +3116,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                initDynStatements(inst, ctx, TypeDeclaration.InitStatementMode.RefsOnly);
             }
 
-            if (mgr != null) {
+            if (mgr != null && mgr.getInitChildrenOnCreate()) {
                // Need to collect all of the children here, not just dynamic.  Right now, there's no modularization of
                // the code which iterates over the children - it's in both new and get and so not inheritable.
                children = getObjChildren(inst, null, false, false, false);
@@ -3446,23 +3424,29 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return ModelUtil.getTypeName(dynChildManager.getClass());
    }
 
+   public static IDynChildManager getDynChildManager(LayeredSystem sys, JavaSemanticNode errNode, Object type) {
+      Object compilerSettings = ModelUtil.getInheritedAnnotation(sys, type, "sc.obj.CompilerSettings");
+      IDynChildManager res = null;
+      if (compilerSettings != null) {
+         String dynChildMgrClass = (String) ModelUtil.getAnnotationValue(compilerSettings, "dynChildManager");
+         res = EMPTY_DYN_CHILD_MANAGER;
+         if (dynChildMgrClass != null && dynChildMgrClass.length() > 0) {
+            Class cl = sys.getCompiledClass(dynChildMgrClass);
+            if (cl == null) {
+               errNode.displayTypeError("No CompilerSettings.dynChildManager class: ", dynChildMgrClass, " for type: ");
+            }
+            else if (!IDynChildManager.class.isAssignableFrom(cl))
+               errNode.displayTypeError("Invalid CompilerSettings.dynChildManager class: ", dynChildMgrClass, "  Should implement IDynChildManager interface. Type: ");
+            else
+               res = (IDynChildManager) RTypeUtil.createInstance(cl);
+         }
+      }
+      return res;
+   }
+
    public IDynChildManager getDynChildManager() {
       if (dynChildManager == null) {
-         Object compilerSettings = getInheritedAnnotation("sc.obj.CompilerSettings");
-         if (compilerSettings != null) {
-            String dynChildMgrClass = (String) ModelUtil.getAnnotationValue(compilerSettings, "dynChildManager");
-            dynChildManager = EMPTY_DYN_CHILD_MANAGER;
-            if (dynChildMgrClass != null && dynChildMgrClass.length() > 0) {
-               Class cl = getLayeredSystem().getCompiledClass(dynChildMgrClass);
-               if (cl == null) {
-                  displayTypeError("No CompilerSettings.dynChildManager class: ", dynChildMgrClass, " for type: ");
-               }
-               else if (!IDynChildManager.class.isAssignableFrom(cl))
-                  displayTypeError("Invalid CompilerSettings.dynChildManager class: ", dynChildMgrClass, "  Should implement IDynChildManager interface. Type: ");
-               else
-                  dynChildManager = (IDynChildManager) RTypeUtil.createInstance(cl);
-            }
-         }
+         dynChildManager = getDynChildManager(getLayeredSystem(), this, this);
       }
       return dynChildManager;
    }
@@ -3654,6 +3638,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public static class NoopDynChildManager implements IDynChildManager {
+      @Override
+      public boolean getInitChildrenOnCreate() {
+         return true;
+      }
+
       public void initChildren(Object parent, Object[] children) {
       }
 
@@ -3867,15 +3856,23 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       Layer lyr = thisLayer.origBuildLayer;
       if (lyr == null)
          lyr = sys.buildLayer;
+      // Must be starting up the layers themselves - fall back to the
+      if (lyr == null)
+         lyr = sys.coreBuildLayer;
       String bd = thisLayer.buildClassesDir;
       if (bd == null)
          bd = sys.buildClassesDir;
+      if (bd == null) {
+         bd = sys.coreBuildLayer.buildClassesDir;
+      }
 
       String stubRelName = getSrcIndexName();
       String buildSrcDir = thisLayer.sysBuildSrcDir;
       // Sometimes this is not set - like for temporary layers that haven't been built yet.
       if (buildSrcDir == null)
          buildSrcDir = sys.buildSrcDir;
+      if (buildSrcDir == null)
+         buildSrcDir = sys.coreBuildLayer.buildSrcDir;
       String newFile = FileUtil.concat(buildSrcDir, stubRelName);
 
       if (doGen) {

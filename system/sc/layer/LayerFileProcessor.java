@@ -4,6 +4,8 @@
 
 package sc.layer;
 
+import sc.obj.CompilerSettings;
+import sc.obj.IComponent;
 import sc.util.FileUtil;
 import sc.util.StringUtil;
 
@@ -19,8 +21,13 @@ import java.util.HashMap;
  * For example, in wicket, a .gif file as a java resource would typically prepend the package suffix.  A .gif file in the web subdirectory
  * of a web application would not prepend it's layer's package prefix.
  */
-public class LayerFileProcessor implements IFileProcessor {
+@CompilerSettings(dynObjManager="sc.layer.LayerDynChildManager", propagateConstructor="sc.layer.Layer")
+public class LayerFileProcessor implements IFileProcessor, IComponent {
    private HashMap<String,LayerFileProcessorResult> fileIndex = new HashMap<String,LayerFileProcessorResult>();
+
+   public String[] extensions;
+
+   public String[] patterns;
 
    public String outputDir;
 
@@ -71,6 +78,60 @@ public class LayerFileProcessor implements IFileProcessor {
    public String skipSrcPathPrefix;
 
    private boolean producesTypes = false;
+
+   private byte _initState = 0;
+
+   public byte getInitState() {
+      return _initState;
+   }
+
+   public LayerFileProcessor() {
+   }
+
+   public LayerFileProcessor(Layer definedInLayer) {
+      this.definedInLayer = definedInLayer;
+   }
+
+   public static LayerFileProcessor newLayerFileProcessor(Layer parent) {
+      return new LayerFileProcessor(parent);
+   }
+
+   public static LayerFileProcessor newLayerFileProcessor() {
+      return new LayerFileProcessor(null);
+   }
+
+   public void preInit() {
+      if (_initState > 0)
+         return;
+      _initState = 1;
+   }
+   public void init() {
+      if (_initState > 1)
+         return;
+      _initState = 2;
+   }
+   public void start() {
+      if (_initState > 2)
+         return;
+      _initState = 3;
+      if (definedInLayer != null) {
+         if (extensions != null) {
+            for (String ext:extensions) {
+               definedInLayer.registerFileProcessor(this, ext);
+            }
+         }
+         if (patterns != null) {
+            for (String pattern:patterns) {
+               definedInLayer.layeredSystem.registerPatternFileProcessor(pattern, this, definedInLayer);
+            }
+         }
+      }
+   }
+   public void stop() {
+      if (_initState > 3)
+         return;
+      _initState = 4;
+   }
 
    public static class PathMapEntry {
       public String fromDir;

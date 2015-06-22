@@ -5,6 +5,7 @@
 package sc.layer;
 
 import sc.classfile.CFClass;
+import sc.dyn.DynUtil;
 import sc.dyn.IDynChildManager;
 import sc.dyn.IDynObject;
 import sc.lang.*;
@@ -33,6 +34,7 @@ import sc.type.TypeUtil;
 import sc.util.*;
 
 import java.io.*;
+import java.net.URL;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -793,7 +795,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       initDynObj();
       if (dynObj != null) {
          if (definesProperty(propName)) {
-            return dynObj.getProperty(propName);
+            return dynObj.getPropertyFromWrapper(this, propName);
          }
          if (baseLayers != null) {
             for (Layer base:baseLayers) {
@@ -1108,6 +1110,18 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    public void initialize() {
       if (initialized)
          return;
+
+      // Initialize the children after all layer types have been merged in so the modifications have taken effect
+      TypeDeclaration td;
+      if (model != null && (td = model.getModelTypeDeclaration()) != null) {
+         Object[] children = td.getObjChildren(this, null, false, true, true);
+         if (children != null) {
+            if (this.children == null)
+               this.children = new ArrayList<Object>(Arrays.asList(children));
+            else
+               this.children.addAll(Arrays.asList(children));
+         }
+      }
 
       initialized = true;
 
@@ -1981,7 +1995,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (sysIndex == null)
          sysIndex = layeredSystem.typeIndex = new SysTypeIndex(layeredSystem);
       LayerListTypeIndex useTypeIndex = activated ? sysIndex.activeTypeIndex : sysIndex.inactiveTypeIndex;
-      if (layeredSystem.writeLocked == 0) {
+      // The core build layer is created in the constructor so don't do this test for it.
+      if (this != layeredSystem.coreBuildLayer && layeredSystem.writeLocked == 0) {
          System.err.println("Updating type index without write lock: ");
          new Throwable().printStackTrace();;
       }
@@ -3210,6 +3225,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (buildInfo != null)
          return buildInfo;
 
+      if (this == layeredSystem.coreBuildLayer)
+         return null;
+
       BuildInfo gd = null;
 
       String bfFileName = layeredSystem.getBuildInfoFile();
@@ -3777,5 +3795,29 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             dynObj = new DynObject(model.getModelTypeDeclaration());
       }
    }
+
+   boolean appendClassPath(StringBuilder sb, String useBuildDir, boolean addOrigBuild) {
+      if (classPath != null && !disabled && !excluded) {
+         for (int j = 0; j < classDirs.size(); j++) {
+            String dir = classDirs.get(j);
+            LayerUtil.addQuotedPath(sb, dir);
+         }
+      }
+      String layerClasses = getBuildClassesDir();
+      if (!layerClasses.equals(useBuildDir) && isBuildLayer()) {
+         LayerUtil.addQuotedPath(sb, layerClasses);
+         if (layerClasses.equals(layeredSystem.origBuildDir))
+            addOrigBuild = false;
+      }
+      return addOrigBuild;
+   }
+
+   void appendBuildURLs(ArrayList<URL> urls) {
+      urls.add(FileUtil.newFileURL(LayerUtil.appendSlashIfNecessary(getBuildClassesDir())));
+      compiledInClassPath = true;
+      if (!buildDir.equals(buildSrcDir) && layeredSystem.includeSrcInClassPath)
+         urls.add(FileUtil.newFileURL(LayerUtil.appendSlashIfNecessary(buildSrcDir)));
+   }
 }
+
 

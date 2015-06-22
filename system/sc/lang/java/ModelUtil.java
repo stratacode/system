@@ -6850,4 +6850,30 @@ public class ModelUtil {
       }
       return false;
    }
+
+   public static Object getPropagatedConstructor(LayeredSystem sys, Object type, JavaSemanticNode refNode) {
+      Object compilerSettings = ModelUtil.getInheritedAnnotation(sys, type, "sc.obj.CompilerSettings");
+      if (compilerSettings != null) {
+         String pConstructor = (String) ModelUtil.getAnnotationValue(compilerSettings, "propagateConstructor");
+         Object[] propagateConstructorArgs;
+
+         if (pConstructor != null && pConstructor.length() > 0) {
+            String[] argTypeNames = StringUtil.split(pConstructor, ',');
+            propagateConstructorArgs = new Object[argTypeNames.length];
+            JavaModel m = refNode == null ? null : refNode.getJavaModel();
+            for (int i = 0; i < argTypeNames.length; i++) {
+               propagateConstructorArgs[i] = m == null ? sys.getTypeDeclaration(argTypeNames[i]) : m.findTypeDeclaration(argTypeNames[i], false);
+               if (propagateConstructorArgs[i] == null) {
+                  if (refNode != null)
+                     refNode.displayError("Bad value to CompilerSettings.propagateConstructor annotation " + pConstructor + " no type: " + argTypeNames[i]);
+                  else
+                     System.err.println("Bad value to CompilerSettings.propagateConstructor annotation " + pConstructor + " no type: " + argTypeNames[i]);
+               }
+               List constParams = Arrays.asList(propagateConstructorArgs);
+               return ModelUtil.definesConstructor(type, constParams, null);
+            }
+         }
+      }
+      return null;
+   }
 }

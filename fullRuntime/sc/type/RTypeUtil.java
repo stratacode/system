@@ -879,12 +879,14 @@ public class RTypeUtil {
          System.arraycopy(params, 0, newParams, 1, params.length);
          newParams[0] = thisObj;
          // Need to get the version of the method with the this object in its parameters
-         method = getMethodFromArgs(accessClass, methodName, newParams);
-         return invokeInternal(method, accessClass, null, newParams);
+         Method newMethod = getMethodFromArgs(accessClass, methodName, newParams);
+         if (newMethod != null) {
+            method = newMethod;
+            params = newParams;
+         }
+         // TODO: else - does this happen?
       }
-      else {
-         return invokeInternal(method, accessClass, thisObj, params);
-      }
+      return invokeInternal(method, accessClass, thisObj, params);
    }
 
    public static String getGenericTypeName(Object resultType, Object member, boolean includeDims) {
@@ -961,6 +963,8 @@ public class RTypeUtil {
       Method method = getMethodFromArgs(theClass, methodName, argValues);
       if (method == null)
          throw new IllegalArgumentException("No method named: " + methodName + " with args: " + argValues + " in: " +  getMethods(theClass, methodName));
+      if (thisObject == null && !PTypeUtil.hasModifier(method, "static"))
+         throw new IllegalArgumentException("Non-static method: " + methodName + " called from a static context");
       return invokeInternal(method, theClass, thisObject, argValues);
    }
 

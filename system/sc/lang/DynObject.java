@@ -204,9 +204,10 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
       else {
          // Note: classes like Element can extend this interface but are not dynamic types.
          if (dynType.isDynamicType() && IDynObject.class.isAssignableFrom(rtClass)) {
-            Object[] newArgs = new Object[args.length+1];
+            Object[] newArgs = new Object[(args == null ? 0 : args.length)+1];
             newArgs[0] = dynType;
-            System.arraycopy(args, 0, newArgs, 1, args.length);
+            if (args != null)
+               System.arraycopy(args, 0, newArgs, 1, args.length);
 
             Class accessClass = null;
             Object accessType = null;

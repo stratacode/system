@@ -875,7 +875,7 @@ public class ModifyDeclaration extends TypeDeclaration {
                                                              thisClassOnly, dynamicOnly, nameSet);
       }
 
-      // Then any modified extends
+      // Also process the extends from the modify type
       if (extendsBoundTypes != null && !thisClassOnly) {
          for (Object extBoundType:extendsBoundTypes) {
             if (extBoundType instanceof TypeDeclaration)

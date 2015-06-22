@@ -11,6 +11,8 @@ package sc.dyn;
  */
 @sc.js.JSSettings(jsLibFiles="js/scdyn.js", prefixAlias="sc_")
 public interface IDynChildManager {
+   /** A hook to allow the manager to control whether children are created when the parent object is created or not. */
+   boolean getInitChildrenOnCreate();
    /** Called when a new parent is created.  This is equivalent to the hook you may insert into the object template for the getX method when you are initializing the children. */
    void initChildren(Object parent, Object[] children);
    /** Called when the type system discovers a new child object */
