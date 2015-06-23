@@ -37,14 +37,14 @@ public class IndexedChoice extends OrderedChoice {
       super(options, toAdd);
    }
 
-   public void initialize() {
+   public void init() {
       if (!initialized) {
-         super.initialize();
-         indexedKeys.initialize();
+         super.init();
+         indexedKeys.init();
          for (List<Parselet> l: indexedParselets.values()) {
             for (Parselet p:l) {
                p.setLanguage(getLanguage());
-               p.initialize();
+               p.init();
             }
          }
       }

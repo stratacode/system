@@ -996,7 +996,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       checkForStaleAdd();
       body.add(s);
       if (isInitialized() && !s.isInitialized())
-         s.initialize();
+         s.init();
    }
 
    public void addBodyStatement(Statement s) {
@@ -1004,7 +1004,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       checkForStaleAdd();
       body.add(s);
       if (isInitialized() && !s.isInitialized())
-         s.initialize();
+         s.init();
    }
 
    public void addBodyStatementAt(int ix, Statement s) {
@@ -1015,7 +1015,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       else
          body.add(ix, s);
       if (isInitialized() && !s.isInitialized())
-         s.initialize();
+         s.init();
    }
 
    public void addBodyStatementAtIndent(int ix, Statement s) {
@@ -1024,7 +1024,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       checkForStaleAdd();
       body.add(ix, s);
       if (isInitialized() && !s.isInitialized())
-         s.initialize();
+         s.init();
    }
 
    public void addBodyStatementsAt(int ix, List<Statement> s) {
@@ -6881,7 +6881,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return defaultConstructor;
    }
 
-   public void initialize() {
+   public void init() {
       if (initialized)
          return;
 
@@ -6889,10 +6889,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (m != null)
          layer = m.getLayer(); // Bind this here so we can get the original layer from the type even after it was moved
 
-      super.initialize();
+      super.init();
 
       if (hiddenBody != null)
-         hiddenBody.initialize();
+         hiddenBody.init();
    }
 
    public void start() {

@@ -20,9 +20,9 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
 
    public transient int frameSize;
 
-   public void initialize() {
+   public void init() {
       if (initialized) return;
-      super.initialize();
+      super.init();
 
       frameSize = ModelUtil.computeFrameSize(statements);
 

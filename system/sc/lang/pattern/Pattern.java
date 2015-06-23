@@ -45,7 +45,7 @@ public class Pattern extends SemanticNode {
 
    public Parselet getParselet(Language language, Object pageType) {
       if (!initialized);
-         initialize();
+         init();
       if (this.language != language)
          parselet = null;
       if (parselet == null) {

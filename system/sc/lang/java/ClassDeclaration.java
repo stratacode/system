@@ -34,7 +34,7 @@ public class ClassDeclaration extends TypeDeclaration {
       return cd;
    }
 
-   public void initialize() {
+   public void init() {
       if (initialized) return;
 
       if (operator == null) {
@@ -53,7 +53,7 @@ public class ClassDeclaration extends TypeDeclaration {
                throw new UnsupportedOperationException();
          }
       }
-      super.initialize();
+      super.init();
    }
 
    public void start() {
@@ -247,7 +247,7 @@ public class ClassDeclaration extends TypeDeclaration {
 
    public DeclarationType getDeclarationType() {
       if (!initialized)
-         initialize();
+         init();
       return declarationType;
    }
 

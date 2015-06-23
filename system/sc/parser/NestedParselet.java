@@ -8,7 +8,6 @@ import sc.dyn.DynUtil;
 import sc.dyn.IDynObject;
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
-import sc.lang.java.Annotation;
 import sc.lang.java.ITypeDeclaration;
 import sc.type.RTypeUtil;
 import sc.type.BeanMapper;
@@ -173,11 +172,11 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       }
    }
 
-   public void initialize() {
+   public void init() {
       if (initialized)
          return;
       
-      super.initialize();
+      super.init();
 
       if (trace)
          System.out.println("Initializing: " + this);
@@ -200,7 +199,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          throw new IllegalArgumentException("Number of parselet parameters for the generation info (after the colon) does not match number of child parselets: " + this + " " + name);
 
       for (Parselet p: parselets)
-         p.initialize();
+         p.init();
 
       // These can no longer be set so if no type is defined, that is ok.
       if (resultClass == UNDEFINED_CLASS)
@@ -215,7 +214,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          }
 
          skipOnErrorParselet.setLanguage(getLanguage());
-         skipOnErrorParselet.initialize();
+         skipOnErrorParselet.init();
       }
 
       if (trace) {
@@ -1766,7 +1765,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
    public Class getSemanticValueClass() {
       if (!initialized)
-         initialize();
+         init();
 
       if (getSemanticValueIsArray()) {
          if (parameterType == ParameterType.STRING)
@@ -1790,7 +1789,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
    public Class getSemanticValueComponentClass() {
       if (!initialized)
-         initialize();
+         init();
 
       if (getSemanticValueIsArray()) {
          if (resultClass == UNDEFINED_CLASS)

@@ -5,8 +5,6 @@
 package sc.layer;
 
 import sc.classfile.CFClass;
-import sc.dyn.DynUtil;
-import sc.dyn.IDynChildManager;
 import sc.dyn.IDynObject;
 import sc.lang.*;
 import sc.lang.sc.IScopeProcessor;
@@ -26,8 +24,6 @@ import sc.repos.RepositoryPackage;
 import sc.repos.RepositorySource;
 import sc.repos.RepositorySystem;
 import sc.sync.SyncManager;
-import sc.sync.SyncOptions;
-import sc.sync.SyncProperties;
 import sc.type.CTypeUtil;
 import sc.type.RTypeUtil;
 import sc.type.TypeUtil;
@@ -1107,7 +1103,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       return isValidated();
    }
 
-   public void initialize() {
+   public void init() {
       if (initialized)
          return;
 
@@ -1135,7 +1131,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             baseLayer.ensureInitialized(true);
       }
 
-      callLayerMethod("initialize");
+      callLayerMethod("init");
 
       if (disabled) {
          disableLayer();
@@ -1226,7 +1222,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    public void ensureInitialized(boolean checkBaseLayers) {
       if (!isInitialized()) {
-         initialize();
+         init();
       }
       if (checkBaseLayers) {
          if (baseLayers != null) {

@@ -9,7 +9,7 @@ import sc.type.CTypeUtil;
 public class CharacterLiteral extends AbstractLiteral {
    public char charValue;
 
-   public void initialize() {
+   public void init() {
       if (value != null) {
          String str = ModelUtil.unescapeJavaString(value);
          if (str.length() == 1)

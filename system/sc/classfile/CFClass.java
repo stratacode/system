@@ -137,7 +137,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       }
    }
 
-   public void initialize() {
+   public void init() {
       if (initialized)
          return;
 
@@ -220,7 +220,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       if (started)
          return;
       if (!initialized)
-         initialize();
+         init();
       
       started = true;
 
@@ -467,7 +467,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          for (int i = 0; i < methods.length; i++) {
             CFMethod meth = methods[i];
             if (!meth.isInitialized())
-               meth.initialize();
+               meth.init();
             if (meth.propertyName != null && meth.propertyName.equals(name) && (refType == null || ModelUtil.checkAccess(refType, meth))) {
                if (needsGet && meth.propertyMethodType.isGet())
                   return meth;
@@ -687,7 +687,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          for (int i = 0; i < sz; i++) {
             CFMethod method = methods[i];
             if (!method.isInitialized())
-               method.initialize();
+               method.init();
             if (method.propertyName != null) {
                if (modifier == null || ModelUtil.hasModifier(method, modifier)) {
                   if (method.propertyMethodType == PropertyMethodType.Set) {
@@ -783,7 +783,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
 
    public List<TypeParameter> getClassTypeParameters() {
       if (!initialized)
-         initialize();
+         init();
       return typeParameters;
    }
 

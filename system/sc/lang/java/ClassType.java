@@ -8,7 +8,6 @@ import sc.lang.ILanguageModel;
 import sc.lang.JavaLanguage;
 import sc.lang.SemanticNodeList;
 import sc.lang.js.JSUtil;
-import sc.lang.sc.ModifyDeclaration;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.type.CTypeUtil;
@@ -77,7 +76,7 @@ public class ClassType extends JavaType {
    public static ClassType createStarted(Object boundType, String...args) {
       ClassType cl = (ClassType) ClassType.create(args);
       cl.type = boundType;
-      cl.initialize();
+      cl.init();
       cl.started = true;
       return cl;
    }
@@ -97,7 +96,7 @@ public class ClassType extends JavaType {
          newTypes.add(ct);
    }
 
-   public void initialize() {
+   public void init() {
       if (initialized)
          return;
 
@@ -105,7 +104,7 @@ public class ClassType extends JavaType {
          for (ClassType t:chainedTypes)
            t.chained = true;
 
-      super.initialize();
+      super.init();
    }
 
    public void start() {
@@ -277,7 +276,7 @@ public class ClassType extends JavaType {
    /** Our type arguments are always stored on the last node of a chained type */
    public List<JavaType> getResolvedTypeArguments() {
       if (!isInitialized())
-         initialize();
+         init();
       if (!isStarted() && type == null)
          start();
       if (chainedTypes != null) {
@@ -737,7 +736,7 @@ public class ClassType extends JavaType {
    public boolean isTypeParameter() {
       if (type == null) {
          if (!isInitialized())
-            initialize();
+            init();
          if (!isStarted() && type == null)
             start();
       }
@@ -952,7 +951,7 @@ public class ClassType extends JavaType {
 
    void startWithType(Object resolvedType) {
       this.type = resolvedType;
-      initialize();
+      init();
       started = true;
    }
 

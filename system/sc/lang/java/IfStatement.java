@@ -15,9 +15,9 @@ public class IfStatement extends NonIndentedStatement {
 
    //public boolean suppressIndent;
 
-   public void initialize()
+   public void init()
    {
-      super.initialize();
+      super.init();
    }
 
    public ExecResult exec(ExecutionContext ctx) {

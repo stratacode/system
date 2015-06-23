@@ -88,7 +88,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       return 0;
    }
 
-   public void initialize() {
+   public void init() {
       if (initialized)
          return;
       initialized = true;
@@ -97,7 +97,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       for (int i = 0; i < sz; i++) {
          Object val = get(i);
          if (val instanceof ILifecycle)
-            ((ILifecycle) val).initialize();
+            ((ILifecycle) val).init();
       }
    }
 
@@ -205,7 +205,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
          if (element instanceof ILifecycle) {
             ILifecycle lcval = (ILifecycle) element;
             if (!lcval.isInitialized()) {
-               lcval.initialize();
+               lcval.init();
                lcval.start();
                if (validated)
                   lcval.validate();
@@ -268,7 +268,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
          if (element instanceof ILifecycle) {
             ILifecycle lcval = (ILifecycle) element;
             if (!lcval.isInitialized()) {
-               lcval.initialize();
+               lcval.init();
                lcval.start();
                if (validated)
                   lcval.validate();

@@ -28,8 +28,8 @@ public class GlueStatement extends Statement {
 
    public transient boolean templateTransformed = false;
 
-   public void initialize() {
-      super.initialize();
+   public void init() {
+      super.init();
 
       AbstractMethodDefinition def = getEnclosingMethod();
       methodReturnValue = def != null && def.body != null && def.body.getNumStatements() == 1;
@@ -126,7 +126,7 @@ public class GlueStatement extends Statement {
          // We do not propagate down the initialize in the semantic node tree, so this has to be done manually.
          ILifecycle parent = (ILifecycle) parentNode;
          if (parent.isInitialized() && !bl.isInitialized())
-            bl.initialize();
+            bl.init();
       }
       return chunkCt;
    }

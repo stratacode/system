@@ -66,7 +66,7 @@ public class NewExpression extends IdentifierExpression {
       return newExpr;
    }
 
-   public void initialize() {
+   public void init() {
       if (initialized) return;
 
       LayeredSystem sys = getLayeredSystem();
@@ -90,7 +90,7 @@ public class NewExpression extends IdentifierExpression {
          }
       }
 
-      super.initialize();
+      super.init();
    }
 
    private transient boolean starting = false;

@@ -7,7 +7,7 @@ package sc.lang.java;
 public class BooleanLiteral extends AbstractLiteral {
    public Boolean boolValue;
 
-   public void initialize() {
+   public void init() {
       boolValue = (value == null || value.equalsIgnoreCase("false") ? Boolean.FALSE : Boolean.TRUE);
    }
 

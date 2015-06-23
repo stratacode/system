@@ -38,7 +38,7 @@ public class LayerUtil implements LayerConstants {
       layer.buildLayer = true;
       layer.initBuildDir();
       layer.makeBuildLayer();
-      layer.initialize();
+      layer.init();
       layer.start();
       layer.validate();
       // We need these in the classes directory so we can load the dynamic stubs

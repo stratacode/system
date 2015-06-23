@@ -287,10 +287,10 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       }
    }
 
-   public void initialize() {
-      super.initialize();
+   public void init() {
+      super.init();
       if (tagObject != null && !tagObject.isInitialized()) {
-         tagObject.initialize();
+         tagObject.init();
       }
    }
 
@@ -1336,7 +1336,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                Template enclTemplate = derivedTD.getEnclosingTemplate();
                if (enclTemplate != null) {
                   if (!enclTemplate.isInitialized())
-                     enclTemplate.initialize();
+                     enclTemplate.init();
                   return ((TypeDeclaration) derivedType).element;
                }
                else {
@@ -1360,7 +1360,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
             Template enclTemplate = derivedTD.getEnclosingTemplate();
             if (enclTemplate != null) {
                if (!enclTemplate.isInitialized())
-                  enclTemplate.initialize();
+                  enclTemplate.init();
                TypeDeclaration dtd = (TypeDeclaration) derivedTD;
                if (dtd.element != null)
                   return dtd.element;
@@ -1383,7 +1383,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
             Template enclTemplate = td.getEnclosingTemplate();
             if (enclTemplate != null) {
                if (!enclTemplate.isInitialized())
-                  enclTemplate.initialize();
+                  enclTemplate.init();
                if (res == null)
                   res = new ArrayList<Element>();
                res.add(((TypeDeclaration) type).element);

@@ -133,16 +133,16 @@ public class BinaryExpression extends Expression {
 
    }
 
-   public void initialize() {
+   public void init() {
       if (initialized) return;
 
       initExprTree();
 
       if (lhs != null)
-         lhs.initialize();
+         lhs.init();
       if (rhs != null)
-         rhs.initialize();
-      super.initialize();
+         rhs.init();
+      super.init();
 
       // If we get restarted, we need to reset all of this stuff
       if (bindingDirection != null)
@@ -502,7 +502,7 @@ public class BinaryExpression extends Expression {
    public void setBindingInfo(BindingDirection dir, Statement dest, boolean nested) {
       super.setBindingInfo(dir, dest, nested);
       if (!initialized)
-         initialize();
+         init();
       if (lhs != null && rhs != null) {
          lhs.setBindingInfo(bindingDirection, bindingStatement, true);
          if (rhs instanceof Expression) {
@@ -889,8 +889,8 @@ public class BinaryExpression extends Expression {
                   }
                }
             }
-            res.lhs.initialize();
-            res.rhs.initialize();
+            res.lhs.init();
+            res.rhs.init();
          }
          if (isStarted()) {
             res.lhs.start();

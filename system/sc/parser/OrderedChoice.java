@@ -50,7 +50,7 @@ public class OrderedChoice extends NestedParselet  {
 
    public Class getSemanticValueClass() {
       if (!initialized)
-         initialize();
+         init();
       
       Class result = null;
       int i = 0;
@@ -119,7 +119,7 @@ public class OrderedChoice extends NestedParselet  {
 
    public Class getSemanticValueComponentClass() {
       if (!initialized)
-          initialize();
+          init();
 
       Class result = null;
       int i = 0;

@@ -18,7 +18,7 @@ public class InterfaceDeclaration extends TypeDeclaration {
       return DeclarationType.INTERFACE;
    }
 
-   public void initialize() {
+   public void init() {
       if (initialized)
          return;
 
@@ -37,7 +37,7 @@ public class InterfaceDeclaration extends TypeDeclaration {
          }
       }
 
-      super.initialize();
+      super.init();
    }
 
    public void start() {

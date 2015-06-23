@@ -13,9 +13,9 @@ public class FinallyStatement extends NonIndentedStatement implements IBlockStat
    public List<Statement> statements;
    public transient int frameSize;
 
-   public void initialize() {
+   public void init() {
       if (initialized) return;
-      super.initialize();
+      super.init();
 
       frameSize = ModelUtil.computeFrameSize(statements);
    }

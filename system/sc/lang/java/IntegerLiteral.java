@@ -82,8 +82,8 @@ public class IntegerLiteral extends AbstractLiteral {
       return value;
    }
 
-   public void initialize() {
-      super.initialize();
+   public void init() {
+      super.init();
       try {
          String toParse = value;
          if (toParse.contains("_")) {

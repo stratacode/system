@@ -27,7 +27,7 @@ public class DependencyFile extends SemanticNode implements ILifecycle {
       return depsByName.get(fileName);
    }
 
-   public void initialize() {
+   public void init() {
       if (depList == null)
          depList = new SemanticNodeList<DependencyEntry>(this);
       for (int i = 0; i < depList.size(); i++) {

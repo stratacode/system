@@ -58,10 +58,10 @@ public class FieldDefinition extends TypedDefinition {
       return fd;
    }
 
-   public void initialize() {
+   public void init() {
       if (initialized) return;
 
-      super.initialize();
+      super.init();
    }
 
    public void start() {

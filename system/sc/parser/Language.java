@@ -580,7 +580,7 @@ public abstract class Language implements IFileProcessor {
       if (initialized)
          return;
       initialized = true;
-      startParselet.initialize();
+      startParselet.init();
       startParselet.start();
 
       DynType type = TypeUtil.getPropertyCache(getClass());

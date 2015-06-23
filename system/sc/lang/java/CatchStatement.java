@@ -12,9 +12,9 @@ public class CatchStatement extends NonIndentedStatement {
    public Parameter parameters;
    public BlockStatement statements;
 
-   public void initialize() {
+   public void init() {
       if (initialized) return;
-      super.initialize();
+      super.init();
 
       if (parameters.getNumParameters() != 1)
          System.err.println("*** Incorrect number of parameters to catch statement: " + toDefinitionString());

@@ -25,9 +25,9 @@ public class StringLiteral extends AbstractLiteral {
       return '"' + stringValue + '"';
    }
 
-   public void initialize() {
+   public void init() {
       if (initialized) return;
-      super.initialize();
+      super.init();
       if (value != null)
          stringValue = ModelUtil.unescapeJavaString(value);
    }
@@ -46,7 +46,7 @@ public class StringLiteral extends AbstractLiteral {
    /** Appends a raw, not escaped string to the StringLiteral. */
    public void appendString(String str) {
       if (!this.initialized)
-         this.initialize();
+         this.init();
       this.stringValue = this.stringValue + str;
       this.value = this.value + CTypeUtil.escapeJavaString(str, false);
    }

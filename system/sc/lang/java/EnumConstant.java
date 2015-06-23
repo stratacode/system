@@ -18,8 +18,8 @@ public class EnumConstant extends BodyTypeDeclaration {
       return DeclarationType.ENUMCONSTANT;
    }
 
-   public void initialize() {
-      super.initialize();
+   public void init() {
+      super.init();
    }
 
    /** For this type only we add the enum constants as properties */

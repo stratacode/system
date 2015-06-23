@@ -35,7 +35,7 @@ public class FloatLiteral extends AbstractLiteral {
       return fl;
    }
 
-   public void initialize() {
+   public void init() {
       if (value != null) {
          try {
             String toParse = value;

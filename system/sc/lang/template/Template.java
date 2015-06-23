@@ -426,7 +426,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
          td.modelType = this;
    }
 
-   public void initialize() {
+   public void init() {
       if (initialized) return;
 
       if (beingInitialized)
@@ -560,7 +560,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
       if (statefulPage && rootType != null && !ModelUtil.isAssignableFrom(IStatefulPage.class, rootType))
          statefulPage = false;
 
-      super.initialize();
+      super.init();
 
       if (templateProcessor != null)
          resultSuffix = templateProcessor.getResultSuffix();
@@ -1151,7 +1151,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
       sts.statements.add(sz, statement);
       // init is not propagated down
       if (isInitialized() && !statement.isInitialized())
-         statement.initialize();
+         statement.init();
    }
 
    private static Object firstInList(List<?> list) {

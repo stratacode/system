@@ -22,7 +22,7 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
    public PropertyMethodType propertyMethodType;
    String propertyName;
 
-   public void initialize() {
+   public void init() {
       if (initialized)
          return;
 
@@ -48,7 +48,7 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
       else if ((propertyName = ModelUtil.isSetIndexMethod(name, parameterJavaTypes, returnType)) != null)
          propertyMethodType = PropertyMethodType.SetIndexed;
 
-      super.initialize();
+      super.init();
    }
 
    public void start() {
@@ -56,7 +56,7 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
          return;
 
       if (!initialized)
-         initialize();
+         init();
 
       if (parameterJavaTypes != null) {
          parameterTypes = new Object[parameterJavaTypes.length];
@@ -70,7 +70,7 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
 
    public Object findType(String typeName, Object refType, TypeContext ctx) {
       if (!initialized)
-         initialize();
+         init();
       if (typeParameters != null)
          for (TypeParameter tp:typeParameters)
             if (tp.name.equals(typeName))

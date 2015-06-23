@@ -40,9 +40,9 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
 
    private boolean wasBound = false;
 
-   public void initialize() {
+   public void init() {
       if (initialized) return;
-      super.initialize();
+      super.init();
 
       bindingDirection = ModelUtil.initBindingDirection(operator);
       if (bindingDirection != null) {

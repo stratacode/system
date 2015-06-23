@@ -97,7 +97,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       }
    }
 
-   public void initialize() {
+   public void init() {
       JavaModel m = getJavaModel();
       if (m != null) {
          layer = m.getLayer(); // Bind this here so we can get the original layer from the type even after it was moved
@@ -109,7 +109,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
          m.addTypeDeclaration(getFileRelativeTypeName(), this);
       }
 
-      super.initialize();
+      super.init();
    }
 
    public void start() {

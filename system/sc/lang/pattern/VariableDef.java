@@ -15,8 +15,8 @@ public class VariableDef extends SemanticNode {
    public transient String propertyName;
    public transient String parseletName;
 
-   public void initialize() {
-      super.initialize();
+   public void init() {
+      super.init();
       if (equalsName != null) {
          parseletName = equalsName;
          propertyName = name;

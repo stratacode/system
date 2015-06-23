@@ -41,9 +41,9 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
    transient String origName;
    private transient boolean templateBody;
 
-   public void initialize() {
+   public void init() {
       if (initialized) return;
-      super.initialize();
+      super.init();
       origName = name;
       templateBody = body != null && body.statements != null && body.statements.size() == 1 &&
                      body.statements.get(0) instanceof GlueStatement;

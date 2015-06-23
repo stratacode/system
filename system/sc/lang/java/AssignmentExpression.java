@@ -28,10 +28,10 @@ public class AssignmentExpression extends TwoOperatorExpression {
    public transient boolean assignmentBinding = false;
 
    // public SymbolChoiceSpace assignmentOperator = new SemanticTokenChoice("=", "+=", "-=", "*=", "/=", "%=", "^=", "|=", "&=", "<<=", ">>=", ">>>=");
-   public void initialize() {
+   public void init() {
       if (lhs != null)
          lhs.setAssignment(true);
-      super.initialize();
+      super.init();
 
       if (bindingDirection == null)
          bindingDirection = ModelUtil.initBindingDirection(operator);

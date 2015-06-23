@@ -6,7 +6,6 @@ package sc.lang.java;
 
 import sc.dyn.DynUtil;
 import sc.lang.ILanguageModel;
-import sc.lang.INamedNode;
 import sc.lang.SemanticNodeList;
 import sc.lang.template.Template;
 import sc.layer.LayeredSystem;
@@ -44,7 +43,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       return res;
    }
 
-   public void initialize() {
+   public void init() {
       if (initialized) return;
       
       if (name != null && type != null) {
@@ -62,7 +61,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       }
 
       // Do this after our propertyName is set so that other initializers can use that info
-      super.initialize();
+      super.init();
    }
 
    public boolean isDynamicType() {
@@ -171,7 +170,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
 
    public Object definesMember(String name, EnumSet<MemberType> mtype, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {
       if (!isInitialized())
-         initialize();
+         init();
       if (propertyName != null &&
           ((mtype.contains(MemberType.GetMethod) && (propertyMethodType == PropertyMethodType.Get ||
                                                      propertyMethodType == PropertyMethodType.Is)) ||

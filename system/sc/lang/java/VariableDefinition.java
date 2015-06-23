@@ -50,7 +50,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
 
    private static boolean wasBound = false;
 
-   public void initialize() {
+   public void init() {
       if (initialized)
          return;
 
@@ -102,7 +102,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
                convertGetSet = true;
          }
       }
-      super.initialize();
+      super.init();
    }
 
    public void start() {

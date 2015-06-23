@@ -5,7 +5,7 @@
 package sc.lifecycle;
 
 public interface ILifecycle  {
-   public void initialize();
+   public void init();
 
    public void start();
 

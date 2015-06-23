@@ -248,7 +248,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       }
    }
 
-   public void initialize() {
+   public void init() {
       if (initialized)
          return;
 
@@ -257,7 +257,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       initPackageAndImports();
 
       // Initialize our types info before we do children as they need this info
-      super.initialize();
+      super.init();
    }
 
    public void addTypeDeclaration(TypeDeclaration td) {

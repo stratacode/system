@@ -34,7 +34,7 @@ public class Parameter extends AbstractVariable implements IVariable {
       return first;
    }
 
-   public void initialize() {
+   public void init() {
       if (initialized)
          return;
       
@@ -44,7 +44,7 @@ public class Parameter extends AbstractVariable implements IVariable {
          type.arrayDimensions = variableName.substring(dimsIx);
          variableName = variableName.substring(0,dimsIx);
       }
-      super.initialize();
+      super.init();
    }
 
    public Object definesMember(String name, EnumSet<MemberType> type, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {

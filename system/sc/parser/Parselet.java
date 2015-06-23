@@ -120,7 +120,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       initOptions(options);
    }
 
-   public void initialize() {
+   public void init() {
       if (initialized)
           return;
 

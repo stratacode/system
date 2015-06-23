@@ -94,7 +94,7 @@ public class SymbolChoice extends Parselet {
 
    int maxLen = -1;
 
-   public void initialize() {
+   public void init() {
       if (initialized)
          return;
       initialized = true;

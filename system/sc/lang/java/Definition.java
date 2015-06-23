@@ -30,10 +30,10 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
 
    private transient Object defaultModifier;
 
-   public void initialize() {
+   public void init() {
       if (initialized)
          return;
-      super.initialize();
+      super.init();
 
       /*
        * Retiring the 'init' function for the scope processor.  So far we have not needed it and implementing it means resolving

@@ -58,7 +58,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       return processed;
    }
 
-   public void initialize() {
+   public void init() {
       if (initialized)
           return;
       initialized = true;
@@ -70,7 +70,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
          IBeanMapper mapper = semanticProps[i];
          Object val = PTypeUtil.getProperty(this, mapper.getField());
          if (val instanceof ILifecycle)
-            ((ILifecycle) val).initialize();
+            ((ILifecycle) val).init();
       }
    }
 
@@ -390,7 +390,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
          if (value instanceof ILifecycle) {
             ILifecycle lval = (ILifecycle) value;
             if (!lval.isInitialized()) {
-               lval.initialize();
+               lval.init();
                if (started)
                   lval.start();
                if (validated)

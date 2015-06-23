@@ -19,14 +19,14 @@ public class UnaryExpression extends ChainedExpression {
       return true;
    }
 
-   public void initialize() {
+   public void init() {
       if (initialized)
          return;
 
       if (isIncrementOperator() && expression != null)
          expression.setAssignment(true);
 
-      super.initialize();
+      super.init();
    }
 
    public Object eval(Class expectedType, ExecutionContext ctx) {

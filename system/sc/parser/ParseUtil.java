@@ -407,7 +407,7 @@ public class ParseUtil  {
       if (obj instanceof ILifecycle) {
          ILifecycle sc = (ILifecycle) obj;
          if (!sc.isInitialized())
-            sc.initialize();
+            sc.init();
       }
       return obj;
    }
@@ -439,7 +439,7 @@ public class ParseUtil  {
          ILifecycle sc = (ILifecycle) obj;
 
          if (!sc.isInitialized())
-            sc.initialize();
+            sc.init();
          if (!sc.isStarted())
             sc.start();
       }
@@ -452,7 +452,7 @@ public class ParseUtil  {
          ILifecycle sc = (ILifecycle) obj;
 
          if (!sc.isInitialized())
-            sc.initialize();
+            sc.init();
          if (!sc.isStarted())
             sc.start();
          if (!sc.isValidated())

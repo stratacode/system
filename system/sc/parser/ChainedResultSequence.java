@@ -88,7 +88,7 @@ public class ChainedResultSequence extends Sequence {
 
    public Class getSemanticValueClass() {
       if (!initialized)
-         initialize();
+         init();
 
       if (semanticValueClass == UNDEFINED_CLASS)
          return null;
