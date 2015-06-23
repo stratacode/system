@@ -4,7 +4,6 @@
 
 package sc.lang.java;
 
-import com.sun.tools.javac.comp.Lower;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.type.DynType;
