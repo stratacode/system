@@ -525,7 +525,7 @@ public class BuildInfo {
    private static final String EXTERNAL_DYN_TYPE_TEMPLATE = "sc.lang.java.ExternalDynTypeTemplate";
 
    private SrcEntry generateExternalType(String typeName, ReverseDependencies reverseDeps) {
-      String res = TransformUtil.evalTemplateResource(EXTERNAL_DYN_TYPE_TEMPLATE, new DynStubParameters(system, system.getTypeDeclaration(typeName), reverseDeps), system.getSysClassLoader());
+      String res = TransformUtil.evalTemplateResource(EXTERNAL_DYN_TYPE_TEMPLATE, new DynStubParameters(system, null, system.getTypeDeclaration(typeName), reverseDeps), system.getSysClassLoader());
       String fileName = FileUtil.addExtension(getExternalDynTypeFileName(typeName), "java");
       FileUtil.saveStringAsFile(fileName, res, true);
 
@@ -536,11 +536,11 @@ public class BuildInfo {
       ExternalDynType edt;
       Object typeObj = system.getTypeDeclaration(typeName);
       if (extDynTypeIndex != null && (edt = extDynTypeIndex.get(typeName)) != null)
-         return new DynStubParameters(system, typeObj, edt.reverseDeps);
+         return new DynStubParameters(system, null, typeObj, edt.reverseDeps);
 
       // Or if it's a regular src type return the stub for that
       if (typeObj instanceof TypeDeclaration)
-         return new DynStubParameters(system, typeObj);
+         return new DynStubParameters(system, null, typeObj);
       return null;
    }
 

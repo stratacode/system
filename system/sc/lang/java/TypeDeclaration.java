@@ -1473,7 +1473,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
    public DynStubParameters getDynamicStubParameters() {
       if (dynamicParams == null)
-         dynamicParams = new DynStubParameters(getLayeredSystem(), this);
+         dynamicParams = new DynStubParameters(getLayeredSystem(), getLayer(), this);
       return dynamicParams;
    }
 

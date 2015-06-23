@@ -700,7 +700,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    Object getPropagatedConstructor() {
-      return ModelUtil.getPropagatedConstructor(getLayeredSystem(), this, this);
+      return ModelUtil.getPropagatedConstructor(getLayeredSystem(), this, this, getLayer());
    }
 
    public Object getConstructorFromSignature(String sig) {
@@ -3424,8 +3424,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return ModelUtil.getTypeName(dynChildManager.getClass());
    }
 
-   public static IDynChildManager getDynChildManager(LayeredSystem sys, JavaSemanticNode errNode, Object type) {
-      Object compilerSettings = ModelUtil.getInheritedAnnotation(sys, type, "sc.obj.CompilerSettings");
+   public static IDynChildManager getDynChildManager(LayeredSystem sys, JavaSemanticNode errNode, Object type, Layer refLayer) {
+      Object compilerSettings = ModelUtil.getInheritedAnnotation(sys, type, "sc.obj.CompilerSettings", false, refLayer, false);
       IDynChildManager res = null;
       if (compilerSettings != null) {
          String dynChildMgrClass = (String) ModelUtil.getAnnotationValue(compilerSettings, "dynChildManager");
@@ -3446,7 +3446,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public IDynChildManager getDynChildManager() {
       if (dynChildManager == null) {
-         dynChildManager = getDynChildManager(getLayeredSystem(), this, this);
+         dynChildManager = getDynChildManager(getLayeredSystem(), this, this, getLayer());
       }
       return dynChildManager;
    }
@@ -4345,7 +4345,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // TODO: could make this configurable via compiler settings
       if (dynStubTemplate == null)
          dynStubTemplate = TransformUtil.parseTemplate(dynStubTemplateStr,  DynStubParameters.class, false);
-      return TransformUtil.evalTemplate(new DynStubParameters(getLayeredSystem(), this, batchCompile), dynStubTemplate);
+      return TransformUtil.evalTemplate(new DynStubParameters(getLayeredSystem(), getLayer(), this, batchCompile), dynStubTemplate);
    }
 
 

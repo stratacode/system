@@ -225,7 +225,6 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
 
    /** The PropertyAssignment in SC is not in Java - we do a simple conversion here to replace x = y by { x = y } */
    public boolean transform(ILanguageModel.RuntimeType runtime) {
-
       if (runtime == ILanguageModel.RuntimeType.JAVA) {
          // Skip the list and go to the declaration
          BodyTypeDeclaration decl = (BodyTypeDeclaration) parentNode.getParentNode();

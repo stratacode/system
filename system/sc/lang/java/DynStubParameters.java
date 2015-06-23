@@ -7,6 +7,7 @@ package sc.lang.java;
 import sc.dyn.IDynObject;
 import sc.lang.sc.ModifyDeclaration;
 import sc.lang.sc.PropertyAssignment;
+import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.layer.MethodKey;
 import sc.layer.ReverseDependencies;
@@ -42,6 +43,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
    private List<PropertyDefinitionParameters> cvtIsToGet = null;
 
    private LayeredSystem sys;
+   private Layer refLayer;
 
    private boolean batchCompile;
 
@@ -53,8 +55,8 @@ public class DynStubParameters extends AbstractTemplateParameters {
       return ModelUtil.getRuntimeTypeName(objType);
    }
 
-   public DynStubParameters(LayeredSystem sys, Object stubType, ReverseDependencies reverseDeps) {
-      this(sys, stubType, false);
+   public DynStubParameters(LayeredSystem sys, Layer refLayer, Object stubType, ReverseDependencies reverseDeps) {
+      this(sys, refLayer, stubType, false);
 
       ArrayList<DynProp> props = new ArrayList<DynProp>();
       for (String propName:reverseDeps.bindableDeps.keySet()) {
@@ -85,12 +87,13 @@ public class DynStubParameters extends AbstractTemplateParameters {
       this.compProps = props.toArray(new DynProp[props.size()]);
    }
 
-   public DynStubParameters(LayeredSystem sys, Object stubType) {
-      this(sys, stubType, true);
+   public DynStubParameters(LayeredSystem sys, Layer refLayer, Object stubType) {
+      this(sys, refLayer, stubType, true);
    }
 
-   public DynStubParameters(LayeredSystem sys, Object stubType, boolean batchCompile) {
+   public DynStubParameters(LayeredSystem sys, Layer refLayer, Object stubType, boolean batchCompile) {
       this.sys = sys;
+      this.refLayer = refLayer;
       objType = stubType;
       this.batchCompile = batchCompile;
 
@@ -267,7 +270,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
      // Object[] constrs = extTypeDecl == null ? null : ModelUtil.getConstructors(extTypeDecl, objType);
       Object[] constrs = ModelUtil.getConstructors(objType, objType);
       if (constrs == null) {
-         Object ctor = ModelUtil.getPropagatedConstructor(sys, objType, objTypeDecl);
+         Object ctor = ModelUtil.getPropagatedConstructor(sys, objType, objTypeDecl, refLayer);
          if (ctor != null)
             constrs = new Object[] {ctor};
       }

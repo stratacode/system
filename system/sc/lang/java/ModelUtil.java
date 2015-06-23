@@ -6851,8 +6851,8 @@ public class ModelUtil {
       return false;
    }
 
-   public static Object getPropagatedConstructor(LayeredSystem sys, Object type, JavaSemanticNode refNode) {
-      Object compilerSettings = ModelUtil.getInheritedAnnotation(sys, type, "sc.obj.CompilerSettings");
+   public static Object getPropagatedConstructor(LayeredSystem sys, Object type, JavaSemanticNode refNode, Layer refLayer) {
+      Object compilerSettings = ModelUtil.getInheritedAnnotation(sys, type, "sc.obj.CompilerSettings", false, refLayer, false);
       if (compilerSettings != null) {
          String pConstructor = (String) ModelUtil.getAnnotationValue(compilerSettings, "propagateConstructor");
          Object[] propagateConstructorArgs;

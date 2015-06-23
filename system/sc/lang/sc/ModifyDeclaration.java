@@ -197,8 +197,15 @@ public class ModifyDeclaration extends TypeDeclaration {
          }
          // Did not get this right in initDynamicType because we did not resolve the modifyTypeDecl
          else if (dynamicNew && modifyTypeDecl.modifyNeedsClass()) {
-            dynamicType = true;
-            dynamicNew = false;
+            // OUr mod-type explicitly is set to be compiled only so we are not dynamic at all.
+            if (modifyTypeDecl.compiledOnly) {
+               dynamicNew = false;
+            }
+            // This type is only setting properties but the base type needs a class so we do too.
+            else {
+               dynamicType = true;
+               dynamicNew = false;
+            }
          }
 
          boolean modifiedCompiledClassLoaded = false;
