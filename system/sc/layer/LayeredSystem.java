@@ -745,6 +745,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       globalLayerImports.put("FileUtil", ImportDeclaration.create("sc.util.FileUtil"));
       globalLayerImports.put("RepositoryPackage", ImportDeclaration.create("sc.repos.RepositoryPackage"));
       globalLayerImports.put("LayerFileProcessor", ImportDeclaration.create("sc.layer.LayerFileProcessor"));
+      globalLayerImports.put("TemplateLanguage", ImportDeclaration.create("sc.lang.TemplateLanguage"));
+      globalLayerImports.put("BuildPhase", ImportDeclaration.create("sc.layer.BuildPhase"));
       globalLayerImports.put("CodeType", ImportDeclaration.create("sc.layer.CodeType"));
       globalLayerImports.put("CodeFunction", ImportDeclaration.create("sc.layer.CodeFunction"));
    }
@@ -9881,9 +9883,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public boolean getLiveDynamicTypes(String typeName) {
       if (!options.liveDynamicTypes)
          return false;
+      String parentName = CTypeUtil.getPackageName(typeName);
+      // If it's a layer component it's always dynamic
+      if (parentName != null && parentName.equals(Layer.LAYER_COMPONENT_PACKAGE))
+         return true;
       SrcEntry srcEnt = getSrcFileFromTypeName(typeName, true, null, true, null);
       if (srcEnt == null) {
-         String parentName = CTypeUtil.getPackageName(typeName);
          if (parentName == null)
             return true;
          return getLiveDynamicTypes(parentName);
@@ -10357,7 +10362,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (rootType == null)
                rootType = getSrcTypeDeclaration(rootTypeName, rootFrom, true, notHidden, true, refLayer == null ? fromLayer : refLayer, layerResolve, true);
 
-            if (rootType == null && layerResolve && rootTypeName.equals("sys.layerCore")) {
+            if (rootType == null && layerResolve && rootTypeName.equals(LayerConstants.LAYER_COMPONENT_PACKAGE)) {
                List<Layer> layersList = refLayer == null ? layers : refLayer.getLayersList();
                // If we are initializing the fromLayer's layer def objects it is not in the list yet
                int pos = fromLayer == null || !fromLayer.isInitialized() ? layersList.size()-1 : fromLayer.layerPosition - 1;

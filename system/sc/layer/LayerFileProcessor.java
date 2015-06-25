@@ -22,7 +22,7 @@ import java.util.HashMap;
  * of a web application would not prepend it's layer's package prefix.
  */
 @CompilerSettings(dynObjManager="sc.layer.LayerDynChildManager", propagateConstructor="sc.layer.Layer")
-public class LayerFileProcessor implements IFileProcessor, IComponent {
+public class LayerFileProcessor extends LayerComponent implements IFileProcessor, IComponent {
    private HashMap<String,LayerFileProcessorResult> fileIndex = new HashMap<String,LayerFileProcessorResult>();
 
    public String[] extensions;
@@ -42,13 +42,6 @@ public class LayerFileProcessor implements IFileProcessor, IComponent {
 
    /** Optionally set to restrict this processor to only working on files with a given type - e.g. files in the web directory are marked as 'web' files and have different processors. */
    public String[] srcPathTypes;
-
-   /**
-    * The layer which defines this processor.  Only layers which extend the definedInLayer can use this processor.
-    * This lets you use the same suffix in different ways based on the layers you include.  Not necessarily
-    * recommended but nice when you need it.
-    */
-   public Layer definedInLayer;
 
    public BuildPhase buildPhase = BuildPhase.Process;
 
@@ -79,19 +72,14 @@ public class LayerFileProcessor implements IFileProcessor, IComponent {
 
    private boolean producesTypes = false;
 
-   private byte _initState = 0;
-
-   public byte getInitState() {
-      return _initState;
-   }
-
    public LayerFileProcessor() {
    }
 
    public LayerFileProcessor(Layer definedInLayer) {
-      this.definedInLayer = definedInLayer;
+      super(definedInLayer);
    }
 
+   /*
    public static LayerFileProcessor newLayerFileProcessor(Layer parent) {
       return new LayerFileProcessor(parent);
    }
@@ -99,21 +87,13 @@ public class LayerFileProcessor implements IFileProcessor, IComponent {
    public static LayerFileProcessor newLayerFileProcessor() {
       return new LayerFileProcessor(null);
    }
+   */
 
-   public void preInit() {
-      if (_initState > 0)
-         return;
-      _initState = 1;
-   }
-   public void init() {
-      if (_initState > 1)
-         return;
-      _initState = 2;
-   }
    public void start() {
       if (_initState > 2)
          return;
-      _initState = 3;
+      super.start();
+
       if (definedInLayer != null) {
          if (extensions != null) {
             for (String ext:extensions) {
@@ -126,11 +106,6 @@ public class LayerFileProcessor implements IFileProcessor, IComponent {
             }
          }
       }
-   }
-   public void stop() {
-      if (_initState > 3)
-         return;
-      _initState = 4;
    }
 
    public static class PathMapEntry {

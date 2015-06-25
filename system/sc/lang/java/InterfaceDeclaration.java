@@ -382,7 +382,9 @@ public class InterfaceDeclaration extends TypeDeclaration {
    public List<Object> getCompiledIFields() {
       List<Object> res = super.getCompiledIFields();
 
-      if (!isDynamicType()) {
+      // For .java files we should not process multiple-inheritance fields because the syntax of a default field with
+      // not static final is treat as static final in Java but in SC it's copied into each class (with getX/setX methods)
+      if (!isDynamicType() && getJavaModel().enableExtensions()) {
          if (res == null)
             res = new ArrayList<Object>();
          addAllIFields(body, res, false, false, true);

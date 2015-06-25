@@ -5,6 +5,7 @@
 package sc.classfile;
 
 import sc.lang.java.JavaType;
+import sc.layer.Layer;
 import sc.parser.*;
 
 public class SignatureLanguage extends Language implements IParserConstants {
@@ -42,6 +43,11 @@ public class SignatureLanguage extends Language implements IParserConstants {
    }
 
    public SignatureLanguage() {
+      this(null);
+   }
+
+   public SignatureLanguage(Layer layer) {
+      super(layer);
       setSemanticValueClassPath("sc.lang.java:sc.classfile");
       setStartParselet(methodSig);
       classSig.setLanguage(this);

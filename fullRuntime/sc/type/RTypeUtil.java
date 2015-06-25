@@ -864,8 +864,18 @@ public class RTypeUtil {
 
    /** Constructs a new cmponent type object with the given set of parameters.  Just calls the newX method */
    public static Object newComponent(Class theClass, Object... params) {
-      String method = "new" + CTypeUtil.capitalizePropertyName(CTypeUtil.getClassName(theClass.getName().replace('$', '.')));
-      return invokeMethod(theClass, null, method, params);
+      String methodName = "new" + CTypeUtil.capitalizePropertyName(CTypeUtil.getClassName(theClass.getName().replace('$', '.')));
+      Method method = getMethodFromArgs(theClass, methodName, params);
+      // If there's no newX method, we'll try the constructor.  Maybe it's a component which does not need graph construction
+      // but does need init, start, etc.
+      if (method == null) {
+         return DynUtil.createInstance(theClass, null, params);
+      }
+      if (method == null)
+         throw new IllegalArgumentException("No method named: " + methodName + " with args: " + params + " in: " +  getMethods(theClass, methodName));
+      if (!PTypeUtil.hasModifier(method, "static"))
+         throw new IllegalArgumentException("Non-static method: " + methodName + " called from a static context");
+      return invokeInternal(method, theClass, null, params);
    }
 
    public static Object newInnerComponent(Object thisObj, Class accessClass, Class theClass, String name, Object... params) {
@@ -884,7 +894,8 @@ public class RTypeUtil {
             method = newMethod;
             params = newParams;
          }
-         // TODO: else - does this happen?
+         else
+            throw new IllegalArgumentException("No method named: " + methodName + " on class: " + accessClass + " with params: " + newParams + " for new inner component");
       }
       return invokeInternal(method, accessClass, thisObj, params);
    }
@@ -937,7 +948,7 @@ public class RTypeUtil {
    public static Method getMethodFromArgs(Class theClass, String methodName, Object...argValues) {
       Method[] list = getMethods(theClass, methodName);
       if (list == null)
-         throw new IllegalArgumentException("No method named: " + methodName + " on class: " + theClass);
+         return null;
       Method method = null;
       if (list.length == 1)
          method = list[0];

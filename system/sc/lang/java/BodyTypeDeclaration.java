@@ -51,7 +51,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    /** Set to true for types which are modified dyanmically.  Either because they have the dynamic keyword or because they're in or modified in a dynamic layer */
    public transient boolean dynamicType = false;
-   /** If we only set properties in a dynamic configuration, we only need to do "dynamicNew" */
+
+   /** If we only set properties in a dynamic configuration, we only need to do "dynamicNew" - no stub is created - we configure the properties of the existing class */
    public transient boolean dynamicNew = false;
 
    /** Set to true if this type is not to be made dynamic even if in a dynamic layer */
@@ -739,7 +740,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public Object getInheritedAnnotation(String annotationName) {
-      return getInheritedAnnotation(annotationName, false, getLayer(), isLayerType);
+      return getInheritedAnnotation(annotationName, false, getLayer(), isLayerType || isLayerComponent());
    }
 
    // Either a compiled java annotation or a parsed Annotation
@@ -973,7 +974,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    void checkForStaleAdd() {
       Layer l = getLayer();
-      if (l != null && l.compiled && !isDynamicType() && staleClassName == null && !isGeneratedType()) {
+      if (l != null && l.compiled && !isDynamicType() && !dynamicNew && staleClassName == null && !isGeneratedType()) {
          LayeredSystem sys = l.layeredSystem;
          sys.setStaleCompiledModel(true, "Added statement to compiled type: ", typeName);
          staleClassName = getCompiledClassName();
@@ -1308,7 +1309,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          // We put all inner types found in layer def files into a single name-space.
          // We could use the layer's package prefix?  If so, we probably need a way for one layer to set other
          // layer's properties so you are not limited what you can do in a layer def file.
-         String parentName = itd.isLayerType() ? "sys.layerCore" : itd.getFullTypeName();
+         String parentName = itd.isLayerType() ? LayerConstants.LAYER_COMPONENT_PACKAGE : itd.getFullTypeName();
          res = parentName + innerTypeSep + typeName;
       }
       else if (pnode instanceof BlockStatement)
@@ -1921,6 +1922,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public void setDynamicType(boolean dt) {
       dynamicType = dt;
+      if (dynamicNew)
+         dynamicNew = false;
       // Need to make any inner types dynamic as well.  Ordinarily they will inherit this from us but in the case
       // where a modified type is setting this on us, it won't be propagated properly.
       if (body != null) {
@@ -3424,8 +3427,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return ModelUtil.getTypeName(dynChildManager.getClass());
    }
 
-   public static IDynChildManager getDynChildManager(LayeredSystem sys, JavaSemanticNode errNode, Object type, Layer refLayer) {
-      Object compilerSettings = ModelUtil.getInheritedAnnotation(sys, type, "sc.obj.CompilerSettings", false, refLayer, false);
+   public static IDynChildManager getDynChildManager(LayeredSystem sys, JavaSemanticNode errNode, Object type, Layer refLayer, boolean layerResolve) {
+      Object compilerSettings = ModelUtil.getInheritedAnnotation(sys, type, "sc.obj.CompilerSettings", false, refLayer, layerResolve);
       IDynChildManager res = null;
       if (compilerSettings != null) {
          String dynChildMgrClass = (String) ModelUtil.getAnnotationValue(compilerSettings, "dynChildManager");
@@ -3446,7 +3449,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public IDynChildManager getDynChildManager() {
       if (dynChildManager == null) {
-         dynChildManager = getDynChildManager(getLayeredSystem(), this, this, getLayer());
+         dynChildManager = getDynChildManager(getLayeredSystem(), this, this, getLayer(), isLayerType || isLayerComponent());
       }
       return dynChildManager;
    }
@@ -3678,6 +3681,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if (extendsType == null)
             return isDynamicType() && needsCompiledClass;
       }
+      if (dynamicNew)
+         return false;
       // The extends type may either be a dynamic type, or a compiled type which implements the IDynObject interface.
       if (isExtendsDynamicType(extendsType)) {
          return includeExtends ? ModelUtil.isDynamicStub(extendsType, true) : needsCompiledClass;
@@ -4602,6 +4607,21 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
    }
 
+   /** As soon as one subclass needs to create a real dynamic type from a base type, we need to make the whole type hierarchy dynamic. */
+   public void clearDynamicNew() {
+      if (dynamicNew) {
+         dynamicNew = false;
+         dynamicType = true;
+
+         Object derivedType = getDerivedTypeDeclaration();
+         if (derivedType instanceof BodyTypeDeclaration) {
+            BodyTypeDeclaration derivedTD = (BodyTypeDeclaration) derivedType;
+            if (derivedTD.dynamicNew)
+              derivedTD.clearDynamicNew();
+         }
+      }
+   }
+
    public Statement updateBodyStatement(Statement def, ExecutionContext ctx, boolean updateInstances, UpdateInstanceInfo info) {
       needsDynamicType();
 
@@ -5012,6 +5032,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // so just copy that state over here.
       if (dynamicType && !newType.dynamicType) {
          newType.dynamicType = true;
+         if (newType.dynamicNew)
+            newType.dynamicNew = false;
       }
 
       if (!getTypeClassName().equals(newType.getTypeClassName())) {
@@ -5403,6 +5425,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       String fullTypeName = getFullTypeName();
       boolean skipAdd = false;
       boolean skipUpdate = false;
+      if (dynamicNew && (toAddObjs.size() > 0 || toAddFields.size() > 0)) {
+         dynamicNew = false;
+         dynamicType = true;
+      }
       if (!dynamicType && (toAddObjs.size() > 0 || toAddFields.size() > 0) && sys.hasInstancesOfType(fullTypeName)) {
          if (toAddFields.size() > 0)
             sys.setStaleCompiledModel(true, "Recompile needed to add fields: " + toAddFields + " to compiled type: " + fullTypeName);
@@ -6376,7 +6402,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (staleClassName != null)
          return staleClassName;
 
-      if (isDynamicType()) {
+      if (isDynamicType() || dynamicNew) {
          // If used in a class value expression or the framework requires one concrete Class for each type
          // we always return the full type name as the compiled type.
          // TODO: should this check if we are an inner type and use the stub name?  Or do we need to set dynCompiledInnerStub
@@ -6394,7 +6420,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             }
             if (extendsType == null) // A simple dynamic type - no concrete class required
                return getDefaultDynTypeClassName();
-            if (isExtendsDynamicType(extendsType)) // Extending a dynamic type - just use that guys class
+            if (isExtendsDynamicType(extendsType) || dynamicNew) // Extending a dynamic type - just use that guys class
                return ModelUtil.getCompiledClassName(extendsType);
          }
          if (getEnclosingType() != null)
@@ -6411,7 +6437,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       /* ??? Not sure why we used to include this test below
       boolean oldTest = ModelUtil.getParamTypeBaseType(extendsType) instanceof Class;
       */
-      return ModelUtil.isDynamicType(extendsType) || (ModelUtil.isAssignableFrom(IDynObject.class, extendsType) && ModelUtil.hasDynTypeConstructor(extendsType));
+      return ModelUtil.isDynamicType(extendsType) || ModelUtil.isDynamicNew(extendsType) || (ModelUtil.isAssignableFrom(IDynObject.class, extendsType) && ModelUtil.hasDynTypeConstructor(extendsType));
    }
 
    /** Converts the supplied type arguments which would be used for the current class to those from the extends class */
@@ -6933,8 +6959,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       super.validate();
 
       if (needsDynamicStubForExtends()) {
-         needsDynamicStub = true;
-         propagateDynamicStub();
+         if (!dynamicNew) {
+            needsDynamicStub = true;
+            propagateDynamicStub();
+         }
       }
 
       // If we extend a class which eventually turns into a compiled inner class, we need to preserve that type
@@ -7634,7 +7662,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
 
       // Don't do sync for the layer types, annotation layer types or interfaces or deactivated layers
-      if (isLayerType || layer.annotationLayer || getDeclarationType() == DeclarationType.INTERFACE || !layer.activated)
+      if (isLayerType || isLayerComponent() || layer.annotationLayer || getDeclarationType() == DeclarationType.INTERFACE || !layer.activated)
          return;
 
       // Or temporary types like documentation
@@ -7695,7 +7723,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
 
       LayeredSystem sys = getLayeredSystem();
-      List<LayeredSystem> syncSystems = sys.getSyncSystems();
+      List<LayeredSystem> syncSystems = isLayerComponent() ? null : sys.getSyncSystems();
       String typeName = getFullTypeName();
 
       // Even if we have no sync runtimes active, you can still enable/disable the @Sync attribute so still process this type
@@ -8370,5 +8398,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public boolean isLayerType() {
       return isLayerType;
+   }
+
+   /** Is this a type defined inside of a layer?  If so, it's implicitly dynamic. */
+   public boolean isLayerComponent() {
+      JavaModel model = getJavaModel();
+      return model != null && model.isLayerModel;
    }
 }

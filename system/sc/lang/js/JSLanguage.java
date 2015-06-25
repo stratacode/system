@@ -5,6 +5,7 @@
 package sc.lang.js;
 
 import sc.lang.SCLanguage;
+import sc.layer.Layer;
 import sc.parser.*;
 
 import java.util.Set;
@@ -65,6 +66,11 @@ public class JSLanguage extends SCLanguage implements IParserConstants {
    }
 
    public JSLanguage() {
+      this(null);
+   }
+
+   public JSLanguage(Layer layer) {
+      super(layer);
       // TODO: need to implement the rest of the JS grammar so we can parse a complete document.  Right now, we're just
       // re-defining any lower level grammar objects for conversion from Java to JS.  Ideally we could parse a JS and generate
       // a Java model from that as well, like to synchronize Java types from code we parse from a JS framework

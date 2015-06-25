@@ -5,6 +5,7 @@
 package sc.layer.deps;
 
 import sc.lang.BaseLanguage;
+import sc.layer.Layer;
 import sc.parser.*;
 
 public class DependenciesLanguage extends BaseLanguage implements IParserConstants
@@ -24,6 +25,11 @@ public class DependenciesLanguage extends BaseLanguage implements IParserConstan
    Sequence depsFile = new Sequence("DependencyFile(depList,,)", depsEnts, spacing, new Symbol(EOF));
 
    public DependenciesLanguage() {
+      this(null);
+   }
+
+   public DependenciesLanguage(Layer layer) {
+      super(layer);
       setSemanticValueClassPath("sc.layer.deps");
       setStartParselet(depsFile);
    }

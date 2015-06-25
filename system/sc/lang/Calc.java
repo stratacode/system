@@ -4,6 +4,7 @@
 
 package sc.lang;
 
+import sc.layer.Layer;
 import sc.parser.*;
 
 import java.io.StringReader;
@@ -70,8 +71,12 @@ public class Calc extends Language implements IParserConstants
       expression.add(addition, subtraction, expression2); 
    }
 
-   public Calc()
-   {
+   public Calc() {
+      this(null);
+   }
+
+   public Calc(Layer layer) {
+      super(layer);
       setStartParselet(expression);
    }
 

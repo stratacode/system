@@ -16,7 +16,8 @@ public interface LayerConstants
    public static final String DEFAULT_LAYERS_URL = "https://github.com/stratacode/layers.git";
 
    public static final String[] ALL_CONFIGURED_RUNTIMES = {"java", "js", "android", "gwt"};
-   String SC_DIR = ".stratacode";
-   String LAYER_PATH_FILE = "layerPath";
-   String SC_SOURCE_PATH = "scSourcePath";
+   public static final String SC_DIR = ".stratacode";
+   public static final String LAYER_PATH_FILE = "layerPath";
+   public static final String SC_SOURCE_PATH = "scSourcePath";
+   public static final String LAYER_COMPONENT_PACKAGE = "sys.layerCore";;
 }

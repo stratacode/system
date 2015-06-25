@@ -102,7 +102,8 @@ public class ClassDeclaration extends TypeDeclaration {
                      setDynamicType(true);
                      dynamicNew = false;
                   }
-
+                  if (extendsTD.dynamicNew)
+                     extendsTD.clearDynamicNew();
                   if (m.layeredSystem != null) {
                      m.layeredSystem.addSubType(extendsTD, this);
                   }

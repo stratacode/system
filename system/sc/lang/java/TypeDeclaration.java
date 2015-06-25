@@ -88,12 +88,32 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       displayError("Invalid type for modify extends operation: ");
    }
 
+   private static final boolean useDynamicNew = true;
+
    protected void initDynamicType() {
       // dynamic type might also be initialized to true externally
       // TODO: should we at this point see if we can propagate the dynamic status to our extends type?  It would have
       // to be a src file but this would reduce the number of stubs we generate.
-      if (hasModifier("dynamic") || ((layer != null && layer.dynamic) && !getCompiledOnly())) {
-         dynamicType = true;
+      if (hasModifier("dynamic") || ((layer != null && layer.dynamic) && !getCompiledOnly()) || isLayerComponent()) {
+         if (!useDynamicNew) {
+            dynamicType = true;
+         }
+         else {
+            /*
+             * We'd like to set dynamicNew here to avoid creating stubs for the simple object dynType extends compiledType
+             * scenario.  Unfortunately if this type is an inner type, we have no way to store the enclosing type so we
+             * need the stub.
+             */
+            if (modifyNeedsClass()) {
+               dynamicType = true;
+               if (dynamicNew)
+                  System.err.println("*** Invalid dynamicNew");
+            } else {
+               dynamicNew = true;
+               if (dynamicType)
+                  System.err.println("*** Invalid dynamicType");
+            }
+         }
       }
    }
 
@@ -1485,7 +1505,6 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
     * Not to be confused with needsDynamicStub - the case where we are generating a dynamic stub for a class in dynamic mode
     */
    public boolean needsDynType() {
-      /*  */
       if (useRuntimeReflection)
          return false;
       DynStubParameters params = getDynamicStubParameters();

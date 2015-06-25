@@ -4,7 +4,17 @@
 
 package sc.lang;
 
+import sc.layer.Layer;
+
 public class MarkdownLanguage extends BaseLanguage {
+
+   public MarkdownLanguage() {
+      this(null);
+   }
+
+   public MarkdownLanguage(Layer layer) {
+      super(layer);
+   }
 
    /*
    SymbolChoice endOfLine = new SymbolChoice("/r/n", "/n", "/r", Symbol.EOF);

@@ -5,6 +5,7 @@
 package sc.lang;
 
 import sc.lang.java.*;
+import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.obj.Constant;
 import sc.type.TypeUtil;
@@ -744,6 +745,11 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    }
 
    public JavaLanguage() {
+     this(null);
+   }
+
+   public JavaLanguage(Layer layer) {
+      super(layer);
       setSemanticValueClassPath("sc.lang.java");
       setStartParselet(compilationUnit);
       // The name used in the IntelliJ plugin files - for now not using as a precaution to try and avoid conflicts

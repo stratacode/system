@@ -4,6 +4,7 @@
 
 package sc.lang;
 
+import sc.layer.Layer;
 import sc.parser.IParserConstants;
 import sc.parser.OrderedChoice;
 
@@ -23,20 +24,22 @@ public class CalcLR extends Calc implements IParserConstants
       LRExpression.set(multiplication, division, addition, subtraction, number, parenExpression);
    }
 
-   public CalcLR()
-   {
+   public CalcLR() {
+      this(null);
+   }
+
+   public CalcLR(Layer layer) {
+      super(layer);
       setStartParselet(LRExpression);
    }
 
-   public static void main(String[] args)
-   {
+   public static void main(String[] args) {
       CalcLR c = new CalcLR();
       //c.debug = true;
       //Object result = c.parse(new StringReader("5+4"));
       //System.out.println("5+4" + " => " + result);
       //c.debug = true;
-      for (int i = 0; i < inputs.length; i++)
-      {
+      for (int i = 0; i < inputs.length; i++) {
          Object result = c.parse(new StringReader(inputs[i]));
          System.out.println(inputs[i] + " => " + result);
       }

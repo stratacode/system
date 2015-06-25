@@ -122,11 +122,16 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
    }
 
    public TemplateLanguage(boolean compiled) {
-      this();
+      this(null);
       compiledTemplate = compiled;
    }
 
    public TemplateLanguage() {
+      this(null);
+   }
+
+   public TemplateLanguage(Layer layer) {
+      super(layer);
       setStartParselet(template);
       addToSemanticValueClassPath("sc.lang.template");
       languageName = "SCTemplate";

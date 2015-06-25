@@ -5,6 +5,7 @@
 package sc.lang;
 
 import sc.lang.java.NonKeywordString;
+import sc.layer.Layer;
 import sc.parser.*;
 
 import java.util.Collections;
@@ -15,7 +16,6 @@ import java.util.Set;
  * level parselets like Keyword, SemanticToken, etc.
  */
 public abstract class BaseLanguage extends Language implements IParserConstants {
-
    public static Set DEPS_KEYWORDS = Collections.emptySet();
 
    public Set getKeywords() {
@@ -443,5 +443,13 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
 
          return super.generate(ctx, value);
       }
+   }
+
+   public BaseLanguage() {
+      this(null);
+   }
+
+   public BaseLanguage(Layer layer) {
+      super(layer);
    }
 }

@@ -4,6 +4,7 @@
 
 package sc.lang;
 
+import sc.layer.Layer;
 import sc.parser.Sequence;
 import sc.parser.Symbol;
 
@@ -54,7 +55,11 @@ public class XMLLanguage extends HTMLLanguage {
    }
 
    public XMLLanguage() {
-      super();
+      this(null);
+   }
+
+   public XMLLanguage(Layer layer) {
+      super(layer);
       addToSemanticValueClassPath("sc.lang.xml");
       languageName = "SCXml";
       defaultExtension = "scxml";

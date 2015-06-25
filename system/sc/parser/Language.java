@@ -5,6 +5,7 @@
 package sc.parser;
 
 import sc.layer.*;
+import sc.obj.CompilerSettings;
 import sc.type.DynType;
 import sc.type.IBeanMapper;
 import sc.type.RTypeUtil;
@@ -44,11 +45,15 @@ import java.util.Map;
  * which represent spacing.  Parse nodes support a "format" phase, that runs after generation.  This
  * phase can use the data in the semantic model to add back in the necessary spacing, newlines, etc.
  */
-public abstract class Language implements IFileProcessor {
+public abstract class Language extends LayerComponent implements IFileProcessor {
    // Suffix used to represent a file which is inherited from an extended layer
    public final static String INHERIT_SUFFIX = "inh";
 
    Parselet startParselet;
+
+   public String[] extensions;
+
+   public String[] patterns;
 
    public ClassLoader classLoader;
 
@@ -62,9 +67,6 @@ public abstract class Language implements IFileProcessor {
    public boolean trackChanges = false;
 
    public boolean debugSuccessOnly = false;
-
-   public Layer definedInLayer;    // If you add a language in a layer, set this to that layer so that previous layers
-                                  // will not see the language definitions
 
    /**
     * The optional name you can set to specify which types of files this language operates on - when the extension is used
@@ -85,6 +87,14 @@ public abstract class Language implements IFileProcessor {
    public boolean useCommonBuildDir = false;
 
    public String defaultExtension = null;
+
+   public Language() {
+      this(null);
+   }
+
+   public Language(Layer layer) {
+      super(layer);
+   }
 
    public Object parse(File file) {
       try {
@@ -692,5 +702,22 @@ public abstract class Language implements IFileProcessor {
 
    public String[] getSrcPathTypes() {
       return srcPathTypes;
+   }
+
+   public void init() {
+      if (_initState > 1)
+         return;
+      super.init();
+
+      // Languages are defined in the initialization stage so that they are available to help process
+      // files in the IDE.  The IDE will initialize the layer when source is loaded but won't start it
+      // until you run the application.
+      if (definedInLayer != null) {
+         if (extensions != null) {
+            for (String ext:extensions) {
+               definedInLayer.registerLanguage(this, ext);
+            }
+         }
+      }
    }
 }

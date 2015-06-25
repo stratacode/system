@@ -180,10 +180,6 @@ public class ModifyDeclaration extends TypeDeclaration {
       // need to start the extends type before we go and start our children.  This ensures an independent layer
       // gets started completely before the dependent layers.
       if (modifyTypeDecl != null) {
-         // temporary types which don't have a layer don't override.
-         if (layer != null) {
-
-         }
          startExtendedType(modifyTypeDecl, "modified");
 
          if (!modifyTypeDecl.getJavaModel().isStarted())
@@ -254,7 +250,6 @@ public class ModifyDeclaration extends TypeDeclaration {
          // only registering sub-types for the modifyInherited case - i.e. where we are not the same type as the modified type
          if (needsSubType())
             thisModel.layeredSystem.addSubType((TypeDeclaration) modifyTypeDecl, this);
-
      }
 
      if (extendsBoundTypes != null) {
@@ -1990,6 +1985,7 @@ public class ModifyDeclaration extends TypeDeclaration {
 
    protected void initDynamicType() {
       super.initDynamicType();
+
       if (dynamicType) {
          if (modifyTypeDecl != null) {
             Layer modLayer = modifyTypeDecl.getLayer();
@@ -2280,7 +2276,7 @@ public class ModifyDeclaration extends TypeDeclaration {
    public String getCompiledClassName() {
       if (staleClassName != null)
          return staleClassName;
-      if (isDynamicType()) {
+      if (isDynamicType() || dynamicNew) {
 
          // If used in a class value expression or the framework requires one concrete Class for each type
          // we always return the full type name as the compiled type.
@@ -2294,7 +2290,7 @@ public class ModifyDeclaration extends TypeDeclaration {
             }
             if (extendsType == null) // A simple dynamic type - no concrete class required
                return getDefaultDynTypeClassName();
-            if (ModelUtil.isDynamicType(extendsType)) { // Extending a dynamic type - just use that guys class
+            if (ModelUtil.isDynamicType(extendsType) || ModelUtil.isDynamicNew(extendsType)) { // Extending a dynamic type - just use that guys class
                String extTypeName = ModelUtil.getCompiledClassName(extendsType);
                // Only look at the extends type defined for this modify expression - don't inherit them here
                Object otherExtType = extendsTypes != null && extendsTypes.size() > 0 ? getExtendsTypeDeclaration() : null;

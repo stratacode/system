@@ -73,6 +73,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    public List<Layer> baseLayers;
 
    private boolean initialized = false;
+   private boolean initializing = false;
+
    public boolean started = false;
    public boolean validated = false;
 
@@ -686,6 +688,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       this.layerDirName = layerDirName == null ? (inLayerDir ? "." : null) : layerDirName.replace('/', '.');
       dynamic = !layeredSystem.getCompiledOnly() && !compiledOnly && (baseIsDynamic || modelType.hasModifier("dynamic") || markDyn ||
               (lpi.explicitDynLayers != null && (layerDirName != null && (lpi.explicitDynLayers.contains(layerDirName) || lpi.explicitDynLayers.contains("<all>")))));
+
+      if (!liveDynamicTypes && dynamic)
+         liveDynamicTypes = true;
 
       //if (options.verbose && markDyn && layer.compiledOnly) {
       //   System.out.println("Compiling layer: " + layer.toString() + " with compiledOnly = true");
@@ -2307,8 +2312,11 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    private final String[] zipSrcSuffixes = {"java"};
 
    public SrcEntry findSrcEntry(String srcName, boolean prependPackage, boolean layerResolve) {
-      if (!layerResolve)
+      if (!layerResolve) {
+         // Could be a reference from a template or something that is parsed while we are generating this layer.  As long as we
+         // are activated we won't start anything.
          checkIfStarted();
+      }
       File f = srcDirCache.get(srcName);
       if (f != null) {
          String path = f.getPath();

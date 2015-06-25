@@ -4,6 +4,7 @@
 
 package sc.lang;
 
+import sc.layer.Layer;
 import sc.parser.OrderedChoice;
 import sc.parser.ParseUtil;
 import sc.parser.Sequence;
@@ -87,9 +88,12 @@ public class CommandSCLanguage extends SCLanguage {
    public static CommandSCLanguage getCommandSCLanguage() {
       return INSTANCE;
    }
-
    public CommandSCLanguage() {
-      super();
+      this(null);
+   }
+
+   public CommandSCLanguage(Layer layer) {
+      super(layer);
       typeCommands.setLanguage(this);
       topLevelCommands.setLanguage(this);
       completionCommands.setLanguage(this);

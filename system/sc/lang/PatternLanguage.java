@@ -4,6 +4,7 @@
 
 package sc.lang;
 
+import sc.layer.Layer;
 import sc.parser.*;
 
 /**
@@ -39,6 +40,11 @@ public class PatternLanguage extends BaseLanguage {
    public Parselet pattern = new Sequence("Pattern(elements,)", patternElements, new Symbol(EOF));
 
    public PatternLanguage() {
+      this(null);
+   }
+
+   public PatternLanguage(Layer layer) {
+      super (layer);
       setSemanticValueClassPath("sc.lang.pattern");
       setStartParselet(pattern);
    }

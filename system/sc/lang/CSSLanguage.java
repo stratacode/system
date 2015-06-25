@@ -4,6 +4,7 @@
 
 package sc.lang;
 
+import sc.layer.Layer;
 import sc.parser.*;
 
 /** TODO: For now, the scss format is just the template language generating a string.  This is the hook for
@@ -26,6 +27,11 @@ public class CSSLanguage extends TemplateLanguage {
     private boolean enableCSSParser = false;
 
     public CSSLanguage() {
+       this(null);
+    }
+
+    public CSSLanguage(Layer layer) {
+        super(layer);
         if (enableCSSParser) {
             templateBodyDeclarations.setName("([],[],[],[],[],[])");
             templateBodyDeclarations.addDefault(cssStyleSheet);

@@ -2045,7 +2045,12 @@ public class ModelUtil {
    public static boolean transformNewExpression(LayeredSystem sys, Object boundType) {
       // For types which have the component interface, if it is either an object or has a new template
       // we need to transform new Foo into a call to the newFoo method that was generated.
-      return ModelUtil.isComponentInterface(sys, boundType);
+      if (!ModelUtil.isComponentInterface(sys, boundType))
+         return false;
+      // We always generate the newX methods for auto components but if it just implements the interface, it may not have one.
+      if ((boundType instanceof Class || (boundType instanceof TypeDeclaration && !((TypeDeclaration) boundType).isAutoComponent())) && getMethods(boundType, "new" + ModelUtil.getClassName(boundType), null, false) == null)
+         return false;
+      return true;
    }
 
    public static boolean isObjectType(Object boundType) {

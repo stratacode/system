@@ -4,6 +4,7 @@
 
 package sc.lang;
 
+import sc.layer.Layer;
 import sc.parser.*;
 
 import java.util.ArrayList;
@@ -384,6 +385,11 @@ public class HTMLLanguage extends TemplateLanguage {
    }
 
    public HTMLLanguage() {
+      this(null);
+   }
+
+   public HTMLLanguage(Layer layer) {
+      super(layer);
       setStartParselet(template);
       addToSemanticValueClassPath("sc.lang.html");
       languageName = "SCHtml";

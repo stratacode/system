@@ -5,6 +5,7 @@
 package sc.lang;
 
 import sc.lang.java.JavaModel;
+import sc.layer.Layer;
 import sc.obj.Constant;
 import sc.util.ExtensionFilenameFilter;
 import sc.parser.*;
@@ -126,7 +127,11 @@ public class SCLanguage extends JavaLanguage {
    }
 
    public SCLanguage() {
-      super();
+      this(null);
+   }
+
+   public SCLanguage(Layer layer) {
+      super(layer);
       addToSemanticValueClassPath("sc.lang.sc");
       languageName = "StrataCode";
       defaultExtension = DEFAULT_EXTENSION;
