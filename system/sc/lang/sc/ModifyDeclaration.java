@@ -2276,7 +2276,7 @@ public class ModifyDeclaration extends TypeDeclaration {
    public String getCompiledClassName() {
       if (staleClassName != null)
          return staleClassName;
-      if (isDynamicType() || dynamicNew) {
+      if (isDynamicNew()) {
 
          // If used in a class value expression or the framework requires one concrete Class for each type
          // we always return the full type name as the compiled type.

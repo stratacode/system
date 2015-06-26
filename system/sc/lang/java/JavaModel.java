@@ -1268,7 +1268,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       List<SrcEntry> innerObjStubs = null;
       TypeDeclaration modelType = getModelTypeDeclaration();
 
-      if (modelType != null && (modelType.isDynamicType() || modelType.dynamicNew)) {
+      if (modelType != null && (modelType.isDynamicNew())) {
          // Save this as a dynamic type in this layer so we know to not load it as a regular class in an incremental build
          buildLayer.markDynamicType(modelType.getFullTypeName());
 

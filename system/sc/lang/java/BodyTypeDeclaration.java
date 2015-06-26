@@ -89,7 +89,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    /* Cached copy of all methods so we don't keep recomputing it for property access */
    private transient Object[] allMethods = null;
 
-   /** Set to true via CompilerSettings or when there's an explicit .class reference.  For dynamic types, we generate additional constructors that mirror the original class hardcoding the type */
+   /**
+    * Set to true via CompilerSettings or when there's an explicit .class reference to force the generation of a dynamic stub for this class.
+    * It's different than compiledOnly which forces the class to be a normal compiled class.
+    * For needCompiledClass dynamic types, we generate the constructors that mirror the original class hardcoding the type
+    */
    public transient boolean needsCompiledClass = false;
    /** True if a method overrides a compiled method - forcing a stub in cases where one is not usually needed.  Not to be confused with needsDynType - used when reflection is diabled and we need to generate dynType info for a compiled class (i.e. GWT) */
    public transient boolean needsDynamicStub = false;
@@ -974,7 +978,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    void checkForStaleAdd() {
       Layer l = getLayer();
-      if (l != null && l.compiled && !isDynamicType() && !dynamicNew && staleClassName == null && !isGeneratedType()) {
+      if (l != null && l.compiled && !isDynamicNew() && staleClassName == null && !isGeneratedType()) {
          LayeredSystem sys = l.layeredSystem;
          sys.setStaleCompiledModel(true, "Added statement to compiled type: ", typeName);
          staleClassName = getCompiledClassName();
@@ -3681,7 +3685,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if (extendsType == null)
             return isDynamicType() && needsCompiledClass;
       }
-      if (dynamicNew)
+      if (dynamicNew && !needsCompiledClass)
          return false;
       // The extends type may either be a dynamic type, or a compiled type which implements the IDynObject interface.
       if (isExtendsDynamicType(extendsType)) {
@@ -3690,7 +3694,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // If we're dynamic and our extends type is not, we need a stub to encapsulate the functionality of the
       // the extends class.
       else
-         return isDynamicType();
+         return isDynamicNew();
    }
 
    private boolean needsDynamicStubForExtends() {
@@ -5835,7 +5839,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          initInstance(overriddenAssign, currentObj, ctx, iit);
       }
       else {
-         getLayeredSystem().setStaleCompiledModel(true, "Update to properties with liveDynamicTypes disabled for ", typeName);
+         getLayeredSystem().setStaleCompiledModel(true, "Not current object of type: ", typeName, " to set property: " + overriddenAssign);
       }
    }
 
@@ -6402,7 +6406,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (staleClassName != null)
          return staleClassName;
 
-      if (isDynamicType() || dynamicNew) {
+      if (isDynamicNew()) {
          // If used in a class value expression or the framework requires one concrete Class for each type
          // we always return the full type name as the compiled type.
          // TODO: should this check if we are an inner type and use the stub name?  Or do we need to set dynCompiledInnerStub
@@ -6420,7 +6424,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             }
             if (extendsType == null) // A simple dynamic type - no concrete class required
                return getDefaultDynTypeClassName();
-            if (isExtendsDynamicType(extendsType) || dynamicNew) // Extending a dynamic type - just use that guys class
+            if (isExtendsDynamicType(extendsType) || isDynamicNew()) // Extending a dynamic type - just use that guys class
                return ModelUtil.getCompiledClassName(extendsType);
          }
          if (getEnclosingType() != null)
@@ -6855,6 +6859,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public void setCompiledOnly(boolean val) {
       compiledOnly = val;
+      if (val) {
+         dynamicNew = false;
+         dynamicType = false;
+      }
    }
 
    public Set<Object> getDependentTypes() {

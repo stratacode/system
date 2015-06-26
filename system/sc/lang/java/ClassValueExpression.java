@@ -58,7 +58,7 @@ public class ClassValueExpression extends Expression {
          if (boundType instanceof BodyTypeDeclaration) {
             BodyTypeDeclaration typeDecl = (BodyTypeDeclaration) boundType;
             // Only set this to true if this is not already a dynamic stub.  We'll generate some ClassValueExpressions in DynObject.resolveName calls for example but we ensure there's already a compiled class.  We don't want to generate those extra constructors since it means more code gen caused by code gen
-            if (typeDecl.isDynamicType()) {
+            if (typeDecl.isDynamicNew()) {
                if (!typeDecl.isDynamicStub(false))
                   typeDecl.enableNeedsCompiledClass();
             }

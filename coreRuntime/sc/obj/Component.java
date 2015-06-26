@@ -20,7 +20,7 @@ import java.lang.annotation.Target;
  * You are guaranteed that all dependent objects have been init'd before your start method is called. 
  */
 @Target({ElementType.TYPE})
-@Retention(RetentionPolicy.SOURCE)
+@Retention(RetentionPolicy.RUNTIME)
 public @interface Component {
    boolean disabled() default false;
 }
