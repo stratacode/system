@@ -48,6 +48,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    public static boolean traceSystemUpdates = false;
 
    public String templatePrefix;
+   public String srcPathType;
    public String genJSPrefix;
 
    public JSBuildInfo jsBuildInfo;
@@ -674,11 +675,12 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    public SrcEntry getSrcEntryForJSFile(Layer genLayer, String jsFile) {
-      String absFilePath = FileUtil.concat(genLayer.buildDir, templatePrefix, jsFile);
+      String prefix = getJSPathPrefix(genLayer);
+      String absFilePath = FileUtil.concat(genLayer.buildDir, prefix, jsFile);
       // These go into the buildSrcDir because there's no use for them in the web root.  Also, they are put into the .deps file - if they don't exist, they force
       // a regenerate.  That's cause they are returned from getProcessedFiles.  Not entirely sure we need that but dep generated files must be in the buildSrcDir
       // They go into the generated layers buildSrcDir, not the system one so we support layered management of these files.
-      SrcEntry srcEnt = new SrcEntry(genLayer, absFilePath, FileUtil.concat(templatePrefix, jsFile));
+      SrcEntry srcEnt = new SrcEntry(genLayer, absFilePath, FileUtil.concat(prefix, jsFile));
       return srcEnt;
    }
 
@@ -1658,6 +1660,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return changed;
    }
 
+   private String getJSPathPrefix(Layer buildLayer) {
+      return templatePrefix != null ? templatePrefix : buildLayer.getSrcPathBuildPrefix(srcPathType);
+   }
+
    public void postProcess(LayeredSystem sys, Layer genLayer) {
       List<BuildInfo.MainMethod> mainMethods = genLayer.buildInfo.mainMethods;
       if (jsBuildInfo.jsGenFiles.size() == 0 && (mainMethods == null || mainMethods.size() == 0)) {
@@ -1699,7 +1705,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
          JSGenFile jsg = ent.getValue();
          LinkedHashMap<JSFileEntry,Boolean> typesInFile = new LinkedHashMap<JSFileEntry,Boolean>();
-         String absFilePath = FileUtil.concat(genLayer.buildDir, templatePrefix, jsFile);
+         String absFilePath = FileUtil.concat(genLayer.buildDir, getJSPathPrefix(genLayer), jsFile);
 
          // This gen file has not been added yet in the layer stack so no processing for it.
          if (jsg.fromLayer.getLayerPosition() > genLayer.getLayerPosition() || (genLayer != sys.buildLayer && !genLayer.extendsLayer(jsg.fromLayer) && !genLayer.extendsLayer(jsg.toLayer)))

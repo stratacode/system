@@ -56,11 +56,13 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          installRepository.doInstall(src, ctx);
          // This is the src repository and so does not need to go into classpath
          src.pkg.definesClasses = false;
-         pomFileRes = POMFile.readPOM(FileUtil.concat(src.pkg.installedRoot, "pom.xml"), this, ctx);
+         pomFileRes = POMFile.readPOM(FileUtil.concat(src.pkg.getVersionRoot(), "pom.xml"), this, ctx, pkg);
          desc = null;
       }
       else {
          desc = MvnDescriptor.fromURL(url);
+         // Need this set here so the version suffix can be resolved from the pkg
+         src.pkg.currentSource = src;
          pomFileRes = installPOM(desc, src.pkg, ctx, false);
          src.pkg.definesClasses = true;
       }
@@ -74,7 +76,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
 
       if (desc != null && !desc.depsOnly) {
          // Install the JAR file
-         String jarFileName = FileUtil.concat(src.pkg.installedRoot, desc.getJarFileName());
+         String jarFileName = FileUtil.concat(src.pkg.getVersionRoot(), desc.getJarFileName());
          boolean found = installMvnFile(desc, jarFileName, "jar");
          if (!found)
             return "Maven jar file: " + desc.getURL() + " not found in repositories: " + repositories;
@@ -108,6 +110,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
                   i--;
                   continue;
                }
+               // First check if it's excluded on this descriptor
                if (exclusions != null) {
                   boolean excluded = false;
                   for (MvnDescriptor exclDesc : exclusions) {
@@ -124,22 +127,43 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
                   if (excluded)
                      continue;
                }
+               // Then see if we exclude it from any exclusions in this path
+               if (ctx != null && excludedContext(ctx, depDesc)) {
+                  depDescs.remove(i);
+                  i--;
+                  continue;
+               }
                // Always load dependencies with the maven repository.  This repository might be git-mvn which loads the initial
                // repository with git
-               // TODO: check optional and exclusions - don't install optional or excluded repositories.
-               // For optional, maybe it's just left off the list.   so we don't get here.  For excluded, we
-               // Sometimes we just don't have a version - no use trying to install it with null
                if (depDesc.version != null)
-                  depPackages.add(depDesc.getOrCreatePackage((MvnRepositoryManager) system.getRepositoryManager("mvn"), false, DependencyContext.child(ctx), true));
+                  depPackages.add(depDesc.getOrCreatePackage((MvnRepositoryManager) system.getRepositoryManager("mvn"), false, DependencyContext.child(ctx, pkg), true));
             }
             src.pkg.dependencies = depPackages;
 
             info(StringUtil.indent(DependencyContext.val(ctx)) + "Done initializing dependencies for: " + pkg.packageName);
          }
       }
-
-
       return null;
+   }
+
+   private boolean excludedContext(DependencyContext ctx, MvnDescriptor desc) {
+      if (ctx.fromPkg != null) {
+         RepositorySource src = ctx.fromPkg.currentSource;
+         if (src instanceof MvnRepositorySource) {
+            MvnRepositorySource msrc = (MvnRepositorySource) src;
+            List<MvnDescriptor> exclusions = msrc.desc.exclusions;
+            if (exclusions != null) {
+               for (MvnDescriptor exclDesc:exclusions) {
+                  if (exclDesc.matches(desc))
+                     return true;
+               }
+            }
+         }
+      }
+      if (ctx.parent != null) {
+         return excludedContext(ctx.parent, desc);
+      }
+      return false;
    }
 
    // Need to install the dependencies after all of them have been collected.  That's so that the sources array gets sorted properly.
@@ -157,7 +181,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       if (depPackages != null) {
          info(StringUtil.indent(DependencyContext.val(ctx)) + "Installing dependencies for: " + pkg.packageName);
          for (RepositoryPackage depPkg:depPackages) {
-            system.installPackage(depPkg, DependencyContext.child(ctx));
+            system.installPackage(depPkg, DependencyContext.child(ctx, pkg));
          }
          info(StringUtil.indent(DependencyContext.val(ctx)) + "Done installing dependencies for: " + pkg.packageName);
       }
@@ -175,7 +199,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
    }
 
    Object installPOM(MvnDescriptor desc, RepositoryPackage pkg, DependencyContext ctx, boolean checkExists) {
-      String pomFileName = FileUtil.concat(pkg.installedRoot, "pom.xml");
+      String pomFileName = FileUtil.concat(pkg.getVersionRoot(), "pom.xml");
       if (!checkExists || !new File(pomFileName).canRead()) {
          boolean found = installMvnFile(desc, pomFileName, "pom");
          if (!found) {
@@ -184,7 +208,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          }
       }
 
-      POMFile pomFile = POMFile.readPOM(pomFileName, this, ctx);
+      POMFile pomFile = POMFile.readPOM(pomFileName, this, ctx, pkg);
       if (pomFile == null) {
          pomCache.put(pomFileName, POMFile.NULL_SENTINEL);
          return "Failed to parse maven POM: " + pomFileName;
@@ -211,7 +235,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
    @Override
    public RepositoryPackage createPackage(String url) {
       MvnDescriptor desc = MvnDescriptor.fromURL(url);
-      RepositorySource src = new RepositorySource(this, url, false);
+      MvnRepositorySource src = new MvnRepositorySource(this, url, false, desc, null);
       return new MvnRepositoryPackage(this, desc.getPackageName(), desc.getJarFileName(), src);
    }
 
@@ -220,7 +244,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
    }
 
    public POMFile getPOMFile(MvnDescriptor desc, RepositoryPackage pkg, DependencyContext ctx) {
-      String pomFileName = FileUtil.concat(pkg.installedRoot, "pom.xml");
+      String pomFileName = FileUtil.concat(pkg.getVersionRoot(), "pom.xml");
       POMFile res = pomCache.get(pomFileName);
       if (res != null) {
          if (res == POMFile.NULL_SENTINEL)

@@ -5,7 +5,6 @@
 package sc.parser;
 
 import sc.layer.*;
-import sc.obj.CompilerSettings;
 import sc.type.DynType;
 import sc.type.IBeanMapper;
 import sc.type.RTypeUtil;
@@ -79,8 +78,6 @@ public abstract class Language extends LayerComponent implements IFileProcessor 
    public boolean exportProcessing = true;  // You can add a language private to a specific layer by setting this to false
 
    public BuildPhase buildPhase = BuildPhase.Process;
-
-   public boolean prependLayerPackage = true;  // If true, prepend the layer's package name to the file.
 
    public String pathPrefix;    // A prefix prepended onto the generated source name
 
@@ -527,7 +524,7 @@ public abstract class Language extends LayerComponent implements IFileProcessor 
    }
 
    public FileEnabledState enabledForPath(String pathName, Layer fileLayer, boolean abs) {
-      String filePathType = fileLayer.getSrcPathType(pathName, abs);
+      String filePathType = fileLayer.getSrcPathTypeName(pathName, abs);
       if (srcPathTypes != null) {
          for (int i = 0; i < srcPathTypes.length; i++) {
             boolean res = StringUtil.equalStrings(srcPathTypes[i], filePathType);
@@ -689,8 +686,9 @@ public abstract class Language extends LayerComponent implements IFileProcessor 
       initialize();
    }
 
-   public String getOutputFileToUse(LayeredSystem sys, IFileProcessorResult result, SrcEntry srcEnt) {
-      return srcEnt.relFileName;
+   public String getOutputFileToUse(LayeredSystem sys, IFileProcessorResult result, SrcEntry srcEnt, Layer buildLayer) {
+      String prefix = getPathPrefix(srcEnt, buildLayer);
+      return FileUtil.concat(prefix, srcEnt.relFileName);
    }
 
    public void resetBuild() {

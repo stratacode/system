@@ -1513,10 +1513,33 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       // TODO: any reason to remove the dirIndex entry?
    }
 
+   /**
+    * The SrcPathType object is used to register one or more different types of src files - e.g. source files, files in the web directory, test files etc.  
+    * Most of the time you can use the default src path type - 'null' and just register a processor or language by the extension.  But when you need to treat
+    * files with the same suffix differently in different contexts, you register a new SrcPathType.  Assign a path-prefix of where to find these files.
+    * You can also assign a buildPrefix for a path type which is used in computing where the generated files go.  
+    */
    private static class SrcPathType {
-      String pathPrefix;
-      String srcType;
+      /** The path name of the src files - if relative is true, relative to this layer - e.g. 'web' or 'src/main/tests.  If absolute, the abs path name to find the src of this type' */
+      String srcPath;
       boolean relative;
+      /** The name of the path-type - e.g. 'web' or 'testFiles' */
+      String pathTypeName;
+      /**
+       * The build prefix to use when building files of this type.  The value which is used is relative to the buildLayer, allowing you to
+       * reorganize files found in base-layers by adding a new layer and changing the buildPrefix for that file type..
+       */
+      String buildPrefix;
+
+      public String toString() {
+         if (pathTypeName == null)
+            return "<null src path type>";
+         if (srcPath == null && buildPrefix == null)
+            return pathTypeName;
+         String buildPrefixStr = buildPrefix == null ? "" : '@' + buildPrefix;
+         String srcPathStr = srcPath == null ? "" : ':' + srcPath;
+         return pathTypeName + srcPathStr + buildPrefixStr;
+      }
    }
 
    private static class ReplacedType {
@@ -1625,7 +1648,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          if (layeredSystem.options.verbose) {
             verbose("Layer: " + this + " custom src path:");
             for (String srcDir:topLevelSrcDirs) {
-               String srcPathType = getSrcPathType(srcDir, true);
+               String srcPathType = getSrcPathTypeName(srcDir, true);
                verbose("   " + srcDir + (srcPathType != null ? " srcPathType: " + srcPathType : ""));
             }
          }
@@ -3712,54 +3735,70 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       buildInfo = null;
    }
 
+   public void addSrcPath(String srcPath, String srcPathType) {
+      addSrcPath(srcPath, srcPathType, null);
+   }
+
+   public void setPathTypeBuildPrefix(String pathTypeName, String buildPrefix) {
+      addSrcPath(null, pathTypeName, buildPrefix);
+   }
+
    /**
     *  Adds a new src path with the optional srcPathType.  The srcPathType specifies the nature of the files under this
     * directory - e.g. for web/** the srcPathType is 'web'.   The default type for normal source files is null.
-    * */
-   public void addSrcPath(String srcPath, String srcPathType) {
-      boolean abs = FileUtil.isAbsolutePath(srcPath);
-      // Relative paths are already in the default src path (layerPathName)
-      if (abs) {
-         if (this.srcPath != null) {
-            this.srcPath = this.srcPath + ":" + srcPath;
-         } else
-            this.srcPath = layerPathName + ":" + srcPath;
+    */
+   public void addSrcPath(String srcPath, String srcPathType, String buildPrefix) {
+      boolean abs;
+      // A null srcPath just sets the buildPrefix
+      if (srcPath != null) {
+         abs = FileUtil.isAbsolutePath(srcPath);
+         // Relative paths are already in the default src path (layerPathName)
+         if (abs) {
+            if (this.srcPath != null) {
+               this.srcPath = this.srcPath + ":" + srcPath;
+            } else
+               this.srcPath = layerPathName + ":" + srcPath;
+         }
       }
-      if (srcPathType != null) {
+      else
+          abs = false;
+      if (srcPathType != null || buildPrefix != null) {
          SrcPathType type = new SrcPathType();
-         type.srcType = srcPathType;
-         type.pathPrefix = srcPath;
+         type.pathTypeName = srcPathType;
+         type.srcPath = srcPath;
+         type.buildPrefix = buildPrefix;
          type.relative = !abs;
          if (srcPathTypes == null)
             srcPathTypes = new ArrayList<SrcPathType>();
          srcPathTypes.add(type);
       }
    }
+   public String getSrcPathTypeName(String fileName, boolean abs) {
+      SrcPathType type = getSrcPathType(fileName, abs);
+      return type == null ? null : type.pathTypeName;
+   }
 
-   public String getSrcPathType(String fileName, boolean abs) {
+   public String getSrcPathBuildPrefix(String pathTypeName) {
+      SrcPathType type = getSrcPathTypeByName(pathTypeName, true);
+      return type == null ? null : type.buildPrefix;
+   }
+
+   public SrcPathType getSrcPathTypeByName(String pathTypeName, boolean buildPrefix) {
       if (srcPathTypes != null) {
          for (SrcPathType srcPathType : srcPathTypes) {
-            if (srcPathType.relative) {
-               if (abs) {
-                  if (fileName.startsWith(layerPathName)) {
-                     if (prefixMatches(srcPathType.pathPrefix, fileName.substring(layerPathName.length() + 1)))
-                        return srcPathType.srcType;
-                  }
-               } else {
-                  if (prefixMatches(srcPathType.pathPrefix, fileName))
-                     return srcPathType.srcType;
-               }
-            } else {
-               if (abs) {
-                  if (prefixMatches(srcPathType.pathPrefix, fileName))
-                     return srcPathType.srcType;
-               }
+            if (buildPrefix) {
+               if (srcPathType.buildPrefix == null)
+                  continue;
+            }
+            // else - return the first matching entry
+            if (StringUtil.equalStrings(srcPathType.pathTypeName, pathTypeName)) {
+               return srcPathType;
             }
          }
       }
       if (baseLayers != null) {
-         for (Layer baseLayer:baseLayers) {
-            String res = baseLayer.getSrcPathType(fileName, abs);
+         for (Layer baseLayer : baseLayers) {
+            SrcPathType res = baseLayer.getSrcPathTypeByName(pathTypeName, buildPrefix);
             if (res != null)
                return res;
          }
@@ -3767,20 +3806,54 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       return null;
    }
 
-   public String getSrcPathType(SrcEntry srcEnt) {
-      for (SrcPathType srcPathType:srcPathTypes) {
-         if (srcPathType.relative) {
-            if (prefixMatches(srcPathType.pathPrefix, srcEnt.getRelDir()))
-               return srcPathType.srcType;
-         }
-         else {
-            if (prefixMatches(srcPathType.pathPrefix, srcEnt.absFileName))
-               return srcPathType.srcType;
+   public SrcPathType getSrcPathType(String fileName, boolean abs) {
+      if (srcPathTypes != null) {
+         for (SrcPathType srcPathType : srcPathTypes) {
+            // This entry just sets the buildPrefix
+            if (srcPathType.srcPath == null)
+               continue;
+            if (srcPathType.relative) {
+               if (abs) {
+                  if (fileName.startsWith(layerPathName)) {
+                     if (prefixMatches(srcPathType.srcPath, fileName.substring(layerPathName.length() + 1)))
+                        return srcPathType;
+                  }
+               } else {
+                  if (prefixMatches(srcPathType.srcPath, fileName))
+                     return srcPathType;
+               }
+            } else {
+               if (abs) {
+                  if (prefixMatches(srcPathType.srcPath, fileName))
+                     return srcPathType;
+               }
+            }
          }
       }
       if (baseLayers != null) {
          for (Layer baseLayer:baseLayers) {
-            String res = baseLayer.getSrcPathType(srcEnt);
+            SrcPathType res = baseLayer.getSrcPathType(fileName, abs);
+            if (res != null)
+               return res;
+         }
+      }
+      return null;
+   }
+
+   public String getSrcPathTypeName(SrcEntry srcEnt) {
+      for (SrcPathType srcPathType:srcPathTypes) {
+         if (srcPathType.relative) {
+            if (prefixMatches(srcPathType.srcPath, srcEnt.getRelDir()))
+               return srcPathType.pathTypeName;
+         }
+         else {
+            if (prefixMatches(srcPathType.srcPath, srcEnt.absFileName))
+               return srcPathType.pathTypeName;
+         }
+      }
+      if (baseLayers != null) {
+         for (Layer baseLayer:baseLayers) {
+            String res = baseLayer.getSrcPathTypeName(srcEnt);
             if (res != null)
                return res;
          }

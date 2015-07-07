@@ -53,7 +53,7 @@ public interface IFileProcessor {
    /** Gets the output directory to use for the given system and buildDir  */
    String getOutputDirToUse(LayeredSystem sys, String buildSrcDir, String layerBuildDir);
 
-   String getOutputFileToUse(LayeredSystem sys, IFileProcessorResult result, SrcEntry srcEnt);
+   String getOutputFileToUse(LayeredSystem sys, IFileProcessorResult result, SrcEntry srcEnt, Layer buildLayer);
 
    void resetBuild();
 

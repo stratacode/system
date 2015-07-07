@@ -323,13 +323,24 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
                exc.printStackTrace();
             }
 
+            String pathTypeName = src.layer.getSrcPathTypeName(src.absFileName, true);
+            String prefixToUse = templatePrefix == null ? buildLayer.getSrcPathBuildPrefix(pathTypeName) : templatePrefix;
+
+            String relFileName = src.relFileName;
+
+            if (pathTypeName != null && src.layer != null) {
+               String remPrefix = src.layer.getSrcPathBuildPrefix(pathTypeName);
+               if (remPrefix != null && relFileName != null && relFileName.startsWith(remPrefix))
+                  relFileName = relFileName.substring(remPrefix.length() + 1);
+            }
+
             // When both compiling and generating the template, use the alternate flag
             boolean prependPackage = compiledTemplate ? prependLayerPackageOnProcess : prependLayerPackage;
-            String prefixToUse = processPrefix != null ? processPrefix : templatePrefix;
+            prefixToUse = processPrefix != null ? processPrefix : prefixToUse;
             String prefix = FileUtil.concat(prefixToUse, prependPackage ? template.getPackagePrefixDir() : null);
             String newFile = FileUtil.concat(
                     outputDir == null ? (useSrcDir ? buildSrcDir : buildLayer.buildDir) :  outputDir,
-                    FileUtil.concat(prefix, src.relFileName));
+                    FileUtil.concat(prefix, relFileName));
             newFile = FileUtil.replaceExtension(newFile, resultSuffix);
 
             // The layered system processes hidden layer files backwards.  So generate will be true the for the

@@ -158,7 +158,7 @@ public class RepositoryPackage implements Serializable {
    private void addToClassPath(HashSet<String> classPath) {
       String fileToUse = getClassPathFileName();
       if (fileToUse != null && definesClasses) {
-         String entry = FileUtil.concat(installedRoot, fileToUse);
+         String entry = FileUtil.concat(getVersionRoot(), fileToUse);
          classPath.add(entry);
       }
 
@@ -264,6 +264,10 @@ public class RepositoryPackage implements Serializable {
 
    public String toString() {
       return packageName;
+   }
+
+   public String getVersionRoot() {
+      return installedRoot;
    }
 
    /**

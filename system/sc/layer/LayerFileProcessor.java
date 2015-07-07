@@ -9,7 +9,6 @@ import sc.obj.IComponent;
 import sc.util.FileUtil;
 import sc.util.StringUtil;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 
 /**
@@ -30,9 +29,6 @@ public class LayerFileProcessor extends LayerComponent implements IFileProcessor
    public String[] patterns;
 
    public String outputDir;
-
-   /** If true, add the layer's package prefix onto the path name of the file in the layer to get the generated/copied file. */
-   public boolean prependLayerPackage = true;
 
    /** If true, use the resulting file part of the generated source and store it in the buildSrcDir of the layer. */
    public boolean useSrcDir = true;
@@ -56,9 +52,6 @@ public class LayerFileProcessor extends LayerComponent implements IFileProcessor
    /** Ordinarily files are copied to the current build dir for the build layer.  Setting this changes it so they are always copied to a fixed shared buildDir, say for a WEB-INF directory */
    public boolean useCommonBuildDir = false;
 
-   /** Prefix pre-pended onto the file in the build dir. */
-   public String templatePrefix;
-
    /** Should the resulting file be executable */
    public boolean makeExecutable = false;
 
@@ -66,9 +59,6 @@ public class LayerFileProcessor extends LayerComponent implements IFileProcessor
 
    /** When inheriting a file from a previous layer, should we use the .inh files and remove all class files like the Java case does? */
    public boolean inheritFiles = false;
-
-   /** For files that start with this prefix, do not include that prefix in the output path used for the file. e.g. with skipSrcPathPrefix = "resources", a path of "resources/icons/foo.gif" turns into "icons/foo.gif" */
-   public String skipSrcPathPrefix;
 
    private boolean producesTypes = false;
 
@@ -169,26 +159,6 @@ public class LayerFileProcessor extends LayerComponent implements IFileProcessor
       return outputDir;
    }
 
-   public String getOutputFileToUse(LayeredSystem sys, IFileProcessorResult result, SrcEntry srcEnt) {
-      String relFileName = srcEnt.relFileName;
-      if (skipSrcPathPrefix != null && relFileName.startsWith(skipSrcPathPrefix))
-         relFileName = relFileName.substring(skipSrcPathPrefix.length() + 1);
-
-      /*
-      if (pathMapTable != null) {
-         for (PathMapEntry pathMapEnt:pathMapTable) {
-            String fromDir = pathMapEnt.fromDir;
-            if (relFileName.startsWith(fromDir)) {
-               relFileName = FileUtil.concat(pathMapEnt.toDir, relFileName.substring(fromDir.length()));
-            }
-         }
-      }
-      */
-
-      return FileUtil.concat(templatePrefix == null ? null : templatePrefix,
-              FileUtil.concat(prependLayerPackage ? srcEnt.layer.getPackagePath() : null, relFileName));
-   }
-
    public void resetBuild() {
       fileIndex.clear();
    }
@@ -204,7 +174,7 @@ public class LayerFileProcessor extends LayerComponent implements IFileProcessor
       // TODO: We should not be passing in null here in general
       if (fileLayer == null)
          return FileEnabledState.Enabled;
-      String filePathType = fileLayer.getSrcPathType(pathName, abs);
+      String filePathType = fileLayer.getSrcPathTypeName(pathName, abs);
       if (srcPathTypes != null) {
          for (int i = 0; i < srcPathTypes.length; i++) {
             boolean res = StringUtil.equalStrings(srcPathTypes[i], filePathType);

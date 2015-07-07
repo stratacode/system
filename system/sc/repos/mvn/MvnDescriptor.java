@@ -125,7 +125,8 @@ public class MvnDescriptor {
    // GroupId and artifactId are required.  The others only default to being equal if not specified.
    public boolean matches(MvnDescriptor other) {
       return strMatches(other.groupId, groupId) && strMatches(other.artifactId, artifactId) &&
-              (version == null || other.version == null || strMatches(version, other.version)) &&
+              // flexible match on version in this direction
+              (version == null /* || other.version == null */ || strMatches(version, other.version)) &&
               (type == null || other.type == null || strMatches(type, other.type)) &&
               (classifier == null || other.classifier == null || strMatches(classifier, other.classifier));
    }

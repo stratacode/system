@@ -4486,7 +4486,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
    }
 
-   public BodyTypeDeclaration updateInnerType(BodyTypeDeclaration innerType, ExecutionContext ctx, boolean updateInstances, UpdateInstanceInfo info) {
+   public BodyTypeDeclaration updateInnerType(BodyTypeDeclaration innerType, ExecutionContext ctx, boolean updateInstances, UpdateInstanceInfo info, boolean clearDynamicNew) {
       Object overridden = getInnerType(innerType.typeName, null);
       // For hidden types, we have already added the type to the parent so it will show up here.  We still need to
       // perform the update though.
@@ -4517,7 +4517,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                BodyTypeDeclaration newType = innerType.replaceHiddenType(this);
                root = innerType.getHiddenRoot();
 
-               updateInnerType(root, ctx, updateInstances, info);
+               updateInnerType(root, ctx, updateInstances, info, clearDynamicNew);
 
                // Don't return the root type... we should not be replacing this guy I don't think so always can return type?
                return newType;
@@ -4550,6 +4550,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          addBodyStatementIndent(innerType);
          getLayeredSystem().notifyInnerTypeAdded(innerType);
       }
+      // Disable the optimization that avoids a dynamic stub in this case - if we are in the interpreter, we expect the type to be extended
+      if (clearDynamicNew)
+         innerType.clearDynamicNew();
 
       /*
        * Adding a new inner object.  This involves finding all instances of the outer type and adding a new field.
@@ -4561,7 +4564,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             addStaticField(innerType, innerType.typeName, DynObject.lazyInitSentinel);
          }
          else {
-            if (isDynamicType()) {
+            if (isDynamicNew()) {
+               if (dynamicNew)
+                  clearDynamicNew();
                addDynInstField(innerType, true);
                addChildObjectToInstances(innerType);
             }
@@ -4719,7 +4724,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return replacedField;
       }
       else if (def instanceof BodyTypeDeclaration) {
-         return updateInnerType((BodyTypeDeclaration) def, ctx, updateInstances, info);
+         return updateInnerType((BodyTypeDeclaration) def, ctx, updateInstances, info, false);
       }
       else if (def instanceof PropertyAssignment) {
          Object replacedObj = updateProperty((PropertyAssignment) def, ctx, true, info);
@@ -5839,7 +5844,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          initInstance(overriddenAssign, currentObj, ctx, iit);
       }
       else {
-         getLayeredSystem().setStaleCompiledModel(true, "Not current object of type: ", typeName, " to set property: " + overriddenAssign);
+         getLayeredSystem().setStaleCompiledModel(true, "No current object of type: ", typeName, " to set property: " + overriddenAssign);
       }
    }
 
@@ -6424,7 +6429,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             }
             if (extendsType == null) // A simple dynamic type - no concrete class required
                return getDefaultDynTypeClassName();
-            if (isExtendsDynamicType(extendsType) || isDynamicNew()) // Extending a dynamic type - just use that guys class
+            // If we are extending a dynamic type or we do not need the dynamic type behavior in this class.
+            if (isExtendsDynamicType(extendsType) || dynamicNew)
                return ModelUtil.getCompiledClassName(extendsType);
          }
          if (getEnclosingType() != null)

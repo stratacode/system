@@ -64,16 +64,17 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       }
       long packageTime = getLastModifiedTime(src);
       // No last modified time for this source... assume it's up to date unless it's not installed
+      String depsInfo = (ctx == null || !info ? "" : " dependency chain: " + ctx.toString());
       if (packageTime == -1) {
          if (installedTime != -1) {
             if (info)
-               info("Package: " + src.pkg.packageName + " already installed");
+               info("Package: " + src.pkg.packageName + " pre-installed" + depsInfo);
             return null;
          }
       }
       else if (installedTime > packageTime) {
          if (info)
-            info("Package: " + src.pkg.packageName + " uptodate");
+            info("Package: " + src.pkg.packageName + " uptodate" + depsInfo);
          return null;
       }
 
@@ -88,7 +89,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
          rootFile.mkdirs();
       }
       if (info)
-         info(StringUtil.indent(DependencyContext.val(ctx)) + "Installing package: " + src.pkg.packageName + " from: " + src.url);
+         info(StringUtil.indent(DependencyContext.val(ctx)) + "Installing package: " + src.pkg.packageName + " src url: " + src.url + depsInfo);
       String err = doInstall(src, ctx);
       if (err != null) {
          tagFile.delete();

@@ -648,7 +648,11 @@ public abstract class AbstractInterpreter extends EditorContext {
 
    private BodyTypeDeclaration addToCurrentType(JavaModel model, BodyTypeDeclaration parentType, BodyTypeDeclaration type) {
       if (parentType == null) {
-         model.addTypeDeclaration((TypeDeclaration) type);
+         TypeDeclaration newTD = (TypeDeclaration) type;
+         model.addTypeDeclaration(newTD);
+         // This optimization let's us avoid an extra dynamic stub for empty classes but in the interpreter we are likely
+         // going to need that dynamic stub so just clear it to avoid a restart.
+         newTD.clearDynamicNew();
 
          // If this is a ModifyDeclaration which could not find it's type, do not add it as it is bogus anyway
          if (type instanceof ModifyDeclaration && type.errorArgs != null)
@@ -689,7 +693,7 @@ public abstract class AbstractInterpreter extends EditorContext {
                }
             }
          }
-         return parentType.updateInnerType(type, execContext, true, null);
+         return parentType.updateInnerType(type, execContext, true, null, true);
       }
    }
 
