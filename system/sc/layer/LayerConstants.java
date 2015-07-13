@@ -4,6 +4,8 @@
 
 package sc.layer;
 
+import sc.type.CTypeUtil;
+
 public interface LayerConstants
 {
    public static final String LAYER_CLASS_NAME = "Layer";
@@ -20,4 +22,6 @@ public interface LayerConstants
    public static final String LAYER_PATH_FILE = "layerPath";
    public static final String SC_SOURCE_PATH = "scSourcePath";
    public static final String LAYER_COMPONENT_PACKAGE = "sys.layerCore";;
+   public static final String LAYER_COMPONENT_TYPE_NAME = "Layer";;
+   public static final String LAYER_COMPONENT_FULL_TYPE_NAME = CTypeUtil.prefixPath(LAYER_COMPONENT_PACKAGE, LAYER_COMPONENT_TYPE_NAME);
 }

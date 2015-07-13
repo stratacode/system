@@ -9885,7 +9885,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return false;
       String parentName = CTypeUtil.getPackageName(typeName);
       // If it's a layer component it's always dynamic
-      if (parentName != null && parentName.equals(Layer.LAYER_COMPONENT_PACKAGE))
+      if (parentName != null && parentName.equals(Layer.LAYER_COMPONENT_FULL_TYPE_NAME))
          return true;
       SrcEntry srcEnt = getSrcFileFromTypeName(typeName, true, null, true, null);
       if (srcEnt == null) {
@@ -10362,7 +10362,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (rootType == null)
                rootType = getSrcTypeDeclaration(rootTypeName, rootFrom, true, notHidden, true, refLayer == null ? fromLayer : refLayer, layerResolve, true);
 
-            if (rootType == null && layerResolve && rootTypeName.equals(LayerConstants.LAYER_COMPONENT_PACKAGE)) {
+            if (rootType == null && layerResolve && rootTypeName.equals(LayerConstants.LAYER_COMPONENT_FULL_TYPE_NAME)) {
                List<Layer> layersList = refLayer == null ? layers : refLayer.getLayersList();
                // If we are initializing the fromLayer's layer def objects it is not in the list yet
                int pos = fromLayer == null || !fromLayer.isInitialized() ? layersList.size()-1 : fromLayer.layerPosition - 1;

@@ -1311,9 +1311,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       else if (pnode instanceof ITypeDeclaration) {
          ITypeDeclaration itd = (ITypeDeclaration) pnode;
          // We put all inner types found in layer def files into a single name-space.
-         // We could use the layer's package prefix?  If so, we probably need a way for one layer to set other
+         // TODO? should we could use the layer's package prefix?  If so, we probably need a way for one layer to set other
          // layer's properties so you are not limited what you can do in a layer def file.
-         String parentName = itd.isLayerType() ? LayerConstants.LAYER_COMPONENT_PACKAGE : itd.getFullTypeName();
+         String parentName = itd.isLayerType() ? LayerConstants.LAYER_COMPONENT_FULL_TYPE_NAME : itd.getFullTypeName();
          res = parentName + innerTypeSep + typeName;
       }
       else if (pnode instanceof BlockStatement)
@@ -1337,6 +1337,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public String getPackageName() {
+      if (isLayerComponent())
+         return LayerConstants.LAYER_COMPONENT_PACKAGE;
       return ModelUtil.getPackageName(this);
    }
 
@@ -3720,7 +3722,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public String getInnerStubFullTypeName() {
-      return CTypeUtil.prefixPath(getJavaModel().getPackagePrefix(), getInnerStubTypeName());
+      String stubTypeName = getInnerStubTypeName();
+      if (isLayerComponent())
+         return CTypeUtil.prefixPath(LayerConstants.LAYER_COMPONENT_PACKAGE, stubTypeName);
+      return CTypeUtil.prefixPath(getJavaModel().getPackagePrefix(), stubTypeName);
    }
 
    public String getInnerStubTypeName() {
@@ -3737,11 +3742,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    private String getInnerStubTypeNameInternal() {
-      BodyTypeDeclaration td = getEnclosingType();
-      if (td == null)
+      BodyTypeDeclaration encl = getEnclosingType();
+      if (encl == null)
          throw new IllegalArgumentException("Not an inner stub!");
 
-      String base = td.getEnclosingType() == null ? td.typeName : td.getInnerStubTypeNameInternal();
+      TypeDeclaration enclEncl = encl.getEnclosingType();
+      String base = encl.isLayerType ? LayerConstants.LAYER_COMPONENT_TYPE_NAME : enclEncl == null ? encl.typeName : encl.getInnerStubTypeNameInternal();
       // This component of the pathname needs to have the normal part of the type name because it extends a compiled
       // inner type.
       if (needsDynInnerStub)
@@ -3975,6 +3981,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          stubBaseName = getTypeName() + ".java";
       else
          stubBaseName = getEnclosingType() != null ? getInnerStubFileName() : (getTypeName() + ".java");
+      JavaModel model = getJavaModel();
+      if (model.isLayerModel)
+         return FileUtil.concat(LayerConstants.LAYER_COMPONENT_PACKAGE.replace(".", FileUtil.FILE_SEPARATOR), stubBaseName);
       return FileUtil.concat(getJavaModel().getPackagePrefixDir(), stubBaseName);
    }
 
@@ -6433,7 +6442,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             if (isExtendsDynamicType(extendsType) || dynamicNew)
                return ModelUtil.getCompiledClassName(extendsType);
          }
-         if (getEnclosingType() != null)
+         TypeDeclaration enclType = getEnclosingType();
+         if (enclType != null)
             return getInnerStubFullTypeName();
          return getFullTypeName();
       }

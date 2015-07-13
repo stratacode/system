@@ -19,6 +19,9 @@ public class MvnRepositoryPackage extends RepositoryPackage {
    public String getVersionRoot() {
       if (!(currentSource instanceof MvnRepositorySource))
          return installedRoot;
-      return FileUtil.concat(installedRoot, ((MvnRepositorySource) currentSource).desc.version);
+      MvnRepositorySource mvnSrc = (MvnRepositorySource) currentSource;
+      if (mvnSrc.desc != null && mvnSrc.desc.version != null)
+          return FileUtil.concat(installedRoot, mvnSrc.desc.version);
+      return installedRoot;
    }
 }

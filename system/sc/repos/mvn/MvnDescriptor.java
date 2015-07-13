@@ -8,10 +8,11 @@ import sc.util.FileUtil;
 import sc.util.StringUtil;
 import sc.util.URLUtil;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MvnDescriptor {
+public class MvnDescriptor implements Serializable {
    public String groupId;
    public String artifactId;
    public String version;

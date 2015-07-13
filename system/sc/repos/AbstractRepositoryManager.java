@@ -68,7 +68,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       if (packageTime == -1) {
          if (installedTime != -1) {
             if (info)
-               info("Package: " + src.pkg.packageName + " pre-installed" + depsInfo);
+               info("Package: " + src.pkg.packageName + " was already installed" + depsInfo);
             return null;
          }
       }

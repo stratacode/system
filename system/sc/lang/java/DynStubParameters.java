@@ -107,7 +107,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
          typeName = objTypeDecl.isDynInnerStub() && !objTypeDecl.needsDynInnerStub ? objTypeDecl.getInnerStubTypeName() : objTypeDecl.getTypeName();
          //typeName = objTypeDecl.getTypeName();
 
-         packageName = getInnerType() && objTypeDecl.needsDynInnerStub ? "" : objTypeDecl.getJavaModel().getPackagePrefix();
+         packageName = getInnerType() && objTypeDecl.needsDynInnerStub ? "" : objTypeDecl.getPackageName();
 
          scopeInterfaces = objTypeDecl.scopeInterfaces;
       }

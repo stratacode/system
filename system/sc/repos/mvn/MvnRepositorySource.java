@@ -10,7 +10,7 @@ import sc.repos.RepositorySource;
 
 public class MvnRepositorySource extends RepositorySource {
    // Do we need to serialize the exclusions?
-   transient MvnDescriptor desc;
+   MvnDescriptor desc;
 
    public MvnRepositorySource(IRepositoryManager mgr, String url, boolean unzip, MvnDescriptor desc, DependencyContext ctx) {
       super(mgr, url, unzip);

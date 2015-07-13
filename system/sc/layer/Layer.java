@@ -1114,7 +1114,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
       // Initialize the children after all layer types have been merged in so the modifications have taken effect
       TypeDeclaration td;
-      if (model != null && (td = model.getModelTypeDeclaration()) != null) {
+      if (model != null && (td = model.getModelTypeDeclaration()) != null && activated) {
          Object[] children = td.getObjChildren(this, null, false, true, true);
          if (children != null) {
             if (this.children == null)

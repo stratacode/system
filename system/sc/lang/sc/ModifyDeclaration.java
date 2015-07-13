@@ -185,9 +185,14 @@ public class ModifyDeclaration extends TypeDeclaration {
          if (!modifyTypeDecl.getJavaModel().isStarted())
             System.out.println("*** Model not started!");
 
-         // First, if our modified type picks up the dynamic behavior because it extends a class which is dynamic,
+         // If our modifyTypeDeclaration is a dynamic new and we do not need a class, we start out as a dynamicNew as well
+         if (modifyTypeDecl.dynamicNew) {
+            dynamicNew = true;
+            dynamicType = false;
+         }
+         // then, if our modified type picks up the dynamic behavior because it extends a class which is dynamic,
          // we need to inherit the dynamic behavior from that.
-         if (modifyTypeDecl.isDynamicType()) {
+         else if (modifyTypeDecl.isDynamicType()) {
             dynamicNew = false;
             dynamicType = true;
          }
@@ -216,9 +221,9 @@ public class ModifyDeclaration extends TypeDeclaration {
             modifiedCompiledClassLoaded = !modifyTypeDecl.isDynamicType() && modLayer.compiledInClassPath && layer.layeredSystem.isClassLoaded(modifyTypeDecl.getCompiledClassName());
          }
 
-         if (isDynamicType()) {
+         if (isDynamicType() && !dynamicNew) {
             if (modifiedCompiledClassLoaded) {
-               staleClassName =  modifyTypeDecl.getCompiledClassName();
+               staleClassName = modifyTypeDecl.getCompiledClassName();
                dynamicType = false;
                dynamicNew = true;
             }
@@ -232,7 +237,7 @@ public class ModifyDeclaration extends TypeDeclaration {
             }
          }
          else if (dynamicNew) {
-            if (modifyTypeDecl.isDynamicType()) {
+            if (modifyTypeDecl.isDynamicType() && !modifyTypeDecl.dynamicNew) {
                dynamicNew = false;
                dynamicType = true;
             }
