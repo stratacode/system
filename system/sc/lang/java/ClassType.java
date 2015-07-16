@@ -374,7 +374,7 @@ public class ClassType extends JavaType {
                         type = layerModel.getModelTypeDeclaration();
                   }
                   else {
-                     Layer layer = sys.findLayerByName(layerRelPath, fullTypeName);
+                     Layer layer = curModel.layer.activated ? sys.findLayerByName(layerRelPath, fullTypeName) : sys.getInactiveLayer(fullTypeName, false, false, false);
                      if (layer != null && layer.model != null)
                         type = layer.model.getModelTypeDeclaration();
                   }

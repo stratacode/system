@@ -104,14 +104,10 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
              * scenario.  Unfortunately if this type is an inner type, we have no way to store the enclosing type so we
              * need the stub.
              */
-            if (modifyNeedsClass()) {
+            if (modifyNeedsClass() || dynamicType) {
                dynamicType = true;
-               if (dynamicNew)
-                  System.err.println("*** Invalid dynamicNew");
             } else {
                dynamicNew = true;
-               if (dynamicType)
-                  System.err.println("*** Invalid dynamicType");
             }
          }
       }
