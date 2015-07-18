@@ -7,6 +7,7 @@ package sc.repos;
 import sc.util.IMessageHandler;
 import sc.util.FileUtil;
 
+import java.io.File;
 import java.util.ArrayList;
 
 /**
@@ -26,6 +27,11 @@ public class GitRepositoryManager extends AbstractRepositoryManager {
       args.add(src.url);
       String resDir = src.pkg.installedRoot;
       args.add(resDir);
+      if (mgr.system.installExisting && new File(resDir).isDirectory()) {
+         if (mgr.info)
+            mgr.info("Using existing install: " + resDir);
+         return null;
+      }
       if (mgr.info)
          mgr.info("Running git install: " + mgr.argsToString(args));
       String res = FileUtil.execCommand(args, null);

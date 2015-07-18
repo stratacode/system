@@ -51,6 +51,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       // Putting this into the installed root so it more reliably gets removed if the folder itself is removed
       File tagFile = new File(src.pkg.installedRoot, ".scPkgInstallInfo");
       File rootFile = new File(src.pkg.installedRoot);
+
       // TODO: right now, we are only installing directories but would we ever install files as well?
       boolean rootDirExists = rootFile.canRead() || rootFile.isDirectory();
       String rootParent = FileUtil.getParentPath(src.pkg.installedRoot);
@@ -59,7 +60,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       long installedTime = -1;
       if (rootDirExists && tagFile.canRead()) {
          RepositoryPackage oldPkg = RepositoryPackage.readFromFile(tagFile, this);
-         if (oldPkg != null && !system.reinstallSystem && src.pkg.updateFromSaved(this, oldPkg, true, ctx))
+         if (oldPkg != null && !system.reinstallSystem && !system.installExisting && src.pkg.updateFromSaved(this, oldPkg, true, ctx))
             installedTime = oldPkg.installedTime;
       }
       long packageTime = getLastModifiedTime(src);
@@ -67,19 +68,29 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       String depsInfo = (ctx == null || !info ? "" : " dependency chain: " + ctx.toString());
       if (packageTime == -1) {
          if (installedTime != -1) {
-            if (info)
-               info("Package: " + src.pkg.packageName + " was already installed" + depsInfo);
-            return null;
+            if (!system.installExisting) {
+               if (info)
+                  info("Package: " + src.pkg.packageName + " up-to-date: " + depsInfo);
+               return null;
+            }
+            else if (info) {
+               info("Installing existing: " + src.pkg.packageName + ":  " + depsInfo);
+            }
          }
       }
       else if (installedTime > packageTime) {
-         if (info)
-            info("Package: " + src.pkg.packageName + " uptodate" + depsInfo);
-         return null;
+         if (!system.installExisting) {
+            if (info)
+               info("Package: " + src.pkg.packageName + "  up-to-date: " + depsInfo);
+            return null;
+         }
+         else if (info) {
+            info("Installing existing: " + src.pkg.packageName + ":  " + depsInfo);
+         }
       }
 
       // If we are installing on top of an existing directory, rename the old directory in the backup folder
-      if (rootDirExists && !isEmptyDir(rootFile)) {
+      if (rootDirExists && !isEmptyDir(rootFile) && !system.installExisting) {
          Date curTime = new Date();
          String backupDir = FileUtil.concat(packageRoot, REPLACED_DIR_NAME, src.pkg.packageName + "." + curTime.getHours() + "." + curTime.getMinutes());
          new File(backupDir).mkdirs();

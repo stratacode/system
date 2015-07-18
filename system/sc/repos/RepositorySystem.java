@@ -20,17 +20,19 @@ public class RepositorySystem {
 
    public boolean updateSystem;
    public boolean reinstallSystem;
+   public boolean installExisting;
 
    public HashMap<String,RepositoryPackage> packages = new HashMap<String,RepositoryPackage>();
 
    public IMessageHandler msg;
 
-   public RepositorySystem(String rootDir, IMessageHandler handler, boolean info, boolean reinstall, boolean update) {
+   public RepositorySystem(String rootDir, IMessageHandler handler, boolean info, boolean reinstall, boolean update, boolean installExisting) {
       packageRoot = rootDir;
 
       msg = handler;
       reinstallSystem = reinstall;
       updateSystem = update;
+      this.installExisting = installExisting;
 
       addRepositoryManager(new ScpRepositoryManager(this, "scp", packageRoot, handler, info));
       addRepositoryManager(new GitRepositoryManager(this, "git", packageRoot, handler, info));

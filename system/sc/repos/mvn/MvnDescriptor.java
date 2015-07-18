@@ -13,6 +13,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MvnDescriptor implements Serializable {
+   private static final long serialVersionUID = 381740762128191325L;
+
    public String groupId;
    public String artifactId;
    public String version;
@@ -76,16 +78,17 @@ public class MvnDescriptor implements Serializable {
       return FileUtil.addExtension(artifactId + "-" + version, "jar");
    }
 
-   public static MvnDescriptor getFromTag(POMFile file, Element tag, boolean dependency) {
+   public static MvnDescriptor getFromTag(POMFile file, Element tag, boolean dependency, boolean appendInherited) {
       String groupId = file.getTagValue(tag, "groupId");
       String artifactId = file.getTagValue(tag, "artifactId");
       String type = file.getTagValue(tag, "type");
       String version = file.getTagValue(tag, "version");
       String classifier = file.getTagValue(tag, "classifier");
       MvnDescriptor desc = new MvnDescriptor(groupId, artifactId, version, type, classifier);
-      if (file.parentPOM != null) {
-         file.parentPOM.appendInherited(desc);
-      }
+      if (appendInherited)
+         file.appendInherited(desc, null);
+      else if (file.parentPOM != null)
+         file.parentPOM.appendInherited(desc, null);
       if (dependency) {
          Element exclRoot = tag.getSingleChildTag("exclusions");
          if (exclRoot != null) {
@@ -93,7 +96,9 @@ public class MvnDescriptor implements Serializable {
             if (exclTags != null) {
                ArrayList<MvnDescriptor> exclList = new ArrayList<MvnDescriptor>();
                for (Element exclTag : exclTags) {
-                  MvnDescriptor exclDesc = MvnDescriptor.getFromTag(file, exclTag, false);
+                  // Do not append inherited here - we only want the values explicitly specified here as those are the
+                  // ones which will match.
+                  MvnDescriptor exclDesc = MvnDescriptor.getFromTag(file, exclTag, false, false);
                   exclList.add(exclDesc);
                }
                desc.exclusions = exclList;
@@ -142,5 +147,18 @@ public class MvnDescriptor implements Serializable {
 
    public String toString() {
       return getURL();
+   }
+
+   public boolean equals(Object other) {
+      if (!(other instanceof MvnDescriptor))
+         return false;
+      MvnDescriptor od = (MvnDescriptor) other;
+
+      return StringUtil.equalStrings(groupId, od.groupId) && StringUtil.equalStrings(artifactId, od.artifactId) && StringUtil.equalStrings(version, od.version) &&
+             StringUtil.equalStrings(classifier, od.classifier) && StringUtil.equalStrings(type, od.type);
+   }
+
+   public int hashCode() {
+      return groupId.hashCode() + artifactId.hashCode();
    }
 }

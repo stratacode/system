@@ -106,6 +106,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
                MvnDescriptor depDesc = depDescs.get(i);
                // TODO: should we be validating that we have some version of this package?
                if (depDesc.version == null) {
+                  System.err.println("Warning: no version number found for maven dependency: " + depDesc + " from package: " + src.pkg.packageName);
                   depDescs.remove(i);
                   i--;
                   continue;
@@ -200,10 +201,14 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
 
    Object installPOM(MvnDescriptor desc, RepositoryPackage pkg, DependencyContext ctx, boolean checkExists) {
       String pomFileName = FileUtil.concat(pkg.getVersionRoot(), "pom.xml");
+      String notExistsFile = pomFileName + ".notFound";
+      if (system.installExisting && new File(notExistsFile).canRead())
+         return "POM file did not exist previously";
       if (!checkExists || !new File(pomFileName).canRead()) {
          boolean found = installMvnFile(desc, pomFileName, "pom");
          if (!found) {
             pomCache.put(pomFileName, POMFile.NULL_SENTINEL);
+            FileUtil.saveStringAsFile(notExistsFile, "does not exist", true);
             return "Maven pom file: " + desc.groupId + "/" + desc.artifactId + "/" + desc.version + " not found in repositories: " + repositories;
          }
       }
@@ -218,6 +223,10 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
 
    private boolean installMvnFile(MvnDescriptor desc, String resFileName, String remoteExt) {
       boolean found = false;
+      if (system.installExisting && new File(resFileName).canRead()) {
+         info("Using existing file: " + resFileName);
+         return true;
+      }
       for (MvnRepository repo:repositories) {
          String pomURL = repo.getFileURL(desc.groupId, desc.artifactId, desc.version, remoteExt);
          String resDir = FileUtil.getParentPath(resFileName);

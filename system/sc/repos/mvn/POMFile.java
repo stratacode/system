@@ -12,10 +12,7 @@ import sc.type.CTypeUtil;
 import sc.util.MessageHandler;
 import sc.util.StringUtil;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 /** Handles parsing and data model of the Maven POM file (pom.xml) */
 public class POMFile extends XMLFileFormat {
@@ -28,6 +25,8 @@ public class POMFile extends XMLFileFormat {
    POMFile parentPOM;
 
    ArrayList<POMFile> modulePOMs;
+
+   ArrayList<POMFile> importedPOMs;
 
    HashMap<String,String> properties = new HashMap<String,String>();
 
@@ -72,12 +71,11 @@ public class POMFile extends XMLFileFormat {
          return false;
       }
 
-      // TODO - process inherited POMs and sub-modules - read the other POM file and populate hash-tables
-      // with keys for the things that can be overridden.   Propagate variables from the nested file to here
       initPackaging();
       initProperties();
       initParent();
       initModules();
+      initDependencyManagement();
 
       return true;
    }
@@ -103,7 +101,7 @@ public class POMFile extends XMLFileFormat {
    private void initParent() {
       Element parent = projElement.getSingleChildTag("parent");
       if (parent != null) {
-         MvnDescriptor parentDesc = MvnDescriptor.getFromTag(this, parent, false);
+         MvnDescriptor parentDesc = MvnDescriptor.getFromTag(this, parent, false, false);
          parentDesc.pomOnly = true; // This reference only requires the POM - not the jar or deps
          RepositoryPackage parentPackage = parentDesc.getOrCreatePackage(mgr, false, DependencyContext.child(depCtx, pomPkg), false);
          // TODO: check for recursive references here!
@@ -210,7 +208,7 @@ public class POMFile extends XMLFileFormat {
             if (depScope == null)
                depScope = DEFAULT_SCOPE;
             if (includesScope(scopes, depScope)) {
-               MvnDescriptor desc = MvnDescriptor.getFromTag(this, depTag, true);
+               MvnDescriptor desc = MvnDescriptor.getFromTag(this, depTag, true, true);
                // TODO: do we need a mechanism to specify which optional packages should be installed?
                if (!desc.optional)
                   res.add(desc);
@@ -272,7 +270,7 @@ public class POMFile extends XMLFileFormat {
       return fileName;
    }
 
-   private void initDependencyManagement() {
+   void initDependencyManagement() {
       if (dependencyManagement == null) {
          dependencyManagement = new ArrayList<MvnDescriptor>();
 
@@ -283,34 +281,69 @@ public class POMFile extends XMLFileFormat {
                Element[] deps = depsRoot.getChildTagsWithName("dependency");
                if (deps != null) {
                   for (Element dep : deps) {
-                     dependencyManagement.add(MvnDescriptor.getFromTag(this, dep, true));
+                     String scope = dep.getSimpleChildValue("scope");
+                     // For <scope>import</scope> (where type = pom) we need to read the POM file specified by this
+                     // descriptor and include the dependencyManagement tags from the referenced file directly into this
+                     // files dependency management section.
+                     if (scope != null && scope.equals("import")) {
+                        // TODO: assert that dep's type attribute = pom.
+                        MvnDescriptor importDesc = MvnDescriptor.getFromTag(this, dep, false, false);
+                        DependencyContext importDepCtx = DependencyContext.child(depCtx, pomPkg);
+                        RepositoryPackage importPkg = importDesc.getOrCreatePackage(mgr, false, importDepCtx, false);
+                        POMFile importPOM = mgr.getPOMFile(importDesc, importPkg, importDepCtx);
+                        if (importPOM != null) {
+                           importPOM.initDependencyManagement();
+                           if (importedPOMs == null)
+                              importedPOMs = new ArrayList<POMFile>();
+                           importedPOMs.add(importPOM);
+                        }
+                        else {
+                           System.err.println("*** Failed to read POM file: " + importDesc + " for scope=import");
+                        }
+                     }
+                     else
+                        dependencyManagement.add(MvnDescriptor.getFromTag(this, dep, true, false));
                   }
                }
             }
          }
       }
-
    }
 
    /** If the child POM file does not specify a version or other properties, those are inherited from the parent POM in the dependency management section. */
    // TODO: need to implement the type=import operation where you can selectiely import dependencies from another POM.
-   public void appendInherited(MvnDescriptor desc) {
+   public void appendInherited(MvnDescriptor desc, HashSet<POMFile> visited) {
+      if (visited == null)
+         visited = new HashSet<POMFile>();
+      if (visited.contains(this))
+         return;
+      visited.add(this);
       if (desc.version == null || desc.type == null || desc.classifier == null) {
          initDependencyManagement();
          for (MvnDescriptor dep : dependencyManagement) {
             if (desc.matches(dep)) {
-               if (desc.version == null && dep.version != null)
+               if (desc.version == null && dep.version != null) {
                   desc.version = dep.version;
+                  if (mgr.info)
+                     mgr.info("Version for package: " + desc + " chosen in file: " + this);
+               }
                if (desc.type == null && dep.type != null)
                   desc.type = dep.type;
                if (desc.classifier == null && dep.classifier != null)
                   desc.classifier = dep.classifier;
             }
          }
+         if (parentPOM != null)
+            parentPOM.appendInherited(desc, visited);
+         if (importedPOMs != null) {
+            for (POMFile importPOM:importedPOMs) {
+               importPOM.appendInherited(desc, visited);
+            }
+         }
       }
       if (modulePOMs != null) {
          for (POMFile modPOM:modulePOMs) {
-            modPOM.appendInherited(desc);
+            modPOM.appendInherited(desc, visited);
          }
       }
    }

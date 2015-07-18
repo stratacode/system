@@ -195,10 +195,19 @@ public class RTypeUtil {
    }
 
    static CoalescedHashMap<String,Method[]> initMethodNameCache(Class resultClass) {
-      Method[] methods = resultClass.getDeclaredMethods();
+      Method[] methods;
+      Class superClass;
+      try {
+         methods = resultClass.getDeclaredMethods();
+         superClass = resultClass.getSuperclass();
+      }
+      catch (NoClassDefFoundError err) {
+         System.err.println("Class not found error resolving class: " + resultClass.getName() + ": " + err);
+         methods = new Method[0];
+         superClass = null;
+      }
       CoalescedHashMap<String,Method[]> superMethods = null, ifMethodList;
       CoalescedHashMap<String,Method[]>[] interfaceMethods = null;
-      Class superClass = resultClass.getSuperclass();
       int tableSize = methods.length;
 
       if (superClass != null) {

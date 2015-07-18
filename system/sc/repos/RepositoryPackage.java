@@ -4,6 +4,7 @@
 
 package sc.repos;
 
+import sc.repos.mvn.MvnRepositorySource;
 import sc.util.FileUtil;
 import sc.util.StringUtil;
 

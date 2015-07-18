@@ -1001,7 +1001,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (!peerMode)
-         this.repositorySystem = new RepositorySystem(getStrataCodeDir("pkgs"), messageHandler, options.verbose, options.reinstall, options.update);
+         this.repositorySystem = new RepositorySystem(getStrataCodeDir("pkgs"), messageHandler, options.verbose, options.reinstall, options.update, options.installExisting);
       else {
          this.repositorySystem = parentSystem.repositorySystem;
          messageHandler = parentSystem.messageHandler;
@@ -2921,6 +2921,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       /** Should we reinstall all packages */
       @Constant public boolean reinstall;
 
+      /** Should we reinstall all packages but reusing existing downloads */
+      @Constant public boolean installExisting;
+
       /** Should we update all packages */
       @Constant public boolean update;
    }
@@ -3012,8 +3015,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      usage("Unrecognized option: " + opt, args);
                   break;
                case 'i':
-                  startInterpreter = true;
-                  editLayer = false;
+                  if (opt.equals("ie"))
+                     options.installExisting = true;
+                  else {
+                     startInterpreter = true;
+                     editLayer = false;
+                  }
                   break;
                case 'h':
                   usage("", args);
