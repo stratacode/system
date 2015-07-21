@@ -520,9 +520,24 @@ public class PTypeUtil {
       DynType cache;
       try {
          numClassesCached++;
+         Method[] methods;
+         Field[] fields;
 
-         Method[] methods = resultClass.getDeclaredMethods();
-         Field[] fields = resultClass.getDeclaredFields();
+         try {
+            methods = resultClass.getDeclaredMethods();
+         }
+         catch (NoClassDefFoundError exc) {
+            System.err.println("*** Missing class in classpath loading methods for: " + resultClass.getName() + ":" + exc);
+            methods = new Method[0];
+         }
+         try {
+            fields = resultClass.getDeclaredFields();
+         }
+         catch (NoClassDefFoundError exc) {
+            System.err.println("*** Missing class in classpath loading fields for: " + resultClass.getName() + ":" + exc);
+            fields = new Field[0];
+         }
+
          BeanMapper mapper;
          int pos = MIN_PROPERTY, staticPos = MIN_PROPERTY;
          boolean isInterface = resultClass.isInterface();

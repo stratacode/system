@@ -203,7 +203,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       String pomFileName = FileUtil.concat(pkg.getVersionRoot(), "pom.xml");
       String notExistsFile = pomFileName + ".notFound";
       if (system.installExisting && new File(notExistsFile).canRead())
-         return "POM file did not exist previously";
+         return "POM file: " + pomFileName + " did not exist when last checked.";
       if (!checkExists || !new File(pomFileName).canRead()) {
          boolean found = installMvnFile(desc, pomFileName, "pom");
          if (!found) {

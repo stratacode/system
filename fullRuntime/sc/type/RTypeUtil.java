@@ -395,11 +395,17 @@ public class RTypeUtil {
    }
 
    public static Constructor[] getConstructors(Class resultClass) {
-      Constructor[] arr = resultClass.getDeclaredConstructors();
-      for (Constructor cs:arr) {
-         cs.setAccessible(true);
+      try {
+         Constructor[] arr = resultClass.getDeclaredConstructors();
+         for (Constructor cs : arr) {
+            cs.setAccessible(true);
+         }
+         return arr;
       }
-      return arr;
+      catch (NoClassDefFoundError exc) {
+         System.err.println("*** Missing class in classpath loading constructors for: " + resultClass.getName() + ":" + exc);
+         return new Constructor[0];
+      }
    }
 
    /** Returns the list of methods with the given name */

@@ -114,6 +114,7 @@ public class MvnDescriptor implements Serializable {
    public RepositoryPackage getOrCreatePackage(MvnRepositoryManager mgr, boolean install, DependencyContext ctx, boolean initDeps) {
       String pkgName = getPackageName();
       RepositorySource depSrc = new MvnRepositorySource(mgr, getURL(), false, this, ctx);
+
       // This will add and install the package
       RepositoryPackage pkg = mgr.system.addPackageSource(mgr, pkgName, getJarFileName(), depSrc, install);
 
