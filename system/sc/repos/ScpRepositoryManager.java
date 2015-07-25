@@ -17,7 +17,7 @@ public class ScpRepositoryManager extends AbstractRepositoryManager {
       super(sys, managerName, rootDir, handler, info);
    }
 
-   public String doInstall(RepositorySource src, DependencyContext ctx) {
+   public String doInstall(RepositorySource src, DependencyContext ctx, DependencyCollection deps) {
       ArrayList<String> args = new ArrayList<String>();
       String resFile = src.pkg.installedRoot;
       String srcURL = src.url;

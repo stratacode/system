@@ -16,7 +16,7 @@ public class GitRepositoryManager extends AbstractRepositoryManager {
    public GitRepositoryManager(RepositorySystem sys, String managerName, String rootDir, IMessageHandler handler, boolean info) {
       super(sys, managerName, rootDir, handler, info);
    }
-   public String doInstall(RepositorySource src, DependencyContext ctx) {
+   public String doInstall(RepositorySource src, DependencyContext ctx, DependencyCollection deps) {
       return gitInstall(src, this);
    }
 

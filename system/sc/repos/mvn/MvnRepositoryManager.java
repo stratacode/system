@@ -17,6 +17,11 @@ import java.util.List;
  * the dependencies for the POM, not the jar for the project itself.
  */
 public class MvnRepositoryManager extends AbstractRepositoryManager {
+   public static String mvnRepositoryDir = FileUtil.concat(System.getProperty("user.home"), "/.m2/repository");
+
+   /** Should we use the local maven repository directory in case this user has already installed the file? */
+   public boolean useLocalRepository = true;
+
    public static String[] defaultRepositories = new String[] {
        //"http://search.maven.org/remotecontent?filepath="
        "https://repo1.maven.org/maven2/"
@@ -45,7 +50,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
    public HashMap<String,POMFile> pomCache = new HashMap<String,POMFile>();
 
    @Override
-   public String doInstall(RepositorySource src, DependencyContext ctx) {
+   public String doInstall(RepositorySource src, DependencyContext ctx, DependencyCollection deps) {
       String url = src.url;
 
       MvnDescriptor desc;
@@ -53,7 +58,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       MvnRepositoryPackage pkg = (MvnRepositoryPackage) src.pkg;
 
       if (installRepository != null) {
-         installRepository.doInstall(src, ctx);
+         installRepository.doInstall(src, ctx, deps);
          // This is the src repository and so does not need to go into classpath
          src.pkg.definesClasses = false;
          pomFileRes = POMFile.readPOM(FileUtil.concat(src.pkg.getVersionRoot(), "pom.xml"), this, ctx, pkg);
@@ -72,7 +77,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
 
       pkg.pomFile = (POMFile) pomFileRes;
 
-      installDependencies(src, ctx);
+      collectDependencies(src, ctx, deps);
 
       if (desc != null && !desc.depsOnly) {
          // Install the JAR file
@@ -168,7 +173,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
    }
 
    // Need to install the dependencies after all of them have been collected.  That's so that the sources array gets sorted properly.
-   private String installDependencies(RepositorySource src, DependencyContext ctx) {
+   private String collectDependencies(RepositorySource src, DependencyContext ctx, DependencyCollection deps) {
       MvnRepositoryPackage pkg = (MvnRepositoryPackage) src.pkg;
 
       ArrayList<RepositoryPackage> depPackages = src.pkg.dependencies;
@@ -179,12 +184,19 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          depPackages = src.pkg.dependencies;
       }
 
+      /*
       if (depPackages != null) {
          info(StringUtil.indent(DependencyContext.val(ctx)) + "Installing dependencies for: " + pkg.packageName);
          for (RepositoryPackage depPkg:depPackages) {
             system.installPackage(depPkg, DependencyContext.child(ctx, pkg));
          }
          info(StringUtil.indent(DependencyContext.val(ctx)) + "Done installing dependencies for: " + pkg.packageName);
+      }
+      */
+      if (depPackages != null) {
+         for (RepositoryPackage depPkg:depPackages) {
+            deps.addDependency(depPkg, DependencyContext.child(ctx, pkg));
+         }
       }
       return null;
    }
@@ -226,6 +238,18 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       if (system.installExisting && new File(resFileName).canRead()) {
          info("Using existing file: " + resFileName);
          return true;
+      }
+      if (useLocalRepository) {
+         String localPkgDir = FileUtil.concat(mvnRepositoryDir, desc.groupId.replace(".", FileUtil.FILE_SEPARATOR), desc.artifactId, desc.version);
+         if (new File(localPkgDir).isDirectory()) {
+            String fileName = FileUtil.concat(localPkgDir, FileUtil.addExtension(desc.artifactId + "-" + desc.version, remoteExt));
+            if (new File(fileName).canRead()) {
+               if (FileUtil.copyFile(fileName, resFileName, true))
+                  return true;
+               else
+                  info("Failed to copy from local repository: " + fileName + " to: " + resFileName);
+            }
+         }
       }
       for (MvnRepository repo:repositories) {
          String pomURL = repo.getFileURL(desc.groupId, desc.artifactId, desc.version, remoteExt);

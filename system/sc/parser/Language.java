@@ -44,7 +44,7 @@ import java.util.Map;
  * which represent spacing.  Parse nodes support a "format" phase, that runs after generation.  This
  * phase can use the data in the semantic model to add back in the necessary spacing, newlines, etc.
  */
-public abstract class Language extends LayerComponent implements IFileProcessor {
+public abstract class Language extends LayerFileComponent {
    // Suffix used to represent a file which is inherited from an extended layer
    public final static String INHERIT_SUFFIX = "inh";
 

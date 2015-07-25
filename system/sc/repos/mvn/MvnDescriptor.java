@@ -115,11 +115,8 @@ public class MvnDescriptor implements Serializable {
       String pkgName = getPackageName();
       RepositorySource depSrc = new MvnRepositorySource(mgr, getURL(), false, this, ctx);
 
-      // This will add and install the package
       RepositoryPackage pkg = mgr.system.addPackageSource(mgr, pkgName, getJarFileName(), depSrc, install);
 
-      // TODO: since dependencies are potentially different for different sources - should we store the in the src itself and compute them once for
-      // each source?  right now we are traversing dependencies on the first source we hit and using them for all.
       if (initDeps && pkg.dependencies == null) {
          POMFile pomFile = mgr.getPOMFile(this, pkg, ctx);
          if (pkg instanceof MvnRepositoryPackage)

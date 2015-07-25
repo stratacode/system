@@ -47,7 +47,17 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       this.info = info;
    }
 
+
    public String install(RepositorySource src, DependencyContext ctx) {
+      DependencyCollection depColl = new DependencyCollection();
+      String err = preInstall(src, ctx, depColl);
+      if (err != null)
+         return err;
+      err = RepositorySystem.installDeps(depColl);
+      return err;
+   }
+
+   public String preInstall(RepositorySource src, DependencyContext ctx, DependencyCollection deps) {
       // Putting this into the installed root so it more reliably gets removed if the folder itself is removed
       File tagFile = new File(src.pkg.installedRoot, ".scPkgInstallInfo");
       File rootFile = new File(src.pkg.installedRoot);
@@ -101,7 +111,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       }
       if (info)
          info(StringUtil.indent(DependencyContext.val(ctx)) + "Installing package: " + src.pkg.packageName + " src url: " + src.url + depsInfo);
-      String err = doInstall(src, ctx);
+      String err = doInstall(src, ctx, deps);
       if (err != null) {
          tagFile.delete();
          System.err.println("Installing package: " + src.pkg.packageName + " failed: " + err);
@@ -125,7 +135,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       return true;
    }
 
-   public abstract String doInstall(RepositorySource src, DependencyContext ctx);
+   public abstract String doInstall(RepositorySource src, DependencyContext ctx, DependencyCollection deps);
 
    public void info(String infoMessage) {
       if (msg != null) {

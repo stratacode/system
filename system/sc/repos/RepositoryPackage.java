@@ -4,6 +4,8 @@
 
 package sc.repos;
 
+import sc.layer.Layer;
+import sc.layer.LayerComponent;
 import sc.repos.mvn.MvnRepositorySource;
 import sc.util.FileUtil;
 import sc.util.StringUtil;
@@ -16,7 +18,7 @@ import java.util.LinkedHashSet;
 /**
  * Represents a third party package that's managed by a RepositoryManager
  */
-public class RepositoryPackage implements Serializable {
+public class RepositoryPackage extends LayerComponent implements Serializable {
    /** A unique name of this package within the layered system */
    public String packageName;
 
@@ -36,6 +38,10 @@ public class RepositoryPackage implements Serializable {
    public String installedRoot;
 
    public String fileName = null;
+
+   public RepositoryPackage(Layer layer) {
+      super(layer);
+   }
 
    public RepositoryPackage(IRepositoryManager mgr, String pkgName, RepositorySource src) {
       this(mgr, pkgName, pkgName, src);
@@ -58,14 +64,31 @@ public class RepositoryPackage implements Serializable {
       updateInstallRoot(mgr);
    }
 
+   public void init() {
+      super.init();
+      if (definedInLayer != null) {
+         if (definedInLayer.repositoryPackages == null)
+            definedInLayer.repositoryPackages = new ArrayList<RepositoryPackage>();
+         definedInLayer.repositoryPackages.add(this);
+      }
+   }
+
    public String install(DependencyContext ctx) {
+      DependencyCollection depCol = new DependencyCollection();
+      String err = preInstall(ctx, depCol);
+      if (err != null)
+         return err;
+      return RepositorySystem.installDeps(depCol);
+   }
+
+   public String preInstall(DependencyContext ctx, DependencyCollection depCol) {
       installed = false;
       StringBuilder errors = null;
       for (RepositorySource src:sources) {
          if (src.repository.isActive()) {
             // Mark as installed to prevent recursive installs
             installed = true;
-            String err = src.repository.install(src, ctx);
+            String err = src.repository.preInstall(src, ctx, depCol);
             if (err == null) {
                updateCurrentSource(src);
                break;
@@ -103,6 +126,9 @@ public class RepositoryPackage implements Serializable {
 
    public void addNewSource(RepositorySource repoSrc) {
       if (repoSrc.equals(currentSource)) {
+         // Need to reinit the dependencies if the exclusions change
+         if (currentSource.mergeExclusions(repoSrc))
+            dependencies = null;
          repoSrc.ctx = DependencyContext.merge(repoSrc.ctx, currentSource.ctx);
          return;
       }
@@ -285,5 +311,15 @@ public class RepositoryPackage implements Serializable {
       currentSource = src;
       if (src != null)
          fileName = src.getClassPathFileName();
+   }
+
+   public boolean equals(Object other) {
+      if (!(other instanceof RepositoryPackage))
+         return false;
+      return ((RepositoryPackage) other).packageName.equals(packageName);
+   }
+
+   public int hashCode() {
+      return packageName.hashCode();
    }
 }

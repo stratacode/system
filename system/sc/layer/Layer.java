@@ -3569,7 +3569,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          return pkg;
       }
       else
-         System.err.println("*** Failed to add repository package: " + pkgName + " no repositoryManager named: " + repositoryTypeName);
+         error("Failed to add repository package: " + pkgName + " no RepositoryManager named: " + repositoryTypeName);
       return null;
    }
 

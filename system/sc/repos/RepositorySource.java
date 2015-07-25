@@ -45,4 +45,8 @@ public class RepositorySource implements Serializable {
    public String toString() {
       return url;
    }
+
+   public boolean mergeExclusions(RepositorySource other) {
+      return false;
+   }
 }

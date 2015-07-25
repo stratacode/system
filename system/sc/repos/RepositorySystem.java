@@ -141,6 +141,35 @@ public class RepositorySystem {
       return pkg;
    }
 
+   public void preInstallPackage(RepositoryPackage pkg, DependencyContext ctx, DependencyCollection depCol) {
+      if (!pkg.installed) {
+         // We do the install and update immediately after they are added so that the layer definition file has
+         // access to the installed state, to for example, list the contents of the lib directory to get the jar files
+         // to add to the classpath.
+         String err = pkg.preInstall(ctx, depCol);
+         if (err != null) {
+            MessageHandler.error(msg, "Failed to install repository package: " + pkg.packageName + " error: " + err);
+         }
+         else if (updateSystem) {
+            pkg.update();
+         }
+      }
+   }
+
+   public static String installDeps(DependencyCollection instDeps) {
+      do {
+         DependencyCollection nextDeps = new DependencyCollection();
+         for (PackageDependency pkgDep : instDeps.neededDeps) {
+            if (!pkgDep.pkg.installed)
+               pkgDep.pkg.preInstall(pkgDep.ctx, nextDeps);
+         }
+         if (nextDeps.neededDeps.size() == 0)
+            return null;
+         instDeps = nextDeps;
+      } while (true);
+   }
+
+
    public void installPackage(RepositoryPackage pkg, DependencyContext ctx) {
       if (!pkg.installed) {
          // We do the install and update immediately after they are added so that the layer definition file has

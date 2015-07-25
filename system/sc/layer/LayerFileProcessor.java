@@ -20,8 +20,7 @@ import java.util.HashMap;
  * For example, in wicket, a .gif file as a java resource would typically prepend the package suffix.  A .gif file in the web subdirectory
  * of a web application would not prepend it's layer's package prefix.
  */
-@CompilerSettings(dynObjManager="sc.layer.LayerDynChildManager", propagateConstructor="sc.layer.Layer")
-public class LayerFileProcessor extends LayerComponent implements IFileProcessor, IComponent {
+public class LayerFileProcessor extends LayerFileComponent {
    private HashMap<String,LayerFileProcessorResult> fileIndex = new HashMap<String,LayerFileProcessorResult>();
 
    public String[] extensions;

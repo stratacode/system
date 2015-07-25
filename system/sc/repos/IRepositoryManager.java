@@ -12,6 +12,8 @@ public interface IRepositoryManager {
    /** Returns null if successful, otherwise an error message. */
    public String install(RepositorySource toInstall, DependencyContext ctx);
 
+   public String preInstall(RepositorySource toInstall, DependencyContext ctx, DependencyCollection deps);
+
    /** Returns null if successful, otherwise an error message. */
    public String update(RepositorySource toInstall);
    public boolean isActive();

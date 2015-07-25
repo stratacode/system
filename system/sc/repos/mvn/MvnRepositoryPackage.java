@@ -9,6 +9,8 @@ import sc.repos.RepositoryPackage;
 import sc.repos.RepositorySource;
 import sc.util.FileUtil;
 
+import java.io.File;
+
 public class MvnRepositoryPackage extends RepositoryPackage {
    transient POMFile pomFile;
 
