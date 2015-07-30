@@ -25,6 +25,7 @@ public @interface MainSettings {
    boolean produceScript() default false;
    /** When produceScript is true use execCommandTemplate to specify the type name of a template file to use for generating the exec script.  If this is not set a default template is used.  The template is passed an instance of ExecCommandParameters to retrieve the command to run and type name */
    String execCommandTemplate() default "";
+   /** Set this to a string to be put into the start script */
    String defaultArgs() default "";
    /** Set this to true to turn off automatic running of a main in a subsequent layer */
    boolean disabled() default false;  

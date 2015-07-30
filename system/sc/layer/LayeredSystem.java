@@ -2928,7 +2928,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       @Constant public boolean update;
    }
 
-   @MainSettings(produceJar = true, produceScript = true, execName = "bin/sc", debug = false, maxMemory = 1024)
+   @MainSettings(produceJar = true, produceScript = true, execName = "bin/sc", debug = false, maxMemory = 1024, defaultArgs = "-restartArgsFile /tmp/restart$$.tmp")
    public static void main(String[] args) {
       String buildLayerName = null;
       List<String> includeLayers = null;
@@ -3448,10 +3448,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
 
          if (options.runClass != null) {
-            // TODO: Do we need one monolithic class loader or is the layered class loader design viable in all situations?
-            // Originally I thought JPA required the monolithic thing but really it just needed the context
-            // class loader set in the interpreter thread
-            //sys.resetClassLoader();
+            // There are situations where we need to reset the class loader - i.e. we cannot use the layered class loaders
+            // for a runtime application.   The problem is that some layers included Java classes at runtime look at their
+            // own class loader to load other application classes that would be later in the classpath.  The compile time wants
+            // to add jars as soon as possible and does it with layered classpaths.  That's fine for compiling but when, For example, 
+            // tomcat's connection pool implementation will load a jdbc driver that is in a subsequent layer's classpath.
+            // TODO should we have some way for layers to turn this on or off?  Most SC frameworks do not do this injected class
+            // dependency thing and work fine without the rest.  It means we hav eto reload all classes.
+            sys.resetClassLoader();
             if (options.runFromBuildDir) {
                if (options.useCommonBuildDir)
                   System.setProperty("user.dir", sys.commonBuildDir);
