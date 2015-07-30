@@ -1645,6 +1645,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       else {
          String [] srcList = srcPath.split(FileUtil.PATH_SEPARATOR);
          topLevelSrcDirs = Arrays.asList(srcList);
+         for (int i = 0; i < topLevelSrcDirs.size(); i++) {
+            if (topLevelSrcDirs.get(i).equals("."))
+               topLevelSrcDirs.set(i, layerPathName);
+         }
          if (layeredSystem.options.verbose) {
             verbose("Layer: " + this + " custom src path:");
             for (String srcDir:topLevelSrcDirs) {
