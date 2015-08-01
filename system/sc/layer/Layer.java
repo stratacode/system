@@ -1582,6 +1582,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          for (RepositoryPackage pkg:repositoryPackages) {
             layeredSystem.repositorySystem.installPackage(pkg, null);
          }
+         installPackages(repositoryPackages.toArray(new RepositoryPackage[repositoryPackages.size()]));
       }
 
       // First start the model so that it can set up our paths etc.
@@ -3537,16 +3538,20 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          i++;
       }
       if (!disabled) {
-         for (RepositoryPackage pkg : pkgList) {
-            if (pkg.installedRoot != null) {
-               String cp = pkg.getClassPath();
-               if (classPath == null)
-                  classPath = cp;
-               else
-                  classPath = classPath + ":" + cp;
-            }
-            // TODO: should we also let a package add to the src path?  What about directory prefixes and file types?
+         installPackages(pkgList);
+      }
+   }
+
+   public void installPackages(RepositoryPackage[] pkgList) {
+      for (RepositoryPackage pkg : pkgList) {
+         if (pkg.installedRoot != null) {
+            String cp = pkg.getClassPath();
+            if (classPath == null)
+               classPath = cp;
+            else
+               classPath = classPath + ":" + cp;
          }
+         // TODO: should we also let a package add to the src path?  What about directory prefixes and file types?
       }
    }
 
@@ -3564,7 +3569,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          if (repositoryPackages == null)
             repositoryPackages = new ArrayList<RepositoryPackage>();
 
-         RepositorySource repoSrc = new RepositorySource(mgr, url, unzip);
+         RepositorySource repoSrc = mgr.createRepositorySource(url, unzip);
          // Add this as a new source.  This will create the package if this is the first definition or add it
          // as a new source if it already exists.
          RepositoryPackage pkg = repoSys.addPackageSource(mgr, pkgName, fileName, repoSrc, started && !disabled);

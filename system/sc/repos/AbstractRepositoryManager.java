@@ -38,6 +38,10 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       return system;
    }
 
+   public RepositorySource createRepositorySource(String url, boolean unzip) {
+      return new RepositorySource(this, url, unzip);
+   }
+
    public AbstractRepositoryManager(RepositorySystem sys, String mn, String reposRoot, IMessageHandler handler, boolean info) {
       this.system = sys;
       this.managerName = mn;

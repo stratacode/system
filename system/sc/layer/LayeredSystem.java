@@ -744,6 +744,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       globalLayerImports.put("LayeredSystem", ImportDeclaration.create("sc.layer.LayeredSystem"));
       globalLayerImports.put("FileUtil", ImportDeclaration.create("sc.util.FileUtil"));
       globalLayerImports.put("RepositoryPackage", ImportDeclaration.create("sc.repos.RepositoryPackage"));
+      globalLayerImports.put("MvnRepositoryPackage", ImportDeclaration.create("sc.repos.mvn.MvnRepositoryPackage"));
       globalLayerImports.put("LayerFileProcessor", ImportDeclaration.create("sc.layer.LayerFileProcessor"));
       globalLayerImports.put("TemplateLanguage", ImportDeclaration.create("sc.lang.TemplateLanguage"));
       globalLayerImports.put("BuildPhase", ImportDeclaration.create("sc.layer.BuildPhase"));

@@ -4,6 +4,7 @@
 
 package sc.repos.mvn;
 
+import sc.layer.Layer;
 import sc.repos.IRepositoryManager;
 import sc.repos.RepositoryPackage;
 import sc.repos.RepositorySource;
@@ -12,7 +13,14 @@ import sc.util.FileUtil;
 import java.io.File;
 
 public class MvnRepositoryPackage extends RepositoryPackage {
+   {
+      type = "mvn";
+   }
    transient POMFile pomFile;
+
+   public MvnRepositoryPackage(Layer layer) {
+      super(layer);
+   }
 
    public MvnRepositoryPackage(IRepositoryManager mgr, String pkgName, String fileName, RepositorySource src) {
       super(mgr, pkgName, fileName, src);

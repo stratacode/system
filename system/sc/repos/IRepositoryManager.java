@@ -29,4 +29,6 @@ public interface IRepositoryManager {
    public RepositoryPackage createPackage(IRepositoryManager mgr, String packageName, String fileName, RepositorySource src);
 
    public RepositorySystem getRepositorySystem();
+
+   RepositorySource createRepositorySource(String url, boolean unzip);
 }

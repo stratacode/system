@@ -60,4 +60,12 @@ public class MvnRepositorySource extends RepositorySource {
       }
       return changed;
    }
+
+   public String getDefaultPackageName() {
+      return desc.getPackageName();
+   }
+
+   public String getDefaultFileName() {
+      return desc.getJarFileName();
+   }
 }

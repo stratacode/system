@@ -92,6 +92,19 @@ public class RepositorySystem {
       return pkg;
    }
 
+   public void addRepositoryPackage(RepositoryPackage pkg) {
+      RepositoryPackage existingPkg = packages.get(pkg.packageName);
+      if (existingPkg != null) {
+         pkg.installedRoot = existingPkg.installedRoot;
+         pkg.currentSource = existingPkg.currentSource;
+         pkg.sources = new RepositorySource[1];
+         pkg.sources[0] = pkg.currentSource;
+      }
+      else {
+         packages.put(pkg.packageName, pkg);
+      }
+   }
+
    public RepositoryPackage addPackageSource(IRepositoryManager mgr, String pkgName, String fileName, RepositorySource repoSrc, boolean install) {
       RepositoryPackage pkg;
       pkg = packages.get(pkgName);

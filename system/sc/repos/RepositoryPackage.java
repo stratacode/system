@@ -8,6 +8,7 @@ import sc.layer.Layer;
 import sc.layer.LayerComponent;
 import sc.repos.mvn.MvnRepositorySource;
 import sc.util.FileUtil;
+import sc.util.MessageHandler;
 import sc.util.StringUtil;
 
 import java.io.*;
@@ -38,6 +39,11 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    public String installedRoot;
 
    public String fileName = null;
+
+   public String url;
+   public String type;
+
+   public boolean unzip;
 
    public RepositoryPackage(Layer layer) {
       super(layer);
@@ -70,6 +76,36 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
          if (definedInLayer.repositoryPackages == null)
             definedInLayer.repositoryPackages = new ArrayList<RepositoryPackage>();
          definedInLayer.repositoryPackages.add(this);
+
+         RepositorySystem sys = definedInLayer.layeredSystem.repositorySystem;
+         if (type != null) {
+            IRepositoryManager mgr = sys.getRepositoryManager(type);
+
+            if (url != null) {
+               RepositorySource src = mgr.createRepositorySource(url, unzip);
+               if (packageName == null)
+                  packageName = src.getDefaultPackageName();
+               if (fileName == null)
+                  fileName = src.getDefaultFileName();
+               // TODO: a null fileName also means to install in the packageRoot.  Do we need to support this case?
+               // maybe that should be a separate flag
+               if (fileName == null)
+                  fileName = packageName;
+               src.pkg = this;
+               updateCurrentSource(src);
+               updateInstallRoot(mgr);
+               sys.addRepositoryPackage(this);
+            }
+         }
+         else {
+            MessageHandler.error(sys.msg, "Package ", packageName, " missing type property - should be 'git', 'mvn', etc.");
+         }
+
+      }
+      else {
+         if (url != null || type != null) {
+            System.err.println("*** Warning - url and type properties set on RepositoryPackage which is not part of a layer");
+         }
       }
    }
 
@@ -84,6 +120,10 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    public String preInstall(DependencyContext ctx, DependencyCollection depCol) {
       installed = false;
       StringBuilder errors = null;
+      if (sources == null && currentSource != null) {
+         sources = new RepositorySource[1];
+         sources[0] = currentSource;
+      }
       for (RepositorySource src:sources) {
          if (src.repository.isActive()) {
             // Mark as installed to prevent recursive installs

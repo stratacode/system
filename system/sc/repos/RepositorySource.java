@@ -7,6 +7,16 @@ package sc.repos;
 import java.io.IOException;
 import java.io.Serializable;
 
+/**
+ * The RepositorySource helps in the definition of the RepositoryPackage.  You can have more than one source
+ * for the same package from different managers for example and then try them on after the other.  You might
+ * have two sources from the same package with different versions of the package, and the package manager
+ * is responsible for picking the right version to use.
+ *
+ * TODO: should this be folded back into the RepositoryPackage?  When we configure RepositoryPackages as components
+ * in the layer, is less useful to define multiple sources.  Rather, you might instead let the layer stacking order
+ * refine one instance of the RepositoryPackage to allow customization and refinement that way.
+ */
 public class RepositorySource implements Serializable {
    public transient IRepositoryManager repository;
    public String managerName;
@@ -48,5 +58,14 @@ public class RepositorySource implements Serializable {
 
    public boolean mergeExclusions(RepositorySource other) {
       return false;
+   }
+
+   /** When creating a package from a URL only, this can extract the package name to use from the URL. */
+   public String getDefaultPackageName() {
+      return null;
+   }
+
+   public String getDefaultFileName() {
+      return null;
    }
 }

@@ -267,9 +267,8 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
 
    @Override
    public RepositoryPackage createPackage(String url) {
-      MvnDescriptor desc = MvnDescriptor.fromURL(url);
-      MvnRepositorySource src = new MvnRepositorySource(this, url, false, desc, null);
-      return new MvnRepositoryPackage(this, desc.getPackageName(), desc.getJarFileName(), src);
+      MvnRepositorySource src = (MvnRepositorySource) createRepositorySource(url, false);
+      return new MvnRepositoryPackage(this, src.desc.getPackageName(), src.desc.getJarFileName(), src);
    }
 
    public RepositoryPackage createPackage(IRepositoryManager mgr, String packageName, String fileName, RepositorySource src) {
@@ -290,5 +289,16 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          return null;
       }
       return (POMFile) pomRes;
+   }
+
+   public RepositorySource createRepositorySource(String url, boolean unzip) {
+      if (url.startsWith("mvn")) {
+         MvnDescriptor desc = MvnDescriptor.fromURL(url);
+         MvnRepositorySource src = new MvnRepositorySource(this, url, false, desc, null);
+         return src;
+      }
+      else {
+         return super.createRepositorySource(url, unzip);
+      }
    }
 }
