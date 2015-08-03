@@ -60,11 +60,11 @@ public abstract class TwoOperatorExpression extends Expression {
       info.remove(lhs);
    }
 
-   public void refreshBoundTypes() {
+   public void refreshBoundTypes(int flags) {
       if (lhs != null)
-         lhs.refreshBoundTypes();
+         lhs.refreshBoundTypes(flags);
       if (rhs != null)
-         rhs.refreshBoundTypes();
+         rhs.refreshBoundTypes(flags);
    }
    public void addDependentTypes(Set<Object> types) {
       if (lhs != null)

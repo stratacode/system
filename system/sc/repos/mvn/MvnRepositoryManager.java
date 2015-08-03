@@ -9,6 +9,7 @@ import sc.util.*;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
@@ -69,7 +70,16 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          // Need this set here so the version suffix can be resolved from the pkg
          src.pkg.currentSource = src;
          pomFileRes = installPOM(desc, src.pkg, ctx, false);
-         src.pkg.definesClasses = true;
+         if (pomFileRes instanceof POMFile) {
+            POMFile pomFile = (POMFile) pomFileRes;
+            if (pomFile != null && (pomFile.packaging.equals("jar") || pomFile.packaging.equals("bundle")))
+               src.pkg.definesClasses = true;
+            else
+               src.pkg.definesClasses = false;
+         }
+         else if (pomFileRes instanceof String) {
+            System.err.println("*** Failed to read POM file: " + pomFileRes);
+         }
       }
 
       if (pomFileRes instanceof String)
@@ -80,11 +90,23 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       collectDependencies(src, ctx, deps);
 
       if (desc != null && !desc.depsOnly) {
-         // Install the JAR file
-         String jarFileName = FileUtil.concat(src.pkg.getVersionRoot(), desc.getJarFileName());
-         boolean found = installMvnFile(desc, jarFileName, "jar");
-         if (!found)
-            return "Maven jar file: " + desc.getURL() + " not found in repositories: " + repositories;
+         // Install the JAR/WAR file
+         String typeExt = null;
+
+         String packaging = pkg.pomFile.packaging;
+         if (packaging.equals("jar") || packaging.equals("war"))
+            typeExt = packaging;
+         // bundle: OSGI bundles, orbit: signed OSGI bundles - treat them like jar files
+         else if (packaging.equals("bundle") || packaging.equals("orbit"))
+            typeExt = "jar";
+         else if (!packaging.equals("pom"))
+            System.err.println("*** Warning - unrecognized packaging type: " + packaging);
+         if (typeExt != null) {
+            String jarFileName = FileUtil.concat(src.pkg.getVersionRoot(), desc.getJarFileName());
+            boolean found = installMvnFile(desc, jarFileName, typeExt);
+            if (!found)
+               return "Maven " + typeExt + " file: " + desc.getURL() + " not found in repositories: " + repositories;
+         }
       }
 
       // Success
@@ -96,7 +118,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
 
       POMFile pomFile = pkg.pomFile;
 
-      if (pomFile != null && !(pomFile.packaging.equals("pom"))) {
+      if (pomFile != null) {
          List<MvnDescriptor> depDescs = pomFile.getDependencies(getScopesToBuild(src.pkg));
          if (depDescs != null) {
             ArrayList<RepositoryPackage> depPackages = new ArrayList<RepositoryPackage>();
@@ -206,9 +228,22 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
    private final static String[] allScopes = {POMFile.DEFAULT_SCOPE, "test", "runtime"};
    private final static String[] runtimeScopes = {POMFile.DEFAULT_SCOPE, "runtime"};
    private String[] getScopesToBuild(RepositoryPackage pkg) {
+      String[] baseList;
       if (pkg.includeTests)
-         return pkg.includeRuntime ? allScopes : testScopes;
-      return pkg.includeRuntime ? runtimeScopes : defaultScopes;
+         baseList = pkg.includeRuntime ? allScopes : testScopes;
+      else
+         baseList = pkg.includeRuntime ? runtimeScopes : defaultScopes;
+      if (pkg instanceof MvnRepositoryPackage) {
+         ArrayList<String> newList = null;
+         MvnRepositoryPackage mpkg = (MvnRepositoryPackage) pkg;
+         if (mpkg.includeProvided) {
+            newList = new ArrayList<String>(Arrays.asList(baseList));
+            newList.add("provided");
+         }
+         if (newList != null)
+            return newList.toArray(new String[newList.size()]);
+      }
+      return baseList;
    }
 
    Object installPOM(MvnDescriptor desc, RepositoryPackage pkg, DependencyContext ctx, boolean checkExists) {

@@ -807,13 +807,13 @@ public class SelectorExpression extends ChainedExpression {
       }
    }
 
-   public void refreshBoundTypes() {
-      super.refreshBoundTypes();
+   public void refreshBoundTypes(int flags) {
+      super.refreshBoundTypes(flags);
       for (Selector sel:selectors)
-         sel.refreshBoundType();
+         sel.refreshBoundType(flags);
       if (boundTypes != null) {
          for (int i = 0; i < boundTypes.length; i++)
-            boundTypes[i] = ModelUtil.refreshBoundIdentifierType(boundTypes[i]);
+            boundTypes[i] = ModelUtil.refreshBoundIdentifierType(getLayeredSystem(), boundTypes[i], flags);
       }
    }
 

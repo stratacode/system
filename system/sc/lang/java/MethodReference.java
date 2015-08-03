@@ -65,16 +65,16 @@ public class MethodReference extends BaseLambdaExpression {
    }
 
    @Override
-   public void refreshBoundTypes() {
+   public void refreshBoundTypes(int flags) {
       Object ref = resolveReference();
       if (ref instanceof JavaType)
-         ((JavaType) ref).refreshBoundType();
+         ((JavaType) ref).refreshBoundType(flags);
       else if (ref instanceof Expression)
-         ((Expression) ref).refreshBoundTypes();
+         ((Expression) ref).refreshBoundTypes(flags);
 
       if (typeArguments != null) {
          for (JavaType typeArg:typeArguments)
-            typeArg.refreshBoundType();
+            typeArg.refreshBoundType(flags);
       }
    }
 

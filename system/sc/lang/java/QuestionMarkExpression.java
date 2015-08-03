@@ -142,13 +142,13 @@ public class QuestionMarkExpression extends Expression {
       return condition.isStaticTarget() && trueChoice.isStaticTarget() && falseChoice.isStaticTarget();
    }
 
-   public void refreshBoundTypes() {
+   public void refreshBoundTypes(int flags) {
       if (condition != null)
-         condition.refreshBoundTypes();
+         condition.refreshBoundTypes(flags);
       if (trueChoice != null)
-         trueChoice.refreshBoundTypes();
+         trueChoice.refreshBoundTypes(flags);
       if (falseChoice != null)
-         falseChoice.refreshBoundTypes();
+         falseChoice.refreshBoundTypes(flags);
    }
 
    public int transformTemplate(int ix, boolean statefulContext) {

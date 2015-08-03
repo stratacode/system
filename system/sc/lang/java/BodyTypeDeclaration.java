@@ -1509,7 +1509,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return methods.size() > 0 ? methods : null;
    }
 
-   public Object getMethodFromSignature(String methodName, String signature) {
+   public Object getMethodFromSignature(String methodName, String signature, boolean resolveLayer) {
       List<Object> methods = getMethods(methodName, null);
       if (methods == null) {
          // Special case way to refer to the constructor
@@ -1525,7 +1525,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                AbstractMethodDefinition repl = methDef.replacedByMethod;
                // Currently a modify type does not update all references to the type it changes when it is added.
                // So when we go to look up a method for the runtime, we need to 
-               while ((repl = methDef.replacedByMethod) != null) {
+               while ((methDef.replaced || resolveLayer) && (repl = methDef.replacedByMethod) != null) {
                   if (repl.replacedByMethod == null)
                      return repl;
                   methDef = repl;
@@ -1872,7 +1872,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return model.getLayeredSystem();
    }
 
-   public void refreshBoundTypes() {
+   public void refreshBoundTypes(int flags) {
       dependentTypes = null; // Reset this so we do not maintain references to types that may get loaded
       memberCache = null; // Not sure if we need to do this but maybe something will hang around in there that points to a parent that was replaced?
 
@@ -1880,12 +1880,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return;
       if (body != null) {
          for (Statement st:body) {
-            st.refreshBoundTypes();
+            st.refreshBoundTypes(flags);
          }
       }
       if (hiddenBody != null) {
          for (Statement st:hiddenBody) {
-            st.refreshBoundTypes();
+            st.refreshBoundTypes(flags);
          }
       }
    }

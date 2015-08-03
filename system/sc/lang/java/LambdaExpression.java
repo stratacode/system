@@ -37,11 +37,11 @@ public class LambdaExpression extends BaseLambdaExpression {
    }
 
    @Override
-   public void refreshBoundTypes() {
+   public void refreshBoundTypes(int flags) {
       if (lambdaParams instanceof Parameter)
-         ((Parameter) lambdaParams).refreshBoundType();
+         ((Parameter) lambdaParams).refreshBoundType(flags);
       if (lambdaBody instanceof BlockStatement)
-         lambdaBody.refreshBoundTypes();
+         lambdaBody.refreshBoundTypes(flags);
    }
 
    @Override

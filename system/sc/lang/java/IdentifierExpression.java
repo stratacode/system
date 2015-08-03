@@ -3241,6 +3241,8 @@ public class IdentifierExpression extends ArgumentsExpression {
          case GetVariable:
          case FieldName:
          case GetSetMethodInvocation:
+            if (idents.size() == 1 && idents.get(0).equals("maxQuestionLength"))
+               System.out.println("***");
             srcObj = getRootFieldThis(this, boundTypes[0], ctx, false);
             if (srcObj == null) {
                System.err.println("*** Unable to resolve root property for: " + toDefinitionString());
@@ -4093,17 +4095,17 @@ public class IdentifierExpression extends ArgumentsExpression {
       return callsSuper() ? arguments.toArray(new Expression[arguments.size()]) : null;
    }
 
-   public void refreshBoundTypes() {
-      super.refreshBoundTypes();
+   public void refreshBoundTypes(int flags) {
+      super.refreshBoundTypes(flags);
       if (boundTypes != null)
          for (int i = 0; i < boundTypes.length; i++) {
             if (boundTypes[i] != null) {
-               boundTypes[i] = ModelUtil.refreshBoundIdentifierType(boundTypes[i]);
+               boundTypes[i] = ModelUtil.refreshBoundIdentifierType(getLayeredSystem(), boundTypes[i], flags);
             }
          }
       // Is this used anyplace?
       if (innerCreator != null)
-         innerCreator.refreshBoundTypes();
+         innerCreator.refreshBoundTypes(flags);
    }
 
    public int transformTemplate(int ix, boolean statefulContext) {

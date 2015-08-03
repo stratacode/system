@@ -9,6 +9,7 @@ import sc.repos.mvn.MvnRepositoryManager;
 import sc.util.MessageHandler;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.TreeMap;
 
 /**
@@ -23,6 +24,7 @@ public class RepositorySystem {
    public boolean installExisting;
 
    public HashMap<String,RepositoryPackage> packages = new HashMap<String,RepositoryPackage>();
+   public HashSet<String> classPath = new HashSet<String>();
 
    public IMessageHandler msg;
 

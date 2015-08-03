@@ -52,4 +52,24 @@ public class SwitchLabel extends ExpressionStatement {
    public boolean childIsTopLevelStatement(Statement st) {
       return true;
    }
+
+   public String toString() {
+      return toSafeLanguageString();
+   }
+
+   public String toSafeLanguageString() {
+      if (parseNode == null || parseNodeInvalid) {
+         StringBuilder sb = new StringBuilder();
+         if (operator != null)
+            sb.append(operator);
+         sb.append(" ");
+         sb.append(expression.toSafeLanguageString());
+         return sb.toString();
+      }
+      return super.toSafeLanguageString();
+   }
+
+   public String getUserVisibleName() {
+      return "case " + (expression == null ? "<null>" : expression.getUserVisibleName());
+   }
 }

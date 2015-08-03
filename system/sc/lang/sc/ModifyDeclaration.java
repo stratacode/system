@@ -2179,12 +2179,12 @@ public class ModifyDeclaration extends TypeDeclaration {
       return compiledOnly || (modifyTypeDecl != null && modifyTypeDecl.getCompiledOnly());
    }
 
-   public void refreshBoundTypes() {
+   public void refreshBoundTypes(int flags) {
       if (isLayerType)
          return;
-      super.refreshBoundTypes();
+      super.refreshBoundTypes(flags);
       JavaModel m = getJavaModel();
-      if (modifyTypeDecl != null) {
+      if (modifyTypeDecl != null && ((flags & ModelUtil.REFRESH_TYPEDEFS) != 0)) {
          BodyTypeDeclaration oldModify = modifyTypeDecl;
          if (modifyTypeDecl.getTransformed()) {
             modifyTypeDecl = getModifyType();
@@ -2198,11 +2198,14 @@ public class ModifyDeclaration extends TypeDeclaration {
                startExtendedType(modifyTypeDecl, "modified");
          }
          else {
-            modifyTypeDecl.refreshBoundTypes();
+            modifyTypeDecl.refreshBoundTypes(flags);
          }
          if (needsSubType() && oldModify != modifyTypeDecl)
             m.layeredSystem.addSubType((TypeDeclaration) modifyTypeDecl, this);
 
+      }
+      if (modifyClass instanceof Class && ((flags & ModelUtil.REFRESH_CLASSES) != 0)) {
+         modifyClass = ModelUtil.refreshBoundClass(getLayeredSystem(), (Class) modifyClass);
       }
       if (extendsTypes != null) {
          Object[] oldExtTypes = new Object[extendsTypes.size()];
@@ -2212,7 +2215,13 @@ public class ModifyDeclaration extends TypeDeclaration {
          if (extendsBoundTypes != null) {
             for (int i = 0; i < extendsBoundTypes.length; i++) {
                Object extBoundType = extendsBoundTypes[i];
-               if (extBoundType instanceof BodyTypeDeclaration && ((BodyTypeDeclaration) extBoundType).getTransformed()) {
+               if (((flags & ModelUtil.REFRESH_TYPEDEFS) != 0) &&
+                   extBoundType instanceof BodyTypeDeclaration && ((BodyTypeDeclaration) extBoundType).getTransformed()) {
+                  extendsBoundTypes = null;
+                  initExtendsTypes();
+                  break;
+               }
+               if (((flags & ModelUtil.REFRESH_CLASSES) != 0) && extBoundType instanceof Class) {
                   extendsBoundTypes = null;
                   initExtendsTypes();
                   break;
@@ -2221,7 +2230,7 @@ public class ModifyDeclaration extends TypeDeclaration {
          }
          int ix = 0;
          for (JavaType t:extendsTypes) {
-            t.refreshBoundType();
+            t.refreshBoundType(flags);
 
             if (extendsBoundTypes != null) {
                extendsBoundTypes[ix] = t.getTypeDeclaration();

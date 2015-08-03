@@ -35,11 +35,11 @@ public class GlueDeclaration extends Statement {
       return ix;
    }
 
-   public void refreshBoundTypes() {
+   public void refreshBoundTypes(int flags) {
       if (declarations != null)
          for (Object o:declarations)
             if (o instanceof Statement)
-               ((Statement) o).refreshBoundTypes();
+               ((Statement) o).refreshBoundTypes(flags);
    }
 
    public void addDependentTypes(Set<Object> types) {

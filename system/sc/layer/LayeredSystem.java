@@ -3449,6 +3449,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
 
          if (options.runClass != null) {
+            if (options.runFromBuildDir) {
+               if (options.useCommonBuildDir)
+                  System.setProperty("user.dir", sys.commonBuildDir);
+               else
+                  System.setProperty("user.dir", sys.buildDir);
+            }
             // There are situations where we need to reset the class loader - i.e. we cannot use the layered class loaders
             // for a runtime application.   The problem is that some layers included Java classes at runtime look at their
             // own class loader to load other application classes that would be later in the classpath.  The compile time wants
@@ -3457,13 +3463,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // TODO should we have some way for layers to turn this on or off?  Most SC frameworks do not do this injected class
             // dependency thing and work fine without the rest.  It means we hav eto reload all classes.
             sys.resetClassLoader();
-            if (options.runFromBuildDir) {
-               if (options.useCommonBuildDir)
-                  System.setProperty("user.dir", sys.commonBuildDir);
-               else
-                  System.setProperty("user.dir", sys.buildDir);
-            }
-            Thread.currentThread().setContextClassLoader(sys.getSysClassLoader());
             if (commandThread != null)
                commandThread.setContextClassLoader(sys.getSysClassLoader());
 
@@ -3908,7 +3907,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
             if (!separateLayersOnly || l.buildSeparate) {
 
-               initSysClassLoader(l, ClassLoaderMode.BUILD);
+              initSysClassLoader(l, ClassLoaderMode.BUILD);
 
                /*
                * This is necessary both to free up resources and also because the transformed models no longer
@@ -8164,6 +8163,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       RTypeUtil.flushCaches();
       resetClassCache();
       initSysClassLoader(buildLayer, ClassLoaderMode.ALL);
+
+      Thread.currentThread().setContextClassLoader(getSysClassLoader());
+      refreshBoundTypes(ModelUtil.REFRESH_CLASSES);
    }
 
    public void setSystemClassLoader(ClassLoader loader) {
@@ -8209,7 +8211,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Object resolveMethod(Object type, String methodName, String paramSig) {
-      return ModelUtil.getMethodFromSignature(type, methodName, paramSig);
+      return ModelUtil.getMethodFromSignature(type, methodName, paramSig, true);
    }
 
    public void cleanTypeCache() {
@@ -8310,7 +8312,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
 
-      refreshBoundTypes();
+      refreshBoundTypes(ModelUtil.REFRESH_TYPEDEFS);
 
       // Need to clear this before we do refreshBoundType.   This was stale after the last recompile which means new classes
       // won't be visible yet - shadowed by cached nulls.  when we validate the models in refreshBoundType we need the new
@@ -8321,7 +8323,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       //modelIndex.clear();
    }
 
-   public void refreshBoundTypes() {
+   public void refreshBoundTypes(int flags) {
       // Need to clone here because we'll be adding new types to this map during the refreshBoundType process below - i.e.
       // remapping transformed types to their untransformed representations
       Map<String,TypeDeclarationCacheEntry> oldTypesByName = (Map<String,TypeDeclarationCacheEntry>) typesByName.clone();
@@ -8333,7 +8335,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          TypeDeclarationCacheEntry tdEnt = mapEnt.getValue();
          for (int k = 0; k < tdEnt.size(); k++) {
             TypeDeclaration td = tdEnt.get(k);
-            td.refreshBoundTypes();
+            td.refreshBoundTypes(flags);
          }
       }
    }
@@ -8979,7 +8981,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       List<Layer.ModelUpdate> changedModels = refreshSystem(updateInfo);
 
       // Once we've refreshed some of the models in the system, we now need to go and update the type references globally to point to the new references
-      refreshBoundTypes();
+      refreshBoundTypes(ModelUtil.REFRESH_TYPEDEFS);
 
       SystemRefreshInfo sysInfo = new SystemRefreshInfo();
       sysInfo.updateInfo = updateInfo;

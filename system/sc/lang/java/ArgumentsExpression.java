@@ -14,10 +14,10 @@ public abstract class ArgumentsExpression extends Expression
       info.visitList(arguments, ctx);
    }
 
-   public void refreshBoundTypes() {
+   public void refreshBoundTypes(int flags) {
       if (arguments != null)
          for (Expression ex:arguments)
-            ex.refreshBoundTypes();
+            ex.refreshBoundTypes(flags);
    }
 
    public int transformTemplate(int ix, boolean statefulContext) {

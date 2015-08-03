@@ -1315,10 +1315,10 @@ public class ClassDeclaration extends TypeDeclaration {
       return ModelUtil.mergeInnerTypes(modProps, declProps);
    }
 
-   public void refreshBoundTypes() {
-      super.refreshBoundTypes();
+   public void refreshBoundTypes(int flags) {
+      super.refreshBoundTypes(flags);
       if (extendsType != null)
-         extendsType.refreshBoundType();
+         extendsType.refreshBoundType(flags);
    }
 
    public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {

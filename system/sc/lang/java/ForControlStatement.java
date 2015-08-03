@@ -69,22 +69,22 @@ public class ForControlStatement extends ForStatement {
       return ExecResult.Next;
    }
 
-   public void refreshBoundTypes() {
-      super.refreshBoundTypes();
+   public void refreshBoundTypes(int flags) {
+      super.refreshBoundTypes(flags);
       if (forInit != null) {
          for (Definition d:forInit) {
             if (d instanceof VariableStatement)
-               ((VariableStatement) d).refreshBoundTypes();
+               ((VariableStatement) d).refreshBoundTypes(flags);
             else if (d instanceof Expression)
-               ((Expression) d).refreshBoundTypes();
+               ((Expression) d).refreshBoundTypes(flags);
          }
       }
       if (repeat != null) {
          for (Statement st:repeat)
-            st.refreshBoundTypes();
+            st.refreshBoundTypes(flags);
       }
       if (condition != null) {
-         condition.refreshBoundTypes();
+         condition.refreshBoundTypes(flags);
       }
    }
 

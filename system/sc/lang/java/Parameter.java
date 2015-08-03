@@ -163,11 +163,11 @@ public class Parameter extends AbstractVariable implements IVariable {
       return names;
    }
 
-   public void refreshBoundType() {
+   public void refreshBoundType(int flags) {
       if (type != null)
-         type.refreshBoundType();
+         type.refreshBoundType(flags);
       if (nextParameter != null)
-         nextParameter.refreshBoundType();
+         nextParameter.refreshBoundType(flags);
    }
 
    public void addDependentTypes(Set<Object> types) {

@@ -54,11 +54,11 @@ public class VariableStatement extends TypedDefinition {
       return false;
    }
 
-   public void refreshBoundTypes() {
-      super.refreshBoundTypes();
+   public void refreshBoundTypes(int flags) {
+      super.refreshBoundTypes(flags);
       if (definitions != null)
          for (VariableDefinition v:definitions)
-            v.refreshBoundType();
+            v.refreshBoundType(flags);
    }
 
    public int transformTemplate(int ix, boolean statefulContext) {

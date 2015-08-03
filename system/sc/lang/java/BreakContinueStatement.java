@@ -15,7 +15,7 @@ public class BreakContinueStatement extends Statement {
       return operator.charAt(0) == 'c' ? ExecResult.Continue : ExecResult.Break;
    }
 
-   public void refreshBoundTypes() {
+   public void refreshBoundTypes(int flags) {
    }
 
    public void addDependentTypes(Set<Object> types) {

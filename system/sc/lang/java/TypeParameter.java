@@ -79,9 +79,9 @@ public class TypeParameter extends JavaSemanticNode implements ITypedObject {
       return otherType == this || ModelUtil.isAssignableFrom(Object.class, otherType);
    }
 
-   public void refreshBoundType() {
+   public void refreshBoundType(int flags) {
       if (extendsType != null)
-         extendsType.refreshBoundType();
+         extendsType.refreshBoundType(flags);
    }
 
    public void addDependentTypes(Set<Object> types) {

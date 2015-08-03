@@ -83,12 +83,12 @@ public class BoundType extends JavaType {
       return sb.toString();
    }
 
-   public void refreshBoundType() {
+   public void refreshBoundType(int flags) {
       if (baseType != null)
-         baseType.refreshBoundType();
+         baseType.refreshBoundType(flags);
       if (boundTypes != null) {
          for (JavaType bt:boundTypes)
-            bt.refreshBoundType();
+            bt.refreshBoundType(flags);
       }
    }
 

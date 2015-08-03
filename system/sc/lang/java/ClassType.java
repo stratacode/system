@@ -603,16 +603,19 @@ public class ClassType extends JavaType {
       return any;
    }
 
-   public void refreshBoundType() {
+   public void refreshBoundType(int flags) {
       if (chained)
          return;
-      
+
       if (type != null && type != FAILED_TO_INIT_SENTINEL) {
          if (type instanceof TypeDeclaration) {
             TypeDeclaration td = (TypeDeclaration) type;
             if (td.getTransformed()) {
-               type = ModelUtil.refreshBoundType(type);
+               type = ModelUtil.refreshBoundType(getLayeredSystem(), type, flags);
             }
+         }
+         else if (type instanceof Class) {
+            type = ModelUtil.refreshBoundType(getLayeredSystem(), type, flags);
          }
       }
    }

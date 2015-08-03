@@ -143,11 +143,11 @@ public class FieldDefinition extends TypedDefinition {
       }
    }
 
-   public void refreshBoundTypes() {
-      super.refreshBoundTypes();
+   public void refreshBoundTypes(int flags) {
+      super.refreshBoundTypes(flags);
       if (variableDefinitions != null)
          for (VariableDefinition v:variableDefinitions)
-            v.refreshBoundType();
+            v.refreshBoundType(flags);
    }
 
    public void addDependentTypes(Set<Object> types) {
@@ -165,6 +165,7 @@ public class FieldDefinition extends TypedDefinition {
       for (VariableDefinition v:variableDefinitions) {
          Expression initializer = v.initializer;
          Object pval;
+
          // Note: we already cleared prim nums to zero so do not set things to null here
          if (initializer != null) {
             if (mode.evalExpression(initializer, v.bindingDirection)) {
@@ -172,7 +173,7 @@ public class FieldDefinition extends TypedDefinition {
 
                if (pval == null) {
                   Class rc = v.getRuntimeClass();
-                  if (rc.isPrimitive())
+                  if (rc != null && rc.isPrimitive())
                      pval = Type.get(rc).getDefaultObjectValue();
                }
 

@@ -86,9 +86,9 @@ public class MvnDescriptor implements Serializable {
       String classifier = file.getTagValue(tag, "classifier");
       MvnDescriptor desc = new MvnDescriptor(groupId, artifactId, version, type, classifier);
       if (appendInherited)
-         file.appendInherited(desc, null);
+         file.appendInheritedAtts(desc, null);
       else if (file.parentPOM != null)
-         file.parentPOM.appendInherited(desc, null);
+         file.parentPOM.appendInheritedAtts(desc, null);
       if (dependency) {
          Element exclRoot = tag.getSingleChildTag("exclusions");
          if (exclRoot != null) {
@@ -158,5 +158,11 @@ public class MvnDescriptor implements Serializable {
 
    public int hashCode() {
       return groupId.hashCode() + artifactId.hashCode();
+   }
+
+   public void mergeFrom(MvnDescriptor parentDesc) {
+      if (version == null && parentDesc.version != null)
+         version = parentDesc.version;
+      // TODO: any other attributes inherited here?
    }
 }

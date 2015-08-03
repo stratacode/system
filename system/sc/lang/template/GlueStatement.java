@@ -131,11 +131,11 @@ public class GlueStatement extends Statement {
       return chunkCt;
    }
 
-   public void refreshBoundTypes() {
+   public void refreshBoundTypes(int flags) {
       if (declarations != null)
          for (Object d:declarations)
             if (d instanceof Statement)
-               ((Statement) d).refreshBoundTypes();
+               ((Statement) d).refreshBoundTypes(flags);
    }
 
    public void addChildBodyStatements(List<Object> statements) {

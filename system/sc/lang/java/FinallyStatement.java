@@ -26,10 +26,10 @@ public class FinallyStatement extends NonIndentedStatement implements IBlockStat
       return 0;
    }
 
-   public void refreshBoundTypes() {
+   public void refreshBoundTypes(int flags) {
       if (statements != null)
          for (Statement st:statements)
-            st.refreshBoundTypes();
+            st.refreshBoundTypes(flags);
    }
 
    public void addChildBodyStatements(List<Object> sts) {

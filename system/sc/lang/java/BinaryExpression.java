@@ -630,16 +630,16 @@ public class BinaryExpression extends Expression {
       return lhs.callsThis() || getRhsExpr().callsThis();
    }
 
-   public void refreshBoundTypes() {
+   public void refreshBoundTypes(int flags) {
       if (lhs != null)
-         lhs.refreshBoundTypes();
+         lhs.refreshBoundTypes(flags);
       if (rhs instanceof JavaType) {
-         ((JavaType) rhs).refreshBoundType();
+         ((JavaType) rhs).refreshBoundType(flags);
       }
       else {
          Expression rhsExpr = getRhsExpr();
          if (rhsExpr != null)
-            rhsExpr.refreshBoundTypes();
+            rhsExpr.refreshBoundTypes(flags);
       }
    }
 

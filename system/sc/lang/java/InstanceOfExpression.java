@@ -53,10 +53,10 @@ public class InstanceOfExpression extends BinaryExpression implements ISemanticW
       return Boolean.class;
    }
 
-   public void refreshBoundTypes() {
-      super.refreshBoundTypes();
+   public void refreshBoundTypes(int flags) {
+      super.refreshBoundTypes(flags);
       if (type != null)
-         type.refreshBoundType();
+         type.refreshBoundType(flags);
    }
 
    public Class getWrappedClass() {

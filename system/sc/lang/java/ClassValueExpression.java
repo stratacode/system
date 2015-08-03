@@ -203,9 +203,9 @@ public class ClassValueExpression extends Expression {
       return relPos;
    }
 
-   public void refreshBoundTypes() {
+   public void refreshBoundTypes(int flags) {
       if (boundType != null) {
-         boundType = ModelUtil.refreshBoundType(boundType);
+         boundType = ModelUtil.refreshBoundType(getLayeredSystem(), boundType, flags);
       }
    }
 

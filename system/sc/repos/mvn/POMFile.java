@@ -209,9 +209,26 @@ public class POMFile extends XMLFileFormat {
                depScope = DEFAULT_SCOPE;
             if (includesScope(scopes, depScope)) {
                MvnDescriptor desc = MvnDescriptor.getFromTag(this, depTag, true, true);
-               // TODO: do we need a mechanism to specify which optional packages should be installed?
-               if (!desc.optional)
+               if (!desc.optional || (pomPkg instanceof MvnRepositoryPackage && ((MvnRepositoryPackage) pomPkg).includeOptional))
                   res.add(desc);
+            }
+         }
+      }
+      if (parentPOM != null) {
+         List<MvnDescriptor> parentDeps = parentPOM.getDependencies(scopes);
+         if (parentDeps != null) {
+            for (MvnDescriptor parentDesc:parentDeps) {
+               boolean found = false;
+               for (MvnDescriptor childDesc:res) {
+                  if (childDesc.matches(parentDesc)) {
+                     found = true;
+                     childDesc.mergeFrom(parentDesc);
+                     break;
+                  }
+               }
+               if (!found) {
+                  res.add(parentDesc);
+               }
             }
          }
       }
@@ -311,8 +328,7 @@ public class POMFile extends XMLFileFormat {
    }
 
    /** If the child POM file does not specify a version or other properties, those are inherited from the parent POM in the dependency management section. */
-   // TODO: need to implement the type=import operation where you can selectiely import dependencies from another POM.
-   public void appendInherited(MvnDescriptor desc, HashSet<POMFile> visited) {
+   public void appendInheritedAtts(MvnDescriptor desc, HashSet<POMFile> visited) {
       if (visited == null)
          visited = new HashSet<POMFile>();
       if (visited.contains(this))
@@ -334,16 +350,16 @@ public class POMFile extends XMLFileFormat {
             }
          }
          if (parentPOM != null)
-            parentPOM.appendInherited(desc, visited);
+            parentPOM.appendInheritedAtts(desc, visited);
          if (importedPOMs != null) {
             for (POMFile importPOM:importedPOMs) {
-               importPOM.appendInherited(desc, visited);
+               importPOM.appendInheritedAtts(desc, visited);
             }
          }
       }
       if (modulePOMs != null) {
          for (POMFile modPOM:modulePOMs) {
-            modPOM.appendInherited(desc, visited);
+            modPOM.appendInheritedAtts(desc, visited);
          }
       }
    }

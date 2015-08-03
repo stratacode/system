@@ -382,7 +382,7 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
    }
 
    public Object invokeFromWrapper(Object origObj, String methodName, String paramSig, Object... args) {
-      Object meth = type.getMethodFromSignature(methodName, paramSig);
+      Object meth = type.getMethodFromSignature(methodName, paramSig, true);
       if (meth == null) {
          type.runtimeError(IllegalArgumentException.class, "No method found: ", methodName, " with signature ", paramSig, " for: ");
          return null; // not reached
@@ -436,7 +436,7 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
       TypeDeclaration dynType = LayeredSystem.getCurrent().getSrcTypeDeclaration(typeName, null, true);
       if (dynType == null)
          throw new IllegalArgumentException("No type named: " + typeName + " for dynamic method call: " + methodName);
-      Object meth = dynType.getMethodFromSignature(methodName, paramSig);
+      Object meth = dynType.getMethodFromSignature(methodName, paramSig, true);
       if (meth == null) {
          dynType.runtimeError(IllegalArgumentException.class, "No method found: ", methodName, " with signature ", paramSig, " for: ");
          return null; // not reached

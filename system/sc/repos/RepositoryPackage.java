@@ -45,6 +45,8 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
 
    public boolean unzip;
 
+   transient public IRepositoryManager mgr;
+
    public RepositoryPackage(Layer layer) {
       super(layer);
    }
@@ -79,7 +81,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
 
          RepositorySystem sys = definedInLayer.layeredSystem.repositorySystem;
          if (type != null) {
-            IRepositoryManager mgr = sys.getRepositoryManager(type);
+            mgr = sys.getRepositoryManager(type);
 
             if (url != null) {
                RepositorySource src = mgr.createRepositorySource(url, unzip);
@@ -98,9 +100,8 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
             }
          }
          else {
-            MessageHandler.error(sys.msg, "Package ", packageName, " missing type property - should be 'git', 'mvn', etc.");
+            MessageHandler.error(sys.msg, "Package ", packageName, " missing type property - should be 'git', 'mvn', 'ur', 'scp' etc.");
          }
-
       }
       else {
          if (url != null || type != null) {
@@ -156,6 +157,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    }
 
    public void updateInstallRoot(IRepositoryManager mgr) {
+      this.mgr = mgr;
       String resName;
       if (fileName == null)
          resName = mgr.getPackageRoot();
@@ -226,7 +228,16 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       String fileToUse = getClassPathFileName();
       if (fileToUse != null && definesClasses) {
          String entry = FileUtil.concat(getVersionRoot(), fileToUse);
-         classPath.add(entry);
+
+         if (mgr != null) {
+            HashSet<String> globalClassPath = mgr.getRepositorySystem().classPath;
+            if (!globalClassPath.contains(entry)) {
+               globalClassPath.add(entry);
+               classPath.add(entry);
+            }
+         }
+         else
+            System.err.println("*** No manager for addToClassPath");
       }
 
       if (dependencies != null) {
@@ -237,6 +248,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    }
 
    public void init(IRepositoryManager mgr) {
+      this.mgr = mgr;
       if (sources != null) {
          for (RepositorySource src:sources)
             src.init(mgr.getRepositorySystem());

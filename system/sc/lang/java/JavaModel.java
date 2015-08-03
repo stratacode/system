@@ -1008,7 +1008,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                   it.remove();
                }
                else {
-                  Object member = type.getMethodFromSignature(key.methodName, key.paramSig);
+                  Object member = type.getMethodFromSignature(key.methodName, key.paramSig, true);
                   if (member != null)
                      addDynMethod(type, key.methodName, key.paramSig, null);
                }

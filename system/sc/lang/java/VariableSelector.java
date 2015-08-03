@@ -75,10 +75,10 @@ public class VariableSelector extends Selector {
       info.visitList(arguments, ctx);
    }
 
-   public void refreshBoundType() {
+   public void refreshBoundType(int flags) {
       if (arguments != null)
          for (Expression expr:arguments)
-            expr.refreshBoundTypes();
+            expr.refreshBoundTypes(flags);
    }
 
    public void addDependentTypes(Set<Object> types) {

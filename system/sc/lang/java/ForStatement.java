@@ -16,9 +16,9 @@ public class ForStatement extends Statement {
       return true;
    }
 
-   public void refreshBoundTypes() {
+   public void refreshBoundTypes(int flags) {
       if (statement != null)
-         statement.refreshBoundTypes();
+         statement.refreshBoundTypes(flags);
    }
 
    public void addChildBodyStatements(List<Object> res) {

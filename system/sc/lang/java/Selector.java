@@ -18,7 +18,7 @@ public abstract class Selector extends JavaSemanticNode {
 
    public abstract void changeExpressionsThis(TypeDeclaration td, TypeDeclaration outer, String newName);
 
-   public abstract void refreshBoundType();
+   public abstract void refreshBoundType(int flags);
 
    public abstract void addDependentTypes(Set<Object> types);
 

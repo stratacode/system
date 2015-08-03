@@ -13,9 +13,9 @@ public class LabelStatement extends Statement {
    public String labelName;
    public Statement statement;
 
-   public void refreshBoundTypes() {
+   public void refreshBoundTypes(int flags) {
       if (statement != null)
-         statement.refreshBoundTypes();
+         statement.refreshBoundTypes(flags);
    }
 
    public void addDependentTypes(Set<Object> types) {

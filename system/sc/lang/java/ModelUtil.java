@@ -42,6 +42,10 @@ public class ModelUtil {
    public static final String CHILDREN_ANNOTATION = "Children";
    public static final String PARENT_ANNOTATION = "Parent";
 
+   /** Flags to refreshBoundTypes */
+   public static int REFRESH_CLASSES = 1;
+   public static int REFRESH_TYPEDEFS = 2;
+
    private ModelUtil() {}
 
    /**
@@ -761,9 +765,9 @@ public class ModelUtil {
       return res;
    }
 
-   public static Object getMethodFromSignature(Object type, String methodName, String paramSig) {
+   public static Object getMethodFromSignature(Object type, String methodName, String paramSig, boolean resolveLayer) {
       if (type instanceof BodyTypeDeclaration)
-         return ((TypeDeclaration) type).getMethodFromSignature(methodName, paramSig);
+         return ((BodyTypeDeclaration) type).getMethodFromSignature(methodName, paramSig, resolveLayer);
       else if (type instanceof Class)
          return PTypeUtil.resolveMethod((Class) type, methodName, paramSig);
       else if (type instanceof DynType)
@@ -773,7 +777,7 @@ public class ModelUtil {
          Object resolvedType = LayeredSystem.getCurrent().getTypeDeclaration(typeName);
          if (resolvedType == null)
             throw new IllegalArgumentException("No type named: " + typeName);
-         return getMethodFromSignature(resolvedType, methodName, paramSig);
+         return getMethodFromSignature(resolvedType, methodName, paramSig, resolveLayer);
       }
       else
          throw new UnsupportedOperationException();
@@ -5949,26 +5953,85 @@ public class ModelUtil {
       return sb.toString();
    }
 
-   public static void refreshBoundProperty(Object type) {
+   public static Object refreshBoundProperty(LayeredSystem sys, Object type, int flags) {
       // TODO: do we need to replace a transformed property reference?  I don't think so because we never use
-      // assignedProperty at runtime.
+      // Replace any properties which refresh to the object itself
+      return ModelUtil.refreshBoundType(sys, type, flags);
    }
 
-   public static Object refreshBoundIdentifierType(Object boundType) {
-      if (boundType instanceof TypeDeclaration)
-           return refreshBoundType(boundType);
+   public static Object refreshBoundMethod(LayeredSystem sys, Object meth) {
+      if (meth instanceof ParamTypedMethod) {
+         ParamTypedMethod ptm = (ParamTypedMethod) meth;
+         ptm.method = refreshBoundMethod(sys, ptm.method);
+         return ptm;
+      }
+      Object enclType = refreshBoundType(sys, ModelUtil.getEnclosingType(meth), REFRESH_TYPEDEFS | REFRESH_CLASSES);
+      Object res = ModelUtil.getMethodFromSignature(enclType, ModelUtil.getMethodName(meth), ModelUtil.getTypeSignature(meth), false);
+      if (res == null)
+         System.out.println("*** Unable to refresh bound method");
+      return res;
+   }
+
+   public static Object refreshBoundField(LayeredSystem sys, Field field) {
+      // Don't try to resolve these because it won't resolve to the right thing.
+      if (field == ArrayTypeDeclaration.LENGTH_FIELD)
+         return field;
+      Object enclType = refreshBoundClass(sys, field.getDeclaringClass());
+      Object res = ModelUtil.definesMember(enclType, ModelUtil.getPropertyName(field), JavaSemanticNode.MemberType.FieldSet, null, null);
+      if (res == null)
+         System.out.println("*** Unable to refreshBoundField");
+      return res;
+   }
+
+   public static Object refreshBoundIdentifierType(LayeredSystem sys, Object boundType, int flags) {
+      if ((flags & REFRESH_TYPEDEFS) != 0) {
+         if (boundType instanceof TypeDeclaration)
+            return refreshBoundType(sys, boundType, flags);
+         else if (boundType instanceof AbstractMethodDefinition || boundType instanceof ParamTypedMethod)
+            return refreshBoundMethod(sys, boundType);
+      }
+      if ((flags & REFRESH_CLASSES) != 0) {
+         if (boundType instanceof Class)
+            return refreshBoundClass(sys, (Class) boundType);
+         if (boundType instanceof Method || boundType instanceof ParamTypedMethod)
+            return refreshBoundMethod(sys, boundType);
+         if (boundType instanceof Constructor)
+            return refreshBoundMethod(sys, boundType);
+         if (boundType instanceof Field)
+            return refreshBoundField(sys, (Field) boundType);
+         if (boundType instanceof ParamTypeDeclaration) {
+            ParamTypeDeclaration ptd = (ParamTypeDeclaration) boundType;
+            ptd.baseType = refreshBoundIdentifierType(sys, ptd.baseType, flags);
+         }
+         else if (boundType instanceof ParamTypedMember) {
+            ParamTypedMember memb = (ParamTypedMember) boundType;
+            memb.member = refreshBoundIdentifierType(sys, memb.member, flags);
+         }
+      }
+
       // TODO: do we need to re-resolve any identifier references that are children types?  Variables, fields, methods?
       // Theoretically their type should not change and we should not be interpreting these references so I'm thinking
       // we are ok for now.
       return boundType;
    }
 
-   public static Object refreshBoundType(Object boundType) {
-      if (boundType instanceof TypeDeclaration) {
+   public static Object refreshBoundType(LayeredSystem sys, Object boundType, int flags) {
+      if (boundType instanceof ParamTypeDeclaration) {
+         ParamTypeDeclaration ptd = (ParamTypeDeclaration) boundType;
+         ptd.baseType = refreshBoundType(sys, ptd.baseType, flags);
+         return ptd;
+      }
+      if ((flags & REFRESH_TYPEDEFS) != 0 && boundType instanceof TypeDeclaration) {
          TypeDeclaration td = (TypeDeclaration) boundType;
          return td.refreshBoundType(boundType);
       }
+      if ((flags & REFRESH_CLASSES) != 0 && boundType instanceof Class)
+         return refreshBoundClass(sys, (Class) boundType);
       return boundType;
+   }
+
+   public static Object refreshBoundClass(LayeredSystem sys, Class boundClass) {
+      return sys.getClass(boundClass.getName(), false);
    }
 
    public static Object getEnum(Object currentType, String nextName) {

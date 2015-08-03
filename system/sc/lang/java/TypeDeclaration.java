@@ -1596,15 +1596,15 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       super.initDynStatements(inst, ctx, mode);
    }
 
-   public void refreshBoundTypes() {
-      super.refreshBoundTypes();
+   public void refreshBoundTypes(int flags) {
+      super.refreshBoundTypes(flags);
       if (implementsTypes != null)
          for (JavaType jt:implementsTypes)
-            jt.refreshBoundType();
+            jt.refreshBoundType(flags);
       if (implementsBoundTypes != null) {
          JavaModel m = getJavaModel();
          for (int i = 0; i < implementsBoundTypes.length; i++) {
-            Object implType = ModelUtil.refreshBoundType(implementsBoundTypes[i]);
+            Object implType = ModelUtil.refreshBoundType(getLayeredSystem(), implementsBoundTypes[i], flags);
             if (implType != implementsBoundTypes[i]) {
                implementsBoundTypes[i] = implType;
                if (implType instanceof TypeDeclaration) {

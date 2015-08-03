@@ -155,9 +155,9 @@ public class ExtendsType extends JavaType {
       return getSignatureCode() + (typeArgument == null ? "" : typeArgument.getSignature());
    }
 
-   public void refreshBoundType() {
+   public void refreshBoundType(int flags) {
       if (typeArgument != null)
-         typeArgument.refreshBoundType();
+         typeArgument.refreshBoundType(flags);
    }
 
    public String toGenerateString() {

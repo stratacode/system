@@ -138,12 +138,12 @@ public class SwitchStatement extends Statement implements IBlockStatement {
       return super.findMemberOwner(name, mtype);
    }
 
-   public void refreshBoundTypes() {
+   public void refreshBoundTypes(int flags) {
       if (expression != null)
-         expression.refreshBoundTypes();
+         expression.refreshBoundTypes(flags);
       if (statements != null)
          for (Statement st:statements)
-            st.refreshBoundTypes();
+            st.refreshBoundTypes(flags);
    }
 
    public void addChildBodyStatements(List<Object> sts) {

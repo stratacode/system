@@ -33,13 +33,13 @@ public class IfStatement extends NonIndentedStatement {
       return true;
    }
 
-   public void refreshBoundTypes() {
+   public void refreshBoundTypes(int flags) {
       if (expression != null)
-         expression.refreshBoundTypes();
+         expression.refreshBoundTypes(flags);
       if (trueStatement != null)
-         trueStatement.refreshBoundTypes();
+         trueStatement.refreshBoundTypes(flags);
       if (falseStatement != null)
-         falseStatement.refreshBoundTypes();
+         falseStatement.refreshBoundTypes(flags);
    }
 
    public void addChildBodyStatements(List<Object> sts) {

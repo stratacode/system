@@ -52,11 +52,11 @@ public class CatchStatement extends NonIndentedStatement {
       }
    }
 
-   public void refreshBoundTypes() {
+   public void refreshBoundTypes(int flags) {
       if (parameters != null)
-         parameters.refreshBoundType();
+         parameters.refreshBoundType(flags);
       if (statements != null)
-         statements.refreshBoundTypes();
+         statements.refreshBoundTypes(flags);
    }
 
    public void addChildBodyStatements(List<Object> sts) {

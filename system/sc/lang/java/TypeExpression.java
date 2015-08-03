@@ -51,11 +51,11 @@ public class TypeExpression extends Statement {
    }
 
    @Override
-   public void refreshBoundTypes() {
+   public void refreshBoundTypes(int flags) {
       if (type != null)
-         type.refreshBoundType();
+         type.refreshBoundType(flags);
       if (expression != null)
-         expression.refreshBoundTypes();
+         expression.refreshBoundTypes(flags);
    }
 
    @Override

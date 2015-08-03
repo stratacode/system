@@ -690,26 +690,30 @@ public class NewExpression extends IdentifierExpression {
          throw new IllegalArgumentException("No parse tree new expression's semantic node");
    }
 
-   public void refreshBoundTypes() {
-      super.refreshBoundTypes();
+   public void refreshBoundTypes(int flags) {
+      super.refreshBoundTypes(flags);
 
       if (arrayDimensions != null) {
          for (Expression ad:arrayDimensions) {
             if (ad != null)
-               ad.refreshBoundTypes();
+               ad.refreshBoundTypes(flags);
          }
       }
 
       if (arrayInitializer != null)
-         arrayInitializer.refreshBoundTypes();
+         arrayInitializer.refreshBoundTypes(flags);
 
       if (typeArguments != null)
          for (JavaType ta:typeArguments)
-            ta.refreshBoundType();
+            ta.refreshBoundType(flags);
 
       if (classBody != null)
          for (Statement cb:classBody)
-            cb.refreshBoundTypes();
+            cb.refreshBoundTypes(flags);
+
+      if (boundType != null) {
+         boundType = ModelUtil.refreshBoundType(getLayeredSystem(), boundType, flags);
+      }
    }
 
    public int transformTemplate(int ix, boolean statefulContext) {

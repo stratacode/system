@@ -287,6 +287,11 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
 
       int methodSize = templateBody ? 1 : 0;
       ctx.pushFrame(true, body.frameSize + methodSize, paramValues, parameters, getEnclosingType());
+
+      // TODO: put in a configurable stack size - or just let the runtime throw a stack overflow exception?
+      if (ctx.getFrameSize() > 500)
+         System.out.println("*** Warning - stack overflow?");
+
       try {
          ExecResult res;
          if (templateBody) {
@@ -319,7 +324,7 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
          return call(thisObj, values);
       Object type = DynUtil.getType(thisObj);
       Object method;
-      method = ModelUtil.getMethodFromSignature(type, name, getTypeSignature());
+      method = ModelUtil.getMethodFromSignature(type, name, getTypeSignature(), true);
       if (method == null)
          throw new UnsupportedOperationException();
       if (method == this)
@@ -526,7 +531,7 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
    }
 
    public Statement transformToJS() {
-      super.refreshBoundTypes();
+      super.transformToJS();
       if (parameters != null)
          parameters.transformToJS();
       if (throwsTypes != null)
@@ -541,20 +546,20 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       return this;
    }
 
-   public void refreshBoundTypes() {
-      super.refreshBoundTypes();
+   public void refreshBoundTypes(int flags) {
+      super.refreshBoundTypes(flags);
       if (parameters != null)
-         parameters.refreshBoundType();
+         parameters.refreshBoundType(flags);
       if (throwsTypes != null)
          for (JavaType t:throwsTypes)
-            t.refreshBoundType();
+            t.refreshBoundType(flags);
 
       if (body != null)
-         body.refreshBoundTypes();
+         body.refreshBoundTypes(flags);
 
       if (typeParameters != null)
          for (TypeParameter tp:typeParameters)
-            tp.refreshBoundType();
+            tp.refreshBoundType(flags);
    }
 
    public int transformTemplate(int ix, boolean statefulContext) {

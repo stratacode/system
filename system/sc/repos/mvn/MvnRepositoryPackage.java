@@ -18,6 +18,9 @@ public class MvnRepositoryPackage extends RepositoryPackage {
    }
    transient POMFile pomFile;
 
+   public boolean includeOptional = false;
+   public boolean includeProvided = false;
+
    public MvnRepositoryPackage(Layer layer) {
       super(layer);
    }

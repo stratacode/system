@@ -232,10 +232,10 @@ public class ArrayInitializer extends Expression {
       return ai;
    }
 
-   public void refreshBoundTypes() {
+   public void refreshBoundTypes(int flags) {
       if (initializers != null)
          for (Expression ex:initializers)
-            ex.refreshBoundTypes();
+            ex.refreshBoundTypes(flags);
    }
 
    public void addDependentTypes(Set<Object> types) {

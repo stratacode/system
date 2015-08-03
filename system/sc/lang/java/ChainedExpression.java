@@ -52,9 +52,9 @@ public abstract class ChainedExpression extends Expression {
       info.visit(expression, ctx);
    }
 
-   public void refreshBoundTypes() {
+   public void refreshBoundTypes(int flags) {
       if (expression != null)
-         expression.refreshBoundTypes();
+         expression.refreshBoundTypes(flags);
    }
 
    public void addDependentTypes(Set<Object> types) {

@@ -18,11 +18,11 @@ public class SynchronizedStatement extends Statement {
       }
    }
 
-   public void refreshBoundTypes() {
+   public void refreshBoundTypes(int flags) {
       if (expression != null)
-         expression.refreshBoundTypes();
+         expression.refreshBoundTypes(flags);
       if (statement != null)
-         statement.refreshBoundTypes();
+         statement.refreshBoundTypes(flags);
    }
 
    public void addChildBodyStatements(List<Object> sts) {

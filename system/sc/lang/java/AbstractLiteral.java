@@ -156,7 +156,7 @@ public abstract class AbstractLiteral extends Expression implements IValueConver
       return true;
    }
 
-   public void refreshBoundTypes() {}
+   public void refreshBoundTypes(int flags) {}
 
    public void addDependentTypes(Set<Object> types) {}
 

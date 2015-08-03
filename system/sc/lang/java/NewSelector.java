@@ -30,9 +30,9 @@ public class NewSelector extends Selector {
       innerCreator.changeExpressionsThis(td, outer, newName);
    }
 
-   public void refreshBoundType() {
+   public void refreshBoundType(int flags) {
       if (innerCreator != null)
-         innerCreator.refreshBoundTypes();
+         innerCreator.refreshBoundTypes(flags);
    }
 
    public void addDependentTypes(Set<Object> types) {

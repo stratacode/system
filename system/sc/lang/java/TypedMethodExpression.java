@@ -56,10 +56,10 @@ public class TypedMethodExpression extends IdentifierExpression {
          throw new IllegalArgumentException("No parse tree new expression's semantic node");
    }
 
-   public void refreshBoundTypes() {
-      super.refreshBoundTypes();
+   public void refreshBoundTypes(int flags) {
+      super.refreshBoundTypes(flags);
       for (JavaType jt:typeArguments)
-         jt.refreshBoundType();
+         jt.refreshBoundType(flags);
    }
 
    public int transformTemplate(int ix, boolean statefulContext) {

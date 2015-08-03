@@ -607,12 +607,12 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       return "assignment";
    }
 
-   public void refreshBoundTypes() {
+   public void refreshBoundTypes(int flags) {
       Expression init = getInitializerExpr();
       if (init != null)
-         init.refreshBoundTypes();
+         init.refreshBoundTypes(flags);
       if (assignedProperty != null)
-         ModelUtil.refreshBoundProperty(assignedProperty);
+         assignedProperty = ModelUtil.refreshBoundProperty(getLayeredSystem(), assignedProperty, flags);
    }
 
    public void addDependentTypes(Set<Object> types) {

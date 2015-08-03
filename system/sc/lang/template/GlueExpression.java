@@ -46,11 +46,11 @@ public class GlueExpression extends Expression {
       return true;
    }
 
-   public void refreshBoundTypes() {
+   public void refreshBoundTypes(int flags) {
       if (expressions != null) {
          for (Object expr:expressions)
             if (expr instanceof Expression)
-               ((Expression) expr).refreshBoundTypes();
+               ((Expression) expr).refreshBoundTypes(flags);
       }
    }
 

@@ -279,5 +279,9 @@ public class ExecutionContext {
       return null;
    }
 
+   public int getFrameSize() {
+      return frames == null ? 0 : frames.size();
+   }
+
 
 }

@@ -74,7 +74,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
       }
       ArrayList<DynMethod> meths = new ArrayList<DynMethod>();
       for (MethodKey methKey:reverseDeps.dynMethods.keySet()) {
-         Object methObj = ModelUtil.getMethodFromSignature(objType, methKey.methodName, methKey.paramSig);
+         Object methObj = ModelUtil.getMethodFromSignature(objType, methKey.methodName, methKey.paramSig, true);
          // Treat constructors as static since they must go into the invokeStatic method
          boolean isStatic = ModelUtil.hasModifier(methObj, "static") || ModelUtil.isConstructor(methObj);
          int pos = getMethodIndex(isStatic, methObj);
