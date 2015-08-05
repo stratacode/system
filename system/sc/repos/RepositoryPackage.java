@@ -78,11 +78,8 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    public void init() {
       super.init();
       if (definedInLayer != null) {
-         if (definedInLayer.repositoryPackages == null)
-            definedInLayer.repositoryPackages = new ArrayList<RepositoryPackage>();
-         definedInLayer.repositoryPackages.add(this);
-
          RepositorySystem sys = definedInLayer.layeredSystem.repositorySystem;
+         RepositoryPackage pkg = this;
          if (type != null) {
             mgr = sys.getRepositoryManager(type);
 
@@ -99,8 +96,13 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
                src.pkg = this;
                updateCurrentSource(src);
                updateInstallRoot(mgr);
-               sys.addRepositoryPackage(this);
+               // Note: if a package with this name has already been added, we use that instance
+               pkg = sys.addRepositoryPackage(this);
             }
+            if (definedInLayer.repositoryPackages == null)
+               definedInLayer.repositoryPackages = new ArrayList<RepositoryPackage>();
+            definedInLayer.repositoryPackages.add(pkg);
+            // TODO: are there any properties in this pkg which we need to copy over to the existing instance if pkg != this
          }
          else {
             MessageHandler.error(sys.msg, "Package ", packageName, " missing type property - should be 'git', 'mvn', 'ur', 'scp' etc.");

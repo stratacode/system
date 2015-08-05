@@ -17,6 +17,7 @@ public class URLRepositoryManager extends AbstractRepositoryManager {
    }
 
    public String doInstall(RepositorySource src, DependencyContext ctx, DependencyCollection deps) {
+      src.pkg.definesClasses = false;
       return URLUtil.saveURLToFile(src.url, src.pkg.installedRoot, src.unzip, msg);
    }
 

@@ -524,7 +524,7 @@ public abstract class Language extends LayerFileComponent {
    }
 
    public FileEnabledState enabledForPath(String pathName, Layer fileLayer, boolean abs) {
-      String filePathType = fileLayer.getSrcPathTypeName(pathName, abs);
+      String filePathType = fileLayer == null ? null : fileLayer.getSrcPathTypeName(pathName, abs);
       if (srcPathTypes != null) {
          for (int i = 0; i < srcPathTypes.length; i++) {
             boolean res = StringUtil.equalStrings(srcPathTypes[i], filePathType);

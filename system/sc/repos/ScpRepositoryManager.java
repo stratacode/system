@@ -20,6 +20,7 @@ public class ScpRepositoryManager extends AbstractRepositoryManager {
    public String doInstall(RepositorySource src, DependencyContext ctx, DependencyCollection deps) {
       ArrayList<String> args = new ArrayList<String>();
       String resFile = src.pkg.installedRoot;
+      src.pkg.definesClasses = false;
       String srcURL = src.url;
       boolean isZip = srcURL.endsWith(".jar") || srcURL.endsWith(".zip");
       if (isZip) {

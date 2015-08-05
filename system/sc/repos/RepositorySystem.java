@@ -93,16 +93,20 @@ public class RepositorySystem {
       return pkg;
    }
 
-   public void addRepositoryPackage(RepositoryPackage pkg) {
+   public RepositoryPackage addRepositoryPackage(RepositoryPackage pkg) {
       RepositoryPackage existingPkg = store.packages.get(pkg.packageName);
       if (existingPkg != null) {
          pkg.installedRoot = existingPkg.installedRoot;
          pkg.currentSource = existingPkg.currentSource;
+         pkg.definesClasses = existingPkg.definesClasses;
+         pkg.installed = existingPkg.installed;
          pkg.sources = new RepositorySource[1];
          pkg.sources[0] = pkg.currentSource;
+         return existingPkg;
       }
       else {
          store.packages.put(pkg.packageName, pkg);
+         return pkg;
       }
    }
 

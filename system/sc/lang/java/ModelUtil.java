@@ -4069,19 +4069,29 @@ public class ModelUtil {
             Class next = superClass.getSuperclass();
             if (next != null && refLayer != null) {
                Object nextType = findTypeDeclaration(system, next.getName(), refLayer, layerResolve);
-               if (nextType != null && nextType instanceof TypeDeclaration) {
+               if (nextType != null) {
                   if (nextType == superType) {
                      System.err.println("*** Loop in inheritance tree: " + next.getName());
                      return null;
                   }
-                  return ((TypeDeclaration) nextType).getInheritedAnnotation(annotationName, skipCompiled, refLayer, layerResolve);
+                  if (nextType instanceof TypeDeclaration) {
+                     return ((TypeDeclaration) nextType).getInheritedAnnotation(annotationName, skipCompiled, refLayer, layerResolve);
+                  }
+                  else if (!skipCompiled) {
+                     return getInheritedAnnotation(system, nextType, annotationName, skipCompiled, refLayer, layerResolve);
+                  }
                }
             }
             Class[] ifaces = superClass.getInterfaces();
             for (Class iface:ifaces) {
-               Object nextIFace = findTypeDeclaration(system, iface.getName(), refLayer, layerResolve);
-               if (nextIFace != null && nextIFace instanceof TypeDeclaration)
-                  return ((TypeDeclaration) nextIFace).getInheritedAnnotation(annotationName, skipCompiled, refLayer, layerResolve);
+               Object nextIface = findTypeDeclaration(system, iface.getName(), refLayer, layerResolve);
+               if (nextIface != null) {
+                  if (nextIface instanceof TypeDeclaration)
+                     return ((TypeDeclaration) nextIface).getInheritedAnnotation(annotationName, skipCompiled, refLayer, layerResolve);
+                  else if (!skipCompiled) {
+                     return getInheritedAnnotation(system, nextIface, annotationName, skipCompiled, refLayer, layerResolve);
+                  }
+               }
             }
             superClass = next;
          }
