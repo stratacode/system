@@ -1,6 +1,6 @@
 #!/bin/sh
 
-../../makeSC.sh /jjv/vbuild/
+../../../makeSC.sh /jjv/vbuild/
 
 cd /jjv/vbuild
 rm -rf bin

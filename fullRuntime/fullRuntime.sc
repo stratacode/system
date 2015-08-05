@@ -1,1 +1,3 @@
-fullRuntime extends coreRuntime {}
+fullRuntime extends coreRuntime {
+   srcPath = "src";
+}

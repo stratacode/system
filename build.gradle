@@ -1,0 +1,86 @@
+/**
+ * Stratacode Gradle build.
+ *
+ * To execute the default build (clean, compile, test, package and install) use <code>gradlew</code>.
+ *
+ * To execute the full build (includes JavaDoc generation) use <code>gradlew -Pbuild=full</code>.
+ *
+ * Alternatively, individual tasks can be run such as <code>gradlew javadoc</code>.
+ */
+if (hasProperty('build')) {
+    ext.build = project['build']
+} else {
+    ext.build = 'default';
+}
+
+if (ext.build == 'full') {
+    defaultTasks 'clean', 'test', 'jar', 'install', 'javadoc'
+} else {
+    defaultTasks 'clean', 'test', 'jar', 'install'
+}
+
+// turn off JavaDoc lint on JDK 8
+if (JavaVersion.current().isJava8Compatible()) {
+    allprojects {
+        tasks.withType(Javadoc) {
+            options.addStringOption('Xdoclint:none', '-quiet')
+        }
+    }
+}
+
+
+buildscript {
+    repositories {
+        mavenLocal()
+        mavenCentral()
+    }
+}
+
+allprojects {
+    repositories {
+        mavenLocal()
+        mavenCentral()
+    }
+}
+
+subprojects {
+    group stratacodeGroup  // this is configured in gradle.properties
+
+    apply plugin: 'java'
+    apply plugin: 'maven'
+
+    // suppress warnings about JDK 1.7 boot classpath
+    [compileJava, compileTestJava]*.options*.compilerArgs = ['-Xlint:-options']
+
+    sourceCompatibility = 1.6
+    targetCompatibility = 1.6
+
+    dependencies {
+        testCompile group: 'junit', name: 'junit', version: junitVersion
+    }
+
+    sourceSets {
+        main {
+            java {
+                srcDir 'src'
+            }
+       }
+   }
+}
+
+project(':coreRuntime') {
+}
+
+project(':fullRuntime') {
+    apply plugin: 'java'
+    dependencies {
+        compile project(':coreRuntime')
+    }
+}
+
+project(':system') {
+    apply plugin: 'java'
+    dependencies {
+        compile project(':fullRuntime')
+    }
+}

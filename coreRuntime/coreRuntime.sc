@@ -2,6 +2,8 @@ coreRuntime {
    codeType = sc.layer.CodeType.Framework;
    codeFunction = sc.layer.CodeFunction.Program;
 
+   srcPath = "src";
+
    public void start() {
       sc.layer.LayeredSystem system = getLayeredSystem();
 
