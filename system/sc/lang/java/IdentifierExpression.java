@@ -3241,8 +3241,6 @@ public class IdentifierExpression extends ArgumentsExpression {
          case GetVariable:
          case FieldName:
          case GetSetMethodInvocation:
-            if (idents.size() == 1 && idents.get(0).equals("maxQuestionLength"))
-               System.out.println("***");
             srcObj = getRootFieldThis(this, boundTypes[0], ctx, false);
             if (srcObj == null) {
                System.err.println("*** Unable to resolve root property for: " + toDefinitionString());

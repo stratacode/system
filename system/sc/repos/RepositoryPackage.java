@@ -20,6 +20,8 @@ import java.util.LinkedHashSet;
  * Represents a third party package that's managed by a RepositoryManager
  */
 public class RepositoryPackage extends LayerComponent implements Serializable {
+   private static final long serialVersionUID = 7334042890983906329L;
+
    /** A unique name of this package within the layered system */
    public String packageName;
 
@@ -46,6 +48,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    public boolean unzip;
 
    transient public IRepositoryManager mgr;
+   transient String computedClassPath;
 
    public RepositoryPackage(Layer layer) {
       super(layer);
@@ -121,7 +124,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    public String preInstall(DependencyContext ctx, DependencyCollection depCol) {
       installed = false;
       StringBuilder errors = null;
-      if (sources == null && currentSource != null) {
+      if ((sources == null || sources.length == 0) && currentSource != null) {
          sources = new RepositorySource[1];
          sources[0] = currentSource;
       }
@@ -215,11 +218,17 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    }
 
    public String getClassPath() {
+      // Because addToClassPath stores away an entry in global class path, we can't call that each time.
+      // instead, cache the first time so we get the accurate list of classpath entries this package adds.
+      // This is a transient field so we compute it once each time so global class path gets updated too.
+      if (computedClassPath != null)
+         return computedClassPath;
       StringBuilder sb = new StringBuilder();
       if (installed) {
          LinkedHashSet<String> cp = new LinkedHashSet<String>();
          addToClassPath(cp);
-         return StringUtil.arrayToPath(cp.toArray());
+         computedClassPath = StringUtil.arrayToPath(cp.toArray());
+         return computedClassPath;
       }
       return null;
    }
@@ -296,6 +305,12 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
          return false;
       if (!StringUtil.equalStrings(fileName, oldPkg.fileName))
          return false;
+
+      if (oldPkg.sources == null)
+         return false;
+
+      if (sources == null)
+         sources = new RepositorySource[0];
 
       if (sources.length > oldPkg.sources.length)
          return false;

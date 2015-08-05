@@ -1457,6 +1457,10 @@ public class ModifyDeclaration extends TypeDeclaration {
          if (inst instanceof Class) {
             inst = RTypeUtil.createInstance((Class) inst);
          }
+         // For the layer models, need to start the model file before we init the instance or else
+         // all of the declarations in the model won't be started when we need to eval them.
+         if (m.isLayerModel)
+            ParseUtil.startComponent(m);
       }
       initLayerInstance(inst, prefix, inheritedPrefix);
 

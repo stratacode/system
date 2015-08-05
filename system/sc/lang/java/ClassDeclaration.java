@@ -69,10 +69,12 @@ public class ClassDeclaration extends TypeDeclaration {
          // This solution reuses replacedByType - which will resolve to the most specific type in the stack and use that to
          // process all layers.  When incompatible changes are made to a type, this won't resolve the earlier references properly.
          if (layer != null && !layer.activated) {
-            String fullTypeName = getFullTypeName();
-            TypeDeclaration prevDecl = thisModel.getPreviousDeclaration(fullTypeName);
-            if (prevDecl != null && prevDecl != this && prevDecl.getFullTypeName().equals(fullTypeName))
-               prevDecl.replacedByType = this;
+            if (!thisModel.isLayerModel) {
+               String fullTypeName = getFullTypeName();
+               TypeDeclaration prevDecl = thisModel.getPreviousDeclaration(fullTypeName);
+               if (prevDecl != null && prevDecl != this && prevDecl.getFullTypeName().equals(fullTypeName))
+                  prevDecl.replacedByType = this;
+            }
          }
       }
 

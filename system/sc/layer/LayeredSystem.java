@@ -20,6 +20,7 @@ import sc.lifecycle.ILifecycle;
 import sc.obj.*;
 import sc.parser.*;
 import sc.repos.RepositoryPackage;
+import sc.repos.RepositoryStore;
 import sc.repos.RepositorySystem;
 import sc.sync.SyncManager;
 import sc.sync.SyncOptions;
@@ -942,8 +943,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       Language.registerLanguage(JavaLanguage.INSTANCE, "java");
       Language.registerLanguage(JavaLanguage.INSTANCE, "scj");  // Alternate suffix for java files in the SC tree
       Language.registerLanguage(SCLanguage.INSTANCE, SCLanguage.DEFAULT_EXTENSION);
-      Language.registerLanguage(TemplateLanguage.INSTANCE, "sctd");
-      Language.registerLanguage(TemplateLanguage.INSTANCE, "sct");
+      Language.registerLanguage(TemplateLanguage.INSTANCE, "sctd");      Language.registerLanguage(TemplateLanguage.INSTANCE, "sct");
 
       // Not registering Javascript yet because it is not complete.  In most projects we just copy the JS files as well so don't need to parse them as a language
       JSLanguage.INSTANCE.initialize();
@@ -1002,10 +1002,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (!peerMode)
-         this.repositorySystem = new RepositorySystem(getStrataCodeDir("pkgs"), messageHandler, options.verbose, options.reinstall, options.update, options.installExisting);
+         this.repositorySystem = new RepositorySystem(new RepositoryStore(getStrataCodeDir("pkgs")), messageHandler, options.verbose, options.reinstall, options.update, options.installExisting);
       else {
-         this.repositorySystem = parentSystem.repositorySystem;
          messageHandler = parentSystem.messageHandler;
+         this.repositorySystem = new RepositorySystem(parentSystem.repositorySystem.store, messageHandler, options.verbose, options.reinstall, options.update, options.installExisting);
       }
 
       if (initLayerNames != null) {
@@ -12369,7 +12369,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       removeExcludedLayers(true);
 
       // For any buildSeparate layers that are needed in this runtime, add them over to 'layers'
-      startSeparateLayers();
+      // TODO: remove this - we used to do this but now instead resolve src refs for layerResolve = true for buildSeparate layers
+      //startSeparateLayers();
 
       // We just created a new layer so now go and re-init the runtimes in case it is the first layer in
       // a new runtime or this layer needs to move to the runtime before it's started.

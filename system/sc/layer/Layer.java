@@ -1114,7 +1114,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
       // Initialize the children after all layer types have been merged in so the modifications have taken effect
       TypeDeclaration td;
-      if (model != null && (td = model.getModelTypeDeclaration()) != null && activated) {
+      if (model != null && (td = model.getModelTypeDeclaration()) != null) {
+         //ParseUtil.startComponent(model);
+
          Object[] children = td.getObjChildren(this, null, false, true, true);
          if (children != null) {
             if (this.children == null)
@@ -2315,7 +2317,18 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    public File findSrcFile(String srcName, boolean layerResolve) {
-      if (!layerResolve && !checkIfStarted())
+      // For buildSeparate layers, we need to lazily initialize the src cache so that we can find src files defined
+      // in this layer which are used by other layer definition files downstream.  Before, we used to try and build
+      // the separate layers so we could resolve downstream layers but that means dealing with separate layers entirely
+      // before we even initialize the layer stack (which we don't do).  So we now just init the src cache as soon as
+      // we need it for these layers.  Before we run the start method on an activated layer we'll have compiled the
+      // files.  That means we do not have to compile for inactive layers which is a nice simplification - otherwise,
+      // those separate layers were always active.
+      if (layerResolve && buildSeparate) {
+         ensureInitialized(true);
+         ensureStarted(true);
+      }
+      else if (!layerResolve && !checkIfStarted())
          return null;
       File res = srcDirCache.get(srcName);
       return res;
@@ -3514,7 +3527,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    public RepositoryPackage getRepositoryPackage(String pkgName) {
-      return layeredSystem.repositorySystem.packages.get(pkgName);
+      return layeredSystem.repositorySystem.store.packages.get(pkgName);
    }
 
    public RepositoryPackage addRepositoryPackage(String url) {

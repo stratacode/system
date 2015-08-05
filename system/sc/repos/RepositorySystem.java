@@ -17,30 +17,29 @@ import java.util.TreeMap;
  * It keeps a cache of the set of packages we know about and the sources for each package.
  */
 public class RepositorySystem {
-   public String packageRoot;
+   public RepositoryStore store;
 
    public boolean updateSystem;
    public boolean reinstallSystem;
    public boolean installExisting;
 
-   public HashMap<String,RepositoryPackage> packages = new HashMap<String,RepositoryPackage>();
    public HashSet<String> classPath = new HashSet<String>();
 
    public IMessageHandler msg;
 
-   public RepositorySystem(String rootDir, IMessageHandler handler, boolean info, boolean reinstall, boolean update, boolean installExisting) {
-      packageRoot = rootDir;
+   public RepositorySystem(RepositoryStore store, IMessageHandler handler, boolean info, boolean reinstall, boolean update, boolean installExisting) {
+      this.store = store;
 
       msg = handler;
       reinstallSystem = reinstall;
       updateSystem = update;
       this.installExisting = installExisting;
 
-      addRepositoryManager(new ScpRepositoryManager(this, "scp", packageRoot, handler, info));
-      addRepositoryManager(new GitRepositoryManager(this, "git", packageRoot, handler, info));
-      addRepositoryManager(new URLRepositoryManager(this, "url", packageRoot, handler, info));
-      addRepositoryManager(new MvnRepositoryManager(this, "mvn", packageRoot, handler, info));
-      addRepositoryManager(new MvnRepositoryManager(this, "git-mvn", packageRoot, handler, info, new GitRepositoryManager(this, "git-mvn", packageRoot, handler, info)));
+      addRepositoryManager(new ScpRepositoryManager(this, "scp", store.packageRoot, handler, info));
+      addRepositoryManager(new GitRepositoryManager(this, "git", store.packageRoot, handler, info));
+      addRepositoryManager(new URLRepositoryManager(this, "url", store.packageRoot, handler, info));
+      addRepositoryManager(new MvnRepositoryManager(this, "mvn", store.packageRoot, handler, info));
+      addRepositoryManager(new MvnRepositoryManager(this, "git-mvn", store.packageRoot, handler, info, new GitRepositoryManager(this, "git-mvn", store.packageRoot, handler, info)));
    }
 
    public IRepositoryManager[] repositories;
@@ -78,7 +77,7 @@ public class RepositorySystem {
       RepositoryPackage pkg = mgr.createPackage(url);
       if (pkg == null)
          return null;
-      RepositoryPackage oldPkg = packages.get(pkg.packageName);
+      RepositoryPackage oldPkg = store.packages.get(pkg.packageName);
       if (oldPkg != null) {
          oldPkg.addNewSource(pkg.sources[0]);
          if (oldPkg.installed)
@@ -87,7 +86,7 @@ public class RepositorySystem {
             pkg = oldPkg;
       }
       else
-         packages.put(pkg.packageName, pkg);
+         store.packages.put(pkg.packageName, pkg);
       if (install) {
          installPackage(pkg, null);
       }
@@ -95,7 +94,7 @@ public class RepositorySystem {
    }
 
    public void addRepositoryPackage(RepositoryPackage pkg) {
-      RepositoryPackage existingPkg = packages.get(pkg.packageName);
+      RepositoryPackage existingPkg = store.packages.get(pkg.packageName);
       if (existingPkg != null) {
          pkg.installedRoot = existingPkg.installedRoot;
          pkg.currentSource = existingPkg.currentSource;
@@ -103,17 +102,17 @@ public class RepositorySystem {
          pkg.sources[0] = pkg.currentSource;
       }
       else {
-         packages.put(pkg.packageName, pkg);
+         store.packages.put(pkg.packageName, pkg);
       }
    }
 
    public RepositoryPackage addPackageSource(IRepositoryManager mgr, String pkgName, String fileName, RepositorySource repoSrc, boolean install) {
       RepositoryPackage pkg;
-      pkg = packages.get(pkgName);
+      pkg = store.packages.get(pkgName);
       if (pkg == null) {
          pkg = mgr.createPackage(mgr, pkgName, fileName, repoSrc);
          pkg.currentSource = repoSrc;
-         packages.put(pkgName, pkg);
+         store.packages.put(pkgName, pkg);
       }
       else {
          pkg.addNewSource(repoSrc);
@@ -134,10 +133,10 @@ public class RepositorySystem {
    public RepositoryPackage addPackage(IRepositoryManager mgr, RepositoryPackage newPkg, boolean install, DependencyContext ctx) {
       RepositoryPackage pkg;
       String pkgName = newPkg.packageName;
-      pkg = packages.get(pkgName);
+      pkg = store.packages.get(pkgName);
       if (pkg == null) {
          pkg = newPkg;
-         packages.put(pkgName, pkg);
+         store.packages.put(pkgName, pkg);
       }
       else {
          for (RepositorySource src : newPkg.sources)

@@ -8,10 +8,7 @@ import sc.lang.*;
 import sc.lang.java.ModelUtil;
 import sc.obj.SyncMode;
 import sc.parser.*;
-import sc.repos.IRepositoryManager;
-import sc.repos.RepositoryPackage;
-import sc.repos.RepositorySource;
-import sc.repos.RepositorySystem;
+import sc.repos.*;
 import sc.type.CTypeUtil;
 import sc.util.*;
 
@@ -683,7 +680,7 @@ public class LayerUtil implements LayerConstants {
    }
 
    public static String installDefaultLayers(String resultDir, IMessageHandler handler, boolean verbose, String gitURL) {
-      RepositorySystem sys = new RepositorySystem(resultDir, handler, verbose, false, false, false);
+      RepositorySystem sys = new RepositorySystem(new RepositoryStore(resultDir), handler, verbose, false, false, false);
       IRepositoryManager mgr = sys.getRepositoryManager("git");
       String fileName = gitURL == null ? "layers" : FileUtil.removeExtension(FileUtil.getFileName(gitURL)); // Remove the '.git' suffix and take the last name as the file name.
       // Just install this package into the packageRoot - don't add the packageName like we do for most packages

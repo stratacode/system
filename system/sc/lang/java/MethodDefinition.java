@@ -339,6 +339,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
 
                String memStr = (minMem != null && minMem != 0 ? " -ms" + minMem + "m ": "") + (maxMem != null && maxMem != 0 ? " -mx" + maxMem + "m " : "");
                String vmParams = lsys.getVMParameters();
+               String[] defaultArgList = defaultArgs.length() == 0 ? null : defaultArgs.trim().split(" ");
                // TODO: put this code into a configurable template
                if (produceJar != null && produceJar) {
                   // TODO: need to find a way to inject command line args into the jar process
@@ -349,7 +350,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                                       " -jar \"$DIRNAME/" + FileUtil.getFileName(execName) + ".jar\"";
                }
                else {
-                  lsys.buildInfo.addMainCommand(model, execName);
+                  lsys.buildInfo.addMainCommand(model, execName, defaultArgList);
                   sharedArgs = "java" + debugStr + vmParams + memStr + " -cp \"" + lsys.userClassPath + "\" " + dynStr + fullTypeName + " ";
                }
                sharedArgs += defaultArgs;
