@@ -9,6 +9,8 @@ import sc.obj.IComponent;
 import sc.util.FileUtil;
 import sc.util.StringUtil;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 
 /**
@@ -169,10 +171,11 @@ public class LayerFileProcessor extends LayerFileComponent {
                               (useCommonBuildDir ? sys.commonBuildDir : layerBuildDir)) : outputDir;
    }
 
-   public FileEnabledState enabledForPath(String pathName, Layer fileLayer, boolean abs) {
+   public FileEnabledState enabledForPath(String pathName, Layer fileLayer, boolean abs, boolean generatedFile) {
       // TODO: We should not be passing in null here in general
-      if (fileLayer == null)
+      if (fileLayer == null || generatedFile)
          return FileEnabledState.Enabled;
+
       String filePathType = fileLayer.getSrcPathTypeName(pathName, abs);
       if (srcPathTypes != null) {
          for (int i = 0; i < srcPathTypes.length; i++) {
@@ -243,5 +246,29 @@ public class LayerFileProcessor extends LayerFileComponent {
 
    public String[] getSrcPathTypes() {
       return srcPathTypes;
+   }
+
+   public void removeExtensions(String... toRem) {
+      if (extensions != null) {
+         ArrayList<String> newRes = new ArrayList<String>(Arrays.asList(extensions));
+         for (int i = 0; i < extensions.length; i++) {
+            String ext = extensions[i];
+            for (int j = 0; j < toRem.length; j++) {
+               if (ext.equals(toRem[j])) {
+                  newRes.remove(i);
+                  break;
+               }
+            }
+         }
+         extensions = newRes.toArray(new String[newRes.size()]);
+      }
+   }
+
+   public void addExtensions(String... toAdd) {
+      if (extensions != null) {
+         ArrayList<String> newRes = new ArrayList<String>(Arrays.asList(extensions));
+         newRes.addAll(Arrays.asList(toAdd));
+         extensions = newRes.toArray(new String[newRes.size()]);
+      }
    }
 }

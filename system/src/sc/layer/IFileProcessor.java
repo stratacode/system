@@ -29,7 +29,7 @@ public interface IFileProcessor {
    FileEnabledState enabledFor(Layer layer);
 
    /** Some file processors are registered for a specific pathname (e.g. web files versus regular src files) */
-   FileEnabledState enabledForPath(String fileName, Layer fileLayer, boolean absFileName);
+   FileEnabledState enabledForPath(String fileName, Layer fileLayer, boolean absFileName, boolean generatedFile);
 
    /** Returns the layer position used to sort this entry to resolve conflicts when more than one is registered for a suffix */
    int getLayerPosition();

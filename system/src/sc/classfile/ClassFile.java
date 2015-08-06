@@ -12,7 +12,9 @@ import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.type.RTypeUtil;
 import sc.util.CoalescedHashMap;
+import sc.util.IMessageHandler;
 import sc.util.IntCoalescedHashMap;
+import sc.util.MessageHandler;
 
 import java.io.*;
 import java.lang.reflect.Modifier;
@@ -22,6 +24,7 @@ import java.util.LinkedHashMap;
 
 public class ClassFile {
    DataInputStream input;
+   IMessageHandler msg;
 
    private static IntCoalescedHashMap modifierNamesToFlags = new IntCoalescedHashMap(14);
    {
@@ -63,11 +66,13 @@ public class ClassFile {
    public ClassFile(InputStream is, LayeredSystem sys) {
       this(is);
       cfClass = new CFClass(this, sys);
+      msg = sys.messageHandler;
    }
 
    public ClassFile(InputStream is, Layer layer) {
       this(is);
       cfClass = new CFClass(this, layer);
+      msg = layer != null ? layer.layeredSystem.messageHandler : null;
    }
 
    private int cpCount = 0;
@@ -77,7 +82,6 @@ public class ClassFile {
          int magic = input.readInt();
          if (magic != 0xCAFEBABE)
             throw new IllegalArgumentException("Invalid class file: magic: " + magic);
-
          minorVersion = input.readUnsignedShort();
          majorVersion = input.readUnsignedShort();
          int numConstants = input.readUnsignedShort();
@@ -142,7 +146,7 @@ public class ClassFile {
    public void close() {
       if (input == null)
          return;
-      
+
       try {
          input.close();
       }
@@ -280,6 +284,11 @@ public class ClassFile {
    private final int Long = 5;
    private final int Double = 6;
    private final int NameAndType = 12;
+
+   private final int InvokeDynamic = 18;
+   private final int MethodHandle=15;
+   private final int MethodType =16;
+
    private final int Utf8 = 1;
 
    public static class ConstantPoolEntry {
@@ -356,6 +365,20 @@ public class ClassFile {
       }
    }
 
+  public class InvokeDynamicConstant extends ConstantPoolEntry {
+     int methodIndex;
+     int nameAndTypeIndex;
+  }
+
+  public class MethodHandleInfo extends ConstantPoolEntry {
+     int kind;
+     int index;
+  }
+
+  public class MethodTypeInfo extends ConstantPoolEntry {
+     int index;
+  }
+
    byte[] buffer = new byte[1024];
 
    public ConstantPoolEntry readConstant() throws IOException {
@@ -430,7 +453,29 @@ public class ClassFile {
          case 0:
             System.out.println("*** ack");
             return null;
+         case InvokeDynamic:
+            // implement invoke dynamic (java/util/Comparator.class)
+            InvokeDynamicConstant id = new InvokeDynamicConstant();
+            id.type = (short)tag;
+            id.methodIndex = input.readUnsignedShort();
+            id.nameAndTypeIndex = input.readUnsignedShort();
+            return id;
+         case MethodHandle:
+            MethodHandleInfo mh = new MethodHandleInfo();
+            mh.type = (short)tag;
+            mh.kind = input.readUnsignedByte();
+            mh.index = input.readUnsignedShort();
+            return mh;
+         case MethodType:
+            MethodTypeInfo mt = new MethodTypeInfo();
+            mt.type = (short)tag;
+            mt.index = input.readUnsignedShort();
+            return mt;
+
          default:
+            if (msg != null) {
+               MessageHandler.error(msg, "Invalid constant type reading Java .class file - " + tag);
+            }
             throw new IllegalArgumentException("Invalid class constant type: " + tag);
       }
    }
@@ -498,7 +543,7 @@ public class ClassFile {
       public String getName() {
          return name;
       }
-      
+
       public void readRest(ClassFile file, DataInputStream input) throws IOException {
          int len = input.readInt();
          attributeData = new byte[len];
@@ -549,7 +594,7 @@ public class ClassFile {
          int attLen = input.readInt(); // not used here since we read it piece by piece
 
          int numClasses = input.readUnsignedShort();
-         
+
          for (int i = 0; i < numClasses; i++) {
             int classInfoIndex = input.readUnsignedShort();
             // Name of the class like ParentClass$1 or ParentClass$ChildClass.  We don't yet record anonymous

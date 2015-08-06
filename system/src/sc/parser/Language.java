@@ -523,7 +523,12 @@ public abstract class Language extends LayerFileComponent {
               layerPos == definedInPos) ? FileEnabledState.Enabled : FileEnabledState.NotEnabled;
    }
 
-   public FileEnabledState enabledForPath(String pathName, Layer fileLayer, boolean abs) {
+   public FileEnabledState enabledForPath(String pathName, Layer fileLayer, boolean abs, boolean generatedFile) {
+      // for generatedFile we just ignore the src path type since that applies to files in the src dir and this
+      // with generatedFile=true, the files are in the destination with a different path structure
+      if (generatedFile)
+         return FileEnabledState.Enabled;
+
       String filePathType = fileLayer == null ? null : fileLayer.getSrcPathTypeName(pathName, abs);
       if (srcPathTypes != null) {
          for (int i = 0; i < srcPathTypes.length; i++) {

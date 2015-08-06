@@ -1446,7 +1446,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             continue;
          String ext = FileUtil.getExtension(fn);
          String srcPath = FileUtil.concat(prefix, fn);
-         IFileProcessor proc = ext == null ? null : layeredSystem.getFileProcessorForExtension(ext, f.getPath(), true, this, null);
+         IFileProcessor proc = ext == null ? null : layeredSystem.getFileProcessorForExtension(ext, f.getPath(), true, this, null, false);
 
          if (proc != null && proc.isParsed()) {
             // Register under both the name with and without the suffix

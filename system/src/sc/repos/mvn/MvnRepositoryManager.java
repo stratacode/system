@@ -310,7 +310,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       return new MvnRepositoryPackage(mgr, packageName, fileName, src);
    }
 
-   public POMFile getPOMFile(MvnDescriptor desc, RepositoryPackage pkg, DependencyContext ctx) {
+   public POMFile getPOMFile(MvnDescriptor desc, RepositoryPackage pkg, DependencyContext ctx, boolean required) {
       String pomFileName = FileUtil.concat(pkg.getVersionRoot(), "pom.xml");
       POMFile res = pomCache.get(pomFileName);
       if (res != null) {
@@ -320,7 +320,10 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       }
       Object pomRes = installPOM(desc, pkg, ctx, true);
       if (pomRes instanceof String) {
-         MessageHandler.error(msg, (String) pomRes);
+         if (required)
+            MessageHandler.error(msg, (String) pomRes);
+         else
+            MessageHandler.debug(msg, (String) pomRes);
          return null;
       }
       return (POMFile) pomRes;

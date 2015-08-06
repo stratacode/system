@@ -106,7 +106,7 @@ public class POMFile extends XMLFileFormat {
          RepositoryPackage parentPackage = parentDesc.getOrCreatePackage(mgr, false, DependencyContext.child(depCtx, pomPkg), false);
          // TODO: check for recursive references here!
          if (parentPackage != null) {
-            parentPOM = mgr.getPOMFile(parentDesc, parentPackage, DependencyContext.child(depCtx, pomPkg));
+            parentPOM = mgr.getPOMFile(parentDesc, parentPackage, DependencyContext.child(depCtx, pomPkg), true);
          }
       }
       // TODO: else - there is a default POM but so far, we don't need any of the contents since it's all concerned with the build
@@ -131,7 +131,7 @@ public class POMFile extends XMLFileFormat {
                MvnDescriptor desc = new MvnDescriptor(getProperty("project.groupId"), moduleName, getProperty("project.version"));
                RepositoryPackage pkg = desc.getOrCreatePackage(mgr, false, depCtx, false);
                if (pkg != null) {
-                  POMFile modPOM = mgr.getPOMFile(desc, pkg, depCtx);
+                  POMFile modPOM = mgr.getPOMFile(desc, pkg, depCtx, false);
                   if (modPOM != null)
                      modulePOMs.add(modPOM);
                }
@@ -307,7 +307,7 @@ public class POMFile extends XMLFileFormat {
                         MvnDescriptor importDesc = MvnDescriptor.getFromTag(this, dep, false, false);
                         DependencyContext importDepCtx = DependencyContext.child(depCtx, pomPkg);
                         RepositoryPackage importPkg = importDesc.getOrCreatePackage(mgr, false, importDepCtx, false);
-                        POMFile importPOM = mgr.getPOMFile(importDesc, importPkg, importDepCtx);
+                        POMFile importPOM = mgr.getPOMFile(importDesc, importPkg, importDepCtx, true);
                         if (importPOM != null) {
                            importPOM.initDependencyManagement();
                            if (importedPOMs == null)

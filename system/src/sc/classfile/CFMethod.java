@@ -191,7 +191,9 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
    }
 
    public Object[] getMethodTypeParameters() {
-      return parameterJavaTypes;
+      if (typeParameters == null)
+         return null;
+      return typeParameters.toArray();
    }
 
    public String toString() {

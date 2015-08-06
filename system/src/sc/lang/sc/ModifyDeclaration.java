@@ -142,9 +142,26 @@ public class ModifyDeclaration extends TypeDeclaration {
                   else if (modifyTypeDecl.replacedByType.getLayer() != getLayer()) {
                      if (modifyTypeDecl.replacedByType.removed)
                         modifyTypeDecl.replacedByType = null;
-                     // TODO: we should accumulate all of these layers into an index.  It's quite possible in the IDE context for us to
-                     // find the same type modified by different layers... in that case representing the different possible stackings.
-                     System.out.println("**** Warning - changing modified from layer to: " + modifyTypeDecl.replacedByType.getLayer() + " to: " + getLayer());
+                     else {
+                        // For layer components we might get the wrong type here - we use the baseLayers to do teh resolution so we may not find the
+                        // layer directly in front of us - instead we find the layer a couple of levels deeper in.
+                        if (!isLayerComponent()) {
+                           // TODO: we should accumulate all of these layers into an index.  It's quite possible in the IDE context for us to
+                           // find the same type modified by different layers... in that case representing the different possible stackings.
+                           System.out.println("**** Warning - changing modified from layer to: " + modifyTypeDecl.replacedByType.getLayer() + " to: " + getLayer());
+                        } else {
+                           // This layer should be in front of us -
+                           if (getLayer().layerPosition != -1 && getLayer().layerPosition < modifyTypeDecl.replacedByType.getLayer().layerPosition)
+                              System.out.println("*** Error - improper layer init ordering");
+                           else {
+                              while (modifyTypeDecl.replacedByType != null) {
+                                 modifyTypeDecl = modifyTypeDecl.replacedByType;
+                              }
+
+                              modifyTypeDecl.replacedByType = null;
+                           }
+                        }
+                     }
                   }
                }
 
@@ -1459,8 +1476,10 @@ public class ModifyDeclaration extends TypeDeclaration {
          }
          // For the layer models, need to start the model file before we init the instance or else
          // all of the declarations in the model won't be started when we need to eval them.
-         if (m.isLayerModel)
+         if (m.isLayerModel) {
+            ((Layer) inst).layerPosition = -1;
             ParseUtil.startComponent(m);
+         }
       }
       initLayerInstance(inst, prefix, inheritedPrefix);
 

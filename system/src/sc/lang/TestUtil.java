@@ -159,6 +159,8 @@ public class TestUtil {
                         opts.findClassName = args[i];
                      }
                   }
+                  else if (opt.equals("cc"))
+                     opts.crossCompile = true;
                   else {
                      System.err.println("*** Unrecognized option: " + opt);
                   }
@@ -312,6 +314,7 @@ public class TestUtil {
       boolean enableStyle = false;
       boolean finalGenerate = true;
       boolean enablePartialValues = false;
+      boolean crossCompile = false;
       int repeatCount = 1;
       boolean layerMode = false;
       // If layerMode = true, the LayeredSystem used
@@ -375,6 +378,7 @@ public class TestUtil {
             }
             else {
                LayeredSystem sys = ParseUtil.createSimpleParser(opts.classPath, opts.externalClassPath, opts.srcPath, null);
+               sys.options.crossCompile = opts.crossCompile;
                lang = (Language) sys.getFileProcessorForExtension(ext);
                opts.system = sys;
 

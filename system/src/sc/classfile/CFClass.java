@@ -28,7 +28,9 @@ import java.util.zip.ZipFile;
 /** The class defined from a ClassFile, i.e. read directly from the binary .class representation. */
 public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycle, IDefinition {
    ClassFile classFile;
+   JavaType extendsJavaType;
    Object extendsType;
+   List<JavaType> implJavaTypes;
    List<Object> implementsTypes;
    Layer layer;
    LayeredSystem system;
@@ -227,13 +229,17 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       if (signature != null) {
          CFClassSignature sig = signature;
          sig.parentNode = this;
-         extendsType = sig.extendsType != null ? sig.extendsType.getTypeDeclaration() : null;
+         if (sig.extendsType != null) {
+            extendsJavaType = sig.extendsType;
+            extendsType = extendsJavaType.getTypeDeclaration();
+         }
          if (extendsType instanceof ParamTypeDeclaration)
             extendsType = ((ParamTypeDeclaration) extendsType).getBaseType();
-         if (sig.implementsTypes != null) {
-            implementsTypes = new ArrayList<Object>(sig.implementsTypes.size());
-            for (int i = 0; i < sig.implementsTypes.size(); i++) {
-               String implTypeCFName = ((ClassType)sig.implementsTypes.get(i)).getCompiledTypeName();
+         implJavaTypes = sig.implementsTypes;
+         if (implJavaTypes != null) {
+            implementsTypes = new ArrayList<Object>(implJavaTypes.size());
+            for (int i = 0; i < implJavaTypes.size(); i++) {
+               String implTypeCFName = ((ClassType)implJavaTypes.get(i)).getCompiledTypeName();
                Object implType = system.getClassFromCFName(implTypeCFName, null);
                if (implType == null)
                   error("Can't find interface: " + implTypeCFName);
@@ -600,12 +606,12 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       return extendsType;
    }
 
-   public Object getExtendsType() {
-      return extendsType;
+   public JavaType getExtendsType() {
+      return extendsJavaType;
    }
 
    public List<?> getImplementsTypes() {
-      return implementsTypes;
+      return implJavaTypes;
    }
 
    public CoalescedHashMap getMethodCache() {

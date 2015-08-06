@@ -118,7 +118,7 @@ public class MvnDescriptor implements Serializable {
       RepositoryPackage pkg = mgr.system.addPackageSource(mgr, pkgName, getJarFileName(), depSrc, install);
 
       if (initDeps && pkg.dependencies == null) {
-         POMFile pomFile = mgr.getPOMFile(this, pkg, ctx);
+         POMFile pomFile = mgr.getPOMFile(this, pkg, ctx, true);
          if (pkg instanceof MvnRepositoryPackage)
             ((MvnRepositoryPackage) pkg).pomFile = pomFile;
          mgr.initDependencies(pkg.currentSource, ctx);

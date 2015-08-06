@@ -41,6 +41,10 @@ public class MessageHandler implements IMessageHandler {
       reportMessage(handler, MessageType.Info, args);
    }
 
+   public static void debug(IMessageHandler handler, CharSequence...args) {
+      reportMessage(handler, MessageType.Debug, args);
+   }
+
    public static void error(IMessageHandler handler, CharSequence...args) {
       reportMessage(handler, MessageType.Error, args);
    }
