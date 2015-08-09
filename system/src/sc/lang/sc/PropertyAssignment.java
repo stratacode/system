@@ -40,6 +40,8 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
 
    private boolean wasBound = false;
 
+   private transient boolean starting = false;
+
    public void init() {
       if (initialized) return;
       super.init();
@@ -60,9 +62,6 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
    public void start() {
       if (started) return;
       boolean isSetMethod = false;
-
-      // Avoid double starting - we don't do super until the end.
-      started = true;
 
       BodyTypeDeclaration encType = getEnclosingType();
       if (encType == null) {
@@ -109,7 +108,10 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
             }
          }
       }
-      else {
+      else if (!starting) {
+         // setInferredType may loop around and try to start us again
+         starting = true;
+
          // Check to be sure the initializer is compatible with the property
          // Skip this test for reverse-only bindings
          if (initializer != null && (bindingDirection == null || bindingDirection.doForward())) {
@@ -129,7 +131,6 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
          }
       }
       super.start();
-
    }
 
    public void validate() {
