@@ -47,8 +47,14 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
 
    public boolean unzip;
 
+   public String[] srcPaths;
+   public String[] webPaths;
+   public String[] configPaths;
+   public String[] testPaths;
+
    transient public IRepositoryManager mgr;
    transient String computedClassPath;
+   transient RepositoryPackage replacedByPkg;
 
    public RepositoryPackage(Layer layer) {
       super(layer);
@@ -98,6 +104,9 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
                updateInstallRoot(mgr);
                // Note: if a package with this name has already been added, we use that instance
                pkg = sys.addRepositoryPackage(this);
+               if (pkg != this) {
+                  replacedByPkg = pkg;
+               }
             }
             if (definedInLayer.repositoryPackages == null)
                definedInLayer.repositoryPackages = new ArrayList<RepositoryPackage>();
@@ -116,11 +125,32 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    }
 
    public String install(DependencyContext ctx) {
+      if (replacedByPkg != null)
+         return replacedByPkg.install(ctx);
+
       DependencyCollection depCol = new DependencyCollection();
       String err = preInstall(ctx, depCol);
       if (err != null)
          return err;
-      return RepositorySystem.installDeps(depCol);
+
+      String depsRes = RepositorySystem.installDeps(depCol);
+      if (depsRes == null && definedInLayer != null && !definedInLayer.disabled && !definedInLayer.excluded) {
+         if (installedRoot != null) {
+            if (srcPaths != null) {
+               for (String srcPath : srcPaths)
+                  definedInLayer.addSrcPath(FileUtil.concat(installedRoot, srcPath), null);
+            }
+            if (webPaths != null) {
+               for (String webPath:webPaths)
+                  definedInLayer.addSrcPath(FileUtil.concat(installedRoot, webPath), "web");
+            }
+            if (configPaths != null) {
+               for (String configPath:configPaths)
+                  definedInLayer.addSrcPath(FileUtil.concat(installedRoot, configPath), "config");
+            }
+         }
+      }
+      return depsRes;
    }
 
    public String preInstall(DependencyContext ctx, DependencyCollection depCol) {
@@ -130,20 +160,21 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
          sources = new RepositorySource[1];
          sources[0] = currentSource;
       }
-      for (RepositorySource src:sources) {
-         if (src.repository.isActive()) {
-            // Mark as installed to prevent recursive installs
-            installed = true;
-            String err = src.repository.preInstall(src, ctx, depCol);
-            if (err == null) {
-               updateCurrentSource(src);
-               break;
-            }
-            else {
-               installed = false;
-               if (errors == null)
-                  errors = new StringBuilder();
-               errors.append(err);
+      if (sources != null) {
+         for (RepositorySource src : sources) {
+            if (src.repository.isActive()) {
+               // Mark as installed to prevent recursive installs
+               installed = true;
+               String err = src.repository.preInstall(src, ctx, depCol);
+               if (err == null) {
+                  updateCurrentSource(src);
+                  break;
+               } else {
+                  installed = false;
+                  if (errors == null)
+                     errors = new StringBuilder();
+                  errors.append(err);
+               }
             }
          }
       }
@@ -155,6 +186,8 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    }
 
    public String update() {
+      if (replacedByPkg != null)
+         return replacedByPkg.update();
       if (!installed || currentSource == null)
          return "Package: " + packageName + " not installed - skipping update";
 
@@ -220,6 +253,8 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    }
 
    public String getClassPath() {
+      if (replacedByPkg != null)
+         return replacedByPkg.getClassPath();
       // Because addToClassPath stores away an entry in global class path, we can't call that each time.
       // instead, cache the first time so we get the accurate list of classpath entries this package adds.
       // This is a transient field so we compute it once each time so global class path gets updated too.

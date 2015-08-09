@@ -1215,7 +1215,6 @@ public class EditorContext extends ClientEditorContext {
                return null;
             if (enclFragmentType != null && enclFragmentType.getEnclosingType() != null)
                typeName = CTypeUtil.prefixPath(typeName, CTypeUtil.getTailType(enclFragmentType.getInnerTypeName()));
-
             Object enclType = system.getTypeDeclaration(typeName, false, fileModel.getLayer(), fileModel.isLayerModel);
             if (enclType instanceof BodyTypeDeclaration)
                currentType = (BodyTypeDeclaration) enclType;
@@ -1223,6 +1222,24 @@ public class EditorContext extends ClientEditorContext {
                Object typeObj = fileModel.findTypeDeclaration(typeName, false);
                if (typeObj instanceof BodyTypeDeclaration)
                   currentType = (BodyTypeDeclaration) typeObj;
+            }
+            if (currentType == null && fileModel.isLayerModel) {
+               currentType = fileModel.getModelTypeDeclaration();
+               if (enclFragmentType != null) {
+                  String innerName = enclFragmentType.getTypeName();
+                  TypeDeclaration fragEncl = enclFragmentType.getEnclosingType();
+                  while (fragEncl != null) {
+                     TypeDeclaration nextEncl = fragEncl.getEnclosingType();
+                     if (nextEncl == null)
+                        break;
+                     innerName = fragEncl.typeName + '.' + innerName;
+                     fragEncl = nextEncl;
+                  }
+
+                  Object newType = currentType.getInnerType(innerName, null, true, false, true);
+                  if (newType instanceof TypeDeclaration)
+                     currentType = (TypeDeclaration) newType;
+               }
             }
          }
       }

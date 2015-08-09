@@ -72,10 +72,15 @@ public class SysTypeIndex {
                if (modLayer == null) {
                   System.err.println("*** Warning unable to find modifying layer: " + modTypeIndex.layerName + " - skipping index entyr");
                } else {
-                  TypeDeclaration modType = (TypeDeclaration) modLayer.layeredSystem.getSrcTypeDeclaration(typeName, modLayer.getNextLayer(), true, false, true, type.getLayer(), type.isLayerType);
-                  if (modType != null) {
-                     res.add(modType);
+                  Layer typeLayerInSystem = sys.getActiveOrInactiveLayerByPath(type.getLayer().getLayerName(), null, true);
+                  if (typeLayerInSystem != null) {
+                     TypeDeclaration modType = (TypeDeclaration) modLayer.layeredSystem.getSrcTypeDeclaration(typeName, modLayer.getNextLayer(), true, false, true, typeLayerInSystem, type.isLayerType || type.isLayerComponent());
+                     if (modType != null) {
+                        res.add(modType);
+                     }
                   }
+                  else
+                     System.err.println("*** Unable to map layer name from system to the other");
                }
             }
          }
@@ -105,6 +110,15 @@ public class SysTypeIndex {
                   candidates.add(typeName);
                else
                   candidates.add(className);
+            }
+         }
+      }
+      // Indexing layers as types but only with the full type name
+      if (inactiveTypeIndex.layersList != null) {
+         for (Layer inactiveLayer : inactiveTypeIndex.layersList) {
+            String typeName = inactiveLayer.layerDirName;
+            if (typeName.startsWith(prefix)) {
+               candidates.add(typeName);
             }
          }
       }

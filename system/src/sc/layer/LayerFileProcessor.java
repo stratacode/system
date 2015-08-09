@@ -271,4 +271,28 @@ public class LayerFileProcessor extends LayerFileComponent {
          extensions = newRes.toArray(new String[newRes.size()]);
       }
    }
+
+   public void removePatterns(String... toRem) {
+      if (patterns != null) {
+         ArrayList<String> newRes = new ArrayList<String>(Arrays.asList(patterns));
+         for (int i = 0; i < patterns.length; i++) {
+            String ext = patterns[i];
+            for (int j = 0; j < toRem.length; j++) {
+               if (ext.equals(toRem[j])) {
+                  newRes.remove(i);
+                  break;
+               }
+            }
+         }
+         patterns = newRes.toArray(new String[newRes.size()]);
+      }
+   }
+
+   public void addPatterns(String... toAdd) {
+      if (patterns != null) {
+         ArrayList<String> newRes = new ArrayList<String>(Arrays.asList(patterns));
+         newRes.addAll(Arrays.asList(toAdd));
+         patterns = newRes.toArray(new String[newRes.size()]);
+      }
+   }
 }

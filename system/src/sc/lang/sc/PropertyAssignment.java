@@ -61,6 +61,9 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       if (started) return;
       boolean isSetMethod = false;
 
+      // Avoid double starting - we don't do super until the end.
+      started = true;
+
       BodyTypeDeclaration encType = getEnclosingType();
       if (encType == null) {
          // System.out.println("*** Error starting PropertyAssignment that's not connected to any model");

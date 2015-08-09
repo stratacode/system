@@ -8,7 +8,7 @@ import java.io.Serializable;
 import java.util.HashMap;
 
 /**
-* Created by jvroom on 10/6/14.
+ * Stores the information we persist in the index for a given layer.
 */
 public class LayerTypeIndex implements Serializable {
    String layerPathName; // Path to layer directory

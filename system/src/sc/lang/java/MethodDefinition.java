@@ -562,6 +562,12 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       Iterator<TypeDeclaration> subTypes = sys.getSubTypesOfType(enclType);
       while (subTypes.hasNext()) {
          TypeDeclaration subType = subTypes.next();
+         if (subType == enclType) {
+            System.err.println("*** Loop in sub-type hierarchy");
+            return;
+         }
+
+         System.out.println("*** addOverridingMethods for: " + name + " subType.typeName=" + subType.typeName);
 
          Object result = subType.declaresMethod(name, ptypes, null, enclType, false);
          if (result instanceof MethodDefinition)

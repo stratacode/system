@@ -454,6 +454,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    public void findMatchingGlobalNames(String prefix, String prefixPkgName, String prefixBaseName, Set<String> candidates) {
       initTypeInfo();
 
+      if (layeredSystem != null) {
+         layeredSystem.addGlobalImports(isLayerModel, prefix, candidates);
+      }
       for (String ent:importsByName.keySet()) {
          if (ent.startsWith(prefix))
             candidates.add(ent);

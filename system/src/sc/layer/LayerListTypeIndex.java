@@ -7,7 +7,8 @@ package sc.layer;
 import java.util.*;
 
 /**
- * Created to store the complete index info for a set of layers
+ * Created to store the complete index info for a set of layers.  We generally store one instance for 'active' layers
+ * and another for 'inactive' layers in a project.
  */
 public class LayerListTypeIndex {
    LayeredSystem sys;

@@ -313,9 +313,12 @@ public class NewExpression extends IdentifierExpression {
          if (ndim == 0)
             ndim = 1;
          Object type = boundType;
+         JavaModel model = getJavaModel();
          if (type == null) // undefined reference - don't inject a null type into the system
             type = Object.class;
-         return new ArrayTypeDeclaration(getJavaModel().getModelTypeDeclaration(), type, StringUtil.repeat("[]", ndim));
+
+         TypeDeclaration modelType = model == null ? null : model.getModelTypeDeclaration();
+         return new ArrayTypeDeclaration(modelType, type, StringUtil.repeat("[]", ndim));
       }
    }
 

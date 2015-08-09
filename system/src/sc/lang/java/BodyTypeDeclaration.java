@@ -1306,7 +1306,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          pnode = pnode.getParentNode();
       String res;
       if (pnode instanceof JavaModel || pnode instanceof TemplateStatement) {
-         res = CTypeUtil.prefixPath(getJavaModel().getPackagePrefix(), typeName);
+         JavaModel model = getJavaModel();
+         // We are treating the layer's type name as just the part in the layer path.   This is the main identifier we use
+         // for finding the layer.  The package prefix is used for finding types inside of the layer.
+         if (model.isLayerModel)
+            return typeName;
+         else
+            res = CTypeUtil.prefixPath(getJavaModel().getPackagePrefix(), typeName);
       }
       else if (pnode instanceof ITypeDeclaration) {
          ITypeDeclaration itd = (ITypeDeclaration) pnode;
@@ -7063,7 +7069,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                if (ext != null) {
                   if (baseTypes == null)
                      baseTypes = new ArrayList<String>();
-                  baseTypes.add(ModelUtil.getTypeName(ext));
+                  // Using the layer name here, not including the package prefix since this is the name which is
+                  // easy to find later.
+                  if (ext instanceof ModifyDeclaration) {
+                     baseTypes.add(((ModifyDeclaration) ext).typeName);
+                  }
+                  else {
+                     baseTypes.add(ModelUtil.getTypeName(ext));
+                  }
                }
             }
          }
@@ -8360,12 +8373,19 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public BodyTypeDeclaration refreshNode() {
       JavaModel oldModel = getJavaModel();
+      // Or we can look our replacement up...
+      if (isLayerType()) {
+         JavaModel layerModel = oldModel.layeredSystem.getAnnotatedLayerModel(getTypeName().replace(".", "/"), null);
+         if (layerModel != null)
+            return layerModel.getModelTypeDeclaration();
+         return this;
+      }
+
       if (!oldModel.removed)
          return this; // We are still valid
       if (removed) // For live types we have a ref to the replacement
          return (TypeDeclaration) replacedByType.refreshNode();
-      // Or we can look our replacement up...
-      Object res = oldModel.layeredSystem.getSrcTypeDeclaration(getFullTypeName(), getLayer().getNextLayer(), true,  false, false, layer, oldModel.isLayerModel);
+      Object res = oldModel.layeredSystem.getSrcTypeDeclaration(getFullTypeName(), getLayer().getNextLayer(), true, false, false, layer, oldModel.isLayerModel);
       if (res instanceof TypeDeclaration) {
          TypeDeclaration newType = (TypeDeclaration) res;
          // We might switch from an inactive layer to an active layer, or maybe the layers themselves were reloaded?

@@ -630,6 +630,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       Object typeObj = getSrcTypeDeclaration(typeName, null, true, false, true, Layer.ANY_INACTIVE_LAYER, false);
       if (typeObj != null)
          res.add(typeObj);
+      else {
+         Layer layer = getLayerByDirName(typeName);
+         if (layer != null)
+             res.add(layer.model.getModelTypeDeclaration());
+         else {
+            layer = getInactiveLayer(typeName.replace('.', '/'), true, true, true);
+            if (layer != null && layer.model != null)
+               res.add(layer.model.getModelTypeDeclaration());
+         }
+      }
       /*
       if (peerSystems != null) {
          for (LayeredSystem peerSys:peerSystems) {
@@ -9476,7 +9486,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (layer != null && oldModel.getUserData() != null) {
                boolean layerModelChanged;
                if (javaModel.isLayerModel)
-                  layerModelChanged = layer.updateModel(javaModel);
+                  layerModelChanged = oldModel.getLastModifiedTime() != javaModel.getLastModifiedTime() && layer.updateModel(javaModel);
                // If it's a regular file, not a layer, we mark the layer as having changed if the last modified time is different or the models have physically different contents.
                // the last modified time for a file edited in the IDE does not get updated until after we've updated the model here.  It is not cheap to identical models but it will
                // save a refresh of all open files when you have only changed comments or whitespace.
@@ -11277,7 +11287,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (model == null) {
          // There's a layer definition file that cannot be parsed - just create a stub layer that represents that file
          if (!lpi.activate && defFile.canRead()) {
-            Layer stubLayer = new Layer();
+            Layer stubLayer = lpi.activate ? pendingActiveLayers.get(expectedName) : pendingInactiveLayers.get(expectedName);
+            if (stubLayer == null)
+               stubLayer = new Layer();
             stubLayer.activated = false;
             stubLayer.layeredSystem = this;
             stubLayer.layerPathName = expectedName;
@@ -11460,7 +11472,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       catch (RuntimeException exc) {
          if (!lpi.activate) {
-            Layer stubLayer = new Layer();
+            Layer stubLayer = lpi.activate ? pendingActiveLayers.get(expectedName) : pendingInactiveLayers.get(expectedName);
+            if (stubLayer == null)
+               stubLayer = new Layer();
             stubLayer.activated = false;
             stubLayer.layeredSystem = this;
             stubLayer.layerPathName = expectedName;
@@ -11874,10 +11888,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public void addSubType(TypeDeclaration superType, TypeDeclaration subType) {
       if (options.liveDynamicTypes) {
-         HashMap<String,Boolean> subTypeMap = subTypesByType.get(superType);
+         String superTypeName = superType.getFullTypeName();
+         HashMap<String,Boolean> subTypeMap = subTypesByType.get(superTypeName);
          if (subTypeMap == null) {
             subTypeMap = new HashMap<String, Boolean>();
-            subTypesByType.put(superType.getFullTypeName(), subTypeMap);
+            subTypesByType.put(superTypeName, subTypeMap);
          }
          subTypeMap.put(subType.getFullTypeName(), Boolean.TRUE);
       }
@@ -11920,10 +11935,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       if (subTypesMap != null) {
          for (String subTypeName:subTypesMap.keySet()) {
-            TypeDeclaration res = (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, type.getLayer(), type.isLayerType);
-            // Check the resulting class name.  getSrcTypeDeclaration may find the base-type of an inner type as it looks for inherited inner types under the parent type's name
-            if (res != null && res.getFullTypeName().equals(subTypeName))
-               result.add(res);
+            if (type.isLayerType()) {
+               Layer layer = getActiveOrInactiveLayerByPath(subTypeName.replace(".", "/"), null, true);
+               if (layer != null) {
+                  result.add(layer.model.getModelTypeDeclaration());
+               }
+            }
+            else {
+               TypeDeclaration res = (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, type.getLayer(), type.isLayerType);
+               // Check the resulting class name.  getSrcTypeDeclaration may find the base-type of an inner type as it looks for inherited inner types under the parent type's name
+               if (res != null && res.getFullTypeName().equals(subTypeName))
+                  result.add(res);
+            }
          }
       }
 
@@ -11942,26 +11965,32 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             for (Map.Entry<String,TypeIndex> subTypeEnt:subTypes.entrySet()) {
                String subTypeName = subTypeEnt.getKey();
                TypeIndex subTypeIndex = subTypeEnt.getValue();
-               TypeDeclaration res = (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, type.getLayer(), type.isLayerType);
-               // Check the resulting class name.  getSrcTypeDeclaration may find the base-type of an inner type as it looks for inherited inner types under the parent type's name
-               if (res != null) {
-                  if (res.getFullTypeName().equals(subTypeName))
-                     result.add(res);
+
+               if (type.isLayerType) {
+                  Layer subLayer = getActiveOrInactiveLayerByPath(subTypeName.replace(".", "/"), null, true);
+                  if (subLayer != null && subLayer.model != null)
+                     result.add(subLayer.model.getModelTypeDeclaration());
                }
                else {
-                  if (subTypeIndex != null) {
-                     Layer subTypeLayer = getInactiveLayer(subTypeIndex.layerName, true, true, true);
+                  TypeDeclaration res = (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, type.getLayer(), type.isLayerType);
+                  // Check the resulting class name.  getSrcTypeDeclaration may find the base-type of an inner type as it looks for inherited inner types under the parent type's name
+                  if (res != null) {
+                     if (res.getFullTypeName().equals(subTypeName))
+                        result.add(res);
+                  } else {
+                     if (subTypeIndex != null) {
+                        Layer subTypeLayer = getInactiveLayer(subTypeIndex.layerName, true, true, true);
 
-                     if (subTypeLayer != null) {
-                        // We may not find this sub-type in this system because we share the same type index across all processes in the runtime.  It might be
-                        // a different runtime.
-                        res = (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, type.getLayer(), type.isLayerType);
-                        if (res != null && res.getFullTypeName().equals(subTypeName))
-                           result.add(res);
-                     }
-                     else {
-                        // TODO: else cull this from the index?
-                        System.err.println("*** Warning: Layer removed?" + subTypeIndex.layerName);
+                        if (subTypeLayer != null) {
+                           // We may not find this sub-type in this system because we share the same type index across all processes in the runtime.  It might be
+                           // a different runtime.
+                           res = (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, type.getLayer(), type.isLayerType);
+                           if (res != null && res.getFullTypeName().equals(subTypeName))
+                              result.add(res);
+                        } else {
+                           // TODO: else cull this from the index?
+                           System.err.println("*** Warning: Layer removed?" + subTypeIndex.layerName);
+                        }
                      }
                   }
                }
@@ -12988,6 +13017,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (proc != null)
          return proc.isParsed();
       return Language.isParseable(fileName);
+   }
+
+   public void addGlobalImports(boolean isLayerModel, String prefix, Set<String> candidates) {
+      Map<String,ImportDeclaration> importMap = isLayerModel ? globalLayerImports : globalImports;
+      for (String impName:importMap.keySet()) {
+         if (impName.startsWith(prefix))
+            candidates.add(impName);
+      }
    }
 
 }

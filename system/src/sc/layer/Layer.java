@@ -1158,6 +1158,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       boolean reInit = model != null && model != newModel;
       model = newModel;
       TypeDeclaration modelType = model.getModelTypeDeclaration();
+      modelType.isLayerType = true;
       if (reInit && initialized && modelType instanceof ModifyDeclaration) {
          ModifyDeclaration layerModel = (ModifyDeclaration) modelType;
          baseLayerNames = layerModel.getExtendsTypeNames();
@@ -1168,6 +1169,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          // TODO: we are resetting the Layer properties based on the new model but really need to first reset them to the defaults.
          // or should we just create a new Layer instance and then update the Layer object references in all of the dependent models, or use a "removeLayer" and "removed" flag?
          String prefix = model.getPackagePrefix();
+         // Reinit the dynamic object's state
+         dynObj = null; // TODO: should we dispose the old one?
+         initDynObj();
          layerModel.initLayerInstance(this, prefix, getInheritedPrefix(baseLayers, prefix, newModel));
          //modelType.initDynamicInstance(this);
          initLayerModel((JavaModel) model, lpi, layerDirName, false, false, dynamic);
@@ -2336,16 +2340,19 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    public SrcEntry getSrcEntry(String absFileName) {
       checkIfStarted();
-      for (String dir:topLevelSrcDirs) {
-         if (absFileName.startsWith(dir)) {
-            String rest = absFileName.substring(dir.length());
-            while (rest.startsWith("/"))
-               rest = rest.substring(1);
-            File f = srcDirCache.get(rest);
-            if (f != null)
-               return new SrcEntry(this, absFileName, rest);
+      if (topLevelSrcDirs != null) {
+         for (String dir : topLevelSrcDirs) {
+            if (absFileName.startsWith(dir)) {
+               String rest = absFileName.substring(dir.length());
+               while (rest.startsWith("/"))
+                  rest = rest.substring(1);
+               File f = srcDirCache.get(rest);
+               if (f != null)
+                  return new SrcEntry(this, absFileName, rest);
+            }
          }
       }
+      // else - we can get here in some cases where we are not started... e.g. looking for source files in separate layers when we are not a separate layer.
       return null;
    }
 
@@ -2687,6 +2694,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    public void findMatchingSrcNames(String prefix, Set<String> candidates, boolean retFullTypeName) {
+      if (layerDirName.startsWith(prefix)) {
+         layeredSystem.addMatchingCandidate(candidates, "", layerDirName, retFullTypeName);
+      }
       for (Iterator<String> srcFiles = getSrcFiles(); srcFiles.hasNext(); )  {
          String srcFile = srcFiles.next();
          String fileName = FileUtil.getFileName(srcFile);
@@ -3774,7 +3784,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       // A null srcPath just sets the buildPrefix
       if (srcPath != null) {
          abs = FileUtil.isAbsolutePath(srcPath);
-         // Relative paths are already in the default src path (layerPathName)
+         // Relative paths will already be found in the default src path (layerPathName) - so no need to add them here
          if (abs) {
             if (this.srcPath != null) {
                this.srcPath = this.srcPath + ":" + srcPath;
