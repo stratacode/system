@@ -1325,7 +1325,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   private void removeExcludedLayers(boolean markOnly) {
+   void removeExcludedLayers(boolean markOnly) {
       // Remove any layers that don't belong in the runtime.  The other runtimes are configured with the right
       // layers from the start in the active set.
       if (!peerMode) {
@@ -1913,10 +1913,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       if (scSourcePath != null) {
-         String scRuntimePath = FileUtil.concat(scSourcePath, core ? "coreRuntime": "fullRuntime");
+         String scRuntimePath = FileUtil.concat(scSourcePath, core ? "coreRuntime": "fullRuntime", "src");
          File f = new File(scRuntimePath);
          if (!f.canRead())
-            System.err.println("*** Unable to determine SCRuntimePath due to non-standard location of the sc.util, type, binding obj, and dyn packages");
+            System.err.println("*** Unable to determine SCRuntimePath due to non-standard location of the sc.util, type, binding obj, and dyn packages - missing: " + scRuntimePath + " inside of scSourcePath: " + scSourcePath);
          else
             return scRuntimePath;
       }
@@ -5266,7 +5266,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public void registerInactiveLayer(Layer layer) {
       inactiveLayerIndex.put(layer.getLayerName(), layer);
       int posIx = -1;
+      int defaultIx = -1;
       boolean replace = false;
+      int minIx = -1;
       for (int ix = 0; ix < inactiveLayers.size(); ix++) {
          Layer oldLayer = inactiveLayers.get(ix);
          if (oldLayer.getLayerName().equals(layer.getLayerName())) {
@@ -5286,16 +5288,23 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          else if (!after) {
             if (layer.getSortPriority() < oldLayer.getSortPriority()) {
-               posIx = ix;
-               break;
+               // If there's no actual dependency between this layer and any others in the list,
+               // we'll use the earlier priority position.
+               if (defaultIx == -1 || (minIx != -1 && defaultIx < minIx))
+                  defaultIx = ix;
             }
          }
+         // Must put this entry after this position
+         else
+            minIx = ix;
       }
       if (replace) {
          layer.layerPosition = posIx;
          inactiveLayers.set(posIx, layer);
       }
       else {
+         if (posIx == -1 && defaultIx != -1 && (minIx == -1 || defaultIx > minIx))
+            posIx = defaultIx;
          if (posIx == -1) {
             layer.layerPosition = inactiveLayers.size();
             inactiveLayers.add(layer);
@@ -9486,7 +9495,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (layer != null && oldModel.getUserData() != null) {
                boolean layerModelChanged;
                if (javaModel.isLayerModel)
-                  layerModelChanged = oldModel.getLastModifiedTime() != javaModel.getLastModifiedTime() && layer.updateModel(javaModel);
+                  layerModelChanged = (oldModel.getLastModifiedTime() != javaModel.getLastModifiedTime() || !oldModel.sameModel(model)) && layer.updateModel(javaModel);
                // If it's a regular file, not a layer, we mark the layer as having changed if the last modified time is different or the models have physically different contents.
                // the last modified time for a file edited in the IDE does not get updated until after we've updated the model here.  It is not cheap to identical models but it will
                // save a refresh of all open files when you have only changed comments or whitespace.
@@ -10652,11 +10661,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return getImportDecl(null, null, CTypeUtil.getClassName(srcTypeName)) != null;
    }
 
-   public Object getImportedStaticType(String name, Layer layer) {
-      if (layer != null && layer.disabled)
+   public Object getImportedStaticType(String name, Layer fromLayer, Layer refLayer) {
+      if (fromLayer != null && fromLayer.disabled)
          return null;
-      List<Layer> layerList = layer == null ? layers : layer.getLayersList();
-      int startIx = layer == null ? layerList.size() - 1 : layer.getLayerPosition();
+      List<Layer> layerList = fromLayer == null ? refLayer == null ? layers : refLayer.getLayersList() : fromLayer.getLayersList();
+      int startIx = fromLayer == null ? layerList.size() - 1 : fromLayer.getLayerPosition();
       for (int i = startIx; i >= 0; i--) {
          Object m = layerList.get(i).getStaticImportedType(name);
          if (m != null)

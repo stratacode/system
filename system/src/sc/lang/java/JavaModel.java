@@ -1854,7 +1854,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          Layer toFilterLayer = isLayerModel ? null : modelLayer;
 
          // This returns the type object containing the member.
-         if ((type = layeredSystem.getImportedStaticType(name, toFilterLayer)) != null) {
+         if ((type = layeredSystem.getImportedStaticType(name, toFilterLayer, modelLayer)) != null) {
             layeredSystem.addAutoImport(getLayer(), getModelTypeName(), ImportDeclaration.createStatic(CTypeUtil.prefixPath(ModelUtil.getTypeName(type), name)));
 
             // Now convert it to the member itself.
@@ -1903,7 +1903,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       }
       if (type == null) {
          // TODO: shouldn't we restrict this layer arg to the "next layer" - same for getImportDecl
-         if (layeredSystem != null && (type = layeredSystem.getImportedStaticType(name, null)) != null) {
+         if (layeredSystem != null && (type = layeredSystem.getImportedStaticType(name, null, getLayer())) != null) {
             layeredSystem.addAutoImport(getLayer(), getModelTypeName(), ImportDeclaration.createStatic(CTypeUtil.prefixPath(ModelUtil.getTypeName(type), name)));
          }
       }

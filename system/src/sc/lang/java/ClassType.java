@@ -381,8 +381,9 @@ public class ClassType extends JavaType {
                      }
                      if (layer != null && layer.model != null)
                         type = layer.model.getModelTypeDeclaration();
-                     else
-                        System.err.println("*** Unable to resolve layer path: " + fullTypeName + " in context; " + layerRelPath);
+                     //else
+                     //  this may be an activated layer that's not part of this layered system - e.g. a server specific layer for the client runtime.
+
                   }
                }
             }

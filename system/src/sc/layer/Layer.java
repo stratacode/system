@@ -1027,9 +1027,17 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                }
             }
          }
-         // TODO: if you do not extend an explicitly enabled layer should we disable you if you extend an explicitly disabled layer here?
-         if (baseState != LayerEnabledState.NotSet)
-            return baseState;
+         // This is some tricky logic to get right.  What's the state for a layer where there's no explicit process affinity but
+         // there is affinity at the runtime level.
+         if (baseState != LayerEnabledState.NotSet) {
+            if (!runtimeBaseState || checkRuntime)
+               return baseState;
+            else if (baseState == LayerEnabledState.Disabled)
+               return baseState;
+            // If this proc has no explicit process defined we will accept that we are enabled for the runtime.
+            else if (proc == null || proc.getProcessName() == IProcessDefinition.DEFAULT_PROCESS_NAME)
+               return baseState;
+         }
       }
       /*
       if (checkBaseLayers && checkRuntime && baseLayers != null) {
@@ -1177,8 +1185,27 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          initLayerModel((JavaModel) model, lpi, layerDirName, false, false, dynamic);
          initImports();
          initImportCache();
+
+         updateExcludedStatus();
       }
       return reInit;
+   }
+
+   private void updateExcludedStatus() {
+      boolean oldExcluded = excluded;
+      excluded = !includeForProcess(layeredSystem.processDefinition);
+      if (oldExcluded != excluded) {
+         System.err.println("*** Not processing exclusion change for layer: " + this + " restart - required");
+         /*
+         if (excluded) {
+            layeredSystem.removeExcludedLayers(true);
+         }
+         else {
+            if (!activated)
+               layeredSystem.registerInactiveLayer(this);
+         }
+         */
+      }
    }
 
    public static boolean getBaseIsDynamic(List<Layer> baseLayers) {
