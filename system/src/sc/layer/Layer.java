@@ -117,6 +117,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    /** Any set of dependent classes code in this layer requires */
    public String classPath;
 
+   /** Stores classPath entries added to this layer to avoid duplicates */
+   public Set<String> classPathCache = null;
+
    /** Any set of dependent classes code in this layer requires which cannot be loaded into the normal ClassLoader */
    public String externalClassPath;
 
@@ -1125,6 +1128,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (model != null && (td = model.getModelTypeDeclaration()) != null) {
          //ParseUtil.startComponent(model);
 
+         // This will go and create all of the dynamic objects defined in this layer's definition file
          Object[] children = td.getObjChildren(this, null, false, true, true);
          if (children != null) {
             if (this.children == null)
@@ -3573,6 +3577,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (repositoryPackages == null)
          repositoryPackages = new ArrayList<RepositoryPackage>();
       repositoryPackages.add(pkg);
+      pkg.definedInLayer = this;
       return pkg;
    }
 
@@ -3953,6 +3958,24 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       compiledInClassPath = true;
       if (!buildDir.equals(buildSrcDir) && layeredSystem.includeSrcInClassPath)
          urls.add(FileUtil.newFileURL(LayerUtil.appendSlashIfNecessary(buildSrcDir)));
+   }
+
+   public void addClassPathEntry(String entry) {
+      if (classPathCache == null)
+         classPathCache = new TreeSet<String>();
+      classPathCache.add(entry);
+   }
+
+   public boolean hasClassPathEntry(String entry) {
+      if (classPathCache != null && classPathCache.contains(entry))
+         return true;
+      if (baseLayers != null) {
+         for (Layer baseLayer:baseLayers) {
+            if (baseLayer.hasClassPathEntry(entry))
+               return true;
+         }
+      }
+      return false;
    }
 }
 

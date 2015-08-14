@@ -229,10 +229,10 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
    private final static String[] runtimeScopes = {POMFile.DEFAULT_SCOPE, "runtime"};
    private String[] getScopesToBuild(RepositoryPackage pkg) {
       String[] baseList;
-      if (pkg.includeTests)
-         baseList = pkg.includeRuntime ? allScopes : testScopes;
+      if (pkg.getIncludeTests())
+         baseList = pkg.getIncludeRuntime() ? allScopes : testScopes;
       else
-         baseList = pkg.includeRuntime ? runtimeScopes : defaultScopes;
+         baseList = pkg.getIncludeRuntime() ? runtimeScopes : defaultScopes;
       if (pkg instanceof MvnRepositoryPackage) {
          ArrayList<String> newList = null;
          MvnRepositoryPackage mpkg = (MvnRepositoryPackage) pkg;

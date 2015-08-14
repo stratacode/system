@@ -15,6 +15,7 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.TreeSet;
 
 /**
  * Represents a third party package that's managed by a RepositoryManager
@@ -29,8 +30,8 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
 
    public boolean installed = false;
    public boolean definesClasses = true;
-   public boolean includeTests = false;
-   public boolean includeRuntime = false;
+   private boolean includeTests = false;
+   private boolean includeRuntime = false;
 
    public RepositorySource[] sources;
    public RepositorySource currentSource;
@@ -277,9 +278,21 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
 
          if (mgr != null) {
             HashSet<String> globalClassPath = mgr.getRepositorySystem().classPath;
+            boolean newGlobal = false;
             if (!globalClassPath.contains(entry)) {
                globalClassPath.add(entry);
                classPath.add(entry);
+               newGlobal = true;
+            }
+            if (definedInLayer != null) {
+               if (!definedInLayer.hasClassPathEntry(entry)) {
+                  definedInLayer.addClassPathEntry(entry);
+                  // It's rare but possible that we've defined this class path entry but at a layer higher in the stack
+                  // that does not depend on this layer.  This layer will need to duplicate the classpath entry as we are not
+                  // always going to search it when searching for types from this layer.
+                  if (!newGlobal)
+                     classPath.add(entry);
+               }
             }
          }
          else
@@ -350,6 +363,13 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
          sources = new RepositorySource[0];
 
       if (sources.length > oldPkg.sources.length)
+         return false;
+
+      // These aspects of a package can change causing us to need to reconfigure a package
+      if (includeTests != oldPkg.includeTests)
+         return false;
+
+      if (includeRuntime != oldPkg.includeRuntime)
          return false;
 
       // Just check that the original sources match.  sources right now only has those added in the layer def files - not those that will be added
@@ -425,5 +445,30 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
 
    public int hashCode() {
       return packageName.hashCode();
+   }
+
+   public void setIncludeTests(boolean newVal) {
+       if (includeTests != newVal && newVal) {
+          // Need to reinstall if we've already installed without the tests
+          if (installed)
+             installed = false;
+       }
+      includeTests = newVal;
+   }
+
+   public boolean getIncludeTests() {
+      return includeTests;
+   }
+
+   public void setIncludeRuntime(boolean newVal) {
+      if (includeRuntime != newVal && newVal) {
+         if (installed)
+            installed = false;
+      }
+      includeRuntime = newVal;
+   }
+
+   public boolean getIncludeRuntime() {
+      return includeRuntime;
    }
 }
