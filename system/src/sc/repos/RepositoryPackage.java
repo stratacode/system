@@ -471,4 +471,16 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    public boolean getIncludeRuntime() {
       return includeRuntime;
    }
+
+   public void addSrcPath(String srcPath) {
+      if (srcPaths == null)
+         srcPaths = new String[] {srcPath};
+      else {
+         int len = srcPaths.length;
+         String[] newSrcPaths = new String[len+1];
+         System.arraycopy(srcPaths, 0, newSrcPaths, 0, len);
+         newSrcPaths[len] = srcPath;
+         srcPaths = newSrcPaths;
+      }
+   }
 }

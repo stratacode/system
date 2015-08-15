@@ -204,6 +204,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public boolean systemCompiled = false;  // Set to true when the system has been fully compiled once
    public boolean buildingSystem = false;
+   public boolean initializingLayers = false; // Set to true when we are initializing layers
    public boolean runClassStarted = false;
    public boolean allTypesProcessed = false;
 
@@ -943,6 +944,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       IRuntimeProcessor useRuntimeProcessor = useProcessDefinition == null ? null : useProcessDefinition.getRuntimeProcessor();
 
+      // Need to set the runtime processor before we initialize the layers.  this lets us rely on getCompiledOnly and also seems like this will make bootstrapping easier.
+      if (useRuntimeProcessor != null)
+         runtimeProcessor = useRuntimeProcessor;
+      if (useProcessDefinition != null)
+         processDefinition = useProcessDefinition;
+
       if (rootClassPath == null)
          rootClassPath = System.getProperty("java.class.path");
 
@@ -1019,11 +1026,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (initLayerNames != null) {
-         // Need to set the runtime processor before we initialize the layers.  this lets us rely on getCompiledOnly and also seems like this will make bootstrapping easier.
-         if (useRuntimeProcessor != null)
-            runtimeProcessor = useRuntimeProcessor;
-         if (useProcessDefinition != null)
-            processDefinition = useProcessDefinition;
          initLayersWithNames(initLayerNames, options.dynamicLayers, options.allDynamic, explicitDynLayers, true, useProcessDefinition != null);
       }
 
@@ -1082,7 +1084,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          lastCompiled.makeBuildLayer();
 
       boolean needsBuildAll = false;
-      if (runtimeProcessor != null)
+      if (runtimeProcessor != null && buildLayer != null)
          needsBuildAll = runtimeProcessor.initRuntime(fromScratch);
 
       if (needsBuildAll)
@@ -2206,7 +2208,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             lastPos = lastLayer == null ? -1 : lastLayer.layerPosition;
             if (sysLayer == null || sysLayer.activated)
                lastStartedLayer = sysLayer;
-            else
+            else if (lastInitedInactiveLayer == null || sysLayer.layerPosition > lastInitedInactiveLayer.layerPosition)
                lastInitedInactiveLayer = sysLayer;
             // We may have inserted this layer... in that case, make sure to process it.
             if (sysLayer != null && lastPos >= sysLayer.layerPosition)
@@ -2234,7 +2236,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             URL[] layerURLs = getLayerClassURLs(sysLayer, lastPos, mode);
             if (layerURLs.length > 0) {
                if (options.verbose) {
-                  verbose("Added to classpath for runtime: " + getRuntimeName());
+                  String fromLayer = lastPos == sysLayer.layerPosition - 1 ? null : sysLayer.getLayersList().get(lastPos).getLayerName();
+                  if (fromLayer != null)
+                     verbose("Added to classpath for layers from: " + fromLayer + " to: " + sysLayer.getLayerName() + " runtime: " + getProcessIdent());
+                  else
+                     verbose("Added to classpath for layer: " + sysLayer.getLayerName() + " runtime: " + getProcessIdent());
                   for (URL url:layerURLs)
                      verbose("   " + url);
                }
@@ -6116,6 +6122,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (curSys != null && curSys.typeIndex == null)
             curSys.typeIndex = curTypeIndex;
 
+         ArrayList<Layer> layersToRebuild = new ArrayList<Layer>();
          for (String indexFileName:filesToProcess.keySet()) {
             if (!filesToProcess.get(indexFileName)) {
                if (indexFileName.endsWith(Layer.TYPE_INDEX_SUFFIX)) {
@@ -6146,7 +6153,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         LayerTypeIndex layerTypeIndex = readTypeIndexFile(typeIndexIdent, layerName);
                         if (layerTypeIndex == null) {
                            // ?? huh we just listed out the file - rebuild it from scratch.
-                           layerTypeIndex = buildLayerTypeIndex(layerName);
+                           addLayerToRebuild(layerName, layersToRebuild);
                            refreshedLayers.add(layerName);
                         } else {
                            switch (options.typeIndexMode) {
@@ -6179,6 +6186,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   }
                }
             }
+            rebuildLayersTypeIndex(layersToRebuild);
          }
       }
 
@@ -6196,14 +6204,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       switch (options.typeIndexMode) {
          case Refresh:
          case Rebuild:
+            // First we batch up all layers we need to index - they are initialized via the getInactiveLayer method
+            // and that way all of the layer components will override each other.  Then we rebuild all of the indexes
+            // once the entire layer stack is formed.
+            ArrayList<Layer> layersToRebuild = new ArrayList<Layer>();
             Map<String,LayerIndexInfo> allLayers = getAllLayerIndex();
-            for (LayerIndexInfo idx:allLayers.values()) {
+            for (LayerIndexInfo idx : allLayers.values()) {
                String layerName = idx.layerDirName;
                if (idx.layer != null && !idx.layer.disabled) {
                   if (options.typeIndexMode == TypeIndexMode.Rebuild || !refreshedLayers.contains(layerName))
-                     buildLayerTypeIndex(layerName);
+                     addLayerToRebuild(layerName, layersToRebuild);
                }
             }
+            rebuildLayersTypeIndex(layersToRebuild);
             break;
       }
    }
@@ -6348,32 +6361,42 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public LayerTypeIndex buildLayerTypeIndex(String layerName) {
+      ArrayList<Layer> toBuild = new ArrayList<Layer>(1);
+      addLayerToRebuild(layerName, toBuild);
+      rebuildLayersTypeIndex(toBuild);
+      return toBuild.get(0).layerTypeIndex;
+   }
+
+   public static void rebuildLayersTypeIndex(ArrayList<Layer> rebuildLayers) {
+      for (Layer layer:rebuildLayers) {
+         layer.ensureStarted(true);
+      }
+      for (Layer layer:rebuildLayers) {
+         layer.initAllTypeIndex();
+         layer.layeredSystem.typeIndex.inactiveTypeIndex.typeIndex.put(layer.getLayerName(), layer.layerTypeIndex);
+      }
+   }
+
+   public void addLayerToRebuild(String layerName, ArrayList<Layer> layersToRebuild) {
       try {
          acquireDynLock(false);
          Layer layer = getInactiveLayer(layerName, true, true, false);
          if (layer == null) {
             System.err.println("*** Unable to index layer: " + layerName);
-            return null;
+            return;
          } else if (layer.disabled) {
-            return null;
+            return;
          } else if (!layer.excluded && layer.layeredSystem == this) {
-            layer.initAllTypeIndex();
-            if (writeLocked == 0) {
-               System.err.println("*** Modifying type index without write lock");
-               new Throwable().printStackTrace();
-            }
-            typeIndex.inactiveTypeIndex.typeIndex.put(layerName, layer.layerTypeIndex);
-            return layer.layerTypeIndex;
+            layersToRebuild.add(layer);
          } else { // For excluded layers, hand it off to the layer's layered system
             if (layer.layeredSystem != this) {
-               return layer.layeredSystem.buildLayerTypeIndex(layerName);
+               layer.layeredSystem.addLayerToRebuild(layerName, layersToRebuild);
             }
          }
       }
       finally {
          releaseDynLock(false);
       }
-      return null;
    }
 
    public String getTypeIndexFileName(String layerName) {
@@ -8682,7 +8705,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       IFileProcessor processor = getFileProcessorForSrcEnt(srcEnt, null, false);
       if (processor != null) {
          if (options.verbose && !isLayer && !srcEnt.relFileName.equals("sc/layer/BuildInfo.sc") && (processor instanceof Language || options.sysDetails))
-            verbose("Reading: " + srcEnt.absFileName + " for runtime: " + getRuntimeName());
+            verbose("Reading: " + srcEnt.absFileName + " for runtime: " + getProcessIdent());
 
          /*
          if (srcEnt.absFileName.contains("coreRuntime") && srcEnt.absFileName.contains("Bind"))
@@ -11464,7 +11487,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          model.setDisableTypeErrors(true);
 
       // Now that we've started the base layers and updated the prefix, it is safe to start the main layer
+      boolean clearInitLayers = !initializingLayers;
       try {
+         initializingLayers = true;
          Layer layer = ((ModifyDeclaration)decl).createLayerInstance(prefix, inheritedPrefix);
 
          // Need to set the excluded flag here for buildSeparate layers
@@ -11498,6 +11523,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             exc.printStackTrace();
       }
       finally {
+         if (clearInitLayers)
+            initializingLayers = false;
          if (!lpi.activate)
             model.setDisableTypeErrors(false);
       }
@@ -12384,15 +12411,24 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       lpi.activate = false;
       lpi.enabled = enabled;
 
-      Layer layer = initLayer(layerPath, null, null, false, lpi);
-      if (layer != null) {
-         return completeNewInactiveLayer(layer, checkPeers);
-      }
-      else if (getNewLayerDir() != null) {
-         Layer res = initLayer(layerPath, getNewLayerDir(), null, false, lpi);
-         if (res != null) {
-            return completeNewInactiveLayer(res, checkPeers);
+      boolean clearInitLayers = !initializingLayers;
+      try {
+         initializingLayers = true;
+
+         Layer layer = initLayer(layerPath, null, null, false, lpi);
+         if (layer != null) {
+            return completeNewInactiveLayer(layer, checkPeers);
          }
+         else if (getNewLayerDir() != null) {
+            Layer res = initLayer(layerPath, getNewLayerDir(), null, false, lpi);
+            if (res != null) {
+               return completeNewInactiveLayer(res, checkPeers);
+            }
+         }
+      }
+      finally {
+         if (clearInitLayers)
+            initializingLayers = false;
       }
       return null;
    }

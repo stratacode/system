@@ -2216,15 +2216,17 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                   if (modifyExtendsType != null && !ModelUtil.isAssignableFrom(HTMLElement.class, modifyExtendsType)) {
                      // These errors can occur in normal situations in inactive layers - because we are not guaranteeing just one stacking order... for now we are going to ignore them and use the declared
                      // extends and modify types for code navigation purposes.   We do need to null out the 'extends' type or else we can end up creating a 'modifyInherited' type with an extends type which is not allowed.
-                     if (javaModel.getLayer().activated)
+                     if (javaModel.getLayer().activated) {
                         displayError("tag with id: ", objName, " modifies type: ", ModelUtil.getTypeName(modifyType), " in layer:", ModelUtil.getLayerForType(null, modifyType) + " already extends: ", ModelUtil.getTypeName(modifyExtendsType), " which has no schtml file (and does not extends HTMLElement): ");
-                     extendsType = null;
+                        extendsType = null;
+                     }
                   }
                   if (declaredExtends != null) {
                      if (!ModelUtil.isAssignableFrom(modifyExtendsType, declaredExtends)) {
-                        if (javaModel.getLayer().activated)
+                        if (javaModel.getLayer().activated) {
                            displayError("The extends attribute: ", ModelUtil.getTypeName(declaredExtends), " overrides an incompatible extends type: ", ModelUtil.getTypeName(modifyExtendsType), " for tag: ");
-                        extendsType = null;
+                           extendsType = null;
+                        }
                      }
                   }
                   // Do not set an extends type here - we need to inherit it from the modified type
@@ -2235,8 +2237,10 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          }
       }
 
-      if (extTypeDecl != null && !ModelUtil.isAssignableFrom(HTMLElement.class, extTypeDecl))
-         displayTypeError("extends type for tag must extend HTMLElement or come from an schtml template: ");
+      if (extTypeDecl != null && !ModelUtil.isAssignableFrom(HTMLElement.class, extTypeDecl)) {
+         if (javaModel.getLayer().activated)
+            displayTypeError("extends type for tag must extend HTMLElement or come from an schtml template: ");
+      }
 
       TypeDeclaration tagType;
       boolean isModify = false;

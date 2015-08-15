@@ -1644,7 +1644,12 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          zipFiles = new ZipFile[classDirs.size()];
          for (int i = 0; i < classDirs.size(); i++) {
             String classDir = classDirs.get(i);
-            // Make classpath entries relative to the layer directory for easy encapsulation
+
+            // skip empty directories
+            if (classDir.length() == 0)
+               continue;
+
+            // Replace "." with the layerPathName - allowing classpath's to be encapsulated in the layer dir
             classDir = FileUtil.getRelativeFile(layerPathName, classDir);
             classDirs.set(i, classDir); // Store the translated path
             String ext = FileUtil.getExtension(classDir);
@@ -1677,24 +1682,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             }
          }
       }
-      if (srcPath == null) {
-         topLevelSrcDirs = Collections.singletonList(LayerUtil.getLayerSrcDirectory(layerPathName));
-      }
-      else {
-         String [] srcList = srcPath.split(FileUtil.PATH_SEPARATOR);
-         topLevelSrcDirs = Arrays.asList(srcList);
-         for (int i = 0; i < topLevelSrcDirs.size(); i++) {
-            if (topLevelSrcDirs.get(i).equals("."))
-               topLevelSrcDirs.set(i, layerPathName);
-         }
-         if (layeredSystem.options.verbose) {
-            verbose("Layer: " + this + " custom src path:");
-            for (String srcDir:topLevelSrcDirs) {
-               String srcPathType = getSrcPathTypeName(srcDir, true);
-               verbose("   " + srcDir + (srcPathType != null ? " srcPathType: " + srcPathType : ""));
-            }
-         }
-      }
+
+      if (topLevelSrcDirs == null)
+         initSrcDirs();
 
       layerTypeIndex.topLevelSrcDirs = topLevelSrcDirs.toArray(new String[topLevelSrcDirs.size()]);
       layerTypeIndex.layerPathName = getLayerPathName();
@@ -1752,6 +1742,27 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
 
       layeredSystem.initSysClassLoader(this, LayeredSystem.ClassLoaderMode.LIBS);
+   }
+
+   private void initSrcDirs() {
+      if (srcPath == null) {
+         topLevelSrcDirs = Collections.singletonList(LayerUtil.getLayerSrcDirectory(layerPathName));
+      }
+      else {
+         String [] srcList = srcPath.split(FileUtil.PATH_SEPARATOR);
+         topLevelSrcDirs = Arrays.asList(srcList);
+         for (int i = 0; i < topLevelSrcDirs.size(); i++) {
+            if (topLevelSrcDirs.get(i).equals("."))
+               topLevelSrcDirs.set(i, layerPathName);
+         }
+         if (layeredSystem.options.verbose) {
+            verbose("Layer: " + this + " custom src path:");
+            for (String srcDir:topLevelSrcDirs) {
+               String srcPathType = getSrcPathTypeName(srcDir, true);
+               verbose("   " + srcDir + (srcPathType != null ? " srcPathType: " + srcPathType : ""));
+            }
+         }
+      }
    }
 
    public void ensureStarted(boolean checkBaseLayers) {
@@ -2341,6 +2352,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                base.checkIfStarted();
          }
          if (initialized && !disabled) {
+            // If we are in the midst of initializing layers we should not start this layer, unless it's a separate
+            // layer in which case we might need to look up src files in it.
+            if (layeredSystem.initializingLayers && !buildSeparate)
+               return false;
             // Should do init, start, and validate
             ParseUtil.initAndStartComponent(this);
          }
@@ -2370,10 +2385,14 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    public SrcEntry getSrcEntry(String absFileName) {
-      checkIfStarted();
+      // Lazily initializing the src dirs to see if this layer needs to be started to find this file.
+      if (topLevelSrcDirs == null)
+         initSrcDirs();
       if (topLevelSrcDirs != null) {
          for (String dir : topLevelSrcDirs) {
             if (absFileName.startsWith(dir)) {
+               checkIfStarted();
+
                String rest = absFileName.substring(dir.length());
                while (rest.startsWith("/"))
                   rest = rest.substring(1);
@@ -3601,6 +3620,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       for (RepositoryPackage pkg : pkgList) {
          if (pkg.installedRoot != null) {
             String cp = pkg.getClassPath();
+            if (cp == null || cp.trim().length() == 0) {
+               continue;
+            }
             if (classPath == null)
                classPath = cp;
             else

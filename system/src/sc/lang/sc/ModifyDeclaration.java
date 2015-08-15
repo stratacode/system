@@ -336,8 +336,11 @@ public class ModifyDeclaration extends TypeDeclaration {
             TypeDeclaration baseTypeDecl = (TypeDeclaration) modifyTypeDecl;
             Object modifyType = baseTypeDecl.getExtendsTypeDeclaration();
             if (modifyType != null && !ModelUtil.isAssignableFrom(modifyType, extType)) {
-               // Is this an error or a warning?  We let you replace the class and break the contract - should we let you replace the extends type?   or should this be a strict option on the layer?
-               displayTypeError("Modify extends incompatible type - ", ModelUtil.getClassName(extType), " should extend existing extends: ", ModelUtil.getClassName(modifyType), " for: ");
+               // For inactivated layers, we allow this since it's ok to have lots of layers with different implementations until you run them.
+               if (getLayer().activated) {
+                  // Is this an error or a warning?  We let you replace the class and break the contract - should we let you replace the extends type?   or should this be a strict option on the layer?
+                  displayTypeError("Modify extends incompatible type - ", ModelUtil.getClassName(extType), " should extend existing extends: ", ModelUtil.getClassName(modifyType), " for: ");
+               }
             }
          }
       }
