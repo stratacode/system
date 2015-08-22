@@ -289,7 +289,7 @@ public abstract class Language extends LayerFileComponent {
       String absFileName = fileName;
       // TODO: this is a hack!  Add a new parameter or maybe disabled:layerName?
       if (layerName != null) {
-         Layer layer = sys.getActiveOrInactiveLayerByPathSync(layerName, null, layerEnabled);
+         Layer layer = sys.getActiveOrInactiveLayerByPathSync(layerName, null, true, layerEnabled);
          if (layer == null) {
             System.err.println("No layer named: " + layerName + " for styleFile method");
             return null;

@@ -1904,14 +1904,15 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
       JavaModel model = getJavaModel();
 
-      if (/*getTransformed() ||*/ model.hasErrors()) {
-         boundType = getJavaModel().findTypeDeclaration(getFullTypeName(), false);
-         if (boundType == null) {
+      Object newBoundType = model.findTypeDeclaration(getFullTypeName(), false);
+      if (newBoundType == null) {
+         newBoundType = model.getTypeDeclaration(typeName);
+         if (newBoundType == null) {
             System.err.println("*** Can't find post compiled type for: " + getFullTypeName());
-            boundType = getJavaModel().findTypeDeclaration(getFullTypeName(), false);
+            return boundType;
          }
       }
-      return boundType;
+      return newBoundType;
    }
 
    public boolean isDynamicType() {

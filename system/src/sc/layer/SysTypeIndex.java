@@ -68,15 +68,20 @@ public class SysTypeIndex {
 
             // Make sure the index entry matches this process before we go and add it.
             if (StringUtil.equalStrings(modTypeIndex.processIdent, sys.getProcessIdent())) {
-               Layer modLayer = sys.getActiveOrInactiveLayerByPath(modTypeIndex.layerName, null, true);
+               Layer modLayer = sys.getActiveOrInactiveLayerByPath(modTypeIndex.layerName, null, true, true);
                if (modLayer == null) {
                   System.err.println("*** Warning unable to find modifying layer: " + modTypeIndex.layerName + " - skipping index entyr");
                } else {
-                  Layer typeLayerInSystem = sys.getActiveOrInactiveLayerByPath(type.getLayer().getLayerName(), null, true);
+                  Layer typeLayerInSystem = sys.getActiveOrInactiveLayerByPath(type.getLayer().getLayerName(), null, true, true);
                   if (typeLayerInSystem != null) {
-                     TypeDeclaration modType = (TypeDeclaration) modLayer.layeredSystem.getSrcTypeDeclaration(typeName, modLayer.getNextLayer(), true, false, true, typeLayerInSystem, type.isLayerType || type.isLayerComponent());
-                     if (modType != null) {
-                        res.add(modType);
+                     Layer peerLayer = typeLayerInSystem.layeredSystem == sys ? typeLayerInSystem : modLayer.layeredSystem.getPeerLayerFromRemote(typeLayerInSystem);
+                     if (peerLayer == null)
+                        System.err.println("*** Unable to find layer in layer in runtime: " + sys.getProcessIdent() + " for: " + typeLayerInSystem);
+                     else {
+                        TypeDeclaration modType = (TypeDeclaration) modLayer.layeredSystem.getSrcTypeDeclaration(typeName, modLayer.getNextLayer(), true, false, true, peerLayer, type.isLayerType || type.isLayerComponent());
+                        if (modType != null) {
+                           res.add(modType);
+                        }
                      }
                   }
                   else

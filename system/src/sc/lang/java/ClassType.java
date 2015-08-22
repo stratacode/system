@@ -617,7 +617,7 @@ public class ClassType extends JavaType {
       if (type != null && type != FAILED_TO_INIT_SENTINEL) {
          if (type instanceof TypeDeclaration) {
             TypeDeclaration td = (TypeDeclaration) type;
-            if (td.getTransformed()) {
+            if (td.getTransformed() || (flags & ModelUtil.REFRESH_TRANSFORMED_ONLY) == 0) {
                type = ModelUtil.refreshBoundType(getLayeredSystem(), type, flags);
             }
          }

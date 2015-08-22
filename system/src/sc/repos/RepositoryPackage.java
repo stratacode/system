@@ -111,7 +111,9 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
             }
             if (definedInLayer.repositoryPackages == null)
                definedInLayer.repositoryPackages = new ArrayList<RepositoryPackage>();
-            definedInLayer.repositoryPackages.add(pkg);
+            // We need to add 'this' not the canonical pkg here so the definedInLayer is set for this layer.  We'll dereference replacedByPkg
+            // as needed to get the installed info from the package.
+            definedInLayer.repositoryPackages.add(this);
             // TODO: are there any properties in this pkg which we need to copy over to the existing instance if pkg != this
          }
          else {
@@ -135,23 +137,27 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
          return err;
 
       String depsRes = RepositorySystem.installDeps(depCol);
-      if (depsRes == null && definedInLayer != null && !definedInLayer.disabled && !definedInLayer.excluded) {
-         if (installedRoot != null) {
+      return depsRes;
+   }
+
+   public void register() {
+      if (definedInLayer != null && !definedInLayer.disabled && !definedInLayer.excluded) {
+         String root = replacedByPkg != null ? replacedByPkg.installedRoot : installedRoot;
+         if (root != null) {
             if (srcPaths != null) {
                for (String srcPath : srcPaths)
-                  definedInLayer.addSrcPath(FileUtil.concat(installedRoot, srcPath), null);
+                  definedInLayer.addSrcPath(FileUtil.concat(root, srcPath), null);
             }
             if (webPaths != null) {
                for (String webPath:webPaths)
-                  definedInLayer.addSrcPath(FileUtil.concat(installedRoot, webPath), "web");
+                  definedInLayer.addSrcPath(FileUtil.concat(root, webPath), "web");
             }
             if (configPaths != null) {
                for (String configPath:configPaths)
-                  definedInLayer.addSrcPath(FileUtil.concat(installedRoot, configPath), "config");
+                  definedInLayer.addSrcPath(FileUtil.concat(root, configPath), "config");
             }
          }
       }
-      return depsRes;
    }
 
    public String preInstall(DependencyContext ctx, DependencyCollection depCol) {
@@ -214,6 +220,8 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
          return;
       }
 
+      if (sources == null)
+         sources = new RepositorySource[0];
       int i = 0;
       for (RepositorySource oldSrc:sources) {
          if (repoSrc.equals(oldSrc)) {

@@ -54,9 +54,14 @@ public class MvnDescriptor implements Serializable {
 
    public static MvnDescriptor fromURL(String url) {
       MvnDescriptor desc = new MvnDescriptor();
+      String origURL = url;
       int ix = url.indexOf("://");
       if (ix != -1)
          url = url.substring(ix+3);
+      while (url.startsWith("/")) {
+         System.err.println("*** Removing invalid '/' in URL: " + origURL);
+         url = url.substring(1);
+      }
       desc.version = URLUtil.getFileName(url);
       String rest = URLUtil.getParentPath(url);
       desc.artifactId = URLUtil.getFileName(rest);

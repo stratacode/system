@@ -54,6 +54,7 @@ import java.util.zip.ZipFile;
 public class Layer implements ILifecycle, LayerConstants, IDynObject {
    public final static Layer ANY_LAYER = new Layer();
    public final static Layer ANY_INACTIVE_LAYER = new Layer();
+   public final static Layer ANY_OPEN_INACTIVE_LAYER = new Layer();
 
    DynObject dynObj;
 
@@ -102,6 +103,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    /** Set to true for layers who want to show all objects and properties visible in their extended layers */
    @Constant
    public boolean transparent = false;
+
+   /** For inactive layers, we can remove a layer from participating in the type system by marking it as closed. */
+   public boolean closed = false;
 
    /**
     * Set this to true so that a given layer is compiled by itself - i.e. its build will not include source or
@@ -361,6 +365,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    public HashMap<String, IScopeProcessor> scopeProcessors = null;
 
    public HashMap<String,IAnnotationProcessor> annotationProcessors = null;
+
+   private ArrayList<ReplacedType> replacedTypes;
 
    /**
     * Add an explicitly dependency on layer.  This will ensure that if your layer and the otherLayerName are in the stack, that this layer will be compiled along with other layer.
@@ -1688,6 +1694,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
       layerTypeIndex.topLevelSrcDirs = topLevelSrcDirs.toArray(new String[topLevelSrcDirs.size()]);
       layerTypeIndex.layerPathName = getLayerPathName();
+      if (layerTypeIndex.layerPathName == null)
+         System.err.println("*** Missing layer path name for type index");
 
       if (excludedFiles != null) {
          excludedPatterns = new ArrayList<Pattern>(excludedFiles.size());
@@ -1724,24 +1732,28 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       // and replace them so the model is in sync with this layer.  When the layer is active, this operation should be fine
       // but we end up loading types in the wrong order - particularly when there are multiple runtimes.
       // We'd need to move this getSrcTypeDeclaration call until after we've started the corresponding peer layers.
-      ArrayList<ReplacedType> replacedTypes = !activated ? new ArrayList<ReplacedType>() : null;
+      replacedTypes = !activated ? new ArrayList<ReplacedType>() : null;
       // Now init our index of the files managed by this layer
       initSrcCache(replacedTypes);
 
       if (isBuildLayer())
          makeBuildLayer();
 
-      // This is the list of types defined in this layer which were already loaded.  We need to replace them with the ones
-      // in this layer now that this layer is active, simply by loading the file.
-      if (replacedTypes != null) {
+      initReplacedTypes();
+
+      layeredSystem.initSysClassLoader(this, LayeredSystem.ClassLoaderMode.LIBS);
+   }
+
+   private void initReplacedTypes() {
+      // This is the list of types defined in this layer which were already loaded into the type cache.  To keep them from being stale, when this inactive layer is opened
+      // we need to replace them with the ones  in this layer now that this layer is open - loading the type should do it.
+      if (replacedTypes != null && !closed) {
          for (ReplacedType replacedType:replacedTypes) {
             TypeDeclaration newType = (TypeDeclaration) layeredSystem.getSrcTypeDeclaration(replacedType.typeName, null, replacedType.prependPackage, false, true, this, false);
             if (newType == null)
                System.out.println("*** Error - did not find type: " + replacedType.typeName + " after adding layer: " + this);
          }
       }
-
-      layeredSystem.initSysClassLoader(this, LayeredSystem.ClassLoaderMode.LIBS);
    }
 
    private void initSrcDirs() {
@@ -3791,6 +3803,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       // Just walk through and start each of the types in this layer  TODO - include inner types in the type index?
       startAllTypes();
       saveTypeIndex();
+      LayerListTypeIndex listTypeIndex = activated ? layeredSystem.typeIndex.activeTypeIndex : layeredSystem.typeIndex.inactiveTypeIndex;
+      listTypeIndex.typeIndex.put(getLayerName(), layerTypeIndex);
    }
 
    public boolean hasDefinitionForType(String typeName) {
@@ -3999,6 +4013,45 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
       return false;
    }
+
+   public void markClosed(boolean val) {
+      boolean changed = closed != val;
+      closed = val;
+      if (baseLayers != null) {
+         for (Layer base:baseLayers)
+            base.markClosed(val);
+      }
+      if (changed && val) {
+         initReplacedTypes();
+      }
+   }
+
+   void refreshBoundTypes(int flags) {
+      if (layerModels != null) {
+         for (IdentityWrapper<ILanguageModel> wrap:layerModels) {
+            wrap.wrapped.refreshBoundTypes(flags);
+         }
+      }
+      if (baseLayers != null) {
+         for (Layer baseLayer:baseLayers) {
+            baseLayer.refreshBoundTypes(flags);
+         }
+      }
+   }
+
+   void flushTypeCache() {
+      if (layerModels != null) {
+         for (IdentityWrapper<ILanguageModel> wrap:layerModels) {
+            wrap.wrapped.flushTypeCache();
+         }
+      }
+      if (baseLayers != null) {
+         for (Layer baseLayer:baseLayers) {
+            baseLayer.flushTypeCache();
+         }
+      }
+   }
 }
+
 
 

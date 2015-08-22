@@ -9,6 +9,7 @@ import sc.lang.java.DeclarationType;
 import java.io.Serializable;
 import java.util.List;
 
+/** We store this information about each type in the type index - essentially one for each .sc file for each process/runtime where it's used. */
 public class TypeIndex implements Serializable {
    public String typeName;
    public String layerName;

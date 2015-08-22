@@ -19,7 +19,6 @@ import sc.layer.deps.*;
 import sc.lifecycle.ILifecycle;
 import sc.obj.*;
 import sc.parser.*;
-import sc.repos.RepositoryPackage;
 import sc.repos.RepositoryStore;
 import sc.repos.RepositorySystem;
 import sc.sync.SyncManager;
@@ -591,16 +590,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       if (searchInactiveTypesForLayer(refLayer)) {
-         if (refLayer == null) {
-            startIx = inactiveLayers.size() - 1;
-            for (int i = startIx; i >= 0; i--) {
-               Layer inactiveLayer = inactiveLayers.get(i);
-               res = inactiveLayer.addInheritedAnnotationProcessors(type, res, false);
-            }
-         }
-         else {
-            res = refLayer.addInheritedAnnotationProcessors(type, res, true);
-         }
+         res = refLayer.addInheritedAnnotationProcessors(type, res, true);
       }
       return res;
    }
@@ -627,8 +617,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    /** For the IDE specifically find or create any TypeDeclaration for the type specified. */
-   public void addAllTypeDeclarations(String typeName, ArrayList<Object> res) {
-      Object typeObj = getSrcTypeDeclaration(typeName, null, true, false, true, Layer.ANY_INACTIVE_LAYER, false);
+   public void addAllTypeDeclarations(String typeName, ArrayList<Object> res, boolean openAllLayers) {
+      Object typeObj = getSrcTypeDeclaration(typeName, null, true, false, true, openAllLayers ? Layer.ANY_INACTIVE_LAYER : Layer.ANY_OPEN_INACTIVE_LAYER, false);
       if (typeObj != null)
          res.add(typeObj);
       else {
@@ -659,9 +649,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                for (TypeIndex typeIndex : typeIndexes) {
                   Layer layer = getInactiveLayerByPath(typeIndex.layerName, null, true);
                   if (layer != null) {
-                     Object newTypeObj = layer.layeredSystem.getSrcTypeDeclaration(typeName, null, true, false, true, Layer.ANY_INACTIVE_LAYER, false);
-                     if (newTypeObj != null)
-                        res.add(newTypeObj);
+                     if (!layer.closed || openAllLayers) {
+                        Object newTypeObj = layer.layeredSystem.getSrcTypeDeclaration(typeName, layer.getNextLayer(), true, false, true, layer, false);
+                        if (newTypeObj != null)
+                           res.add(newTypeObj);
+                     }
+                     else {
+                        res.add(typeIndex);
+                     }
                   }
                }
             }
@@ -716,7 +711,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
    }
-
 
    public enum BuildCommandTypes {
       Pre, Post, Run, Test
@@ -2236,7 +2230,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             URL[] layerURLs = getLayerClassURLs(sysLayer, lastPos, mode);
             if (layerURLs.length > 0) {
                if (options.verbose) {
-                  String fromLayer = lastPos == sysLayer.layerPosition - 1 ? null : sysLayer.getLayersList().get(lastPos).getLayerName();
+                  String fromLayer = lastPos == -1 || lastPos == sysLayer.layerPosition - 1 ? null : sysLayer.getLayersList().get(lastPos).getLayerName();
                   if (fromLayer != null)
                      verbose("Added to classpath for layers from: " + fromLayer + " to: " + sysLayer.getLayerName() + " runtime: " + getProcessIdent());
                   else
@@ -2422,7 +2416,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
 
             if (!srcOnly) {
-               if (refLayer != null && refLayer != Layer.ANY_LAYER && refLayer.inheritImports && refLayer != Layer.ANY_INACTIVE_LAYER) {
+               if (refLayer != null && refLayer != Layer.ANY_LAYER && refLayer.inheritImports && refLayer != Layer.ANY_INACTIVE_LAYER && refLayer != Layer.ANY_OPEN_INACTIVE_LAYER) {
                   refLayer.findMatchingGlobalNames(prefix, candidates, retFullTypeName, true);
                }
 
@@ -6325,7 +6319,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                if (curTypeIndex == null || lastModified < subF.lastModified()) {
                   try {
                      acquireDynLock(false);
-                     Layer newLayer = getActiveOrInactiveLayerByPath(layerName, null, true);
+                     Layer newLayer = getActiveOrInactiveLayerByPath(layerName, null, true, true);
                      if (newLayer == null) {
                         System.err.println("*** Warning unable to find layer in type index: " + layerName + " - skipping index entyr");
                      }
@@ -6363,18 +6357,90 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public LayerTypeIndex buildLayerTypeIndex(String layerName) {
       ArrayList<Layer> toBuild = new ArrayList<Layer>(1);
       addLayerToRebuild(layerName, toBuild);
+      if (toBuild.size() == 0) {
+         error("Failed to find layer type index: " + layerName);
+         return null;
+      }
       rebuildLayersTypeIndex(toBuild);
       return toBuild.get(0).layerTypeIndex;
    }
 
-   public static void rebuildLayersTypeIndex(ArrayList<Layer> rebuildLayers) {
+   LinkedHashSet<String> leafLayerNames = new LinkedHashSet<String>();
+
+   private void markClosedLayers(boolean val) {
+      for (Layer inactiveLayer:inactiveLayers)
+         inactiveLayer.closed = val;
+
+      if (!peerMode && peerSystems != null) {
+         for (LayeredSystem peerSys:peerSystems) {
+            peerSys.markClosedLayers(val);
+         }
+      }
+   }
+
+   public void rebuildLayersTypeIndex(ArrayList<Layer> rebuildLayers) {
+      // Start out with all layers
       for (Layer layer:rebuildLayers) {
          layer.ensureStarted(true);
       }
       for (Layer layer:rebuildLayers) {
-         layer.initAllTypeIndex();
-         layer.layeredSystem.typeIndex.inactiveTypeIndex.typeIndex.put(layer.getLayerName(), layer.layerTypeIndex);
+         layer.ensureValidated(true);
       }
+      // Collecting each layer in this list - it may contain layers from different layered system so we build up a list
+      // in each system of the types which need to be rebuilt in that system.
+      for (Layer layer:rebuildLayers) {
+         layer.layeredSystem.leafLayerNames.add(layer.getLayerName());
+      }
+      markClosedLayers(true);
+      // Remove any layers which are extended by other layers
+      for (Layer layer:rebuildLayers) {
+         if (layer.baseLayerNames != null) {
+            for (String baseLayerName : layer.baseLayerNames) {
+               layer.layeredSystem.leafLayerNames.remove(baseLayerName);
+               // Find this layer in whatever layered system it lives in since it's in a different one than the parent
+               Layer baseLayer = getInactiveLayer(baseLayerName, true, true, true);
+               if (baseLayer != null) {
+                  baseLayer.layeredSystem.leafLayerNames.remove(baseLayerName);
+               }
+            }
+         }
+      }
+
+      initLeafTypeIndexes();
+      if (peerSystems != null) {
+         for (int i = 0; i < peerSystems.size(); i++) {
+            LayeredSystem peerSys = peerSystems.get(i);
+            peerSys.initLeafTypeIndexes();
+         }
+      }
+   }
+
+   private void initLeafTypeIndexes() {
+      for (String leafLayerName:leafLayerNames) {
+         Layer leafLayer = lookupInactiveLayer(leafLayerName, false, true);
+         if (leafLayer == null) {
+            System.err.println("*** Can't find leaf layer: " + leafLayerName);
+            continue;
+         }
+         if (options.verbose)
+            verbose("Initializing type index for leaf layer: " + leafLayer.getLayerName());
+         // Open all of these layers
+         leafLayer.markClosed(false);
+         // refreshBoundTypes on all classes in extends types of this leaf layer since this layer may have altered the structure of the dependent layers
+         if (leafLayer.baseLayers != null) {
+            for (Layer baseLayer:leafLayer.baseLayers) {
+               baseLayer.flushTypeCache();
+            }
+            for (Layer baseLayer:leafLayer.baseLayers) {
+               baseLayer.refreshBoundTypes(ModelUtil.REFRESH_TYPEDEFS);
+            }
+         }
+         leafLayer.initAllTypeIndex();
+         // Now close them up again so we can process the next leaf layer type
+         leafLayer.markClosed(true);
+      }
+      // Clear these out so we don't keep re-initing the same layers over and over again.
+      leafLayerNames = new LinkedHashSet<String>();
    }
 
    public void addLayerToRebuild(String layerName, ArrayList<Layer> layersToRebuild) {
@@ -8353,7 +8419,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
 
-      refreshBoundTypes(ModelUtil.REFRESH_TYPEDEFS);
+      refreshBoundTypes(ModelUtil.REFRESH_TYPEDEFS | ModelUtil.REFRESH_TRANSFORMED_ONLY);
 
       // Need to clear this before we do refreshBoundType.   This was stale after the last recompile which means new classes
       // won't be visible yet - shadowed by cached nulls.  when we validate the models in refreshBoundType we need the new
@@ -9513,6 +9579,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       else {
          ILanguageModel oldModel = inactiveModelIndex.put(absName, model);
          if (oldModel != null && model instanceof JavaModel && oldModel != model) {
+            if (layer != null)
+               layer.layerModels.remove(new IdentityWrapper(oldModel));
+
             JavaModel javaModel = (JavaModel) model;
             // We only do this if replacing the inactive model.  The first time, we will have parsed an unannotated layer model so don't process the update for that.
             if (layer != null && oldModel.getUserData() != null) {
@@ -9528,6 +9597,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   externalModelIndex.layerChanged(layer);
             }
          }
+         if (layer != null)
+            layer.layerModels.add(new IdentityWrapper(model));
       }
    }
 
@@ -10033,10 +10104,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    /** Retrieves a type declaration, usually the source definition with a given type name.  If fromLayer != null, it retrieves only types
-    * defines below fromLayer (not including fromLayer).  If prependPackage is true, the name is resolved like a Java type name.  If
-    * it is false, it is resolved like a file system path - where the type's package is not used in the type name.  If not hidden is true,
-    * do not return any types which are marked as hidden - i.e. not visible in the editor.  In some configurations this mode is used for the addDyn calls so that
-    * we do not bother loading for source you are not going to change.
+    * defines below fromLayer (not including fromLayer).
+    *
+    * If prependPackage is true, the name is resolved like a Java type name.  If
+    * it is false, it is resolved like a file system path - where the type's package is not used in the type name.
+    *
+    * If not hidden is true, do not return any types which are marked as hidden - i.e. not visible in the editor.
+    * In some configurations this mode is used for the addDyn calls so that we do not bother loading for source you are not going to change.
     *
     * The srcOnly flag is t if you need a TypeDeclaration - and cannot deal with a final class.
     *
@@ -10354,7 +10428,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private static boolean cacheForRefLayer(Layer refLayer) {
       if (refLayer == null)
          return true;
-      return refLayer != Layer.ANY_LAYER && refLayer != Layer.ANY_INACTIVE_LAYER && refLayer.activated;
+      return refLayer != Layer.ANY_LAYER && refLayer != Layer.ANY_INACTIVE_LAYER && refLayer != Layer.ANY_OPEN_INACTIVE_LAYER && refLayer.activated;
    }
 
    private static boolean searchActiveTypesForLayer(Layer refLayer) {
@@ -10362,7 +10436,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    private static boolean searchInactiveTypesForLayer(Layer refLayer) {
-      return refLayer != null && !refLayer.disabled && (!refLayer.activated || refLayer == Layer.ANY_LAYER || refLayer == Layer.ANY_INACTIVE_LAYER);
+      return refLayer != null && !refLayer.disabled && (!refLayer.activated || refLayer == Layer.ANY_LAYER || refLayer == Layer.ANY_INACTIVE_LAYER || refLayer == Layer.ANY_OPEN_INACTIVE_LAYER);
    }
 
    /** Try peeling away the last part of the type name to find an inner type */
@@ -10781,14 +10855,26 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          for (int i = startIx; i >= 0; i--) {
             Layer inactiveLayer = inactiveLayers.get(i);
             //SrcEntry ent = inactiveLayer.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, processDefinition, layerResolve);
-            SrcEntry ent = inactiveLayer.getSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, layerResolve);
-            if (ent != null) {
-               return ent;
+            if (includeInactiveLayerInSearch(inactiveLayer, refLayer)) {
+               SrcEntry ent = inactiveLayer.getSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, layerResolve);
+               if (ent != null) {
+                  return ent;
+               }
             }
          }
       }
 
       return null;
+   }
+
+   private boolean includeInactiveLayerInSearch(Layer inactiveLayer, Layer refLayer) {
+      if (refLayer == Layer.ANY_OPEN_INACTIVE_LAYER)
+         return !inactiveLayer.closed;
+      if (refLayer == Layer.ANY_LAYER || refLayer == Layer.ANY_INACTIVE_LAYER || refLayer == null || refLayer == inactiveLayer)
+         return true;
+      if (refLayer.layeredSystem != inactiveLayer.layeredSystem)
+         System.err.println("*** Mismatching runtimes for type lookup!");
+      return !inactiveLayer.closed;
    }
 
    /**
@@ -10801,7 +10887,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       String subPath = typeName.replace(".", FileUtil.FILE_SEPARATOR);
 
       if (searchInactiveTypesForLayer(refLayer)) {
-         SrcEntry lastEnt = null;
          int startIx = inactiveLayers.size() - 1;
 
          // Only look at layers which precede the supplied layer
@@ -10813,9 +10898,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          for (int i = startIx; i >= 0; i--) {
             Layer inactiveLayer = inactiveLayers.get(i);
             if (layerResolve || !inactiveLayer.excludeForProcess(processDefinition)) {
-               SrcEntry ent = inactiveLayer.getSrcFileFromRelativeTypeName(relDir, subPath, packagePrefix, srcOnly, false, layerResolve);
-               if (ent != null) {
-                  return ent;
+               if (includeInactiveLayerInSearch(inactiveLayer, refLayer)) {
+                  SrcEntry ent = inactiveLayer.getSrcFileFromRelativeTypeName(relDir, subPath, packagePrefix, srcOnly, false, layerResolve);
+                  if (ent != null) {
+                     return ent;
+                  }
                }
             }
          }
@@ -11972,13 +12059,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (subTypesMap != null) {
          for (String subTypeName:subTypesMap.keySet()) {
             if (type.isLayerType()) {
-               Layer layer = getActiveOrInactiveLayerByPath(subTypeName.replace(".", "/"), null, true);
+               Layer layer = getActiveOrInactiveLayerByPath(subTypeName.replace(".", "/"), null, true, true);
                if (layer != null) {
                   result.add(layer.model.getModelTypeDeclaration());
                }
             }
             else {
-               TypeDeclaration res = (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, type.getLayer(), type.isLayerType);
+               Layer refLayer = type.getLayer();
+               if (refLayer.layeredSystem != this)
+                  refLayer = getPeerLayerFromRemote(refLayer);
+               TypeDeclaration res = (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
                // Check the resulting class name.  getSrcTypeDeclaration may find the base-type of an inner type as it looks for inherited inner types under the parent type's name
                if (res != null && res.getFullTypeName().equals(subTypeName))
                   result.add(res);
@@ -12003,12 +12093,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                TypeIndex subTypeIndex = subTypeEnt.getValue();
 
                if (type.isLayerType) {
-                  Layer subLayer = getActiveOrInactiveLayerByPath(subTypeName.replace(".", "/"), null, true);
+                  Layer subLayer = getActiveOrInactiveLayerByPath(subTypeName.replace(".", "/"), null, true, true);
                   if (subLayer != null && subLayer.model != null)
                      result.add(subLayer.model.getModelTypeDeclaration());
                }
                else {
-                  TypeDeclaration res = (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, type.getLayer(), type.isLayerType);
+                  Layer refLayer = type.getLayer();
+                  if (refLayer.layeredSystem != this)
+                     refLayer = getPeerLayerFromRemote(refLayer);
+                  TypeDeclaration res = (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
                   // Check the resulting class name.  getSrcTypeDeclaration may find the base-type of an inner type as it looks for inherited inner types under the parent type's name
                   if (res != null) {
                      if (res.getFullTypeName().equals(subTypeName))
@@ -12020,7 +12113,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         if (subTypeLayer != null) {
                            // We may not find this sub-type in this system because we share the same type index across all processes in the runtime.  It might be
                            // a different runtime.
-                           res = (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, type.getLayer(), type.isLayerType);
+                           res = (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
                            if (res != null && res.getFullTypeName().equals(subTypeName))
                               result.add(res);
                         } else {
@@ -12519,17 +12612,17 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return layer;
    }
 
-   public Layer getActiveOrInactiveLayerByPathSync(String layerPath, String prefix, boolean enabled) {
+   public Layer getActiveOrInactiveLayerByPathSync(String layerPath, String prefix, boolean checkPeers, boolean enabled) {
       try {
          acquireDynLock(false);
-         return getActiveOrInactiveLayerByPath(layerPath, prefix, enabled);
+         return getActiveOrInactiveLayerByPath(layerPath, prefix, checkPeers, enabled);
       }
       finally {
          releaseDynLock(false);
       }
    }
 
-   public Layer getActiveOrInactiveLayerByPath(String layerPath, String prefix, boolean enabled) {
+   public Layer getActiveOrInactiveLayerByPath(String layerPath, String prefix, boolean checkPeers, boolean enabled) {
       Layer layer;
       String origPrefix = prefix;
       String usePath = layerPath;
@@ -12537,7 +12630,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          layer = getLayerByPath(usePath, true);
          if (layer == null) {
             // Layer does not have to be active here - this lets us parse the code in the layer but not really start, transform or run the modules because the layer itself is not started
-            layer = getInactiveLayer(usePath, true, enabled, false);
+            layer = getInactiveLayer(usePath, checkPeers, enabled, false);
          }
 
          if (prefix != null) {
@@ -12817,6 +12910,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             layer = activeLayers ? getLayerByPath(parentDirPath, true) : getInactiveLayerByPath(parentDirPath, null, true);
             // This path is for the layer itself
             if (layer != null) {
+               if (!activeLayers)
+                  layer.markClosed(false);
                return getSrcEntryForLayerPaths(layer, pathName, pathFileName, isDir);
             }
          }
@@ -12829,8 +12924,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                String nextPart = layerAndFileName.substring(0, slashIx);
                fileName = layerAndFileName.substring(slashIx+1);
                layerName = FileUtil.concat(layerName, nextPart);
-               layer = activeLayers ? getLayerByPath(layerName, true) : getActiveOrInactiveLayerByPath(layerName, null, true);
+               layer = activeLayers ? getLayerByPath(layerName, true) : getActiveOrInactiveLayerByPath(layerName, null, true, true);
                if (layer != null) {
+                  if (!activeLayers)
+                     layer.markClosed(false);
                   // TODO: validate that we found this layer under the right root?
                   return getSrcEntryForLayerPaths(layer, pathName, fileName, isDir);
                }
@@ -12863,8 +12960,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          List<Layer> layersList = activeLayers ? layers : inactiveLayers;
          for (Layer layer:layersList) {
             SrcEntry layerEnt = layer.getSrcEntry(pathName);
-            if (layerEnt != null)
+            if (layerEnt != null) {
+               if (!activeLayers)
+                  layer.markClosed(false);
                return layerEnt;
+            }
          }
          if (layerPathDirs != null) {
             for (File layerPathDir:layerPathDirs) {
@@ -12944,21 +13044,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       if (searchInactiveTypesForLayer(refLayer)) {
-         if (refLayer == null) {
-            startIx = inactiveLayers.size() - 1;
-            for (int i = startIx; i >= 0; i--) {
-               Layer inactiveLayer = inactiveLayers.get(i);
-
-               if (inactiveLayer.annotationProcessors != null) {
-                  IAnnotationProcessor res = inactiveLayer.annotationProcessors.get(annotName);
-                  if (res != null)
-                     return res;
-               }
-            }
-         }
-         else {
-            return refLayer.getAnnotationProcessor(annotName, true);
-         }
+         return refLayer.getAnnotationProcessor(annotName, true);
       }
       return null;
    }
@@ -12985,21 +13071,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       if (searchInactiveTypesForLayer(refLayer)) {
-         if (refLayer == null) {
-            startIx = inactiveLayers.size() - 1;
-            for (int i = startIx; i >= 0; i--) {
-               Layer inactiveLayer = inactiveLayers.get(i);
-
-               if (inactiveLayer.scopeProcessors != null) {
-                  IScopeProcessor res = inactiveLayer.scopeProcessors.get(scopeName);
-                  if (res != null)
-                     return res;
-               }
-            }
-         }
-         else {
-            return refLayer.getScopeProcessor(scopeName, true);
-         }
+         return refLayer.getScopeProcessor(scopeName, true);
       }
       return null;
    }
@@ -13071,5 +13143,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             candidates.add(impName);
       }
    }
+
+   public Layer getPeerLayerFromRemote(Layer layer) {
+      if (layer.layeredSystem == this)
+         System.err.println("*** Not from a remote system");
+      Layer res = getLayerByName(layer.getLayerName());
+      if (res != null)
+         return res;
+      for (Layer nextLayer = layer.getNextLayer(); nextLayer != null; nextLayer = nextLayer.getNextLayer()) {
+         res = getLayerByName(nextLayer.getLayerName());
+         if (res != null)
+            return res;
+      }
+      return Layer.ANY_INACTIVE_LAYER;
+   }
+
 
 }

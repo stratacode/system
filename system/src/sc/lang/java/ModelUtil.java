@@ -45,6 +45,7 @@ public class ModelUtil {
    /** Flags to refreshBoundTypes */
    public static int REFRESH_CLASSES = 1;
    public static int REFRESH_TYPEDEFS = 2;
+   public static int REFRESH_TRANSFORMED_ONLY = 4;
 
    private ModelUtil() {}
 
@@ -171,8 +172,9 @@ public class ModelUtil {
          paramMap.put(new TypeParamKey(genParam), argType);
       }
       else if (genParam instanceof ExtendsType.LowerBoundsTypeDeclaration) {
-         if (!ModelUtil.isUnboundSuper(genParam))
-            System.out.println("*** Unkown extends lower bounds type");
+         // TODO: I don't think there is anything we need to do here.
+         //if (!ModelUtil.isUnboundSuper(genParam))
+         //   System.out.println("*** Unkown extends lower bounds type");
       }
       else if (ModelUtil.isParameterizedType(genParam)) {
          int numTypeParams = getNumTypeParameters(genParam);

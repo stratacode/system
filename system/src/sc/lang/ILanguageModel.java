@@ -84,4 +84,8 @@ public interface ILanguageModel extends IFileProcessorResult {
    /** An optimization - returns true if the other is the exact same model,  Returns false if you are not sure. */
    boolean sameModel(ILanguageModel other);
 
+   void refreshBoundTypes(int flags);
+
+   void flushTypeCache();
+
 }

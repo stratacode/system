@@ -2675,6 +2675,13 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    public boolean sameModel(ILanguageModel other) {
       return other instanceof JavaModel && ((JavaModel) other).deepEquals(this);
    }
+
+   public void refreshBoundTypes(int flags) {
+      if (types != null) {
+         for (TypeDeclaration type:types)
+            type.refreshBoundTypes(flags);
+      }
+   }
 }
 
 

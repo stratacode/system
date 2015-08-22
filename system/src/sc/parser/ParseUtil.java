@@ -612,7 +612,7 @@ public class ParseUtil  {
          ILanguageModel model = ((ILanguageModel) semanticValue);
 
          LayeredSystem sys = LayeredSystem.getCurrent().getMainLayeredSystem();
-         Layer layer = layerPath == null ? null : sys.getActiveOrInactiveLayerByPathSync(layerPath, null, enabled);
+         Layer layer = layerPath == null ? null : sys.getActiveOrInactiveLayerByPathSync(layerPath, null, true, enabled);
          if (layer != null)
             model.setLayeredSystem(layer.layeredSystem);
          else

@@ -536,7 +536,7 @@ public class ModifyDeclaration extends TypeDeclaration {
 
                   // Do errors for the layer def file when it gets started - skip this for peerMode.  The checkPeers flag here does not work because we only set them
                   // after we've initialized the layers so this is too late.
-                  if (!sys.peerMode && sys.getActiveOrInactiveLayerByPath(layerTypeName, CTypeUtil.getPackageName(layer.getLayerName()), true) == null) {
+                  if (!sys.peerMode && sys.getActiveOrInactiveLayerByPath(layerTypeName, CTypeUtil.getPackageName(layer.getLayerName()), true, true) == null) {
                      extendsType.displayTypeError("No layer: ");
                   }
                }
@@ -2212,7 +2212,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       JavaModel m = getJavaModel();
       if (modifyTypeDecl != null && ((flags & ModelUtil.REFRESH_TYPEDEFS) != 0)) {
          BodyTypeDeclaration oldModify = modifyTypeDecl;
-         if (modifyTypeDecl.getTransformed()) {
+         if (modifyTypeDecl.getTransformed() || (flags & ModelUtil.REFRESH_TRANSFORMED_ONLY) == 0) {
             modifyTypeDecl = getModifyType();
             if (modifyTypeDecl == this) {
                System.err.println("*** Error: recursive modify in refresh");
@@ -2242,7 +2242,8 @@ public class ModifyDeclaration extends TypeDeclaration {
             for (int i = 0; i < extendsBoundTypes.length; i++) {
                Object extBoundType = extendsBoundTypes[i];
                if (((flags & ModelUtil.REFRESH_TYPEDEFS) != 0) &&
-                   extBoundType instanceof BodyTypeDeclaration && ((BodyTypeDeclaration) extBoundType).getTransformed()) {
+                   extBoundType instanceof BodyTypeDeclaration &&
+                   (((BodyTypeDeclaration) extBoundType).getTransformed() || (flags & ModelUtil.REFRESH_TRANSFORMED_ONLY) == 0)) {
                   extendsBoundTypes = null;
                   initExtendsTypes();
                   break;

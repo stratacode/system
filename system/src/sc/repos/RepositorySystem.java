@@ -180,6 +180,8 @@ public class RepositorySystem {
          for (PackageDependency pkgDep : instDeps.neededDeps) {
             if (!pkgDep.pkg.installed)
                pkgDep.pkg.preInstall(pkgDep.ctx, nextDeps);
+            else
+               pkgDep.pkg.register();
          }
          if (nextDeps.neededDeps.size() == 0)
             return null;
@@ -196,10 +198,12 @@ public class RepositorySystem {
          String err = pkg.install(ctx);
          if (err != null) {
             MessageHandler.error(msg, "Failed to install repository package: " + pkg.packageName + " error: " + err);
-         }
-         else if (updateSystem) {
-            pkg.update();
+            return;
          }
       }
+      else if (updateSystem) {
+         pkg.update();
+      }
+      pkg.register();
    }
 }
