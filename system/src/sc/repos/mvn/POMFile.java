@@ -49,10 +49,16 @@ public class POMFile extends XMLFileFormat {
       POMFile file = new POMFile(fileName, mgr, depCtx, pomPkg);
       // Need to put this before we try to parse it - in case we resolve another recursive reference during the parsing
       mgr.pomCache.put(fileName, file);
-      if (file.parse())
-         return file;
-      else
-         return null;
+      try {
+         if (file.parse())
+            return file;
+         else
+            return null;
+      }
+      catch (IllegalArgumentException exc) {
+         MessageHandler.error(mgr.msg, "Failed to read POM file: " + exc);
+      }
+      return null;
    }
 
    public boolean parse() {

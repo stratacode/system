@@ -68,11 +68,11 @@ public class SysTypeIndex {
 
             // Make sure the index entry matches this process before we go and add it.
             if (StringUtil.equalStrings(modTypeIndex.processIdent, sys.getProcessIdent())) {
-               Layer modLayer = sys.getActiveOrInactiveLayerByPath(modTypeIndex.layerName, null, true, true);
+               Layer modLayer = sys.getActiveOrInactiveLayerByPath(modTypeIndex.layerName, null, false, true, true);
                if (modLayer == null) {
                   System.err.println("*** Warning unable to find modifying layer: " + modTypeIndex.layerName + " - skipping index entyr");
                } else {
-                  Layer typeLayerInSystem = sys.getActiveOrInactiveLayerByPath(type.getLayer().getLayerName(), null, true, true);
+                  Layer typeLayerInSystem = sys.getActiveOrInactiveLayerByPath(type.getLayer().getLayerName(), null, false, true, true);
                   if (typeLayerInSystem != null) {
                      Layer peerLayer = typeLayerInSystem.layeredSystem == sys ? typeLayerInSystem : modLayer.layeredSystem.getPeerLayerFromRemote(typeLayerInSystem);
                      if (peerLayer == null)

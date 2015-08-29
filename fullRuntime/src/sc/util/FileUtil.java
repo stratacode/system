@@ -460,6 +460,10 @@ public class FileUtil {
     * best to rename the existing directory.
     */
    public static boolean unzip(String zipFile, String resName, boolean overwrite) {
+      if (!overwrite && new File(resName).exists()) {
+         System.err.println("*** unzip failed because overwrite is false and " + resName + " exists");
+         return false;
+      }
       String zipRes = overwrite ? exec(null, true, "unzip", "-o", zipFile, "-d", resName) : exec(null, true, "unzip", zipFile, "-d", resName);
       if (zipRes == null) {
          System.err.println("*** zip failed");

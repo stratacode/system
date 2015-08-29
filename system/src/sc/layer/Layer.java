@@ -1180,7 +1180,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (reInit && initialized && modelType instanceof ModifyDeclaration) {
          ModifyDeclaration layerModel = (ModifyDeclaration) modelType;
          baseLayerNames = layerModel.getExtendsTypeNames();
-         baseLayers = layeredSystem.mapLayerNamesToLayers(model.getRelDirPath(), baseLayerNames, activated);
+         baseLayers = layeredSystem.mapLayerNamesToLayers(model.getRelDirPath(), baseLayerNames, activated, !closed);
          LayerParamInfo lpi = new LayerParamInfo();
          initFailed = layeredSystem.cleanupLayers(baseLayers) || initFailed;
          lpi.activate = activated;
@@ -1747,7 +1747,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    private void initReplacedTypes() {
       // This is the list of types defined in this layer which were already loaded into the type cache.  To keep them from being stale, when this inactive layer is opened
       // we need to replace them with the ones  in this layer now that this layer is open - loading the type should do it.
-      if (replacedTypes != null && !closed) {
+      // We need to skip this when we are starting the layers for the type index - need to avoid all normal src lookups in this phase
+      if (replacedTypes != null && !closed && !layeredSystem.startingTypeIndexLayers) {
          for (ReplacedType replacedType:replacedTypes) {
             TypeDeclaration newType = (TypeDeclaration) layeredSystem.getSrcTypeDeclaration(replacedType.typeName, null, replacedType.prependPackage, false, true, this, false);
             if (newType == null)
@@ -2397,9 +2398,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    public SrcEntry getSrcEntry(String absFileName) {
-      // Lazily initializing the src dirs to see if this layer needs to be started to find this file.
-      if (topLevelSrcDirs == null)
-         initSrcDirs();
+      // Cannot lazily initialize the layer to find the src file here... layers like jool.lib need to be
+      // started before the topLevelSrcDirs is set.
+      //if (topLevelSrcDirs == null)
+      //   initSrcDirs();
       if (topLevelSrcDirs != null) {
          for (String dir : topLevelSrcDirs) {
             if (absFileName.startsWith(dir)) {
@@ -2900,10 +2902,17 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    public String toString() {
       String base = getLayerName();
+      StringBuilder sb = new StringBuilder();
+      if (closed)
+         sb.append(" closed");
+      if (excluded)
+         sb.append(" excluded");
+      if (disabled)
+         sb.append(" disabled");
       if (packagePrefix == null || packagePrefix.length() == 0)
-         return base;
+         return base + sb;
       else
-         return base + "(" + packagePrefix + ")";
+         return base + "(" + packagePrefix + ")" + sb;
    }
 
    public void saveLayer() {
@@ -3791,7 +3800,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    public void initAllTypeIndex() {
-      if (layerTypesStarted)
+      if (layerTypesStarted || disabled || excluded)
          return;
       layerTypesStarted = true;
       if (baseLayers != null) {
@@ -4014,21 +4023,37 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       return false;
    }
 
-   public void markClosed(boolean val) {
+   public void markClosed(boolean val, boolean closePeers) {
       boolean changed = closed != val;
       closed = val;
+      // In some cases, when we close a layer, we also need to close the same layer in other runtimes (if it exists there)
+      // That's because we need to open the layers in other runtimes when starting a type so we can resolve any remote methods.
+      if (closePeers) {
+         List<LayeredSystem> peerSystems = layeredSystem.peerSystems;
+         if (peerSystems != null) {
+            for (LayeredSystem peer:peerSystems) {
+               Layer peerLayer = peer.lookupInactiveLayer(getLayerName(), false, true);
+               if (peerLayer != null)
+                  peerLayer.markClosed(val, false);
+            }
+         }
+      }
       if (baseLayers != null) {
          for (Layer base:baseLayers)
-            base.markClosed(val);
+            base.markClosed(val, closePeers);
       }
-      if (changed && val) {
+      if (changed && !val) {
          initReplacedTypes();
       }
    }
 
    void refreshBoundTypes(int flags) {
       if (layerModels != null) {
-         for (IdentityWrapper<ILanguageModel> wrap:layerModels) {
+         // Need to refresh all layerModels currently cached.  As we refresh them, we might add to this list so
+         // we make a copy of the list upfront.
+         ArrayList<IdentityWrapper<ILanguageModel>> modelList = new ArrayList<IdentityWrapper<ILanguageModel>>();
+         modelList.addAll(layerModels);
+         for (IdentityWrapper<ILanguageModel> wrap:modelList) {
             wrap.wrapped.refreshBoundTypes(flags);
          }
       }

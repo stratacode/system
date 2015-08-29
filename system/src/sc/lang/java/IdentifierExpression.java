@@ -937,6 +937,8 @@ public class IdentifierExpression extends ArgumentsExpression {
          boundType = ((PropertyAssignment) boundType).getAssignedProperty();
       if (idType == IdentifierType.FieldName || idType == IdentifierType.GetSetMethodInvocation) {
          if (!ModelUtil.isConstant(annotType)) {
+            if (boundType instanceof ParamTypedMember)
+               boundType = ((ParamTypedMember) boundType).getMemberObject();
             if (boundType instanceof VariableDefinition) {
                VariableDefinition varDef = (VariableDefinition) boundType;
                varDef.makeBindable(referenceOnly);
@@ -4098,7 +4100,12 @@ public class IdentifierExpression extends ArgumentsExpression {
       super.refreshBoundTypes(flags);
       if (boundTypes != null)
          for (int i = 0; i < boundTypes.length; i++) {
-            if (boundTypes[i] != null) {
+            // For super expressions we need just resolve the entire thing from scratch.
+            if (idTypes[i] == IdentifierType.SuperExpression) {
+               reresolveTypeReference();
+               return;
+            }
+            else if (boundTypes[i] != null) {
                boundTypes[i] = ModelUtil.refreshBoundIdentifierType(getLayeredSystem(), boundTypes[i], flags);
             }
          }

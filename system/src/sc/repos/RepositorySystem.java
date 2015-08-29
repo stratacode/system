@@ -97,7 +97,8 @@ public class RepositorySystem {
       RepositoryPackage existingPkg = store.packages.get(pkg.packageName);
       if (existingPkg != null) {
          pkg.installedRoot = existingPkg.installedRoot;
-         pkg.currentSource = existingPkg.currentSource;
+         if (existingPkg.currentSource != null)
+            pkg.currentSource = existingPkg.currentSource;
          pkg.definesClasses = existingPkg.definesClasses;
          pkg.installed = existingPkg.installed;
          pkg.sources = new RepositorySource[1];
@@ -119,7 +120,7 @@ public class RepositorySystem {
          store.packages.put(pkgName, pkg);
       }
       else {
-         pkg.addNewSource(repoSrc);
+         repoSrc = pkg.addNewSource(repoSrc);
          // We may first encounter a package from a Maven module reference - where we are not installing the package.  That's a weaker reference
          // than if we are installing it so use this new reference.
          if (!pkg.installed && install) {

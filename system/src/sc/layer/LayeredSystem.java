@@ -332,6 +332,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    private LayerUtil.LayeredSystemPtr systemPtr;
 
+   /** Internal flag set when initializing the type index to prevent loading src files during this time. */
+   boolean startingTypeIndexLayers = false;
+
    private void clearReverseTypeIndex() {
       typeIndex.clearReverseTypeIndex();
    }
@@ -503,7 +506,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          removeExcludedLayers(true);
 
          // Init the runtimes, using the excluded layers as a guide
-         initRuntimes(null, true);
+         initRuntimes(null, true, false);
 
          // Now actually remove the excluded layers.
          removeExcludedLayers(false);
@@ -626,7 +629,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (layer != null)
              res.add(layer.model.getModelTypeDeclaration());
          else {
-            layer = getInactiveLayer(typeName.replace('.', '/'), true, true, true);
+            layer = getInactiveLayer(typeName.replace('.', '/'), openAllLayers, true, true, true);
             if (layer != null && layer.model != null)
                res.add(layer.model.getModelTypeDeclaration());
          }
@@ -647,7 +650,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             ArrayList<TypeIndex> typeIndexes = sysIndex.getTypeIndexes(typeName);
             if (typeIndexes != null) {
                for (TypeIndex typeIndex : typeIndexes) {
-                  Layer layer = getInactiveLayerByPath(typeIndex.layerName, null, true);
+                  Layer layer = getInactiveLayerByPath(typeIndex.layerName, null, openAllLayers, true);
                   if (layer != null) {
                      if (!layer.closed || openAllLayers) {
                         Object newTypeObj = layer.layeredSystem.getSrcTypeDeclaration(typeName, layer.getNextLayer(), true, false, true, layer, false);
@@ -655,6 +658,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                            res.add(newTypeObj);
                      }
                      else {
+                        boolean found = false;
+                        for (Object resEnt:res) {
+                           if (typeIndex.sameType(resEnt)) {
+                              found = true;
+                              break;
+                           }
+                        }
                         res.add(typeIndex);
                      }
                   }
@@ -709,6 +719,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
             layer.layerPosition = disabledLayers.size() - 1;
          }
+         checkLayerPosition();
       }
    }
 
@@ -1041,7 +1052,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (useProcessDefinition == null) {
          if (!reusingDefaultRuntime)
             removeExcludedLayers(true);
-         initRuntimes(explicitDynLayers, true);
+         initRuntimes(explicitDynLayers, true, false);
          if (!reusingDefaultRuntime)
             removeExcludedLayers(false);
       }
@@ -1103,7 +1114,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   private void initRuntimes(List<String> explicitDynLayers, boolean active) {
+   private void initRuntimes(List<String> explicitDynLayers, boolean active, boolean openLayer) {
       LayeredSystem curSys = getCurrent();
       // If we have activated some layers and still don't have any runtimes, we create the default runtime
       if (runtimes == null && layers.size() != 0)
@@ -1201,7 +1212,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             for (int i = 0; i < inactiveLayers.size(); i++) {
                Layer inactiveLayer = inactiveLayers.get(i);
                if (inactiveLayer.includeForProcess(proc)) {
-                  Layer peerLayer = peerSys.getInactiveLayer(inactiveLayer.getLayerName(), false, !inactiveLayer.disabled, false);
+                  Layer peerLayer = peerSys.getInactiveLayer(inactiveLayer.getLayerName(), openLayer, false, !inactiveLayer.disabled, false);
                   if (peerLayer == null)
                      System.err.println("*** failed to find peer layer");
                }
@@ -5238,9 +5249,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
          }
       }
-      else {
+      else if (!layer.disabled)
          registerInactiveLayer(layer);
-      }
 
       return layer;
    }
@@ -5353,6 +5363,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
+   /** Provide skipExcluded = false unless you want to return null if the layer is excluded */
    public Layer lookupInactiveLayer(String layerName, boolean checkPeers, boolean skipExcluded) {
       Layer res = inactiveLayerIndex.get(layerName);
       if (res != null && (!skipExcluded || !res.excluded))
@@ -6319,7 +6330,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                if (curTypeIndex == null || lastModified < subF.lastModified()) {
                   try {
                      acquireDynLock(false);
-                     Layer newLayer = getActiveOrInactiveLayerByPath(layerName, null, true, true);
+                     Layer newLayer = getActiveOrInactiveLayerByPath(layerName, null, false, true, true);
                      if (newLayer == null) {
                         System.err.println("*** Warning unable to find layer in type index: " + layerName + " - skipping index entyr");
                      }
@@ -6380,30 +6391,38 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public void rebuildLayersTypeIndex(ArrayList<Layer> rebuildLayers) {
       // Start out with all layers
-      for (Layer layer:rebuildLayers) {
-         layer.ensureStarted(true);
-      }
-      for (Layer layer:rebuildLayers) {
-         layer.ensureValidated(true);
-      }
-      // Collecting each layer in this list - it may contain layers from different layered system so we build up a list
-      // in each system of the types which need to be rebuilt in that system.
-      for (Layer layer:rebuildLayers) {
-         layer.layeredSystem.leafLayerNames.add(layer.getLayerName());
-      }
-      markClosedLayers(true);
-      // Remove any layers which are extended by other layers
-      for (Layer layer:rebuildLayers) {
-         if (layer.baseLayerNames != null) {
-            for (String baseLayerName : layer.baseLayerNames) {
-               layer.layeredSystem.leafLayerNames.remove(baseLayerName);
-               // Find this layer in whatever layered system it lives in since it's in a different one than the parent
-               Layer baseLayer = getInactiveLayer(baseLayerName, true, true, true);
-               if (baseLayer != null) {
-                  baseLayer.layeredSystem.leafLayerNames.remove(baseLayerName);
+      try {
+         acquireDynLock(false);
+         startingTypeIndexLayers = true;
+         for (Layer layer : rebuildLayers) {
+            layer.ensureStarted(true);
+         }
+         for (Layer layer : rebuildLayers) {
+            layer.ensureValidated(true);
+         }
+         startingTypeIndexLayers = false;
+         // Collecting each layer in this list - it may contain layers from different layered system so we build up a list
+         // in each system of the types which need to be rebuilt in that system.
+         for (Layer layer:rebuildLayers) {
+            layer.layeredSystem.leafLayerNames.add(layer.getLayerName());
+         }
+         markClosedLayers(true);
+         // Remove any layers which are extended by other layers
+         for (Layer layer:rebuildLayers) {
+            if (layer.baseLayerNames != null) {
+               for (String baseLayerName : layer.baseLayerNames) {
+                  layer.layeredSystem.leafLayerNames.remove(baseLayerName);
+                  // Find this layer in whatever layered system it lives in since it's in a different one than the parent
+                  Layer baseLayer = getInactiveLayer(baseLayerName, false, true, true, true);
+                  if (baseLayer != null) {
+                     baseLayer.layeredSystem.leafLayerNames.remove(baseLayerName);
+                  }
                }
             }
          }
+      }
+      finally {
+         releaseDynLock(false);
       }
 
       initLeafTypeIndexes();
@@ -6417,27 +6436,35 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    private void initLeafTypeIndexes() {
       for (String leafLayerName:leafLayerNames) {
-         Layer leafLayer = lookupInactiveLayer(leafLayerName, false, true);
-         if (leafLayer == null) {
-            System.err.println("*** Can't find leaf layer: " + leafLayerName);
-            continue;
-         }
-         if (options.verbose)
-            verbose("Initializing type index for leaf layer: " + leafLayer.getLayerName());
-         // Open all of these layers
-         leafLayer.markClosed(false);
-         // refreshBoundTypes on all classes in extends types of this leaf layer since this layer may have altered the structure of the dependent layers
-         if (leafLayer.baseLayers != null) {
-            for (Layer baseLayer:leafLayer.baseLayers) {
-               baseLayer.flushTypeCache();
+         try {
+            acquireDynLock(false);
+            Layer leafLayer = lookupInactiveLayer(leafLayerName, false, true);
+            if (leafLayer == null) {
+               System.err.println("*** Can't find leaf layer: " + leafLayerName);
+               continue;
             }
-            for (Layer baseLayer:leafLayer.baseLayers) {
-               baseLayer.refreshBoundTypes(ModelUtil.REFRESH_TYPEDEFS);
+            if (options.verbose)
+               verbose("Initializing type index for leaf layer: " + leafLayer.getLayerName());
+            // Open all of these layers
+            leafLayer.markClosed(false, false);
+            // refreshBoundTypes on all classes in extends types of this leaf layer since this layer may have altered the structure of the dependent layers
+            if (leafLayer.baseLayers != null) {
+               for (Layer baseLayer : leafLayer.baseLayers) {
+                  baseLayer.flushTypeCache();
+               }
+               for (Layer baseLayer : leafLayer.baseLayers) {
+                  baseLayer.refreshBoundTypes(ModelUtil.REFRESH_TYPEDEFS);
+               }
             }
+            leafLayer.initAllTypeIndex();
+            // Now close them up again so we can process the next leaf layer type.  Need to use closePeers = true here
+            // because we may have opened layers in peer runtimes while opening types in this runtime that also live
+            // in those layers.
+            leafLayer.markClosed(true, true);
          }
-         leafLayer.initAllTypeIndex();
-         // Now close them up again so we can process the next leaf layer type
-         leafLayer.markClosed(true);
+         finally {
+            releaseDynLock(false);
+         }
       }
       // Clear these out so we don't keep re-initing the same layers over and over again.
       leafLayerNames = new LinkedHashSet<String>();
@@ -6446,7 +6473,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public void addLayerToRebuild(String layerName, ArrayList<Layer> layersToRebuild) {
       try {
          acquireDynLock(false);
-         Layer layer = getInactiveLayer(layerName, true, true, false);
+         Layer layer = getInactiveLayer(layerName, false, true, true, false);
          if (layer == null) {
             System.err.println("*** Unable to index layer: " + layerName);
             return;
@@ -8255,7 +8282,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    /**
-    * TODO - maybe remove this?  It's not used anymore.
     * Before we run any application code, we want to build a single canonical class loader used by the system.
     * We'll throw away the existing one and flush out any classes loaded for compilation.  The issue is that some
     * systems like openJPA use their class loader to load resources etc.  This class loader needs to have access to
@@ -11400,6 +11426,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          model = (JavaModel) inactiveModelIndex.get(defFile.absFileName);
          if (model != null)
             return model.layer;
+         // If this layer has already been disabled return the disabled layer
+         Layer disabledLayer = lookupDisabledLayer(expectedName);
+         if (disabledLayer != null)
+            return disabledLayer;
       }
       model = parseLayerModel(defFile, expectedName, true, lpi.activate);
 
@@ -11546,7 +11576,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          else {
             // When we are processing only the explicit layers do not recursively init the layers.  Just init the layers specified.
-            baseLayers = mapLayerNamesToLayers(relPath, baseLayerNames, lpi.activate);
+            baseLayers = mapLayerNamesToLayers(relPath, baseLayerNames, lpi.activate, false);
          }
          /*
          if (baseLayers != null) {
@@ -11618,13 +11648,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
-   List<Layer> mapLayerNamesToLayers(String relPath, List<String> baseLayerNames, boolean activated) {
+   List<Layer> mapLayerNamesToLayers(String relPath, List<String> baseLayerNames, boolean activated, boolean openLayers) {
       List<Layer> baseLayers = new ArrayList<Layer>();
       if (baseLayerNames == null)
          return null;
       for (int li = 0; li < baseLayerNames.size(); li++) {
          String baseLayerName = baseLayerNames.get(li);
-         Layer bl = activated ? findLayerByName(relPath, baseLayerName) : getInactiveLayer(baseLayerName.replace("/", "."), false, false, false);
+         Layer bl = activated ? findLayerByName(relPath, baseLayerName) : getInactiveLayer(baseLayerName.replace("/", "."), openLayers, false, false, false);
          if (bl != null)
             baseLayers.add(bl);
          else {
@@ -11714,7 +11744,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return urls.toArray(new URL[urls.size()]);
    }
 
-   static int readLocked, writeLocked;
+   public static int readLocked, writeLocked;
 
    public void acquireDynLock(boolean readOnly) {
       long startTime = 0;
@@ -12042,14 +12072,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Iterator<TypeDeclaration> getSubTypesOfType(TypeDeclaration type) {
-      return getSubTypesOfType(type, true, false);
+      return getSubTypesOfType(type, true, true, false);
    }
 
    /**
     * Returns the sub-types of the specified type.  If activeOnly is true, only those types active in this system are checked.  If activeOnly is false
     * and checkPeers is true, the type name is used to find sub-types in the peer systems as well.
     */
-   public Iterator<TypeDeclaration> getSubTypesOfType(TypeDeclaration type, boolean activeOnly, boolean checkPeers) {
+   public Iterator<TypeDeclaration> getSubTypesOfType(TypeDeclaration type, boolean activeOnly, boolean openLayers, boolean checkPeers) {
       String typeName = type.getFullTypeName();
       HashMap<String,Boolean> subTypesMap = subTypesByType.get(typeName);
       if (activeOnly && subTypesMap == null)
@@ -12059,7 +12089,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (subTypesMap != null) {
          for (String subTypeName:subTypesMap.keySet()) {
             if (type.isLayerType()) {
-               Layer layer = getActiveOrInactiveLayerByPath(subTypeName.replace(".", "/"), null, true, true);
+               Layer layer = getActiveOrInactiveLayerByPath(subTypeName.replace(".", "/"), null, openLayers, true, true);
                if (layer != null) {
                   result.add(layer.model.getModelTypeDeclaration());
                }
@@ -12079,7 +12109,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (!activeOnly) {
          if (checkPeers && !peerMode && peerSystems != null) {
             for (int i = 0; i < peerSystems.size(); i++) {
-               Iterator<TypeDeclaration> peerRes = getSubTypesOfType(type, false, false);
+               Iterator<TypeDeclaration> peerRes = getSubTypesOfType(type, false, openLayers, false);
                if (peerRes != null) {
                   while (peerRes.hasNext())
                      result.add(peerRes.next());
@@ -12093,7 +12123,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                TypeIndex subTypeIndex = subTypeEnt.getValue();
 
                if (type.isLayerType) {
-                  Layer subLayer = getActiveOrInactiveLayerByPath(subTypeName.replace(".", "/"), null, true, true);
+                  Layer subLayer = getActiveOrInactiveLayerByPath(subTypeName.replace(".", "/"), null, openLayers, true, true);
                   if (subLayer != null && subLayer.model != null)
                      result.add(subLayer.model.getModelTypeDeclaration());
                }
@@ -12108,17 +12138,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         result.add(res);
                   } else {
                      if (subTypeIndex != null) {
-                        Layer subTypeLayer = getInactiveLayer(subTypeIndex.layerName, true, true, true);
+                        Layer subTypeLayer = getInactiveLayer(subTypeIndex.layerName, openLayers, true, true, true);
 
                         if (subTypeLayer != null) {
-                           // We may not find this sub-type in this system because we share the same type index across all processes in the runtime.  It might be
-                           // a different runtime.
-                           res = (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
-                           if (res != null && res.getFullTypeName().equals(subTypeName))
-                              result.add(res);
+                           if (!subTypeLayer.closed) {
+                              // We may not find this sub-type in this system because we share the same type index across all processes in the runtime.  It might be
+                              // a different runtime.
+                              res = (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
+                              if (res != null && res.getFullTypeName().equals(subTypeName))
+                                 result.add(res);
+                           }
                         } else {
                            // TODO: else cull this from the index?
-                           System.err.println("*** Warning: Layer removed?" + subTypeIndex.layerName);
+                           System.err.println("*** Warning: Layer removed: " + subTypeIndex.layerName);
                         }
                      }
                   }
@@ -12469,14 +12501,26 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return options.restartArgsFile != null;
    }
 
-   public Layer getInactiveLayerSync(String layerPath, boolean checkPeers, boolean enabled, boolean skipExcluded) {
+   public Layer getInactiveLayerSync(String layerPath, boolean openLayer, boolean checkPeers, boolean enabled, boolean skipExcluded) {
       try {
          acquireDynLock(false);
 
-         return getInactiveLayer(layerPath, checkPeers, enabled, skipExcluded);
+         return getInactiveLayer(layerPath, openLayer, checkPeers, enabled, skipExcluded);
       }
       finally {
          releaseDynLock(false);
+      }
+   }
+
+   private Layer lookupDisabledLayer(String layerName) {
+      if (!peerMode) {
+         if (disabledLayersIndex != null)
+            return disabledLayersIndex.get(layerName);
+         return null;
+      }
+      else {
+         LayeredSystem mainSys = getMainLayeredSystem();
+         return mainSys.lookupDisabledLayer(layerName);
       }
    }
 
@@ -12486,12 +12530,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * Pass in true unless you want to get the excluded layer from this runtime which
     * we create temporarily to bootstrap layers in other runtimes.   We first create the Layer in the original runtime to see if it's excluded or not.  If so, we remove from the list.
     */
-   public Layer getInactiveLayer(String layerPath, boolean checkPeers, boolean enabled, boolean skipExcluded) {
+   public Layer getInactiveLayer(String layerPath, boolean openLayer, boolean checkPeers, boolean enabled, boolean skipExcluded) {
       String layerName = layerPath.replace("/", ".");
       Layer inactiveLayer = lookupInactiveLayer(layerPath, checkPeers, skipExcluded);
       if (inactiveLayer != null) {
-         if (inactiveLayer.layeredSystem == this || (inactiveLayer.excludeForProcess(processDefinition) || !inactiveLayer.includeForProcess(processDefinition)))
+         if (inactiveLayer.layeredSystem == this || (inactiveLayer.excludeForProcess(processDefinition) || !inactiveLayer.includeForProcess(processDefinition))) {
+            if (openLayer && inactiveLayer.closed)
+               inactiveLayer.markClosed(false, false);
             return inactiveLayer;
+         }
       }
 
       if (disabledLayersIndex != null) {
@@ -12510,12 +12557,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
          Layer layer = initLayer(layerPath, null, null, false, lpi);
          if (layer != null) {
-            return completeNewInactiveLayer(layer, checkPeers);
+            return completeNewInactiveLayer(layer, openLayer, checkPeers);
          }
          else if (getNewLayerDir() != null) {
             Layer res = initLayer(layerPath, getNewLayerDir(), null, false, lpi);
             if (res != null) {
-               return completeNewInactiveLayer(res, checkPeers);
+               return completeNewInactiveLayer(res, openLayer, checkPeers);
             }
          }
       }
@@ -12526,7 +12573,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
-   private Layer completeNewInactiveLayer(Layer layer, boolean doBuild) {
+   private Layer completeNewInactiveLayer(Layer layer, boolean openLayer, boolean doBuild) {
       layer.ensureInitialized(true);
 
       // First mark any excluded layers with the excluded flag so we know they do not belong in this runtime.
@@ -12541,7 +12588,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // We just created a new layer so now go and re-init the runtimes in case it is the first layer in
       // a new runtime or this layer needs to move to the runtime before it's started.
       if (!peerMode) {
-         initRuntimes(null, false);
+         initRuntimes(null, false, openLayer);
       }
 
       removeExcludedLayers(false);
@@ -12556,7 +12603,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
            // Need to also load this layer and any dependent layers as an inactive layers into the other runtimes if they are needed there.
             if (layer.includeForProcess(peerSys.processDefinition)) {
-               Layer peerRes = peerSys.getInactiveLayer(layer.getLayerName(), false, !layer.disabled, false);
+               Layer peerRes = peerSys.getInactiveLayer(layer.getLayerName(), openLayer, false, !layer.disabled, false);
                if (peerRes != null)
                   foundInPeer = true;
             }
@@ -12587,6 +12634,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       // If this layer moved, now find it in the proper runtime
       Layer newRes = lookupInactiveLayer(layer.getLayerName(), true, true);
+
+      // Make sure all of our baseLayers are open if we are also open
+      if (newRes != null) {
+         if (openLayer)
+            newRes.markClosed(false, false);
+         else
+            newRes.closed = true;
+      }
+
       if (newRes != layer) {
          if (newRes != null)
             return newRes;
@@ -12612,17 +12668,17 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return layer;
    }
 
-   public Layer getActiveOrInactiveLayerByPathSync(String layerPath, String prefix, boolean checkPeers, boolean enabled) {
+   public Layer getActiveOrInactiveLayerByPathSync(String layerPath, String prefix, boolean openLayer, boolean checkPeers, boolean enabled) {
       try {
          acquireDynLock(false);
-         return getActiveOrInactiveLayerByPath(layerPath, prefix, checkPeers, enabled);
+         return getActiveOrInactiveLayerByPath(layerPath, prefix, openLayer, checkPeers, enabled);
       }
       finally {
          releaseDynLock(false);
       }
    }
 
-   public Layer getActiveOrInactiveLayerByPath(String layerPath, String prefix, boolean checkPeers, boolean enabled) {
+   public Layer getActiveOrInactiveLayerByPath(String layerPath, String prefix, boolean openLayer, boolean checkPeers, boolean enabled) {
       Layer layer;
       String origPrefix = prefix;
       String usePath = layerPath;
@@ -12630,7 +12686,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          layer = getLayerByPath(usePath, true);
          if (layer == null) {
             // Layer does not have to be active here - this lets us parse the code in the layer but not really start, transform or run the modules because the layer itself is not started
-            layer = getInactiveLayer(usePath, checkPeers, enabled, false);
+            layer = getInactiveLayer(usePath, true, checkPeers, enabled, false);
          }
 
          if (prefix != null) {
@@ -12644,13 +12700,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return layer;
    }
 
-   public Layer getInactiveLayerByPath(String layerPath, String prefix, boolean enabled) {
+   public Layer getInactiveLayerByPath(String layerPath, String prefix, boolean openLayer, boolean enabled) {
       Layer layer;
       String origPrefix = prefix;
       String usePath = layerPath;
       do {
          // Layer does not have to be active here - this lets us parse the code in the layer but not really start, transform or run the modules because the layer itself is not started
-         layer = getInactiveLayer(usePath, true, enabled, false);
+         layer = getInactiveLayer(usePath, openLayer, true, enabled, false);
 
          if (prefix != null) {
             usePath = CTypeUtil.prefixPath(prefix, layerPath);
@@ -12666,7 +12722,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public JavaModel getAnnotatedLayerModel(String layerPath, String prefix) {
       if (externalModelIndex != null) {
 
-         Layer layer = getInactiveLayerByPath(layerPath, prefix, true);
+         Layer layer = getInactiveLayerByPath(layerPath, prefix, true, true);
          if (layer != null && layer.model != null)
             return parseInactiveModel(layer.model.getSrcFile());
       }
@@ -12889,7 +12945,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return false;
    }
 
-   private SrcEntry getSrcEntryForPathDir(String layerPath, String pathName, boolean activeLayers) {
+   private SrcEntry getSrcEntryForPathDir(String layerPath, String pathName, boolean activeLayers, boolean openLayer) {
       String layerAndFileName = pathName.substring(layerPath.length());
       while (layerAndFileName.startsWith(FileUtil.FILE_SEPARATOR))
          layerAndFileName = layerAndFileName.substring(FileUtil.FILE_SEPARATOR.length());
@@ -12907,11 +12963,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             return new SrcEntry(null, pathName, pathFileName);
          }
          if (isDir || (pathFileName.endsWith(SCLanguage.DEFAULT_EXTENSION) && FileUtil.removeExtension(pathFileName).equals(dirName))) {
-            layer = activeLayers ? getLayerByPath(parentDirPath, true) : getInactiveLayerByPath(parentDirPath, null, true);
+            layer = activeLayers ? getLayerByPath(parentDirPath, true) : getInactiveLayerByPath(parentDirPath, null, openLayer, true);
             // This path is for the layer itself
             if (layer != null) {
                if (!activeLayers)
-                  layer.markClosed(false);
+                  layer.markClosed(false, false);
                return getSrcEntryForLayerPaths(layer, pathName, pathFileName, isDir);
             }
          }
@@ -12924,10 +12980,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                String nextPart = layerAndFileName.substring(0, slashIx);
                fileName = layerAndFileName.substring(slashIx+1);
                layerName = FileUtil.concat(layerName, nextPart);
-               layer = activeLayers ? getLayerByPath(layerName, true) : getActiveOrInactiveLayerByPath(layerName, null, true, true);
+               layer = activeLayers ? getLayerByPath(layerName, true) : getActiveOrInactiveLayerByPath(layerName, null, openLayer, true, true);
                if (layer != null) {
                   if (!activeLayers)
-                     layer.markClosed(false);
+                     layer.markClosed(false, false);
                   // TODO: validate that we found this layer under the right root?
                   return getSrcEntryForLayerPaths(layer, pathName, fileName, isDir);
                }
@@ -12951,7 +13007,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return new SrcEntry(layer, relPath, fileName);
    }
 
-   public SrcEntry getSrcEntryForPath(String pathName, boolean activeLayers) {
+   public SrcEntry getSrcEntryForPath(String pathName, boolean activeLayers, boolean openLayer) {
       acquireDynLock(false);
 
       pathName = FileUtil.makeAbsolute(pathName);
@@ -12961,8 +13017,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          for (Layer layer:layersList) {
             SrcEntry layerEnt = layer.getSrcEntry(pathName);
             if (layerEnt != null) {
-               if (!activeLayers)
-                  layer.markClosed(false);
+               if (!activeLayers && openLayer)
+                  layer.markClosed(false, false);
                return layerEnt;
             }
          }
@@ -12970,7 +13026,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             for (File layerPathDir:layerPathDirs) {
                String layerPath = layerPathDir.getPath();
                if (pathName.startsWith(layerPath)) {
-                  SrcEntry ent = getSrcEntryForPathDir(layerPath, pathName, activeLayers);
+                  SrcEntry ent = getSrcEntryForPathDir(layerPath, pathName, activeLayers, openLayer);
                   if (ent != null)
                      return ent;
                }
@@ -12980,7 +13036,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                try {
                   pathName = FileUtil.makeCanonical(pathName);
                   if (pathName.startsWith(layerPath)) {
-                     SrcEntry ent = getSrcEntryForPathDir(layerPath, pathName, activeLayers);
+                     SrcEntry ent = getSrcEntryForPathDir(layerPath, pathName, activeLayers, openLayer);
                      if (ent != null)
                         return ent;
                   }

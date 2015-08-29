@@ -211,13 +211,13 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       installedRoot = resName;
    }
 
-   public void addNewSource(RepositorySource repoSrc) {
-      if (repoSrc.equals(currentSource)) {
+   public RepositorySource addNewSource(RepositorySource repoSrc) {
+      if (currentSource != null && repoSrc.equals(currentSource)) {
          // Need to reinit the dependencies if the exclusions change
          if (currentSource.mergeExclusions(repoSrc))
             dependencies = null;
          repoSrc.ctx = DependencyContext.merge(repoSrc.ctx, currentSource.ctx);
-         return;
+         return currentSource;
       }
 
       if (sources == null)
@@ -237,7 +237,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
                }
                sources[i] = oldSrc;
             }
-            return;
+            return repoSrc;
          }
          i++;
       }
@@ -259,6 +259,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
          newSrcs[j] = repoSrc;
       repoSrc.pkg = this;
       sources = newSrcs;
+      return repoSrc;
    }
 
    public String getClassPath() {

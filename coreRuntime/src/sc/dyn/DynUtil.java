@@ -31,6 +31,10 @@ public class DynUtil {
 
    static int traceCt = 0;
 
+   // Stores the actual mapping cache.  Init this before referencing PTypeUtil since it uses this to create
+   // it's types
+   static Map<Class, DynType> mappingCache = new HashMap<Class, DynType>();
+
    static Map<Object,Integer> traceIds = (Map<Object,Integer>) PTypeUtil.getWeakHashMap();
 
    // A table for each type name which lists the current unique integer for that type that we use to automatically generate semi-unique ids for each instance
@@ -39,8 +43,6 @@ public class DynUtil {
    // A table which stores the automatically assigned id for a given object instance.
    //static Map<Object,String> objectIds = (Map<Object,String>) PTypeUtil.getWeakHashMap();
    static Map<Object,String> objectIds = new HashMap<Object,String>();
-
-   static Map<Class, DynType> mappingCache = new HashMap<Class, DynType>();
 
    public static void clearObjectIds() {
       objectIds.clear();
@@ -51,6 +53,10 @@ public class DynUtil {
    }
 
    public static DynType getPropertyCache(Class beanClass) {
+      // There is a cycle initializing class variables - DynUtil
+      if (mappingCache == null) {
+         return null;
+      }
       return mappingCache.get(beanClass);
    }
 

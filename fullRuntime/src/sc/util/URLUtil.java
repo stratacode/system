@@ -101,7 +101,7 @@ public class URLUtil {
          if (noSuffix.equals(fileName))
             MessageHandler.error(msg, "Zip files must have a suffix of .zip or .jar: ", fileName);
          else {
-            if (!FileUtil.unzip(fileName, noSuffix, false))
+            if (!FileUtil.unzip(fileName, noSuffix, true))
                return "Failed to unzip: " + fileName + " into: " + noSuffix;
          }
       }

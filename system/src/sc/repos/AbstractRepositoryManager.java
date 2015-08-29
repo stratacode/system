@@ -62,8 +62,12 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
    }
 
    public String preInstall(RepositorySource src, DependencyContext ctx, DependencyCollection deps) {
-      // Putting this into the installed root so it more reliably gets removed if the folder itself is removed
-      File tagFile = new File(src.pkg.installedRoot, ".scPkgInstallInfo");
+      // Must set this so getVersionRoot returns the right value
+      if (src.pkg.currentSource == null)
+         src.pkg.currentSource = src;
+      // Putting this into the version-specific installed root so it more reliably gets removed if the folder itself is removed
+      // and so that for versioned packaged, we can store more than one version in the repository at the same time.
+      File tagFile = new File(src.pkg.getVersionRoot(), "scPkgCachedInfo.ser");
       File rootFile = new File(src.pkg.installedRoot);
 
       // TODO: right now, we are only installing directories but would we ever install files as well?

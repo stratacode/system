@@ -64,6 +64,9 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          src.pkg.definesClasses = false;
          pomFileRes = POMFile.readPOM(FileUtil.concat(src.pkg.getVersionRoot(), "pom.xml"), this, ctx, pkg);
          desc = null;
+         // Can't read file returns null
+         if (pomFileRes == null)
+            pomFileRes = "Failed to read pom file for package: " + src.pkg.packageName;
       }
       else {
          desc = MvnDescriptor.fromURL(url);

@@ -1882,6 +1882,16 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       dependentTypes = null; // Reset this so we do not maintain references to types that may get loaded
       memberCache = null; // Not sure if we need to do this but maybe something will hang around in there that points to a parent that was replaced?
 
+      // If we are refreshing after a layer has been closed/open and that layer happened to be modifying this type
+      // we need to clear out that replacedByType so it is not used later
+      if ((flags & ModelUtil.REFRESH_TYPEDEFS) != 0) {
+         if (replacedByType != null && !replaced) {
+            Layer replacedByLayer = replacedByType.getLayer();
+            if (replacedByLayer.closed)
+               replacedByType = null;
+         }
+      }
+
       if (isLayerType)
          return;
       if (body != null) {
@@ -1903,7 +1913,42 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return replacedByType.refreshBoundType(boundType);
       }
       JavaModel model = getJavaModel();
+      /*
+      Layer layer = model.getLayer();
 
+      Object newBoundType = null;
+      if (layer != null) {
+         LayeredSystem sys = model.getLayeredSystem();
+         if (getFullTypeName().contains("DirEnt") && layer.getLayerName().contains("model"))
+            System.out.println("***");
+         // Need to lookup this specific type (if it's inside of a layer)
+         newBoundType = sys.getSrcTypeDeclaration(getFullTypeName(), layer.getNextLayer(), model.prependLayerPackage, false, true, layer, isLayerType);
+         if (newBoundType != null) {
+            Layer refreshedLayer = ModelUtil.getLayerForType(sys, newBoundType);
+            // For inner types it seems we are having trouble always returning the correct type here.  Try to adjust it
+            // but this is really a hack.  It seems like getSrcTypeDeclaration should consistently honor the fromLayer
+            // or we need a new mechanism to lookup a type in a specific layer.
+            while (refreshedLayer != null && !refreshedLayer.getLayerName().equals(layer.getLayerName())) {
+               if (newBoundType instanceof ModifyDeclaration) {
+                  ModifyDeclaration modType = (ModifyDeclaration) newBoundType;
+                  newBoundType = modType.getModifiedType();
+                  refreshedLayer = ModelUtil.getLayerForType(sys, newBoundType);
+               }
+               else {
+                  System.err.println("*** Failed to refresh bound type property");
+                  return boundType;
+               }
+            }
+            if (refreshedLayer == null || !refreshedLayer.getLayerName().equals(layer.getLayerName()))
+               System.out.println("*** Error - did not refresh bound type properly");
+         }
+         return newBoundType;
+      }
+      */
+      /**
+       * This method will return the most specific type after the refresh.  It should not be used for
+       * modify types or super.x constructs which both will need to get a modified type
+       */
       Object newBoundType = model.findTypeDeclaration(getFullTypeName(), false);
       if (newBoundType == null) {
          newBoundType = model.getTypeDeclaration(typeName);
@@ -5038,6 +5083,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
     * we are adding a new layered version of this type.  In other words, adding a new modify that modifies this type.
     */
    public void updateType(BodyTypeDeclaration newType, ExecutionContext ctx, TypeUpdateMode updateMode, boolean updateInstances, UpdateInstanceInfo info) {
+      // Are we removing a type layer?  If so we first modify the previous type, then remove this type
       if (updateMode == TypeUpdateMode.Remove && this instanceof ModifyDeclaration) {
          ModifyDeclaration modThis = (ModifyDeclaration) this;
          BodyTypeDeclaration nextToRemove = modThis.getModifiedType();

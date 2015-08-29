@@ -382,7 +382,7 @@ public class TestUtil {
                lang = (Language) sys.getFileProcessorForExtension(ext);
                opts.system = sys;
 
-               SrcEntry srcEnt = sys.getSrcEntryForPath(fileName, false);
+               SrcEntry srcEnt = sys.getSrcEntryForPath(fileName, false, true);
                if (srcEnt == null) {
                   System.err.println("*** Unable to find srcFile: " + fileName + " in: " + opts.srcPath);
                   result = null;

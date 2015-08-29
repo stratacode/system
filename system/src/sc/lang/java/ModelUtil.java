@@ -5971,16 +5971,22 @@ public class ModelUtil {
       return ModelUtil.refreshBoundType(sys, type, flags);
    }
 
-   public static Object refreshBoundMethod(LayeredSystem sys, Object meth) {
+   public static Object refreshBoundMethod(LayeredSystem sys, Object meth, int flags) {
       if (meth instanceof ParamTypedMethod) {
          ParamTypedMethod ptm = (ParamTypedMethod) meth;
-         ptm.method = refreshBoundMethod(sys, ptm.method);
+         ptm.method = refreshBoundMethod(sys, ptm.method, flags);
          return ptm;
       }
-      Object enclType = refreshBoundType(sys, ModelUtil.getEnclosingType(meth), REFRESH_TYPEDEFS | REFRESH_CLASSES);
+      Object enclType = refreshBoundType(sys, ModelUtil.getEnclosingType(meth), flags);
+      if (enclType == null) {
+         System.err.println("** Failed to refresh enclosing type for method");
+         return meth;
+      }
       Object res = ModelUtil.getMethodFromSignature(enclType, ModelUtil.getMethodName(meth), ModelUtil.getTypeSignature(meth), false);
-      if (res == null)
-         System.out.println("*** Unable to refresh bound method");
+      if (res == null) {
+         System.err.println("*** Unable to refresh bound method");
+         return meth;
+      }
       return res;
    }
 
@@ -6000,15 +6006,15 @@ public class ModelUtil {
          if (boundType instanceof TypeDeclaration)
             return refreshBoundType(sys, boundType, flags);
          else if (boundType instanceof AbstractMethodDefinition || boundType instanceof ParamTypedMethod)
-            return refreshBoundMethod(sys, boundType);
+            return refreshBoundMethod(sys, boundType, flags);
       }
       if ((flags & REFRESH_CLASSES) != 0) {
          if (boundType instanceof Class)
             return refreshBoundClass(sys, (Class) boundType);
          if (boundType instanceof Method || boundType instanceof ParamTypedMethod)
-            return refreshBoundMethod(sys, boundType);
+            return refreshBoundMethod(sys, boundType, flags);
          if (boundType instanceof Constructor)
-            return refreshBoundMethod(sys, boundType);
+            return refreshBoundMethod(sys, boundType, flags);
          if (boundType instanceof Field)
             return refreshBoundField(sys, (Field) boundType);
          if (boundType instanceof ParamTypeDeclaration) {
@@ -6459,6 +6465,9 @@ public class ModelUtil {
    }
 
    public static String getGenericSetMethodPropertyTypeName(Object resultType, Object setMethod, boolean includeDim) {
+      if (setMethod instanceof ParamTypedMember) {
+         return getGenericSetMethodPropertyTypeName(resultType, ((ParamTypedMember) setMethod).getMemberObject(), includeDim);
+      }
       if (setMethod instanceof Method) {
          Method setMeth = (Method) setMethod;
          Type[] parameterTypes = setMeth.getGenericParameterTypes();
