@@ -4428,7 +4428,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public void updateBaseTypeLeaf(BodyTypeDeclaration newType) {
-      if (getDeclarationType() != DeclarationType.INTERFACE) {
+      if (newType.getDeclarationType() != DeclarationType.INTERFACE) {
          if (instFields != null) {
             // Stash away the old instance fields - used in DynObject.setType so it can remap properties
             oldInstFields = instFields;
@@ -5078,25 +5078,46 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    }
 
-   /**
-    * Updates this type with the new type.  If replacesType is true, we are replacing this exact type.  If it is false
-    * we are adding a new layered version of this type.  In other words, adding a new modify that modifies this type.
-    */
-   public void updateType(BodyTypeDeclaration newType, ExecutionContext ctx, TypeUpdateMode updateMode, boolean updateInstances, UpdateInstanceInfo info) {
-      // Are we removing a type layer?  If so we first modify the previous type, then remove this type
-      if (updateMode == TypeUpdateMode.Remove && this instanceof ModifyDeclaration) {
-         ModifyDeclaration modThis = (ModifyDeclaration) this;
-         BodyTypeDeclaration nextToRemove = modThis.getModifiedType();
-         // Need to unpeel the onion, so we remove the earliest type first, then the later ones.  TODO: possibly move this out one level to updateModel?
-         if (nextToRemove != newType) {
-            nextToRemove.updateType(newType, ctx, updateMode, updateInstances, info);
-            modThis.updateExtendsType(newType, true, false);
-            updateType(newType, ctx, updateMode, updateInstances, info);
-            return;
-         }
-      }
+   private static class UpdateTypeCtx {
+      boolean thisOriginallyDynamic;
 
-      boolean thisOriginallyDynamic = isDynamicType();
+      List<Object> oldFields;
+      int numOldFields;
+      List<Object> newFields;
+
+      int numNewFields;
+      List<Object> newTypes;
+      CoalescedHashMap<String,List<Object>> oldFieldIndex;
+
+      int newTypesSize;
+      CoalescedHashMap<String,Object> newTypeIndex;
+
+      List<Object> oldTypes;
+
+      int oldTypesSize;
+      CoalescedHashMap<String,Object> oldTypeIndex;
+
+      CoalescedHashMap<String,List<Object>> newFieldIndex;
+
+      ArrayList<TypeDeclaration> toRemoveObjs = new ArrayList<TypeDeclaration>();
+      ArrayList<TypeDeclaration> toAddObjs = new ArrayList<TypeDeclaration>();
+      ArrayList<TypeDeclaration> toUpdateObjs = new ArrayList<TypeDeclaration>();
+      ArrayList<UpdateTypeCtx> toUpdateCtxs = new ArrayList<UpdateTypeCtx>();
+
+      ArrayList<IVariableInitializer> toUpdateFields = new ArrayList<IVariableInitializer>();
+      // When we remove a property assignment, we have to restore the old one
+      ArrayList<IVariableInitializer> toRestoreFields = new ArrayList<IVariableInitializer>();
+
+      // Now go through the new fields and figure out which need to be updated or added.  Also mark fields, methods so
+      // they point to this type.
+      ArrayList<IVariableInitializer> toAddFields = new ArrayList<IVariableInitializer>();
+      ArrayList<BlockStatement> toExecBlocks = new ArrayList<BlockStatement>();
+   }
+
+   UpdateTypeCtx buildUpdateTypeContext(BodyTypeDeclaration newType, TypeUpdateMode updateMode, UpdateInstanceInfo info) {
+      UpdateTypeCtx tctx = new UpdateTypeCtx();
+
+      tctx.thisOriginallyDynamic = isDynamicType();
 
       // During initialization, this type might have been turned into a dynamic type from a subsequent layer.
       // Since we do not restart all of the other layers, we won't turn this new guy back into a dynamic type
@@ -5107,68 +5128,57 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             newType.dynamicNew = false;
       }
 
-      if (!getTypeClassName().equals(newType.getTypeClassName())) {
-         displayError("Expected type: " + typeName + " found: " + newType.typeName + " in: ");
-         return;
-      }
-
       LayeredSystem sys = getLayeredSystem();
 
-      List<Object> oldFields = updateMode == TypeUpdateMode.Replace ? getDeclaredFields(null, false, false, true, false, false) :
-                                                                      getAllFields(null, false, false, true, true, false);
-      int numOldFields = oldFields == null ? 0 : oldFields.size();
-      List<Object> newFields = updateMode == TypeUpdateMode.Replace ? newType.getDeclaredFields(null, false, false, true, false, false) :
-                                                                       newType.getAllFields(null, false, false, true, true, false);
-      int numNewFields = newFields == null ? 0 : newFields.size();
-      CoalescedHashMap<String,List<Object>> oldFieldIndex = new CoalescedHashMap<String,List<Object>>(numOldFields);
+      tctx.oldFields = updateMode == TypeUpdateMode.Replace ? getDeclaredFields(null, false, false, true, false, false) :
+              getAllFields(null, false, false, true, true, false);
+      tctx.numOldFields = tctx.oldFields == null ? 0 : tctx.oldFields.size();
+      tctx.newFields = updateMode == TypeUpdateMode.Replace ? newType.getDeclaredFields(null, false, false, true, false, false) :
+              newType.getAllFields(null, false, false, true, true, false);
+      tctx.numNewFields = tctx.newFields == null ? 0 : tctx.newFields.size();
+      tctx.oldFieldIndex = new CoalescedHashMap<String,List<Object>>(tctx.numOldFields);
       // Keep a list of fields for each name to deal with reverse only bindingins.  Those do not replace/override the previous definition.
-      for (int i = 0; i < numOldFields; i++) {
-         Object varDef = oldFields.get(i);
-         addFieldToIndex(oldFieldIndex, varDef);
+      for (int i = 0; i < tctx.numOldFields; i++) {
+         Object varDef = tctx.oldFields.get(i);
+         addFieldToIndex(tctx.oldFieldIndex, varDef);
       }
-      List<Object> newTypes = newType.getAllInnerTypes(null, updateMode == TypeUpdateMode.Replace);
-      int newTypesSize = newTypes == null ? 0 : newTypes.size();
-      CoalescedHashMap<String,Object> newTypeIndex = new CoalescedHashMap<String,Object>(newTypesSize);
-      for (int i = 0; i < newTypesSize; i++) {
-         Object newInnerType = newTypes.get(i);
-         newTypeIndex.put(CTypeUtil.getClassName(ModelUtil.getTypeName(newInnerType)), newInnerType);
+      tctx.newTypes = newType.getAllInnerTypes(null, updateMode == TypeUpdateMode.Replace);
+      tctx.newTypesSize = tctx.newTypes == null ? 0 : tctx.newTypes.size();
+      tctx.newTypeIndex = new CoalescedHashMap<String,Object>(tctx.newTypesSize);
+      for (int i = 0; i < tctx.newTypesSize; i++) {
+         Object newInnerType = tctx.newTypes.get(i);
+         tctx.newTypeIndex.put(CTypeUtil.getClassName(ModelUtil.getTypeName(newInnerType)), newInnerType);
       }
 
-      List<Object> oldTypes = getAllInnerTypes(null, updateMode == TypeUpdateMode.Replace);
-      int oldTypesSize = oldTypes == null ? 0 : oldTypes.size();
-      CoalescedHashMap<String,Object> oldTypeIndex = new CoalescedHashMap<String,Object>(oldTypesSize);
-      for (int i = 0; i < oldTypesSize; i++) {
-         Object oldInnerType = oldTypes.get(i);
-         oldTypeIndex.put(CTypeUtil.getClassName(ModelUtil.getTypeName(oldInnerType)), oldInnerType);
+      tctx.oldTypes = getAllInnerTypes(null, updateMode == TypeUpdateMode.Replace);
+      tctx.oldTypesSize = tctx.oldTypes == null ? 0 : tctx.oldTypes.size();
+      tctx.oldTypeIndex = new CoalescedHashMap<String,Object>(tctx.oldTypesSize);
+      for (int i = 0; i < tctx.oldTypesSize; i++) {
+         Object oldInnerType = tctx.oldTypes.get(i);
+         tctx.oldTypeIndex.put(CTypeUtil.getClassName(ModelUtil.getTypeName(oldInnerType)), oldInnerType);
       }
 
       if (body != null && updateMode == TypeUpdateMode.Replace) {
          for (int i = 0; i < body.size(); i++) {
             Object oldBodyDef = body.get(i);
             if (oldBodyDef instanceof PropertyAssignment) {
-               addFieldToIndex(oldFieldIndex, oldBodyDef);
+               addFieldToIndex(tctx.oldFieldIndex, oldBodyDef);
             }
          }
       }
-      CoalescedHashMap<String,List<Object>> newFieldIndex = new CoalescedHashMap<String,List<Object>>(numNewFields);
-      for (int i = 0; i < numNewFields; i++) {
-         Object varDef = newFields.get(i);
-         addFieldToIndex(newFieldIndex, varDef);
+      tctx.newFieldIndex = new CoalescedHashMap<String,List<Object>>(tctx.numNewFields);
+      for (int i = 0; i < tctx.numNewFields; i++) {
+         Object varDef = tctx.newFields.get(i);
+         addFieldToIndex(tctx.newFieldIndex, varDef);
       }
       if (newType.body != null && updateMode == TypeUpdateMode.Replace) {
          for (int i = 0; i < newType.body.size(); i++) {
             Object newBodyDef = newType.body.get(i);
             if (newBodyDef instanceof PropertyAssignment)
-               addFieldToIndex(newFieldIndex, newBodyDef);
+               addFieldToIndex(tctx.newFieldIndex, newBodyDef);
          }
       }
 
-      ArrayList<TypeDeclaration> toRemoveObjs = new ArrayList<TypeDeclaration>();
-      ArrayList<TypeDeclaration> toAddObjs = new ArrayList<TypeDeclaration>();
-      ArrayList<TypeDeclaration> toUpdateObjs = new ArrayList<TypeDeclaration>();
-      ArrayList<IVariableInitializer> toUpdateFields = new ArrayList<IVariableInitializer>();
-      // When we remove a property assignment, we have to restore the old one
-      ArrayList<IVariableInitializer> toRestoreFields = new ArrayList<IVariableInitializer>();
       boolean doChangeMethods = info != null && info.needsChangedMethods();
 
       // First go through all of the old fields, methods etc and remove any which are not present in the new index
@@ -5181,7 +5191,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                   List<Object> newDefObjs;
                   // Old field replaced
                   Object newDefObj = null;
-                  if ((newDefObjs = newFieldIndex.get(oldVarDef.variableName)) != null) {
+                  if ((newDefObjs = tctx.newFieldIndex.get(oldVarDef.variableName)) != null) {
                      PropertyAssignment newPA;
                      for (int j = 0; j < newDefObjs.size(); j++) {
                         Object newPAObj = newDefObjs.get(j);
@@ -5197,8 +5207,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
                         IVariableInitializer newDefVar = (IVariableInitializer) newDefObj;
                         // Only do the update if the thing has actually changed
-                        if (!DynUtil.equalObjects(newDefVar.getInitializerExpr(), oldVarDef.getInitializerExpr()) && !toUpdateFields.contains(newDefVar))
-                           toUpdateFields.add(newDefVar);
+                        if (!DynUtil.equalObjects(newDefVar.getInitializerExpr(), oldVarDef.getInitializerExpr()) && !tctx.toUpdateFields.contains(newDefVar))
+                           tctx.toUpdateFields.add(newDefVar);
                      }
                   }
                   // old field removed
@@ -5210,35 +5220,35 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             }
             else if (oldBodyDef instanceof PropertyAssignment) {
                PropertyAssignment oldPA = (PropertyAssignment) oldBodyDef;
-               List<Object> newFieldDefs = newFieldIndex.get(oldPA.propertyName);
+               List<Object> newFieldDefs = tctx.newFieldIndex.get(oldPA.propertyName);
                if (newFieldDefs != null)  {
                   if (!newFieldDefs.contains(oldPA)) {
                      for (Object newFieldDef:newFieldDefs) {
                         IVariableInitializer newFieldInit = (IVariableInitializer) newFieldDef;
-                        if (!DynUtil.equalObjects(oldPA.getInitializerExpr(), newFieldInit.getInitializerExpr()) && !toUpdateFields.contains(newFieldInit))
-                           toUpdateFields.add(newFieldInit);
+                        if (!DynUtil.equalObjects(oldPA.getInitializerExpr(), newFieldInit.getInitializerExpr()) && !tctx.toUpdateFields.contains(newFieldInit))
+                           tctx.toUpdateFields.add(newFieldInit);
                      }
                   }
                }
                else {
                   Object newInit = newType.definesMember(oldPA.propertyName, MemberType.InitializerSet, null, null);
                   if (newInit instanceof IVariableInitializer)
-                     toRestoreFields.add((IVariableInitializer) newInit);
+                     tctx.toRestoreFields.add((IVariableInitializer) newInit);
                }
             }
             else if (oldBodyDef instanceof TypeDeclaration) {
                TypeDeclaration oldInnerType = (TypeDeclaration) oldBodyDef;
-               List<Object> newDefs = newFieldIndex.get(oldInnerType.typeName);
+               List<Object> newDefs = tctx.newFieldIndex.get(oldInnerType.typeName);
                Object newDef = null;
                if (newDefs != null)
                   newDef = newDefs.get(0);
 
                if (newDef == null)
-                  newDef = newTypeIndex.get(oldInnerType.typeName);
+                  newDef = tctx.newTypeIndex.get(oldInnerType.typeName);
 
                // old object is removed
                if (newDef == null) {
-                  toRemoveObjs.add(oldInnerType);
+                  tctx.toRemoveObjs.add(oldInnerType);
                   if (!isDynamicType() && !sys.isDynamicRuntime()) {
                      sys.setStaleCompiledModel(true, "Recompile needed: object: ", oldInnerType.typeName, " removed from compiled type: ", typeName);
                   }
@@ -5252,12 +5262,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                   // if the types are the same, recursively replace the type.  Because property assignments can be applied to
                   // both compiled and dynamic types, we don't do errors here
                   if (ModelUtil.sameTypes(newInnerType.getExtendsTypeDeclaration(), oldInnerType.getExtendsTypeDeclaration())) {
-                     toUpdateObjs.add(oldInnerType);
+                     tctx.toUpdateObjs.add(oldInnerType);
                   }
                   // else if it is a completely new definition, remove the old type and add the new one
                   else {
-                     toRemoveObjs.add(oldInnerType);
-                     toAddObjs.add(newInnerType);
+                     tctx.toRemoveObjs.add(oldInnerType);
+                     tctx.toAddObjs.add(newInnerType);
                   }
                }
             }
@@ -5280,10 +5290,6 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
       }
 
-      // Now go through the new fields and figure out which need to be updated or added.  Also mark fields, methods so
-      // they point to this type.
-      ArrayList<IVariableInitializer> toAddFields = new ArrayList<IVariableInitializer>();
-      ArrayList<BlockStatement> toExecBlocks = new ArrayList<BlockStatement>();
 
       if (newType.body != null) {
          for (int i = 0; i < newType.body.size(); i++) {
@@ -5292,12 +5298,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                FieldDefinition newFieldDef = (FieldDefinition) newBodyDef;
 
                for (VariableDefinition newVarDef:newFieldDef.variableDefinitions) {
-                  List<Object> oldVarDefListObj = oldFieldIndex.get(newVarDef.variableName);
+                  List<Object> oldVarDefListObj = tctx.oldFieldIndex.get(newVarDef.variableName);
                   if (oldVarDefListObj == null) {
-                     toAddFields.add(newVarDef);
+                     tctx.toAddFields.add(newVarDef);
                   }
-                  else if (!oldVarDefListObj.contains(newVarDef) && !toUpdateFields.contains(newVarDef)) {
-                     toUpdateFields.add(newVarDef);
+                  else if (!oldVarDefListObj.contains(newVarDef) && !tctx.toUpdateFields.contains(newVarDef)) {
+                     tctx.toUpdateFields.add(newVarDef);
                   }
                }
             }
@@ -5320,22 +5326,22 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             else if (newBodyDef instanceof BlockStatement) {
                BlockStatement newBlock = (BlockStatement) newBodyDef;
                if (findBlockStatement(newBlock) == null)
-                  toExecBlocks.add(newBlock);
+                  tctx.toExecBlocks.add(newBlock);
             }
             else if (newBodyDef instanceof TypeDeclaration) {
                TypeDeclaration newInnerType = (TypeDeclaration) newBodyDef;
 
-               List<Object> oldDefs = oldFieldIndex.get(newInnerType.typeName);
+               List<Object> oldDefs = tctx.oldFieldIndex.get(newInnerType.typeName);
                Object oldDef;
                if (oldDefs == null)
-                  oldDef = oldTypeIndex.get(newInnerType.typeName);
+                  oldDef = tctx.oldTypeIndex.get(newInnerType.typeName);
                else
                   oldDef = oldDefs.get(0);
 
 
                // Totally new object
                if (oldDef == null) {
-                  toAddObjs.add(newInnerType);
+                  tctx.toAddObjs.add(newInnerType);
                }
 
                // Because we are now inheriting some definitions we may find the old and new are the same - just skip those.
@@ -5349,32 +5355,39 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                            oldDef = oldMod.getModifiedType();
                         if (oldDef instanceof TypeDeclaration) {
                            TypeDeclaration oldTypeDef = (TypeDeclaration) oldDef;
-                           if (!toUpdateObjs.contains(oldTypeDef))
-                              toUpdateObjs.add(oldTypeDef);
+                           if (!tctx.toUpdateObjs.contains(oldTypeDef))
+                              tctx.toUpdateObjs.add(oldTypeDef);
                         }
                      }
                      else if (oldDef instanceof ClassDeclaration) {
                         TypeDeclaration oldTypeDef = (TypeDeclaration) oldDef;
-                        if (!toUpdateObjs.contains(oldTypeDef))
-                           toUpdateObjs.add(oldTypeDef);
+                        if (!tctx.toUpdateObjs.contains(oldTypeDef))
+                           tctx.toUpdateObjs.add(oldTypeDef);
                      }
                   }
                }
             }
             else if (newBodyDef instanceof PropertyAssignment) {
                PropertyAssignment pa = (PropertyAssignment) newBodyDef;
-               List<Object> oldDefObjs = oldFieldIndex.get(pa.propertyName);
-               if ((oldDefObjs == null || !oldDefObjs.contains(pa)) && !toUpdateFields.contains(pa))
-                  toUpdateFields.add(pa);
+               List<Object> oldDefObjs = tctx.oldFieldIndex.get(pa.propertyName);
+               if ((oldDefObjs == null || !oldDefObjs.contains(pa)) && !tctx.toUpdateFields.contains(pa))
+                  tctx.toUpdateFields.add(pa);
             }
          }
       }
 
+      return tctx;
+   }
+
+   void updateTypeInternals(UpdateTypeCtx tctx, BodyTypeDeclaration newType, ExecutionContext ctx, TypeUpdateMode updateMode, boolean updateInstances, UpdateInstanceInfo info, boolean outerType) {
+      dependentTypes = null;
+
+      LayeredSystem sys = getLayeredSystem();
       // First remove any old objects - note that we're using the old indexes so this has to be done before
       // we go and update the properties table in each instance.
-      for (int i = 0; i < toRemoveObjs.size(); i++) {
+      for (int i = 0; i < tctx.toRemoveObjs.size(); i++) {
          // if static, null the slot in the static fields
-         TypeDeclaration oldInnerType = toRemoveObjs.get(i);
+         TypeDeclaration oldInnerType = tctx.toRemoveObjs.get(i);
          if (ModelUtil.isObjectType(oldInnerType) || ModelUtil.isEnum(oldInnerType)) {
             if (oldInnerType.hasModifier("static")) {
                if (staticValues != null) {
@@ -5414,7 +5427,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             replaced = true;
       }
 
-      // In this case, we are stripping over a type layer... "this" type is being removed and replaced by some previous type in the chain.
+      // In this case, we are stripping off a type layer... "this" type is being removed and replaced by some previous type in the chain.
       if (updateMode == TypeUpdateMode.Remove && (this instanceof ModifyDeclaration && !((ModifyDeclaration) this).modifyInherited)) {
          ModifyDeclaration thisModify = (ModifyDeclaration) this;
          Object modTypeObj = thisModify.getDerivedTypeDeclaration();
@@ -5453,12 +5466,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if (this instanceof TypeDeclaration)
             sys.replaceTypeDeclaration((TypeDeclaration) this, (TypeDeclaration) newType);
 
-         // Old type needs to remove itself from the sub-type table at least.  We also stop things to be sure
-         // no stale bits of the old model are being used in the new model.
-         stop();
+         if (outerType) {
+            // If this is the root, the old type needs to remove itself from the sub-type table at least.  We also stop things to be sure
+            // no stale bits of the old model are being used in the new model.  Since the root will stop the children, we do not have to stop
+            // them as well
+            stop();
+         }
       }
       else {
-
          // For the remove operation we have to remove the oldType from the subTypes list before we update the model
          // type or else we'll find the old type as a sub-type of the new-type and try to update it as well.
          if (updateMode == TypeUpdateMode.Remove)
@@ -5478,7 +5493,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if (this instanceof TypeDeclaration) {
             // TODO: this is probably not needed at all now that we store the sub-types table by type name.
             if (!(newType instanceof ModifyDeclaration) || !((ModifyDeclaration) newType).modifyInherited)
-                sys.replaceSubTypes((TypeDeclaration) this, (TypeDeclaration) newType);
+               sys.replaceSubTypes((TypeDeclaration) this, (TypeDeclaration) newType);
          }
 
 
@@ -5488,23 +5503,77 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             unregister(); // Maybe this could be done before updateModelBaseType along with remove?
       }
 
+      // Now we need to update the internals of each of the inner types - before we start the new type.
+      // That way, we have a clean new model in this new type before we resolve references when starting the new type
+      for (int i = 0; i < tctx.toUpdateObjs.size(); i++) {
+         TypeDeclaration oldInnerType = tctx.toUpdateObjs.get(i);
+         Object newFieldObj = null;
+         List<Object> newFieldObjs = tctx.newFieldIndex.get(oldInnerType.typeName);
+         if (newFieldObjs != null)
+            newFieldObj = newFieldObjs.get(0);
+         TypeDeclaration newInnerType = (TypeDeclaration) newFieldObj;
+         if (newInnerType == null)
+            newInnerType = (TypeDeclaration) tctx.newTypeIndex.get(oldInnerType.typeName);
+         if (oldInnerType != newInnerType) { // Not sure why this is necessary but clearly don't update if it's the same thing
+            UpdateTypeCtx innerTypeCtx = oldInnerType.buildUpdateTypeContext(newInnerType, updateMode, info);
+            tctx.toUpdateCtxs.add(innerTypeCtx);
+            oldInnerType.updateTypeInternals(innerTypeCtx, newInnerType, ctx, updateMode, updateInstances, info, false);
+         }
+         else
+            tctx.toUpdateCtxs.add(null);
+      }
+   }
+
+
+   /**
+    * Updates this type with the new type.  If replacesType is true, we are replacing this exact type.  If it is false
+    * we are adding a new layered version of this type.  In other words, adding a new modify that modifies this type.
+    */
+   public void updateType(BodyTypeDeclaration newType, ExecutionContext ctx, TypeUpdateMode updateMode, boolean updateInstances, UpdateInstanceInfo info) {
+      // Are we removing a type layer?  If so we first modify the previous type, then remove this type
+      if (updateMode == TypeUpdateMode.Remove && this instanceof ModifyDeclaration) {
+         ModifyDeclaration modThis = (ModifyDeclaration) this;
+         BodyTypeDeclaration nextToRemove = modThis.getModifiedType();
+         // Need to unpeel the onion, so we remove the earliest type first, then the later ones.  TODO: possibly move this out one level to updateModel?
+         if (nextToRemove != newType) {
+            nextToRemove.updateType(newType, ctx, updateMode, updateInstances, info);
+            modThis.updateExtendsType(newType, true, false);
+            updateType(newType, ctx, updateMode, updateInstances, info);
+            return;
+         }
+      }
+
+      if (!getTypeClassName().equals(newType.getTypeClassName())) {
+         displayError("Invalid updateType - expected type: " + typeName + " but found: " + newType.typeName + " for: ");
+         return;
+      }
+
+      UpdateTypeCtx tctx = buildUpdateTypeContext(newType, updateMode, info);
+
+      updateTypeInternals(tctx, newType, ctx, updateMode, updateInstances, info, true);
+
       // Start the type after it's fully registered into the new type system so any new references we create point
       // to the new model.
       if (updateMode != TypeUpdateMode.Remove);
          ParseUtil.realInitAndStartComponent(newType);
 
+      completeUpdateType(tctx, newType, ctx, updateMode, updateInstances, info, true);
+   }
+
+   void completeUpdateType(UpdateTypeCtx tctx, BodyTypeDeclaration newType, ExecutionContext ctx, TypeUpdateMode updateMode, boolean updateInstances, UpdateInstanceInfo info, boolean outerType) {
+      LayeredSystem sys = getLayeredSystem();
       String fullTypeName = getFullTypeName();
       boolean skipAdd = false;
       boolean skipUpdate = false;
-      if (dynamicNew && (toAddObjs.size() > 0 || toAddFields.size() > 0)) {
+      if (dynamicNew && (tctx.toAddObjs.size() > 0 || tctx.toAddFields.size() > 0)) {
          dynamicNew = false;
          dynamicType = true;
       }
-      if (!dynamicType && (toAddObjs.size() > 0 || toAddFields.size() > 0) && sys.hasInstancesOfType(fullTypeName)) {
-         if (toAddFields.size() > 0)
-            sys.setStaleCompiledModel(true, "Recompile needed to add fields: " + toAddFields + " to compiled type: " + fullTypeName);
-         if (toAddObjs.size() > 0)
-            sys.setStaleCompiledModel(true, "Recompile needed to add inner objects: " + toAddObjs + " to compiled type: " + fullTypeName);
+      if (!dynamicType && (tctx.toAddObjs.size() > 0 || tctx.toAddFields.size() > 0) && sys.hasInstancesOfType(fullTypeName)) {
+         if (tctx.toAddFields.size() > 0)
+            sys.setStaleCompiledModel(true, "Recompile needed to add fields: " + tctx.toAddFields + " to compiled type: " + fullTypeName);
+         if (tctx.toAddObjs.size() > 0)
+            sys.setStaleCompiledModel(true, "Recompile needed to add inner objects: " + tctx.toAddObjs + " to compiled type: " + fullTypeName);
          skipAdd = true;
       }
 
@@ -5522,7 +5591,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          boolean classLoaded = sys.isClassLoaded(fullTypeName);
          boolean hasInstances = sys.hasInstancesOfType(fullTypeName);
          // Only a problem if there are any instances of this type outstanding right now
-         if (!thisOriginallyDynamic) {
+         if (!tctx.thisOriginallyDynamic) {
             sys.setStaleCompiledModel(true, "Recompile needed: " + typeName + " 's " + (prevExtends ? "previous " : "") + "extends type changed from: " + oldExtType + " to: " + newExtType);
             skipAdd = true;
             skipUpdate = true;
@@ -5533,6 +5602,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             skipAdd = true;
             skipUpdate = true;
          }
+         // TODO: classLoaded is always false here - do we need this code anymore?
          else if (classLoaded && oldExtType != null && newExtType == null) {
             newType.prevCompiledExtends = oldExtType;
          }
@@ -5542,9 +5612,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          info.typeChanged(this);
 
       if (!skipAdd) {
-         for (int i = 0; i < toAddObjs.size(); i++) {
+         for (int i = 0; i < tctx.toAddObjs.size(); i++) {
             // if static,  the slot in the static fields
-            TypeDeclaration newInnerType = toAddObjs.get(i);
+            TypeDeclaration newInnerType = tctx.toAddObjs.get(i);
             if (ModelUtil.isObjectType(newInnerType) || ModelUtil.isEnum(newInnerType)) {
                if (newInnerType.isStaticType()) {
                   if (newType.staticValues != null) {
@@ -5565,8 +5635,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
          // We're just adding to the property cache instead of rebuilding the table.  To build, we'd have to remap all
          // of the data bindings
-         for (int i = 0; i < toAddFields.size(); i++) {
-            IVariableInitializer varDef = toAddFields.get(i);
+         for (int i = 0; i < tctx.toAddFields.size(); i++) {
+            IVariableInitializer varDef = tctx.toAddFields.get(i);
             newType.addInstMemberToPropertyCache(varDef.getVariableName(), varDef);
          }
       }
@@ -5575,36 +5645,36 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          // Now that stuff is in a stable state, re-initialize any properties that need to be initialized
          // This should fill in any uninitialized slots (all new fields are here) plus any properties whose initializers
          // are changed we run those.  Note we're keeping the order the same as they appear in the body of this type.
-         for (int i = 0; i < toAddFields.size(); i++) {
-            IVariableInitializer varDef = toAddFields.get(i);
+         for (int i = 0; i < tctx.toAddFields.size(); i++) {
+            IVariableInitializer varDef = tctx.toAddFields.get(i);
             newType.updatePropertyForType((JavaSemanticNode)varDef, ctx, InitInstanceType.Init, updateInstances, info);
          }
-         for (int i = 0; i < toUpdateFields.size(); i++) {
-            IVariableInitializer varDef = toUpdateFields.get(i);
+         for (int i = 0; i < tctx.toUpdateFields.size(); i++) {
+            IVariableInitializer varDef = tctx.toUpdateFields.get(i);
             newType.updatePropertyForType((JavaSemanticNode)varDef, ctx, InitInstanceType.Init, updateInstances, info);
          }
-         for (int i = 0; i < toRestoreFields.size(); i++) {
-            IVariableInitializer varDef = toRestoreFields.get(i);
+         for (int i = 0; i < tctx.toRestoreFields.size(); i++) {
+            IVariableInitializer varDef = tctx.toRestoreFields.get(i);
             newType.updatePropertyForType((JavaSemanticNode)varDef, ctx, InitInstanceType.Init, updateInstances, info);
          }
-         for (int i = 0; i < toUpdateObjs.size(); i++) {
-            TypeDeclaration oldInnerType = toUpdateObjs.get(i);
+         for (int i = 0; i < tctx.toUpdateObjs.size(); i++) {
+            TypeDeclaration oldInnerType = tctx.toUpdateObjs.get(i);
             Object newFieldObj = null;
-            List<Object> newFieldObjs = newFieldIndex.get(oldInnerType.typeName);
+            List<Object> newFieldObjs = tctx.newFieldIndex.get(oldInnerType.typeName);
             if (newFieldObjs != null)
                newFieldObj = newFieldObjs.get(0);
             TypeDeclaration newInnerType = (TypeDeclaration) newFieldObj;
             if (newInnerType == null)
-               newInnerType = (TypeDeclaration) newTypeIndex.get(oldInnerType.typeName);
+               newInnerType = (TypeDeclaration) tctx.newTypeIndex.get(oldInnerType.typeName);
             if (oldInnerType != newInnerType) // Not sure why this is necessary but clearly don't update if it's the same thing
-               oldInnerType.updateType(newInnerType, ctx, updateMode, updateInstances, info);
+               oldInnerType.completeUpdateType(tctx.toUpdateCtxs.get(i), newInnerType, ctx, updateMode, updateInstances, info, false);
          }
       }
 
       if (!skipAdd) {
-         for (int i = 0; i < toAddObjs.size(); i++) {
+         for (int i = 0; i < tctx.toAddObjs.size(); i++) {
             // if static,  the slot in the static fields
-            TypeDeclaration newInnerType = toAddObjs.get(i);
+            TypeDeclaration newInnerType = tctx.toAddObjs.get(i);
             if (ModelUtil.isObjectType(newInnerType)) {
                if (!newInnerType.isStaticType()) {
                   // Will init with the lazy-init sentinel for this slot in each referencing instance
@@ -5615,8 +5685,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
 
          // This should be the list of all block statements which did not exist in the old type or which have changed
-         for (int i = 0; i < toExecBlocks.size(); i++) {
-            BlockStatement bs = toExecBlocks.get(i);
+         for (int i = 0; i < tctx.toExecBlocks.size(); i++) {
+            BlockStatement bs = tctx.toExecBlocks.get(i);
 
             if (info != null) {
                info.addBlockStatement(this, bs);
@@ -5633,9 +5703,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          newType.refreshClientTypeDeclaration();
       }
 
-      for (int i = 0; i < toRemoveObjs.size(); i++) {
+      for (int i = 0; i < tctx.toRemoveObjs.size(); i++) {
          // Must be done after we remove the type from the name space as we'll skip the remove if this is not the last type for this type name
-         sys.notifyInnerTypeRemoved(toRemoveObjs.get(i));
+         sys.notifyInnerTypeRemoved(tctx.toRemoveObjs.get(i));
       }
    }
 

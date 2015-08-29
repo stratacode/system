@@ -2103,6 +2103,9 @@ public class ModifyDeclaration extends TypeDeclaration {
    }
 
    public boolean updateExtendsType(BodyTypeDeclaration extType, boolean modifyOnly, boolean extOnly) {
+      // Need to clear this here because the extends types are in the dependent types
+      dependentTypes = null;
+
       if (extendsTypes != null && !modifyOnly) {
          int i = 0;
          for (JavaType modExtType:extendsTypes) {

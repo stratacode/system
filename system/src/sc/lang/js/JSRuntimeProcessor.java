@@ -1978,6 +1978,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       if (depType instanceof ParamTypeDeclaration)
          depType = resolveBaseType(((ParamTypeDeclaration) depType).getBaseType());
 
+      // In case we have updated the types since the dependent types were computed
+      if (depType instanceof BodyTypeDeclaration)
+         depType = ((BodyTypeDeclaration) depType).resolve(false);
+
       ParseUtil.realInitAndStartComponent(depType);
 
       return depType;

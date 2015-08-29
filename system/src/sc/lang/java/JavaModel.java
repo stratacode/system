@@ -760,6 +760,14 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             }
          }
       }
+
+      // This can happen in particular when a type has been replaced, stopped and is getting restarted because it's still in use.
+      // It would be easy to avoid restarting the object, but this will help us catch places where we used these replaced objects.
+      // Doing a resolve before using it will fix the problem.
+      if (type.replaced) {
+         System.err.println("*** Error - re-adding replaced type");
+         return;
+      }
       definedTypesByName.put(typeName, type);
       // Not using the typeIndex for layer models or sync models which use a custom resolver.  Maybe we just need to check
       // the custom resolver before the typeIndex, but with this, we register a Layer type which ends up extending itself.

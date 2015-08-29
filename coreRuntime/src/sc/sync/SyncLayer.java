@@ -648,58 +648,75 @@ public class SyncLayer {
       StringBuilder newSB = new StringBuilder();
       StringBuilder switchSB = null;
 
+      String newPackageName = syncHandler.getPackageName();
+      boolean packagesMatch = !(changeCtx.lastPackageName != newPackageName && (changeCtx.lastPackageName == null || !changeCtx.lastPackageName.equals(newPackageName)));
+
       boolean pushName = true;
       boolean topLevel = false;
       int ix;
       int sz = currentObjNames.size();
       ArrayList<String> newObjNames = (ArrayList<String>) currentObjNames.clone();
       ArrayList<String> startObjNames = null;
-      if (sz > 0) {
-         ix = sz - 1;
-         // Do these path names reach the same type?  If so, nothing changes
-         if (DynUtil.equalObjects(getPathName(currentObjNames), newObjName)) {
-            pushName = false;
-            newObjNames = (ArrayList<String>) currentObjNames.clone();
-         }
-         else {
-            int curIx = newObjNames.indexOf(newObjName);
-            // This object is not in the current stack - but maybe a parent is?
-            if (curIx == -1) {
-               // Can we find a parent name which matches?
-               String currentParent = CTypeUtil.getPackageName(newObjName);
-               String currentChildPath = CTypeUtil.getClassName(newObjName);
-               while (currentParent != null) {
-                  int parIx = newObjNames.indexOf(currentParent);
+      if (!packagesMatch) {
+         if (sz > 0) {
+            if (switchSB == null)
+               switchSB = new StringBuilder();
+            // Pop from sz to the one before curIx
+            popCurrentObjNames(switchSB, newObjNames, sz);
 
-                  // Found a parent so close to reach it's context, then strip that part off of the rest of the name we need to set.
-                  if (parIx != -1) {
+            // This is the "object x" case with creating a new top-level object, such as an ObjectId.  We'll do object x as a top-level which is fine
+            if (isNew && !newObjName.contains(".") && (newArgs == null || newArgs.length == 0)) {
+               pushName = false; // topLevel
+               topLevel = true;
+            }
+         }
+      }
+      else {
+         if (sz > 0) {
+            ix = sz - 1;
+            // Do these path names reach the same type?  If so, nothing changes
+            if (DynUtil.equalObjects(getPathName(currentObjNames), newObjName)) {
+               pushName = false;
+               newObjNames = (ArrayList<String>) currentObjNames.clone();
+            } else {
+               int curIx = newObjNames.indexOf(newObjName);
+               // This object is not in the current stack - but maybe a parent is?
+               if (curIx == -1) {
+                  // Can we find a parent name which matches?
+                  String currentParent = CTypeUtil.getPackageName(newObjName);
+                  String currentChildPath = CTypeUtil.getClassName(newObjName);
+                  while (currentParent != null) {
+                     int parIx = newObjNames.indexOf(currentParent);
+
+                     // Found a parent so close to reach it's context, then strip that part off of the rest of the name we need to set.
+                     if (parIx != -1) {
+                        if (switchSB == null)
+                           switchSB = new StringBuilder();
+                        popCurrentObjNames(switchSB, newObjNames, sz - parIx - 1);
+                        newObjName = currentChildPath;
+                        break;
+                     }
+                     currentChildPath = CTypeUtil.getClassName(currentParent) + "." + currentChildPath;
+                     currentParent = CTypeUtil.getPackageName(currentParent);
+                  }
+                  // Nothing in common so get rid of all of these names
+                  if (currentParent == null) {
                      if (switchSB == null)
                         switchSB = new StringBuilder();
-                     popCurrentObjNames(switchSB, newObjNames, sz - parIx - 1);
-                     newObjName = currentChildPath;
-                     break;
+                     popCurrentObjNames(switchSB, newObjNames, sz);
+                     // This is the "object x" case with creating a new top-level object, such as an ObjectId.  We'll do object x as a top-level which is fine
+                     if (isNew && !newObjName.contains(".") && (newArgs == null || newArgs.length == 0)) {
+                        pushName = false; // topLevel
+                        topLevel = true;
+                     }
                   }
-                  currentChildPath = CTypeUtil.getClassName(currentParent) + "." + currentChildPath;
-                  currentParent = CTypeUtil.getPackageName(currentParent);
-               }
-               // Nothing in common so get rid of all of these names
-               if (currentParent == null) {
+               } else {
                   if (switchSB == null)
                      switchSB = new StringBuilder();
-                  popCurrentObjNames(switchSB, newObjNames, sz);
-                  // This is the "object x" case with creating a new top-level object, such as an ObjectId.  We'll do object x as a top-level which is fine
-                  if (isNew && !newObjName.contains(".") && (newArgs == null || newArgs.length == 0)) {
-                     pushName = false; // topLevel
-                     topLevel = true;
-                  }
+                  // Pop from sz to the one before curIx
+                  popCurrentObjNames(switchSB, newObjNames, sz - curIx - 1);
+                  pushName = false;
                }
-            }
-            else {
-               if (switchSB == null)
-                  switchSB = new StringBuilder();
-               // Pop from sz to the one before curIx
-               popCurrentObjNames(switchSB, newObjNames, sz - curIx - 1);
-               pushName = false;
             }
          }
       }

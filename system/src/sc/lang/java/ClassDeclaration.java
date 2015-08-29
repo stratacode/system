@@ -249,7 +249,7 @@ public class ClassDeclaration extends TypeDeclaration {
    }
 
    public DeclarationType getDeclarationType() {
-      if (!initialized)
+      if (declarationType == null && !initialized)
          init();
       return declarationType;
    }
