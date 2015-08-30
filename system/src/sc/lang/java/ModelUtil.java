@@ -1538,7 +1538,20 @@ public class ModelUtil {
             return ((ITypeDeclaration) type2).implementsType(((Class) type1).getName(), assignmentSemantics, allowUnbound);
          }
          else if (type2 instanceof Class) {
-            return ((Class) type1).isAssignableFrom((Class) type2);
+            Class cl1 = (Class) type1;
+            Class cl2 = (Class) type2;
+            boolean res = cl1.isAssignableFrom(cl2);
+
+            // TODO: we only need this (I think) during the refreshBoundType after resetClassLoader.  Because we refresh references in any order
+            // we might temporarily get incompatible class loaders during the refreshBoundTypes operation which prevent us from resolving types properly.
+            // It seems like a better fix would be to just fix the order
+            if (!res && cl1.getClassLoader() != cl2.getClassLoader()) {
+               if (cl1.getName().equals(cl2.getName())) {
+                  return true;
+               }
+            }
+
+            return res;
          }
          else if (type2 == null)
             return false;

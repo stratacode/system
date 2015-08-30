@@ -8295,6 +8295,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       buildClassLoader = getClass().getClassLoader();
       RTypeUtil.flushCaches();
       resetClassCache();
+      resetModelCaches();
       initSysClassLoader(buildLayer, ClassLoaderMode.ALL);
 
       Thread.currentThread().setContextClassLoader(getSysClassLoader());
@@ -8454,6 +8455,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       //typesByName.clear();
       //modelIndex.clear();
+   }
+
+   private void resetModelCaches() {
+      for (Iterator<Map.Entry<String,ILanguageModel>> it = modelIndex.entrySet().iterator(); it.hasNext(); ) {
+         ILanguageModel model = it.next().getValue();
+         model.flushTypeCache();
+      }
    }
 
    public void refreshBoundTypes(int flags) {
@@ -9113,8 +9121,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       UpdateInstanceInfo updateInfo = newUpdateInstanceInfo();
       List<Layer.ModelUpdate> changedModels = refreshSystem(updateInfo);
 
-      // Once we've refreshed some of the models in the system, we now need to go and update the type references globally to point to the new references
-      refreshBoundTypes(ModelUtil.REFRESH_TYPEDEFS);
+      if (changedModels.size() > 0) {
+         // Once we've refreshed some of the models in the system, we now need to go and update the type references globally to point to the new references
+         refreshBoundTypes(ModelUtil.REFRESH_TYPEDEFS);
+      }
 
       SystemRefreshInfo sysInfo = new SystemRefreshInfo();
       sysInfo.updateInfo = updateInfo;

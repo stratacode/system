@@ -3107,6 +3107,11 @@ public class IdentifierExpression extends ArgumentsExpression {
             while (pType != null && !ModelUtil.isAssignableFrom(srcType, pType)) {
                pType = ModelUtil.getEnclosingType(pType);
             }
+            // Adding this to deal with a case where we optimized out an inner class.
+            if (pType == null)
+               pType = srcType; // Why is it ever anything different?
+            if (pType != srcType)
+               System.out.println("*** Not returning the field's static type");
             srcObj = pType;
          }
          else

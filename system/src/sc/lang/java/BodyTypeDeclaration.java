@@ -1919,8 +1919,6 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       Object newBoundType = null;
       if (layer != null) {
          LayeredSystem sys = model.getLayeredSystem();
-         if (getFullTypeName().contains("DirEnt") && layer.getLayerName().contains("model"))
-            System.out.println("***");
          // Need to lookup this specific type (if it's inside of a layer)
          newBoundType = sys.getSrcTypeDeclaration(getFullTypeName(), layer.getNextLayer(), model.prependLayerPackage, false, true, layer, isLayerType);
          if (newBoundType != null) {
