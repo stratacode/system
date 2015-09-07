@@ -711,12 +711,16 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public Object getClass(String className, boolean useImports, Layer refLayer, boolean layerResolve) {
+      return getClass(className, useImports, refLayer, layerResolve, false);
+   }
+
+   public Object getClass(String className, boolean useImports, Layer refLayer, boolean layerResolve, boolean forceClass) {
       if (layeredSystem != null) {
-         Object cl = layeredSystem.getClassWithPathName(className, refLayer, layerResolve, false);
+         Object cl = layeredSystem.getClassWithPathName(className, refLayer, layerResolve, false, forceClass);
          if (cl == null && useImports) {
             String impName = getImportedName(className);
             if (impName != null)
-               return layeredSystem.getClassWithPathName(impName, refLayer, layerResolve, false);
+               return layeredSystem.getClassWithPathName(impName, refLayer, layerResolve, false, forceClass);
          }
          return cl;
       }

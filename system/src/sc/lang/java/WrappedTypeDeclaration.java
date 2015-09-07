@@ -155,6 +155,16 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
       return Arrays.asList(baseMethods);
    }
 
+   @Override
+   public Object getConstructorFromSignature(String sig) {
+      return ModelUtil.getConstructorFromSignature(baseType, sig);
+   }
+
+   @Override
+   public Object getMethodFromSignature(String methodName, String signature, boolean resolveLayer) {
+      return ModelUtil.getMethodFromSignature(baseType, methodName, signature, resolveLayer);
+   }
+
    public List<Object> getAllProperties(String modifier, boolean includeAssigns) {
       Object[] baseProps = ModelUtil.getProperties(baseType, modifier, includeAssigns);
       if (baseProps == null)

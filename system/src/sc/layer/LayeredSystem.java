@@ -1770,8 +1770,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             lpi.explicitDynLayers = new ArrayList<String>();
             // We support either . or / as separate for layer names so be sure to match both
             for (String initLayer : initLayerNames) {
-               lpi.explicitDynLayers.add(initLayer.replace(".", "/"));
-               lpi.explicitDynLayers.add(initLayer.replace("/", "."));
+               lpi.explicitDynLayers.add(initLayer.replace('.', '/'));
+               lpi.explicitDynLayers.add(initLayer.replace('/', '.'));
                if (allDynamic)
                   lpi.explicitDynLayers.add("<all>");
             }
@@ -1781,8 +1781,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             for (int i = 0; i < recursiveDyn.size(); i++) {
                String exLayer = recursiveDyn.get(i);
                exLayer = FileUtil.removeTrailingSlash(exLayer);
-               aliases.add(exLayer.replace(".", "/"));
-               aliases.add(exLayer.replace("/", "."));
+               aliases.add(exLayer.replace('.', '/'));
+               aliases.add(exLayer.replace('/', '.'));
             }
             aliases.addAll(recursiveDyn);
             lpi.recursiveDynLayers = aliases;
@@ -2186,6 +2186,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public void updateBuildClassLoader(ClassLoader loader) {
       buildClassLoader = loader;
       Thread.currentThread().setContextClassLoader(buildClassLoader);
+      // We have just extended the class path and so need to flush out any null sentinels we may have cached for
+      // these newly loaded classes.
+      RTypeUtil.flushLoadedClasses();
    }
 
    void initSysClassLoader(Layer sysLayer, ClassLoaderMode mode) {
@@ -2450,7 +2453,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (!srcOnly) {
             for (Map.Entry<String,HashMap<String,PackageEntry>> piEnt:packageIndex.entrySet()) {
                String pkgName = piEnt.getKey();
-               pkgName = pkgName == null ? null : pkgName.replace("/", ".");
+               pkgName = pkgName == null ? null : pkgName.replace('/', '.');
 
                // If there's a pkg name for the prefix, and it matches the package, check the contents against
                if (pkgName == prefixPkg || (prefixPkg != null && pkgName != null && pkgName.equals(prefixPkg))) {
@@ -3225,6 +3228,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      Element.trace = true;
                   else if (opt.equals("vs"))
                      SyncManager.trace = true;
+                  else if (opt.equals("vc")) {
+                     RTypeUtil.verboseClasses = true;
+                     options.verboseClasses = true;
+                  }
                   else if (opt.equals("vlck"))
                      options.verboseLocks = true;
                   else if (opt.equals("vsa")) {
@@ -4793,7 +4800,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       try {
          acquireDynLock(false);
          String layerSlashName = LayerUtil.fixLayerPathName(layerName);
-         layerName = layerName.replace(FileUtil.FILE_SEPARATOR, ".");
+         layerName = layerName.replace(FileUtil.FILE_SEPARATOR_CHAR, '.');
          String rootFile = getNewLayerDir();
          String pathName;
          String baseName;
@@ -4885,7 +4892,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                          "   [ -dyn ]: Layers specified after -dyn (and those they extend) are made dynamic unless they are marked: 'compiledOnly'\n" +
                          "   [ -c ]: Generate and compile only - do not run any main methods\n" +
                          "   [ -v ]: Verbose info about the layered system.  [-vb ] [-vba] Trace data binding (or trace all) [-vs] [-vsa] [-vsv] Trace the sync system (or verbose and trace all)\n" +
-                         "   [ -vh ]: verbose html [ -vl ]: display initial layers [ -vp ] turn on performance monitoring " +
+                         "   [ -vh ]: verbose html [ -vl ]: display initial layers [ -vp ] turn on performance monitoring [ -vc ]: info on loading of class files\n" +
                          "   [ -f <file-list>]: Process/compile only these files\n" +
                          "   [ -cp <classPath>]: Use this classpath for resolving compiled references.\n" +
                          "   [ -lp <layerPath>]: Set of directories to search in order for layer directories.\n" +
@@ -4935,7 +4942,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          layerPathName = FileUtil.removeTrailingSlash(layerPathName);
 
          layerFileName = FileUtil.concat(layerDir, LayerUtil.fixLayerPathName(layerPathName));
-         layerTypeName = layerPathName.replace(FileUtil.FILE_SEPARATOR, ".");
+         layerTypeName = layerPathName.replace(FileUtil.FILE_SEPARATOR_CHAR, '.');
          /* For flexibility, allow users to specify the package prefix or not */
       }
 
@@ -5052,7 +5059,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             layerTypeName = layerFileName.substring(layerDir.length());
             while (layerTypeName.startsWith("/"))
                layerTypeName = layerTypeName.substring(1);
-            layerTypeName = layerTypeName.replace("/", ".");
+            layerTypeName = layerTypeName.replace('/', '.');
             layerGroup = CTypeUtil.getPackageName(layerTypeName);
             if (layerDir.equals(layerFileName))
                layerTypeName = CTypeUtil.prefixPath(layerTypeName, FileUtil.getFileName(layerFileName));
@@ -5083,7 +5090,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          else {
             layerGroup = FileUtil.getParentPath(layerPathNamePath);
          }
-         layerPathName = layerPathName.replace(FileUtil.FILE_SEPARATOR, ".");
+         layerPathName = layerPathName.replace(FileUtil.FILE_SEPARATOR_CHAR, '.');
          layerPathPrefix = CTypeUtil.getPackageName(layerPathName);
          layerTypeName = CTypeUtil.prefixPath(layerPrefix, layerPathName);
          /* For flexibility, allow users to specify the package prefix or not */
@@ -5122,7 +5129,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (!lpi.activate) {
-         Layer inactiveLayer = lookupInactiveLayer(layerPathName.replace("/", "."), false, false);
+         Layer inactiveLayer = lookupInactiveLayer(layerPathName.replace('/', '.'), false, false);
          if (inactiveLayer != null)
             return inactiveLayer;
          layer.activated = false;
@@ -5462,7 +5469,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (layer == null) {
-         origLayerPathName = origLayerPathName.replace(".",FileUtil.FILE_SEPARATOR);
+         origLayerPathName = origLayerPathName.replace('.',FileUtil.FILE_SEPARATOR_CHAR);
          String layerBaseName = FileUtil.addExtension(FileUtil.getFileName(origLayerPathName), SCLanguage.STRATACODE_SUFFIX.substring(1));
          String layerFileName = FileUtil.concat(origLayerPathName, layerBaseName);
          File layerPathFile = new File(layerFileName);
@@ -5502,7 +5509,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
     /** Uses the normalizes path name, i.e. "/" even on windows */
    public Layer getLayerByPath(String layerPath, boolean checkPeers) {
-      String layerType = layerPath.replace("/", ".");
+      String layerType = layerPath.replace('/', '.');
       Layer res = layerPathIndex.get(layerType);
       if (res == null && checkPeers && peerSystems != null) {
          for (LayeredSystem peerSys:peerSystems) {
@@ -5933,7 +5940,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public Set<String> getFilesInPackage(String packageName) {
       if (packageName == null)
          packageName = "";
-      packageName = packageName.replace(".", FileUtil.FILE_SEPARATOR);
+      packageName = packageName.replace('.', FileUtil.FILE_SEPARATOR_CHAR);
       HashMap<String,PackageEntry> pkgEnt = packageIndex.get(packageName);
       if (pkgEnt == null)
          return null;
@@ -7174,7 +7181,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          ArrayList<SrcEntry> toStartModels = null;
 
          File srcDir = new File(srcDirName);
-         File depFile = new File(genLayer.buildSrcDir, FileUtil.concat(srcEnt.layer.getPackagePath(), srcPath, srcEnt.layer.getLayerName().replace(".", "-") + "-" + phase.getDependenciesFile()));
+         File depFile = new File(genLayer.buildSrcDir, FileUtil.concat(srcEnt.layer.getPackagePath(), srcPath, srcEnt.layer.getLayerName().replace('.', '-') + "-" + phase.getDependenciesFile()));
          boolean depsChanged = false;
 
          DependencyFile deps;
@@ -9580,7 +9587,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       String packageName = CTypeUtil.getPackageName(typeName);
       String baseName = CTypeUtil.getClassName(typeName);
       SCModel model = new SCModel();
-      model.addSrcFile(new SrcEntry(null, fileName, packageName.replace(".",FileUtil.FILE_SEPARATOR)));
+      model.addSrcFile(new SrcEntry(null, fileName, packageName.replace('.',FileUtil.FILE_SEPARATOR_CHAR)));
       ModifyDeclaration modDecl = new ModifyDeclaration();
       modDecl.typeName = baseName;
       model.setProperty("types", new SemanticNodeList(1));
@@ -10327,7 +10334,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       Object td = getSrcTypeDeclaration(typeName, null, true, false, srcOnly, refLayer, layerResolve);
       if (td == null)
-         return getClassWithPathName(typeName, refLayer, layerResolve, false);
+         return getClassWithPathName(typeName, refLayer, layerResolve, false, false);
       return td;
    }
 
@@ -10862,7 +10869,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * defines the type for dependency purposes.
     */
    public SrcEntry getSrcFileFromTypeName(String typeName, boolean srcOnly, Layer fromLayer, boolean prependPackage, String suffix, Layer refLayer, boolean layerResolve) {
-      String subPath = typeName.replace(".", FileUtil.FILE_SEPARATOR);
+      String subPath = typeName.replace('.', FileUtil.FILE_SEPARATOR_CHAR);
       if (suffix != null)
          subPath = FileUtil.addExtension(subPath, suffix);
 
@@ -10919,8 +10926,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * defines the type for dependency purposes.
     */
    public SrcEntry getSrcFileFromRelativeTypeName(String typeName, String packagePrefix, boolean srcOnly, Layer fromLayer, boolean prependPackage, Layer refLayer, boolean layerResolve) {
-      String relDir = packagePrefix != null ? packagePrefix.replace(".", FileUtil.FILE_SEPARATOR) : null;
-      String subPath = typeName.replace(".", FileUtil.FILE_SEPARATOR);
+      String relDir = packagePrefix != null ? packagePrefix.replace('.', FileUtil.FILE_SEPARATOR_CHAR) : null;
+      String subPath = typeName.replace('.', FileUtil.FILE_SEPARATOR_CHAR);
 
       if (searchInactiveTypesForLayer(refLayer)) {
          int startIx = inactiveLayers.size() - 1;
@@ -10963,11 +10970,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Object getClassWithPathName(String pathName) {
-      return getClassWithPathName(pathName, null, false, false);
+      return getClassWithPathName(pathName, null, false, false, false);
    }
 
-   public Object getClassWithPathName(String pathName, Layer refLayer, boolean layerResolve, boolean alwaysCheckInnerTypes) {
-      Object c = getClass(pathName, layerResolve);
+   public Object getClassWithPathName(String pathName, Layer refLayer, boolean layerResolve, boolean alwaysCheckInnerTypes, boolean forceClass) {
+      Object c = getClass(pathName, layerResolve || forceClass);
       if (c != null)
          return c;
 
@@ -11075,8 +11082,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          Object resObj = otherClassCache.get(className);
          if (resObj == NullClassSentinel.class)
             return null;
-         if (resObj != null)
-            return resObj;
+         if (resObj != null) {
+            if (!forceClass || (resObj instanceof Class))
+               return resObj;
+         }
       }
 
       if (!options.crossCompile || forceClass) {
@@ -11088,12 +11097,23 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
 
-      String classFileName = className.replace(".", FileUtil.FILE_SEPARATOR) + ".class";
+      String classFileName = className.replace('.', FileUtil.FILE_SEPARATOR_CHAR) + ".class";
       if (!forceClass) {
          Object resObj = getClassFromClassFileName(classFileName, className);
          if (resObj != null)
             return resObj;
+
+         // If we are cross compiling and did not find a CFClass, as a last resort lookup for a class - such as [B etc.
+         if (options.crossCompile) {
+            res = RTypeUtil.loadClass(getSysClassLoader(), className, false);
+            if (res != null) {
+               compiledClassCache.put(className, res);
+               return res;
+            }
+         }
       }
+
+
       /*
       for (int i = layers.size()-1; i >= 0; i--) {
          Layer layer = layers.get(i);
@@ -11157,9 +11177,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                // that we are caching files twice.
                ZipFile zip = getCachedZipFile(ent.fileName);
                res = CFClass.load(zip, classFileName, this);
+               if (res != null && options.verboseClasses)
+                  verbose("Loaded CFClass: " + classFileName + " from jar: " + ent.fileName);
             }
             else {
                res = CFClass.load(ent.fileName, classFileName, this);
+               if (res != null && options.verboseClasses)
+                  verbose("Loaded CFClass: " + classFileName);
             }
             if (res == null)
                res = NullClassSentinel.class;
@@ -11332,7 +11356,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
 
-      Object c = getClassWithPathName(name, refLayer, layerResolve, false);
+      Object c = getClassWithPathName(name, refLayer, layerResolve, false, false);
       if (c != null)
          return c;
 
@@ -11664,7 +11688,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return null;
       for (int li = 0; li < baseLayerNames.size(); li++) {
          String baseLayerName = baseLayerNames.get(li);
-         Layer bl = activated ? findLayerByName(relPath, baseLayerName) : getInactiveLayer(baseLayerName.replace("/", "."), openLayers, false, false, false);
+         Layer bl = activated ? findLayerByName(relPath, baseLayerName) : getInactiveLayer(baseLayerName.replace('/', '.'), openLayers, false, false, false);
          if (bl != null)
             baseLayers.add(bl);
          else {
@@ -12099,7 +12123,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (subTypesMap != null) {
          for (String subTypeName:subTypesMap.keySet()) {
             if (type.isLayerType()) {
-               Layer layer = getActiveOrInactiveLayerByPath(subTypeName.replace(".", "/"), null, openLayers, true, true);
+               Layer layer = getActiveOrInactiveLayerByPath(subTypeName.replace('.', '/'), null, openLayers, true, true);
                if (layer != null) {
                   result.add(layer.model.getModelTypeDeclaration());
                }
@@ -12133,7 +12157,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                TypeIndex subTypeIndex = subTypeEnt.getValue();
 
                if (type.isLayerType) {
-                  Layer subLayer = getActiveOrInactiveLayerByPath(subTypeName.replace(".", "/"), null, openLayers, true, true);
+                  Layer subLayer = getActiveOrInactiveLayerByPath(subTypeName.replace('.', '/'), null, openLayers, true, true);
                   if (subLayer != null && subLayer.model != null)
                      result.add(subLayer.model.getModelTypeDeclaration());
                }
@@ -12541,7 +12565,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * we create temporarily to bootstrap layers in other runtimes.   We first create the Layer in the original runtime to see if it's excluded or not.  If so, we remove from the list.
     */
    public Layer getInactiveLayer(String layerPath, boolean openLayer, boolean checkPeers, boolean enabled, boolean skipExcluded) {
-      String layerName = layerPath.replace("/", ".");
+      String layerName = layerPath.replace('/', '.');
       Layer inactiveLayer = lookupInactiveLayer(layerPath, checkPeers, skipExcluded);
       if (inactiveLayer != null) {
          if (inactiveLayer.layeredSystem == this || (inactiveLayer.excludeForProcess(processDefinition) || !inactiveLayer.includeForProcess(processDefinition))) {
@@ -12787,7 +12811,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                continue;
             if (LayerUtil.isLayerDir(filePath)) {
                String layerName = FileUtil.concat(prefix, fileName);
-               String expectedName = layerName.replace(FileUtil.FILE_SEPARATOR, ".");
+               String expectedName = layerName.replace(FileUtil.FILE_SEPARATOR_CHAR, '.');
                try {
                   String relFile = fileName + SCLanguage.STRATACODE_SUFFIX;
                   String absFile = FileUtil.concat(filePath, relFile);

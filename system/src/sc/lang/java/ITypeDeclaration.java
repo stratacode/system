@@ -72,6 +72,10 @@ public interface ITypeDeclaration {
 
    List<Object> getMethods(String methodName, String modifier, boolean includeExtends);
 
+   Object getConstructorFromSignature(String sig);
+
+   Object getMethodFromSignature(String methodName, String signature, boolean resolveLayer);
+
    List<Object> getAllProperties(String modifier, boolean includeAssigns);
 
    /** Returns all of the fields based on the flags.  If modifier is not null then we only return those with have or don't have the modifier based on hasModifier.

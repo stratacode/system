@@ -21,6 +21,7 @@ public class FileUtil {
    public static final String FILE_SEPARATOR = System.getProperty("file.separator");
    public static final char PATH_SEPARATOR_CHAR = PATH_SEPARATOR.charAt(0);
    public static boolean nonStandardFileSeparator = !FILE_SEPARATOR.equals("/");
+   public static final char FILE_SEPARATOR_CHAR = FILE_SEPARATOR.charAt(0);
 
    public static void saveStringAsFile(String fileName, String data, boolean mkdirs) {
       FileUtil.saveStringAsFile(new File(fileName), data, mkdirs);

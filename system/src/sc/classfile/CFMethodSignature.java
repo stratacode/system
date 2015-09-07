@@ -13,4 +13,5 @@ public class CFMethodSignature extends SemanticNode {
    public SemanticNodeList<TypeParameter> typeParameters;
    public SemanticNodeList<JavaType> parameterTypes;
    public JavaType returnType;
+   public SemanticNodeList<JavaType> throwsTypes;
 }

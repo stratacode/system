@@ -753,6 +753,7 @@ public enum Type {
       primitiveIndex.put("void", Void);
       arrayTypeIndex.put("V", Void);
       Void.arrayTypeCode = 'V';
+      Void.primitiveClass = java.lang.Void.TYPE;
 
       arrayTypeIndex.put("L", Object);
       Object.arrayTypeCode = 'L';

@@ -14,6 +14,7 @@ public class SignatureLanguage extends Language implements IParserConstants {
    Symbol greaterThan = new Symbol(">");
 
    SymbolChoice typeName = new SymbolChoice(REPEAT | NOT, ";", "+", "-", "<", ">", ":", "*", "[", EOF);
+   SymbolChoice identifier = new SymbolChoice(REPEAT | NOT, ";", "+", "-", "<", ">", ":", "*", "[", "/", ".", EOF);
    public OrderedChoice type = new OrderedChoice(); // forward ref
    Symbol signatureDims = new Symbol(OPTIONAL | REPEAT, "[");
    Sequence primitiveType = new Sequence("PrimitiveType(signatureDims, signatureCode)", signatureDims,
@@ -26,11 +27,11 @@ public class SignatureLanguage extends Language implements IParserConstants {
    Sequence boundType = new Sequence("BoundType(baseType,boundTypes)", OPTIONAL, optType, colonTypeList);
    Sequence formalTypeParameter = new Sequence("TypeParameter(name,,extendsType)", typeName, colon, boundType);
    Sequence formalTypeParameters = new Sequence("(,[],)", OPTIONAL, lessThan, new Sequence("([])", REPEAT, formalTypeParameter), greaterThan);
-   public Sequence methodSig = new Sequence("CFMethodSignature(typeParameters,,parameterTypes,,returnType,)", formalTypeParameters,
-                                            new Symbol("("), typeList, new Symbol(")"), type, new Symbol(EOF));
+   public Sequence methodSig = new Sequence("CFMethodSignature(typeParameters,,parameterTypes,,returnType,throwsTypes,)", formalTypeParameters,
+                                            new Symbol("("), typeList, new Symbol(")"), type, new Sequence("(,[])", OPTIONAL | REPEAT, new Symbol("^"), type), new Symbol(EOF));
    Sequence typeArguments = new Sequence("(,[],)", OPTIONAL | REPEAT, lessThan, typeList, greaterThan);
-   Sequence namedType = new Sequence("ClassType(signatureDims, signatureCode, compiledTypeName, typeArguments,)",
-           signatureDims, new SymbolChoice("L", "T"), typeName, typeArguments, new Symbol(";"));
+   Sequence namedType = new Sequence("ClassType(signatureDims, signatureCode, typeName, typeArguments, chainedTypes,)",
+           signatureDims, new SymbolChoice("L", "T"), identifier, typeArguments, new Sequence("ClassType(, typeName, typeArguments)", OPTIONAL | REPEAT, new SymbolChoice(".", "/"), identifier, typeArguments), new Symbol(";"));
    { type.set(primitiveType, namedType, extendsType); }
 
    public Sequence classSig = new Sequence("CFClassSignature(typeParameters, extendsType, implementsTypes)",

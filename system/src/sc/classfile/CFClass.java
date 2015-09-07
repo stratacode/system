@@ -20,6 +20,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.zip.ZipEntry;
@@ -42,6 +43,9 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
    String fullTypeName;
 
    CFClassSignature signature;
+
+   static final private int SyntheticModifier = 0x1000;
+   static final private int AccessFlagInterfaceMethod = Modifier.VOLATILE | SyntheticModifier; // Volatile & Synthetic appears to mean a method defined on the interface and inherited
 
    CFClass(ClassFile cl, Layer layer) {
       classFile = cl;
@@ -154,49 +158,53 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       }
    }
 
+   private static Object[] mergeInterfaceMethods(CoalescedHashMap[] interfaceMethods, String name) {
+      Object[] res = null;
+      for (CoalescedHashMap<String,Object[]> m:interfaceMethods) {
+         Object[] nextRes = m.get(name);
+         if (nextRes != null) {
+            if (res == null)
+               res = nextRes;
+            else {
+               Object[] combined = new Object[res.length+nextRes.length];
+               System.arraycopy(res, 0, combined, 0, res.length);
+               System.arraycopy(nextRes, 0, combined, res.length, nextRes.length);
+               res = combined;
+            }
+         }
+      }
+      return res;
+   }
+
+   // TODO: this is very similar to the method in RTypeUtil which works just for Class objects.  Here we are doing the same thing for CFClass.  We could merge this code and
+   // put it into ModelUtil so it works generically pretty easily.
    private void initMethodAndFieldIndex() {
       CFMethod[] methods = classFile.methods;
       int tableSize = methods.length;
 
-      CoalescedHashMap<String,Object[]> superCache = null;
+      CoalescedHashMap<String,Object[]> superMethods = null;
+      CoalescedHashMap<String,Object[]>[] interfaceMethods = null;
 
       if (extendsType != null) {
-         superCache = ModelUtil.getMethodCache(extendsType);
-         if (superCache != null)
-            tableSize += superCache.size;
+         superMethods = ModelUtil.getMethodCache(extendsType);
+         if (superMethods != null)
+            tableSize += superMethods.size;
       }
       if (implementsTypes != null) {
          int numInterfaces = implementsTypes.size();
-         CoalescedHashMap<String,Object[]> implCache;
+         interfaceMethods = new CoalescedHashMap[numInterfaces];
          for (int i = 0; i < numInterfaces; i++) {
             Object implType = implementsTypes.get(i);
             if (implType != null) {
-               implCache = ModelUtil.getMethodCache(implType);
-               if (implCache != null)
-                  tableSize += implCache.size;
+               interfaceMethods[i] = ModelUtil.getMethodCache(implType);
+               if (interfaceMethods[i] != null)
+                  tableSize += interfaceMethods[i].size;
             }
          }
       }
 
       CoalescedHashMap<String,Object[]> cache = methodsByName = new CoalescedHashMap<String,Object[]>(tableSize);
 
-      for (CFMethod meth:methods) {
-         Object[] meths = cache.get(meth.name);
-         if (meths == null) {
-            meths = new Object[1];
-         }
-         else {
-            Object[] newMeths = new Object[meths.length+1];
-            System.arraycopy(meths, 0, newMeths, 0, meths.length);
-            meths = newMeths;
-         }
-         cache.put(meth.name, meths);
-         meths[meths.length-1] = meth;
-      }
-
-      if (superCache != null) {
-         mergeSuperTypeMethods(superCache);
-      }
       if (implementsTypes != null) {
          CoalescedHashMap<String,Object[]> implCache;
          for (int k = 0; k < implementsTypes.size(); k++) {
@@ -204,6 +212,81 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
             if (implType != null) {
                implCache = ModelUtil.getMethodCache(implType);
                mergeSuperTypeMethods(implCache);
+            }
+         }
+      }
+      if (superMethods != null) {
+         mergeSuperTypeMethods(superMethods);
+      }
+
+      for (CFMethod meth:methods) {
+         String methodName = meth.name;
+         Object method = meth;
+         // Used to represent a method we inherit from the interface with a different signature (not that I could find this documented anyplace)
+         if ((meth.accessFlags & AccessFlagInterfaceMethod) == AccessFlagInterfaceMethod)
+            continue;
+         // Is this actually set on methods anyplace by itself?
+         if ((meth.accessFlags & Modifier.VOLATILE) != 0) {
+            continue;
+         }
+         // Synthetic method - e.g. lambda code points and stuff like that
+         if ((meth.accessFlags & SyntheticModifier) != 0) {
+            continue;
+         }
+         Object[] methodList = cache.get(methodName);
+         if (methodList == null) {
+            methodList = new Object[1];
+            methodList[0] = method;
+            cache.put(methodName, methodList);
+         }
+         else {
+            // Do not include super methods for the constructor - those are not inherited in Java
+            Object[] superMethodList = methodName.equals("<init>") ? null : cache.get(methodName);
+            boolean addToList = true;
+            if (superMethodList != null) {
+               for (int j = 0; j < superMethodList.length; j++) {
+                  if (ModelUtil.overridesMethod(method, superMethodList[j])) {
+                     addToList = false;
+                     // Only override the method once for a given class.  Java has an annoying habit of returning
+                     // interface methods that have different signatures from the class versions after the main
+                     // methods in this list.  As long as we ignore those other methods, we get by ok.
+                     if (j < methodList.length && superMethodList[j] == methodList[j]) {
+                        // We start out sharing the array from our super class = make a copy on the
+                        // first change only
+                        method = ModelUtil.pickMoreSpecificMethod(method, superMethodList[j], null);
+                        // We start out with a CFMethod[] but may need to replace it with a Class if we override something
+                        methodList = checkMethodList(cache, methodList, methodName, method);
+                        methodList[j] = method;
+                     }
+                     // We'd like to break but unfortunately Java returns methods with the same signature from
+                     // getDeclared methods (e.g. AbstractStringBuilder.append(char)).   it also will not let you
+                     // use those methods on an instance in this case.  So we need to replace all methods in the
+                     // methodList that are overridden by this method.
+                     //break;
+                  }
+               }
+            }
+
+            // New method - expand the list
+            if (addToList) {
+               Object[] newCachedList = new Object[methodList.length+1];
+               System.arraycopy(methodList, 0, newCachedList, 0, methodList.length);
+               newCachedList[methodList.length] = method;
+               methodList = newCachedList;
+               cache.put(methodName, methodList);
+            }
+            else {
+               for (int j = 0; j < methodList.length; j++) {
+                  Object otherMeth = methodList[j];
+                  if (otherMeth != method && ModelUtil.overridesMethod(method, otherMeth)) {
+                     Object newMethod = ModelUtil.pickMoreSpecificMethod(method, otherMeth, null);
+                     if (newMethod == method) {
+                        methodList = checkMethodList(cache, methodList, methodName, method);
+                        methodList[j] = method;
+                        break;
+                     }
+                  }
+               }
             }
          }
       }
@@ -216,6 +299,16 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       for (CFField field:fields) {
          fieldsByName.put(field.name, field);
       }
+   }
+
+   static Object[] checkMethodList(CoalescedHashMap cache, Object[] methodList, String methodName, Object method) {
+      if ((!(method instanceof CFMethod) && methodList instanceof CFMethod[]) || (methodList instanceof Method[])) {
+         Object[] newMethodList = new Object[methodList.length];
+         System.arraycopy(methodList, 0, newMethodList, 0, methodList.length);
+         methodList = newMethodList;
+         cache.put(methodName, methodList);
+      }
+      return methodList;
    }
 
    public void start() {
@@ -239,10 +332,10 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          if (implJavaTypes != null) {
             implementsTypes = new ArrayList<Object>(implJavaTypes.size());
             for (int i = 0; i < implJavaTypes.size(); i++) {
-               String implTypeCFName = ((ClassType)implJavaTypes.get(i)).getCompiledTypeName();
-               Object implType = system.getClassFromCFName(implTypeCFName, null);
+               String implTypeName = ((ClassType)implJavaTypes.get(i)).getFullTypeName();
+               Object implType = system.getClass(implTypeName, false);
                if (implType == null)
-                  error("Can't find interface: " + implTypeCFName);
+                  error("Can't find interface: " + implTypeName);
                else
                   implementsTypes.add(implType);
             }
@@ -277,8 +370,11 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          if (key != null) {
             Object[] superMethods = (Object[]) values[i];
             Object[] thisMethods = methodsByName.get(key);
-            if (thisMethods == null)
-               methodsByName.put(key, superMethods);
+            if (thisMethods == null) {
+               thisMethods = new Object[superMethods.length];
+               System.arraycopy(superMethods, 0, thisMethods, 0, superMethods.length);
+               methodsByName.put(key, thisMethods);
+            }
             else {
                Object[] origThisMeths = thisMethods;
                for (int s = 0; s < superMethods.length; s++) {
@@ -521,13 +617,19 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
             return system.getInnerCFClass(getFullTypeName(), name);
          return layer.getInnerCFClass(getFullTypeName(), name);
       }
-
+      if (extendsType != null) {
+         Object res = ModelUtil.getInnerType(extendsType, name, ctx);
+         if (res != null)
+            return res;
+      }
       return null;
    }
 
    public boolean implementsType(String otherName, boolean assignment, boolean allowUnbound) {
       if (!started)
          start();
+
+      otherName = otherName.replace('$', '.');
 
       if (otherName.equals(getFullTypeName()))
          return true;
@@ -618,6 +720,35 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       if (!started)
          start();
       return methodsByName;
+   }
+
+   public Object getConstructorFromSignature(String sig) {
+      Object[] cstrs = getConstructors(null);
+      if (cstrs == null)
+         return null;
+      for (int i = 0; i < cstrs.length; i++) {
+         Object constr = cstrs[i];
+         if (StringUtil.equalStrings(((ConstructorDefinition) constr).getTypeSignature(), sig))
+            return constr;
+      }
+      return null;
+   }
+
+   public Object getMethodFromSignature(String methodName, String signature, boolean resolveLayer) {
+      List<Object> methods = getMethods(methodName, null, true);
+      if (methods == null) {
+         // Special case way to refer to the constructor
+         if (methodName.equals(getTypeName()))
+            return getConstructorFromSignature(signature);
+         // TODO: default constructor?
+         return null;
+      }
+      for (Object meth:methods) {
+         if (StringUtil.equalStrings(ModelUtil.getTypeSignature(meth), signature)) {
+            return meth;
+         }
+      }
+      return null;
    }
 
    public List<Object> getMethods(String methodName, String modifier, boolean includeExtends) {
@@ -1015,5 +1146,15 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          else
             System.out.println(StringUtil.arrayToString(args));
       }
+   }
+
+   public boolean isAnonymous() {
+      int ix = fullTypeName.indexOf("$");
+      if (ix == -1)
+         return false;
+      boolean anon = fullTypeName.length() > ix && Character.isDigit(fullTypeName.charAt(ix+1));
+      if (anon)
+         return true;
+      return false;
    }
 }

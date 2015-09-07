@@ -45,4 +45,15 @@ public class CoercedTypeDeclaration extends WrappedTypeDeclaration {
       }
       return false;
    }
+
+   public boolean implementsType(String otherTypeName, boolean assignment, boolean allowUnbound) {
+      // TODO: should we verify that our parameters match if the other type has assigned params too?
+      if (ModelUtil.implementsType(baseType, otherTypeName, assignment, allowUnbound))
+         return true;
+      for (Object iface:interfaces) {
+         if (ModelUtil.implementsType(iface, otherTypeName, assignment, allowUnbound))
+            return true;
+      }
+      return false;
+   }
 }

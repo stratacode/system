@@ -900,10 +900,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                         break;
                      depType = nextDepType;
                   }
-                  if (depType instanceof Class) {
-                     Class depClass = (Class) depType;
-                     if (!depClass.isPrimitive()) {
-                        if (hasAlias(depClass))
+                  if (ModelUtil.isCompiledClass(depType)) {
+                     if (!ModelUtil.isPrimitive(depType)) {
+                        if (hasAlias(depType))
                            continue;
 
                         String depModuleFile = getJSModuleFile(depType, false);
@@ -917,8 +916,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                               System.err.println("Warning: no source for type: " + ModelUtil.getTypeName(depType) + " to resolve dependency for type: " + type);
                         }
 
-                        if (depType instanceof Class) {
-                           if (addJSLibFiles(depClass, true, typeLibFilesStr == null ? null : typeLibFiles[0], type, "uses") == null && !hasJSCompiled(type)) {
+                        if (ModelUtil.isCompiledClass(depType)) {
+                           if (addJSLibFiles(depType, true, typeLibFilesStr == null ? null : typeLibFiles[0], type, "uses") == null && !hasJSCompiled(type)) {
                               String warnTypeName = type.typeName;
                               if (!warnedCompiledTypes.contains(warnTypeName)) {
                                  System.err.println("*** Warning: js type: " + warnTypeName + " in layer: " + type.layer + " depends on compiled class: " + depType);
@@ -1185,7 +1184,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             }
          }
 
-         if (type instanceof Class) {
+         if (ModelUtil.isCompiledClass(type)) {
             return jsBuildInfo.jsModuleNames.get(typeName);
          }
       }
@@ -1346,13 +1345,13 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       if (jsBuildInfo.replaceTypes.get(typeName) != null)
          return true;
 
-      if (type instanceof Class) {
+      if (ModelUtil.isCompiledClass(type)) {
          Object newType = ModelUtil.findTypeDeclaration(system, ModelUtil.getTypeName(type), null, false);
          if (newType != null) {
             type = newType;
          }
          //type = ModelUtil.resolveSrcTypeDeclaration(system, type);
-         if (type instanceof Class) {
+         if (ModelUtil.isCompiledClass(type)) {
             String pkgName = CTypeUtil.getPackageName(typeName);
             if (pkgName != null) {
                String className = CTypeUtil.getClassName(typeName);
@@ -1942,28 +1941,29 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
    Object resolveBaseType(Object depType) {
       // First get the most specific definition of this type
-      if (depType instanceof Class) {
-         Class depCL = (Class) depType;
-         if (depCL.isPrimitive())
+      if (ModelUtil.isCompiledClass(depType)) {
+         if (ModelUtil.isPrimitive(depType))
             return null;
          //depType = ModelUtil.resolveSrcTypeDeclaration(system, depType);
          // But do not force the load of the src at this time.
          Object newDepType = ModelUtil.findTypeDeclaration(system, ModelUtil.getTypeName(depType), null, false);
          if (newDepType != null)
             depType = newDepType;
-         else if (!depCL.isArray() && !depCL.isAnonymousClass())
+         else if (!ModelUtil.isArray(depType) && !ModelUtil.isAnonymousClass(depType))
             System.out.println("*** diagnostic code: remove!");
 
       }
 
 
-      if (depType instanceof Class) {
-         Class depClass = (Class) depType;
-         if (depClass.isArray())
-            depType = resolveBaseType(depClass.getComponentType());
+      if (ModelUtil.isCompiledClass(depType)) {
+         if (ModelUtil.isArray(depType)) {
+            Object newDepType = resolveBaseType(ModelUtil.getArrayComponentType(depType));
+            if (newDepType == null)
+               return null;
+         }
 
          Object enclType;
-         if ((enclType = ModelUtil.getEnclosingType(depClass)) != null)
+         if ((enclType = ModelUtil.getEnclosingType(depType)) != null)
             depType = resolveBaseType(enclType);
       }
       if (depType instanceof TypeParameter) {
@@ -2243,19 +2243,18 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                      if (ModelUtil.isParameterizedType(depType))
                         depType = ModelUtil.getParamTypeBaseType(depType);
                      if (!(depType instanceof BodyTypeDeclaration)) {
-                        if (depType instanceof Class) {
-                           Class depClass = (Class) depType;
-                           if (!depClass.isPrimitive()) {
-                              String depTypeName = ModelUtil.getTypeName(depClass);
+                        if (ModelUtil.isCompiledClass(depType)) {
+                           if (!ModelUtil.isPrimitive(depType)) {
+                              String depTypeName = ModelUtil.getTypeName(depType);
                               JSTypeInfo depJTI = getJSTypeInfo(depTypeName, false);
                               if (depJTI != null) {
                                  // If it's an unassigned class it's in the same file, or if the files match.
                                  if (depJTI.jsModuleFile == null || (typeLibFile != null && depJTI.jsModuleFile.equals(typeLibFile))) {
-                                    addCompiledTypesToFile(ModelUtil.getTypeName(depClass), typesInFile, parentLibFile, genLayer, jsFileBody, typesInSameFile);
+                                    addCompiledTypesToFile(depTypeName, typesInFile, parentLibFile, genLayer, jsFileBody, typesInSameFile);
                                  }
                                  continue;
                               }
-                              else if (hasJSLibFiles(depClass))
+                              else if (hasJSLibFiles(depType))
                                  continue;
                               // TODO: remove this as it's redundant now since that logic is folded in above.
                               /*

@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import sc.classfile.ClassFile;
 import sc.dyn.IDynObjManager;
 import sc.dyn.IDynObject;
 import sc.lang.*;
@@ -2673,8 +2674,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
          // Make sure we switch to the class version if we are compiled.  Since this is the runtime description
          // we don't want to get field references for things which have had get/set methods created.
-         if (extType != null && !ModelUtil.isDynamicType(extType))
+         if (extType != null && !ModelUtil.isDynamicType(extType)) {
             extType = ModelUtil.getRuntimeType(extType);
+            if (extType == null)
+               System.err.println("*** No runtime type for extType!");
+         }
 
          if (modType != null && !ModelUtil.isDynamicType(modType))
             modType = ModelUtil.getRuntimeType(modType);
@@ -7036,7 +7040,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if (mgrType != null)
             types.add(mgrType);
          else
-            displayTypeError("No CompilierSettings.dynChildManager class: ", dynChildMgrClassName, " for: ");
+            displayTypeError("No CompilerSettings.dynChildManager class: ", dynChildMgrClassName, " for: ");
       }
    }
 
@@ -7842,7 +7846,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       boolean includeSuper = false;
 
       if (syncAnnot != null) {
-         syncMode = (SyncMode) ModelUtil.getAnnotationValue(syncAnnot, "syncMode");
+         Object av = ModelUtil.getAnnotationValue(syncAnnot, "syncMode");
+         syncMode = (SyncMode) av;
          if (syncMode == null) // The @Sync tag without any mode just turns it on.
             syncMode = SyncMode.Enabled;
          String[] destArray = (String[]) ModelUtil.getAnnotationValue(syncAnnot, "destinations");

@@ -4,10 +4,7 @@
 
 package sc.classfile;
 
-import sc.lang.java.AccessLevel;
-import sc.lang.java.IDefinition;
-import sc.lang.java.JavaSemanticNode;
-import sc.lang.java.ITypeDeclaration;
+import sc.lang.java.*;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.type.RTypeUtil;
@@ -128,8 +125,9 @@ public class ClassFile {
             Attribute att;
             attributes[i] = att = readAttribute();
             String name = att.getName();
-            if (name != null)
+            if (name != null) {
                attributesByName.put(name, att);
+            }
          }
          if (input.available() != 0)
             System.err.println("*** Failed to read all data in class file");
@@ -226,8 +224,8 @@ public class ClassFile {
       return aa.getAnnotation(annotName);
    }
 
-   public FieldMethodInfo readFieldMethodInfo(boolean b) throws IOException {
-      FieldMethodInfo fi = b ? new CFField() : new CFMethod();
+   public FieldMethodInfo readFieldMethodInfo(boolean fld) throws IOException {
+      FieldMethodInfo fi = fld ? new CFField() : new CFMethod();
       fi.accessFlags = input.readUnsignedShort();
       fi.name = readConstantRefString();
       fi.desc = readConstantRefString();
@@ -291,11 +289,16 @@ public class ClassFile {
 
    private final int Utf8 = 1;
 
-   public static class ConstantPoolEntry {
+   public static class ConstantPoolEntry implements IValueNode {
       short type;
 
       public Object getValue() {
          return this;
+      }
+
+      @Override
+      public Object eval(Class expectedType, ExecutionContext ctx) {
+         return getValue();
       }
    }
 
@@ -361,6 +364,10 @@ public class ClassFile {
       String value;
 
       public Object getValue() {
+         return value;
+      }
+
+      public String toString() {
          return value;
       }
    }
@@ -451,7 +458,7 @@ public class ClassFile {
             ut.value = new String(buffer, 0, len);
             return ut;
          case 0:
-            System.out.println("*** ack");
+            System.out.println("*** Unrecognized value in class file");
             return null;
          case InvokeDynamic:
             // implement invoke dynamic (java/util/Comparator.class)
@@ -493,6 +500,7 @@ public class ClassFile {
       attributeClasses.put("RuntimeVisibleAnnotations", AnnotationsAttribute.class);
       attributeClasses.put("Signature", SignatureAttribute.class);
       attributeClasses.put("Exceptions", ExceptionsAttribute.class);
+      attributeClasses.put("Code", CodeAttribute.class);
    }
 
    public static class SignatureAttribute implements Attribute {
@@ -549,6 +557,21 @@ public class ClassFile {
          attributeData = new byte[len];
          if (input.read(attributeData, 0, len) != len)
             throw new IllegalArgumentException("EOF reading attribute data");
+      }
+   }
+
+   /** The code attributes - stored on methods for holding the byte code */
+   public static class CodeAttribute implements Attribute {
+      public void setName(String name) {}
+      public String getName() {
+         return "Code";
+      }
+
+      public void readRest(ClassFile file, DataInputStream input) throws IOException {
+         int len = input.readInt();
+         // TODO: Add a flag or an option where we preserve this info?
+         if (input.skipBytes(len) != len)
+            throw new IllegalArgumentException("EOF reading code attribute");
       }
    }
 
@@ -642,8 +665,14 @@ public class ClassFile {
    public static class EnumValue {
       public String typeName;
       public String valueName;
-      public EnumValue(String typeName, String valName) {
-         this.typeName = typeName;
+      public EnumValue(String typeSig, String valName) {
+         // Is there a chance this is another type signature?  If so, do we need to parse this and turn it into a type name?
+         if (typeSig.startsWith("L")) {
+            this.typeName = typeSig.substring(1, typeSig.length()-1).replace('/', '.');
+         }
+         else {
+            this.typeName = typeSig;
+         }
          this.valueName = valName;
       }
    }

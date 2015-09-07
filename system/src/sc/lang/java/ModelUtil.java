@@ -58,7 +58,11 @@ public class ModelUtil {
       name = name.replace("$", ".");
       if (model == null)
          return t;
-      return model.findTypeDeclaration(name, false);
+      Object res = model.findTypeDeclaration(name, false);
+      if (res != null)
+         return res;
+      // certain array classes do not get resolved this way - e.g. [[Lsc.lang.java.DynStubParameters.DynConstructor;
+      return t;
    }
 
    public static Object getVariableTypeDeclaration(Object varObj, JavaModel model) {
@@ -767,9 +771,21 @@ public class ModelUtil {
       return res;
    }
 
+   public static Object getConstructorFromSignature(Object type, String sig) {
+      if (type instanceof ITypeDeclaration) {
+         return ((ITypeDeclaration) type).getConstructorFromSignature(sig);
+      }
+      else if (type instanceof Class) {
+         return PTypeUtil.resolveMethod((Class) type, ModelUtil.getTypeName(type), sig);
+      }
+      else
+         throw new UnsupportedOperationException();
+   }
+
    public static Object getMethodFromSignature(Object type, String methodName, String paramSig, boolean resolveLayer) {
-      if (type instanceof BodyTypeDeclaration)
-         return ((BodyTypeDeclaration) type).getMethodFromSignature(methodName, paramSig, resolveLayer);
+      if (type instanceof ITypeDeclaration) {
+         return ((ITypeDeclaration) type).getMethodFromSignature(methodName, paramSig, resolveLayer);
+      }
       else if (type instanceof Class)
          return PTypeUtil.resolveMethod((Class) type, methodName, paramSig);
       else if (type instanceof DynType)
@@ -921,8 +937,13 @@ public class ModelUtil {
       if (ModelUtil.isInterface(ModelUtil.getEnclosingType(c1)) && !ModelUtil.isInterface(ModelUtil.getEnclosingType(c2)))
          return c2;
 
-      if (ModelUtil.hasModifier(c1, "abstract"))
+      // Most likely only one method in this list is abstract but just to be paranoid, we check both flags
+      boolean c1abs = ModelUtil.hasModifier(c1, "abstract");
+      boolean c2abs = ModelUtil.hasModifier(c2, "abstract");
+      if (c1abs && !c2abs)
          return c2;
+      if (c2abs && !c1abs)
+         return c1;
 
       if (ModelUtil.isAssignableFrom(ModelUtil.getReturnType(c2), ModelUtil.getReturnType(c1)))
          return c1;
@@ -1033,7 +1054,11 @@ public class ModelUtil {
          return true;
       }
       if (type instanceof Class) {
-         sc.type.Type t = sc.type.Type.get((Class) type);
+         Class cl = (Class) type;
+         boolean cval = cl.isPrimitive();
+         sc.type.Type t = sc.type.Type.get(cl);
+         if (cval != (t.primitiveClass == type))
+            System.err.println("*** Internal error with primitive type comparison: " + type + " and: " + t);
          return t.primitiveClass == type;
       }
       else if (type instanceof WrappedTypeDeclaration) {
@@ -1339,6 +1364,8 @@ public class ModelUtil {
       }
       else if (arrayType instanceof GenericArrayType)
          return true;
+      else if (arrayType instanceof CFClass)
+         return false;
       return false;
    }
 
@@ -2289,6 +2316,8 @@ public class ModelUtil {
          return ((FieldDefinition) field).type.getTypeDeclaration();
       else if (field instanceof VariableDefinition)
          return getFieldType(((VariableDefinition) field).getDefinition());
+      else if (field instanceof IFieldDefinition)
+         return ((IFieldDefinition) field).getFieldType();
       else
          throw new UnsupportedOperationException();
    }
@@ -3606,7 +3635,11 @@ public class ModelUtil {
          return res;
       }
       else if (member instanceof ITypedObject) {
-         return ((ITypedObject) member).getGenericTypeName(resultType, includeDims);
+         Object pval = ((ITypedObject) member).getTypeDeclaration();
+         String res = resolveGenericTypeName(getEnclosingType(member), resultType, pval, includeDims);
+         if (res == null)
+            return "Object";
+         return res;
       }
       else
          throw new IllegalArgumentException();
@@ -4133,7 +4166,7 @@ public class ModelUtil {
    public static Object resolveSrcTypeDeclaration(LayeredSystem sys, Object type, boolean cachedOnly, boolean srcOnly) {
       if (type instanceof ParamTypeDeclaration)
          type = ((ParamTypeDeclaration) type).getBaseType();
-      if (type instanceof Class || type instanceof ParameterizedType) {
+      if (ModelUtil.isCompiledClass(type) || type instanceof ParameterizedType) {
          String typeName = ModelUtil.getTypeName(type);
          if (sys != null) {
             Object res = cachedOnly ? sys.getCachedTypeDeclaration(typeName, null, null, false, true) : sys.getSrcTypeDeclaration(typeName, null, true, false, srcOnly);
@@ -6062,7 +6095,7 @@ public class ModelUtil {
    }
 
    public static Object refreshBoundClass(LayeredSystem sys, Class boundClass) {
-      return sys.getClass(boundClass.getName(), false);
+      return sys.getClass(boundClass.getName(), true);
    }
 
    public static Object getEnum(Object currentType, String nextName) {
@@ -6562,7 +6595,7 @@ public class ModelUtil {
    }
 
    public static boolean needsClassInit(Object srcType) {
-      if (srcType instanceof Class)
+      if (ModelUtil.isCompiledClass(srcType))
          return true;
       if (srcType instanceof BodyTypeDeclaration) {
          return ((BodyTypeDeclaration) srcType).needsClassInit();
@@ -6977,5 +7010,14 @@ public class ModelUtil {
          }
       }
       return null;
+   }
+
+   public static boolean isAnonymousClass(Object depClass) {
+      if (depClass instanceof Class)
+         return ((Class) depClass).isAnonymousClass();
+      else if (depClass instanceof CFClass)
+         return ((CFClass) depClass).isAnonymous();
+      else // TODO: do we need this for ITypeDeclaration in general?
+         throw new UnsupportedOperationException();
    }
 }

@@ -550,6 +550,16 @@ public abstract class BaseLambdaExpression extends Expression {
       }
 
       @Override
+      public Object getConstructorFromSignature(String sig) {
+         return null;
+      }
+
+      @Override
+      public Object getMethodFromSignature(String methodName, String signature, boolean resolveLayer) {
+         return null;
+      }
+
+      @Override
       public List<Object> getAllProperties(String modifier, boolean includeAssigns) {
          return null;
       }

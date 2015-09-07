@@ -288,6 +288,20 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
       return Arrays.asList(meths);
    }
 
+   @Override
+   public Object getConstructorFromSignature(String sig) {
+      if (rootType == null)
+         return null;
+      return ModelUtil.getConstructorFromSignature(rootType, sig);
+   }
+
+   @Override
+   public Object getMethodFromSignature(String methodName, String signature, boolean resolveLayer) {
+      if (rootType == null)
+         return null;
+      return ModelUtil.getMethodFromSignature(rootType, methodName, signature, resolveLayer);
+   }
+
    public List<Object> getAllProperties(String modifier, boolean includeAssigns) {
       if (rootType == null)
          return null;

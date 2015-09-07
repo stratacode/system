@@ -131,7 +131,7 @@ public class EnumDeclaration extends TypeDeclaration {
       if (typeName == null)
          return null;
       JavaModel model = getJavaModel();
-      Object classObj = model.getClass(typeName, false, model.getLayer(), model.isLayerModel);
+      Object classObj = model.getClass(typeName, false, model.getLayer(), model.isLayerModel, true);
       if (classObj instanceof Class)
          return (Class) classObj;
       return null;

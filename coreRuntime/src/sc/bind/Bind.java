@@ -508,7 +508,6 @@ public class Bind {
             else
                newListeners = oldListeners;
 
-
             BindingListener n = new BindingListener();
             n.eventMask = eventMask;
             n.listener = listener;

@@ -1496,7 +1496,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             String rootPath = dir.getPath();
             layeredSystem.addToPackageIndex(rootPath, this, false, true, absPrefix, fn);
 
-            String srcRelType = srcPath.replace(FileUtil.FILE_SEPARATOR, ".");
+            String srcRelType = srcPath.replace(FileUtil.FILE_SEPARATOR_CHAR, '.');
 
             // Has this type already been loaded in a previous layer?  If so, we need to record that we need to apply this type in this layer after the
             // layer has been started.
@@ -1934,7 +1934,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
             // Inner type
             if (path.indexOf(TypeDeclaration.INNER_STUB_SEPARATOR) != -1) {
-               String dotPath = FileUtil.removeExtension(path.replace(FileUtil.FILE_SEPARATOR, "."));
+               String dotPath = FileUtil.removeExtension(path.replace(FileUtil.FILE_SEPARATOR_CHAR, '.'));
                String[] typeNames = StringUtil.split(dotPath, TypeDeclaration.INNER_STUB_SEPARATOR);
                // Pick the outermost type to see if that is still in use
                String typeName = typeNames[0].replace('.', '/') + ".java";
@@ -2209,7 +2209,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                //
                // Not using layerResolve here since this type is resolved for runtime, not for layer init time.
                if (typeObj == null)
-                  typeObj = layeredSystem.getClassWithPathName(typeName, this, false, true);
+                  typeObj = layeredSystem.getClassWithPathName(typeName, this, false, true, false);
                if (imp.hasWildcard()) {
                   boolean addedAny = false;
                   if (typeObj != null) {
@@ -2478,7 +2478,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             String typeName;
             // srcFile entries come back without suffixes... just ignore them.
             if (depProc != null) {
-               String fullTypeName = CTypeUtil.prefixPath(depProc.getPrependLayerPackage() ? packagePrefix : null, FileUtil.removeExtension(srcFile).replace(FileUtil.FILE_SEPARATOR, "."));
+               String fullTypeName = CTypeUtil.prefixPath(depProc.getPrependLayerPackage() ? packagePrefix : null, FileUtil.removeExtension(srcFile).replace(FileUtil.FILE_SEPARATOR_CHAR, '.'));
                TypeDeclaration td = (TypeDeclaration) layeredSystem.getSrcTypeDeclaration(fullTypeName, this.getNextLayer(), depProc.getPrependLayerPackage(), false, true, this, false);
                if (td != null) {
                   ParseUtil.initAndStartComponent(td);
@@ -2724,8 +2724,12 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          }
          else
             cl = CFClass.load(FileUtil.concat(cdirs.get(i), classFileName), this);
-         if (cl != null)
+         if (cl != null) {
+            if (layeredSystem.options.verboseClasses) {
+               verbose("Loaded CFClass: " + classFileName);
+            }
             return cl;
+         }
       }
       return null;
    }

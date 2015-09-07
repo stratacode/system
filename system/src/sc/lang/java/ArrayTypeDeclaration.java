@@ -264,6 +264,16 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
       return null;
    }
 
+   @Override
+   public Object getConstructorFromSignature(String sig) {
+      return null;
+   }
+
+   @Override
+   public Object getMethodFromSignature(String methodName, String signature, boolean resolveLayer) {
+      return null;
+   }
+
    public List<Object> getAllProperties(String modifier, boolean includeAssigns) {
       return null;
    }

@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import sc.classfile.CFMethod;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.util.StringUtil;
@@ -521,7 +522,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
       else if (method instanceof ParamTypedMethod) {
          return method.toString();
       }
-      else if (method instanceof Method) {
+      else if (method instanceof Method || method instanceof CFMethod) {
          Object[] args = ModelUtil.getParameterJavaTypes(method);
          String argsStr = args == null ? "" : StringUtil.arrayToString(args);
          return ModelUtil.getMethodName(method) + "(" + argsStr + ")";

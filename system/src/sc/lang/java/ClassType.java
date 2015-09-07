@@ -27,7 +27,7 @@ public class ClassType extends JavaType {
    private boolean chained;            // Is this type part of another parent type
    transient Object runtimeClass;
    transient Object type;
-   private transient String compiledTypeName;
+   //private transient String compiledTypeName;
    transient Object[] errorArgs;
 
    public final static Object FAILED_TO_INIT_SENTINEL = "Invalid type sentinel";
@@ -489,6 +489,7 @@ public class ClassType extends JavaType {
     * It's a different way of producing a ClassType...
     * need to manually patch up the chainedTypes and typeArguments so they are structured like the normal
     class type. */
+   /*
    public void setCompiledTypeName(String compiledTypeName) {
       this.compiledTypeName = compiledTypeName;
       setFullTypeName(compiledTypeName.replace('$','.').replace('/','.'));
@@ -497,6 +498,7 @@ public class ClassType extends JavaType {
    public String getCompiledTypeName() {
       return compiledTypeName;
    }
+   */
 
    public void setFullTypeName(String fullTypeName) {
       int ix = fullTypeName.indexOf(".");
@@ -787,7 +789,7 @@ public class ClassType extends JavaType {
       if ((options & CopyInitLevels) != 0) {
          res.chained = chained;
          res.runtimeClass = runtimeClass;
-         res.compiledTypeName = compiledTypeName;
+         //res.compiledTypeName = compiledTypeName;
       }
       return res;
    }

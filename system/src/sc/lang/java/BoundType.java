@@ -94,11 +94,14 @@ public class BoundType extends JavaType {
 
    public String toGenerateString() {
       StringBuilder sb = new StringBuilder();
-      sb.append(baseType.toGenerateString());
-      for (int i = 0; i < boundTypes.size(); i++) {
-         JavaType t = boundTypes.get(i);
-         sb.append(" & ");
-         sb.append(t.toGenerateString());
+      if (baseType != null)
+         sb.append(baseType.toGenerateString());
+      if (boundTypes != null) {
+         for (int i = 0; i < boundTypes.size(); i++) {
+            JavaType t = boundTypes.get(i);
+            sb.append(" & ");
+            sb.append(t.toGenerateString());
+         }
       }
       return sb.toString();
    }

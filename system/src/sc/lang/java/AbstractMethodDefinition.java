@@ -435,7 +435,17 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       // compiled.
       if (isDynMethod())
          return this;
-      return ModelUtil.definesMethod(ModelUtil.getCompiledClass(getDeclaringType()), name, getParameterList(), null, null, false, false);
+      Object compiledClass = ModelUtil.getCompiledClass(getDeclaringType());
+      if (compiledClass == null) {
+         System.err.println("*** No compiled class for: " + getDeclaringType());
+      }
+      Object res = ModelUtil.definesMethod(compiledClass, name, getParameterList(), null, null, false, false);
+      if (res == null) {
+         System.err.println("*** No runtime method for: " + name);
+         boolean x = isDynMethod();
+         Object y = ModelUtil.definesMethod(compiledClass, name, getParameterList(), null, null, false, false);
+      }
+      return res;
    }
 
    public Object[] getParameterTypes(boolean bound) {

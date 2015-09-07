@@ -326,6 +326,16 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return parameterizeMethodList(baseMethods);
    }
 
+   @Override
+   public Object getConstructorFromSignature(String sig) {
+      return ModelUtil.getConstructorFromSignature(baseType, sig);
+   }
+
+   @Override
+   public Object getMethodFromSignature(String methodName, String signature, boolean resolveLayer) {
+      return ModelUtil.getMethodFromSignature(baseType, methodName, signature, resolveLayer);
+   }
+
    public List<Object> getAllProperties(String modifier, boolean includeAssigns) {
       Object[] baseProps = ModelUtil.getProperties(baseType, modifier, includeAssigns);
       return parameterizePropList(baseProps);
@@ -351,7 +361,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       if (definedInType != null)
          return definedInType.getClass(className, useImports);
       else
-         return system.getClassWithPathName(className, null, false, false);
+         return system.getClassWithPathName(className, null, false, false, false);
    }
 
    public Object findTypeDeclaration(String typeName, boolean addExternalReference) {

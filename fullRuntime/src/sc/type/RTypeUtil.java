@@ -4,6 +4,7 @@
 
 package sc.type;
 
+import com.thoughtworks.xstream.mapper.Mapper;
 import sc.dyn.DynUtil;
 import sc.util.CoalescedHashMap;
 import sc.util.PerfMon;
@@ -20,12 +21,21 @@ public class RTypeUtil {
    static Map<Class, CoalescedHashMap<String,Method[]>> methodCache = new HashMap<Class,CoalescedHashMap<String,Method[]>>();
    static public Class MAIN_ARG = sc.type.Type.get(String.class).getArrayClass(String.class, 1);
 
+   public static boolean verboseClasses = false;
+
+   public static Map<String,Class> loadedClasses = new HashMap<String,Class>();
+
    public static void flushCaches() {
       fieldCache.clear();
       innerClassIndex.clear();
       enumIndex.clear();
       methodCache.clear();
       DynUtil.flushCaches();
+      loadedClasses.clear();
+   }
+
+   public static void flushLoadedClasses() {
+      loadedClasses.clear();
    }
 
    public static Field[] getFields(Class cl) {
@@ -839,14 +849,32 @@ public class RTypeUtil {
       return null;
    }
 
+   private static class NullSentinelClass {
+   }
+
    /**
     * Returns a class by name.
     */
    public static Class loadClass(String className) {
       try {
-         return Class.forName(className);
+         Class res = loadedClasses.get(className);
+         if (res != null) {
+            if (res == NullSentinelClass.class)
+               return null;
+            return res;
+         }
+         res = Class.forName(className);
+         if (res != null) {
+            loadedClasses.put(className, res);
+            if (verboseClasses) {
+               System.out.println("Loaded class: " + className + " from default classLoader: " + res.getClassLoader());
+            }
+         }
+         return res;
       }
-      catch (ClassNotFoundException exc) {}
+      catch (ClassNotFoundException exc) {
+         loadedClasses.put(className, NullSentinelClass.class);
+      }
       return null;
    }
 
@@ -857,20 +885,40 @@ public class RTypeUtil {
       }
       try {
          PerfMon.start("loadClass", false);
-         if (classLoader == null)
-            return Class.forName(className);
+         Class res;
+         if (classLoader == null) {
+            return loadClass(className);
+         }
          try {
-            return Class.forName(className, initialize, classLoader);
+            res = loadedClasses.get(className);
+            if (res != null) {
+               if (res == NullSentinelClass.class)
+                  return null;
+               return res;
+            }
+            res = Class.forName(className, initialize, classLoader);
+            if (res != null) {
+               loadedClasses.put(className, res);
+               if (verboseClasses)
+                  System.out.println("Loaded class: " + className + " initialize = " + initialize + " from classLoader: " + classLoader);
+            }
+            return res;
          }
          // The Javascript layers need to redefine java.util and java.lang source files.  We may try to load the compiled
          // version of these classes cause layers let you override things.  Java mandates you don't do that though, probably
          // a good idea.   In this case, just go back to the primordial class loader to get these class files.
          catch (SecurityException exc) {
+            if (verboseClasses)
+               System.err.println("*** Security exception loading class with class loader: " + exc);
             return Class.forName(className);
          }
       }
-      catch (ClassNotFoundException exc) {}
-      catch (NoClassDefFoundError exc2) {}
+      catch (ClassNotFoundException exc) {
+         loadedClasses.put(className, NullSentinelClass.class);
+      }
+      catch (NoClassDefFoundError exc2) {
+         loadedClasses.put(className, NullSentinelClass.class);
+      }
       finally {
          PerfMon.end("loadClass");
       }

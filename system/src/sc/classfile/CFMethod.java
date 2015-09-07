@@ -41,12 +41,13 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
       /** Note: this needs to be done in initialize so we can do resolves without accessing the property name */
       if ((propertyName = ModelUtil.isGetMethod(name, parameterJavaTypes, returnType)) != null)
          propertyMethodType = propertyName.startsWith("i") ? PropertyMethodType.Is : PropertyMethodType.Get;
+      // Do this before set method because isSetMethod includes indexed properties
+      else if ((propertyName = ModelUtil.isSetIndexMethod(name, parameterJavaTypes, returnType)) != null)
+         propertyMethodType = PropertyMethodType.SetIndexed;
       else if ((propertyName = ModelUtil.isSetMethod(name, parameterJavaTypes, returnType)) != null)
          propertyMethodType = PropertyMethodType.Set;
       else if ((propertyName = ModelUtil.isGetIndexMethod(name, parameterJavaTypes, returnType)) != null)
          propertyMethodType = PropertyMethodType.GetIndexed;
-      else if ((propertyName = ModelUtil.isSetIndexMethod(name, parameterJavaTypes, returnType)) != null)
-         propertyMethodType = PropertyMethodType.SetIndexed;
 
       super.init();
    }

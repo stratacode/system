@@ -1120,6 +1120,8 @@ public class DynStubParameters extends AbstractTemplateParameters {
       }
 
       public String getPostInvoke() {
+         if (isVoid())
+            return "";
          return ModelUtil.isPrimitive(ModelUtil.getReturnType(method)) ? ")" : "";
       }
 

@@ -40,8 +40,10 @@ public class CFField extends ClassFile.FieldMethodInfo implements IVariable, IFi
       return type.getAbsoluteGenericTypeName(resultType, includeDims);
    }
 
+   static final int ENUM      = 0x00004000;
+
    public boolean isEnumConstant() {
-      return ownerClass.isEnum();
+      return ownerClass.isEnum() && (accessFlags & ENUM) != 0;
    }
 
    public String toString() {
