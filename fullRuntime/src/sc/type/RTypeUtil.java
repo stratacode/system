@@ -22,7 +22,7 @@ public class RTypeUtil {
 
    public static boolean verboseClasses = false;
 
-   public static Map<String,Class> loadedClasses = new HashMap<String,Class>();
+   public static Map<ClassLoader,Map<String,Class>> loadedClasses = new HashMap<ClassLoader,Map<String,Class>>();
 
    public static void flushCaches() {
       fieldCache.clear();
@@ -34,6 +34,7 @@ public class RTypeUtil {
    }
 
    public static void flushLoadedClasses() {
+      // TODO - most of the time here we only need to remove the NullSentinels.   Maybe we should set a sequence number to invalidate the null the next time we check?
       loadedClasses.clear();
    }
 
@@ -851,20 +852,37 @@ public class RTypeUtil {
    private static class NullSentinelClass {
    }
 
+   private static Map<String,Class> getClassLoaderMap(ClassLoader cl) {
+      Map<String,Class> clMap = loadedClasses.get(cl);
+      if (clMap == null) {
+         synchronized (loadedClasses) {
+            clMap = loadedClasses.get(cl);
+            if (clMap == null) {
+               loadedClasses.put(cl, clMap = new HashMap<String, Class>());
+            }
+         }
+      }
+      return clMap;
+   }
+
    /**
     * Returns a class by name.
     */
    public static Class loadClass(String className) {
+      Map<String,Class> clMap = null;
       try {
-         Class res = loadedClasses.get(className);
+         Class res;
+         clMap = getClassLoaderMap(null);
+         res = clMap.get(className);
          if (res != null) {
-            if (res == NullSentinelClass.class)
+            if (res == NullSentinelClass.class) {
                return null;
+            }
             return res;
          }
          res = Class.forName(className);
          if (res != null) {
-            loadedClasses.put(className, res);
+            clMap.put(className, res);
             if (verboseClasses) {
                System.out.println("Loaded class: " + className + " from default classLoader: " + res.getClassLoader());
             }
@@ -872,7 +890,7 @@ public class RTypeUtil {
          return res;
       }
       catch (ClassNotFoundException exc) {
-         loadedClasses.put(className, NullSentinelClass.class);
+         clMap.put(className, NullSentinelClass.class);
       }
       return null;
    }
@@ -882,6 +900,7 @@ public class RTypeUtil {
          System.out.println("Error: null class name to TypeUtil.loadClass");
          return null;
       }
+      Map<String,Class> clMap = null;
       try {
          PerfMon.start("loadClass", false);
          Class res;
@@ -889,15 +908,17 @@ public class RTypeUtil {
             return loadClass(className);
          }
          try {
-            res = loadedClasses.get(className);
+            clMap = getClassLoaderMap(classLoader);
+            res = clMap.get(className);
             if (res != null) {
-               if (res == NullSentinelClass.class)
+               if (res == NullSentinelClass.class) {
                   return null;
+               }
                return res;
             }
             res = Class.forName(className, initialize, classLoader);
             if (res != null) {
-               loadedClasses.put(className, res);
+               clMap.put(className, res);
                if (verboseClasses)
                   System.out.println("Loaded class: " + className + " initialize = " + initialize + " from classLoader: " + classLoader);
             }
@@ -913,10 +934,10 @@ public class RTypeUtil {
          }
       }
       catch (ClassNotFoundException exc) {
-         loadedClasses.put(className, NullSentinelClass.class);
+         clMap.put(className, NullSentinelClass.class);
       }
       catch (NoClassDefFoundError exc2) {
-         loadedClasses.put(className, NullSentinelClass.class);
+         clMap.put(className, NullSentinelClass.class);
       }
       finally {
          PerfMon.end("loadClass");

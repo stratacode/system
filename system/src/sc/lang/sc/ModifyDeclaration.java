@@ -393,8 +393,9 @@ public class ModifyDeclaration extends TypeDeclaration {
             DynUtil.execLaterJobs();
             type = thisModel.customResolver.resolveType(thisModel.getPackagePrefix(), ftName, true, this);
          }
-         if (type instanceof Class)
+         if (type instanceof Class) {
             modifyClass = type;
+         }
          else if (type instanceof TypeDeclaration) {
             if (!ftName.startsWith("sc_type_"))
                modifyTypeDecl = (TypeDeclaration) type;

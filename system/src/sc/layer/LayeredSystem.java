@@ -4,6 +4,7 @@
 
 package sc.layer;
 
+import com.thoughtworks.xstream.mapper.Mapper;
 import sc.bind.Bind;
 import sc.bind.Bindable;
 import sc.classfile.CFClass;
@@ -2632,6 +2633,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       Class c = getCompiledClass(pathName);
       if (c != null) {
          compiledClassCache.put(pathName, c);
+         if (c == NullClassSentinel.class)
+            return null;
          return c;
       }
 
@@ -11067,7 +11070,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    /** The core method to use to retrieve a compiled class from the system.
     * It will use either of two mechanisms to get the class definition - read it using the ClassLoader or
-    * it will find the file and parse the .class file into a lightweight data structure.
+    * it will find the file and parse the .class file into a lightweight data structure - CFClass.  If you require
+    * a true runtime class, provide forceClass=true.
     */
    public Object getClass(String className, boolean forceClass) {
       Class res;
@@ -11100,8 +11104,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       String classFileName = className.replace('.', FileUtil.FILE_SEPARATOR_CHAR) + ".class";
       if (!forceClass) {
          Object resObj = getClassFromClassFileName(classFileName, className);
-         if (resObj != null)
+         if (resObj != null) {
+            if (resObj == NullClassSentinel.class)
+               return null;
             return resObj;
+         }
 
          // If we are cross compiling and did not find a CFClass, as a last resort lookup for a class - such as [B etc.
          if (options.crossCompile) {
@@ -11198,7 +11205,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
-   private static class NullClassSentinel {
+   public static class NullClassSentinel {
    }
 
    public Object resolveRuntimeName(String name, boolean create) {
