@@ -4,7 +4,6 @@
 
 package sc.layer;
 
-import com.thoughtworks.xstream.mapper.Mapper;
 import sc.bind.Bind;
 import sc.bind.Bindable;
 import sc.classfile.CFClass;
