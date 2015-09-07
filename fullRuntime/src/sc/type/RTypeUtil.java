@@ -4,7 +4,6 @@
 
 package sc.type;
 
-import com.thoughtworks.xstream.mapper.Mapper;
 import sc.dyn.DynUtil;
 import sc.util.CoalescedHashMap;
 import sc.util.PerfMon;
