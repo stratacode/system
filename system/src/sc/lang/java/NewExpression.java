@@ -177,19 +177,19 @@ public class NewExpression extends IdentifierExpression {
       return super.findMember(name, mtype, this, refType, ctx, skipIfaces);
    }
 
-   public Object findMethod(String name, List<? extends Object> params, Object fromChild, Object refType) {
+   public Object findMethod(String name, List<? extends Object> params, Object fromChild, Object refType, boolean staticOnly) {
       if (classBody != null && classBody.indexOf(fromChild) != -1) {
-         Object v = BodyTypeDeclaration.findMethodInBody(classBody, name, params, null, refType, false);
+         Object v = BodyTypeDeclaration.findMethodInBody(classBody, name, params, null, refType, staticOnly);
          if (v != null)
             return v;
 
          if (boundType != null) {
-            v = ModelUtil.definesMethod(boundType, name, params, null, refType, ModelUtil.isTransformedType(boundType), false);
+            v = ModelUtil.definesMethod(boundType, name, params, null, refType, ModelUtil.isTransformedType(boundType), staticOnly);
             if (v != null)
                return v;
          }
       }
-      return super.findMethod(name, params, this, refType);
+      return super.findMethod(name, params, this, refType, staticOnly);
    }
    
    public boolean isReferenceInitializer() {

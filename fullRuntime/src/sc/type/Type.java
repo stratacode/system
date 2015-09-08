@@ -768,6 +768,10 @@ public enum Type {
 
    public char arrayTypeCode;
 
+   public Class getObjectClass() {
+      return objectClass;
+   }
+
    public Class getArrayClass(Class componentType, int ndims) {
       Class res;
       if (componentType == null) {

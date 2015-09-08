@@ -1894,14 +1894,14 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return super.definesMember(name, mtype, refType, ctx, skipIfaces, isTransformed);
    }
 
-   public Object findMethod(String name, List<? extends Object> params, Object fromChild, Object refType) {
+   public Object findMethod(String name, List<? extends Object> params, Object fromChild, Object refType, boolean staticOnly) {
       Object v;
 
-      if ((v = definesMethod(name, params, null, refType, nonTransformedModel != null, false)) != null)
+      if ((v = definesMethod(name, params, null, refType, nonTransformedModel != null, staticOnly)) != null)
          return v;
 
       // If this is an inner type, we still need to check the parent
-      return super.findMethod(name, params, this, refType);
+      return super.findMethod(name, params, this, refType, staticOnly);
    }
 
    public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly) {

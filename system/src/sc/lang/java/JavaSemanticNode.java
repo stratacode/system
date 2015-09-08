@@ -167,10 +167,10 @@ public abstract class JavaSemanticNode extends SemanticNode {
       return m.getLayeredSystem();
    }
 
-   public Object findMethod(String name, List<? extends Object> parametersOrExpressions, Object fromChild, Object refType) {
+   public Object findMethod(String name, List<? extends Object> parametersOrExpressions, Object fromChild, Object refType, boolean staticOnly) {
       for (ISemanticNode pnode = parentNode; pnode != null; pnode = pnode.getParentNode())
          if (pnode instanceof JavaSemanticNode)
-            return ((JavaSemanticNode)pnode).findMethod(name, parametersOrExpressions, this, refType);
+            return ((JavaSemanticNode)pnode).findMethod(name, parametersOrExpressions, this, refType, staticOnly);
       return null;
    }
 

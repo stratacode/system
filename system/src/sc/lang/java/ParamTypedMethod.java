@@ -103,6 +103,13 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
       else if (typeVariable instanceof ExtendsType.LowerBoundsTypeDeclaration) {
          return ((ExtendsType.LowerBoundsTypeDeclaration) typeVariable).resolveTypeVariables(this, resolve);
       }
+      else if (ModelUtil.isGenericArray(typeVariable)) {
+         Object origCompType = ModelUtil.getGenericComponentType(typeVariable);
+         Object compType = resolveTypeParameter(origCompType, resolve);
+         if (origCompType == compType)
+            return typeVariable;
+         return ArrayTypeDeclaration.create(compType, 1, definedInType);
+      }
       else
          throw new UnsupportedOperationException();
    }

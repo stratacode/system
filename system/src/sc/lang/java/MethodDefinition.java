@@ -567,8 +567,6 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             return;
          }
 
-         System.out.println("*** addOverridingMethods for: " + name + " subType.typeName=" + subType.typeName);
-
          Object result = subType.declaresMethod(name, ptypes, null, enclType, false);
          if (result instanceof MethodDefinition)
             res.add(result);

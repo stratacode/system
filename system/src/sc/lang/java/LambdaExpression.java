@@ -80,6 +80,7 @@ public class LambdaExpression extends BaseLambdaExpression {
    }
 
    protected void propagateInferredType(Object type) {
+      super.propagateInferredType(type);
       if (lambdaBody instanceof Expression) {
          ((Expression) lambdaBody).setInferredType(type);
       }

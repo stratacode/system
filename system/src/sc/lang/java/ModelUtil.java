@@ -175,6 +175,12 @@ public class ModelUtil {
       if (ModelUtil.isTypeVariable(genParam)) {
          paramMap.put(new TypeParamKey(genParam), argType);
       }
+      else if (ModelUtil.isGenericArray(genParam)) {
+         Object paramComponentType = ModelUtil.getGenericComponentType(genParam);
+         // Sometimes we get an Object type which is a valid array type but does not add any info to the type parameter so just ignore it
+         if (ModelUtil.isTypeVariable(paramComponentType) && argType != Object.class)
+            paramMap.put(new TypeParamKey(paramComponentType), ModelUtil.getGenericComponentType(argType));
+      }
       else if (genParam instanceof ExtendsType.LowerBoundsTypeDeclaration) {
          // TODO: I don't think there is anything we need to do here.
          //if (!ModelUtil.isUnboundSuper(genParam))
@@ -282,7 +288,7 @@ public class ModelUtil {
                if (isArrayType) {
                   Object componentType = retType;
                   while (ModelUtil.isGenericArray(componentType)) {
-                     componentType = ModelUtil.getGenericComponentType(genRetType);
+                     componentType = ModelUtil.getGenericComponentType(componentType);
                      ndim++;
                   }
                   retType = componentType;
@@ -399,10 +405,22 @@ public class ModelUtil {
          }
          int[] dims = new int[ndim];
          Object compTypeDecl = getTypeDeclFromType(typeContext, compType, true, sys, bindUnboundParams, definedInType);
-         if (ModelUtil.hasTypeVariables(compTypeDecl))
+         // Do not get the default here - need to signal that this is unbound
+         if (bindUnboundParams && ModelUtil.hasTypeVariables(compTypeDecl))
             compTypeDecl = ModelUtil.getTypeParameterDefault(compTypeDecl);
-         if (compTypeDecl instanceof ParamTypeDeclaration)
-            return ArrayTypeDeclaration.create(compTypeDecl, ndim, (ITypeDeclaration) ModelUtil.getEnclosingType(typeContext));
+         if (compTypeDecl instanceof ParamTypeDeclaration || ModelUtil.isTypeVariable(compTypeDecl)) {
+            ITypeDeclaration dit = null;
+            // TODO: Should we perhaps always use definedInType here for the ArrayTypeDeclarations?
+            if (typeContext instanceof ParameterizedType) {
+               if (definedInType != null)
+                  dit = definedInType;
+               else
+                  System.err.println("*** No defined in type for array type declaration");
+            }
+            else
+               dit = (ITypeDeclaration) ModelUtil.getEnclosingType(typeContext);
+            return ArrayTypeDeclaration.create(compTypeDecl, ndim, dit);
+         }
          return Array.newInstance((Class) compTypeDecl, dims).getClass();
       }
       else if (ModelUtil.isTypeVariable(type)) {
@@ -1578,6 +1596,12 @@ public class ModelUtil {
                }
             }
 
+            // Java will do a conversion from int to Integer so you can for example cast an int to Comparable and it will work.
+            if (!res && cl2.isPrimitive()) {
+               Class clWrapper = sc.type.Type.get(cl2).getObjectClass();
+               res = isAssignableFrom(cl1, clWrapper);
+            }
+
             return res;
          }
          else if (type2 == null)
@@ -1681,13 +1705,15 @@ public class ModelUtil {
    public static boolean implementsType(Object implType, String fullTypeName, boolean assignment, boolean allowUnbound) {
       if (implType instanceof ITypeDeclaration)
          return ((ITypeDeclaration) implType).implementsType(fullTypeName, assignment, allowUnbound);
-      else {
+      else if (implType instanceof Class) {
          Class implClass = (Class) implType;
 
          Class typeClass = RTypeUtil.loadClass(implClass.getClassLoader(), fullTypeName, false);
 
          return typeClass != null && typeClass.isAssignableFrom(implClass);
       }
+      else
+         throw new UnsupportedOperationException();
    }
 
    /**
@@ -3384,7 +3410,7 @@ public class ModelUtil {
    public static boolean hasParameterizedReturnType(Object method) {
       if (method instanceof Method) {
          Type returnType = ((Method) method).getGenericReturnType();
-         return returnType instanceof TypeVariable || returnType instanceof ParameterizedType;
+         return returnType instanceof TypeVariable || returnType instanceof ParameterizedType || returnType instanceof GenericArrayType;
       }
       else if (method instanceof IMethodDefinition) {
          Object retType = ((IMethodDefinition) method).getReturnType();
@@ -3522,7 +3548,8 @@ public class ModelUtil {
    }
 
    public static boolean hasTypeVariables(Object type) {
-      return ModelUtil.isTypeVariable(type) || (type instanceof ExtendsType.LowerBoundsTypeDeclaration && hasTypeVariables(((ExtendsType.LowerBoundsTypeDeclaration) type).getBaseType()));
+      return ModelUtil.isTypeVariable(type) || (type instanceof ExtendsType.LowerBoundsTypeDeclaration && hasTypeVariables(((ExtendsType.LowerBoundsTypeDeclaration) type).getBaseType())) ||
+             (ModelUtil.isGenericArray(type) && hasTypeVariables(ModelUtil.getGenericComponentType(type)));
    }
 
    public static String getTypeParameterString(Object type) {
@@ -3587,6 +3614,9 @@ public class ModelUtil {
       }
       else if (typeParam instanceof ExtendsType.LowerBoundsTypeDeclaration) {
          return getTypeParameterDefault(((ExtendsType.LowerBoundsTypeDeclaration) typeParam).getBaseType());
+      }
+      else if (ModelUtil.isGenericArray(typeParam)) {
+         return new ArrayTypeDeclaration(typeParam instanceof ArrayTypeDeclaration ? ((ArrayTypeDeclaration) typeParam).definedInType : null, ModelUtil.getTypeParameterDefault(ModelUtil.getGenericComponentType(typeParam)), "[]");
       }
       else
          throw new UnsupportedOperationException();

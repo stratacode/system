@@ -14,6 +14,7 @@ import sc.type.CTypeUtil;
 import sc.type.Type;
 import sc.util.StringUtil;
 
+import java.lang.reflect.TypeVariable;
 import java.util.*;
 
 public class ClassType extends JavaType {
@@ -406,6 +407,7 @@ public class ClassType extends JavaType {
          type = sys.getTypeDeclaration(fullTypeName, false, ctx == null ? null : ctx.getRefLayer(), false);
       }
 
+      boolean userType = false;
       // When looking up type parameters, typically the it is the ParamTypeDeclaration but if it's a param method, it won't be so we need to
       // look up the type parameter for the method explicitly here.
       if (type == null && it == null && ctx != null) {
@@ -414,6 +416,7 @@ public class ClassType extends JavaType {
          // as the type so we know it's essentially an unbound type.
          if (type == null && typeParam != null) {
             type = typeParam;
+            userType = true;
          }
       }
 
@@ -423,8 +426,10 @@ public class ClassType extends JavaType {
       }
 
       if (type == null) {
-         if (typeParam != null)
+         if (typeParam != null) {
             type = typeParam;
+            userType = true;
+         }
          else {
             type = FAILED_TO_INIT_SENTINEL;
             if (displayError) {
@@ -465,7 +470,8 @@ public class ClassType extends JavaType {
          }
       }
 
-      if (arrayDimensions != null && type != FAILED_TO_INIT_SENTINEL) {
+      // Sometimes when we are called, typeParam supplies the component type and others the actual array generic type so be careful not to re-wrap it or leave it unwrapped
+      if ((!userType || !ModelUtil.isGenericArray(type)) && arrayDimensions != null && type != FAILED_TO_INIT_SENTINEL) {
          type = new ArrayTypeDeclaration(it, type, arrayDimensions);
       }
    }

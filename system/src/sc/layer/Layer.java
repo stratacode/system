@@ -877,7 +877,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    @Override
    public Object getDynType() {
-      return model == null ? null : model.getModelTypeDeclaration();
+      return model == null ? Layer.class : model.getModelTypeDeclaration();
    }
 
    @Override
@@ -2272,7 +2272,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (!model.hasErrors()) {
          ExecutionContext ctx = new ExecutionContext();
          ctx.resolver = layeredSystem;
-         Object startMethObj = model.getModelTypeDeclaration().findMethod(methodName, null, null, null);
+         Object startMethObj = model.getModelTypeDeclaration().findMethod(methodName, null, null, null, false);
          if (startMethObj instanceof MethodDefinition) {
             ctx.pushCurrentObject(this);
             try {

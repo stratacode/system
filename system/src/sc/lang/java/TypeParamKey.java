@@ -21,4 +21,8 @@ public class TypeParamKey {
    public int hashCode() {
       return ModelUtil.getTypeParameterName(typeVar).hashCode();
    }
+
+   public String toString() {
+      return typeVar == null ? "<null>" : typeVar.toString();
+   }
 }

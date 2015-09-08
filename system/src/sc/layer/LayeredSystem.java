@@ -665,7 +665,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                               break;
                            }
                         }
-                        res.add(typeIndex);
+                        if (!found)
+                           res.add(typeIndex);
                      }
                   }
                }

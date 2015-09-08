@@ -558,7 +558,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return super.definesMember(name, mtype, refType, ctx, skipIfaces, isTransformed);
    }
 
-   public Object findMethod(String name, List<? extends Object> params, Object fromChild, Object refType) {
+   public Object findMethod(String name, List<? extends Object> params, Object fromChild, Object refType, boolean staticOnly) {
       Object v;
 
       // We've been modified by a subsequent definition so let it implement this operation for this type
@@ -566,13 +566,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // code like a setX reference which requires the transformed model.
       // TODO: for transformed types, is this all we have to change to resolve setX methods which are only in the transformed type.
       if (replacedByType != null && !isTransformedType())
-         return replacedByType.findMethod(name, params, fromChild, refType);
+         return replacedByType.findMethod(name, params, fromChild, refType, staticOnly);
 
-      if ((v = definesMethod(name, params, null, refType, isTransformedType(), false)) != null)
+      if ((v = definesMethod(name, params, null, refType, isTransformedType(), staticOnly)) != null)
          return v;
 
       // If this is an inner type, we still need to check the parent
-      return super.findMethod(name, params, this, refType);
+      return super.findMethod(name, params, this, refType, staticOnly);
    }
 
    public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly) {

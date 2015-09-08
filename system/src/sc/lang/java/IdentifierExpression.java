@@ -188,7 +188,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          }
          else if (sz == offset()) {
             if (arguments != null && !(this instanceof NewExpression)) {
-               Object foundMeth = findMethod(firstIdentifier, arguments, this, enclType);
+               Object foundMeth = findMethod(firstIdentifier, arguments, this, enclType, isStatic());
                if (foundMeth != null) {
                   foundMeth = parameterizeMethod(this, foundMeth, inferredType, arguments);
                   idTypes[0] = IdentifierType.MethodInvocation;
@@ -220,7 +220,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                // template hierarchy.  So when it does the findMethod inside of the Template it never checks the root type.  If the enclType is the Template
                // the template checks the root type.  So either we should do findMethod originally on encltype or maybe the encltype should be the template?
                if (boundTypes[0] == null && enclType instanceof BodyTypeDeclaration) {
-                  boundTypes[0] = ((BodyTypeDeclaration) enclType).findMethod(firstIdentifier, arguments, this, enclType);
+                  boundTypes[0] = ((BodyTypeDeclaration) enclType).findMethod(firstIdentifier, arguments, this, enclType, isStatic());
                }
                if (boundTypes[0] == null) {
                   checkRemoteMethod(this, null, firstIdentifier, 0, idTypes, boundTypes, arguments, false);
@@ -228,7 +228,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                if (boundTypes[0] == null && model != null && !model.disableTypeErrors) {
                   String otherMethods = enclType == null ? "" : getOtherMethodsMessage(enclType, firstIdentifier);
                   displayTypeError("No method named: ", firstIdentifier, ModelUtil.argumentsToString(arguments), otherMethods, " for: ");
-                  foundMeth = findMethod(firstIdentifier, arguments, this, enclType);
+                  foundMeth = findMethod(firstIdentifier, arguments, this, enclType, isStatic());
                }
                if (idTypes[0] == null) {
                   idTypes[0] = IdentifierType.MethodInvocation;
@@ -524,6 +524,19 @@ public class IdentifierExpression extends ArgumentsExpression {
    }
 
    static void propagateInferredArgs(Expression rootExpr, Object meth, List<Expression> arguments) {
+      /*
+      if (rootExpr instanceof IdentifierExpression) {
+         IdentifierExpression rid = (IdentifierExpression) rootExpr;
+         if (rid.identifiers != null && rid.identifiers.size() == 2 && rid.identifiers.get(0).equals("IdentifierExpression") && rid.identifiers.get(1).equals("create"))
+            System.out.println("***");
+         if (arguments.size() == 1 && arguments.get(0) instanceof IdentifierExpression) {
+            IdentifierExpression argExpr = (IdentifierExpression) arguments.get(0);
+            if (argExpr.identifiers != null && argExpr.identifiers.size() == 2)
+               if (argExpr.identifiers.get(0).equals("ids"))
+                  System.out.println("***");
+         }
+      }
+      */
       Object[] paramTypes = ModelUtil.getActualParameterTypes(meth, true);
       int i = 0;
       int plen = paramTypes == null ? 0 : paramTypes.length;
@@ -543,8 +556,11 @@ public class IdentifierExpression extends ArgumentsExpression {
             Object useType = pType;
             // Handling repeating parameters - it's a varargs method and the last element is an array
             if (i >= last && ModelUtil.isVarArgs(meth)) {
-               if (ModelUtil.isArray(pType))
-                  useType = ModelUtil.getArrayComponentType(pType);
+               if (ModelUtil.isArray(pType)) {
+                  // If we are supplying an array, leave the type as an array
+                  if (!ModelUtil.isArray(arg.getTypeDeclaration()))
+                     useType = ModelUtil.getArrayComponentType(pType);
+               }
             }
             if (ModelUtil.isTypeVariable(useType))
                useType = ModelUtil.getTypeParameterDefault(useType);
@@ -1189,7 +1205,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          if (enclPeerType != peerType)
             ModelUtil.ensureStarted(enclPeerType, false);
          if (findType && peerType instanceof BodyTypeDeclaration) {
-            meth = ((BodyTypeDeclaration) peerType).findMethod(methodName, arguments, expr, peerType);
+            meth = ((BodyTypeDeclaration) peerType).findMethod(methodName, arguments, expr, peerType, isStatic);
          }
          else
             meth = ModelUtil.definesMethod(peerType, methodName, arguments, null, enclPeerType, false, isStatic);

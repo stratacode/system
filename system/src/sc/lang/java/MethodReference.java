@@ -220,8 +220,19 @@ public class MethodReference extends BaseLambdaExpression {
             }
             break;
          case Constructor:
-            if (ref instanceof JavaType)
-               bodyExpr = NewExpression.create(((JavaType) ref).getFullTypeName(), args);
+            if (ref instanceof JavaType) {
+               JavaType typeRef = (JavaType) ref;
+               if (typeRef.arrayDimensions != null) {
+                  if (args.size() != 1) {
+                     displayError("Method reference with array constructor - missing 'length' parameter: ");
+                     return null;
+                  }
+                  // Create new <type>[intArg] - exclude dimensions from the type name with fullBaseTypeName
+                  bodyExpr = NewExpression.create(typeRef.getFullBaseTypeName(), args, null);
+               }
+               else // Create new <type>(arg1, arg2)
+                  bodyExpr = NewExpression.create(typeRef.getFullTypeName(), args);
+            }
             else
                System.err.println("*** Unhandled case for MethodReference new operator: ");
             break;

@@ -58,4 +58,13 @@ public class ReturnStatement extends ExpressionStatement {
    public void addReturnStatements(List<Statement> res) {
       res.add(this);
    }
+
+   public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append("return ");
+      if (expression == null)
+         sb.append("<null>");
+      sb.append(expression.toString());
+      return sb.toString();
+   }
 }

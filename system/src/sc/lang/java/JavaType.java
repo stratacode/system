@@ -160,6 +160,7 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
                java.lang.reflect.Type componentType = gat.getGenericComponentType();
                newType = createFromParamType(componentType, ctx, definedInType);
                newType.setProperty("arrayDimensions", "[]");
+               newType.initType(typeCtx.getLayeredSystem(), typeCtx, null, ctx, true, false, newType.getTypeDeclaration());
                typeParam = newType;
             }
             else if (ModelUtil.isTypeVariable(typeParam)) {
@@ -171,6 +172,10 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
                JavaType javaType = (JavaType) typeParam;
                javaType = javaType.resolveTypeParameters(ctx);
                typeParams.add(javaType);
+            }
+            else if (ModelUtil.hasTypeParameters(typeParam)) {
+               JavaType typeParamJavaType = createFromParamType(typeParam, ctx, definedInType);
+               typeParams.add(typeParamJavaType);
             }
             else {
                String typeName = ModelUtil.getTypeName(typeParam);

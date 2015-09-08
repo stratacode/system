@@ -107,8 +107,8 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
          }
       }
 
-      // If we are installing on top of an existing directory, rename the old directory in the backup folder
-      if (rootDirExists && !isEmptyDir(rootFile) && !system.installExisting) {
+      // If we are installing on top of an existing directory, rename the old directory in the backup folder.  Checking tagFile because it could be version specific and don't want to back up one version to install another one
+      if (rootDirExists && !isEmptyDir(rootFile) && !system.installExisting && tagFile.canRead()) {
          Date curTime = new Date();
          String backupDir = FileUtil.concat(packageRoot, REPLACED_DIR_NAME, src.pkg.packageName + "." + curTime.getHours() + "." + curTime.getMinutes());
          new File(backupDir).mkdirs();
@@ -127,6 +127,8 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       }
       else {
          src.pkg.installedTime = System.currentTimeMillis();
+         // Make the version specific directory if necessary
+         new File(tagFile.getParent()).mkdirs();
          src.pkg.saveToFile(tagFile);
          //FileUtil.saveStringAsFile(tagFile, String.valueOf(System.currentTimeMillis()), true);
       }

@@ -32,7 +32,7 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
    public static final int length = 0;
    public static final Field LENGTH_FIELD = RTypeUtil.getField(ArrayTypeDeclaration.class, "length");
 
-   private ITypeDeclaration definedInType;
+   public ITypeDeclaration definedInType;
 
    // All array classes just have this one property so they share the same cache
    private final static DynType arrayPropertyCache = TypeUtil.getPropertyCache(OBJECT_ARRAY_CLASS);
@@ -40,6 +40,8 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
    public ArrayTypeDeclaration(ITypeDeclaration dit, Object comp, String arrayDims) {
       if (comp == null)
          System.out.println("*** Error null array component type");
+      if (comp instanceof ArrayTypeDeclaration)
+         System.out.println("*** Error - nesting array types");
       componentType = comp;
       arrayDimensions = arrayDims;
       definedInType = dit;
@@ -402,5 +404,9 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
 
    public Object getArrayComponentType() {
       return componentType;
+   }
+
+   public String toString() {
+      return componentType == null ? "<null>" : componentType.toString() + (arrayDimensions == null ? "<no dims>" : arrayDimensions);
    }
 }
