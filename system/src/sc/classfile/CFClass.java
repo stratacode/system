@@ -709,10 +709,18 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
    }
 
    public JavaType getExtendsType() {
+      if (extendsJavaType == null && extendsType != null)
+         extendsJavaType = ClassType.createJavaType(extendsType);
       return extendsJavaType;
    }
 
    public List<?> getImplementsTypes() {
+      if (implJavaTypes == null && implementsTypes != null) {
+         implJavaTypes = new ArrayList<JavaType>(implementsTypes.size());
+         for (Object implType:implementsTypes) {
+            implJavaTypes.add(ClassType.createJavaType(implType));
+         }
+      }
       return implJavaTypes;
    }
 

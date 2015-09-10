@@ -67,6 +67,12 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
       //if (other instanceof TypeDeclaration || other instanceof CFClass || other instanceof ParamTypeDeclaration || other instanceof EnumConstant)
       //   return false;
 
+      // We might have a ParamTypeDeclaration wrapping the array - if so, just unwrap
+      if (other instanceof ParamTypeDeclaration) {
+         Object otherObj = ((ParamTypeDeclaration) other).getBaseType();
+         return ModelUtil.isAssignableFrom(this, otherObj, assignmentSemantics, null);
+      }
+
       if (!(other instanceof ArrayTypeDeclaration))
          return false;
 

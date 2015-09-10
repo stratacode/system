@@ -48,7 +48,7 @@ public class ClassType extends JavaType {
          arr[arr.length-1] = arr[arr.length-1].substring(0,ix);
       }
       String arg = arr[0];
-      if (arg.equals("<null>"))
+      if (arg.equals("<null>") || arg.equals("<missing type>"))
          System.err.println("*** Creating ClassType from null name");
       if (arg.indexOf(".") != -1) {
          String[] firstList = StringUtil.split(arg, '.');
@@ -292,10 +292,10 @@ public class ClassType extends JavaType {
    }
 
    public List<Object> getTypeArgumentDeclarations() {
-      return getTypeArgumentDeclarations(null);
+      return getTypeArgumentDeclarations(null, null, null, null);
    }
 
-   public List<Object> getTypeArgumentDeclarations(ITypeParamContext ctx) {
+   public List<Object> getTypeArgumentDeclarations(LayeredSystem sys, ITypeDeclaration it, JavaSemanticNode node, ITypeParamContext ctx) {
       List<JavaType> typeArgs = getResolvedTypeArguments();
       if (typeArgs == null)
          return null;
@@ -304,7 +304,12 @@ public class ClassType extends JavaType {
          JavaType typeArg = typeArgs.get(i);
          Object argType = typeArg.getTypeDeclaration(ctx, false);
          if (argType == null) {
+            typeArg.initType(sys, it, node, ctx, true, false, null);
+            argType = typeArg.getTypeDeclaration(ctx, false);
+         }
+         if (argType == null) {
             typeDefs.add(null); // An unresolved type?  Do not put ClassTypes here but are there any cases we need a TypeVariable?
+            argType = typeArg.getTypeDeclaration(ctx, false);
          }
          else
             typeDefs.add(argType);
@@ -453,7 +458,7 @@ public class ClassType extends JavaType {
       // Before we return the type, check and see if this definition adds any bound type parameters -
       // i.e. concrete types instead of parameter names.  If so, we need to wrap the returned type with
       // an object which knows how to resolve type parameters to do the proper type matching when generics are used.
-      List<Object> typeDefs = getTypeArgumentDeclarations(ctx);
+      List<Object> typeDefs = getTypeArgumentDeclarations(sys, it, node, ctx);
       if (typeDefs != null && type != FAILED_TO_INIT_SENTINEL && anyBoundParameters(typeDefs)) {
          List<?> typeParams = ModelUtil.getTypeParameters(type);
          if (typeParams == null || typeParams.size() != typeDefs.size())
@@ -929,6 +934,8 @@ public class ClassType extends JavaType {
 
          if (ModelUtil.isTypeVariable(baseType)) {
             Object newType = t.getTypeForVariable(baseType, false);
+            if (newType == null)
+               newType = ModelUtil.getTypeParameterDefault(baseType);
             if (newType != null && newType != baseType && !(newType instanceof ExtendsType.LowerBoundsTypeDeclaration)) {
                superWildcard = new ExtendsType.LowerBoundsTypeDeclaration(newType);
             }
@@ -982,6 +989,11 @@ public class ClassType extends JavaType {
          return null;
       if (isTypeParameter() && ModelUtil.sameTypeParameters(type, typeParam))
          return ctx != null ? resolveTypeParameters(ctx) : this;
+      if (arrayDimensions != null && ModelUtil.isGenericArray(type)) {
+         Object compType = ModelUtil.getGenericComponentType(type);
+         if (ModelUtil.isTypeVariable(compType) && ModelUtil.sameTypeParameters(compType, typeParam))
+            return ctx.getTypeDeclarationForParam(ModelUtil.getTypeParameterName(typeParam), typeParam, true);
+      }
       // TODO: deal with array dimensions here - for each dimension, unwrap one level of ArrayTypeDeclaration wrapper.
       return null;
    }

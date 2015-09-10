@@ -58,7 +58,10 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
    public Object getTypeDeclaration(List<? extends ITypedObject> args, boolean resolve) {
       Object parameterizedType = ModelUtil.getParameterizedReturnType(method, args, resolve);
       if (ModelUtil.hasTypeVariables(parameterizedType)) {
-         return resolveTypeParameter(parameterizedType, resolve);
+         Object res = resolveTypeParameter(parameterizedType, resolve);
+         if (res == null)
+            System.err.println("*** Returning null for type of method");
+         return res;
       }
       if (ModelUtil.isParameterizedType(parameterizedType)) {
          // Parameterized type here is a ParamTypeDeclaration with types that are unbound type parameters.
@@ -92,6 +95,8 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
                paramType.unboundInferredType = true;
          }
       }
+      if (parameterizedType == null)
+         System.out.println("*** Returning null for param typed method");
       return parameterizedType;
    }
 
@@ -124,7 +129,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
       if (paramJavaTypes != null) {
          for (JavaType paramJavaType : paramJavaTypes) {
             if (paramJavaType != null) {
-               Object type = paramJavaType.definesTypeParameter(typeVar, paramTypeDecl);
+               Object type = paramTypeDecl == null ? null : paramJavaType.definesTypeParameter(typeVar, paramTypeDecl);
                if (type != null) {
                   // There are times when we need to bind the type parameter to the type of the argument passed to the method.
                   if (boundJavaTypes != null && i < boundJavaTypes.length) {
@@ -143,10 +148,17 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
                if (boundJavaTypes != null && i < boundJavaTypes.length) {
                   JavaType boundJavaType = boundJavaTypes[i];
                   if (boundJavaType != null) {
+                     Object boundParamType = boundJavaType.getTypeDeclaration();
+                     Object paramType = paramJavaType.getTypeDeclaration();
+                     if (i == boundJavaTypes.length - 1 && ModelUtil.isVarArgs(method) && ModelUtil.isArray(boundParamType) && !ModelUtil.isArray(paramType)) {
+                        boundParamType = ModelUtil.getArrayComponentType(boundParamType);
+                     }
+
+
                      // Do we have an actual bound value for this type parameter - if so, return it without checking the inferredType.
                      // If this is any type of unbound type parameter expression - e.g. ? super T we need to check for T in the inferredtype
                      // and so should not return.
-                     type = extractTypeParameter(paramJavaType, paramJavaType.getTypeDeclaration(), boundJavaType.getTypeDeclaration(), typeVar);
+                     type = extractTypeParameter(paramJavaType, paramType, boundParamType, typeVar);
                      if (type != null)
                         return type;
                   }
@@ -208,6 +220,13 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
          }
          else
             return null;
+      }
+      else if (ModelUtil.isGenericArray(paramType)) {
+         Object compType = ModelUtil.getArrayComponentType(paramType);
+         if (ModelUtil.isTypeVariable(compType) && ModelUtil.sameTypeParameters(compType, typeVar)) {
+            Object boundCompType = ModelUtil.getArrayComponentType(boundType);
+            return boundCompType;
+         }
       }
       if (ModelUtil.isTypeVariable(boundType))
          return null;
@@ -535,5 +554,42 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
          return ModelUtil.getMethodName(method) + "(" + argsStr + ")";
       }
       throw new UnsupportedOperationException();
+   }
+
+   // We may retrieve a ParamTypedMethod from a base type and need to merge the ParamTypeDeclaration of the
+   // context from which that method is invoked into the one we retrieved from the base type.
+   public void updateParamTypes(ParamTypeDeclaration ptd) {
+      if (paramTypeDecl == null)
+         paramTypeDecl = ptd;
+      else if (paramTypeDecl instanceof ParamTypeDeclaration) {
+         ParamTypeDeclaration oldType = (ParamTypeDeclaration) paramTypeDecl;
+         if (oldType.getFullTypeName().equals(ptd.getFullTypeName())) {
+            paramTypeDecl = ptd;
+         }
+         else {
+            ParamTypeDeclaration mergedPT = oldType.cloneForNewTypes();
+
+            int i = 0;
+            // For each type parameter in the method's enclosing type - see if we can find a type param in the new type context to supply the right value
+            for (Object typeParam:mergedPT.typeParams) {
+               Object typeParamType = ModelUtil.getTypeParameterDeclaration(typeParam);
+               // Is this parameter defined by a type parameter in the type context in which the method is invoked?
+               // If so, find the position of that parameter and update the type context for this method with the
+               // type of that parameter.
+               Object mappedResParam = ModelUtil.resolveTypeParameter(mergedPT.baseType, ptd.baseType, typeParam);
+               if (mappedResParam != null) {
+                  int j = 0;
+                  for (Object tparam:ptd.typeParams) {
+                     if (ModelUtil.sameTypeParameters(mappedResParam, tparam)) {
+                        mergedPT.types.set(i, ptd.types.get(j));
+                     }
+                     j++;
+                  }
+               }
+               i++;
+            }
+            paramTypeDecl = mergedPT;
+         }
+      }
    }
 }

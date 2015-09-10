@@ -59,7 +59,7 @@ public abstract class BaseLambdaExpression extends Expression {
    Object getInterfaceMethod(Object inferredType, boolean errors) {
       if (!ModelUtil.isInterface(inferredType)) {
          if (errors)
-            displayError("Type for lambda expression: " + ModelUtil.getTypeName(inferredType) + " is not an interface");
+            displayError("Type for lambda expression: " + ModelUtil.getTypeName(inferredType) + " is not an interface for expression: ");
          return null;
       }
 
@@ -119,9 +119,6 @@ public abstract class BaseLambdaExpression extends Expression {
 
       if (newExpr != null)
          System.err.println("*** reinitializing new expression!");
-
-      //if (this instanceof MethodReference && ((MethodReference) this).methodName.equals("v2") && getEnclosingType().typeName.equals("Seq"))
-      //   System.out.println("***");
 
       Object ifaceMeth = getInterfaceMethod(inferredType, true);
       if (ifaceMeth == null) {
@@ -252,10 +249,10 @@ public abstract class BaseLambdaExpression extends Expression {
          newExpr.setProperty("typeArguments", typeParams);
       }
 
-      propagateInferredType(inferredType);
+      propagateInferredType(inferredType, paramReturnType);
    }
 
-   protected void propagateInferredType(Object type) {
+   protected void propagateInferredType(Object type, Object methReturnType) {
       if (newExpr != null)
          newExpr.setInferredType(inferredType);
    }
@@ -396,8 +393,6 @@ public abstract class BaseLambdaExpression extends Expression {
    }
 
    public void setInferredType(Object parentType) {
-      //if (this instanceof MethodReference && ((MethodReference) this).methodName.equals("v2") && getEnclosingType().typeName.equals("Seq"))
-      //   System.out.println("***");
       // Convert between the ParameterizedType and ParamTypeDeclaration
       if (parentType instanceof ParameterizedType)
          parentType = ModelUtil.getTypeDeclFromType(parentType, parentType, false, getLayeredSystem(), false, getEnclosingType());

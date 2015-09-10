@@ -105,7 +105,7 @@ public class ModelUtil {
       return typeToClass(getVariableTypeDeclaration(varObj));
    }
 
-   public static Map<TypeParamKey,Object> initMethodTypeParameters(Object[] typeParameters, Object[] genericParamTypes, List<Expression> arguments, Object retType, Object retInferredType) {
+   public static Map<TypeParamKey,Object> initMethodTypeParameters(Object[] typeParameters, Object[] genericParamTypes, Object[] resolvedParamTypes, List<Expression> arguments, Object retType, Object retInferredType) {
       if (typeParameters == null)
          return new HashMap<TypeParamKey,Object>(2);
 
@@ -126,6 +126,7 @@ public class ModelUtil {
          // Resolve any type parameters we can from the types of the arguments to the method
          for (int i = 0; i < genericParamTypes.length; i++) {
             Object genParam = genericParamTypes[i];
+            Object resolvedParam = resolvedParamTypes[i];
 
             boolean isGenArray = ModelUtil.isGenericArray(genParam);
 
@@ -190,35 +191,38 @@ public class ModelUtil {
          int numTypeParams = getNumTypeParameters(genParam);
          for (int atpIndex = 0; atpIndex < numTypeParams; atpIndex++) {
             Object atp = getTypeParameter(genParam, atpIndex);
+            Object typeVar = getTypeVariable(genParam, atpIndex);
 
             if (ModelUtil.isTypeVariable(atp)) {
                String argParamName = ModelUtil.getTypeParameterName(atp);
                Object curParamType = paramMap.get(new TypeParamKey(atp));
-               if (curParamType == null)
-                  ; // This happens sometimes - when we are not able to map the parameter type.
-               else {
-                  // Special case - Class<E> - e.g. <E extends Enum<E>> EnumSet<E> allOf(Class<E> elementType)
-                  if (ModelUtil.getTypeName(genParam).equals("java.lang.Class") && DynUtil.isType(argType)) {
-                     // assert curParamType.isAssignableFrom(atp)
-                     if (ModelUtil.isAssignableFrom(curParamType, paramArgType)) {
-                        argType = paramArgType;
-                        paramMap.put(new TypeParamKey(atp), argType);
-                     }
+               // Special case - Class<E> - e.g. <E extends Enum<E>> EnumSet<E> allOf(Class<E> elementType)
+               if (ModelUtil.getTypeName(genParam).equals("java.lang.Class") && DynUtil.isType(argType)) {
+                  // assert curParamType.isAssignableFrom(atp)
+                  if (curParamType != null && ModelUtil.isAssignableFrom(curParamType, paramArgType)) {
+                     argType = paramArgType;
+                     paramMap.put(new TypeParamKey(atp), argType);
                   }
-                  else if (!(curParamType instanceof WildcardType)) {
-                     int paramPos = ModelUtil.getTypeParameterPosition(curParamType, argParamName);
-                     if (paramPos != -1) {
-                        if (hasTypeParameters(argType)) {
-                           Object paramType = getTypeParameter(argType, paramPos);
-                           paramMap.put(new TypeParamKey(atp), paramType);
+               }
+               else {
+                  if (hasTypeParameters(argType)) {
+                     if (ModelUtil.isAssignableFrom(genParam, argType)) {
+                        Object resTypeParam = resolveTypeParameter(genParam, argType, typeVar);
+                        if (resTypeParam != null) {
+                           int resPos = ModelUtil.getTypeParameterPosition(argType, ModelUtil.getTypeParameterName(resTypeParam));
+                           Object resTypeValue = ModelUtil.getTypeParameter(argType, resPos);
+                           if (resTypeValue != null)
+                              paramMap.put(new TypeParamKey(atp), resTypeValue);
                         }
                      }
-                     // else - could be a method parameter
+                     else {
+                        // This can happen for the return type because the inferred type is a base-type of genParam.  Should we be extracting parameters in this case?
+                     }
                   }
+                  // else - could be a method parameter
                }
             }
             else {
-               Object typeVar = getTypeVariable(genParam, atpIndex);
                if (ModelUtil.isTypeVariable(typeVar)) {
                   paramMap.put(new TypeParamKey(typeVar), atp);
                }
@@ -261,7 +265,10 @@ public class ModelUtil {
 
          Object genRetType = ModelUtil.getParameterizedReturnType(varObj, arguments, false);
          if (tps != null && tps.length > 0) {
-            Object[] genParamTypes = ModelUtil.getGenericParameterTypes(varObj, true);
+            // The resolve parameter here must be false - we need the type parameters here so we can figure out how to
+            // bind them to the concrete values.
+            Object[] genParamTypes = ModelUtil.getGenericParameterTypes(varObj, false);
+            Object[] resolvedParamTypes = ModelUtil.getGenericParameterTypes(varObj, true);
 
             boolean isTypeVariable = ModelUtil.isTypeVariable(genRetType);
 
@@ -271,7 +278,7 @@ public class ModelUtil {
             boolean isParamType = hasTypeParameters(genRetType);
             boolean isArrayType = isGenericArray(genRetType);
             if (isParamType || isArrayType || isTypeVariable) {
-               Map<TypeParamKey,Object> paramMap = initMethodTypeParameters(tps, genParamTypes, arguments, genRetType, inferredType);
+               Map<TypeParamKey,Object> paramMap = initMethodTypeParameters(tps, genParamTypes, resolvedParamTypes, arguments, genRetType, inferredType);
 
                if (isTypeVariable) {
                   String retParamName = ModelUtil.getTypeParameterName(genRetType);
@@ -963,8 +970,15 @@ public class ModelUtil {
       if (c2abs && !c1abs)
          return c1;
 
-      if (ModelUtil.isAssignableFrom(ModelUtil.getReturnType(c2), ModelUtil.getReturnType(c1)))
-         return c1;
+      Object c1Ret = ModelUtil.getReturnType(c2);
+      Object c2Ret = ModelUtil.getReturnType(c1);
+      if (!ModelUtil.sameTypes(c1Ret, c2Ret)) {
+         if (ModelUtil.isAssignableFrom(c1Ret, c2Ret))
+            return c1;
+         else if (ModelUtil.isAssignableFrom(c2Ret, c1Ret))
+            return c2;
+      }
+      // Picks by the method with the shortest number of parameters
       return defaultType;
    }
 
@@ -3824,6 +3838,7 @@ public class ModelUtil {
       return typeParamName;
    }
 
+   /** Computes the type parameter in type 'resultType' that corresponds to the typeParam which is a type parameter for it's base class srcType */
    public static Object resolveTypeParameter(Object srcType, Object resultType, Object typeParam) {
       String typeParamName = ModelUtil.getTypeParameterName(typeParam);
       int srcIx = ModelUtil.getTypeParameterPosition(srcType, typeParamName);
@@ -3845,6 +3860,8 @@ public class ModelUtil {
          if (typeArgs == null)
             return null;
          Object typeArg = typeArgs.get(srcIx);
+         if (typeArg instanceof JavaType)
+            typeArg = ((JavaType) typeArg).getTypeDeclaration();
          if (ModelUtil.isTypeVariable(typeArg)) {
             res = typeArg;
             typeParamName = ModelUtil.getTypeParameterName(res);

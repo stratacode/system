@@ -190,7 +190,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             if (arguments != null && !(this instanceof NewExpression)) {
                Object foundMeth = findMethod(firstIdentifier, arguments, this, enclType, isStatic());
                if (foundMeth != null) {
-                  foundMeth = parameterizeMethod(this, foundMeth, inferredType, arguments);
+                  foundMeth = parameterizeMethod(this, foundMeth, null, inferredType, arguments);
                   idTypes[0] = IdentifierType.MethodInvocation;
                   boundTypes[0] = foundMeth;
                }
@@ -499,24 +499,23 @@ public class IdentifierExpression extends ArgumentsExpression {
       }
    }
 
-   static Object parameterizeMethod(Expression rootExpr, Object foundMeth, Object inferredType, List<Expression> arguments) {
+   static Object parameterizeMethod(Expression rootExpr, Object foundMeth, Object currentType, Object inferredType, List<Expression> arguments) {
       if (foundMeth != null) {
+         if (!(foundMeth instanceof ParamTypedMethod) && ModelUtil.isMethod(foundMeth) && (ModelUtil.hasMethodTypeParameters(foundMeth) || currentType instanceof ITypeParamContext)) {
+            TypeDeclaration definedInType = rootExpr.getEnclosingType();
+            if (definedInType == null) {
+               // This happens for the tag expressions inside of Element objects.  We really just need a layered system and a layer
+               // to resolve this reference so no need to find the accurate tag object.
+               definedInType = rootExpr.getJavaModel().getModelTypeDeclaration();
+               if (definedInType == null)
+                  System.err.println("*** Unable to parametrize reference - no enclosing type");
+            }
+            ParamTypedMethod ptm = new ParamTypedMethod(foundMeth, currentType instanceof ITypeParamContext ? (ITypeParamContext) currentType : null, definedInType, arguments);
+            foundMeth = ptm;
+         }
          if (inferredType != null) {
             if (foundMeth instanceof ParamTypedMethod) {
                ((ParamTypedMethod) foundMeth).setInferredType(inferredType);
-            }
-            else if (ModelUtil.isMethod(foundMeth) && ModelUtil.hasMethodTypeParameters(foundMeth)) {
-               TypeDeclaration definedInType = rootExpr.getEnclosingType();
-               if (definedInType == null) {
-                  // This happens for the tag expressions inside of Element objects.  We really just need a layered system and a layer
-                  // to resolve this reference so no need to find the accurate tag object.
-                  definedInType = rootExpr.getJavaModel().getModelTypeDeclaration();
-                  if (definedInType == null)
-                     System.err.println("*** Unable to parametrize reference - no enclosing type");
-               }
-               ParamTypedMethod ptm = new ParamTypedMethod(foundMeth, null, definedInType, arguments);
-               foundMeth = ptm;
-               ptm.setInferredType(inferredType);
             }
          }
       }
@@ -524,19 +523,6 @@ public class IdentifierExpression extends ArgumentsExpression {
    }
 
    static void propagateInferredArgs(Expression rootExpr, Object meth, List<Expression> arguments) {
-      /*
-      if (rootExpr instanceof IdentifierExpression) {
-         IdentifierExpression rid = (IdentifierExpression) rootExpr;
-         if (rid.identifiers != null && rid.identifiers.size() == 2 && rid.identifiers.get(0).equals("IdentifierExpression") && rid.identifiers.get(1).equals("create"))
-            System.out.println("***");
-         if (arguments.size() == 1 && arguments.get(0) instanceof IdentifierExpression) {
-            IdentifierExpression argExpr = (IdentifierExpression) arguments.get(0);
-            if (argExpr.identifiers != null && argExpr.identifiers.size() == 2)
-               if (argExpr.identifiers.get(0).equals("ids"))
-                  System.out.println("***");
-         }
-      }
-      */
       Object[] paramTypes = ModelUtil.getActualParameterTypes(meth, true);
       int i = 0;
       int plen = paramTypes == null ? 0 : paramTypes.length;
@@ -1247,7 +1233,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   idTypes[i] = IdentifierType.BoundObjectName;
                }
                else {
-                  methVar = parameterizeMethod(expr, methVar, inferredType, arguments);
+                  methVar = parameterizeMethod(expr, methVar, currentTypeDecl, inferredType, arguments);
                   idTypes[i] = IdentifierType.MethodInvocation;
                }
                boundTypes[i] = methVar;
@@ -1334,7 +1320,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          if (isMethod) {
             Method methObj = (Method) ModelUtil.definesMethod(currentClass, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic);
             if (methObj != null) {
-               Object meth = parameterizeMethod(expr, methObj, inferredType, arguments);
+               Object meth = parameterizeMethod(expr, methObj, currentClass, inferredType, arguments);
                idTypes[i] = IdentifierType.MethodInvocation;
                boundTypes[i] = meth;
             }

@@ -38,6 +38,8 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       if (types != null) {
          int i = 0;
          for (Object type:types) {
+            if (type == null)
+               System.out.println("*** Warning - null type in parameterized type");
             Object newType = ModelUtil.wrapPrimitiveType(type);
             if (newType != type)
                types.set(i, newType);
@@ -195,7 +197,13 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       Object method = ModelUtil.definesMethod(baseType, name, parametersOrExpressions, this, refType, isTransformed, staticOnly);
       if (ctx == null)
          ctx = this;
-      if (method != null && ModelUtil.isParameterizedMethod(method))
+      // If we already got back some parameter types for this method, we need to merge the definitions of this type into the one we retrieved.
+      // If it's a base type, it means mapping the parameter type names to the base type.
+      if (method instanceof ParamTypedMethod) {
+         ParamTypedMethod methPT = (ParamTypedMethod) method;
+         methPT.updateParamTypes(this);
+      }
+      else if (method != null && ModelUtil.isParameterizedMethod(method))
          return new ParamTypedMethod(method, this, definedInType, parametersOrExpressions);
       return method;
    }

@@ -79,10 +79,10 @@ public class LambdaExpression extends BaseLambdaExpression {
       return super.findMember(memberName, type, this, refType, ctx, skipIfaces);
    }
 
-   protected void propagateInferredType(Object type) {
-      super.propagateInferredType(type);
+   protected void propagateInferredType(Object type, Object methReturnType) {
+      super.propagateInferredType(type, methReturnType);
       if (lambdaBody instanceof Expression) {
-         ((Expression) lambdaBody).setInferredType(type);
+         ((Expression) lambdaBody).setInferredType(methReturnType);
       }
    }
 }

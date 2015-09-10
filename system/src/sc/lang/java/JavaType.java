@@ -174,8 +174,12 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
                typeParams.add(javaType);
             }
             else if (ModelUtil.hasTypeParameters(typeParam)) {
-               JavaType typeParamJavaType = createFromParamType(typeParam, ctx, definedInType);
-               typeParams.add(typeParamJavaType);
+               if (typeParam == type)
+                  System.out.println("*** Error!");
+               else {
+                  JavaType typeParamJavaType = createFromParamType(typeParam, ctx, definedInType);
+                  typeParams.add(typeParamJavaType);
+               }
             }
             else {
                String typeName = ModelUtil.getTypeName(typeParam);

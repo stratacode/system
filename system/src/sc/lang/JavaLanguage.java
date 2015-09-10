@@ -152,7 +152,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       optArguments.ignoreEmptyList = false;
    }
    Sequence classCreatorRest = new Sequence("(arguments, classBody)", arguments, new Sequence("(.)", OPTIONAL, classBody));
-   OrderedChoice typeOrQuestion = new OrderedChoice(argType,questionMark);
+   OrderedChoice typeOrQuestion = new OrderedChoice(argType, new Sequence("ExtendsType(questionMark)", questionMark));
    Sequence simpleTypeArguments = new Sequence("(,[],)", OPTIONAL, lessThan,
            new Sequence("([],[])", OPTIONAL, typeOrQuestion, new Sequence("(,[])",OPTIONAL | REPEAT, comma, typeOrQuestion))
            , greaterThanSkipOnError);

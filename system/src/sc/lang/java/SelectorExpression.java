@@ -41,19 +41,14 @@ public class SelectorExpression extends ChainedExpression {
       return selExpr;
    }
 
-   public void start() {
-      if (started) return;
-
-      super.start();
-
+   private void resolveTypeDeclaration() {
       if (expression == null)
          return; // fragment was parsed without an expression
-
-      int sz;
 
       // The root expression in a selector does not have an inferred type.  This is just to trigger the propagation of inferred types
       // since it's the only case where a sub-expression does not have an inferred type.
       //expression.setInferredType(null);
+      int sz;
 
       if (selectors != null && (sz = selectors.size()) > 0) {
          idTypes = new IdentifierExpression.IdentifierType[sz];
@@ -92,10 +87,12 @@ public class SelectorExpression extends ChainedExpression {
                   }
                   else {
                      IdentifierExpression.bindNextIdentifier(this, currentType, nextName, i, idTypes, boundTypes,
-                                    vsel.isAssignment, vsel.arguments != null, vsel.arguments, bindingDirection, false, inferredType);
+                             vsel.isAssignment, vsel.arguments != null, vsel.arguments, bindingDirection, false, inferredType);
                      currentType = IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, vsel.arguments, i, getJavaModel(), currentType, inferredType, getEnclosingType());
                   }
-                  if (vsel.arguments != null && boundTypes[i] != null) {
+                  // If we already have the inferred type or this is the root expression and so has no inferred type - we re-resolve the type after propagating the infeerred type.  This may fill in type parameters and other information
+                  // we need to make the type correct.
+                  if (vsel.arguments != null && boundTypes[i] != null && (inferredType != null || !hasInferredType())) {
                      IdentifierExpression.propagateInferredArgs(this, boundTypes[i], vsel.arguments);
                      currentType = IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, vsel.arguments, i, getJavaModel(), origCurrentType, inferredType, getEnclosingType());
                   }
@@ -110,6 +107,14 @@ public class SelectorExpression extends ChainedExpression {
             }
          }
       }
+   }
+
+   public void start() {
+      if (started) return;
+
+      super.start();
+
+      resolveTypeDeclaration();
    }
 
    public void validate() {
@@ -999,6 +1004,8 @@ public class SelectorExpression extends ChainedExpression {
 
    public void setInferredType(Object inferredType) {
       this.inferredType = inferredType;
+      // Re-resolve this now that we have the inferred type
+      resolveTypeDeclaration();
    }
 
    // We propagate to arguments in VariableSelectors but not to the root expression
