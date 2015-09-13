@@ -440,8 +440,9 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
                if (((ITypeDeclaration) implType).isAssignableTo(other))
                   return true;
             }
+            // implType might be another Java class but how could a java class depend on a CFClass?
             else if (implType != Object.class)
-               System.out.println("*** Unable to test impl type: " + implType);
+               ;
          }
       }
       if (extendsType != null) {

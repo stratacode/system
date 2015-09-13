@@ -5782,7 +5782,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       String javaHome = System.getProperty("java.home");
       for (int i = 0; i < list.length; i++) {
          // Skip any jar libs that are installed with the system
-         if (list[i].startsWith(javaHome))
+         if (javaHome != null && list[i].startsWith(javaHome))
             continue;
          File f = new File(list[i]);
 
