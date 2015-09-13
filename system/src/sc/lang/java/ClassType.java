@@ -254,7 +254,7 @@ public class ClassType extends JavaType {
          res = type;
       }
       else if (ctx != null && ModelUtil.isTypeVariable(type)) {
-         Object newType = ctx.getTypeForVariable(type, true);
+         Object newType = ctx.getTypeForVariable(type, resolve);
          if (newType != null)
             res = newType;
       }
@@ -927,13 +927,13 @@ public class ClassType extends JavaType {
       return true;
    }
 
-   public JavaType resolveTypeParameters(ITypeParamContext t) {
+   public JavaType resolveTypeParameters(ITypeParamContext t, boolean resolveUnbound) {
       if (type instanceof ExtendsType.LowerBoundsTypeDeclaration) {
          ExtendsType.LowerBoundsTypeDeclaration superWildcard = ((ExtendsType.LowerBoundsTypeDeclaration) type);
          Object baseType = superWildcard.getBaseType();
 
          if (ModelUtil.isTypeVariable(baseType)) {
-            Object newType = t.getTypeForVariable(baseType, false);
+            Object newType = t.getTypeForVariable(baseType, resolveUnbound); // was false
             if (newType == null)
                newType = ModelUtil.getTypeParameterDefault(baseType);
             if (newType != null && newType != baseType && !(newType instanceof ExtendsType.LowerBoundsTypeDeclaration)) {
@@ -943,7 +943,7 @@ public class ClassType extends JavaType {
          return ExtendsType.createSuper(superWildcard, t);
       }
       if (isTypeParameter()) {
-         Object typeParam = t.getTypeForVariable(type, false);
+         Object typeParam = t.getTypeForVariable(type, resolveUnbound);
          if (typeParam == null)
             typeParam = type;
          JavaType res = ClassType.createJavaType(typeParam);
@@ -958,7 +958,7 @@ public class ClassType extends JavaType {
       int ix = 0;
       for (JavaType typeArg:typeArgs) {
          if (typeArg.isParameterizedType()) {
-            JavaType newType = typeArg.resolveTypeParameters(t);
+            JavaType newType = typeArg.resolveTypeParameters(t, resolveUnbound);
             if (cloneArgs == null) {
                cloneArgs = (List<JavaType>) ((ArrayList)typeArgs).clone();
             }
@@ -988,7 +988,7 @@ public class ClassType extends JavaType {
       if (type == null)
          return null;
       if (isTypeParameter() && ModelUtil.sameTypeParameters(type, typeParam))
-         return ctx != null ? resolveTypeParameters(ctx) : this;
+         return ctx != null ? resolveTypeParameters(ctx, false) : this;
       if (arrayDimensions != null && ModelUtil.isGenericArray(type)) {
          Object compType = ModelUtil.getGenericComponentType(type);
          if (ModelUtil.isTypeVariable(compType) && ModelUtil.sameTypeParameters(compType, typeParam))

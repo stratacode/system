@@ -323,8 +323,14 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          CFClassSignature sig = signature;
          sig.parentNode = this;
          if (sig.extendsType != null) {
-            extendsJavaType = sig.extendsType;
-            extendsType = extendsJavaType.getTypeDeclaration();
+            if (isInterface()) {
+               //if (sig.extendsType.getFullTypeName().equals("java.lang.Object"))
+               //   System.out.println("*** Ignoring this since it's the default");
+            }
+            else {
+               extendsJavaType = sig.extendsType;
+               extendsType = extendsJavaType.getTypeDeclaration();
+            }
          }
          if (extendsType instanceof ParamTypeDeclaration)
             extendsType = ((ParamTypeDeclaration) extendsType).getBaseType();
@@ -462,6 +468,12 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          for (Class c:ifaces)
             if (isAssignableFromClass(c))
                return true;
+      }
+      // Handles the int implements Comparable when Comparable is a CFClass
+      if (other.isPrimitive()) {
+         Class clWrapper = sc.type.Type.get(other).getObjectClass();
+         if (isAssignableFromClass(clWrapper))
+            return true;
       }
       return false;
    }
@@ -705,6 +717,8 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
    }
 
    public Object getExtendsTypeDeclaration() {
+//      if (extendsType == null && isInterface() && implementsTypes != null && implementsTypes.size() > 0)
+//         return implementsTypes.get(0);
       return extendsType;
    }
 
@@ -799,17 +813,43 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
    }
 
    public List<Object> getAllMethods(String modifier, boolean hasModifier, boolean isDyn, boolean overridesComp) {
-      CFMethod[] meths = classFile.methods;
-      if (meths == null || isDyn || overridesComp)
+      if (isDyn || overridesComp)
          return null;
-      int sz = meths.length;
-      ArrayList<Object> res = new ArrayList<Object>(sz);
-      for (int i = 0; i < sz; i++) {
-         Object meth = meths[i];
-         if (modifier == null || hasModifier == ModelUtil.hasModifier(meth, modifier))
-            res.add(meth);
+
+      if (!started)
+         start();
+
+      CFMethod[] meths = classFile.methods;
+      List<Object> res = new ArrayList<Object>();
+      if (meths != null) {
+         int sz = meths.length;
+         for (int i = 0; i < sz; i++) {
+            Object meth = meths[i];
+            if (modifier == null || hasModifier == ModelUtil.hasModifier(meth, modifier))
+               res.add(meth);
+         }
       }
-      return res;
+
+      if (implementsTypes != null) {
+         for (Object impl:implementsTypes) {
+            Object[] implResult = ModelUtil.getAllMethods(impl, modifier, hasModifier, false, false);
+            if (implResult != null && implResult.length > 0) {
+               res = ModelUtil.appendInheritedMethods(implResult, res);
+            }
+         }
+      }
+      Object extendsObj = getDerivedTypeDeclaration();
+      List<Object> extMeths;
+      if (extendsObj == null)
+         return res;
+      else {
+         Object[] extM = ModelUtil.getAllMethods(extendsObj, modifier, hasModifier, false, false);
+         if (extM != null)
+            extMeths = Arrays.asList(extM);
+         else
+            extMeths = null;
+      }
+      return ModelUtil.mergeMethods(extMeths, res);
    }
 
 
@@ -933,6 +973,8 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
    }
 
    public Object[] getConstructors(Object refType) {
+      if (!started)
+         start();
       // TODO: enforce ref type here?
       return methodsByName.get("<init>");
    }

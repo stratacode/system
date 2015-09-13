@@ -107,11 +107,11 @@ public class BoundType extends JavaType {
    }
 
    @Override
-   public JavaType resolveTypeParameters(ITypeParamContext t) {
+   public JavaType resolveTypeParameters(ITypeParamContext t, boolean bound) {
       if (!isParameterizedType())
          return this;
 
-      JavaType newBaseType = baseType.resolveTypeParameters(t);
+      JavaType newBaseType = baseType.resolveTypeParameters(t, bound);
       BoundType newRes = null;
       if (newBaseType != baseType) {
          newRes = new BoundType();
@@ -122,7 +122,7 @@ public class BoundType extends JavaType {
       SemanticNodeList<JavaType> newBoundTypes = null;
       for (int i = 0; i < boundTypes.size(); i++) {
          JavaType bt = boundTypes.get(i);
-         JavaType newBt = bt.resolveTypeParameters(t);
+         JavaType newBt = bt.resolveTypeParameters(t, bound);
          if (newBt != bt) {
             if (newRes == null) {
                newRes = new BoundType();

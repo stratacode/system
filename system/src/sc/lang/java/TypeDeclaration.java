@@ -843,7 +843,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
             if (implResult != null && implResult.length > 0) {
                if (result == null)
                   result = new ArrayList<Object>();
-               result = appendInheritedMethods(implResult, result);
+               result = ModelUtil.appendInheritedMethods(implResult, result);
                //result.addAll(Arrays.asList(implResult));
             }
          }
@@ -861,7 +861,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
             if (impl != null) {
                Object[] implResult = ModelUtil.getMethods(impl, methodName, modifier);
                if (implResult != null && implResult.length > 0) {
-                  result = appendInheritedMethods(implResult, result);
+                  result = ModelUtil.appendInheritedMethods(implResult, result);
                }
             }
          }
@@ -869,25 +869,6 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return result;
    }
 
-   protected List<Object> appendInheritedMethods(Object[] implResult, List<Object> result) {
-      if (result == null) {
-         result = new ArrayList<Object>();
-         result.addAll(Arrays.asList(implResult));
-      }
-      else {
-         for (Object implMeth:implResult) {
-            int r;
-            for (r = 0; r < result.size(); r++) {
-               Object resMeth = result.get(r);
-               if (ModelUtil.overridesMethod(resMeth, implMeth))
-                  break;
-            }
-            if (r == result.size())
-               result.add(implMeth);
-         }
-      }
-      return result;
-   }
 
    public List<Object> getAllProperties(String modifier, boolean includeAssigns) {
       List<Object> result = super.getAllProperties(modifier, includeAssigns);

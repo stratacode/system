@@ -15,9 +15,15 @@ public class IfStatement extends NonIndentedStatement {
 
    //public boolean suppressIndent;
 
-   public void init()
-   {
+   public void init() {
       super.init();
+   }
+
+   public void start() {
+      super.start();
+
+      if (expression != null)
+         expression.setInferredType(Boolean.class);
    }
 
    public ExecResult exec(ExecutionContext ctx) {

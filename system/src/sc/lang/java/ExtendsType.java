@@ -178,10 +178,10 @@ public class ExtendsType extends JavaType {
    }
 
    @Override
-   public JavaType resolveTypeParameters(ITypeParamContext t) {
+   public JavaType resolveTypeParameters(ITypeParamContext t, boolean resolveUnbound) {
       if (typeArgument == null)
          return this;
-      JavaType newTypeArg = typeArgument.resolveTypeParameters(t);
+      JavaType newTypeArg = typeArgument.resolveTypeParameters(t, resolveUnbound);
       // This LowerBounds marker will already create the extends type so just return that
       if (typeArgument instanceof ClassType && ((ClassType) typeArgument).type instanceof LowerBoundsTypeDeclaration)
          return newTypeArg;

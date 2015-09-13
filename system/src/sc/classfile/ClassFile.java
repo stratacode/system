@@ -187,6 +187,12 @@ public class ClassFile {
       }
 
       public boolean hasModifier(String modifierName) {
+         if (modifierName.equals("default")) {
+            // Default methods are identified in the class file as non-abstract, non-static instance methods
+            if (ownerClass.isInterface() && !hasModifier("abstract") && !hasModifier("static") && hasModifier("public"))
+               return true;
+            return false;
+         }
          return (accessFlags & modifierNamesToFlags.get(modifierName)) != 0;
       }
 

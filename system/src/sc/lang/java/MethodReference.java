@@ -141,7 +141,7 @@ public class MethodReference extends BaseLambdaExpression {
          // Find the method in the list which matches the type parameters of the inferred type method
          // First pass is to look for a method where all of the parameters match each other
          for (Object meth:meths) {
-            if (ModelUtil.parametersMatch(ModelUtil.getParameterTypes(meth, true), paramTypes) && ModelUtil.isAssignableFrom(returnType, ModelUtil.getReturnType(meth))) {
+            if (ModelUtil.parametersMatch(ModelUtil.getParameterTypes(meth, true), paramTypes, true) && ModelUtil.isAssignableFrom(returnType, ModelUtil.getReturnType(meth))) {
                if (res == null)
                   res = meth;
                else
@@ -162,7 +162,7 @@ public class MethodReference extends BaseLambdaExpression {
                if (!ModelUtil.isAssignableFrom(refType, paramTypes[0]))
                   continue;
                Object[] refParamTypes = ModelUtil.getParameterTypes(meth, true);
-               if (ModelUtil.parametersMatch(refParamTypes, nextParamTypes)) {
+               if (ModelUtil.parametersMatch(refParamTypes, nextParamTypes, true)) {
                   if (res == null)
                      res = meth;
                   else

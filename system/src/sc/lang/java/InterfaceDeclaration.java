@@ -172,7 +172,7 @@ public class InterfaceDeclaration extends TypeDeclaration {
             if (implResult != null && implResult.length > 0) {
                if (result == null)
                   result = new ArrayList<Object>();
-               result = appendInheritedMethods(implResult, result);
+               result = ModelUtil.appendInheritedMethods(implResult, result);
             }
          }
       }

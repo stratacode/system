@@ -839,10 +839,10 @@ public class ModelUtil {
 
       Object[] c1Types = ModelUtil.getParameterTypes(c1);
       Object[] c2Types = ModelUtil.getParameterTypes(c2);
-      return parametersMatch(c1Types, c2Types);
+      return parametersMatch(c1Types, c2Types, false);
    }
 
-   public static boolean parametersMatch(Object[] c1Types, Object[] c2Types) {
+   public static boolean parametersMatch(Object[] c1Types, Object[] c2Types, boolean allowUnbound) {
       int c1Len = c1Types == null ? 0 : c1Types.length;
       int checkLen = c2Types == null ? 0 : c2Types.length;
       if (c1Len != checkLen)
@@ -859,7 +859,7 @@ public class ModelUtil {
             if (sameTypes(c1Arg, c2Arg))
                continue;
 
-            if (ModelUtil.isAssignableFrom(c1Arg, c2Arg))
+            if (ModelUtil.isAssignableFrom(c1Arg, c2Arg, false, null, allowUnbound))
                continue;
 
             return false;
@@ -1620,7 +1620,7 @@ public class ModelUtil {
          }
          else if (type2 == null)
             return false;
-         else if (type2 == LambdaExpression.LAMBDA_INFERRED_TYPE)
+         else if (type2 instanceof BaseLambdaExpression.LambdaInferredType)
             return true;
          else
             throw new UnsupportedOperationException();
@@ -1632,6 +1632,10 @@ public class ModelUtil {
          }
          if (!(type2 instanceof ITypeDeclaration))
             System.out.println("*** Error - invalid type to isAssignable method");
+
+         if (type2 instanceof BaseLambdaExpression.LambdaInferredType)
+            return true;
+
          ITypeDeclaration decl2 = (ITypeDeclaration) type2;
          return decl1.isAssignableFrom(decl2, assignmentSemantics);
       }
@@ -3445,8 +3449,13 @@ public class ModelUtil {
          JavaType[] paramTypes = ((IMethodDefinition) method).getParameterJavaTypes();
          if (paramTypes != null) {
             for (JavaType paramType:paramTypes) {
-               if (ModelUtil.hasUnboundTypeParameters(paramType))
+               if (paramType.isParameterizedType())
                   return true;
+               // TODO: remove this test - replaced the the one above which works and this one only would work if we got the type declaration first
+               if (ModelUtil.hasUnboundTypeParameters(paramType)) {
+                  System.err.println("*** Not reached?");
+                  return true;
+               }
             }
          }
          return false;
@@ -4807,6 +4816,26 @@ public class ModelUtil {
       return modMeths;
    }
 
+   public static List<Object> appendInheritedMethods(Object[] implResult, List<Object> result) {
+      if (result == null) {
+         result = new ArrayList<Object>();
+         result.addAll(Arrays.asList(implResult));
+      }
+      else {
+         for (Object implMeth:implResult) {
+            int r;
+            for (r = 0; r < result.size(); r++) {
+               Object resMeth = result.get(r);
+               if (ModelUtil.overridesMethod(resMeth, implMeth))
+                  break;
+            }
+            if (r == result.size())
+               result.add(implMeth);
+         }
+      }
+      return result;
+   }
+
    private static int methodIndexOf(List props, Object prop) {
       if (props == null)
          return -1;
@@ -4891,6 +4920,10 @@ public class ModelUtil {
       else if (elem instanceof Method) {
          Method meth = (Method) elem;
          sb.append(getTypeName(meth.getReturnType()) + " " + meth.getName() + parameterTypesToString(meth.getParameterTypes()));
+      }
+      else if (elem instanceof CFMethod) {
+         CFMethod meth = (CFMethod) elem;
+         sb.append(getTypeName(meth.getReturnType()) + " " + meth.getMethodName() + " (" + StringUtil.arrayToString(meth.getParameterTypes(false)) + ")");
       }
       else if (elem instanceof Field) {
          Field f = (Field) elem;
@@ -6259,7 +6292,7 @@ public class ModelUtil {
    }
 
    public static boolean isConstructor(Object method) {
-      return method instanceof Constructor || method instanceof ConstructorDefinition;
+      return method instanceof Constructor || method instanceof ConstructorDefinition || (method instanceof CFMethod && ((CFMethod) method).getMethodName().equals("<init>"));
    }
 
    /** Weird rule in java.  When you have a parameterized return type and no arguments, the type comes from the LHS of the assignment expression
@@ -6541,6 +6574,10 @@ public class ModelUtil {
          return actual[ix];
          //Object res = getTypeVariable(pt.getRawType(), ix);
          //Object res2 = ModelUtil.getTypeVariable(javaType, ix);
+      }
+      else if (javaType instanceof ParamTypeDeclaration) {
+         ParamTypeDeclaration ptd = (ParamTypeDeclaration) javaType;
+         return ptd.typeParams.get(ix);
       }
       else
          return null;

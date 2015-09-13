@@ -38,8 +38,11 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       if (types != null) {
          int i = 0;
          for (Object type:types) {
-            if (type == null)
-               System.out.println("*** Warning - null type in parameterized type");
+            if (type == null) {
+               // System.out.println("*** Warning - null type in parameterized type");
+               // If there are unresolved types in the model this might happen.
+               continue;
+            }
             Object newType = ModelUtil.wrapPrimitiveType(type);
             if (newType != type)
                types.set(i, newType);
@@ -85,24 +88,29 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
                break;
          } while (true);
 
-         List<?> otherTypeParams = otherParamType.typeParams;
-         if (typeParams.size() != otherTypeParams.size())
-            return false;
-
          for (int i = 0; i < typeParams.size(); i++) {
             Object typeParam = typeParams.get(i);
-            Object otherTypeParam = otherTypeParams.get(i);
+            Object otherTypeParam = ModelUtil.resolveTypeParameter(baseType, otherBaseType, typeParam);
+            // May not be mapped to a type parameter in the base type
+            if (otherTypeParam == null)
+               continue;
             // For TypeVariables, do we need to bind them to their real types in any situations here?
             if (!ModelUtil.isTypeVariable(typeParam) && !ModelUtil.isAssignableFrom(typeParam, otherTypeParam))
                return false;
+            // TODO: This is a complex case - do we need to check if this type parameter is defined in this param type declaration - e.g. HashMap.EntryIterator<K, V> extends Iterator<Map.Entry<K, V>>
+            if (!ModelUtil.isTypeVariable(otherTypeParam))
+               continue;
             if (types != null && otherParamType.types != null) {
                Object type = types.get(i);
-               if (i >= otherParamType.types.size())
-                  return false;
-               Object otherType = otherParamType.types.get(i);
-               // A null type is a signal for a wildcard like <T> List<T> emptyList();
-               if (type != null && otherType != null && !ModelUtil.isAssignableFrom(type, otherType, false, null, true))
-                  return false;
+               int otherPos = ModelUtil.getTypeParameterPosition(otherBaseType, ModelUtil.getTypeParameterName(otherTypeParam));
+               if (otherPos >= otherParamType.types.size())
+                  System.err.println("*** Internal error mapping type parameter");
+               else {
+                  Object otherType = otherParamType.types.get(otherPos);
+                  // A null type is a signal for a wildcard like <T> List<T> emptyList();
+                  if (type != null && otherType != null && !ModelUtil.isAssignableFrom(type, otherType, false, null, true))
+                     return false;
+               }
             }
          }
          return true;
@@ -558,15 +566,18 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
 
    public String toString() {
       StringBuilder sb = new StringBuilder();
-      sb.append(ModelUtil.getTypeName(baseType));
+      if (baseType != null)
+         sb.append(ModelUtil.getTypeName(baseType));
       sb.append("<");
       int i = 0;
-      for (Object type:types) {
-         if (i != 0)
-            sb.append(", ");
-         if (type != null)
-            sb.append(ModelUtil.getTypeName(type));
-         i++;
+      if (types != null) {
+         for (Object type:types) {
+            if (i != 0)
+               sb.append(", ");
+            if (type != null)
+               sb.append(ModelUtil.getTypeName(type));
+            i++;
+         }
       }
       sb.append(">");
       return sb.toString();
@@ -633,6 +644,10 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
          }
       }
       System.err.println("*** Failed to augment parameterized type with computed type parameter: " + varName);
+   }
+
+   public void setTypeParamIndex(int ix, Object type) {
+      types.set(ix, type);
    }
 
    public boolean hasUnboundParameters() {

@@ -263,7 +263,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                               if (paramExpr instanceof ClassValueExpression) {
                                  ClassValueExpression pe = (ClassValueExpression) paramExpr;
                                  Object classType = pe.resolveClassType();
-                                 result.types.set(j, classType);
+                                 result.setTypeParamIndex(j, classType);
                               }
                               // else - a runtime class.  We don't get additional type info from that.
                            }

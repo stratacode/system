@@ -170,7 +170,7 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
             }
             if (typeParam instanceof JavaType) {
                JavaType javaType = (JavaType) typeParam;
-               javaType = javaType.resolveTypeParameters(ctx);
+               javaType = javaType.resolveTypeParameters(ctx, false);
                typeParams.add(javaType);
             }
             else if (ModelUtil.hasTypeParameters(typeParam)) {
@@ -317,7 +317,7 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
 
    public abstract String toGenerateString();
 
-   public abstract JavaType resolveTypeParameters(ITypeParamContext t);
+   public abstract JavaType resolveTypeParameters(ITypeParamContext t, boolean useDefaultsForUnbound);
 
    public abstract boolean isBound();
 

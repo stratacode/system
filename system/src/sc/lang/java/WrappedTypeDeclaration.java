@@ -125,6 +125,8 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
    }
 
    public boolean implementsType(String otherTypeName, boolean assignment, boolean allowUnbound) {
+      if (allowUnbound && ModelUtil.isTypeVariable(baseType))
+         return true;
       // TODO: should we verify that our parameters match if the other type has assigned params too?
       return ModelUtil.implementsType(baseType, otherTypeName, assignment, allowUnbound);
    }

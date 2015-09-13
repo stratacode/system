@@ -13,7 +13,9 @@ import sc.layer.LayeredSystem;
 import sc.parser.IString;
 import sc.parser.PString;
 import sc.parser.ParseUtil;
+import sc.parser.StringToken;
 import sc.type.DynType;
+import sc.util.StringUtil;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.WildcardType;
@@ -21,8 +23,6 @@ import java.util.*;
 
 /** Java 8 lambda expression.  To run these in JS we need to convert them to anonymous classes */
 public abstract class BaseLambdaExpression extends Expression {
-   public final static String LAMBDA_INFERRED_TYPE = new String("lambdaInferredTypeSentinel");
-
    /** These are the parameters to the lambda expression - they should match the inferredTypeMethod */
    transient Parameter parameters; // Either a copy of lambdaParams when they are full specified or Parameter types we create to mirror the method that will be generated
    /** This is the "functional interface" (i.e. one method which is unimplemented) we are implementing with this lambda expression. */
@@ -100,7 +100,7 @@ public abstract class BaseLambdaExpression extends Expression {
                if (methods.length == 0)
                   displayError("Lambda expression's inferred type: " + inferredType.toString() + " does not have any methods for: ");
                else
-                  displayError("Lambda expression's inferred type: " + inferredType.toString() + " does not have suitable methods: " + methods + " for: ");
+                  displayError("Lambda expression's inferred type: " + inferredType.toString() + " does not have suitable methods: " + StringUtil.arrayToString(methods) + " for: ");
             }
          }
       }
@@ -116,6 +116,7 @@ public abstract class BaseLambdaExpression extends Expression {
          displayError("No inferredType for lambda expression: ");
          return;
       }
+
 
       if (newExpr != null)
          System.err.println("*** reinitializing new expression!");
@@ -269,7 +270,7 @@ public abstract class BaseLambdaExpression extends Expression {
       }
       else if (lambdaParams instanceof Parameter) {
          Object[] paramTypes = ((Parameter) lambdaParams).getParameterTypes();
-         return ModelUtil.parametersMatch(paramTypes, params);
+         return ModelUtil.parametersMatch(paramTypes, params, false); // TODO: should we allow unbound type parameters to match here
       }
       // () turns into null?
       else if (lambdaParams == null) {

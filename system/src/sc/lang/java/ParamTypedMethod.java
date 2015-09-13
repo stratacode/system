@@ -23,11 +23,17 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
    // for type parameter values used in resolving parameter types of the method invocation.
    Object inferredType;
 
-   // Cached the first time used
+   // --- These next type definitions are computed and cached the first time used and when inferredType is changed.
+   // These are the types of the method as they are declared
    JavaType[] paramJavaTypes;
+   // Resolved type parameters
    JavaType[] resolvedParamJavaTypes;
+   // The types of the expressions used in this method call
    JavaType[] boundJavaTypes;
+
+   // The resulting types of the parameters of these methods - without defaults for unbound type parameters
    Object[] paramTypes;
+   // The resulting types of the parameters of these methods - with type parameters removed (defaults used)
    Object[] boundTypes;
 
    // Set to true when this type is derived from parameter types which are not defined until the inferredType is set
@@ -78,7 +84,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
                      if (newType == null) {
                         newType = paramType.cloneForNewTypes();
                      }
-                     newType.types.set(i, ModelUtil.wrapPrimitiveType(newVal));
+                     newType.setTypeParamIndex(i, ModelUtil.wrapPrimitiveType(newVal));
                   }
                }
                else if (ModelUtil.isParameterizedType(type)) {
@@ -305,6 +311,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
    public JavaType[] getResolvedParameterJavaTypes() {
       if (resolvedParamJavaTypes != null)
          return resolvedParamJavaTypes;
+
       if (method instanceof IMethodDefinition) {
          JavaType[] paramTypes = getParameterJavaTypes();
          if (paramTypes == null)
@@ -314,7 +321,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
          for (int i = 0; i < len; i++) {
             JavaType paramType = paramTypes[i];
             if (paramType.isParameterizedType()) {
-               JavaType resolvedType = paramType.resolveTypeParameters(this);
+               JavaType resolvedType = paramType.resolveTypeParameters(this, false);
                if (resolvedType != paramType) {
                   if (result == null) {
                      result = new JavaType[len];
@@ -338,11 +345,11 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
             if (paramType instanceof ExtendsType.LowerBoundsTypeDeclaration)
                System.out.println("*** Unknown lower bounds type (6)");
             if (ModelUtil.hasTypeVariables(paramType)) {
-               paramType = resolveTypeParameter(paramType, false);
+               paramType = resolveTypeParameter(paramType, false); // Needs to be false
             }
             JavaType javaType = JavaType.createFromParamType(paramType, this, null);
             if (javaType.isParameterizedType()) {
-               JavaType newVal = javaType.resolveTypeParameters(this);
+               JavaType newVal = javaType.resolveTypeParameters(this, false);
                if (newVal != null) {
                   newVal.initType(getLayeredSystem(), getDefinedInType(), null, this, false, false, javaType.getTypeDeclaration());
                   if (newVal instanceof ClassType && ((ClassType) newVal).type == ClassType.FAILED_TO_INIT_SENTINEL) {
@@ -537,8 +544,14 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
    }
 
    public void setInferredType(Object inferredType) {
-      this.inferredType = inferredType;
-      paramTypes = null;
+      if (inferredType != this.inferredType) {
+         this.inferredType = inferredType;
+
+         // Invalidate these since they might be refined once the inferred type is set
+         paramTypes = null;
+         boundTypes = null;
+         resolvedParamJavaTypes = null;
+      }
    }
 
    public String toString() {
@@ -581,7 +594,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
                   int j = 0;
                   for (Object tparam:ptd.typeParams) {
                      if (ModelUtil.sameTypeParameters(mappedResParam, tparam)) {
-                        mergedPT.types.set(i, ptd.types.get(j));
+                        mergedPT.setTypeParamIndex(i, ptd.types.get(j));
                      }
                      j++;
                   }

@@ -131,7 +131,7 @@ public class PrimitiveType extends JavaType {
    }
 
    @Override
-   public JavaType resolveTypeParameters(ITypeParamContext t) {
+   public JavaType resolveTypeParameters(ITypeParamContext t, boolean resolveUnbound) {
       return this;
    }
 
