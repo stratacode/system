@@ -476,7 +476,7 @@ public class ClassType extends JavaType {
       }
 
       // Sometimes when we are called, typeParam supplies the component type and others the actual array generic type so be careful not to re-wrap it or leave it unwrapped
-      if ((!userType || !ModelUtil.isGenericArray(type)) && arrayDimensions != null && type != FAILED_TO_INIT_SENTINEL) {
+      if ((!userType || !ModelUtil.isArray(type)) && arrayDimensions != null && type != FAILED_TO_INIT_SENTINEL) {
          type = new ArrayTypeDeclaration(it, type, arrayDimensions);
       }
    }
