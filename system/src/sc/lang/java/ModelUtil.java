@@ -1797,6 +1797,23 @@ public class ModelUtil {
       return mainAnnot;
    }
 
+   public static Object getPropertyAnnotation(Object property, String annotationName) {
+      Object res = getAnnotation(property, annotationName);
+      if (res != null)
+         return res;
+      if (ModelUtil.isGetMethod(property)) {
+         Object setMethod = ModelUtil.getSetMethodFromGet(property);
+         if (setMethod != null)
+            return ModelUtil.getAnnotation(setMethod, annotationName);
+      }
+      else if (ModelUtil.isSetMethod(property)) {
+         Object getMethod = ModelUtil.getGetMethodFromSet(property);
+         if (getMethod != null)
+            return ModelUtil.getAnnotation(getMethod, annotationName);
+      }
+      return null;
+   }
+
    public static Object getAnnotation(Object definition, String annotationName) {
       PerfMon.start("getAnnotation");
       try {
@@ -3261,10 +3278,20 @@ public class ModelUtil {
    }
 
    public static boolean isSetMethod(Object method) {
+      if (method instanceof ParamTypedMember)
+         return isSetMethod(((ParamTypedMember) method).getMemberObject());
       if (method instanceof IMethodDefinition)
          return ((IMethodDefinition) method).isSetMethod();
       else if (method instanceof Method)
          return RTypeUtil.isSetMethod((Method) method);
+      else if (method instanceof VariableStatement)
+         return false;
+      if (method instanceof IBeanMapper || method instanceof VariableDefinition || method instanceof FieldDefinition || method instanceof Field) // Returning false here... isConstant already checks both get and set for mappers so it's not a get method for that purpose.
+         return false;
+      else if (method instanceof ITypeDeclaration)
+         return false;
+      else if (method instanceof PropertyAssignment)
+         return false;
       else
          throw new UnsupportedOperationException();
    }
@@ -3280,8 +3307,14 @@ public class ModelUtil {
          return RTypeUtil.isGetMethod((Method) method);
       else if (method instanceof ITypeDeclaration)
          return false;
-      else if (method instanceof PropertyAssignment)
-         return isGetMethod(((PropertyAssignment) method).getAssignedProperty());
+      else if (method instanceof PropertyAssignment) {
+         Object prop = ((PropertyAssignment) method).getAssignedProperty();
+         if (prop != null)
+            return isGetMethod(prop);
+         return false;
+      }
+      else if (method instanceof VariableStatement)
+         return false;
       else
          throw new UnsupportedOperationException();
    }
@@ -5541,7 +5574,8 @@ public class ModelUtil {
    }
 
    public static Object getBindableAnnotation(Object def) {
-      return ModelUtil.getAnnotation(def, "Bindable");
+      // Check both get and set method if this is a get or set method
+      return ModelUtil.getPropertyAnnotation(def, "Bindable");
    }
 
    public static boolean isAutomaticBindingAnnotation(Object annotationObj) {

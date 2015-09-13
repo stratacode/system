@@ -22,6 +22,8 @@ import java.util.*;
  * the method is an "is" or a "get" method and extensions are enabled.
  */
 public class MethodDefinition extends AbstractMethodDefinition implements IVariable {
+
+   /** Gets set to true when you use the override keyword to set an annotation on a method, perhaps as part of an annotation layer. */
    public boolean override;
   
    public transient String propertyName = null;
@@ -442,12 +444,12 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
    }
 
    public boolean isGetMethod() {
-      return propertyName != null && (name.startsWith("get") || name.startsWith("is")) || (origName != null && (origName.startsWith("get") || origName.startsWith("is")));
+      return propertyName != null && ((name.startsWith("get") || name.startsWith("is")) || (origName != null && (origName.startsWith("get") || origName.startsWith("is"))));
    }
 
    public boolean isSetMethod() {
       // Make sure to include the orig name in case we do the _bind_set transformation
-      return propertyName != null && name.startsWith("set") || (origName != null && origName.startsWith("set"));
+      return propertyName != null && (name.startsWith("set") || (origName != null && origName.startsWith("set")));
    }
 
    public boolean isGetIndexMethod() {
@@ -518,6 +520,16 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          }
       }
       return super.callVirtual(thisObj, values);
+   }
+
+   public AccessLevel getAccessLevel(boolean explicitOnly) {
+      AccessLevel level = super.getAccessLevel(explicitOnly);
+      if (level == null && override) {
+         Object prev = getPreviousDefinition();
+         if (prev != null)
+            return ModelUtil.getAccessLevel(prev, explicitOnly);
+      }
+      return level;
    }
 
    public boolean hasModifier(String modifier) {

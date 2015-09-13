@@ -855,7 +855,7 @@ public class IdentifierExpression extends ArgumentsExpression {
 
       if (!(referenceType instanceof BodyTypeDeclaration)) {
          if (!referenceOnly && ModelUtil.hasSetMethod(boundType) && ModelUtil.getAnnotation(annotType, "Bindable") == null)
-            fromExpr.displayWarning("Can't add binding to compiled type: " + referenceType + " for property: " + propertyName + " in: ");
+            fromExpr.displayWarning("Binding to unbindable compiled type: " + referenceType + " for property: " + propertyName + " in: ");
 
          if (!(sys = fromExpr.getLayeredSystem()).useRuntimeReflection) {
             sys.buildInfo.addExternalDynProp(referenceType, propertyName, fromExpr.getJavaModel(), referenceOnly);
