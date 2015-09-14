@@ -152,7 +152,7 @@ public class ExtendsType extends JavaType {
    }
 
    public String getBaseSignature() {
-      return getSignatureCode() + (typeArgument == null ? "" : typeArgument.getSignature());
+      return getSignatureCode() + (typeArgument == null ? "" : typeArgument.getSignature(false));
    }
 
    public void refreshBoundType(int flags) {

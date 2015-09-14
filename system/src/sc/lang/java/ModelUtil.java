@@ -873,6 +873,8 @@ public class ModelUtil {
       if (c1 == null)
          return c2;
 
+      // For CFClass at least, we pass in c2 as the sub-classes type as the second arg... not sure this is right.  Maybe we should only use this logic for when we get the list
+      // from the same type?
       Object defaultType = c2;
 
       // First an exact match of parameter types overrides - e.g. Math.abs(int)
@@ -1823,6 +1825,8 @@ public class ModelUtil {
       else {
          // TODO: fix annotation names
          Class annotationClass;
+         if (annotationName.equals("Bindable")) // TODO remove me
+            System.err.println("*** Old Bindable annotation");
          if (annotationName.equals("Bindable") || annotationName.equals("sc.bind.Bindable"))
             annotationClass = Bindable.class;
          else if (annotationName.equals("BindSettings"))
@@ -2335,6 +2339,12 @@ public class ModelUtil {
          return false;
       if (propObj instanceof VariableDefinition)
          return false;
+      if (ModelUtil.isSetMethod(propObj)) {
+         Object getMethod = ModelUtil.getGetMethodFromSet(propObj);
+         if (getMethod != null && propObj != getMethod)
+            return isPropertyIs(getMethod);
+         return false;
+      }
       return propObj instanceof IBeanMapper ? ((IBeanMapper) propObj).isPropertyIs() : getMethodName(propObj).startsWith("is");
    }
 
@@ -3067,7 +3077,7 @@ public class ModelUtil {
    }
 
    public static boolean isManualBindable(Object assignedProperty) {
-      Object bindAnnot = getAnnotation(assignedProperty, "Bindable");
+      Object bindAnnot = getAnnotation(assignedProperty, "sc.bind.Bindable");
       return bindAnnot != null && !ModelUtil.isAutomaticBindingAnnotation(bindAnnot);
    }
 
@@ -3081,7 +3091,7 @@ public class ModelUtil {
       }
       if (assignedProperty == null)
          return false;
-      Object bindAnnot = getAnnotation(assignedProperty, "Bindable");
+      Object bindAnnot = getAnnotation(assignedProperty, "sc.bind.Bindable");
       return bindAnnot != null && ModelUtil.isAutomaticBindingAnnotation(bindAnnot);
    }
 
@@ -3292,6 +3302,8 @@ public class ModelUtil {
          return false;
       else if (method instanceof PropertyAssignment)
          return false;
+      else if (method instanceof IFieldDefinition)
+         return false;
       else
          throw new UnsupportedOperationException();
    }
@@ -3313,6 +3325,8 @@ public class ModelUtil {
             return isGetMethod(prop);
          return false;
       }
+      else if (method instanceof IFieldDefinition)
+         return false;
       else if (method instanceof VariableStatement)
          return false;
       else
@@ -5575,7 +5589,7 @@ public class ModelUtil {
 
    public static Object getBindableAnnotation(Object def) {
       // Check both get and set method if this is a get or set method
-      return ModelUtil.getPropertyAnnotation(def, "Bindable");
+      return ModelUtil.getPropertyAnnotation(def, "sc.bind.Bindable");
    }
 
    public static boolean isAutomaticBindingAnnotation(Object annotationObj) {
@@ -5844,6 +5858,9 @@ public class ModelUtil {
       else if (staticType instanceof Class) {
          return TypeUtil.getStaticValue((Class) staticType, firstIdentifier);
       }
+      else if (staticType instanceof CFClass) {
+         return getStaticPropertyValue(((CFClass) staticType).getCompiledClass(), firstIdentifier);
+      }
       else if (staticType == null)
          throw new NullPointerException("No static type where static property: " + firstIdentifier + " expected");
       else
@@ -5912,9 +5929,9 @@ public class ModelUtil {
 
    public static String getSignature(Object type) {
       if (type instanceof JavaType)
-         return ((JavaType) type).getSignature();
+         return ((JavaType) type).getSignature(false);
       else if (type instanceof ITypeDeclaration)
-         return ModelUtil.getTypeName(type);
+         return "L" + ModelUtil.getTypeName(type).replace('.', '/') + ";";
       else if (type instanceof Class) {
          return RTypeUtil.getSignature((Class) type);
       }

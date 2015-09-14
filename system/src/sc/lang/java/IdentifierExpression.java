@@ -854,8 +854,10 @@ public class IdentifierExpression extends ArgumentsExpression {
       LayeredSystem sys;
 
       if (!(referenceType instanceof BodyTypeDeclaration)) {
-         if (!referenceOnly && ModelUtil.hasSetMethod(boundType) && ModelUtil.getAnnotation(annotType, "Bindable") == null)
+         if (!referenceOnly && ModelUtil.hasSetMethod(boundType) && ModelUtil.getPropertyAnnotation(annotType, "sc.bind.Bindable") == null) {
             fromExpr.displayWarning("Binding to unbindable compiled type: " + referenceType + " for property: " + propertyName + " in: ");
+            ModelUtil.getPropertyAnnotation(annotType, "sc.bind.Bindable");
+         }
 
          if (!(sys = fromExpr.getLayeredSystem()).useRuntimeReflection) {
             sys.buildInfo.addExternalDynProp(referenceType, propertyName, fromExpr.getJavaModel(), referenceOnly);
@@ -864,14 +866,14 @@ public class IdentifierExpression extends ArgumentsExpression {
       else {
          referenceTD = (TypeDeclaration) referenceType;
 
-         if (ModelUtil.hasSetMethod(boundType) && ModelUtil.getAnnotation(annotType, "Bindable") == null) {
+         if (ModelUtil.hasSetMethod(boundType) && ModelUtil.getPropertyAnnotation(annotType, "sc.bind.Bindable") == null) {
             Object nextType;
             TypeDeclaration nextTD;
             boolean addBindable = true;
 
             // We'll already be making the property in the reference TD bindable which should be enough
             Object member = referenceTD.definesMember(propertyName, MemberType.PropertyAnySet, null, null);
-            if (checkAnnotations && member != null && ModelUtil.getAnnotation(member, "Bindable") != null)
+            if (checkAnnotations && member != null && ModelUtil.getAnnotation(member, "sc.bind.Bindable") != null)
                 return;
 
             // Find the most specific class/object type which defines this property skipping annotation layers which are
@@ -887,7 +889,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   break;
 
                // If we are derived from a type which implements the bindable contract, we do not need to make this one bindable as well.
-               if (checkAnnotations && (ModelUtil.getAnnotation(member, "Bindable") != null || ModelUtil.isConstant(member))) {
+               if (checkAnnotations && (ModelUtil.getAnnotation(member, "sc.bind.Bindable") != null || ModelUtil.isConstant(member))) {
                   addBindable = false;
                   break;
                }

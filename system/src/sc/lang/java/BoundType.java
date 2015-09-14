@@ -78,7 +78,7 @@ public class BoundType extends JavaType {
       sb.append(baseType.getBaseSignature());
       for (int i = 0; i < boundTypes.size(); i++) {
          sb.append(":");
-         sb.append(boundTypes.get(i).getSignature());
+         sb.append(boundTypes.get(i).getSignature(false));
       }
       return sb.toString();
    }

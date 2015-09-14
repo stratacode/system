@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import sc.classfile.CFMethod;
 import sc.classfile.ClassFile;
 import sc.dyn.IDynObjManager;
 import sc.dyn.IDynObject;
@@ -1698,8 +1699,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          // Jump to the implementation class.  Otherwise, the "stop searching sentinel" is hit due to the object tag and we never find the object.
          Object accessClass = outer.getClassDeclarationForType();
          Object overrideDef = ModelUtil.definesMember(accessClass, typeName, MemberType.SetMethodSet, null, null);
-         if (overrideDef != null && ModelUtil.hasSetMethod(overrideDef))
+         if (overrideDef != null && ModelUtil.hasSetMethod(overrideDef)) {
+            if (overrideDef instanceof CFMethod)
+               return ((CFMethod) overrideDef).getRuntimeMethod();
             return overrideDef;
+         }
       }
       return null;
    }

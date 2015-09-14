@@ -280,9 +280,17 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
 
    public abstract String getBaseSignature();
 
-   public String getSignature() {
+   public String getSignature(boolean expandTypeParams) {
       String dimsStr = getSignatureDims();
       String baseSig = getBaseSignature();
+      if (baseSig.startsWith("T") && expandTypeParams) {
+         Object type = getTypeDeclaration(null, true);
+         if (ModelUtil.isArray(type))
+            type = ModelUtil.getArrayComponentType(type);
+         if (ModelUtil.isTypeVariable(type))
+            type = ModelUtil.getTypeParameterDefault(type);
+         baseSig = ModelUtil.getSignature(type);
+      }
       return dimsStr == null ? baseSig : dimsStr + baseSig;
    }
 

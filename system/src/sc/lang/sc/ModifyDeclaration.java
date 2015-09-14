@@ -1988,6 +1988,9 @@ public class ModifyDeclaration extends TypeDeclaration {
          else
             return super.getCompiledClass();
       }
+      else if (modifyClass instanceof CFClass) {
+         return getLayeredSystem().getCompiledClass(getFullTypeName());
+      }
       else
          return null;
    }

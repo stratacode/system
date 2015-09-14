@@ -20,7 +20,7 @@ import java.util.*;
 
 public class TransformUtil {
    final static String[] BINDABLE_INTERFACE = {"sc", "bind", "IBindable"};
-   final static String BINDABLE_ANNOTATION = "Bindable";
+   final static String BINDABLE_ANNOTATION = "sc.bind.Bindable";
 
    final static String[] COMPONENT_INTERFACE = {"sc", "obj", "IComponent"};
    final static String[] ALT_COMPONENT_INTERFACE = {"sc", "obj", "IAltComponent"};

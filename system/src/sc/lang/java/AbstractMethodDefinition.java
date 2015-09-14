@@ -488,7 +488,7 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
          List<Parameter> paramList = parameters.getParameterList();
          StringBuilder sb = new StringBuilder();
          for (int i = 0; i < num; i++)
-            sb.append(paramList.get(i).type.getSignature());
+            sb.append(paramList.get(i).type.getSignature(true));
          return sb.toString();
       }
       return null;

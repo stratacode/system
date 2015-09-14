@@ -169,10 +169,24 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
    public String getTypeSignature() {
       if (typeSignature == null)
          return null;
+      if (!started)
+         start();
+
+      // When type parameters are involved, we need to expand the types here - otherwise, we could try to substring this from typeSignature
+      if (parameterJavaTypes != null) {
+         StringBuilder sb = new StringBuilder();
+         for (int i = 0; i < parameterJavaTypes.length; i++)
+            sb.append(parameterJavaTypes[i].getSignature(true));
+         return sb.toString();
+      }
+      return null;
+      /*
+      int openIx = typeSignature.indexOf("(");
       int closeIx = typeSignature.indexOf(")");
-      if (closeIx == -1)
+      if (closeIx == -1 || openIx == -1)
          return typeSignature; // Not reached
-      return typeSignature.substring(1, closeIx);
+      return typeSignature.substring(openIx+1, closeIx);
+      */
    }
 
    public JavaType[] getExceptionTypes() {
@@ -238,7 +252,7 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
       if (cl == null)
          return null;
 
-      Class[] paramTypes = ModelUtil.typeToClassArray(parameterJavaTypes);
-      return RTypeUtil.getMethod(cl, name, paramTypes);
+      Method res = RTypeUtil.getMethodFromTypeSignature(cl, name, getTypeSignature());
+      return res;
    }
 }

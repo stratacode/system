@@ -949,7 +949,7 @@ public class ModelUtil {
          // TODO: fix annotation names
          Class annotationClass;
          if (annotationName.equals("Bindable") || annotationName.equals("ccake.binding.Bindable"))
-            annotationClass = Bindable.class;
+
          else if (annotationName.equals("BindSettings"))
             annotationClass = BindSettings.class;
          else

@@ -253,7 +253,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
                      if (j < methodList.length && superMethodList[j] == methodList[j]) {
                         // We start out sharing the array from our super class = make a copy on the
                         // first change only
-                        method = ModelUtil.pickMoreSpecificMethod(method, superMethodList[j], null);
+                        method = ModelUtil.pickMoreSpecificMethod(superMethodList[j], method, null);
                         // We start out with a CFMethod[] but may need to replace it with a Class if we override something
                         methodList = checkMethodList(cache, methodList, methodName, method);
                         methodList[j] = method;
@@ -279,7 +279,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
                for (int j = 0; j < methodList.length; j++) {
                   Object otherMeth = methodList[j];
                   if (otherMeth != method && ModelUtil.overridesMethod(method, otherMeth)) {
-                     Object newMethod = ModelUtil.pickMoreSpecificMethod(method, otherMeth, null);
+                     Object newMethod = ModelUtil.pickMoreSpecificMethod(otherMeth, method, null);
                      if (newMethod == method) {
                         methodList = checkMethodList(cache, methodList, methodName, method);
                         methodList[j] = method;
@@ -917,8 +917,10 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       for (int i = 0; i < num; i++) {
          String innerName = classFile.getInnerClassName(i);
          Object innerType = getInnerType(innerName, null);
-         if (innerType == null)
-            error("Can't find inner type: " + innerName + " of: " + getTypeName());
+         if (innerType == null) {
+            // These could just be defined on the base class.  We don't need them here since we'll inherit them at lookup time
+            //error("Can't find inner type: " + innerName + " of: " + getTypeName());
+         }
          else if (modifier == null || ModelUtil.hasModifier(innerType, modifier))
             innerTypes.add(innerType);
       }

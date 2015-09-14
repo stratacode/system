@@ -160,7 +160,7 @@ public class ConstructorDefinition extends AbstractMethodDefinition {
       if (parameters != null && (num = parameters.getNumParameters()) != 0) {
          List<Parameter> paramList = parameters.getParameterList();
          for (int i = 0; i < num; i++)
-            sb.append(paramList.get(i).type.getSignature());
+            sb.append(paramList.get(i).type.getSignature(true));
       }
       return sb.length() == 0 ? null : sb.toString();
    }

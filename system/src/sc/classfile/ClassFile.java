@@ -639,6 +639,9 @@ public class ClassFile {
             // Name of inner class
             int innerNameIndex = input.readUnsignedShort();
             String innerName = innerNameIndex == 0 ? null : ((Utf8Constant) file.constantPool[innerNameIndex]).value;
+            // TODO: these are Modifier.PUBLIC, PRIVATE, etc. but it seems like they must also be in the CFClass we read for the inner class
+            // itself so we are ignoring them here.
+            int innerAccessFlags = input.readUnsignedShort();
             if (innerName != null) {
                if (innerClasses == null) {
                   file.theInnerClasses = this;
@@ -647,8 +650,6 @@ public class ClassFile {
                innerClasses.add(innerName);
             }
 
-            int innerAccessFlags = input.readUnsignedShort();
-            // TODO... do we need these?
          }
       }
    }
