@@ -385,7 +385,7 @@ public abstract class Language extends LayerFileComponent {
     * @param pkg
     */
    public void setSemanticValueClassPath(String pkg) {
-      semanticValueClassPath = pkg.split(":");
+      semanticValueClassPath = pkg.split(File.pathSeparator);
    }
 
    public void addToSemanticValueClassPath(String newPkg) {

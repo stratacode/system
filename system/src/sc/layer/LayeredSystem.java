@@ -5607,7 +5607,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // Include any new entries in the .layerPath file into the layer path
             String layerPath = FileUtil.getFileAsString(layerPathFileName);
             if (layerPath != null && !layerPath.trim().equals(".")) {
-               String[] newLayerPaths = layerPath.split(":");
+               String[] newLayerPaths = layerPath.split(File.pathSeparator);
                for (String newLayerPath:newLayerPaths) {
                   if (!inLayerPath(newLayerPath)) {
                      File newDirFile = new File(newLayerPath);
