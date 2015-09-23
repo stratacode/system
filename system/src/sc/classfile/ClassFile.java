@@ -4,7 +4,23 @@
 
 package sc.classfile;
 
-import sc.lang.java.*;
+import java.io.BufferedInputStream;
+import java.io.DataInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+
+import sc.lang.java.AccessLevel;
+import sc.lang.java.ExecutionContext;
+import sc.lang.java.IDefinition;
+import sc.lang.java.ITypeDeclaration;
+import sc.lang.java.IValueNode;
+import sc.lang.java.JavaSemanticNode;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.type.RTypeUtil;
@@ -12,12 +28,6 @@ import sc.util.CoalescedHashMap;
 import sc.util.IMessageHandler;
 import sc.util.IntCoalescedHashMap;
 import sc.util.MessageHandler;
-
-import java.io.*;
-import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 
 public class ClassFile {
    DataInputStream input;
@@ -791,6 +801,7 @@ public class ClassFile {
          file.initialize();
       }
       catch (IOException exc) {
+         exc.printStackTrace();
          System.out.println("**** Can't open file: " + exc);
       }
    }

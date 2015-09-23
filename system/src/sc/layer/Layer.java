@@ -4,15 +4,60 @@
 
 package sc.layer;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InvalidClassException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+
 import sc.classfile.CFClass;
 import sc.dyn.IDynObject;
-import sc.lang.*;
+import sc.lang.DynObject;
+import sc.lang.IAnnotationProcessor;
+import sc.lang.IDefinitionProcessor;
+import sc.lang.ILanguageModel;
+import sc.lang.SemanticNodeList;
+import sc.lang.java.AnonClassDeclaration;
+import sc.lang.java.BodyTypeDeclaration;
+import sc.lang.java.BooleanLiteral;
+import sc.lang.java.ClassType;
+import sc.lang.java.DeclarationType;
+import sc.lang.java.EnumConstant;
+import sc.lang.java.ExecutionContext;
+import sc.lang.java.ImportDeclaration;
+import sc.lang.java.JavaModel;
+import sc.lang.java.JavaSemanticNode;
+import sc.lang.java.JavaType;
+import sc.lang.java.MethodDefinition;
+import sc.lang.java.ModelUtil;
+import sc.lang.java.TypeDeclaration;
+import sc.lang.java.UpdateInstanceInfo;
 import sc.lang.sc.IScopeProcessor;
-import sc.lang.sc.SCModel;
-import sc.lang.sc.PropertyAssignment;
-import sc.lifecycle.ILifecycle;
 import sc.lang.sc.ModifyDeclaration;
-import sc.lang.java.*;
+import sc.lang.sc.PropertyAssignment;
+import sc.lang.sc.SCModel;
+import sc.lifecycle.ILifecycle;
 import sc.obj.CompilerSettings;
 import sc.obj.Constant;
 import sc.obj.GlobalScopeDefinition;
@@ -27,14 +72,11 @@ import sc.sync.SyncManager;
 import sc.type.CTypeUtil;
 import sc.type.RTypeUtil;
 import sc.type.TypeUtil;
-import sc.util.*;
-
-import java.io.*;
-import java.net.URL;
-import java.util.*;
-import java.util.regex.Pattern;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
+import sc.util.FileUtil;
+import sc.util.IdentityWrapper;
+import sc.util.MessageType;
+import sc.util.PerfMon;
+import sc.util.StringUtil;
 
 /** 
  * The main implementation class for a Layer.  There's one instance of this class for
@@ -1664,6 +1706,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                   zipFiles[i] = new ZipFile(classDir);
                }
                catch (IOException exc) {
+                  exc.printStackTrace();
                   System.err.println("*** Can't open layer: " + layerPathName + "'s classPath entry as a zip file: " + classDir);
                }
             }
@@ -1683,6 +1726,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                   externalZipFiles[i] = new ZipFile(classDir);
                }
                catch (IOException exc) {
+                  exc.printStackTrace();
                   System.err.println("*** Can't open layer: " + layerPathName + "'s classPath entry as a zip file: " + classDir);
                }
             }
@@ -3651,7 +3695,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             if (classPath == null)
                classPath = cp;
             else
-               classPath = classPath + ":" + cp;
+               classPath = classPath + File.pathSeparator + cp;
          }
          // TODO: should we also let a package add to the src path?  What about directory prefixes and file types?
       }
@@ -3868,9 +3912,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          // Relative paths will already be found in the default src path (layerPathName) - so no need to add them here
          if (abs) {
             if (this.srcPath != null) {
-               this.srcPath = this.srcPath + ":" + srcPath;
+               this.srcPath = this.srcPath + File.pathSeparator + srcPath;
             } else
-               this.srcPath = layerPathName + ":" + srcPath;
+               this.srcPath = layerPathName + File.pathSeparator + srcPath;
          }
       }
       else
