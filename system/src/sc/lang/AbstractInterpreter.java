@@ -823,7 +823,7 @@ public abstract class AbstractInterpreter extends EditorContext {
       // with the same name and this allows no way to override that.
       if (currentTypes.size() > 0) {
          curType = currentTypes.get(currentTypes.size()-1);
-         methObj = curType.definesMethod(def, null, null, null, false, false);
+         methObj = curType.definesMethod(def, null, null, null, false, false, null);
          varObj = curType.definesMember(def, JavaSemanticNode.MemberType.AllSet, null, null);
          typeObj = curType.findType(def);
          if (typeObj == null)

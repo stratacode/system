@@ -31,8 +31,7 @@ public class VariableSelector extends Selector {
          if (boundType == null)
             throw new IllegalArgumentException("Unable to find method: " + identifier + " on type: " +
                                                baseValue.getClass() + " with arguments: " + arguments.toLanguageString());
-         return ModelUtil.invokeMethod(baseValue, boundType, arguments,
-                                       expectedType, ctx, true, true);
+         return ModelUtil.invokeMethod(baseValue, boundType, arguments, expectedType, ctx, true, true, null);
       }
       else {
          /*

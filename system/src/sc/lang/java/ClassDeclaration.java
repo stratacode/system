@@ -918,7 +918,7 @@ public class ClassDeclaration extends TypeDeclaration {
       else {
          for (int i = 0; i < meths.length; i++) {
             Object meth = meths[i];
-            Object declMethObj = declaresMethod(onInitMethodName, Arrays.asList(ModelUtil.getParameterTypes(meth)), null, null, false);
+            Object declMethObj = declaresMethod(onInitMethodName, Arrays.asList(ModelUtil.getParameterTypes(meth)), null, null, false, null);
             MethodDefinition declMeth;
             if (declMethObj == null) {
                declMeth = (MethodDefinition) TransformUtil.defineRedirectMethod(this, onInitMethodName, meth, false, !ModelUtil.isAbstractMethod(meth));
@@ -1090,7 +1090,7 @@ public class ClassDeclaration extends TypeDeclaration {
       Object extendsMethod;
 
       // super.method() - either, there is a preInit method or we will generate one anyway cause it is a component too
-      if (extendsIsComponent || (extendsMethod = extendsDefinesMethod(name, null, null, null, false, false)) != null &&
+      if (extendsIsComponent || (extendsMethod = extendsDefinesMethod(name, null, null, null, false, false, null)) != null &&
           (ModelUtil.hasModifier(extendsMethod, "public") || ModelUtil.hasModifier(extendsMethod, "protected"))) {
          IdentifierExpression ie = IdentifierExpression.create("super", superName);
          ie.setProperty("arguments", new SemanticNodeList(0));

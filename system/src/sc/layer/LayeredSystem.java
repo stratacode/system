@@ -2709,7 +2709,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Object getReturnType(Object method) {
-      return ModelUtil.getReturnType(method);
+      return ModelUtil.getReturnType(method, true);
    }
 
    public Object[] getParameterTypes(Object dynMethod) {
@@ -4177,7 +4177,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       Object[] args = new Object[] {processCommandArgs(runClassArgs)};
       if (type != null && ModelUtil.isDynamicType(type)) {
-         Object meth = ModelUtil.getMethod(type, "main", null, null, false, RTypeUtil.MAIN_ARG);
+         Object meth = ModelUtil.getMethod(this, type, "main", null, null, null, false, RTypeUtil.MAIN_ARG);
          if (!ModelUtil.hasModifier(meth, "static"))
             System.err.println("*** Main method missing 'static' modifier: " + runClass);
          else {
@@ -8302,6 +8302,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * ClassLoader scheme when we start running stuff.
     */
    private void resetClassLoader() {
+      if (buildClassLoader instanceof TrackingClassLoader) {
+         ((TrackingClassLoader) buildClassLoader).deactivate();
+      }
       buildClassLoader = getClass().getClassLoader();
       RTypeUtil.flushCaches();
       resetClassCache();

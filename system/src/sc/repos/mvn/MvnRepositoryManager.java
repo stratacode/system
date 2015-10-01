@@ -36,9 +36,21 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
    public MvnRepositoryManager(RepositorySystem sys, String managerName, String rootDir, IMessageHandler handler, boolean info) {
       super(sys, managerName, rootDir, handler, info);
 
-      for (String defPath:defaultRepositories) {
-         repositories.add(new MvnRepository(defPath));
+      // Need to make sure both types share the same pomCache and repositories
+      if (managerName.equals("mvn")) {
+         pomCache = new HashMap<String,POMFile>();
+         repositories = new ArrayList<MvnRepository>();
+
+         for (String defPath:defaultRepositories) {
+            repositories.add(new MvnRepository(defPath));
+         }
       }
+      else {
+         MvnRepositoryManager mvnMgr = (MvnRepositoryManager) sys.getRepositoryManager("mvn");
+         pomCache = mvnMgr.pomCache;
+         repositories = mvnMgr.repositories;
+      }
+
    }
 
    public final String MAVEN_URL_PREFIX = "mvn://";
@@ -46,9 +58,9 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
    public AbstractRepositoryManager installRepository;
 
    // These are the maven repositories we use to find files.  Defaults to maven centrl.
-   ArrayList<MvnRepository> repositories = new ArrayList<MvnRepository>();
+   ArrayList<MvnRepository> repositories;
 
-   public HashMap<String,POMFile> pomCache = new HashMap<String,POMFile>();
+   public HashMap<String,POMFile> pomCache;
 
    @Override
    public String doInstall(RepositorySource src, DependencyContext ctx, DependencyCollection deps) {
@@ -58,37 +70,71 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       Object pomFileRes;
       MvnRepositoryPackage pkg = (MvnRepositoryPackage) src.pkg;
 
+      POMFile parentPOM = null;
+      if (pkg.parentPkg instanceof MvnRepositoryPackage) {
+         parentPOM = ((MvnRepositoryPackage) pkg.parentPkg).pomFile;
+      }
+
       if (installRepository != null) {
          installRepository.doInstall(src, ctx, deps);
-         // This is the src repository and so does not need to go into classpath
-         src.pkg.definesClasses = false;
-         pomFileRes = POMFile.readPOM(FileUtil.concat(src.pkg.getVersionRoot(), "pom.xml"), this, ctx, pkg);
+         // Typically installRepository is git so we change the defaults
+         pkg.buildFromSrc = true;
+         // Don't update the class path
+         pkg.definesClasses = false;
+         // Do update the src path - this will be changed if pom packaging to false - then we pick up the src path from the sub-modules
+         pkg.definesSrc = true;
+         pomFileRes = POMFile.readPOM(FileUtil.concat(pkg.getVersionRoot(), "pom.xml"), this, ctx, pkg, parentPOM, null);
          desc = null;
          // Can't read file returns null
          if (pomFileRes == null)
-            pomFileRes = "Failed to read pom file for package: " + src.pkg.packageName;
+            pomFileRes = "Failed to read pom file for package: " + pkg.packageName;
       }
       else {
          desc = MvnDescriptor.fromURL(url);
          // Need this set here so the version suffix can be resolved from the pkg
-         src.pkg.currentSource = src;
-         pomFileRes = installPOM(desc, src.pkg, ctx, false);
-         if (pomFileRes instanceof POMFile) {
-            POMFile pomFile = (POMFile) pomFileRes;
-            if (pomFile != null && (pomFile.packaging.equals("jar") || pomFile.packaging.equals("bundle")))
-               src.pkg.definesClasses = true;
-            else
-               src.pkg.definesClasses = false;
+         pkg.setCurrentSource(src);
+         // We may have already processed a pom for this package as part of a weird module reference, before we'd decided on the right version for the package
+         // We just overwrite the old one
+         if (pkg.pomFile != null && !pkg.pomFile.fileName.equals(getPOMFileName(pkg))) {
+            pkg.pomFile = null;
          }
-         else if (pomFileRes instanceof String) {
-            System.err.println("*** Failed to read POM file: " + pomFileRes);
+         POMFile pomFile = pkg.pomFile;
+         if (pomFile == null) {
+            // If this is a nested POM this should find it's already there and not install
+            pomFileRes = installPOM(desc, pkg, ctx, false, parentPOM, null);
+            if (pomFileRes instanceof POMFile) {
+               pomFile = (POMFile) pomFileRes;
+            } else if (pomFileRes instanceof String) {
+               System.err.println("*** Failed to read POM file: " + pomFileRes);
+            }
+         }
+         else
+            pomFileRes = null;
+
+         // If we are included this package as source, don't download and include the jar files even if we could grab them from maven
+         if (pomFile != null) {
+            if (!pkg.buildFromSrc) {
+               if ((pomFile.packaging.equals("jar") || pomFile.packaging.equals("bundle"))) {
+                  pkg.definesClasses = true;
+                  pkg.definesSrc = false;
+               } else {
+                  pkg.definesSrc = false;
+                  pkg.definesClasses = false;
+               }
+            } else {
+               if ((pomFile.packaging.equals("jar") || pomFile.packaging.equals("bundle")) || pomFile.packaging.equals("war") || pomFile.packaging.equals("orbit")) {
+                  pkg.definesSrc = true;
+                  pkg.definesClasses = false;
+               } else {
+                  pkg.definesSrc = false;
+                  pkg.definesClasses = false;
+               }
+            }
          }
       }
 
       if (pomFileRes instanceof String)
          return (String) pomFileRes;
-
-      pkg.pomFile = (POMFile) pomFileRes;
 
       collectDependencies(src, ctx, deps);
 
@@ -96,19 +142,36 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          // Install the JAR/WAR file
          String typeExt = null;
 
-         String packaging = pkg.pomFile.packaging;
-         if (packaging.equals("jar") || packaging.equals("war"))
-            typeExt = packaging;
-         // bundle: OSGI bundles, orbit: signed OSGI bundles - treat them like jar files
-         else if (packaging.equals("bundle") || packaging.equals("orbit"))
-            typeExt = "jar";
-         else if (!packaging.equals("pom"))
-            System.err.println("*** Warning - unrecognized packaging type: " + packaging);
-         if (typeExt != null) {
-            String jarFileName = FileUtil.concat(src.pkg.getVersionRoot(), desc.getJarFileName());
-            boolean found = installMvnFile(desc, jarFileName, typeExt);
-            if (!found)
-               return "Maven " + typeExt + " file: " + desc.getURL() + " not found in repositories: " + repositories;
+         for (String fileType:pkg.installFileTypes) {
+            if (fileType == null) {
+               String packaging = pkg.pomFile.packaging;
+               if (packaging.equals("jar") || packaging.equals("war"))
+                  typeExt = packaging;
+                  // bundle: OSGI bundles, orbit: signed OSGI bundles - treat them like jar files
+               else if (packaging.equals("bundle") || packaging.equals("orbit"))
+                  typeExt = "jar";
+               else if (!packaging.equals("pom"))
+                  System.err.println("*** Warning - unrecognized packaging type: " + packaging);
+               // If we are in source mode, do not download the jar file
+               // TODO: need to adjust if desc contains a classifier - e.g. classes?
+               if (typeExt != null && pkg.definesClasses) {
+                  String jarFileName = FileUtil.concat(pkg.getVersionRoot(), desc.getJarFileName());
+                  boolean found = installMvnFile(desc, jarFileName, "", typeExt);
+                  if (!found)
+                     return "Maven " + typeExt + " file: " + desc.getURL() + " not found in repositories: " + repositories;
+               }
+            }
+            else {
+               if (fileType.equals("test-jar")) {
+                  String testJarName = FileUtil.concat(pkg.getVersionRoot(), desc.getTestJarFileName());
+                  boolean found = installMvnFile(desc, testJarName, "-tests", "jar");
+                  if (!found)
+                     return "Maven " + typeExt + " test-jar file: " + desc.getURL() + " not found in repositories: " + repositories;
+               }
+               else {
+                  System.out.println("*** Warning - unable to install artifact-type: " + fileType);
+               }
+            }
          }
       }
 
@@ -122,7 +185,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       POMFile pomFile = pkg.pomFile;
 
       if (pomFile != null) {
-         List<MvnDescriptor> depDescs = pomFile.getDependencies(getScopesToBuild(src.pkg));
+         List<MvnDescriptor> depDescs = pomFile.getDependencies(getScopesToBuild(src.pkg), true, src.pkg.parentPkg == null);
          if (depDescs != null) {
             ArrayList<RepositoryPackage> depPackages = new ArrayList<RepositoryPackage>();
 
@@ -167,7 +230,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
                // Always load dependencies with the maven repository.  This repository might be git-mvn which loads the initial
                // repository with git
                if (depDesc.version != null)
-                  depPackages.add(depDesc.getOrCreatePackage((MvnRepositoryManager) system.getRepositoryManager("mvn"), false, DependencyContext.child(ctx, pkg), true));
+                  depPackages.add(depDesc.getOrCreatePackage(getChildManager(), false, DependencyContext.child(ctx, pkg), true, null));
             }
             src.pkg.dependencies = depPackages;
 
@@ -175,6 +238,10 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          }
       }
       return null;
+   }
+
+   MvnRepositoryManager getChildManager() {
+      return (MvnRepositoryManager) system.getRepositoryManager("mvn");
    }
 
    private boolean excludedContext(DependencyContext ctx, MvnDescriptor desc) {
@@ -249,13 +316,20 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       return baseList;
    }
 
-   Object installPOM(MvnDescriptor desc, RepositoryPackage pkg, DependencyContext ctx, boolean checkExists) {
-      String pomFileName = FileUtil.concat(pkg.getVersionRoot(), "pom.xml");
+   String getPOMFileName(RepositoryPackage pkg) {
+      return FileUtil.concat(pkg.getVersionRoot(), "pom.xml");
+   }
+
+   Object installPOM(MvnDescriptor desc, RepositoryPackage pkg, DependencyContext ctx, boolean checkExists, POMFile parentPOM, POMFile includedFromPOM) {
+      // If we are going to be the first to create the install directory, need to make sure it's been validated that we can write to it.
+      // and also make sure we don't do this twice.
+      preInstallPackage(pkg, ctx);
+      String pomFileName = getPOMFileName(pkg);
       String notExistsFile = pomFileName + ".notFound";
       if (system.installExisting && new File(notExistsFile).canRead())
          return "POM file: " + pomFileName + " did not exist when last checked.";
       if (!checkExists || !new File(pomFileName).canRead()) {
-         boolean found = installMvnFile(desc, pomFileName, "pom");
+         boolean found = installMvnFile(desc, pomFileName, "", "pom");
          if (!found) {
             pomCache.put(pomFileName, POMFile.NULL_SENTINEL);
             FileUtil.saveStringAsFile(notExistsFile, "does not exist", true);
@@ -263,7 +337,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          }
       }
 
-      POMFile pomFile = POMFile.readPOM(pomFileName, this, ctx, pkg);
+      POMFile pomFile = POMFile.readPOM(pomFileName, this, ctx, pkg, parentPOM, includedFromPOM);
       if (pomFile == null) {
          pomCache.put(pomFileName, POMFile.NULL_SENTINEL);
          return "Failed to parse maven POM: " + pomFileName;
@@ -271,7 +345,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       return pomFile;
    }
 
-   private boolean installMvnFile(MvnDescriptor desc, String resFileName, String remoteExt) {
+   private boolean installMvnFile(MvnDescriptor desc, String resFileName, String remoteSuffix, String remoteExt) {
       boolean found = false;
       if (system.installExisting && new File(resFileName).canRead()) {
          info("Using existing file: " + resFileName);
@@ -280,7 +354,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       if (useLocalRepository) {
          String localPkgDir = FileUtil.concat(mvnRepositoryDir, desc.groupId.replace(".", FileUtil.FILE_SEPARATOR), desc.artifactId, desc.version);
          if (new File(localPkgDir).isDirectory()) {
-            String fileName = FileUtil.concat(localPkgDir, FileUtil.addExtension(desc.artifactId + "-" + desc.version, remoteExt));
+            String fileName = FileUtil.concat(localPkgDir, FileUtil.addExtension(desc.artifactId + "-" + desc.version + remoteSuffix, remoteExt));
             if (new File(fileName).canRead()) {
                if (FileUtil.copyFile(fileName, resFileName, true))
                   return true;
@@ -290,7 +364,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          }
       }
       for (MvnRepository repo:repositories) {
-         String pomURL = repo.getFileURL(desc.groupId, desc.artifactId, desc.version, remoteExt);
+         String pomURL = repo.getFileURL(desc.groupId, desc.artifactId, desc.version, remoteSuffix, remoteExt);
          String resDir = FileUtil.getParentPath(resFileName);
          new File(resDir).mkdirs();
          String res = URLUtil.saveURLToFile(pomURL, resFileName, false, msg);
@@ -306,22 +380,26 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
    @Override
    public RepositoryPackage createPackage(String url) {
       MvnRepositorySource src = (MvnRepositorySource) createRepositorySource(url, false);
-      return new MvnRepositoryPackage(this, src.desc.getPackageName(), src.desc.getJarFileName(), src);
+      return new MvnRepositoryPackage(this, src.desc.getPackageName(), src.desc.getJarFileName(), src, null);
    }
 
    public RepositoryPackage createPackage(IRepositoryManager mgr, String packageName, String fileName, RepositorySource src) {
-      return new MvnRepositoryPackage(mgr, packageName, fileName, src);
+      return new MvnRepositoryPackage(mgr, packageName, fileName, src, null);
    }
 
-   public POMFile getPOMFile(MvnDescriptor desc, RepositoryPackage pkg, DependencyContext ctx, boolean required) {
-      String pomFileName = FileUtil.concat(pkg.getVersionRoot(), "pom.xml");
+   public RepositoryPackage createPackage(IRepositoryManager mgr, String packageName, String fileName, RepositorySource src, RepositoryPackage parentPkg) {
+      return new MvnRepositoryPackage(mgr, packageName, fileName, src, parentPkg);
+   }
+
+   public POMFile getPOMFile(MvnDescriptor desc, RepositoryPackage pkg, DependencyContext ctx, boolean required, POMFile parentPOM, POMFile includedFromPOM) {
+      String pomFileName = getPOMFileName(pkg);
       POMFile res = pomCache.get(pomFileName);
       if (res != null) {
          if (res == POMFile.NULL_SENTINEL)
             return null;
          return res;
       }
-      Object pomRes = installPOM(desc, pkg, ctx, true);
+      Object pomRes = installPOM(desc, pkg, ctx, true, parentPOM, includedFromPOM);
       if (pomRes instanceof String) {
          if (required)
             MessageHandler.error(msg, (String) pomRes);
@@ -340,6 +418,22 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       }
       else {
          return super.createRepositorySource(url, unzip);
+      }
+   }
+
+   /**
+    * For nested modules, we create the package with one name, then once we read the POM we figure out it's name in the maven package
+    * space.  If there are dependencies to a module we need to resolve them against the maven name or we'll load the whole thing again.
+    */
+   public void registerNameForPackage(RepositoryPackage pkg, String name) {
+      if (pkg instanceof MvnRepositoryPackage) {
+         MvnRepositoryPackage mpkg = (MvnRepositoryPackage) pkg;
+         String groupId = mpkg.getGroupId();
+         if (groupId != null) {
+            String newName = groupId + "/" + name;
+            if (!pkg.packageName.equals(newName))
+               system.registerAlternateName(pkg, newName);
+         }
       }
    }
 }

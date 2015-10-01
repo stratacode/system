@@ -72,7 +72,7 @@ public class DynBeanIndexMapper extends DynBeanMapper implements IBeanIndexMappe
          return super.getPropertyType();
       Object elementType;
       if (getIndexMethod != null)
-         elementType = ModelUtil.getReturnType(getIndexMethod);
+         elementType = ModelUtil.getReturnType(getIndexMethod, true);
       else if (setIndexMethod != null)
          elementType = ModelUtil.getParameterTypes(setIndexMethod)[1];
       else

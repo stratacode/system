@@ -39,11 +39,11 @@ public class AnonClassDeclaration extends ClassDeclaration {
       return newExpr.findMember(name, mtype, fromChild, refType, ctx, skipIfaces);
    }
 
-   public Object findMethod(String name, List<? extends Object> params, Object fromChild, Object refType, boolean staticOnly) {
-      Object res = super.findMethod(name, params, fromChild, refType, staticOnly);
+   public Object findMethod(String name, List<? extends Object> params, Object fromChild, Object refType, boolean staticOnly, Object inferredType) {
+      Object res = super.findMethod(name, params, fromChild, refType, staticOnly, inferredType);
       if (res != null)
          return res;
-      return newExpr.findMethod(name, params, fromChild, refType, staticOnly);
+      return newExpr.findMethod(name, params, fromChild, refType, staticOnly, inferredType);
    }
 
    public TypeDeclaration getEnclosingType() {

@@ -72,7 +72,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       if (other instanceof ParamTypeDeclaration) {
          ParamTypeDeclaration otherParamType = ((ParamTypeDeclaration) other);
          Object otherBaseType = otherParamType.baseType;
-         if (!ModelUtil.isAssignableFrom(baseType, otherBaseType, assignmentSemantics, null))
+         if (!ModelUtil.isAssignableFrom(baseType, otherBaseType, assignmentSemantics, null, getLayeredSystem()))
             return false;
 
          // TODO: Need to skip to find the most specific version of the other base type which matches to ensure the type parameters match.
@@ -80,7 +80,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
          // I feel like we need to remap the type parameters we are given in some cases as they may move around and probably can't always get around skipping them until we find the most specific extends type as done here.
          do {
             Object otherBaseTypeExtends = ModelUtil.getExtendsClass(otherBaseType);
-            if (otherBaseTypeExtends != null && ModelUtil.isAssignableFrom(baseType, otherBaseTypeExtends, assignmentSemantics, null) && otherBaseTypeExtends instanceof ParamTypeDeclaration) {
+            if (otherBaseTypeExtends != null && ModelUtil.isAssignableFrom(baseType, otherBaseTypeExtends, assignmentSemantics, null, getLayeredSystem()) && otherBaseTypeExtends instanceof ParamTypeDeclaration) {
                otherParamType = (ParamTypeDeclaration) otherBaseTypeExtends;
                otherBaseType = otherParamType.baseType;
             }
@@ -108,7 +108,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
                else {
                   Object otherType = otherParamType.types.get(otherPos);
                   // A null type is a signal for a wildcard like <T> List<T> emptyList();
-                  if (type != null && otherType != null && !ModelUtil.isAssignableFrom(type, otherType, false, null, true))
+                  if (type != null && otherType != null && !ModelUtil.isAssignableFrom(type, otherType, false, null, true, getLayeredSystem()))
                      return false;
                }
             }
@@ -116,7 +116,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
          return true;
       }
       else {
-         return ModelUtil.isAssignableFrom(baseType, other, assignmentSemantics, null);
+         return ModelUtil.isAssignableFrom(baseType, other, assignmentSemantics, null, getLayeredSystem());
       }
    }
 
@@ -200,9 +200,9 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return ModelUtil.isDynamicStub(baseType, includeExtends);
    }
 
-   public Object definesMethod(String name, List<? extends Object> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly) {
+   public Object definesMethod(String name, List<? extends Object> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType) {
       // assert ctx == null; ??? this fails unfortunately...
-      Object method = ModelUtil.definesMethod(baseType, name, parametersOrExpressions, this, refType, isTransformed, staticOnly);
+      Object method = ModelUtil.definesMethod(baseType, name, parametersOrExpressions, this, refType, isTransformed, staticOnly, inferredType);
       if (ctx == null)
          ctx = this;
       // If we already got back some parameter types for this method, we need to merge the definitions of this type into the one we retrieved.
@@ -212,7 +212,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
          methPT.updateParamTypes(this);
       }
       else if (method != null && ModelUtil.isParameterizedMethod(method))
-         return new ParamTypedMethod(method, this, definedInType, parametersOrExpressions);
+         return new ParamTypedMethod(method, this, definedInType, parametersOrExpressions, inferredType);
       return method;
    }
 
@@ -279,7 +279,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       if (ModelUtil.isMethod(srcType)) {
          // DEBUG-start
          Object meth = srcType;
-         srcType = ModelUtil.getReturnType(meth);
+         srcType = ModelUtil.getReturnType(meth, true);
          //if (ModelUtil.isAssignableFrom(srcType, baseType)) {
          //   Object oldRes = ModelUtil.resolveTypeParameter(srcType, this, ModelUtil.getTypeParameterName(typeVar));
             //return oldRes; // TODO: remove me.
@@ -425,7 +425,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       for (int i = 0; i < baseMethods.length; i++) {
          Object meth = baseMethods[i];
          if (ModelUtil.isParameterizedMethod(meth))
-            result.add(new ParamTypedMethod(meth, this, definedInType, null));
+            result.add(new ParamTypedMethod(meth, this, definedInType, null, null));
          else
             result.add(meth);
       }
@@ -637,7 +637,13 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
                      typeParamMapping = new ArrayList<TypeParamMap>();
                   typeParamMapping.add(new TypeParamMap(oldType, typeParam));
                }
-               types.set(i, ModelUtil.wrapPrimitiveType(type));
+               Object origType = types.get(i);
+               if (ModelUtil.isTypeVariable(origType))
+                  types.set(i, ModelUtil.wrapPrimitiveType(type));
+               // Here the 'type' may be more specific for the core type but may not include type parameters which exist in the current type.
+               else {
+                  types.set(i, ModelUtil.refineType(definedInType, origType, type));
+               }
                return;
             }
             i++;

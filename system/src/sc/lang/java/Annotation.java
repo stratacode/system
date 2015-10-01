@@ -123,7 +123,7 @@ public class Annotation extends JavaSemanticNode implements IAnnotation {
       Object[] methods = ModelUtil.getMethods(boundType, propName, null);
       if (methods == null)
          return null;
-      return ModelUtil.getReturnType(methods[0]);
+      return ModelUtil.getReturnType(methods[0], true);
    }
 
    public Object getAnnotationElementValue(String identifier) {

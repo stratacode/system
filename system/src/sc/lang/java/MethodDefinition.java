@@ -49,7 +49,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       if (initialized) return;
       
       if (name != null && type != null) {
-         JavaType[] paramJavaTypes = parameters == null ? null : parameters.getParameterJavaTypes();
+         JavaType[] paramJavaTypes = parameters == null ? null : parameters.getParameterJavaTypes(true);
          if ((propertyName = ModelUtil.isGetMethod(name, paramJavaTypes, type)) != null)
             propertyMethodType = propertyName.startsWith("i") ? PropertyMethodType.Is : PropertyMethodType.Get;
          else if ((propertyName = ModelUtil.isSetMethod(name, paramJavaTypes, type)) != null)
@@ -94,7 +94,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       Object modType = methodType.getDerivedTypeDeclaration();
       if (extendsType == null)
          extendsType = Object.class;
-      Object overridden = ModelUtil.definesMethod(extendsType, name, getParameterList(), null, null, false, false);
+      Object overridden = ModelUtil.definesMethod(extendsType, name, getParameterList(), null, null, false, false, null);
       superMethod = overridden;
       if (overridden instanceof MethodDefinition) {
          MethodDefinition superMeth = (MethodDefinition) overridden;
@@ -128,7 +128,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          if (overridden == null && methodType.implementsBoundTypes != null) {
             Object implMeth;
             for (Object impl:methodType.implementsBoundTypes) {
-               implMeth = ModelUtil.definesMethod(impl, name, getParameterList(), null, null, false, false);
+               implMeth = ModelUtil.definesMethod(impl, name, getParameterList(), null, null, false, false, null);
                if (implMeth != null && ModelUtil.isCompiledMethod(implMeth)) {
                   methodType.setNeedsDynamicStub(true);
                   overridesCompiled = true;
@@ -137,7 +137,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          }
 
          if (modType != extendsType) {
-            overridden = ModelUtil.definesMethod(modType, name, getParameterList(), null, null, false, false);
+            overridden = ModelUtil.definesMethod(modType, name, getParameterList(), null, null, false, false, null);
             if (overridden instanceof MethodDefinition) {
                MethodDefinition overMeth = (MethodDefinition) overridden;
                if (overMeth == this)
@@ -192,7 +192,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          if (prev instanceof MethodDefinition)
             return ((MethodDefinition) prev).getTypeDeclaration();
          else
-            return ModelUtil.getReturnType(prev);
+            return ModelUtil.getReturnType(prev, true);
       }
       return type == null ? null : type.getTypeDeclaration();
    }
@@ -215,34 +215,41 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          if (prev instanceof IMethodDefinition)
             return ((IMethodDefinition) prev).getTypeDeclaration(arguments, resolve);
          else
-            return ModelUtil.getReturnType(prev);
+            return ModelUtil.getReturnType(prev, resolve);
       }
 
       Object returnType = getTypeDeclaration();
       if (typeParameters == null)
          return returnType;
 
+      // TODO: Can we remove this code?  The substitution of type parameters is now done in ModelUtil so we can
+      // share that logic with src and compiled types.
+      /*
       if (returnType instanceof TypeParameter && arguments != null) {
          TypeParameter rtParam = (TypeParameter) returnType;
-         List<Parameter> paramList = parameters.getParameterList();
-         for (int i = 0; i < paramList.size(); i++) {
-            Object paramType = paramList.get(i).getTypeDeclaration();
-            if (paramType != null && ModelUtil.isTypeVariable(paramType)) {
-               String paramArgName = ModelUtil.getTypeParameterName(paramType);
-               if (paramArgName != null && paramArgName.equals(rtParam.name)) {
-                  if (i >= arguments.size()) // No value for a repeating parameter?
-                     return null;
-                  return arguments.get(i).getTypeDeclaration();
+         if (parameters != null) {
+            List<Parameter> paramList = parameters.getParameterList();
+            for (int i = 0; i < paramList.size(); i++) {
+               Object paramType = paramList.get(i).getTypeDeclaration();
+               if (paramType != null && ModelUtil.isTypeVariable(paramType)) {
+                  String paramArgName = ModelUtil.getTypeParameterName(paramType);
+                  if (paramArgName != null && paramArgName.equals(rtParam.name)) {
+                     if (i >= arguments.size()) // No value for a repeating parameter?
+                        return null;
+                     return arguments.get(i).getTypeDeclaration();
+                  }
                }
             }
          }
       }
+      */
       // The case for a method like:
       //   public static <E extends Enum<E>> EnumSet<E> allOf(Class<E> type)
       //
       // Get the type of each parameter.  For each type parameter to the method.
       // Take the current type for that parameter and compute the bound types for those type parameters.
       //
+      /*
       if (returnType instanceof ParamTypeDeclaration) {
          ParamTypeDeclaration returnTypePT = (ParamTypeDeclaration) returnType;
          ParamTypeDeclaration result = returnTypePT.copy();
@@ -287,6 +294,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          }
          return result;
       }
+      */
       return returnType;
    }
 
@@ -460,8 +468,8 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       return propertyMethodType == PropertyMethodType.SetIndexed;
    }
 
-   public Object getReturnType() {
-      return getTypeDeclaration();
+   public Object getReturnType(boolean boundParams) {
+      return getTypeDeclaration(null, boundParams);
    }
 
    public Object getPreviousDefinition() {
@@ -471,12 +479,12 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
 
       Object res;
       if (ext != null) {
-         res = ModelUtil.definesMethod(ext, name, getParameterList(), null, null, false, false);
+         res = ModelUtil.definesMethod(ext, name, getParameterList(), null, null, false, false, null);
          if (res != null)
             return res;
       }
       if (ext != base && base != null) {
-         res = ModelUtil.definesMethod(base, name, getParameterList(), null, null, false, false);
+         res = ModelUtil.definesMethod(base, name, getParameterList(), null, null, false, false, null);
          if (res != null)
             return res;
       }
@@ -579,7 +587,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             return;
          }
 
-         Object result = subType.declaresMethod(name, ptypes, null, enclType, false);
+         Object result = subType.declaresMethod(name, ptypes, null, enclType, false, null);
          if (result instanceof MethodDefinition)
             res.add(result);
 

@@ -24,10 +24,14 @@ public class GitRepositoryManager extends AbstractRepositoryManager {
       ArrayList<String> args = new ArrayList<String>();
       args.add("git");
       args.add("clone");
+      // TODO: make this configurable?
+      args.add("--depth");
+      args.add("1");
       args.add(src.url);
       String resDir = src.pkg.installedRoot;
       args.add(resDir);
-      if (mgr.system.installExisting && new File(resDir).isDirectory()) {
+      File resDirFile = new File(resDir);
+      if (resDirFile.isDirectory() && !isEmptyDir(resDirFile)) {
          if (mgr.info)
             mgr.info("Using existing install: " + resDir);
          return null;

@@ -177,19 +177,19 @@ public class NewExpression extends IdentifierExpression {
       return super.findMember(name, mtype, this, refType, ctx, skipIfaces);
    }
 
-   public Object findMethod(String name, List<? extends Object> params, Object fromChild, Object refType, boolean staticOnly) {
+   public Object findMethod(String name, List<? extends Object> params, Object fromChild, Object refType, boolean staticOnly, Object inferredType) {
       if (classBody != null && classBody.indexOf(fromChild) != -1) {
-         Object v = BodyTypeDeclaration.findMethodInBody(classBody, name, params, null, refType, staticOnly);
+         Object v = BodyTypeDeclaration.findMethodInBody(classBody, name, params, null, refType, staticOnly, inferredType);
          if (v != null)
             return v;
 
          if (boundType != null) {
-            v = ModelUtil.definesMethod(boundType, name, params, null, refType, ModelUtil.isTransformedType(boundType), staticOnly);
+            v = ModelUtil.definesMethod(boundType, name, params, null, refType, ModelUtil.isTransformedType(boundType), staticOnly, inferredType);
             if (v != null)
                return v;
          }
       }
-      return super.findMethod(name, params, this, refType, staticOnly);
+      return super.findMethod(name, params, this, refType, staticOnly, inferredType);
    }
    
    public boolean isReferenceInitializer() {
@@ -404,7 +404,7 @@ public class NewExpression extends IdentifierExpression {
                if (accessClass != null) {
                   String name = cl.getName().replace('$', '.');
                   String methodName = "new" + CTypeUtil.capitalizePropertyName(CTypeUtil.getClassName(name));
-                  Object method = ModelUtil.definesMethod(accessClass, methodName, arguments, null, null, true, false);
+                  Object method = ModelUtil.definesMethod(accessClass, methodName, arguments, null, null, true, false, null);
                   if (method != null) {
                      Object[] params = ModelUtil.expressionListToValues(arguments, ctx);
                      Object thisObj = ctx.findThisType(accessClass);

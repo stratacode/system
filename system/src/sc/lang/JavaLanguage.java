@@ -702,7 +702,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
          new Sequence("(.,)",annotationTypeDeclaration, optSemicolon));
 
    Sequence annotationTypeBody = new Sequence("(,.,)", openBraceEOL,
-         new Sequence("(,[])", OPTIONAL | REPEAT, modifiers, annotationTypeElementRest), closeBrace);
+         new Sequence("([])", OPTIONAL | REPEAT, new Sequence("(modifiers,.)", modifiers, annotationTypeElementRest)), closeBrace);
 
    {
       annotationTypeDeclaration.set(

@@ -3203,15 +3203,15 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       return super.findType(name, refType, context);
    }
 
-   public Object findMethod(String name, List<? extends Object> parametersOrExpressions, Object fromChild, Object refType, boolean staticOnly) {
+   public Object findMethod(String name, List<? extends Object> parametersOrExpressions, Object fromChild, Object refType, boolean staticOnly, Object inferredType) {
       if (refType != this) {
          if (tagObject != null) {
-            Object meth = tagObject.findMethod(name, parametersOrExpressions, fromChild, refType, staticOnly);
+            Object meth = tagObject.findMethod(name, parametersOrExpressions, fromChild, refType, staticOnly, inferredType);
             if (meth != null)
                return meth;
          }
       }
-      return super.findMethod(name, parametersOrExpressions, fromChild, refType, staticOnly);
+      return super.findMethod(name, parametersOrExpressions, fromChild, refType, staticOnly, inferredType);
    }
 
    private Object findInnerTypeInChildList(SemanticNodeList<Object> childList, String name) {

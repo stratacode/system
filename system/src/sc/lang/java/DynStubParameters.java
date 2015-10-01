@@ -1011,7 +1011,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
       }
 
       Object findSuperMethod(Object type, List<Object> paramList) {
-         return ModelUtil.definesMethod(type, ModelUtil.getMethodName(method), paramList, null, null, false, false);
+         return ModelUtil.definesMethod(type, ModelUtil.getMethodName(method), paramList, null, null, false, false, null);
       }
 
       public MethodBindSettings getBindSettings() {
@@ -1053,12 +1053,12 @@ public class DynStubParameters extends AbstractTemplateParameters {
 
       public boolean isVoid() {
          Object ret;
-         return (ret = ModelUtil.getReturnType(method)) == null || ModelUtil.typeIsVoid(ret);
+         return (ret = ModelUtil.getReturnType(method, true)) == null || ModelUtil.typeIsVoid(ret);
       }
 
       public boolean getNeedsCast() {
          // Casts can't be used with primitive types
-         return !ModelUtil.isPrimitive(ModelUtil.getReturnType(method));
+         return !ModelUtil.isPrimitive(ModelUtil.getReturnType(method, true));
       }
 
       public String getTypeSignature() {
@@ -1078,7 +1078,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
 
       public String[] getParamTypeNames() {
          Object[] types;
-         if (method == null || (types = ModelUtil.getParameterJavaTypes(method)) == null)
+         if (method == null || (types = ModelUtil.getParameterJavaTypes(method, true)) == null)
             return new String[0];
          String[] ptNames = new String[types.length];
          for (int i = 0; i < types.length; i++) {
@@ -1113,7 +1113,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
          if (isVoid())
             return "";
 
-         Object retType = ModelUtil.getReturnType(method);
+         Object retType = ModelUtil.getReturnType(method, true);
          return "return " +
                  (!ModelUtil.isPrimitive(retType) ? (getNeedsCast() ? "(" + getReturnType() + ")" : "") :
                          "sc.dyn.DynUtil." + ModelUtil.getNumberPrefixFromType(retType) + "Value(");
@@ -1122,7 +1122,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
       public String getPostInvoke() {
          if (isVoid())
             return "";
-         return ModelUtil.isPrimitive(ModelUtil.getReturnType(method)) ? ")" : "";
+         return ModelUtil.isPrimitive(ModelUtil.getReturnType(method, true)) ? ")" : "";
       }
 
       public boolean isConstructor() {

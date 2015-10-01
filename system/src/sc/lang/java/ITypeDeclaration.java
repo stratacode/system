@@ -40,7 +40,7 @@ public interface ITypeDeclaration {
 
    boolean isDynamicStub(boolean includeExtends);
 
-   Object definesMethod(String name, List<?> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly);
+   Object definesMethod(String name, List<?> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType);
 
    Object declaresConstructor(List<?> parametersOrExpressions, ITypeParamContext ctx);
 

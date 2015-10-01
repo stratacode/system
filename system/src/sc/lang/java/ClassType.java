@@ -6,6 +6,7 @@ package sc.lang.java;
 
 import sc.lang.ILanguageModel;
 import sc.lang.JavaLanguage;
+import sc.lang.SemanticNode;
 import sc.lang.SemanticNodeList;
 import sc.lang.js.JSUtil;
 import sc.layer.Layer;
@@ -15,6 +16,7 @@ import sc.type.Type;
 import sc.util.StringUtil;
 
 import java.lang.reflect.TypeVariable;
+import java.lang.reflect.WildcardType;
 import java.util.*;
 
 public class ClassType extends JavaType {
@@ -257,6 +259,22 @@ public class ClassType extends JavaType {
          Object newType = ctx.getTypeForVariable(type, resolve);
          if (newType != null)
             res = newType;
+      }
+      else if (ctx != null && arrayDimensions != null && ModelUtil.isArray(type)) {
+         Object compType = ModelUtil.getArrayComponentType(type);
+         if (ModelUtil.isTypeVariable(compType)) {
+            Object newType = ctx.getTypeForVariable(compType, resolve);
+            if (newType != null) {
+               ITypeDeclaration definedInType = type instanceof ArrayTypeDeclaration ? ((ArrayTypeDeclaration) type).definedInType : getEnclosingType();
+               return ArrayTypeDeclaration.create(newType, 1, definedInType);
+            }
+         }
+      }
+      else if (ctx != null && type instanceof ExtendsType.LowerBoundsTypeDeclaration) {
+         ExtendsType.LowerBoundsTypeDeclaration extType = (ExtendsType.LowerBoundsTypeDeclaration) type;
+         if (ModelUtil.isTypeVariable(extType))
+            return ctx.getTypeForVariable(extType.baseType, resolve);
+         return extType.baseType;
       }
       if (resolve && ModelUtil.isTypeVariable(res))
          return ModelUtil.getTypeParameterDefault(res);
@@ -775,6 +793,12 @@ public class ClassType extends JavaType {
             if (o instanceof JavaType && ((JavaType) o).isParameterizedType())
                return true;
       }
+      if (arrayDimensions != null) {
+         if (type != null && ModelUtil.isArray(type)) {
+            Object compType = ModelUtil.getArrayComponentType(type);
+            return ModelUtil.isParameterizedType(compType);
+         }
+      }
       return false;
    }
 
@@ -942,11 +966,24 @@ public class ClassType extends JavaType {
          }
          return ExtendsType.createSuper(superWildcard, t);
       }
+      else if (ModelUtil.isGenericArray(type)) {
+         Object compType = ModelUtil.getGenericComponentType(type);
+         if (ModelUtil.isParameterizedType(compType)) {
+            // TODO: handle other parameterized types?
+            if (ModelUtil.isTypeVariable(compType)) {
+               Object newCompType = t.getTypeForVariable(compType, resolveUnbound);
+               if (newCompType != null && newCompType != compType) {
+                  JavaType resType = ClassType.createJavaType(newCompType);
+                  return resType.convertToArray(type instanceof ArrayTypeDeclaration ? ((ArrayTypeDeclaration) type).definedInType : getEnclosingIType());
+               }
+            }
+         }
+      }
       if (isTypeParameter()) {
          Object typeParam = t.getTypeForVariable(type, resolveUnbound);
          if (typeParam == null)
             typeParam = type;
-         JavaType res = ClassType.createJavaType(typeParam);
+         JavaType res = JavaType.createJavaType(typeParam);
          res.parentNode = parentNode;
          return res;
       }
@@ -996,5 +1033,12 @@ public class ClassType extends JavaType {
       }
       // TODO: deal with array dimensions here - for each dimension, unwrap one level of ArrayTypeDeclaration wrapper.
       return null;
+   }
+
+   public JavaType convertToArray(ITypeDeclaration definedInType) {
+      ClassType newType = (ClassType) super.convertToArray(definedInType);
+      if (type != null)
+         newType.type = ArrayTypeDeclaration.create(type, 1, definedInType == null ? getEnclosingIType() : definedInType);
+      return newType;
    }
 }

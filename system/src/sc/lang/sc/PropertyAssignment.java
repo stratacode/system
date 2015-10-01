@@ -119,7 +119,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
             initializer.setInferredType(propType);
             Object initType = initializer.getGenericType();
             if (initType != null && propType != null &&
-                !ModelUtil.isAssignableFrom(propType, initType, true, null)) {
+                !ModelUtil.isAssignableFrom(propType, initType, true, null, getLayeredSystem())) {
                displayTypeError("Type mismatch - assignment to property with type: " + ModelUtil.getTypeName(propType, true, true) + " does not match expression type: " + ModelUtil.getTypeName(initType, true, true) + " for: ");
                boolean x = ModelUtil.isAssignableFrom(propType, initType, true, null);
             }
@@ -511,7 +511,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
          return null;
       if (assignedProperty instanceof IMethodDefinition) {
          IMethodDefinition meth = (IMethodDefinition) assignedProperty;
-         return meth.isSetMethod() ?  meth.getParameterTypes(false)[0] : meth.getReturnType();
+         return meth.isSetMethod() ?  meth.getParameterTypes(false)[0] : meth.getReturnType(false);
       }
       return ModelUtil.getVariableTypeDeclaration(assignedProperty);
    }
@@ -530,7 +530,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       if (assignedProperty instanceof IMethodDefinition) {
          IMethodDefinition meth = (IMethodDefinition) assignedProperty;
          if (meth.getMethodName().startsWith("set"))
-            return meth.getParameterJavaTypes()[0].getGenericTypeName(resultType, includeDims);
+            return meth.getParameterJavaTypes(true)[0].getGenericTypeName(resultType, includeDims);
       }
       return ModelUtil.getGenericTypeName(resultType, assignedProperty, includeDims);
    }
@@ -542,7 +542,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       if (assignedProperty instanceof IMethodDefinition) {
          IMethodDefinition meth = (IMethodDefinition) assignedProperty;
          if (meth.getMethodName().startsWith("set"))
-            return meth.getParameterJavaTypes()[0].getAbsoluteGenericTypeName(resultType, includeDims);
+            return meth.getParameterJavaTypes(true)[0].getAbsoluteGenericTypeName(resultType, includeDims);
       }
       return ModelUtil.getAbsoluteGenericTypeName(resultType, assignedProperty, includeDims);
    }

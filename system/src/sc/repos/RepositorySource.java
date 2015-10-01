@@ -6,6 +6,7 @@ package sc.repos;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.List;
 
 /**
  * The RepositorySource helps in the definition of the RepositoryPackage.  You can have more than one source
@@ -43,8 +44,8 @@ public class RepositorySource implements Serializable {
    }
 
    /** If the version number is in the file name, it will be different for each source */
-   public String getClassPathFileName() {
-      return pkg.fileName;
+   public List<String> getClassPathFileNames() {
+      return pkg.fileNames;
    }
 
    public void init(RepositorySystem sys) {

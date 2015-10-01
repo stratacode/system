@@ -65,6 +65,18 @@ public class AssignmentExpression extends TwoOperatorExpression {
       }
    }
 
+   private boolean isArithSelfOperator() {
+      if (selfOperator == null)
+         return false;
+      return selfOperator.equals("+") || selfOperator.equals("-") || selfOperator.equals("/") || selfOperator.equals("*") || selfOperator.equals("%");
+   }
+
+   private boolean isIntSelfOperator() {
+      if (selfOperator == null)
+         return false;
+      return selfOperator.equals("<<") || selfOperator.startsWith(">>") || selfOperator.equals("^") || selfOperator.equals("|") || selfOperator.equals("&");
+   }
+
    public void start() {
       if (started) return;
 
@@ -98,9 +110,15 @@ public class AssignmentExpression extends TwoOperatorExpression {
          rhs.setInferredType(lhsType);
 
          Object rhsType = useGenericTypes ? rhs.getGenericType() : rhs.getTypeDeclaration();
-         if (lhsType != null && rhsType != null && !ModelUtil.isAssignableFrom(lhsType, rhsType, true, null)) {
-            if (selfOperator != null && selfOperator.equals("+") && ModelUtil.isString(lhsType)) {
-               // Accept this case:  str += object - it will call the toString
+         if (lhsType != null && rhsType != null && !ModelUtil.isAssignableFrom(lhsType, rhsType, true, null, getLayeredSystem())) {
+            if (selfOperator != null) {
+               if (selfOperator.equals("+") && ModelUtil.isString(lhsType)) {
+                  // Accept this case:  str += object - it will call the toString
+                  return;
+               }
+               if (isArithSelfOperator() && ModelUtil.isANumber(lhsType) && ModelUtil.isANumber(rhsType))
+                  return;
+               if (isIntSelfOperator() && ModelUtil.isAnInteger(lhsType) && ModelUtil.isAnInteger(rhsType))
                   return;
             }
             /*
@@ -108,10 +126,10 @@ public class AssignmentExpression extends TwoOperatorExpression {
              * only, it inherits the type of the assignment.  Only thing is that we need to still validate that we can coerce
              * the rhs to the type of the lhs, in other words, they are assignable the other way.
              */
-            if (!rhs.getLHSAssignmentTyped() || !ModelUtil.isAssignableFrom(rhsType, lhsType, true, null)) {
+            if (!rhs.getLHSAssignmentTyped() || !ModelUtil.isAssignableFrom(rhsType, lhsType, true, null, getLayeredSystem())) {
                displayTypeError("Incompatible types: ", ModelUtil.getTypeName(lhsType, true, true), " and ", ModelUtil.getTypeName(rhsType, true, true), " for: ");
                rhsType = rhs.getGenericType(); // TODO: REMOVE For easier error debugging only
-               boolean x = ModelUtil.isAssignableFrom(lhsType, rhsType, true, null); // TODO: REMOVE!
+               boolean x = ModelUtil.isAssignableFrom(lhsType, rhsType, true, null, getLayeredSystem()); // TODO: REMOVE!
             }
          }
       }
@@ -431,4 +449,9 @@ public class AssignmentExpression extends TwoOperatorExpression {
          return true;
       return false;
    }
+
+   public boolean propagatesInferredType(Expression child) {
+      return true;
+   }
 }
+

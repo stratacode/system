@@ -167,14 +167,14 @@ public abstract class JavaSemanticNode extends SemanticNode {
       return m.getLayeredSystem();
    }
 
-   public Object findMethod(String name, List<? extends Object> parametersOrExpressions, Object fromChild, Object refType, boolean staticOnly) {
+   public Object findMethod(String name, List<? extends Object> parametersOrExpressions, Object fromChild, Object refType, boolean staticOnly, Object inferredType) {
       for (ISemanticNode pnode = parentNode; pnode != null; pnode = pnode.getParentNode())
          if (pnode instanceof JavaSemanticNode)
-            return ((JavaSemanticNode)pnode).findMethod(name, parametersOrExpressions, this, refType, staticOnly);
+            return ((JavaSemanticNode)pnode).findMethod(name, parametersOrExpressions, this, refType, staticOnly, inferredType);
       return null;
    }
 
-   public Object definesMethod(String name, List<?> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly) {
+   public Object definesMethod(String name, List<?> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType) {
       return null;
    }
 
@@ -331,10 +331,21 @@ public abstract class JavaSemanticNode extends SemanticNode {
 
    public AbstractMethodDefinition getEnclosingMethod() {
       for (ISemanticNode pnode = parentNode; pnode != null; pnode = pnode.getParentNode()) {
-         if (pnode instanceof TypeDeclaration)
-            return null; // not in a method
          if (pnode instanceof AbstractMethodDefinition)
             return (AbstractMethodDefinition) pnode;
+         if (pnode instanceof LambdaExpression) {
+            return ((LambdaExpression) pnode).getLambdaMethod();
+         }
+      }
+      return null;
+   }
+
+   public IMethodDefinition getEnclosingIMethod() {
+      for (ISemanticNode pnode = parentNode; pnode != null; pnode = pnode.getParentNode()) {
+         // Needed for CFMethods who define ClassType objects through the signature parser - those types are children of the CFMethod.  Of course
+         // this also works like getEnclosingMethod for MethodDefinition.
+         if (pnode instanceof IMethodDefinition)
+            return (IMethodDefinition) pnode;
          if (pnode instanceof LambdaExpression) {
             return ((LambdaExpression) pnode).getLambdaMethod();
          }

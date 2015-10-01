@@ -514,7 +514,7 @@ public class TransformUtil {
          }
 
          // Check if this method is already implemented in this type.  If it's implemented in a base type, we still generate the method to pick up new children
-         if (objType.declaresMethod("getObjChildren", objChildrenParameters, null, null, false) == null) {
+         if (objType.declaresMethod("getObjChildren", objChildrenParameters, null, null, false, null) == null) {
             String getObjCodeToInsert = evalTemplate(parameters, getObjChildrenDefinitionTemplate());
 
             parseClassBodySnippet(objType, getObjCodeToInsert, applyToHiddenBody, -1, null, objType);
@@ -1132,7 +1132,7 @@ public class TransformUtil {
          redirMethod.addModifier(al.levelName);
       redirMethod.name = name;
       if (!isConstructor) {
-         String typeName = ModelUtil.getTypeName(ModelUtil.getReturnType(meth));
+         String typeName = ModelUtil.getTypeName(ModelUtil.getReturnType(meth, true));
          redirMethod.setProperty("type", ClassType.create(typeName));
       }
       Object[] ptypes = ModelUtil.getParameterTypes(meth);

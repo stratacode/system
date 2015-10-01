@@ -8,6 +8,10 @@ import sc.repos.DependencyContext;
 import sc.repos.IRepositoryManager;
 import sc.repos.RepositorySource;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 public class MvnRepositorySource extends RepositorySource {
    // Do we need to serialize the exclusions?
    MvnDescriptor desc;
@@ -19,10 +23,14 @@ public class MvnRepositorySource extends RepositorySource {
    }
 
    /** By maven convention, the version number is in the file name */
-   public String getClassPathFileName() {
+   public List<String> getClassPathFileNames() {
+      // The package may include both the tests and regular jar files when it's set.
+      if (pkg != null)
+         return pkg.fileNames;
       if (desc == null)
-         return super.getClassPathFileName();
-      return desc.getJarFileName();
+         return super.getClassPathFileNames();
+      boolean isTestJar = desc.type != null && desc.type.equals("test-jar");
+      return new ArrayList<String>(Collections.singletonList(isTestJar ? desc.getTestJarFileName() : desc.getJarFileName()));
    }
 
    /**

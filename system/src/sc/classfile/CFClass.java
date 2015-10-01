@@ -525,16 +525,16 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       return false;
    }
 
-   public Object definesMethod(String name, List<?> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly) {
+   public Object definesMethod(String name, List<?> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType) {
       if (!started)
          start();
 
-      Object meth = ModelUtil.getMethod(this, name, refType, ctx, staticOnly, ModelUtil.varListToTypes(parametersOrExpressions));
+      Object meth = ModelUtil.getMethod(system, this, name, refType, ctx, inferredType, staticOnly, ModelUtil.varListToTypes(parametersOrExpressions));
       if (meth != null)
          return meth;
 
       if (extendsType != null) {
-         meth = ModelUtil.definesMethod(extendsType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly);
+         meth = ModelUtil.definesMethod(extendsType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType);
          if (meth != null)
             return meth;
       }
@@ -543,7 +543,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          for (int i = 0; i < numInterfaces; i++) {
             Object implType = implementsTypes.get(i);
             if (implType != null) {
-               meth = ModelUtil.definesMethod(implType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly);
+               meth = ModelUtil.definesMethod(implType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType);
                if (meth != null)
                   return meth;
             }

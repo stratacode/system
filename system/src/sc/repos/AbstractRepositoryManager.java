@@ -7,6 +7,7 @@ package sc.repos;
 import sc.util.*;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -54,88 +55,157 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
 
    public String install(RepositorySource src, DependencyContext ctx) {
       DependencyCollection depColl = new DependencyCollection();
+      ArrayList<RepositoryPackage> allDeps = new ArrayList<RepositoryPackage>();
       String err = preInstall(src, ctx, depColl);
-      if (err != null)
-         return err;
-      err = RepositorySystem.installDeps(depColl);
+      if (err == null) {
+         err = RepositorySystem.installDeps(depColl, allDeps);
+      }
+      completeInstall(src.pkg);
+      RepositorySystem.completeInstallDeps(allDeps);
       return err;
    }
 
-   public String preInstall(RepositorySource src, DependencyContext ctx, DependencyCollection deps) {
-      // Must set this so getVersionRoot returns the right value
-      if (src.pkg.currentSource == null)
-         src.pkg.currentSource = src;
-      // Putting this into the version-specific installed root so it more reliably gets removed if the folder itself is removed
-      // and so that for versioned packaged, we can store more than one version in the repository at the same time.
-      File tagFile = new File(src.pkg.getVersionRoot(), "scPkgCachedInfo.ser");
-      File rootFile = new File(src.pkg.installedRoot);
+   // Putting this into the version-specific installed root so it more reliably gets removed if the folder itself is removed
+   // and so that for versioned packaged, we can store more than one version in the repository at the same time.
+   private File getTagFile(RepositoryPackage pkg) {
+      File tagFile = new File(pkg.getVersionRoot(), "scPkgCachedInfo.ser");
+      return tagFile;
+   }
+
+   public String getDepsInfo(DependencyContext ctx) {
+      return (ctx == null || !info ? "" : " from: " + ctx.toString());
+   }
+
+   protected void preInstallPackage(RepositoryPackage pkg, DependencyContext ctx) {
+      RepositorySource src = pkg.currentSource;
+      if (src == null) {
+         error("No source for package init: " + pkg.packageName);
+         return;
+      }
+
+      if (pkg.initedSources == null)
+         pkg.initedSources = new ArrayList<RepositorySource>();
+      else if (pkg.initedSources.contains(src))
+         return;
+
+      boolean preInstalled = pkg.initedSources.size() == 0 ? true : pkg.preInstalled;
+      pkg.initedSources.add(src);
+
+      File tagFile = getTagFile(pkg);
+      // Though it would be nice to only have one version of each component, maven makes that awkward.  We at least need
+      // to download the pom.xml files from different versions - load x, then x -> parent, then parent -> modules[i] -> y <version>
+      // We can in many cases disable downloading the pom file modules of parents (and in many cases they don't resolve)
+      // but in some cases I believe the parent module
+      File rootFile = new File(pkg.getVersionRoot());
 
       // TODO: right now, we are only installing directories but would we ever install files as well?
       boolean rootDirExists = rootFile.canRead() || rootFile.isDirectory();
-      String rootParent = FileUtil.getParentPath(src.pkg.installedRoot);
+      String rootParent = FileUtil.getParentPath(pkg.getVersionRoot());
       if (rootParent != null)
          new File(rootParent).mkdirs();
       long installedTime = -1;
       if (rootDirExists && tagFile.canRead()) {
          RepositoryPackage oldPkg = RepositoryPackage.readFromFile(tagFile, this);
-         if (oldPkg != null && !system.reinstallSystem && !system.installExisting && src.pkg.updateFromSaved(this, oldPkg, true, ctx))
+
+         if (oldPkg == null)
+            pkg.rebuildReason = "failed to read scPkgCachedInfo.ser file";
+         else if (system.reinstallSystem)
+            pkg.rebuildReason = "reinstalling system - clean install";
+         else if (system.installExisting)
+            pkg.rebuildReason = "reinitializing from previous install";
+         else if (!pkg.updateFromSaved(this, oldPkg, true, ctx))
+            pkg.rebuildReason = "package description changed";
+         if (pkg.rebuildReason == null) {
             installedTime = oldPkg.installedTime;
+         }
       }
+      else
+         pkg.rebuildReason = "first install";
       long packageTime = getLastModifiedTime(src);
+
       // No last modified time for this source... assume it's up to date unless it's not installed
-      String depsInfo = (ctx == null || !info ? "" : " dependency chain: " + ctx.toString());
       if (packageTime == -1) {
          if (installedTime != -1) {
             if (!system.installExisting) {
                if (info)
-                  info("Package: " + src.pkg.packageName + " up-to-date: " + depsInfo);
-               return null;
+                  info("Package: " + pkg.packageName + " up-to-date: " + getDepsInfo(ctx));
+               pkg.preInstalled = preInstalled;
             }
-            else if (info) {
-               info("Installing existing: " + src.pkg.packageName + ":  " + depsInfo);
-            }
+            else
+               pkg.rebuildReason += ": found existing directory";
          }
       }
       else if (installedTime > packageTime) {
          if (!system.installExisting) {
             if (info)
-               info("Package: " + src.pkg.packageName + "  up-to-date: " + depsInfo);
-            return null;
+               info("Package: " + pkg.packageName + "  up-to-date: " + getDepsInfo(ctx));
+            pkg.preInstalled = preInstalled;
          }
          else if (info) {
-            info("Installing existing: " + src.pkg.packageName + ":  " + depsInfo);
+            if (pkg.rebuildReason == null)
+               pkg.rebuildReason = "";
+            pkg.rebuildReason = ": forced reinstall from existing directory";
          }
       }
+      else
+         pkg.rebuildReason += ": files out of date";
 
       // If we are installing on top of an existing directory, rename the old directory in the backup folder.  Checking tagFile because it could be version specific and don't want to back up one version to install another one
-      if (rootDirExists && !isEmptyDir(rootFile) && !system.installExisting && tagFile.canRead()) {
+      if (!pkg.preInstalled && rootDirExists && !isEmptyDir(rootFile) && !system.installExisting && pkg.parentPkg == null) {
          Date curTime = new Date();
-         String backupDir = FileUtil.concat(packageRoot, REPLACED_DIR_NAME, src.pkg.packageName + "." + curTime.getHours() + "." + curTime.getMinutes());
+         String backupDir = FileUtil.concat(packageRoot, REPLACED_DIR_NAME, pkg.packageName + "." + curTime.getHours() + "." + curTime.getMinutes());
          new File(backupDir).mkdirs();
          if (info)
-            info("Backing up package: " + src.pkg.packageName + " into: " + backupDir);
-         FileUtil.renameFile(src.pkg.installedRoot, backupDir);
+            info("Backing up package: " + pkg.packageName + " into: " + backupDir);
+         FileUtil.renameFile(pkg.getVersionRoot(), backupDir);
          rootFile.mkdirs();
       }
+   }
+
+   public String preInstall(RepositorySource src, DependencyContext ctx, DependencyCollection deps) {
+      RepositoryPackage pkg = src.pkg;
+
+      // Must set this so getVersionRoot returns the right value
+      if (pkg.currentSource == null)
+         pkg.setCurrentSource(src);
+
+      preInstallPackage(pkg, ctx);
+
+      pkg.installedSource = pkg.currentSource;
+
+      if (pkg.preInstalled)
+         return null;
+
       if (info)
-         info(StringUtil.indent(DependencyContext.val(ctx)) + "Installing package: " + src.pkg.packageName + " src url: " + src.url + depsInfo);
-      String err = doInstall(src, ctx, deps);
-      if (err != null) {
-         tagFile.delete();
-         System.err.println("Installing package: " + src.pkg.packageName + " failed: " + err);
-         return err;
-      }
-      else {
-         src.pkg.installedTime = System.currentTimeMillis();
-         // Make the version specific directory if necessary
-         new File(tagFile.getParent()).mkdirs();
-         src.pkg.saveToFile(tagFile);
-         //FileUtil.saveStringAsFile(tagFile, String.valueOf(System.currentTimeMillis()), true);
-      }
+         info(StringUtil.indent(DependencyContext.val(ctx)) + "Installing package: " + pkg.packageName + (pkg.rebuildReason == null ? "" : ": " + pkg.rebuildReason) + " src url: " + src.url + getDepsInfo(ctx));
+      pkg.installError = doInstall(src, ctx, deps);
+      if (pkg.installError != null)
+         return pkg.installError;
+
       return null;
    }
 
-   boolean isEmptyDir(File f) {
+   /**
+    * Called after the dependencies have been installed.  Can use pkg.installError to determine if the install was
+    * successfull.
+    */
+   public void completeInstall(RepositoryPackage pkg) {
+      File tagFile = getTagFile(pkg);
+      if (pkg.installError != null) {
+         tagFile.delete();
+         System.err.println("Installing package: " + pkg.packageName + " failed: " + pkg.installError);
+      }
+      else {
+         pkg.installedTime = System.currentTimeMillis();
+         // Make the version specific directory if necessary
+         new File(tagFile.getParent()).mkdirs();
+         pkg.saveToFile(tagFile);
+         //FileUtil.saveStringAsFile(tagFile, String.valueOf(System.currentTimeMillis()), true);
+      }
+
+   }
+
+   static boolean isEmptyDir(File f) {
       String[] contents = f.list();
       if (contents != null) {
          for (String fileName : contents)
@@ -153,6 +223,13 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       }
       if (info)
          System.out.println(infoMessage);
+   }
+
+   public void error(String infoMessage) {
+      if (msg != null) {
+         msg.reportMessage(infoMessage, null, -1, -1, MessageType.Error);
+      }
+      System.err.println(infoMessage);
    }
 
    public long getLastModifiedTime(RepositorySource src) {
@@ -185,7 +262,11 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
    }
 
    public RepositoryPackage createPackage(IRepositoryManager mgr, String packageName, String fileName, RepositorySource src) {
-      return new RepositoryPackage(mgr, packageName, fileName, src);
+      return new RepositoryPackage(mgr, packageName, fileName, src, null);
+   }
+
+   public RepositoryPackage createPackage(IRepositoryManager mgr, String packageName, String fileName, RepositorySource src, RepositoryPackage parentPkg) {
+      return new RepositoryPackage(mgr, packageName, fileName, src, parentPkg);
    }
 
    public String toString() {

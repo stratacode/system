@@ -45,7 +45,7 @@ public class ConstructorDefinition extends AbstractMethodDefinition {
       return false;
    }
 
-   public Object getReturnType() {
+   public Object getReturnType(boolean boundParams) {
       return null;
    }
 

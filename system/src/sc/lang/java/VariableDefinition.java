@@ -138,10 +138,10 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          Object varType = getTypeDeclaration();
          initializer.setInferredType(varType);
          Object initType = initializer.getGenericType();
-         if (initType != null && varType != null && !ModelUtil.isAssignableFrom(varType, initType, true, null) && (bindingDirection == null || bindingDirection.doForward())) {
+         if (initType != null && varType != null && !ModelUtil.isAssignableFrom(varType, initType, true, null, getLayeredSystem()) && (bindingDirection == null || bindingDirection.doForward())) {
             if (!ModelUtil.hasUnboundTypeParameters(initType)) {
                displayTypeError("Type mismatch - assignment to variable with type: " + ModelUtil.getTypeName(varType, true, true) + " does not match expression type: " + ModelUtil.getTypeName(initType, true, true) + " for: ");
-               boolean xx = initType != null && varType != null && !ModelUtil.isAssignableFrom(varType, initType, true, null) && (bindingDirection == null || bindingDirection.doForward());
+               boolean xx = initType != null && varType != null && !ModelUtil.isAssignableFrom(varType, initType, true, null, getLayeredSystem()) && (bindingDirection == null || bindingDirection.doForward());
                initType = initializer.getGenericType();
             }
          }

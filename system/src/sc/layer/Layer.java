@@ -2272,7 +2272,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (!model.hasErrors()) {
          ExecutionContext ctx = new ExecutionContext();
          ctx.resolver = layeredSystem;
-         Object startMethObj = model.getModelTypeDeclaration().findMethod(methodName, null, null, null, false);
+         Object startMethObj = model.getModelTypeDeclaration().findMethod(methodName, null, null, null, false, null);
          if (startMethObj instanceof MethodDefinition) {
             ctx.pushCurrentObject(this);
             try {
@@ -3674,7 +3674,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          RepositorySource repoSrc = mgr.createRepositorySource(url, unzip);
          // Add this as a new source.  This will create the package if this is the first definition or add it
          // as a new source if it already exists.
-         RepositoryPackage pkg = repoSys.addPackageSource(mgr, pkgName, fileName, repoSrc, started && !disabled);
+         RepositoryPackage pkg = repoSys.addPackageSource(mgr, pkgName, fileName, repoSrc, started && !disabled, null);
          repositoryPackages.add(pkg);
 
          return pkg;

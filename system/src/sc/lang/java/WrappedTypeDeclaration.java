@@ -100,8 +100,8 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
       return ModelUtil.isDynamicStub(baseType, includeExtends);
    }
 
-   public Object definesMethod(String name, List<? extends Object> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly) {
-      return ModelUtil.definesMethod(baseType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly);
+   public Object definesMethod(String name, List<? extends Object> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType) {
+      return ModelUtil.definesMethod(baseType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType);
    }
 
    public Object declaresConstructor(List<?> parametersOrExpressions, ITypeParamContext ctx) {
@@ -125,10 +125,14 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
    }
 
    public boolean implementsType(String otherTypeName, boolean assignment, boolean allowUnbound) {
-      if (allowUnbound && ModelUtil.isTypeVariable(baseType))
+      boolean isTypeVar = ModelUtil.isTypeVariable(baseType);
+      if (allowUnbound && isTypeVar)
          return true;
+      Object typeToUse = baseType;
+      if (isTypeVar)
+         typeToUse = ModelUtil.getTypeParameterDefault(typeToUse);
       // TODO: should we verify that our parameters match if the other type has assigned params too?
-      return ModelUtil.implementsType(baseType, otherTypeName, assignment, allowUnbound);
+      return ModelUtil.implementsType(typeToUse, otherTypeName, assignment, allowUnbound);
    }
 
    public Object getInheritedAnnotation(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
@@ -151,7 +155,10 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
    }
 
    public List<Object> getMethods(String methodName, String modifier, boolean includeExtends) {
-      Object[] baseMethods = ModelUtil.getMethods(baseType, methodName, modifier, includeExtends);
+      Object type = baseType;
+      if (ModelUtil.isTypeVariable(type))
+         type = ModelUtil.getTypeParameterDefault(type);
+      Object[] baseMethods = ModelUtil.getMethods(type, methodName, modifier, includeExtends);
       if (baseMethods == null)
          return null;
       return Arrays.asList(baseMethods);

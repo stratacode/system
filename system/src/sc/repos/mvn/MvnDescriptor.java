@@ -83,12 +83,16 @@ public class MvnDescriptor implements Serializable {
       return FileUtil.addExtension(artifactId + "-" + version, "jar");
    }
 
-   public static MvnDescriptor getFromTag(POMFile file, Element tag, boolean dependency, boolean appendInherited) {
-      String groupId = file.getTagValue(tag, "groupId");
-      String artifactId = file.getTagValue(tag, "artifactId");
-      String type = file.getTagValue(tag, "type");
-      String version = file.getTagValue(tag, "version");
-      String classifier = file.getTagValue(tag, "classifier");
+   public String getTestJarFileName() {
+      return FileUtil.addExtension(artifactId + "-" + version + "-tests", "jar");
+   }
+
+   public static MvnDescriptor getFromTag(POMFile file, Element tag, boolean dependency, boolean appendInherited, boolean required) {
+      String groupId = file.getTagValue(tag, "groupId", required);
+      String artifactId = file.getTagValue(tag, "artifactId", required);
+      String type = file.getTagValue(tag, "type", required);
+      String version = file.getTagValue(tag, "version", required);
+      String classifier = file.getTagValue(tag, "classifier", required);
       MvnDescriptor desc = new MvnDescriptor(groupId, artifactId, version, type, classifier);
       if (appendInherited)
          file.appendInheritedAtts(desc, null);
@@ -103,27 +107,29 @@ public class MvnDescriptor implements Serializable {
                for (Element exclTag : exclTags) {
                   // Do not append inherited here - we only want the values explicitly specified here as those are the
                   // ones which will match.
-                  MvnDescriptor exclDesc = MvnDescriptor.getFromTag(file, exclTag, false, false);
+                  MvnDescriptor exclDesc = MvnDescriptor.getFromTag(file, exclTag, false, false, required);
                   exclList.add(exclDesc);
                }
                desc.exclusions = exclList;
             }
          }
-         String optional = file.getTagValue(tag, "optional");
+         String optional = file.getTagValue(tag, "optional", true);
          if (optional != null && optional.equalsIgnoreCase("true"))
             desc.optional = true;
       }
       return desc;
    }
 
-   public RepositoryPackage getOrCreatePackage(MvnRepositoryManager mgr, boolean install, DependencyContext ctx, boolean initDeps) {
+   public RepositoryPackage getOrCreatePackage(MvnRepositoryManager mgr, boolean install, DependencyContext ctx, boolean initDeps, MvnRepositoryPackage parentPkg) {
       String pkgName = getPackageName();
       RepositorySource depSrc = new MvnRepositorySource(mgr, getURL(), false, this, ctx);
 
-      RepositoryPackage pkg = mgr.system.addPackageSource(mgr, pkgName, getJarFileName(), depSrc, install);
+      RepositoryPackage pkg = mgr.system.addPackageSource(mgr, pkgName, getJarFileName(), depSrc, install, parentPkg);
+      if (pkg.parentPkg == null)
+         pkg.parentPkg = parentPkg;
 
       if (initDeps && pkg.dependencies == null) {
-         POMFile pomFile = mgr.getPOMFile(this, pkg, ctx, true);
+         POMFile pomFile = mgr.getPOMFile(this, pkg, ctx, true, parentPkg != null ? parentPkg.pomFile : null, null);
          if (pkg instanceof MvnRepositoryPackage)
             ((MvnRepositoryPackage) pkg).pomFile = pomFile;
          mgr.initDependencies(pkg.currentSource, ctx);
@@ -136,7 +142,8 @@ public class MvnDescriptor implements Serializable {
       return strMatches(other.groupId, groupId) && strMatches(other.artifactId, artifactId) &&
               // flexible match on version in this direction
               (version == null /* || other.version == null */ || strMatches(version, other.version)) &&
-              (type == null || other.type == null || strMatches(type, other.type)) &&
+              // Strict match on type - each type we reference becomes a different source for the same package
+              strMatches(type, other.type) &&
               (classifier == null || other.classifier == null || strMatches(classifier, other.classifier));
    }
 

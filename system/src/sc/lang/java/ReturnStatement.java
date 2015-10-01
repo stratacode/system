@@ -29,11 +29,11 @@ public class ReturnStatement extends ExpressionStatement {
 
          returnType = expression.getGenericType();
          // Verified at least that non-assignmentSemantics are too strict, i.e. method declared as char returning 0.
-         if (returnType != null && !ModelUtil.isAssignableFrom(methodReturnType, returnType, true, null)) {
+         if (returnType != null && !ModelUtil.isAssignableFrom(methodReturnType, returnType, true, null, getLayeredSystem())) {
             if (!ModelUtil.hasUnboundTypeParameters(returnType)) {
                displayTypeError("Type mismatch - method return type: " + ModelUtil.getTypeName(methodReturnType, true, true) + " does not match expression type: " + ModelUtil.getTypeName(returnType, true, true) + " for: ");
                returnType = expression.getGenericType();
-               ModelUtil.isAssignableFrom((methodReturnType = method.type.getTypeDeclaration()), returnType, true, null);
+               ModelUtil.isAssignableFrom((methodReturnType = method.type.getTypeDeclaration()), returnType, true, null, getLayeredSystem());
             }
          }
       }

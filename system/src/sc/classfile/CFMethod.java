@@ -15,7 +15,8 @@ import java.util.List;
 public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IMethodDefinition {
    public JavaType returnType;
    public JavaType[] parameterJavaTypes;
-   public Object[] parameterTypes;
+   public Object[] boundParameterTypes;
+   public Object[] unboundParameterTypes;
    public List<TypeParameter> typeParameters;
    public String typeSignature;
 
@@ -60,9 +61,11 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
          init();
 
       if (parameterJavaTypes != null) {
-         parameterTypes = new Object[parameterJavaTypes.length];
+         boundParameterTypes = new Object[parameterJavaTypes.length];
+         unboundParameterTypes = new Object[parameterJavaTypes.length];
          for (int i = 0; i < parameterJavaTypes.length; i++) {
-            parameterTypes[i] = parameterJavaTypes[i].getTypeDeclaration();
+            boundParameterTypes[i] = parameterJavaTypes[i].getTypeDeclaration(null, true);
+            unboundParameterTypes[i] = parameterJavaTypes[i].getTypeDeclaration(null, false);
          }
       }
 
@@ -89,31 +92,32 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
       return ownerClass;
    }
 
-   public Object getReturnType() {
+   public Object getReturnType(boolean boundParams) {
       if (!started)
          start();
       if (returnType == null)
          return null;
-      return returnType.getTypeDeclaration();
+      return returnType.getTypeDeclaration(null, boundParams);
    }
 
    public Object getReturnJavaType() {
-      return getReturnType();
+      return returnType;
    }
 
    public Object[] getParameterTypes(boolean bound) {
       if (!started)
          start();
-      return parameterTypes;
+      return bound ? boundParameterTypes : unboundParameterTypes;
    }
 
-   public JavaType[] getParameterJavaTypes() {
+   public JavaType[] getParameterJavaTypes(boolean convertRepeating) {
+      // TODO: this most likely will already turn repeating args to array types... we are migrating from convertRepeating = false to true so hopefully convertRepeating is never true
       return parameterJavaTypes;
    }
 
    public Object getTypeDeclaration(List<? extends ITypedObject> args, boolean resolve) {
-      // TODO: get type parameters and return the parameterized type here if the match
-      return getReturnType();
+      // Type parameter resolution happens in ModelUtil so this code is shared
+      return getReturnType(resolve);
    }
 
    public String getPropertyName() {

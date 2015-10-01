@@ -70,7 +70,7 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
       // We might have a ParamTypeDeclaration wrapping the array - if so, just unwrap
       if (other instanceof ParamTypeDeclaration) {
          Object otherObj = ((ParamTypeDeclaration) other).getBaseType();
-         return ModelUtil.isAssignableFrom(this, otherObj, assignmentSemantics, null);
+         return ModelUtil.isAssignableFrom(this, otherObj, assignmentSemantics, null, getLayeredSystem());
       }
 
       if (!(other instanceof ArrayTypeDeclaration))
@@ -78,7 +78,7 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
 
       ArrayTypeDeclaration otherTD = (ArrayTypeDeclaration) other;
       
-      return ModelUtil.isAssignableFrom(componentType, otherTD.componentType, assignmentSemantics, null) && otherTD.arrayDimensions.equals(arrayDimensions);
+      return ModelUtil.isAssignableFrom(componentType, otherTD.componentType, assignmentSemantics, null, getLayeredSystem()) && otherTD.arrayDimensions.equals(arrayDimensions);
    }
 
    public boolean isAssignableTo(ITypeDeclaration other) {
@@ -87,7 +87,7 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
 
       ArrayTypeDeclaration otherTD = (ArrayTypeDeclaration) other;
 
-      return ModelUtil.isAssignableFrom(otherTD.componentType, componentType) && otherTD.arrayDimensions.equals(arrayDimensions);
+      return ModelUtil.isAssignableFrom(otherTD.componentType, componentType, getLayeredSystem()) && otherTD.arrayDimensions.equals(arrayDimensions);
    }
 
    public String getTypeName() {
@@ -149,8 +149,8 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
       return arrayDimensions.length() >> 1;
    }
 
-   public Object definesMethod(String name, List<? extends Object> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly) {
-      Object res = ModelUtil.definesMethod(OBJECT_ARRAY_CLASS, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly);
+   public Object definesMethod(String name, List<? extends Object> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType) {
+      Object res = ModelUtil.definesMethod(OBJECT_ARRAY_CLASS, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType);
       // The clone method in an array declaration seems to magically know the return value is an array even though reflection on the class does not detect a clone method.
       if (name.equals("clone")) {
          return new ArrayCloneMethod(this, res, definedInType.getJavaModel());
@@ -209,7 +209,7 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
          else
             otherComponentType = t.primitiveClass;
 
-         return ModelUtil.isAssignableFrom(otherComponentType, componentType, assignment, null, allowUnbound);
+         return ModelUtil.isAssignableFrom(otherComponentType, componentType, assignment, null, allowUnbound, getLayeredSystem());
 
       }
       else {
@@ -261,7 +261,7 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
          if (classComponentType == null)
             return false;
       }
-      return ModelUtil.isAssignableFrom(componentType, classComponentType);
+      return ModelUtil.isAssignableFrom(componentType, classComponentType, getLayeredSystem());
    }
 
    public List<Object> getAllMethods(String modifier, boolean hasModifier, boolean isDyn, boolean overridesComp) {
@@ -331,7 +331,7 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
    }
 
    public LayeredSystem getLayeredSystem() {
-      return definedInType.getLayeredSystem();
+      return definedInType == null ? null : definedInType.getLayeredSystem();
    }
 
    public List<?> getClassTypeParameters() {

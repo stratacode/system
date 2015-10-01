@@ -12,6 +12,7 @@ import sc.type.IBeanMapper;
 import sc.type.PTypeUtil;
 import sc.util.CoalescedHashMap;
 
+import java.lang.reflect.Array;
 import java.util.List;
 import java.util.Stack;
 

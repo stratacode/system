@@ -10,9 +10,12 @@ import sc.util.IMessageHandler;
  */
 public interface IRepositoryManager {
    /** Returns null if successful, otherwise an error message. */
+   public String preInstall(RepositorySource toInstall, DependencyContext ctx, DependencyCollection deps);
+
+   /** Performs the complete install */
    public String install(RepositorySource toInstall, DependencyContext ctx);
 
-   public String preInstall(RepositorySource toInstall, DependencyContext ctx, DependencyCollection deps);
+   void completeInstall(RepositoryPackage pkg);
 
    /** Returns null if successful, otherwise an error message. */
    public String update(RepositorySource toInstall);
@@ -26,9 +29,10 @@ public interface IRepositoryManager {
 
    public RepositoryPackage createPackage(String url);
 
-   public RepositoryPackage createPackage(IRepositoryManager mgr, String packageName, String fileName, RepositorySource src);
+   public RepositoryPackage createPackage(IRepositoryManager mgr, String packageName, String fileName, RepositorySource src, RepositoryPackage parentPkg);
 
    public RepositorySystem getRepositorySystem();
 
    RepositorySource createRepositorySource(String url, boolean unzip);
+
 }

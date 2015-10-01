@@ -17,7 +17,10 @@ public class TrackingClassLoader extends URLClassLoader {
    Layer layer;
    TrackingClassLoader parentTrackingLoader;
    HashSet<String> loaded = new HashSet<String>();
+   // Has this active class loader been disabled for loading new classes
    boolean disabled = false;
+   // Has this class loader been decommissioned - i.e. replaced due to resetClassLoader
+   public boolean deactivated = false;
    TrackingClassLoader replaceLoader;
    boolean buildLoader = false;
    ClassLoader nonTrackingParent;
@@ -150,5 +153,14 @@ public class TrackingClassLoader extends URLClassLoader {
          }
       }
       return this;
+   }
+
+   public void deactivate() {
+      if (deactivated)
+         return;
+      deactivated = true;
+      if (parentTrackingLoader != null) {
+         parentTrackingLoader.deactivate();
+      }
    }
 }

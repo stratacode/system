@@ -41,10 +41,10 @@ public class ArrayInitializer extends Expression {
             for (Expression init:initializers) {
                Object initType = init.getTypeDeclaration();
                // Using assignment semantics to get more flexible type conversions
-               if (!ModelUtil.isAssignableFrom(componentType, initType, true, null)) {
+               if (!ModelUtil.isAssignableFrom(componentType, initType, true, null, getLayeredSystem())) {
                   displayError("Array element type mismatch - Expected " + ModelUtil.getTypeName(componentType) + " found: " + ModelUtil.getTypeName(initType) + " for: ");
                   initType = init.getTypeDeclaration();
-                  boolean res = ModelUtil.isAssignableFrom(componentType, initType, true, null);
+                  boolean res = ModelUtil.isAssignableFrom(componentType, initType, true, null, getLayeredSystem());
                }
             }
          }

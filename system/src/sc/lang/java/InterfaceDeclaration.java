@@ -86,15 +86,15 @@ public class InterfaceDeclaration extends TypeDeclaration {
       }
    }
 
-   public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly) {
+   public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType) {
       // For an interface, we need to check hiddenBody first because it has the most specific definitions of things.  The constraint is that we can't modify hiddenBody elements
       // during the "transform" phase.... if we always search hiddenBody first, in Class types with scopes etc. we can end up returning the wrong member and not see the changes reflected in
       // the generted file.
-      Object v = findMethodInBody(hiddenBody, name, types, ctx, refType, staticOnly);
+      Object v = findMethodInBody(hiddenBody, name, types, ctx, refType, staticOnly, inferredType);
       if (v != null)
          return v;
 
-      v = super.definesMethod(name, types, ctx, refType, isTransformed, staticOnly);
+      v = super.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType);
       if (v != null)
          return v;
 
@@ -102,12 +102,12 @@ public class InterfaceDeclaration extends TypeDeclaration {
 
       if (extendsBoundTypes != null) {
          for (Object impl:extendsBoundTypes) {
-            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly)) != null)
+            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType)) != null)
                return v;
          }
       }
       else
-         return ModelUtil.definesMethod(Object.class, name, types, ctx, refType, isTransformed, staticOnly);
+         return ModelUtil.definesMethod(Object.class, name, types, ctx, refType, isTransformed, staticOnly, inferredType);
       return null;
    }
 
@@ -156,7 +156,7 @@ public class InterfaceDeclaration extends TypeDeclaration {
 
       if (extendsBoundTypes != null) {
          for (Object implType:extendsBoundTypes) {
-            if (implType != null && ModelUtil.isAssignableFrom(other, implType))
+            if (implType != null && ModelUtil.isAssignableFrom(other, implType, getLayeredSystem()))
                return true;
          }
       }

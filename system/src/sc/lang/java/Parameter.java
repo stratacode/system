@@ -127,15 +127,22 @@ public class Parameter extends AbstractVariable implements IVariable {
       return parameterTypes;
    }
 
-   public JavaType[] getParameterJavaTypes() {
-      if (nextParameter == null)
-         return new JavaType[] {type};
+   public JavaType[] getParameterJavaTypes(boolean convertRepeating) {
+      if (nextParameter == null) {
+         JavaType retType = type;
+         if (convertRepeating && repeatingParameter)
+            retType = retType.convertToArray(null);
+         return new JavaType[]{retType};
+      }
       else {
          JavaType[] arr = new JavaType[getNumParameters()];
          Parameter current = this;
          int ix = 0;
          while (current != null) {
-            arr[ix++] = current.type;
+            JavaType useType = current.type;
+            if (current.repeatingParameter)
+               useType = useType.convertToArray(null);
+            arr[ix++] = useType;
             current = current.nextParameter;
          }
          return arr;

@@ -7,7 +7,9 @@ package sc.repos;
 import sc.util.IMessageHandler;
 import sc.repos.mvn.MvnRepositoryManager;
 import sc.util.MessageHandler;
+import sc.util.StringUtil;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.TreeMap;
@@ -98,7 +100,7 @@ public class RepositorySystem {
       if (existingPkg != null) {
          pkg.installedRoot = existingPkg.installedRoot;
          if (existingPkg.currentSource != null)
-            pkg.currentSource = existingPkg.currentSource;
+            pkg.setCurrentSource(existingPkg.currentSource);
          pkg.definesClasses = existingPkg.definesClasses;
          pkg.installed = existingPkg.installed;
          pkg.sources = new RepositorySource[1];
@@ -111,12 +113,20 @@ public class RepositorySystem {
       }
    }
 
-   public RepositoryPackage addPackageSource(IRepositoryManager mgr, String pkgName, String fileName, RepositorySource repoSrc, boolean install) {
+   public void registerAlternateName(RepositoryPackage pkg, String altName) {
+      if (!StringUtil.equalStrings(altName, pkg.packageAlias) && pkg.packageAlias != null)
+         System.err.println("*** Warning - replacing existing package alias: " + pkg.packageAlias + altName);
+      pkg.packageAlias = altName;
+      if (altName != null)
+         store.packages.put(altName, pkg);
+   }
+
+   public RepositoryPackage addPackageSource(IRepositoryManager mgr, String pkgName, String fileName, RepositorySource repoSrc, boolean install, RepositoryPackage parentPkg) {
       RepositoryPackage pkg;
       pkg = store.packages.get(pkgName);
       if (pkg == null) {
-         pkg = mgr.createPackage(mgr, pkgName, fileName, repoSrc);
-         pkg.currentSource = repoSrc;
+         pkg = mgr.createPackage(mgr, pkgName, fileName, repoSrc, parentPkg);
+         pkg.setCurrentSource(repoSrc);
          store.packages.put(pkgName, pkg);
       }
       else {
@@ -124,8 +134,8 @@ public class RepositorySystem {
          // We may first encounter a package from a Maven module reference - where we are not installing the package.  That's a weaker reference
          // than if we are installing it so use this new reference.
          if (!pkg.installed && install) {
-            pkg.currentSource = repoSrc;
-            pkg.fileName = repoSrc.getClassPathFileName();
+            pkg.setCurrentSource(repoSrc);
+            pkg.fileNames = repoSrc.getClassPathFileNames();
          }
       }
 
@@ -135,15 +145,18 @@ public class RepositorySystem {
       return pkg;
    }
 
-   public RepositoryPackage addPackage(IRepositoryManager mgr, RepositoryPackage newPkg, boolean install, DependencyContext ctx) {
+   public RepositoryPackage addPackage(IRepositoryManager mgr, RepositoryPackage newPkg, RepositoryPackage parentPkg, boolean install, DependencyContext ctx) {
       RepositoryPackage pkg;
       String pkgName = newPkg.packageName;
       pkg = store.packages.get(pkgName);
       if (pkg == null) {
          pkg = newPkg;
+         pkg.parentPkg = parentPkg;
          store.packages.put(pkgName, pkg);
       }
       else {
+         if (parentPkg != null)
+            System.err.println("*** Warning - child package that was already added");
          for (RepositorySource src : newPkg.sources)
             pkg.addNewSource(src);
          // We may first encounter a package from a Maven module reference - where we are not installing the package.  That's a weaker reference
@@ -175,7 +188,7 @@ public class RepositorySystem {
       }
    }
 
-   public static String installDeps(DependencyCollection instDeps) {
+   public static String installDeps(DependencyCollection instDeps, ArrayList<RepositoryPackage> allDeps) {
       do {
          DependencyCollection nextDeps = new DependencyCollection();
          for (PackageDependency pkgDep : instDeps.neededDeps) {
@@ -183,6 +196,7 @@ public class RepositorySystem {
                pkgDep.pkg.preInstall(pkgDep.ctx, nextDeps);
             else
                pkgDep.pkg.register();
+            allDeps.add(pkgDep.pkg);
          }
          if (nextDeps.neededDeps.size() == 0)
             return null;
@@ -190,6 +204,11 @@ public class RepositorySystem {
       } while (true);
    }
 
+   public static void completeInstallDeps(ArrayList<RepositoryPackage> allDeps) {
+      for (RepositoryPackage pkg : allDeps) {
+         pkg.mgr.completeInstall(pkg);
+      }
+   }
 
    public void installPackage(RepositoryPackage pkg, DependencyContext ctx) {
       if (!pkg.installed) {

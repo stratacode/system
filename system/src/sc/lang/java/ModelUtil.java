@@ -734,14 +734,16 @@ public class ModelUtil {
    /**
     * Uses a more flexible comparison for the arguments.
     */
-   public static Object getMethod(Object resultClass, String methodName, Object refType, ITypeParamContext ctx, boolean staticOnly, Object... types) {
+   public static Object getMethod(LayeredSystem sys, Object resultClass, String methodName, Object refType, ITypeParamContext ctx, Object inferredType, boolean staticOnly, Object... types) {
+      // TODO: Need to wrap any param type methods and set the inferredType so we do the lookup accurately
+
       Object[] list = ModelUtil.getMethods(resultClass, methodName, null);
 
       if (list == null) {
          // Interfaces don't inherit object methods in Java but an inteface type in this system needs to still
          // implement methods like "toString" even if they are not on the interface.
          if (ModelUtil.isInterface(resultClass)) {
-            return getMethod(Object.class, methodName, refType, null, staticOnly, types);
+            return getMethod(sys, Object.class, methodName, refType, null, inferredType, staticOnly, types);
          }
          return null;
       }
@@ -775,7 +777,7 @@ public class ModelUtil {
                   }
                   else
                      paramType = parameterTypes[j];
-                  if (types[j] != null && !ModelUtil.isAssignableFrom(paramType, types[j], false, ctx)) {
+                  if (types[j] != null && !ModelUtil.isAssignableFrom(paramType, types[j], false, ctx, sys)) {
                      // Repeating parameters... if the last parameter is an array match if the component type matches
                      if (j >= last && ModelUtil.isArray(paramType)) {
                         if (!ModelUtil.isAssignableFrom(ModelUtil.getArrayComponentType(paramType), types[j], false, ctx)) {
@@ -794,6 +796,49 @@ public class ModelUtil {
          }
       }
       return res;
+   }
+
+   public static boolean parameterTypesMatch(Object[] parameterTypes, Object[] types, Object toCheck, Object refType, ITypeParamContext ctx) {
+      int paramLen = parameterTypes == null ? 0 : parameterTypes.length;
+      int typesLen = types == null ? 0 : types.length;
+      if (paramLen == 0 && typesLen == 0) {
+         if (refType == null || checkAccess(refType, toCheck))
+            return true;
+      }
+      else {
+         int j;
+         int last = paramLen - 1;
+         if (paramLen != typesLen) {
+            // If the last guy is not a repeating parameter, it can't match
+            if (last < 0 || !ModelUtil.isVarArgs(toCheck) || !ModelUtil.isArray(parameterTypes[last]) || typesLen < last)
+               return false;
+         }
+         for (j = 0; j < typesLen; j++) {
+            Object paramType;
+            if (j > last) {
+               if (!ModelUtil.isArray(paramType = parameterTypes[last]))
+                  return false;
+            }
+            else
+               paramType = parameterTypes[j];
+            if (types[j] != null && !ModelUtil.isAssignableFrom(paramType, types[j], false, ctx)) {
+               // Repeating parameters... if the last parameter is an array match if the component type matches
+               if (j >= last && ModelUtil.isArray(paramType)) {
+                  if (!ModelUtil.isAssignableFrom(ModelUtil.getArrayComponentType(paramType), types[j], false, ctx)) {
+                     return false;
+                  }
+               }
+               else
+                  return false;
+            }
+         }
+         if (j == typesLen) {
+            if (refType == null || checkAccess(refType, toCheck))
+               return true;
+         }
+      }
+      return false;
+
    }
 
    public static Object getConstructorFromSignature(Object type, String sig) {
@@ -830,19 +875,25 @@ public class ModelUtil {
       return ModelUtil.getMethodName(c1).equals(ModelUtil.getMethodName(c2));
    }
 
-   public static boolean methodsMatch(Object c1, Object c2) {
-      if (c1 == null)
-         return c2 == null;
+   public static boolean methodsMatch(Object m1, Object m2) {
+      if (m1 == null)
+         return m2 == null;
 
-      if (c2 == null)
+      if (m2 == null)
          return false;
 
-      Object[] c1Types = ModelUtil.getParameterTypes(c1);
-      Object[] c2Types = ModelUtil.getParameterTypes(c2);
-      return parametersMatch(c1Types, c2Types, false);
+      Object[] c1Types = ModelUtil.getParameterTypes(m1);
+      Object[] c2Types = ModelUtil.getParameterTypes(m2);
+      if (!parametersMatch(c1Types, c2Types, false, null))
+         return false;
+      Object encl1Type = ModelUtil.getEnclosingType(m1);
+      Object encl2Type = ModelUtil.getEnclosingType(m2);
+      if (!ModelUtil.sameTypes(encl1Type, encl2Type))
+         return false;
+      return ModelUtil.isVarArgs(m1) == ModelUtil.isVarArgs(m2);
    }
 
-   public static boolean parametersMatch(Object[] c1Types, Object[] c2Types, boolean allowUnbound) {
+   public static boolean parametersMatch(Object[] c1Types, Object[] c2Types, boolean allowUnbound, LayeredSystem sys) {
       int c1Len = c1Types == null ? 0 : c1Types.length;
       int checkLen = c2Types == null ? 0 : c2Types.length;
       if (c1Len != checkLen)
@@ -859,7 +910,7 @@ public class ModelUtil {
             if (sameTypes(c1Arg, c2Arg))
                continue;
 
-            if (ModelUtil.isAssignableFrom(c1Arg, c2Arg, false, null, allowUnbound))
+            if (ModelUtil.isAssignableFrom(c1Arg, c2Arg, false, null, allowUnbound, sys))
                continue;
 
             return false;
@@ -885,6 +936,30 @@ public class ModelUtil {
          int checkLen = c2Types == null ? 0 : c2Types.length;
          if (c1Len != checkLen)
             defaultType = c1Len > checkLen ? c2 : c1;
+
+         boolean c1VarArg = ModelUtil.isVarArgs(c1);
+         boolean c2VarArg = ModelUtil.isVarArgs(c2);
+
+         boolean paramsSorted = false;
+
+         // If we have one var arg and one non-var-arg and the same parameters, choose the type based on whether the
+         // varArg argument is an array.  If it's an array, choose the varArgs one.  If not, choose the scalar.
+         if (c1VarArg != c2VarArg && c1Len == checkLen) {
+            Object lastType = types[types.length-1];
+            // This rule for using varArgs to match arrays applies to Integer[] but not int[]
+            boolean lastTypeArr = ModelUtil.isArray(lastType) && !ModelUtil.isPrimitive(ModelUtil.getArrayComponentType(lastType));
+            // If one matches exactly and the other matches because it's a repeat definition, choose the non-repeating one (e.g. Seq.of(T) versus Seq.of(T...) except if you have an array param.
+            // Then the match goes the other way.
+            if (c1VarArg && !c2VarArg) {
+               defaultType = lastTypeArr ? c1 : c2;
+               paramsSorted = true;
+            }
+            else if (c2VarArg && !c1VarArg) {
+               defaultType = lastTypeArr ? c2 : c1;
+               paramsSorted = true;
+            }
+         }
+
 
          // First if any of the parameters is a lambda expression, we need to ensure the
          // lambda expression parameters match the parameters of the single-interface method
@@ -913,56 +988,64 @@ public class ModelUtil {
             }
          }
 
-         for (int i = 0; i < types.length; i++) {
-            Object arg = types[i];
-            boolean repeat1Arg = c1Types.length <= i;
-            boolean repeat2Arg = c2Types.length <= i;
-            Object c1Arg = repeat1Arg ? c1Types[c1Types.length] : c1Types[i];
-            Object c2Arg = repeat2Arg ? c2Types[c2Types.length] : c2Types[i];
+         if (!paramsSorted) {
+            for (int i = 0; i < types.length; i++) {
+               Object arg = types[i];
+               boolean repeat1Arg = c1Types.length <= i;
+               boolean repeat2Arg = c2Types.length <= i;
+               Object c1Arg = repeat1Arg ? c1Types[c1Types.length] : c1Types[i];
+               Object c2Arg = repeat2Arg ? c2Types[c2Types.length] : c2Types[i];
 
-            if (c1Arg == c2Arg)
-               continue;
+               if (c1Arg == c2Arg)
+                  continue;
 
-            /*
-            if (arg == LambdaExpression.LAMBDA_INFERRED_TYPE) {
-               boolean c2Interface = ModelUtil.isInterface(c2Arg);
-               if (!ModelUtil.isInterface(c1Arg)) {
-                  if (c2Interface)
-                     return c2;
+               /*
+               if (arg == LambdaExpression.LAMBDA_INFERRED_TYPE) {
+                  boolean c2Interface = ModelUtil.isInterface(c2Arg);
+                  if (!ModelUtil.isInterface(c1Arg)) {
+                     if (c2Interface)
+                        return c2;
+                  }
+                  else if (!c2Interface)
+                     return c1;
+                  arg = Object.class;
                }
-               else if (!c2Interface)
+               */
+
+               if (sameTypes(arg, c1Arg))
                   return c1;
-               arg = Object.class;
+
+               if (sameTypes(arg, c2Arg))
+                  return c2;
+
+               // TODO: This does not look right - we should pick the more specific the args in both directions here right?
+               // And only return if they are diferent.  And why do we return defaultType after the first parameter?
+               if (ModelUtil.isAssignableFrom(c1Arg, c2Arg))
+                  return c2;
+               //else if (ModelUtil.isAssignableFrom(c2Arg, c1Arg))
+
+               boolean argIsArray = ModelUtil.isArray(arg);
+               if (ModelUtil.isArray(c1Arg) && !ModelUtil.isArray(c2Arg)) {
+                  if (argIsArray)
+                     return c1;
+                  // If we have c1 as a "..." signifier and c2 is not, match the one which is not
+                  return c2;
+               }
+               // If the arg is an array pick the array type
+               else if (argIsArray && ModelUtil.isArray(c2Arg) && !ModelUtil.isArray(c1Arg))
+                  return c2;
+               return defaultType;
             }
-            */
-
-            if (sameTypes(arg, c1Arg))
-               return c1;
-
-            if (sameTypes(arg, c2Arg))
-               return c2;
-
-            if (ModelUtil.isAssignableFrom(c1Arg, c2Arg))
-               return c2;
-            //else if (ModelUtil.isAssignableFrom(c2Arg, c1Arg))
-
-            boolean argIsArray = ModelUtil.isArray(arg);
-            if (ModelUtil.isArray(c1Arg) && !ModelUtil.isArray(c2Arg)) {
-               if (argIsArray)
-                  return c1;
-               // If we have c1 as a "..." signifier and c2 is not, match the one which is not
-               return c2;
-            }
-            // If the arg is an array pick the array type
-            else if (argIsArray && ModelUtil.isArray(c2Arg) && !ModelUtil.isArray(c1Arg))
-               return c2;
-            return defaultType;
          }
       }
 
       // Preference to methods in the type rather than in the interface
-      if (ModelUtil.isInterface(ModelUtil.getEnclosingType(c1)) && !ModelUtil.isInterface(ModelUtil.getEnclosingType(c2)))
+      boolean c1iface = ModelUtil.isInterface(ModelUtil.getEnclosingType(c1));
+      boolean c2iface = ModelUtil.isInterface(ModelUtil.getEnclosingType(c2));
+      if (c1iface && !c2iface)
          return c2;
+      if (c2iface && !c1iface)
+         return c1;
 
       // Most likely only one method in this list is abstract but just to be paranoid, we check both flags
       boolean c1abs = ModelUtil.hasModifier(c1, "abstract");
@@ -972,13 +1055,13 @@ public class ModelUtil {
       if (c2abs && !c1abs)
          return c1;
 
-      Object c1Ret = ModelUtil.getReturnType(c2);
-      Object c2Ret = ModelUtil.getReturnType(c1);
+      Object c1Ret = ModelUtil.getReturnType(c1, true);
+      Object c2Ret = ModelUtil.getReturnType(c2, true);
       if (!ModelUtil.sameTypes(c1Ret, c2Ret)) {
          if (ModelUtil.isAssignableFrom(c1Ret, c2Ret))
-            return c1;
-         else if (ModelUtil.isAssignableFrom(c2Ret, c1Ret))
             return c2;
+         else if (ModelUtil.isAssignableFrom(c2Ret, c1Ret))
+            return c1;
       }
       // Picks by the method with the shortest number of parameters
       return defaultType;
@@ -1181,6 +1264,46 @@ public class ModelUtil {
          }
          throw new IllegalArgumentException("Cannot coerce types: " + ModelUtil.getTypeName(lhsType) + " and: " + ModelUtil.getTypeName(rhsType));
       }
+   }
+
+   public static Object refineType(ITypeDeclaration definedInType, Object origType, Object newType) {
+      if (ModelUtil.isTypeVariable(origType))
+         return newType;
+      if (ModelUtil.isTypeVariable(newType))
+         return origType;
+
+      if (!ModelUtil.isAssignableFrom(origType, newType))
+         System.err.println("*** Incompatible types in refineType");
+
+      if (ModelUtil.isParameterizedType(origType)) {
+         // If the old type has type parameters but the new one does not, create a new param type which has the new type
+         // as the base type and the old type parameters
+         if (!ModelUtil.isParameterizedType(newType)) {
+            if (origType instanceof ParamTypeDeclaration) {
+               ParamTypeDeclaration mergedType = ((ParamTypeDeclaration) origType).copy();
+               mergedType.baseType = newType;
+               return mergedType;
+            }
+            else {
+               // TODO: is this right?  Do we actually even get here?  Basically we do not have any bindings for type parameters
+               List<?> typeParams = ModelUtil.getTypeParameters(origType);
+               return new ParamTypeDeclaration(definedInType, typeParams, (List<Object>)typeParams, newType);
+            }
+         }
+         else {
+            List<?> typeParams = ModelUtil.getTypeParameters(origType);
+            int numParams = typeParams.size();
+            ArrayList<Object> typeDefs = new ArrayList<Object>(numParams);
+            for (int i = 0; i < numParams; i++) {
+               Object op = ModelUtil.getTypeParameter(origType, i);
+               Object np = ModelUtil.getTypeParameter(newType, i);
+               typeDefs.add(refineType(definedInType, op, np));
+            }
+            ParamTypeDeclaration mergedParamType = new ParamTypeDeclaration(definedInType, typeParams, typeDefs, ModelUtil.getParamTypeBaseType(newType));
+            return mergedParamType;
+         }
+      }
+      return newType;
    }
 
    public static boolean implementsInterfaces(Object type, Object[] ifaces) {
@@ -1513,7 +1636,11 @@ public class ModelUtil {
    }
 
    public static boolean isAssignableFrom(Object type1, Object type2) {
-      return isAssignableFrom(type1, type2, false, null);
+      return isAssignableFrom(type1, type2, false, null, false, null);
+   }
+
+   public static boolean isAssignableFrom(Object type1, Object type2, LayeredSystem sys) {
+      return isAssignableFrom(type1, type2, false, null, false, sys);
    }
 
    /** Use for comparing parameter types in methods to decide when one overrides the other */
@@ -1525,10 +1652,15 @@ public class ModelUtil {
    }
 
    public static boolean isAssignableFrom(Object type1, Object type2, boolean assignmentSemantics, ITypeParamContext ctx) {
-      return isAssignableFrom(type1, type2, assignmentSemantics, ctx, false);
+      return isAssignableFrom(type1, type2, assignmentSemantics, ctx, false, null);
    }
 
-   public static boolean isAssignableFrom(Object type1, Object type2, boolean assignmentSemantics, ITypeParamContext ctx, boolean allowUnbound) {
+   public static boolean isAssignableFrom(Object type1, Object type2, boolean assignmentSemantics, ITypeParamContext ctx, LayeredSystem sys) {
+      return isAssignableFrom(type1, type2, assignmentSemantics, ctx, false, sys);
+   }
+
+   /** Note: the LayeredSystem is an optional parameter here for an edge case that allows us to detect mismatching Classes after we've reset the class loader and reload them rather than compare by name. */
+   public static boolean isAssignableFrom(Object type1, Object type2, boolean assignmentSemantics, ITypeParamContext ctx, boolean allowUnbound, LayeredSystem sys) {
       if (type1 == type2)
          return true;
 
@@ -1547,7 +1679,7 @@ public class ModelUtil {
          return ((TypeParameter)type2).isAssignableTo(type1, ctx);
       }
 
-      if (type1 instanceof TypeVariable) {
+      while (type1 instanceof TypeVariable) {
          type1 = ((TypeVariable) type1).getBounds()[0];
       }
 
@@ -1603,12 +1735,28 @@ public class ModelUtil {
             Class cl2 = (Class) type2;
             boolean res = cl1.isAssignableFrom(cl2);
 
-            // TODO: we only need this (I think) during the refreshBoundType after resetClassLoader.  Because we refresh references in any order
+            // We only need this during the refreshBoundType after resetClassLoader.  Because we refresh references in any order
             // we might temporarily get incompatible class loaders during the refreshBoundTypes operation which prevent us from resolving types properly.
-            // It seems like a better fix would be to just fix the order
-            if (!res && cl1.getClassLoader() != cl2.getClassLoader()) {
-               if (cl1.getName().equals(cl2.getName())) {
-                  return true;
+            // It seems like a better fix would be to just fix the order so we resolve things before we reference them?
+            ClassLoader cl1Loader = cl1.getClassLoader();
+            ClassLoader cl2Loader = cl2.getClassLoader();
+            if (!res && cl1Loader != cl2Loader) {
+               boolean deactivatedLoader = false;
+               if (cl1Loader instanceof TrackingClassLoader)
+                  deactivatedLoader = ((TrackingClassLoader) cl1Loader).deactivated;
+               if (cl2Loader instanceof TrackingClassLoader)
+                  deactivatedLoader |= ((TrackingClassLoader) cl2Loader).deactivated;
+               if (deactivatedLoader) {
+                  if (sys != null) {
+                     Object ncl1, ncl2;
+                     ncl1 = ModelUtil.refreshBoundClass(sys, cl1);
+                     ncl2 = ModelUtil.refreshBoundClass(sys, cl2);
+                     if (ncl1 != cl1 || ncl2 != cl2)
+                        return ModelUtil.isAssignableFrom(ncl1, ncl2, assignmentSemantics, ctx, allowUnbound, sys);
+                  }
+                  if (ModelUtil.isAssignableByName(cl1, cl2)) {
+                     return true;
+                  }
                }
             }
 
@@ -1645,6 +1793,23 @@ public class ModelUtil {
          return false;
       else
          throw new UnsupportedOperationException();
+   }
+
+   public static boolean isAssignableByName(Object cl1, Object cl2) {
+      if (ModelUtil.getTypeName(cl1).equals(ModelUtil.getTypeName(cl2)))
+         return true;
+
+      Object[] implTypes = ModelUtil.getImplementsTypeDeclarations(cl2);
+      if (implTypes != null) {
+         for (Object implType:implTypes)
+            if (isAssignableByName(cl1, implType))
+               return true;
+      }
+      Object extType = ModelUtil.getExtendsClass(cl2);
+      if (extType != null)
+         if (isAssignableByName(cl1, extType))
+            return true;
+      return false;
    }
 
    public static boolean isString(Object type) {
@@ -1964,15 +2129,20 @@ public class ModelUtil {
       return parameterTypes;
    }
 
-   public static Object definesMethod(Object td, String name, List<? extends Object> parameters, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly) {
+   public static Object definesMethod(Object td, String name, List<? extends Object> parameters, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType) {
+      return definesMethod(td, name, parameters, ctx, refType, isTransformed, staticOnly, inferredType, null);
+   }
+
+   public static Object definesMethod(Object td, String name, List<? extends Object> parameters, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, LayeredSystem sys) {
       Object res;
       if (td instanceof ITypeDeclaration) {
-         if ((res = ((ITypeDeclaration)td).definesMethod(name, parameters, ctx, refType, isTransformed, staticOnly)) != null)
+         if ((res = ((ITypeDeclaration)td).definesMethod(name, parameters, ctx, refType, isTransformed, staticOnly, inferredType)) != null)
             return res;
       }
       else if (td instanceof Class) {
          Object[] parameterTypes = parametersToTypeArray(parameters, ctx);
-         if ((res = ModelUtil.getMethod(td, name, refType, ctx, staticOnly, parameterTypes)) != null)
+         // TODO: I think we need to pass in inferredType since this can affect the choice of the method we are picking
+         if ((res = ModelUtil.getMethod(sys, td, name, refType, ctx, inferredType, staticOnly, parameterTypes)) != null)
             return res;
       }
       return null;
@@ -2363,11 +2533,11 @@ public class ModelUtil {
          return getFieldType(prop);
       else if (ModelUtil.isMethod(prop)) {
          if (isGetMethod(prop))
-            return getReturnType(prop);
+            return getReturnType(prop, true);
          else if (isSetMethod(prop))
             return getSetMethodPropertyType(prop);
          else if (isGetIndexMethod(prop))
-            return getReturnType(prop); // TODO: should be an array of return type?
+            return getReturnType(prop, true); // TODO: should be an array of return type?
          else if (isSetIndexMethod(prop))
             return getSetMethodPropertyType(prop); // TODO: should be an array
       }
@@ -2910,35 +3080,42 @@ public class ModelUtil {
          throw new UnsupportedOperationException();
    }
 
+   private static Object[] convertArgsForRepeating(Object meth, ParamTypedMethod pmeth, List<Expression> arguments, Object[] argValues) {
+      // If we have a param-typed method use that to get the parameter types as those reflect the compile-time binding of the types
+      // Possibly repeating parameter
+      if (ModelUtil.isVarArgs(meth)) {
+         Object[] types = pmeth == null ? ModelUtil.getParameterTypes(meth) : pmeth.getParameterTypes(true);
+         int last = types.length - 1;
+         Object lastType = types[last];
+         if (ModelUtil.isArray(lastType)) {
+            Object[] newArgValues = new Object[types.length];
+            for (int i = 0; i < last; i++) {
+               newArgValues[i] = argValues[i];
+            }
+
+            // Use the type of the expression, not the type of the value to emulate compile time binding
+            if (!ModelUtil.isAssignableFrom(lastType, arguments.get(arguments.size() - 1).getTypeDeclaration())) {
+               Object[] array = (Object[]) Array.newInstance(ModelUtil.getCompiledClass(ModelUtil.getArrayComponentType(lastType)), arguments.size() - last);
+               for (int i = last; i < argValues.length; i++)
+                  array[i - last] = argValues[i];
+               newArgValues[last] = array;
+               argValues = newArgValues;
+            } else if (last >= arguments.size() && newArgValues[last] == null) {
+               newArgValues[last] = Array.newInstance(ModelUtil.getCompiledClass(ModelUtil.getArrayComponentType(lastType)), 0);
+               argValues = newArgValues;
+            }
+         }
+      }
+      return argValues;
+   }
+
    private static Object invokeMethodWithValues(Object thisObject, Object method, List<Expression> arguments,
-                                     Class expectedType, ExecutionContext ctx, boolean repeatArgs, boolean findMethodOnThis, Object[] argValues) {
+                                     Class expectedType, ExecutionContext ctx, boolean repeatArgs, boolean findMethodOnThis, ParamTypedMethod pmeth, Object[] argValues) {
       // Compiled
       if (method instanceof Method) {
          Method jMethod = (Method) method;
          if (repeatArgs && argValues.length > 0) {
-            Class[] types = jMethod.getParameterTypes();
-            int last = types.length - 1;
-            Class lastType = types[last];
-            // Possibly repeating parameter
-            if (jMethod.isVarArgs() && ModelUtil.isArray(lastType)) {
-               Object[] newArgValues = new Object[types.length];
-               for (int i = 0; i < last; i++) {
-                  newArgValues[i] = argValues[i];
-               }
-
-               // Use the type of the expression, not the type of the value to emulate compile time binding
-               if (!ModelUtil.isAssignableFrom(lastType, arguments.get(arguments.size()-1).getTypeDeclaration())) {
-                  Object[] array = (Object[]) Array.newInstance(lastType.getComponentType(), arguments.size() - last);
-                  for (int i = last; i < argValues.length; i++)
-                     array[i - last] = argValues[i];
-                  newArgValues[last] = array;
-                  argValues = newArgValues;
-               }
-               else if (last >= arguments.size() && newArgValues[last] == null) {
-                  newArgValues[last] = Array.newInstance(lastType.getComponentType(), 0);
-                  argValues = newArgValues;
-               }
-            }
+            argValues = convertArgsForRepeating(jMethod, pmeth, arguments, argValues);
          }
          return TypeUtil.invokeMethod(thisObject, jMethod, argValues);
       }
@@ -2949,12 +3126,11 @@ public class ModelUtil {
          if (!rtmeth.isDynMethod()) {
             Object realRTMethod = rtmeth.getRuntimeMethod();
             if (realRTMethod != rtmeth) {
-               return invokeMethodWithValues(thisObject, realRTMethod, arguments, expectedType, ctx, repeatArgs, findMethodOnThis, argValues);
+               return invokeMethodWithValues(thisObject, realRTMethod, arguments, expectedType, ctx, repeatArgs, findMethodOnThis, pmeth, argValues);
             }
          }
 
 
-         // TODO: handle repeating arguments
          boolean isStatic = false;
          try {
             if (thisObject != null) {
@@ -2967,12 +3143,15 @@ public class ModelUtil {
 
                if (!isStatic && findMethodOnThis) {
                   Object concreteType = getObjectsType(thisObject);
-                  Object overMeth = ModelUtil.definesMethod(concreteType, rtmeth.name, rtmeth.getParameterList(), null, null, false, false);
+                  Object overMeth = ModelUtil.definesMethod(concreteType, rtmeth.name, rtmeth.getParameterList(), null, null, false, false, null);
 
                   if (overMeth != rtmeth && overMeth != null) {
-                     return invokeMethodWithValues(thisObject, overMeth, arguments, expectedType, ctx, repeatArgs, findMethodOnThis, argValues);
+                     return invokeMethodWithValues(thisObject, overMeth, arguments, expectedType, ctx, repeatArgs, false, pmeth, argValues);
                   }
                }
+            }
+            if (repeatArgs && argValues.length > 0) {
+               argValues = convertArgsForRepeating(method, pmeth, arguments, argValues);
             }
             return rtmeth.invoke(ctx, Arrays.asList(argValues));
          }
@@ -2991,10 +3170,11 @@ public class ModelUtil {
          if (rtMeth == null)
             throw new IllegalArgumentException("Can't invoke method: " + method + " No runtime class found");
 
-         return ModelUtil.invokeMethod(thisObject, rtMeth, arguments, expectedType, ctx, repeatArgs, findMethodOnThis);
+         return ModelUtil.invokeMethod(thisObject, rtMeth, arguments, expectedType, ctx, repeatArgs, findMethodOnThis, pmeth);
       }
       else if (method instanceof ParamTypedMethod) {
-         return invokeMethod(thisObject, ((ParamTypedMethod) method).method, arguments, expectedType, ctx, repeatArgs, findMethodOnThis);
+         pmeth = ((ParamTypedMethod) method);
+         return invokeMethod(thisObject, pmeth.method, arguments, expectedType, ctx, repeatArgs, findMethodOnThis, pmeth);
       }
       else
          throw new UnsupportedOperationException();
@@ -3002,10 +3182,10 @@ public class ModelUtil {
 
    /** Invokes a method given a list of arguments, the Method object and args to eval.  Handles repeated arguments */
    public static Object invokeMethod(Object thisObject, Object method, List<Expression> arguments,
-                                     Class expectedType, ExecutionContext ctx, boolean repeatArgs, boolean findMethodOnThis) {
+                                     Class expectedType, ExecutionContext ctx, boolean repeatArgs, boolean findMethodOnThis, ParamTypedMethod pmeth) {
       Object[] argValues = expressionListToValues(arguments, ctx);
 
-      return invokeMethodWithValues(thisObject, method, arguments, expectedType, ctx, repeatArgs, findMethodOnThis, argValues);
+      return invokeMethodWithValues(thisObject, method, arguments, expectedType, ctx, repeatArgs, findMethodOnThis, pmeth, argValues);
    }
 
    public static boolean isComponentType(Object type) {
@@ -3478,7 +3658,7 @@ public class ModelUtil {
          return returnType instanceof TypeVariable || returnType instanceof ParameterizedType || returnType instanceof GenericArrayType;
       }
       else if (method instanceof IMethodDefinition) {
-         Object retType = ((IMethodDefinition) method).getReturnType();
+         Object retType = ((IMethodDefinition) method).getReturnType(false);
          return retType instanceof TypeParameter || ModelUtil.hasUnboundTypeParameters(retType);
       }
       throw new UnsupportedOperationException();
@@ -3493,7 +3673,7 @@ public class ModelUtil {
          return false;
       }
       else if (method instanceof IMethodDefinition) {
-         JavaType[] paramTypes = ((IMethodDefinition) method).getParameterJavaTypes();
+         JavaType[] paramTypes = ((IMethodDefinition) method).getParameterJavaTypes(true);
          if (paramTypes != null) {
             for (JavaType paramType:paramTypes) {
                if (paramType.isParameterizedType())
@@ -3541,7 +3721,7 @@ public class ModelUtil {
          else if (member instanceof Method)
             return ((Method) member).getGenericReturnType();
          else if (member instanceof IMethodDefinition) {
-            return ((IMethodDefinition) member).getReturnType();
+            return ((IMethodDefinition) member).getReturnType(true);
          }
          else if (member instanceof Class)
             return member;
@@ -4970,7 +5150,7 @@ public class ModelUtil {
       }
       else if (elem instanceof CFMethod) {
          CFMethod meth = (CFMethod) elem;
-         sb.append(getTypeName(meth.getReturnType()) + " " + meth.getMethodName() + " (" + StringUtil.arrayToString(meth.getParameterTypes(false)) + ")");
+         sb.append(getTypeName(meth.getReturnType(true)) + " " + meth.getMethodName() + " (" + StringUtil.arrayToString(meth.getParameterTypes(false)) + ")");
       }
       else if (elem instanceof Field) {
          Field f = (Field) elem;
@@ -5487,13 +5667,18 @@ public class ModelUtil {
          suggestVariables(enclBlock, prefix, candidates);
    }
 
-   public static Object getReturnType(Object method) {
+   public static Object getReturnType(Object method, boolean boundParams) {
       if (method instanceof IMethodDefinition)
-         return ((IMethodDefinition) method).getReturnType();
+         return ((IMethodDefinition) method).getReturnType(boundParams);
       else if (method instanceof Constructor)
          return ((Constructor) method).getDeclaringClass();
-      else if (method instanceof Method)
-         return ((Method) method).getReturnType(); // TODO: generic type here?
+      else if (method instanceof Method) {
+         Method meth = (Method) method;
+         if (!boundParams)
+            return meth.getGenericReturnType();
+         else
+            return meth.getReturnType();
+      }
       else
          throw new UnsupportedOperationException();
    }
@@ -5553,9 +5738,9 @@ public class ModelUtil {
       return res;
    }
 
-   public static Object[] getParameterJavaTypes(Object method) {
+   public static Object[] getParameterJavaTypes(Object method, boolean convertRepeating) {
       if (method instanceof IMethodDefinition)
-         return ((IMethodDefinition) method).getParameterJavaTypes();
+         return ((IMethodDefinition) method).getParameterJavaTypes(convertRepeating);
       else if (method instanceof Method)
          return ((Method) method).getParameterTypes();
       else if (method instanceof Constructor)
@@ -5639,7 +5824,7 @@ public class ModelUtil {
             lp = null;
          else
             lp = Arrays.asList(params);
-         res = ModelUtil.definesMethod(specEncType, ModelUtil.getMethodName(def), lp, null, null, false, false);
+         res = ModelUtil.definesMethod(specEncType, ModelUtil.getMethodName(def), lp, null, null, false, false, null);
          if (res == null) {
             System.out.println("*** no method in specEncType");
             res = def;
@@ -6226,7 +6411,10 @@ public class ModelUtil {
    }
 
    public static Object refreshBoundClass(LayeredSystem sys, Class boundClass) {
-      return sys.getClass(boundClass.getName(), true);
+      Object res = sys.getClass(boundClass.getName(), true);
+      if (res != null)
+         return res;
+      return boundClass;
    }
 
    public static Object getEnum(Object currentType, String nextName) {
@@ -6661,7 +6849,7 @@ public class ModelUtil {
       }
       else if (setMethod instanceof IMethodDefinition) {
          IMethodDefinition meth = (IMethodDefinition) setMethod;
-         JavaType[] paramTypes = meth.getParameterJavaTypes();
+         JavaType[] paramTypes = meth.getParameterJavaTypes(true);
          if (paramTypes.length == 0)
             return null;
          return paramTypes[0].getGenericTypeName(resultType, includeDim);
@@ -6673,9 +6861,9 @@ public class ModelUtil {
    }
 
    public static Object definesComponentMethod(Object type, String name, Object refType) {
-      Object res = ModelUtil.definesMethod(type, name, null, null, refType, false, false);
+      Object res = ModelUtil.definesMethod(type, name, null, null, refType, false, false, null);
       if (res == null)
-         res = ModelUtil.definesMethod(type, "_" + name, null, null, refType, false, false);
+         res = ModelUtil.definesMethod(type, "_" + name, null, null, refType, false, false, null);
       return res;
    }
 
@@ -6726,7 +6914,7 @@ public class ModelUtil {
       List<Object> params = paramTypes == null ? null : Arrays.asList(paramTypes);
       // If we're looking for the super of a constructor, use the type name
       String methName = ModelUtil.isConstructor(method) ? CTypeUtil.getClassName(ModelUtil.getTypeName(extClass)) : ModelUtil.getMethodName(method);
-      return ModelUtil.definesMethod(extClass, methName, params, null, null, false, false);
+      return ModelUtil.definesMethod(extClass, methName, params, null, null, false, false, null);
    }
 
    public static boolean needsClassInit(Object srcType) {
@@ -6748,7 +6936,7 @@ public class ModelUtil {
 
       Object enclType = ModelUtil.getEnclosingType(meth);
       enclType = ModelUtil.resolveSrcTypeDeclaration(sys, enclType, cachedOnly, srcOnly);
-      Object newMeth = ModelUtil.getMethod(enclType, ModelUtil.getMethodName(meth), null, null, false, ModelUtil.getParameterTypes(meth));
+      Object newMeth = ModelUtil.getMethod(sys, enclType, ModelUtil.getMethodName(meth), null, null, null, false, ModelUtil.getParameterTypes(meth));
       if (newMeth != null)
          return newMeth;
       return meth;
@@ -7107,7 +7295,7 @@ public class ModelUtil {
 
    public static boolean overridesMethodInType(Object type, Object meth) {
       Object[] paramTypes = ModelUtil.getGenericParameterTypes(meth, false);
-      if (getMethod(type, ModelUtil.getMethodName(meth), null, null, false, paramTypes) != null)
+      if (getMethod(null, type, ModelUtil.getMethodName(meth), null, null, null, false, paramTypes) != null)
          return true;
       return false;
    }

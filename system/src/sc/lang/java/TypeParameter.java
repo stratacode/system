@@ -65,8 +65,9 @@ public class TypeParameter extends JavaSemanticNode implements ITypedObject {
          Object thisType = ctx.getTypeForVariable(this, true);
 
          // No binding for this type parameter... see if the
-         if (thisType == this)
-            return ModelUtil.isAssignableFrom(otherType, Object.class);
+         if (thisType == this) {
+            return ModelUtil.isAssignableFrom(otherType, ModelUtil.getTypeParameterDefault(thisType));
+         }
          if (thisType != null) {
             if (ModelUtil.isTypeVariable(thisType)) {
                Object thisDefault = ctx.getTypeDeclarationForParam(ModelUtil.getTypeParameterName(thisType), thisType, true);
@@ -89,11 +90,12 @@ public class TypeParameter extends JavaSemanticNode implements ITypedObject {
          extendsType.addDependentTypes(types);
    }
 
+   /** Using IType and IMethod here so this works for TypeParameters parsed from signatures */
    public Object getGenericDeclaration() {
-      Object def = getEnclosingMethod();
+      Object def = getEnclosingIMethod();
       if (def != null)
          return def;
-      return getEnclosingType();
+      return getEnclosingIType();
    }
 
    public String toGenerateString() {

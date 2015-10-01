@@ -9,6 +9,7 @@ import sc.repos.RepositoryPackage;
 import sc.lang.html.Element;
 import sc.lang.xml.XMLFileFormat;
 import sc.type.CTypeUtil;
+import sc.util.FileUtil;
 import sc.util.MessageHandler;
 import sc.util.StringUtil;
 
@@ -16,13 +17,16 @@ import java.util.*;
 
 /** Handles parsing and data model of the Maven POM file (pom.xml) */
 public class POMFile extends XMLFileFormat {
-   public static final POMFile NULL_SENTINEL = new POMFile(null, null, null, null);
+   public static final POMFile NULL_SENTINEL = new POMFile(null, null, null, null, null);
 
    MvnRepositoryManager mgr;
 
    Element projElement;
 
    POMFile parentPOM;
+
+   // Represents the chain of includes for variable resolving
+   POMFile includedFromPOM;
 
    ArrayList<POMFile> modulePOMs;
 
@@ -36,17 +40,23 @@ public class POMFile extends XMLFileFormat {
 
    public String packaging;
 
+   public String artifactId;
+
    RepositoryPackage pomPkg;
 
-   public POMFile(String fileName, MvnRepositoryManager mgr, DependencyContext ctx, RepositoryPackage pomPkg) {
+   public POMFile(String fileName, MvnRepositoryManager mgr, DependencyContext ctx, RepositoryPackage pomPkg, POMFile includedFromPOM) {
       super(fileName, mgr == null ? null : mgr.msg);
       this.mgr = mgr;
       depCtx = ctx;
       this.pomPkg = pomPkg;
+      if (pomPkg instanceof MvnRepositoryPackage)
+         ((MvnRepositoryPackage) pomPkg).pomFile = this;
+      this.includedFromPOM = includedFromPOM;
    }
 
-   public static POMFile readPOM(String fileName, MvnRepositoryManager mgr, DependencyContext depCtx, RepositoryPackage pomPkg) {
-      POMFile file = new POMFile(fileName, mgr, depCtx, pomPkg);
+   public static POMFile readPOM(String fileName, MvnRepositoryManager mgr, DependencyContext depCtx, RepositoryPackage pomPkg, POMFile parentPOM, POMFile includedFromPOM) {
+      POMFile file = new POMFile(fileName, mgr, depCtx, pomPkg, includedFromPOM);
+      file.parentPOM = parentPOM;
       // Need to put this before we try to parse it - in case we resolve another recursive reference during the parsing
       mgr.pomCache.put(fileName, file);
       try {
@@ -79,7 +89,11 @@ public class POMFile extends XMLFileFormat {
 
       initPackaging();
       initProperties();
-      initParent();
+      // If we are a sub-module we are created with the parent and so don't need to init it
+      if (parentPOM == null)
+         initParent();
+      // Must be after we've initialized the parent
+      initCanonicalName();
       initModules();
       initDependencyManagement();
 
@@ -91,6 +105,15 @@ public class POMFile extends XMLFileFormat {
          packaging = projElement.getSimpleChildValue("packaging");
          if (packaging == null)
             packaging = "jar";
+      }
+   }
+
+   private void initCanonicalName() {
+      if (projElement != null) {
+         artifactId = projElement.getSimpleChildValue("artifactId");
+         if (artifactId != null) {
+            mgr.registerNameForPackage(pomPkg, artifactId);
+         }
       }
    }
 
@@ -107,12 +130,12 @@ public class POMFile extends XMLFileFormat {
    private void initParent() {
       Element parent = projElement.getSingleChildTag("parent");
       if (parent != null) {
-         MvnDescriptor parentDesc = MvnDescriptor.getFromTag(this, parent, false, false);
+         MvnDescriptor parentDesc = MvnDescriptor.getFromTag(this, parent, false, false, true);
          parentDesc.pomOnly = true; // This reference only requires the POM - not the jar or deps
-         RepositoryPackage parentPackage = parentDesc.getOrCreatePackage(mgr, false, DependencyContext.child(depCtx, pomPkg), false);
+         RepositoryPackage parentPackage = parentDesc.getOrCreatePackage(mgr.getChildManager(), false, DependencyContext.child(depCtx, pomPkg), false, null);
          // TODO: check for recursive references here!
          if (parentPackage != null) {
-            parentPOM = mgr.getPOMFile(parentDesc, parentPackage, DependencyContext.child(depCtx, pomPkg), true);
+            parentPOM = mgr.getPOMFile(parentDesc, parentPackage, DependencyContext.child(depCtx, pomPkg), true, null, this);
          }
       }
       // TODO: else - there is a default POM but so far, we don't need any of the contents since it's all concerned with the build
@@ -126,29 +149,40 @@ public class POMFile extends XMLFileFormat {
          if (modules != null) {
             for (Element module:modules) {
                String moduleName = module.getBodyAsString();
-               String parentName = getProperty("project.artifactId");
+               String parentName = getProperty("project.artifactId", true, true);
                while (moduleName.startsWith("../")) {
                   moduleName = moduleName.substring(3);
                   if (parentName != null)
                      parentName = CTypeUtil.getPackageName(parentName);
                }
-               if (parentName != null)
-                  moduleName = CTypeUtil.prefixPath(CTypeUtil.getPackageName(parentName), moduleName);
-               MvnDescriptor desc = new MvnDescriptor(getProperty("project.groupId"), moduleName, getProperty("project.version"));
-               RepositoryPackage pkg = desc.getOrCreatePackage(mgr, false, depCtx, false);
+               boolean isSrc = pomPkg.buildFromSrc;
+               if (parentName != null) {
+                  if (!isSrc)
+                     moduleName = CTypeUtil.prefixPath(CTypeUtil.getPackageName(parentName), moduleName);
+                  else
+                     moduleName = parentName + "/" + moduleName;
+               }
+               MvnDescriptor desc = new MvnDescriptor(getProperty("project.groupId", true, true), moduleName, getProperty("project.version", true, true));
+               // Do not init the dependencies here.  We won't be able to resolve deps inbetween these modules.  We have to create them all and
+               // initialize the deps for the modules when we init them for the parent.
+               RepositoryPackage pkg = desc.getOrCreatePackage(mgr.getChildManager(), false, depCtx, false, isSrc ? (MvnRepositoryPackage) pomPkg : null);
                if (pkg != null) {
-                  POMFile modPOM = mgr.getPOMFile(desc, pkg, depCtx, false);
+                  POMFile modPOM = mgr.getPOMFile(desc, pkg, depCtx, isSrc, isSrc ? this : null, null);
                   if (modPOM != null)
                      modulePOMs.add(modPOM);
                }
             }
          }
+         // Copy these over so they get serialized along with the parent module and to make them easier to find
+         pomPkg.subPackages = new ArrayList<RepositoryPackage>();
+         for (POMFile modPOM:modulePOMs)
+            pomPkg.subPackages.add(modPOM.pomPkg);
       }
    }
 
-   private final static String[] variableTagNames = {"project", "pom"};
+   private final static String[] variableTagNames = {"project", "pom", "version", "artifactId", "baseDir"};
 
-   public String getProperty(String name) {
+   public String getProperty(String name, boolean up, boolean down) {
       String val = properties.get(name);
       if (val != null)
          return val;
@@ -159,7 +193,6 @@ public class POMFile extends XMLFileFormat {
             String[] varPath = StringUtil.split(name, '.');
             if (varPath.length > 1 && varPath[0].equals(varTagName)) {
                isTagVariable = true;
-               Element parent = projElement;
                if (varTagName.equals("pom")) {
                   if (varPath.length == 2 & varPath[1].equals("groupId"))
                      return getGroupId();
@@ -171,6 +204,8 @@ public class POMFile extends XMLFileFormat {
                // TODO: Are there variables that don't start with pom or project?
                int i = varTagName.equals("project") ? 1 : 0;
                String result = null;
+
+               Element parent = projElement;
                while (parent != null && i < varPath.length) {
                   if (i == varPath.length - 1) {
                      result = parent.getSimpleChildValue(varPath[i]);
@@ -183,11 +218,28 @@ public class POMFile extends XMLFileFormat {
                if (result != null)
                   return result;
             }
+            else if (varPath.length == 1) {
+               if (varTagName.equals("baseDir")) {
+                  return FileUtil.getParentPath(fileName);
+               }
+
+               Element parent = projElement;
+               // Version, artifactId - any others?
+               if (parent != null) {
+                  return parent.getSimpleChildValue(varPath[0]);
+               }
+            }
          }
       }
 
-      if (parentPOM != null) {
-         val = parentPOM.getProperty(name);
+      if (parentPOM != null && up) {
+         val = parentPOM.getProperty(name, true, false);
+         if (val != null)
+            return val;
+      }
+
+      if (includedFromPOM != null && down) {
+         val = includedFromPOM.getProperty(name, false, true);
          if (val != null)
             return val;
       }
@@ -200,45 +252,55 @@ public class POMFile extends XMLFileFormat {
 
    public static final String DEFAULT_SCOPE = "compile";
 
-   public List<MvnDescriptor> getDependencies(String[] scopes) {
+   public List<MvnDescriptor> getDependencies(String[] scopes, boolean addChildren, boolean addParent) {
       Element[] deps = projElement.getChildTagsWithName("dependencies");
-      if (deps == null || deps.length == 0)
-         return Collections.emptyList();
-      if (deps.length > 1)
+      if (deps != null && deps.length > 1)
          MessageHandler.error(msg, "Multiple tags with dependencies - should be only one");
       ArrayList<MvnDescriptor> res = new ArrayList<MvnDescriptor>();
-      Element[] depTags = deps[0].getChildTagsWithName("dependency");
-      if (depTags != null) {
-         for (Element depTag:depTags) {
-            String depScope = depTag.getSimpleChildValue("scope");
-            if (depScope == null)
-               depScope = DEFAULT_SCOPE;
-            if (includesScope(scopes, depScope)) {
-               MvnDescriptor desc = MvnDescriptor.getFromTag(this, depTag, true, true);
-               if (!desc.optional || (pomPkg instanceof MvnRepositoryPackage && ((MvnRepositoryPackage) pomPkg).includeOptional))
-                  res.add(desc);
+      if (deps != null) {
+         Element[] depTags = deps[0].getChildTagsWithName("dependency");
+         if (depTags != null) {
+            for (Element depTag : depTags) {
+               String depScope = depTag.getSimpleChildValue("scope");
+               if (depScope == null)
+                  depScope = DEFAULT_SCOPE;
+               if (includesScope(scopes, depScope)) {
+                  MvnDescriptor desc = MvnDescriptor.getFromTag(this, depTag, true, true, true);
+                  if (!desc.optional || (pomPkg instanceof MvnRepositoryPackage && ((MvnRepositoryPackage) pomPkg).includeOptional))
+                     res.add(desc);
+               }
             }
          }
       }
-      if (parentPOM != null) {
-         List<MvnDescriptor> parentDeps = parentPOM.getDependencies(scopes);
-         if (parentDeps != null) {
-            for (MvnDescriptor parentDesc:parentDeps) {
-               boolean found = false;
-               for (MvnDescriptor childDesc:res) {
-                  if (childDesc.matches(parentDesc)) {
-                     found = true;
-                     childDesc.mergeFrom(parentDesc);
-                     break;
-                  }
-               }
-               if (!found) {
-                  res.add(parentDesc);
-               }
-            }
+      if (parentPOM != null && addParent) {
+         addPOMRefDependencies(parentPOM, res, scopes, false, true);
+      }
+      if (pomPkg instanceof MvnRepositoryPackage && ((MvnRepositoryPackage) pomPkg).definesSrc && modulePOMs != null && addChildren) {
+         for (POMFile modulePOM:modulePOMs) {
+            addPOMRefDependencies(modulePOM, res, scopes, true, false);
          }
       }
       return res;
+   }
+
+   private void addPOMRefDependencies(POMFile refPOM, ArrayList<MvnDescriptor> res, String[] scopes, boolean checkChildren, boolean checkParent) {
+      List<MvnDescriptor> parentDeps = refPOM.getDependencies(scopes, checkChildren, checkParent);
+      if (parentDeps != null) {
+         for (MvnDescriptor parentDesc:parentDeps) {
+            boolean found = false;
+            for (MvnDescriptor childDesc:res) {
+               if (childDesc.matches(parentDesc)) {
+                  found = true;
+                  childDesc.mergeFrom(parentDesc);
+                  break;
+               }
+            }
+            if (!found) {
+               res.add(parentDesc);
+            }
+         }
+      }
+
    }
 
    private boolean includesScope(String[] scopes, String scope) {
@@ -249,7 +311,7 @@ public class POMFile extends XMLFileFormat {
       return false;
    }
 
-   private String replaceVariables(String input) {
+   private String replaceVariables(String input, boolean required) {
       int ix;
       do {
          ix = input.indexOf("${");
@@ -257,9 +319,10 @@ public class POMFile extends XMLFileFormat {
             int endIx = input.indexOf("}", ix);
             if (endIx != -1) {
                String varName = input.substring(ix+2, endIx);
-               String varValue = getProperty(varName);
+               String varValue = getProperty(varName, true, true);
                if (varValue == null) {
-                  MessageHandler.error(msg, "No value for POM variable: " + varName + " in: ", this.toString());
+                  if (required)
+                      MessageHandler.error(msg, "No value for POM variable: " + varName + " in: ", this.toString());
                   return input;
                }
                input = input.substring(0, ix) + varValue + input.substring(endIx + 1);
@@ -273,19 +336,36 @@ public class POMFile extends XMLFileFormat {
       return input;
    }
 
-   public String getTagValue(Element tag, String valName) {
+   public String getTagValue(Element tag, String valName, boolean required) {
       String res = tag.getSimpleChildValue(valName);
       if (res == null)
          return null;
       String tRes = res.trim();
+      do {
+         // TODO: Check if this is correct: we are replacing the variables we find in one file with resolutions from the same context - i.e.
+         // starting in the current file, not looking from the file that originated the first call to getTagValue.
+         String newRes = replaceVariables(tRes, required);
+         // Keep going as long as we replaced something.
+         if (newRes == tRes)
+            break;
+         res = newRes;
+         tRes = newRes;
+      } while (true);
+      /*
       if (tRes.startsWith("${") && tRes.endsWith("}")) {
          String varName = tRes.substring(2, tRes.length()-1);
-         String val = getProperty(varName);
+         String val = getProperty(varName, true, true);
          if (val == null) {
-            MessageHandler.error(msg, "No value for POM variable: " + varName + " in: ", this.toString());
+            if (required)
+               MessageHandler.error(msg, "No value for POM variable: " + varName + " in: ", this.toString());
+            else
+               return res;
          }
          return val;
       }
+      else if (tRes.contains("${"))
+         System.out.println("*** Warning - variable inside of value: " + tRes);
+       */
       return res;
    }
 
@@ -310,10 +390,11 @@ public class POMFile extends XMLFileFormat {
                      // files dependency management section.
                      if (scope != null && scope.equals("import")) {
                         // TODO: assert that dep's type attribute = pom.
-                        MvnDescriptor importDesc = MvnDescriptor.getFromTag(this, dep, false, false);
+                        MvnDescriptor importDesc = MvnDescriptor.getFromTag(this, dep, false, false, false);
                         DependencyContext importDepCtx = DependencyContext.child(depCtx, pomPkg);
-                        RepositoryPackage importPkg = importDesc.getOrCreatePackage(mgr, false, importDepCtx, false);
-                        POMFile importPOM = mgr.getPOMFile(importDesc, importPkg, importDepCtx, true);
+                        RepositoryPackage importPkg = importDesc.getOrCreatePackage(mgr.getChildManager(), false, importDepCtx, false, null);
+                        // TODO should we set includedFromPOM here so the imported file can resolve variables defined in this POM
+                        POMFile importPOM = mgr.getPOMFile(importDesc, importPkg, importDepCtx, true, null, null);
                         if (importPOM != null) {
                            importPOM.initDependencyManagement();
                            if (importedPOMs == null)
@@ -325,7 +406,7 @@ public class POMFile extends XMLFileFormat {
                         }
                      }
                      else
-                        dependencyManagement.add(MvnDescriptor.getFromTag(this, dep, true, false));
+                        dependencyManagement.add(MvnDescriptor.getFromTag(this, dep, true, false, false));
                   }
                }
             }
@@ -346,11 +427,17 @@ public class POMFile extends XMLFileFormat {
             if (desc.matches(dep)) {
                if (desc.version == null && dep.version != null) {
                   desc.version = dep.version;
-                  if (mgr.info)
-                     mgr.info("Version for package: " + desc + " chosen in file: " + this);
+                  if (desc.version.contains("${")) {
+                     mgr.error("Reference to dependencyManagement entry with unresolved version: " + this + ": " + desc);
+                  }
+                  // TODO: We should add this POM file name + attribute to MvnDescriptor as debugInfo, then log the dependency tree
+                  // with all 'debugInfo' displayed
+                  //if (mgr.info)
+                  //   mgr.info("Version for package: " + desc + " chosen in file: " + this);
                }
-               if (desc.type == null && dep.type != null)
-                  desc.type = dep.type;
+               // It does not appear that we should be inheriting the type
+               //if (desc.type == null && dep.type != null)
+               //   desc.type = dep.type;
                if (desc.classifier == null && dep.classifier != null)
                   desc.classifier = dep.classifier;
             }
@@ -383,4 +470,7 @@ public class POMFile extends XMLFileFormat {
       return null;
    }
 
+   public boolean isSubModule() {
+      return pomPkg.buildFromSrc && (pomPkg instanceof MvnRepositoryPackage) && ((MvnRepositoryPackage) pomPkg).subModule;
+   }
 }

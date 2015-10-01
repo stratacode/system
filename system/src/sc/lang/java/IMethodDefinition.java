@@ -11,13 +11,13 @@ public interface IMethodDefinition extends IMember {
 
    Object getDeclaringType();
 
-   Object getReturnType();
+   Object getReturnType(boolean boundTypeParams);
 
    Object getReturnJavaType();
 
    Object[] getParameterTypes(boolean bound);
 
-   JavaType[] getParameterJavaTypes();
+   JavaType[] getParameterJavaTypes(boolean convertRepeating);
 
    Object getTypeDeclaration(List<? extends ITypedObject> args, boolean resolve);
 

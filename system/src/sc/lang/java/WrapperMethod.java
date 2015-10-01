@@ -18,8 +18,8 @@ public abstract class WrapperMethod implements IMethodDefinition {
       return ModelUtil.getEnclosingType(wrapped);
    }
 
-   public Object getReturnType() {
-      return ModelUtil.getReturnType(wrapped);
+   public Object getReturnType(boolean resolve) {
+      return ModelUtil.getReturnType(wrapped, resolve);
    }
 
    public Object getReturnJavaType() {
@@ -30,8 +30,8 @@ public abstract class WrapperMethod implements IMethodDefinition {
       return ModelUtil.getParameterTypes(wrapped, bound);
    }
 
-   public JavaType[] getParameterJavaTypes() {
-      return (JavaType[]) ModelUtil.getParameterJavaTypes(wrapped);
+   public JavaType[] getParameterJavaTypes(boolean convertRepeating) {
+      return (JavaType[]) ModelUtil.getParameterJavaTypes(wrapped, convertRepeating);
    }
 
    public Object getTypeDeclaration(List<? extends ITypedObject> args, boolean resolve) {

@@ -788,7 +788,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
 
       if ((currentMethod = getCurrentMethod()) != null &&
               currentMethod.propertyName != null) {
-         Object objectType = currentMethod.getReturnType();
+         Object objectType = currentMethod.getReturnType(true);
          if (objectType != null)
             return ModelUtil.sameTypes(objectType, newType);
       }

@@ -6,6 +6,7 @@ package sc.lang.java;
 
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
+import sc.layer.LayeredSystem;
 
 import java.util.List;
 import java.util.Set;
@@ -115,6 +116,7 @@ public class MethodReference extends BaseLambdaExpression {
          referenceMethod = null;
          return;
       }
+
       Object[] meths;
       if (methodName.equals("new")) {
          meths = ModelUtil.getConstructors(refType, getEnclosingType());
@@ -137,11 +139,12 @@ public class MethodReference extends BaseLambdaExpression {
       else {
          Object res = null;
          Object[] paramTypes = ModelUtil.getParameterTypes(inferredTypeMethod, true);
-         Object returnType = ModelUtil.getReturnType(inferredTypeMethod);
+         Object returnType = ModelUtil.getReturnType(inferredTypeMethod, true);
+         LayeredSystem sys = getLayeredSystem();
          // Find the method in the list which matches the type parameters of the inferred type method
          // First pass is to look for a method where all of the parameters match each other
          for (Object meth:meths) {
-            if (ModelUtil.parametersMatch(ModelUtil.getParameterTypes(meth, true), paramTypes, true) && ModelUtil.isAssignableFrom(returnType, ModelUtil.getReturnType(meth))) {
+            if (ModelUtil.parametersMatch(ModelUtil.getParameterTypes(meth, true), paramTypes, true, sys) && ModelUtil.isAssignableFrom(returnType, ModelUtil.getReturnType(meth, true), sys)) {
                if (res == null)
                   res = meth;
                else
@@ -154,15 +157,15 @@ public class MethodReference extends BaseLambdaExpression {
             Object[] nextParamTypes = new Object[newLen];
             System.arraycopy(paramTypes, 1, nextParamTypes, 0, newLen);
             for (Object meth:meths) {
-               Object methReturnType = ModelUtil.getReturnType(meth);
+               Object methReturnType = ModelUtil.getReturnType(meth, true);
 
                //if (!ModelUtil.isAssignableFrom(paramTypes[0], methReturnType))
                //   continue;
 
-               if (!ModelUtil.isAssignableFrom(refType, paramTypes[0]))
+               if (!ModelUtil.isAssignableFrom(refType, paramTypes[0], sys))
                   continue;
                Object[] refParamTypes = ModelUtil.getParameterTypes(meth, true);
-               if (ModelUtil.parametersMatch(refParamTypes, nextParamTypes, true)) {
+               if (ModelUtil.parametersMatch(refParamTypes, nextParamTypes, true, sys)) {
                   if (res == null)
                      res = meth;
                   else
@@ -256,5 +259,39 @@ public class MethodReference extends BaseLambdaExpression {
       sb.append("::");
       sb.append(methodName);
       return sb.toString();
+   }
+
+   // For MethodReferences, we know the return type directly from the reference type.  We need this type to properly
+   // set type parameters in the newMethod's parameter list.
+   public Object getNewMethodReturnType() {
+      if (referenceType == null)
+         return null;
+      switch (referenceType) {
+         case StaticMethod:
+         case InstanceMethod:
+         case ClassMethod:
+            return referenceMethod == null ? null : ModelUtil.getReturnType(referenceMethod, false);
+         case Constructor:
+            return ModelUtil.getEnclosingType(referenceMethod);
+      }
+      return null;
+   }
+
+   void updateMethodTypeParameters(Object ifaceMeth) {
+      if (referenceMethod != null) {
+         Object[] ifaceParamTypes = ModelUtil.getParameterTypes(ifaceMeth, false);
+         Object[] refParamTypes = ModelUtil.getParameterTypes(referenceMethod, true);
+         if (ifaceParamTypes != null && refParamTypes != null) {
+            int j = 0;
+            int start = paramInstance ? 1 : 0;
+            for (int i = start; i < ifaceParamTypes.length; i++) {
+               Object ifaceParamType = ifaceParamTypes[i];
+               Object refParamType = refParamTypes[j];
+               if (ModelUtil.isTypeVariable(ifaceParamType)) {
+                  addTypeParameterMapping(ifaceMeth, ifaceParamType, refParamType);
+               }
+            }
+         }
+      }
    }
 }

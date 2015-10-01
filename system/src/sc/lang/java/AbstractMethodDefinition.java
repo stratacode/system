@@ -72,7 +72,7 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       return super.findMember(memberName, type, this, refType, ctx, skipIfaces);
    }
 
-   public Object definesMethod(String methodName, List<?> methParams, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly) {
+   public Object definesMethod(String methodName, List<?> methParams, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType) {
       if (name != null && methodName.equals(name)) {
          if (parametersMatch(methParams, ctx)) {
             // In Java, it's possible to have static and non-static methods with the identical signature.  If we are calling this from a static
@@ -80,8 +80,19 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
             if (staticOnly && !hasModifier("static"))
                return null;
             if (refType == null || ModelUtil.checkAccess(refType, this)) {
-               if (typeParameters != null)
-                  return new ParamTypedMethod(this, ctx, getEnclosingType(), methParams);
+               // TODO: I think we may have to do this if the method has any unbound type parameters in any of it declared types
+               if (typeParameters != null) {
+                  ParamTypedMethod paramMethod = new ParamTypedMethod(this, ctx, getEnclosingType(), methParams, inferredType);
+                  if (inferredType != null) {
+                     // Turn off the binding of parameter types while we do a match for this method.  We can't have the parameter types setting type parameters
+                     // here - only the inferred type to be sure it does not conflict with the parameter type match.
+                     paramMethod.bindParamTypes = false;
+                     if (!ModelUtil.parameterTypesMatch(paramMethod.getParameterTypes(true), ModelUtil.parametersToTypeArray(methParams, ctx), paramMethod, refType, ctx))
+                        return null;
+                     paramMethod.bindParamTypes = true;
+                  }
+                  return paramMethod;
+               }
                return this;
             }
          }
@@ -129,9 +140,9 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
 
          // Take a conservative approach... if types are not available, just match
          boolean allowUnbound = otherP instanceof ParamTypeDeclaration && ((ParamTypeDeclaration) otherP).unboundInferredType;
-         if (thisType != null && thisType != otherP && !ModelUtil.isAssignableFrom(thisType, otherP, false, ctx, allowUnbound)) {
+         if (thisType != null && thisType != otherP && !ModelUtil.isAssignableFrom(thisType, otherP, false, ctx, allowUnbound, getLayeredSystem())) {
             if (i >= last && repeatingLast) {
-               if (!ModelUtil.isAssignableFrom(ModelUtil.getArrayComponentType(thisType), otherP, false, ctx)) {
+               if (!ModelUtil.isAssignableFrom(ModelUtil.getArrayComponentType(thisType), otherP, false, ctx, getLayeredSystem())) {
                   return false;
                }
             }
@@ -389,9 +400,9 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       StringBuilder sb = new StringBuilder();
       sb.append(name);
       if (parameters != null && parameters.getNumParameters() > 0) {
-         sb.append("(");
+         //sb.append("("); part of language string
          sb.append(parameters.toLanguageString(SCLanguage.getSCLanguage().parameters));
-         sb.append(")");
+         //sb.append(")"); part of language string?
       }
       else
          sb.append("()");
@@ -439,11 +450,11 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       if (compiledClass == null) {
          System.err.println("*** No compiled class for: " + getDeclaringType());
       }
-      Object res = ModelUtil.definesMethod(compiledClass, name, getParameterList(), null, null, false, false);
+      Object res = ModelUtil.definesMethod(compiledClass, name, getParameterList(), null, null, false, false, null);
       if (res == null) {
          System.err.println("*** No runtime method for: " + name);
          boolean x = isDynMethod();
-         Object y = ModelUtil.definesMethod(compiledClass, name, getParameterList(), null, null, false, false);
+         Object y = ModelUtil.definesMethod(compiledClass, name, getParameterList(), null, null, false, false, null);
       }
       return res;
    }
@@ -487,8 +498,13 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       if (parameters != null && (num = parameters.getNumParameters()) != 0) {
          List<Parameter> paramList = parameters.getParameterList();
          StringBuilder sb = new StringBuilder();
-         for (int i = 0; i < num; i++)
-            sb.append(paramList.get(i).type.getSignature(true));
+         for (int i = 0; i < num; i++) {
+            Parameter param = paramList.get(i);
+            // Repeating parameters have the array-like signature
+            if (param.repeatingParameter)
+               sb.append("[");
+            sb.append(param.type.getSignature(true));
+         }
          return sb.toString();
       }
       return null;
@@ -605,8 +621,8 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
             tp.addDependentTypes(types);
    }
 
-   public JavaType[] getParameterJavaTypes() {
-      return parameters == null ? null : parameters.getParameterJavaTypes();
+   public JavaType[] getParameterJavaTypes(boolean convertRepeating) {
+      return parameters == null ? null : parameters.getParameterJavaTypes(convertRepeating);
    }
 
 

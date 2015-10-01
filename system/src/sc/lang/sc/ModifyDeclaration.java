@@ -673,20 +673,20 @@ public class ModifyDeclaration extends TypeDeclaration {
       return null;
    }
 
-   public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly) {
-      Object v = super.definesMethod(name, types, ctx, refType, isTransformed, staticOnly);
+   public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType) {
+      Object v = super.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType);
       if (v != null)
          return v;
 
       if (extendsBoundTypes != null) {
          for (Object impl:extendsBoundTypes) {
-            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly)) != null)
+            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType)) != null)
                return v;
          }
       }
       if (impliedRoots != null) {
          for (Object impl:impliedRoots) {
-            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly)) != null)
+            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType)) != null)
                return v;
          }
       }
@@ -1555,7 +1555,7 @@ public class ModifyDeclaration extends TypeDeclaration {
 
    public boolean isAssignableFrom(ITypeDeclaration other, boolean assignmentSemantics) {
       Object extType = getDerivedTypeDeclaration();
-      return ModelUtil.isAssignableFrom(extType, other, assignmentSemantics, null);
+      return ModelUtil.isAssignableFrom(extType, other, assignmentSemantics, null, getLayeredSystem());
    }
 
    public boolean isAssignableTo(ITypeDeclaration other) {
