@@ -208,15 +208,20 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
             newType.initType(ctx.getLayeredSystem(), typeCtx, null, ctx, true, false, null);
          return newType;
       }
-      else if (type instanceof GenericArrayType) {
+      else if (type instanceof GenericArrayType || type instanceof ArrayTypeDeclaration) {
          StringBuilder arrDims = new StringBuilder();
          Object compType;
          do {
-            compType = ((GenericArrayType) type).getGenericComponentType();
+            compType = ModelUtil.getGenericComponentType(type);
             arrDims.append("[]");
          } while (compType instanceof GenericArrayType);
 
-         newType = ClassType.create(ModelUtil.getTypeName(compType));
+         if (ModelUtil.isWildcardType(compType)) {
+            newType = ExtendsType.createFromType(compType, ctx);
+         }
+         else {
+            newType = ClassType.create(ModelUtil.getTypeName(compType));
+         }
          newType.arrayDimensions = arrDims.toString();
          if (ctx != null)
             newType.initType(ctx.getLayeredSystem(), typeCtx, null, ctx, true, false, compType);

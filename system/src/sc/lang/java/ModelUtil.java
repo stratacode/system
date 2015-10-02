@@ -470,6 +470,8 @@ public class ModelUtil {
          if (ModelUtil.isSuperWildcard(type)) {
             Object lowerBounds = getWildcardLowerBounds(type);
             type = getTypeDeclFromType(typeContext, lowerBounds, classOnly, sys, bindUnboundParams, definedInType);
+            if (type instanceof ExtendsType.LowerBoundsTypeDeclaration)
+               return type;
             // Need to resolve the type parameters here and return a LowerBoundTD that points to the resolved type paraemters
             return new ExtendsType.LowerBoundsTypeDeclaration(type);
          }

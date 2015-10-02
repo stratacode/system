@@ -974,6 +974,7 @@ public class ClassType extends JavaType {
                Object newCompType = t.getTypeForVariable(compType, resolveUnbound);
                if (newCompType != null && newCompType != compType) {
                   JavaType resType = ClassType.createJavaType(newCompType);
+                  resType.parentNode = parentNode;
                   return resType.convertToArray(type instanceof ArrayTypeDeclaration ? ((ArrayTypeDeclaration) type).definedInType : getEnclosingIType());
                }
             }
@@ -996,10 +997,12 @@ public class ClassType extends JavaType {
       for (JavaType typeArg:typeArgs) {
          if (typeArg.isParameterizedType()) {
             JavaType newType = typeArg.resolveTypeParameters(t, resolveUnbound);
-            if (cloneArgs == null) {
-               cloneArgs = (List<JavaType>) ((ArrayList)typeArgs).clone();
+            if (newType != typeArg) {
+               if (cloneArgs == null) {
+                  cloneArgs = (List<JavaType>) ((ArrayList) typeArgs).clone();
+               }
+               cloneArgs.set(ix, newType);
             }
-            cloneArgs.set(ix, newType);
          }
          ix++;
       }

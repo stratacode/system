@@ -12,6 +12,7 @@ import sc.util.StringUtil;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -342,7 +343,9 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
          JavaType paramJavaType = javaTypes[i];
          res[i] = paramJavaType.getTypeDeclaration(bound ? this : null, false);
          if (res[i] instanceof ClassType) {
-            res[i] = javaTypes[i].getTypeDeclaration();
+            Object newRes = javaTypes[i].getTypeDeclaration();
+            if (newRes != null)
+               res[i] = newRes;
          }
          if (res[i] == null)
             System.out.println("*** Warning - null value for parameter type");

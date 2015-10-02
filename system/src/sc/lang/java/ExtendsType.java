@@ -204,6 +204,16 @@ public class ExtendsType extends JavaType {
       return true;
    }
 
+   public static ExtendsType createFromType(Object type, ITypeParamContext ctx) {
+      if (type instanceof WildcardType)
+         return create((WildcardType) type);
+      else if (type instanceof LowerBoundsTypeDeclaration) {
+         return createSuper((LowerBoundsTypeDeclaration) type, ctx);
+      }
+      else
+         throw new UnsupportedOperationException();
+   }
+
    public static ExtendsType create(WildcardType type) {
       ExtendsType res = new ExtendsType();
       String typeName = type.toString(); // In Java8 We can use getTypeName() which does the same thing
