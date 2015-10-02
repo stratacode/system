@@ -7275,6 +7275,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public void setNeedsDynamicStub(boolean val) {
       if (!needsDynamicStub && val) {
+         if (getSuperIsDynamicStub()) {
+            return;
+         }
          needsDynamicStub = true;
          if (needsDynInnerStub) {
             BodyTypeDeclaration enclType = getEnclosingType();

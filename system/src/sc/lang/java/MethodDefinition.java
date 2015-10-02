@@ -107,7 +107,11 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       if (isDynamicType()) {
          if (overridden != null) {
             if (ModelUtil.isCompiledMethod(overridden)) {
-               methodType.setNeedsDynamicStub(true);
+               // If we inherit this method through a dynamic stub, that type will have already made a stub for this method.
+               // We can't have one dynamic stub extending another one because of the _super_x methods - there can be only one of them in the type hierarchy.  This
+               // basically requires us to only have one dynamic stub
+               if (!methodType.getSuperIsDynamicStub())
+                  methodType.setNeedsDynamicStub(true);
                overridesCompiled = true;
             }
             else if (overridden instanceof MethodDefinition) {
