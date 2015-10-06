@@ -1478,7 +1478,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
 
       TreeSet<String> dirIndex = getDirIndex(prefix);
-      String absPrefix = FileUtil.concat(packagePrefix.replace('.', '/'), prefix);
+      String absPrefix = FileUtil.concat(packagePrefix.replace('.', FileUtil.FILE_SEPARATOR_CHAR), prefix);
       for (String fn:files) {
          File f = new File(dir, fn);
 
@@ -1541,8 +1541,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       TreeSet<String> dirIndex = getDirIndex(relDir);
       srcDirCache.put(FileUtil.removeExtension(relFileName), f);
       srcDirCache.put(relFileName, f);
-      String absPrefix = FileUtil.concat(packagePrefix.replace('.', '/'), relDir);
-      layeredSystem.addToPackageIndex(layerPathName, this, false, true, absPrefix, srcEnt.baseFileName);
+      String absPrefix = FileUtil.concat(packagePrefix.replace('.', FileUtil.FILE_SEPARATOR_CHAR), relDir);
+      layeredSystem.addToPackageIndex(FileUtil.normalize(layerPathName), this, false, true, FileUtil.normalize(absPrefix), srcEnt.baseFileName);
       dirIndex.add(FileUtil.removeExtension(srcEnt.baseFileName));
    }
 

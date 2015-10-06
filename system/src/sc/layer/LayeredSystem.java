@@ -2605,7 +2605,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Object getInnerCFClass(String fullTypeName, String name) {
-      String parentClassPathName = fullTypeName.replace('.','/');
+      String parentClassPathName = fullTypeName.replace('.',FileUtil.FILE_SEPARATOR_CHAR);
       PackageEntry ent = getPackageEntry(parentClassPathName);
       if (ent == null) {
          System.err.println("*** can't find package entry for parent of inner type");
@@ -5998,7 +5998,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       addPathToIndex(null, rootCP);
       // Ordinarily the classes.jar is in the classpath.  But if not (like in the -jar option used in layerCake), we need to
       // find the classes in the boot class path.
-      if (packageIndex.get("java/awt") == null) {
+      if (packageIndex.get("java" + FileUtil.FILE_SEPARATOR + "awt") == null) {
          String bootPath = System.getProperty("sun.boot.class.path");
          if (bootPath == null)
             System.err.println("*** No boot classpath found in properties: " + System.getProperties());
@@ -6674,8 +6674,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                for (Enumeration<? extends ZipEntry> e = z.entries(); e.hasMoreElements(); ) {
                   ZipEntry ze = e.nextElement();
                   if (!ze.isDirectory()) {
-                     String dirName = FileUtil.getParentPath(ze.getName());
-                     addToPackageIndex(layerDirName, layer, true, false, dirName, FileUtil.getFileName(ze.getName()));
+                     String zipPath = FileUtil.unnormalize(ze.getName());
+                     String dirName = FileUtil.getParentPath(zipPath);
+                     addToPackageIndex(layerDirName, layer, true, false, dirName, FileUtil.getFileName(zipPath));
                   }
                }
                z.close();
@@ -11149,6 +11150,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
+   /** Note: cfName here is normalized since it comes from the class file */
    public Object getClassFromCFName(String cfName, String className) {
       Object res = otherClassCache.get(className);
       if (res == NullClassSentinel.class)
@@ -11156,7 +11158,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (res != null)
          return res;
       
-      String classFileName = cfName + ".class";
+      String classFileName = FileUtil.unnormalize(cfName) + ".class";
       return getClassFromClassFileName(classFileName, className);
    }
 

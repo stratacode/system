@@ -116,7 +116,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
    private static CFClass load(ZipFile zipFile, String classPathName, LayeredSystem system, Layer layer) {
       ClassFile file = null;
       try {
-         ZipEntry zipEnt = zipFile.getEntry(classPathName);
+         ZipEntry zipEnt = zipFile.getEntry(FileUtil.normalize(classPathName));
          if (zipEnt != null) {
             InputStream input = zipFile.getInputStream(zipEnt);
             if (input != null) {
