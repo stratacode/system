@@ -982,6 +982,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       initSysClassLoader(null, ClassLoaderMode.LIBS);
       initSysClassLoader(coreBuildLayer, ClassLoaderMode.BUILD);
 
+      // We only need to do this on Windows when run from IntelliJ or Cygwin.  It seems like jline works fine when you run from the cmd prompt
+      // but not sure how to tell the difference.  The WindowsTerminal will hang on cygwin and when running in the debugger on windows.
+      if (FileUtil.PATH_SEPARATOR_CHAR == ';')
+         System.setProperty("jline.terminal", "jline.UnsupportedTerminal");
+
       if (startInterpreter)
          cmd = new JLineInterpreter(this);
 
