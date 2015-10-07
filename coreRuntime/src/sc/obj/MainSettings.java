@@ -25,6 +25,10 @@ public @interface MainSettings {
    boolean produceScript() default false;
    /** When produceScript is true use execCommandTemplate to specify the type name of a template file to use for generating the exec script.  If this is not set a default template is used.  The template is passed an instance of ExecCommandParameters to retrieve the command to run and type name */
    String execCommandTemplate() default "";
+   /** When produceBAT is true, a windows .bat file is produced */
+   boolean produceBAT() default false;
+   /** When produceBAT is true, you can specify a template name for the bat file. */
+   String execBATTemplate() default "";
    /** Set this to a string to be put into the start script */
    String defaultArgs() default "";
    /** Set this to true to turn off automatic running of a main in a subsequent layer */
@@ -36,5 +40,7 @@ public @interface MainSettings {
    boolean test() default false;          
    String[] testCommands() default {};
    /** Include Java debug arguments for the Java start definition */
-   boolean debug() default false; 
+   boolean debug() default false;
+   /** If produceJar is true, should we also include dependent classes in the jar file (excluding system classes) */
+   boolean includeDepsInJar() default true;
 }

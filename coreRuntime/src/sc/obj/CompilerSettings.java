@@ -51,8 +51,10 @@ public @interface CompilerSettings {
    String jarFileName() default "";          
    /** Name of a jar file relative to the build directory for packaging the generated Java source */
    String srcJarFileName() default "";       
-   /** List of package names to be put into the jar file */
-   String[] jarPackages() default {};        
+   /** List of package names to be put into the jar file.  Defaults to all packages in the buildDir */
+   String[] jarPackages() default {};
+   /** If jarFileName is set, should we also include dependent classes in the jar file (excluding system classes) */
+   boolean includeDepsInJar() default true;
    /** Class implementing IDynChildManager, used to implement obj children on dynamic types */
    String dynChildManager() default "";      
    /** Class implementing IDynObjManager - used to define how objects are constructed */

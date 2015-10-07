@@ -2029,12 +2029,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (info.buildDirName != null) {
          info("Building scrt.jar from class dir: " + info.buildDirName + " into: " + outJarName);
          if (getSystemBuildLayer(info.buildDirName) != null) {
-            // TODO: need to do the merge of coreRuntime and fullRuntime and copy that to the runtime libs dir.
+            // TODO: need to do the merge of coreRuntime and fullRuntime and copy that to the runtime libs dir.  That should be easy now that buildJarFile supports the mergePath
             // Make sure fullRuntime overrides coreRuntime.
             System.err.println("*** Unable to build scrt.jar file from standard build configuration yet");
          }
          else {
-            if (LayerUtil.buildJarFile(info.buildDirName, getRuntimePrefix(), outJarName, null,  runtimePackages, /* userClassPath */ null, LayerUtil.CLASSES_JAR_FILTER, options.verbose) != 0)
+            if (LayerUtil.buildJarFile(info.buildDirName, getRuntimePrefix(), outJarName, null,  runtimePackages, /* userClassPath */ null, null, LayerUtil.CLASSES_JAR_FILTER, options.verbose) != 0)
                System.err.println("*** Unable to jar up sc runtime files into: " + outJarName + " from buildDir: " + info.buildDirName);
 
          }
@@ -2067,7 +2067,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       if (srcDirFile.isDirectory()) {
          info("Building scrt-core-src.jar from src dir: " + srcDir + " into: " + outJarName);
-         if (LayerUtil.buildJarFile(srcDir, null, outJarName, null,  runtimePackages, /* userClassPath */ null, LayerUtil.SRC_JAR_FILTER, options.verbose) != 0)
+         if (LayerUtil.buildJarFile(srcDir, null, outJarName, null,  runtimePackages, /* userClassPath */ null, null, LayerUtil.SRC_JAR_FILTER, options.verbose) != 0)
             System.err.println("*** Failed trying to jar sc runtime src files into: " + outJarName + " from buildDir: " + srcDir);
       }
       else {
@@ -2100,7 +2100,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          if (options.info)
             info("Building sc.jar from src dirs: " + srcRoot + " into: " + outJarName);
-         if (LayerUtil.buildJarFile(tempDir.getPath(), null, outJarName, null,  null, /* userClassPath */ null, LayerUtil.CLASSES_JAR_FILTER, options.verbose) != 0)
+         if (LayerUtil.buildJarFile(tempDir.getPath(), null, outJarName, null,  null, /* userClassPath */ null, null, LayerUtil.CLASSES_JAR_FILTER, options.verbose) != 0)
             System.err.println("*** Failed trying to jar sc runtime src files into: " + outJarName + " from buildDir: " + tempDirPath);
          else
             FileUtil.removeFileOrDirectory(tempDir);
@@ -2956,7 +2956,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       @Constant public boolean update;
    }
 
-   @MainSettings(produceJar = true, produceScript = true, execName = "bin/sc", debug = false, maxMemory = 1024, defaultArgs = "-restartArgsFile /tmp/restart$$.tmp")
+   @MainSettings(produceJar = true, produceScript = true, produceBAT = true, execName = "bin/sc", debug = false, maxMemory = 1024, defaultArgs = "-restartArgsFile <%= getTempDir(\"restart\", \"tmp\") %>")
    public static void main(String[] args) {
       String buildLayerName = null;
       List<String> includeLayers = null;
@@ -5529,21 +5529,31 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return layerPathIndex.get(layerPath);
    }
 
+   /**
+    * This is the classpath of the current external dependencies, including all class-path entries added for all layers.  Not including
+    * the system classpath which StrataCode was started with (unless those directories are added again in a layer)
+    */
+   public String getDepsClassPath() {
+      if (buildLayer == null)
+         return null;
+      return getClassPathForLayer(buildLayer, false, null, false);
+   }
 
-   public String getClassPathForLayer(Layer startLayer, String useBuildDir) {
+   public String getClassPathForLayer(Layer startLayer, boolean includeBuildDir, String useBuildDir, boolean addSysClassPath) {
       StringBuilder sb = new StringBuilder();
       boolean addOrigBuild = true;
-      sb.append(useBuildDir); // Our build dir overrides all other directories
+      if (useBuildDir != null)
+         sb.append(useBuildDir); // Our build dir overrides all other directories
       if (startLayer == coreBuildLayer) {
-         addOrigBuild = startLayer.appendClassPath(sb, useBuildDir, addOrigBuild);
+         addOrigBuild = startLayer.appendClassPath(sb, includeBuildDir, useBuildDir, addOrigBuild);
       }
       else {
          for (int i = startLayer.layerPosition; i >= 0; i--) {
             Layer layer = layers.get(i);
-            addOrigBuild = layer.appendClassPath(sb, useBuildDir, addOrigBuild);
+            addOrigBuild = layer.appendClassPath(sb, includeBuildDir, useBuildDir, addOrigBuild);
          }
       }
-      if (addOrigBuild && origBuildDir != null) {
+      if (includeBuildDir && addOrigBuild && origBuildDir != null) {
          LayerUtil.addQuotedPath(sb, origBuildDir);
       }
       /*
@@ -5557,7 +5567,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       */
-      return sb.toString() + FileUtil.PATH_SEPARATOR + rootClassPath;
+      if (addSysClassPath)
+         return sb.toString() + FileUtil.PATH_SEPARATOR + rootClassPath;
+      else
+         return sb.toString();
    }
 
    public boolean isValidLayersDir(String dirName) {
@@ -7021,7 +7034,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       // Wait till after all of the layers have been started, now we can compute the
       // system classpaths and sync the runtime libraries
-      classPath = getClassPathForLayer(genLayer, buildClassesDir);
+      classPath = getClassPathForLayer(genLayer, true, buildClassesDir, true);
       userClassPath = buildUserClassPath(classPath);
 
       if (genLayer == buildLayer) {
@@ -8158,7 +8171,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                info("Compiling Java: " + bd.toCompile.size() + " files into " + genLayer.getBuildClassesDir());
 
             PerfMon.start("javaCompile");
-            if (LayerUtil.compileJavaFilesInternal(bd.toCompile, genLayer.getBuildClassesDir(), getClassPathForLayer(genLayer, genLayer.getBuildClassesDir()), options.debug, messageHandler) == 0) {
+            if (LayerUtil.compileJavaFilesInternal(bd.toCompile, genLayer.getBuildClassesDir(), getClassPathForLayer(genLayer, true, genLayer.getBuildClassesDir(), true), options.debug, messageHandler) == 0) {
                if (!buildInfo.buildJars())
                   compileFailed = true;
             }

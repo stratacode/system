@@ -232,12 +232,14 @@ public class BuildInfo {
       public String jarName;
       public String[] packages;
       public boolean src;
-      public ModelJar(String tn, String mainClass, String jn, String[] pkgs, boolean src) {
+      public boolean includeDeps;
+      public ModelJar(String tn, String mainClass, String jn, String[] pkgs, boolean src, boolean includeDeps) {
          typeName = tn;
          mainClassName = mainClass;
          jarName = jn;
          packages = pkgs;
          this.src = src;
+         this.includeDeps = includeDeps;
       }
 
       public boolean equals(Object other) {
@@ -423,16 +425,16 @@ public class BuildInfo {
    }
 
    /** Adds a model jar file to the build info */
-   public void addModelJar(JavaModel model, String mainClassName, String jarName, String[] packages, boolean src) {
+   public void addModelJar(JavaModel model, String mainClassName, String jarName, String[] packages, boolean src, boolean includeDeps) {
       changed = true;
       if (modelJarFiles == null)
          modelJarFiles = new ArrayList<ModelJar>();
-      modelJarFiles.add(new ModelJar(model.getModelTypeName(), mainClassName, jarName, packages, src));
+      modelJarFiles.add(new ModelJar(model.getModelTypeName(), mainClassName, jarName, packages, src, includeDeps));
 
       if (system != null && system.buildInfo == this) {
          for (Layer l:system.layers) {
             if (needsBuildInfo(l)) {
-               l.buildInfo.addModelJar(model, mainClassName, jarName, packages, src);
+               l.buildInfo.addModelJar(model, mainClassName, jarName, packages, src, includeDeps);
             }
          }
       }
@@ -549,7 +551,7 @@ public class BuildInfo {
          for (int j = 0; j < modelJarFiles.size(); j++) {
             ModelJar mjar = modelJarFiles.get(j);
             // Setting the classpath overrides the default classes...
-            if (LayerUtil.buildJarFile(system.buildDir, system.getRuntimePrefix(), mjar.jarName, mjar.mainClassName, mjar.packages, /* userClassPath */ null, mjar.src ? LayerUtil.SRC_JAR_FILTER : LayerUtil.CLASSES_JAR_FILTER, system.options.verbose) != 0)
+            if (LayerUtil.buildJarFile(system.buildDir, system.getRuntimePrefix(), mjar.jarName, mjar.mainClassName, mjar.packages, /* userClassPath */ null, mjar.includeDeps ? system.getDepsClassPath() : null, mjar.src ? LayerUtil.SRC_JAR_FILTER : LayerUtil.CLASSES_JAR_FILTER, system.options.verbose) != 0)
                return false;
          }
       }

@@ -4023,7 +4023,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (toCompileEnts.size() > 0) {
          // Yes, this should be srcEnt.typeName but stubRelName here is relative to build not the layer so that doesn't work
          sys.flushClassCache(FileUtil.removeExtension(stubRelName).replace("/", "."));
-         String cp = sys.getClassPathForLayer(lyr, bd);
+         String cp = sys.getClassPathForLayer(lyr, true, bd, true);
          if (sys.options.verbose)
             System.out.println("Compiling: " + toCompileEnts + " into build dir: " + bd + " with classpath: " + cp);
          else if (sys.options.info)

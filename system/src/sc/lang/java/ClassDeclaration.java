@@ -478,14 +478,15 @@ public class ClassDeclaration extends TypeDeclaration {
       compilerSettings = getAnnotation("sc.obj.CompilerSettings");
       if (compilerSettings != null) {
          String jarFile = (String) ModelUtil.getAnnotationValue(compilerSettings, "jarFileName");
+         Boolean includeDeps = (Boolean) ModelUtil.getAnnotationValue(compilerSettings, "includeDepsInJar");
          if (jarFile != null && jarFile.length() > 0) {
             String [] jarPackages = (String[]) ModelUtil.getAnnotationValue(compilerSettings, "jarPackages");
-            lsys.buildInfo.addModelJar(model, null, jarFile, jarPackages == null ? null : jarPackages.length > 0 ? jarPackages : null, false);
+            lsys.buildInfo.addModelJar(model, null, jarFile, jarPackages == null ? null : jarPackages.length > 0 ? jarPackages : null, false, includeDeps == null || includeDeps);
          }
          jarFile = (String) ModelUtil.getAnnotationValue(compilerSettings, "srcJarFileName");
          if (jarFile != null && jarFile.length() > 0) {
             String [] jarPackages = (String[]) ModelUtil.getAnnotationValue(compilerSettings, "jarPackages");
-            lsys.buildInfo.addModelJar(model, null, jarFile, jarPackages == null ? null : jarPackages.length > 0 ? jarPackages : null, true);
+            lsys.buildInfo.addModelJar(model, null, jarFile, jarPackages == null ? null : jarPackages.length > 0 ? jarPackages : null, true, false);
          }
       }
 

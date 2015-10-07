@@ -17,6 +17,8 @@ import java.io.*;
 import java.lang.reflect.Field;
 import java.util.*;
 import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 public class LayerUtil implements LayerConstants {
 
@@ -261,7 +263,7 @@ public class LayerUtil implements LayerConstants {
 
    // TODO: Write a FilenameFilter which uses the logic in the IFileProcessor's to match class and source files.  We might need a new flag in there when the default is not accurate but we already know whether a file goes into the buildSrc or buildClasses folders.
    // Note: ft and html are here for the sc4idea plugin which uses those extensions to load resources from the classpath for the file templates.
-   public static final FilenameFilter CLASSES_JAR_FILTER = new ExtensionFilenameFilter(Arrays.asList(new String[]{"class", "properties", "sctp", "xml", "jpg", "gif", "png", "ft", "html"}), true);
+   public static final FilenameFilter CLASSES_JAR_FILTER = new ExtensionFilenameFilter(Arrays.asList(new String[]{"class", "properties", "sctp", "xml", "jpg", "gif", "png", "ft", "html", "dll"}), true);
    public static final FilenameFilter SRC_JAR_FILTER = new ExtensionFilenameFilter(Arrays.asList(new String[]{"java", "properties", "sctp", "xml"}), true);
 
    /**
@@ -319,7 +321,7 @@ public class LayerUtil implements LayerConstants {
       }
    }
 
-   public static int buildJarFile(String buildDir, String prefix, String jarName, String mainTypeName, String[] pkgs, String classPath, FilenameFilter jarFilter, boolean verbose) {
+   public static int buildJarFile(String buildDir, String prefix, String jarName, String mainTypeName, String[] pkgs, String classPath, String mergePath, FilenameFilter jarFilter, boolean verbose) {
       List<String> args = null;
       File manifestTmp = null;
 
@@ -336,9 +338,41 @@ public class LayerUtil implements LayerConstants {
       jarDirFile.mkdirs();
 
       try {
-         List<String> allClassFiles;
+         List<String> allClassFiles = null;
+         File zipTemp = null;
+         if (mergePath != null && mergePath.trim().length() > 0) {
+            String[] mergeDirs = mergePath.split(":");
+            zipTemp = createTempDirectory("scJarPkg");
+            for (String mergeDir:mergeDirs) {
+               if (mergeDir.trim().length() == 0)
+                  continue;
+               File mergeFile = new File(mergeDir);
+               if (!mergeFile.isDirectory() && mergeFile.canRead()) {
+                  ArrayList<String> unjarArgs = new ArrayList<String>();
+                  unjarArgs.add("jar");
+                  unjarArgs.add("xf");
+                  unjarArgs.add(mergeDir);
+                  if (FileUtil.execCommand(zipTemp.getPath(), unjarArgs, "", 0, false) == null)
+                     System.err.println("*** Failed to unjar with " + unjarArgs);
+                  mergeFile = zipTemp;
+               }
+               else if (mergeFile.isDirectory()) {
+                  FileUtil.copyAllFiles(mergeFile.getPath(), zipTemp.getPath(), true, jarFilter);
+               }
+            }
+         }
+         // When we are merging from multiple sources we use a temp directory
+         if (zipTemp != null) {
+            // Make this absolute since we are now running this from a different directory
+            jarName = FileUtil.concat(classDir, jarName);
+            String zipPath = zipTemp.getPath();
+            FileUtil.copyAllFiles(classDir, zipPath, true, jarFilter);
+            classDir = zipPath;
+         }
+         // If the user specified a specific list of packages only process those packages
          if (pkgs != null) {
-            allClassFiles = new ArrayList<String>();
+            if (allClassFiles == null)
+               allClassFiles = new ArrayList<String>();
             for (String pkg:pkgs) {
                List<String> newFiles = FileUtil.getRecursiveFiles(classDir, FileUtil.concat(pkg.replace(".", FileUtil.FILE_SEPARATOR)), jarFilter);
                allClassFiles.addAll(newFiles);
@@ -399,6 +433,10 @@ public class LayerUtil implements LayerConstants {
          while ((len = bis.read(buf, 0, buf.length)) != -1)
             System.out.write(buf, 0, len);
          int stat = p.waitFor();
+
+         if (zipTemp != null)
+            FileUtil.removeDirectory(zipTemp.getPath());
+
          return stat;
       }
       catch (InterruptedException exc) {
@@ -418,6 +456,14 @@ public class LayerUtil implements LayerConstants {
             manifestTmp.delete();
       }
       return -1;
+   }
+
+   static Random fileRandom = new Random();
+
+   public static File createTempDirectory(String baseName) {
+      File tempDir = new File(FileUtil.concat(System.getProperty("java.io.tmpdir"), baseName + fileRandom.nextInt(999999999)));
+      tempDir.mkdir();
+      return tempDir;
    }
 
    public static int execCommand(ProcessBuilder cmd, String dir) {

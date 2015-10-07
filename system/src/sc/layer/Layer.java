@@ -3986,7 +3986,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
    }
 
-   boolean appendClassPath(StringBuilder sb, String useBuildDir, boolean addOrigBuild) {
+   boolean appendClassPath(StringBuilder sb, boolean appendBuildDir, String useBuildDir, boolean addOrigBuild) {
       if (classPath != null && !disabled && !excluded) {
          for (int j = 0; j < classDirs.size(); j++) {
             String dir = classDirs.get(j);
@@ -3994,7 +3994,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          }
       }
       String layerClasses = getBuildClassesDir();
-      if (!layerClasses.equals(useBuildDir) && isBuildLayer()) {
+      if (appendBuildDir && !layerClasses.equals(useBuildDir) && isBuildLayer()) {
          LayerUtil.addQuotedPath(sb, layerClasses);
          if (layerClasses.equals(layeredSystem.origBuildDir))
             addOrigBuild = false;

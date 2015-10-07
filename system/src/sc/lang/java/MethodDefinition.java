@@ -306,6 +306,135 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       return propertyName;
    }
 
+   class JavaCommandInfo {
+      String command, restartCommand, sharedArgs;
+      Boolean produceJar;
+      Boolean produceScript;
+      Boolean produceBAT;
+      String execCommandTemplateName;
+      String execBATTemplateName;
+      Boolean debug;
+      Integer debugPort;
+      String execName;
+      String defaultArgs;
+      Integer maxMem;
+      Integer minMem;
+      String scriptSuffix;
+      Boolean includeDepsInJar;
+
+      JavaModel model;
+      String fullTypeName;
+      LayeredSystem lsys;
+
+      String shellType;
+
+      private void initSettings(Object mainSettings, JavaModel model, String fullTypeName) {
+         lsys = model.getLayeredSystem();
+         this.model = model;
+         this.fullTypeName = fullTypeName;
+         produceJar = (Boolean) ModelUtil.getAnnotationValue(mainSettings, "produceJar");
+         produceScript = (Boolean) ModelUtil.getAnnotationValue(mainSettings, "produceScript");
+         produceBAT = (Boolean) ModelUtil.getAnnotationValue(mainSettings, "produceBAT");
+         execCommandTemplateName = (String) ModelUtil.getAnnotationValue(mainSettings, "execCommandTemplate");
+         if (execCommandTemplateName != null && execCommandTemplateName.equals(""))
+            execCommandTemplateName = null;
+         execBATTemplateName = (String) ModelUtil.getAnnotationValue(mainSettings, "execBATTemplate");
+         if (execBATTemplateName != null && execBATTemplateName.equals(""))
+            execBATTemplateName = null;
+         debug = (Boolean) ModelUtil.getAnnotationValue(mainSettings, "debug");
+         debugPort = (Integer) ModelUtil.getAnnotationValue(mainSettings, "debugPort");
+         execName = (String) ModelUtil.getAnnotationValue(mainSettings, "execName");
+         defaultArgs = (String) ModelUtil.getAnnotationValue(mainSettings, "defaultArgs");
+         if (defaultArgs == null)
+            defaultArgs = "";
+         maxMem = (Integer) ModelUtil.getAnnotationValue(mainSettings, "maxMemory");
+         minMem = (Integer) ModelUtil.getAnnotationValue(mainSettings, "minMemory");
+         includeDepsInJar = (Boolean) ModelUtil.getAnnotationValue(mainSettings, "includeDepsInJar");
+      }
+
+      /**
+       * The defaultArgs can be a template against this object.  It may need a temp file and can get one portably through this
+       * method.
+       */
+      public String getTempDir(String baseName, String suffix) {
+         if (shellType.equals("sh")) {
+            return "/tmp/" + baseName + "$$" + "." + suffix;
+         }
+         else if (shellType.equals("bat")) {
+            return "%TEMP%\\" + baseName + "%RANDOM%" + "." + suffix;
+         }
+         else
+            throw new UnsupportedOperationException();
+      }
+
+      private String varString(String varName) {
+         if (shellType.equals("sh"))
+            return "$" + varName;
+         else if (shellType.equals("bat"))
+            return '%' + varName + '%';
+         else
+            throw new UnsupportedOperationException();
+      }
+
+      private void setShellType(String shellType) {
+         this.shellType = shellType;
+         scriptSuffix = "";
+         String extraArgs = defaultArgs;
+         if (defaultArgs != null && defaultArgs.length() > 0) {
+            if (defaultArgs.length() > 0 && !defaultArgs.startsWith(" ")) {
+               try {
+                  extraArgs = " " + TransformUtil.evalTemplate(this, defaultArgs, false);
+               }
+               catch (IllegalArgumentException exc) {
+                  displayError("Failed to parse defaultArgs as a template string: " + defaultArgs);
+               }
+            }
+         }
+         if (execName == null || execName.length() == 0) {
+            execName = model.getModelTypeName().replace(".", FileUtil.FILE_SEPARATOR);
+            scriptSuffix = "." + shellType;
+         }
+         String debugStr = debug != null && debug ?
+                 " -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=" + (debugPort == null ? "5005": debugPort)  :
+                 "";
+
+         String dynStr = "";
+         if (lsys.hasDynamicLayers()) {
+            dynStr = "sc.layer.LayeredSystem " + lsys.getLayerNames() + " -lp " + lsys.getLayerPath() + " -r ";
+         }
+
+         String sepStr = shellType.equals("bat") ? "\\" : "/";
+
+         String memStr = (minMem != null && minMem != 0 ? " -ms" + minMem + "m ": "") + (maxMem != null && maxMem != 0 ? " -mx" + maxMem + "m " : "");
+         String vmParams = lsys.getVMParameters();
+         String[] defaultArgList = defaultArgs.length() == 0 ? null : defaultArgs.trim().split(" ");
+         // TODO: put this code into a configurable template
+         if (produceJar != null && produceJar) {
+            // TODO: need to find a way to inject command line args into the jar process
+            if (dynStr.length() > 0)
+               System.err.println("*** Unable to produce script with jar option for dynamic layers");
+            lsys.buildInfo.addModelJar(model, model.getModelTypeName(), execName + ".jar", null, false, includeDepsInJar == null || includeDepsInJar);
+            sharedArgs =  "java" + debugStr + memStr + vmParams +
+                    " -jar \"" + varString("DIRNAME") + sepStr + FileUtil.getFileName(execName) + ".jar\"";
+         }
+         else {
+            lsys.buildInfo.addMainCommand(model, execName, defaultArgList);
+            sharedArgs = "java" + debugStr + vmParams + memStr + " -cp \"" + lsys.userClassPath + "\" " + dynStr + fullTypeName + " ";
+         }
+         sharedArgs += extraArgs;
+         command = sharedArgs + " $*";
+         restartCommand = sharedArgs + " -restart";
+      }
+
+   }
+
+   JavaCommandInfo createJavaCommandInfo(Object mainSettings, JavaModel model, String fullTypeName) {
+      JavaCommandInfo ci = new JavaCommandInfo();
+      ci.initSettings(mainSettings, model, fullTypeName);
+      return ci;
+   }
+
+
    public void process() {
       if (processed) return;
 
@@ -315,82 +444,33 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          if (mainSettings != null) {
             Boolean disabled = (Boolean) ModelUtil.getAnnotationValue(mainSettings, "disabled");
             if (disabled == null || !disabled) {
-               Boolean produceJar = (Boolean) ModelUtil.getAnnotationValue(mainSettings, "produceJar");
-               Boolean produceScript = (Boolean) ModelUtil.getAnnotationValue(mainSettings, "produceScript");
-               String execCommandTemplateName = (String) ModelUtil.getAnnotationValue(mainSettings, "execCommandTemplate");
-               if (execCommandTemplateName != null && execCommandTemplateName.equals(""))
-                  execCommandTemplateName = null;
-               Boolean debug = (Boolean) ModelUtil.getAnnotationValue(mainSettings, "debug");
-               Integer debugPort = (Integer) ModelUtil.getAnnotationValue(mainSettings, "debugPort");
-               String execName = (String) ModelUtil.getAnnotationValue(mainSettings, "execName");
-               String defaultArgs = (String) ModelUtil.getAnnotationValue(mainSettings, "defaultArgs");
-               Integer maxMem = (Integer) ModelUtil.getAnnotationValue(mainSettings, "maxMemory");
-               Integer minMem = (Integer) ModelUtil.getAnnotationValue(mainSettings, "minMemory");
-               if (defaultArgs == null)
-                  defaultArgs = "";
-               else {
-                  if (defaultArgs.length() > 0 && !defaultArgs.startsWith(" "))
-                     defaultArgs = " " + defaultArgs;
-               }
-               String scriptSuffix = "";
-               if (execName == null || execName.length() == 0) {
-                  execName = model.getModelTypeName().replace(".", FileUtil.FILE_SEPARATOR);
-                  scriptSuffix = ".sh";
-               }
 
                LayeredSystem lsys = getJavaModel().getLayeredSystem();
 
-               String command, restartCommand, sharedArgs;
                String fullTypeName = getEnclosingType().getFullTypeName();
-               String debugStr = debug != null && debug ?
-                      " -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=" + (debugPort == null ? "5005": debugPort)  :
-                       "";
+               JavaCommandInfo ci = createJavaCommandInfo(mainSettings, model, fullTypeName);
+               ci.setShellType("sh");
 
-               String dynStr = "";
-               if (lsys.hasDynamicLayers()) {
-                  dynStr = "sc.layer.LayeredSystem " + lsys.getLayerNames() + " -lp " + lsys.getLayerPath() + " -r ";
-               }
+               // TODO: should we make this more flexible?
+               boolean doRestart = fullTypeName.contains("LayeredSystem");
 
-               String memStr = (minMem != null && minMem != 0 ? " -ms" + minMem + "m ": "") + (maxMem != null && maxMem != 0 ? " -mx" + maxMem + "m " : "");
-               String vmParams = lsys.getVMParameters();
-               String[] defaultArgList = defaultArgs.length() == 0 ? null : defaultArgs.trim().split(" ");
-               // TODO: put this code into a configurable template
-               if (produceJar != null && produceJar) {
-                  // TODO: need to find a way to inject command line args into the jar process
-                  if (dynStr.length() > 0)
-                     System.err.println("*** Unable to produce script with jar option for dynamic layers");
-                  lsys.buildInfo.addModelJar(model, model.getModelTypeName(), execName + ".jar", null, false);
-                  sharedArgs =  "java" + debugStr + memStr + vmParams +
-                                      " -jar \"$DIRNAME/" + FileUtil.getFileName(execName) + ".jar\"";
-               }
-               else {
-                  lsys.buildInfo.addMainCommand(model, execName, defaultArgList);
-                  sharedArgs = "java" + debugStr + vmParams + memStr + " -cp \"" + lsys.userClassPath + "\" " + dynStr + fullTypeName + " ";
-               }
-               sharedArgs += defaultArgs;
-               command = sharedArgs + " $*";
-               restartCommand = sharedArgs + " -restart";
-
-
-               if (produceScript != null && produceScript) {
-                  String runScriptFile = FileUtil.concat(lsys.buildDir, execName + scriptSuffix);
-                  // TODO: adjust relative paths and add a "cd" in the script?  Eliminate system classes?
+               if (ci.produceScript != null && ci.produceScript) {
+                  String runScriptFile = FileUtil.concat(lsys.buildDir, ci.execName + ci.scriptSuffix);
                   String startCommand;
-                  // TODO: should we make this more flexible?
-                  boolean doRestart = fullTypeName.contains("LayeredSystem");
 
                   Template templ = null;
-                  if (execCommandTemplateName != null)
-                     templ = getEnclosingType().findTemplatePath(execCommandTemplateName, "exec command template", ExecCommandParameters.class);
+                  if (ci.execCommandTemplateName != null)
+                     templ = getEnclosingType().findTemplatePath(ci.execCommandTemplateName, "exec command template", ExecCommandParameters.class);
                   String restartCommands = !doRestart ? "" :
                                   "while expr $? = 33; do" +
                                   FileUtil.LINE_SEPARATOR +
-                                  "   " + restartCommand +
+                                  "   " + ci.restartCommand +
                                   FileUtil.LINE_SEPARATOR +
                                   "SC_EXIT_STATUS=$?" +
                                   FileUtil.LINE_SEPARATOR +
                                   "done" +
                                   FileUtil.LINE_SEPARATOR;
+
                   if (templ == null) {
                      startCommand = "#!/bin/sh\n" +
                                     "# This file is generated by the MainSettings annotation on class " + fullTypeName + " - warning changes made here will be lost" +
@@ -399,18 +479,19 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                                     FileUtil.LINE_SEPARATOR +
                                     "DIRNAME=`dirname $CMDPATH`" +
                                     FileUtil.LINE_SEPARATOR +
-                                    command +
+                                    ci.command +
                                     FileUtil.LINE_SEPARATOR +
                                     "SC_EXIT_STATUS=$?" +
                                     FileUtil.LINE_SEPARATOR +
                                     restartCommands +
-                                    "exit $SC_EXIT_STATUS";
+                                    "exit $SC_EXIT_STATUS" +
+                                    FileUtil.LINE_SEPARATOR;
                   }
                   else {
                      ExecCommandParameters params = new ExecCommandParameters();
-                     params.command = command;
+                     params.command = ci.command;
                      params.fullTypeName = fullTypeName;
-                     params.restartCommand = restartCommand;
+                     params.restartCommand = ci.restartCommand;
 
                      startCommand = TransformUtil.evalTemplate(params, templ);
                   }
@@ -418,6 +499,47 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                   // TODO: include comment about not modifying, set exec bit
                   FileUtil.saveStringAsFile(runScriptFile, startCommand, true);
                   new File(runScriptFile).setExecutable(true, true);
+               }
+
+               ci.setShellType("bat");
+
+               if (ci.produceBAT != null && ci.produceBAT) {
+                  String runBATFile = FileUtil.concat(lsys.buildDir, ci.execName + ".bat");
+                  String startBAT;
+
+                  Template templ = null;
+                  if (ci.execBATTemplateName != null)
+                     templ = getEnclosingType().findTemplatePath(ci.execBATTemplateName, "exec command template", ExecCommandParameters.class);
+
+                  String restartBAT = !doRestart ? "" :
+                          "if %SC_EXIT_STATUS% neq 33 goto exitsc\r\n" +
+                          ":tryagain\r\n" +
+                                  ci.restartCommand + "\r\n" +
+                                  "set SC_EXIT_STATUS=%errorlevel%\r\n" +
+                                  "if %SC_EXIT_STATUS% equ 33 goto tryagain\r\n" +
+                            ":exitsc\r\n";
+                  if (templ == null) {
+                     startBAT = "@ECHO off\r\n" +
+                             "SETLOCAL ENABLEEXTENSIONS\r\n" +
+                             "SET DIRNAME=%~dp0\r\n" +
+                             ci.command + "\r\n" +
+                             "SET SC_EXIT_STATUS=%ERRORLEVEL%\r\n" +
+                             restartBAT +
+                             "EXIT /B %SC_EXIT_STATUS%\r\n";
+                  }
+                  else {
+                     ExecCommandParameters params = new ExecCommandParameters();
+                     params.command = ci.command;
+                     params.fullTypeName = fullTypeName;
+                     params.restartCommand = restartBAT;
+
+                     startBAT = TransformUtil.evalTemplate(params, templ);
+                  }
+
+                  // TODO: include comment about not modifying, set exec bit
+                  FileUtil.saveStringAsFile(runBATFile, startBAT, true);
+                  new File(runBATFile).setExecutable(true, true);
+
                }
             }
          }
@@ -430,6 +552,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       }
       super.process();
    }
+
 
    public boolean isProperty() {
       return propertyName != null;

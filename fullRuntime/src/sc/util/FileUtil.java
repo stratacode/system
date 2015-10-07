@@ -280,8 +280,9 @@ public class FileUtil {
       }
    }
 
+
    public static String exec(String input, boolean echoOutput, String... args) {
-      return execCommand(Arrays.asList(args), input, 0, echoOutput);
+      return execCommand(null, Arrays.asList(args), input, 0, echoOutput);
    }
 
    public static int fork(String inputString, boolean echoOutput, String... args) {
@@ -306,7 +307,7 @@ public class FileUtil {
    }
 
    public static String execCommand(List<String> args, String inputString) {
-      return execCommand(args, inputString, 0, false);
+      return execCommand(null, args, inputString, 0, false);
    }
 
    public static StringBuilder readInputStream(InputStream is) {
@@ -344,12 +345,14 @@ public class FileUtil {
       return null;
    }
 
-   public static String execCommand(List<String> args, String inputString, int successResult, boolean echoOutput) {
+   public static String execCommand(String currentDir, List<String> args, String inputString, int successResult, boolean echoOutput) {
       // Handle simple unix shell scripts so we don't have to have special logic for windows to run as long as
       // cygwin or the shell at least is installed
       args = fixArgsForSystem(args);
 
       ProcessBuilder pb = new ProcessBuilder(args);
+      if (currentDir != null)
+         pb.directory(new File(currentDir));
 
       try {
          Process p = pb.start();

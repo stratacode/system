@@ -5,6 +5,10 @@ system extends fullRuntime {
    // Source is stored one-directory below
    srcPath = "src";
 
+   object jlinePkg extends MvnRepositoryPackage {
+      url = "mvn://jline/jline/1.0";
+   }
+
    public void start() {
       sc.layer.LayeredSystem system = getLayeredSystem();
 
