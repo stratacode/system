@@ -728,7 +728,7 @@ public class LayerUtil implements LayerConstants {
    public static String installDefaultLayers(String resultDir, IMessageHandler handler, boolean verbose, String gitURL) {
       RepositorySystem sys = new RepositorySystem(new RepositoryStore(resultDir), handler, verbose, false, false, false);
       IRepositoryManager mgr = sys.getRepositoryManager("git");
-      String fileName = gitURL == null ? "layers" : FileUtil.removeExtension(FileUtil.getFileName(gitURL)); // Remove the '.git' suffix and take the last name as the file name.
+      String fileName = gitURL == null ? LayerConstants.DEFAULT_LAYERS_PATH: FileUtil.removeExtension(URLUtil.getFileName(gitURL)); // Remove the '.git' suffix and take the last name as the file name.
       // Just install this package into the packageRoot - don't add the packageName like we do for most packages
       RepositoryPackage pkg = new RepositoryPackage(mgr, fileName, null, new RepositorySource(mgr, gitURL == null ? LayerConstants.DEFAULT_LAYERS_URL : gitURL, false), null);
       //RepositoryPackage pkg = new RepositoryPackage("layers", new RepositorySource(mgr, "ssh://vsgit@stratacode.com/home/git/vs/layers", false));

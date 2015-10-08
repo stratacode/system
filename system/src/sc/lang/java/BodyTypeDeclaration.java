@@ -3933,7 +3933,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          lyr = sys.buildLayer;
       // Must be starting up the layers themselves - fall back to the
       if (lyr == null)
-         lyr = sys.coreBuildLayer;
+         lyr = sys.getCoreBuildLayer();
       String bd = thisLayer.buildClassesDir;
       if (bd == null)
          bd = sys.buildClassesDir;
@@ -3947,7 +3947,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (buildSrcDir == null)
          buildSrcDir = sys.buildSrcDir;
       if (buildSrcDir == null)
-         buildSrcDir = sys.coreBuildLayer.buildSrcDir;
+         buildSrcDir = sys.getCoreBuildLayer().buildSrcDir;
       String newFile = FileUtil.concat(buildSrcDir, stubRelName);
 
       if (doGen) {

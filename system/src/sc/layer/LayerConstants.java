@@ -5,6 +5,7 @@
 package sc.layer;
 
 import sc.type.CTypeUtil;
+import sc.util.URLUtil;
 
 public interface LayerConstants
 {
@@ -16,6 +17,7 @@ public interface LayerConstants
    public static final String DEFAULT_VM_PARAMETERS = "-Xmx1024m";
 
    public static final String DEFAULT_LAYERS_URL = "https://github.com/stratacode/layers.git";
+   public static final String DEFAULT_LAYERS_PATH = "layers";
 
    public static final String[] ALL_CONFIGURED_RUNTIMES = {"java", "js", "android", "gwt"};
    public static final String SC_DIR = ".stratacode";

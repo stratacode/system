@@ -6,6 +6,7 @@ package sc.lang;
 
 import sc.layer.Layer;
 import sc.layer.LayerUtil;
+import sc.util.FileUtil;
 import sc.util.StringUtil;
 
 import java.io.PrintWriter;
@@ -46,7 +47,7 @@ public class CreateLayerWizard extends CommandWizard {
                vprint("\nDirectory to hold your layer's files.  The directory may be a path: example/unitConverter where 'example' is the layer group and 'unitConverter' is the layer's directory.  You can refer to a layer by its path name 'example/unitConverter' or via dot notation: 'example.unitConverter'\n");
                verboseSeen.add(Step.Name);
             }
-            return "Enter new layer directory: " + commandInterpreter.system.getNewLayerDir() + "/";
+            return "Enter new layer directory: " + commandInterpreter.system.getNewLayerDir() + FileUtil.FILE_SEPARATOR_CHAR;
          case Dynamic:
             if (!verboseSeen.contains(Step.Dynamic)) {
                vprint("\nDynamic layers allow runtime code changes without restart for some frameworks.  For prototyping and assembling applications you see changes immediately or by refreshing.  Runtime dynamic layers implement styles, states, or dynamic forms.  Note: any layer which extends a dynamic layer is automatically dynamic itself.\n");

@@ -361,7 +361,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             return "/tmp/" + baseName + "$$" + "." + suffix;
          }
          else if (shellType.equals("bat")) {
-            return "%TEMP%\\" + baseName + "%RANDOM%" + "." + suffix;
+            return "%TEMP%\\" + baseName + "%SCPID%" + "." + suffix;
          }
          else
             throw new UnsupportedOperationException();
@@ -391,7 +391,8 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             }
          }
          if (execName == null || execName.length() == 0) {
-            execName = model.getModelTypeName().replace(".", FileUtil.FILE_SEPARATOR);
+            // Exec name is a normalized path name since it comes from configuration
+            execName = model.getModelTypeName().replace('.', '/');
             scriptSuffix = "." + shellType;
          }
          String debugStr = debug != null && debug ?
@@ -415,7 +416,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                System.err.println("*** Unable to produce script with jar option for dynamic layers");
             lsys.buildInfo.addModelJar(model, model.getModelTypeName(), execName + ".jar", null, false, includeDepsInJar == null || includeDepsInJar);
             sharedArgs =  "java" + debugStr + memStr + vmParams +
-                    " -jar \"" + varString("DIRNAME") + sepStr + FileUtil.getFileName(execName) + ".jar\"";
+                    " -jar \"" + varString("DIRNAME") + sepStr + getFileNamePart(execName, "/") + ".jar\"";
          }
          else {
             lsys.buildInfo.addMainCommand(model, execName, defaultArgList);
@@ -434,6 +435,16 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       return ci;
    }
 
+   public static String getFileNamePart(String pathName, String sep) {
+      while (pathName.endsWith(sep))
+         pathName = pathName.substring(0, pathName.length() - 1);
+
+      int ix = pathName.lastIndexOf(sep);
+      if (ix != -1)
+         pathName = pathName.substring(ix+1);
+
+      return pathName;
+   }
 
    public void process() {
       if (processed) return;
@@ -521,6 +532,8 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                   if (templ == null) {
                      startBAT = "@ECHO off\r\n" +
                              "SETLOCAL ENABLEEXTENSIONS\r\n" +
+                             // No way I could find to get a process id of the bat file so just use a random number for the temp file
+                             "SET SCPID=%RANDOM%\r\n" +
                              "SET DIRNAME=%~dp0\r\n" +
                              ci.command + "\r\n" +
                              "SET SC_EXIT_STATUS=%ERRORLEVEL%\r\n" +
