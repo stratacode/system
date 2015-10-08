@@ -1008,8 +1008,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          String scSourceConfig = getStrataCodeDir(SC_SOURCE_PATH);
          if (new File(scSourceConfig).canRead()) {
             scSourcePath = FileUtil.getFileAsString(scSourceConfig);
-            if (scSourcePath != null)
+            if (scSourcePath != null) {
                scSourcePath = scSourcePath.trim();
+               // For windows, fix this path to be file system specific
+               if (FileUtil.FILE_SEPARATOR_CHAR != '/')
+                  scSourcePath = FileUtil.unnormalize(scSourcePath);
+            }
          }
 
          if (!systemInstalled) {
@@ -1969,6 +1973,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       boolean warned = false;
       for (int i = 0; i < runtimePackages.length; i++) {
          String pkg = runtimePackages[i];
+         pkg = FileUtil.unnormalize(pkg);
          HashMap<String,PackageEntry> pkgContents = packageIndex.get(pkg);
          if (pkgContents == null) {
             System.err.println("*** runtime package: " + pkg + " not found in the classpath - check classpath to be sure it contains a valid sc.jar");

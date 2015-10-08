@@ -3423,7 +3423,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
       // Reset this file when you are compiling everything in case it gets corrupted
       if (gd == null && (copied || !getBuildAllFiles()))
-         gd = (BuildInfo) layeredSystem.loadInstanceFromFile(FileUtil.concat(buildSrcDir, bfFileName), "sc/layer/" + bfFileName);
+         gd = (BuildInfo) layeredSystem.loadInstanceFromFile(FileUtil.concat(buildSrcDir, bfFileName), FileUtil.concat("sc", "layer", bfFileName));
 
       if (gd == null) {
          gd = new BuildInfo(this);
