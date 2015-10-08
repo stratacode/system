@@ -3366,7 +3366,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       String currentLayerNames = getDependentLayerNames();
       // Reset this file when you are compiling everything in case it gets corrupted
       if (!getBuildAllFiles()) {
-         gd = (BuildInfo) layeredSystem.loadInstanceFromFile(buildInfoFile, "sc/layer/" + bfFileName);
+         gd = (BuildInfo) layeredSystem.loadInstanceFromFile(buildInfoFile, FileUtil.concat("sc", "layer", bfFileName));
          if (gd == null) {
             if (layeredSystem.options.verbose)
                System.out.println("Missing BuildInfo file: " + buildInfoFile + " for runtime: " + layeredSystem.getRuntimeName());

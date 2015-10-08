@@ -1006,6 +1006,8 @@ public class EditorContext extends ClientEditorContext {
 
    public String validateLayerPath(String str) {
       String dotName = str.replace(FileUtil.FILE_SEPARATOR, ".");
+      if (FileUtil.FILE_SEPARATOR_CHAR != '/')
+         dotName = dotName.replace('/', '.');
       dotName = validateIdentifier(dotName);
       // Allows either "." or file separator in the names
       return LayerUtil.fixLayerPathName(dotName);

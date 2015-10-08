@@ -376,6 +376,15 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             throw new UnsupportedOperationException();
       }
 
+      private String argsString() {
+         if (shellType.equals("sh"))
+            return "$*";
+         else if (shellType.equals("bat"))
+            return "%*";
+         else
+            throw new UnsupportedOperationException();
+      }
+
       private void setShellType(String shellType) {
          this.shellType = shellType;
          scriptSuffix = "";
@@ -423,7 +432,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             sharedArgs = "java" + debugStr + vmParams + memStr + " -cp \"" + lsys.userClassPath + "\" " + dynStr + fullTypeName + " ";
          }
          sharedArgs += extraArgs;
-         command = sharedArgs + " $*";
+         command = sharedArgs + " " + argsString();
          restartCommand = sharedArgs + " -restart";
       }
 

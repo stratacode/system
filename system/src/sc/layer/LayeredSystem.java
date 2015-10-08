@@ -3277,7 +3277,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
                includeLayers.add(args[i]);
 
-
                if (recursiveDynLayers != null)
                   recursiveDynLayers.add(args[i]);
             }
@@ -3302,6 +3301,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       PerfMon.start("main", true, true);
 
+      // Handle normalized layer names to make scripts portable
+      if (FileUtil.FILE_SEPARATOR_CHAR != '/' && includeLayers != null) {
+         for (int i = 0; i < includeLayers.size(); i++) {
+            includeLayers.set(i, FileUtil.unnormalize(includeLayers.get(i)));
+         }
+      }
+
       // Build layer is always the last layer in the list
       if (includeLayers != null) {
          buildLayerName = includeLayers.get(includeLayers.size()-1);
@@ -3309,7 +3315,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       if (options.info) {
          StringBuilder sb = new StringBuilder();
-         sb.append("Running: sc ");
+         sb.append("Running: scc ");
          for (String varg:args) {
             sb.append(varg);
             sb.append(" ");

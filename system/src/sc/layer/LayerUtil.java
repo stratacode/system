@@ -97,6 +97,10 @@ public class LayerUtil implements LayerConstants {
 
    public static int compileJavaFilesInternal(Collection<SrcEntry> srcEnts, String buildDir, String classPath, boolean debug, IMessageHandler messageHandler) {
       JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+      if (compiler == null) {
+         System.err.println("*** No internal java compiler found - Do you have the JDK installed and is tools.jar in the system classpath? - trying javac");
+         return compileJavaFiles(srcEnts, buildDir, classPath, debug, messageHandler);
+      }
 
       DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<JavaFileObject>();
 
