@@ -975,16 +975,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       initLayerPath();
 
       // Sets the coreBuildLayer - used for storing dynamic stubs needed for the layer init process
-      LayerUtil.initCoreBuildLayer(this);
+      if (systemInstalled)
+         LayerUtil.initCoreBuildLayer(this);
 
       // Do this before we init the layers so they can see the classes in the system layer
       initClassIndex(rootClassPath);
       initSysClassLoader(null, ClassLoaderMode.LIBS);
-      initSysClassLoader(coreBuildLayer, ClassLoaderMode.BUILD);
+      if (coreBuildLayer != null)
+         initSysClassLoader(coreBuildLayer, ClassLoaderMode.BUILD);
 
       // We only need to do this on Windows when run from IntelliJ or Cygwin.  It seems like jline works fine when you run from the cmd prompt
       // but not sure how to tell the difference.  The WindowsTerminal will hang on cygwin and when running in the debugger on windows.
-      if (FileUtil.PATH_SEPARATOR_CHAR == ';')
+      if (FileUtil.PATH_SEPARATOR_CHAR == ';' && System.getProperty("jline.terminal") == null)
          System.setProperty("jline.terminal", "jline.UnsupportedTerminal");
 
       if (startInterpreter)
@@ -1422,6 +1424,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             String err = LayerUtil.installDefaultLayers(newLayerDir, null, options.info, null);
             if (err != null)
                return false;
+            newLayerDir = FileUtil.concat(newLayerDir, DEFAULT_LAYERS_PATH);
             systemInstalled = true;
             if (layerPath == null) {
                layerPath = newLayerDir;
@@ -13276,6 +13279,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             return res;
       }
       return Layer.ANY_INACTIVE_LAYER;
+   }
+
+   public Layer getCoreBuildLayer() {
+      if (coreBuildLayer == null) {
+         LayerUtil.initCoreBuildLayer(this);
+         initSysClassLoader(coreBuildLayer, ClassLoaderMode.BUILD);
+      }
+      return coreBuildLayer;
    }
 
 
