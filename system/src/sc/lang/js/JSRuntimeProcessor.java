@@ -49,6 +49,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
    public String templatePrefix;
    public String srcPathType;
+   /** The prefix for generated individual .js files like Java "one-class-per-file".  This is a normalized path name for portability */
    public String genJSPrefix;
 
    public JSBuildInfo jsBuildInfo;
@@ -667,10 +668,11 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    public SrcEntry getJSSrcEntryFromTypeName(Layer genLayer, String buildSrcDir, String fullTypeName) {
       LayeredSystem sys = getLayeredSystem();
       String fileName = FileUtil.addExtension(JSUtil.convertTypeName(sys, fullTypeName), "js");
+      String genPrefix = FileUtil.unnormalize(genJSPrefix);
       // These go into the buildSrcDir because there's no use for them in the web root.  Also, they are put into the .deps file - if they don't exist, they force
       // a regenerate.  That's cause they are returned from getProcessedFiles.  Not entirely sure we need that but dep generated files must be in the buildSrcDir
       // They go into the generated layers buildSrcDir, not the system one so we support layered management of these files.
-      SrcEntry srcEnt = new SrcEntry(genLayer, FileUtil.concat(FileUtil.concat(buildSrcDir, genJSPrefix), fileName), FileUtil.concat(genJSPrefix, fileName));
+      SrcEntry srcEnt = new SrcEntry(genLayer, FileUtil.concat(FileUtil.concat(buildSrcDir, genPrefix), fileName), FileUtil.concat(genPrefix, fileName));
       return srcEnt;
    }
 
@@ -1704,7 +1706,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
          JSGenFile jsg = ent.getValue();
          LinkedHashMap<JSFileEntry,Boolean> typesInFile = new LinkedHashMap<JSFileEntry,Boolean>();
-         String absFilePath = FileUtil.concat(genLayer.buildDir, getJSPathPrefix(genLayer), jsFile);
+         String absFilePath = FileUtil.concat(genLayer.buildDir, getJSPathPrefix(genLayer), FileUtil.unnormalize(jsFile));
 
          // This gen file has not been added yet in the layer stack so no processing for it.
          if (jsg.fromLayer.getLayerPosition() > genLayer.getLayerPosition() || (genLayer != sys.buildLayer && !genLayer.extendsLayer(jsg.fromLayer) && !genLayer.extendsLayer(jsg.toLayer)))

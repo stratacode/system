@@ -273,7 +273,7 @@ public class TestUtil {
                else
                   srcDirs.add(parentDir);
             }
-            opts.srcPath = StringUtil.arrayToPath(srcDirs.toArray());
+            opts.srcPath = StringUtil.arrayToPath(srcDirs.toArray(), false);
          }
       }
 

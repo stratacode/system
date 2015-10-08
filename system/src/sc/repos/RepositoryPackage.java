@@ -252,7 +252,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
          if (fileNames.size() == 0)
             resName = mgr.getPackageRoot();
          else
-            resName = FileUtil.concat(mgr.getPackageRoot(), packageName);
+            resName = FileUtil.concat(mgr.getPackageRoot(), FileUtil.unnormalize(packageName));
       }
       installedRoot = resName;
    }
@@ -327,7 +327,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       if (installed) {
          LinkedHashSet<String> cp = new LinkedHashSet<String>();
          addToClassPath(cp);
-         computedClassPath = StringUtil.arrayToPath(cp.toArray());
+         computedClassPath = StringUtil.arrayToPath(cp.toArray(), false);
          return computedClassPath;
       }
       return null;

@@ -3651,7 +3651,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             if (classPath == null)
                classPath = cp;
             else
-               classPath = classPath + ":" + cp;
+               classPath = classPath + FileUtil.PATH_SEPARATOR_CHAR + cp;
          }
          // TODO: should we also let a package add to the src path?  What about directory prefixes and file types?
       }
@@ -3868,9 +3868,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          // Relative paths will already be found in the default src path (layerPathName) - so no need to add them here
          if (abs) {
             if (this.srcPath != null) {
-               this.srcPath = this.srcPath + ":" + srcPath;
+               this.srcPath = this.srcPath + FileUtil.PATH_SEPARATOR_CHAR + srcPath;
             } else
-               this.srcPath = layerPathName + ":" + srcPath;
+               this.srcPath = layerPathName + FileUtil.PATH_SEPARATOR_CHAR + srcPath;
          }
       }
       else

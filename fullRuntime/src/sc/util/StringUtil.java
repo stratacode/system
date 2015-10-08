@@ -121,11 +121,12 @@ public class StringUtil {
    }
 
    /** Returns a normalized path from the list of toString'd objects */
-   public static String arrayToPath(Object[] list) {
+   public static String arrayToPath(Object[] list, boolean normalized) {
       StringBuilder sb = new StringBuilder();
+      String sep = normalized ? ":" : FileUtil.PATH_SEPARATOR;
       for (int i = 0; i < list.length; i++) {
          if (i != 0)
-            sb.append(":");
+            sb.append(sep);
          sb.append(list[i]);
       }
       return sb.toString();

@@ -254,7 +254,7 @@ public class FileUtil {
       for (int i = 0; i < result.size(); i++)
          result.set(i, FileUtil.concat(dir, result.get(i)));
 
-      return StringUtil.arrayToPath(result.toArray());
+      return StringUtil.arrayToPath(result.toArray(), false);
    }
 
    private static void addFilesInDirectory(String buildDir, String prefix, FilenameFilter filter, List<String> result) {
