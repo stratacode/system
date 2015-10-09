@@ -213,7 +213,7 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
          Object compType;
          do {
             compType = ModelUtil.getGenericComponentType(type);
-            arrDims.append("[]");
+            arrDims.append(ModelUtil.getArrayDimsStr(type));
          } while (compType instanceof GenericArrayType);
 
          if (ModelUtil.isWildcardType(compType)) {

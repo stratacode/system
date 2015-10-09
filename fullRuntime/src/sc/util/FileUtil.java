@@ -750,7 +750,7 @@ public class FileUtil {
       boolean first = true;
       for (String pathDir:pathDirs) {
          if (!first)
-            sb.append(":");
+            sb.append(FileUtil.PATH_SEPARATOR_CHAR);
          else
             first = false;
          sb.append(FileUtil.makeAbsolute(pathDir));

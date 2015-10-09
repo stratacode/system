@@ -345,7 +345,7 @@ public class LayerUtil implements LayerConstants {
          List<String> allClassFiles = null;
          File zipTemp = null;
          if (mergePath != null && mergePath.trim().length() > 0) {
-            String[] mergeDirs = mergePath.split(":");
+            String[] mergeDirs = mergePath.split(FileUtil.PATH_SEPARATOR);
             zipTemp = createTempDirectory("scJarPkg");
             for (String mergeDir:mergeDirs) {
                if (mergeDir.trim().length() == 0)

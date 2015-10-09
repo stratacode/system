@@ -11,7 +11,7 @@ public class PrimitiveType extends JavaType {
    public String typeName;
 
    public String toString() {
-      return typeName;
+      return typeName + (arrayDimensions == null ? "" : arrayDimensions);
    }
 
    public static PrimitiveType create(String typeName) {

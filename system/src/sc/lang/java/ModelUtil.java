@@ -30,6 +30,7 @@ import sc.classfile.CFField;
 import sc.dyn.DynUtil;
 import sc.dyn.RDynUtil;
 import sc.parser.*;
+import sun.jvm.hotspot.utilities.GenericArray;
 
 import java.io.File;
 import java.io.StringReader;
@@ -7344,5 +7345,15 @@ public class ModelUtil {
          return ((CFClass) depClass).isAnonymous();
       else // TODO: do we need this for ITypeDeclaration in general?
          throw new UnsupportedOperationException();
+   }
+
+   public static String getArrayDimsStr(Object type) {
+      if (type instanceof ArrayTypeDeclaration) {
+         return ((ArrayTypeDeclaration) type).arrayDimensions;
+      }
+      else if (type instanceof GenericArrayType) {
+         return "[]";
+      }
+      throw new UnsupportedOperationException();
    }
 }

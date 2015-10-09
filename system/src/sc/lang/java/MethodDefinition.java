@@ -177,10 +177,12 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
    public Object definesMember(String name, EnumSet<MemberType> mtype, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {
       if (!isInitialized())
          init();
-      if (propertyName != null &&
+      if (propertyName != null && propertyName.equals(name) &&
           ((mtype.contains(MemberType.GetMethod) && (propertyMethodType == PropertyMethodType.Get ||
                                                      propertyMethodType == PropertyMethodType.Is)) ||
-          (mtype.contains(MemberType.SetMethod) && propertyMethodType == PropertyMethodType.Set)) && propertyName.equals(name))
+          (mtype.contains(MemberType.SetMethod) && propertyMethodType == PropertyMethodType.Set) ||
+          (mtype.contains(MemberType.GetIndexed) && propertyMethodType == PropertyMethodType.GetIndexed) ||
+          (mtype.contains(MemberType.SetIndexed) && propertyMethodType == PropertyMethodType.SetIndexed)))
          return this;
       return super.definesMember(name, mtype, refType, ctx, skipIfaces, isTransformed);
    }
