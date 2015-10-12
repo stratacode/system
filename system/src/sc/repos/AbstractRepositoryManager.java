@@ -7,6 +7,7 @@ package sc.repos;
 import sc.util.*;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -113,7 +114,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
             pkg.rebuildReason = "reinstalling system - clean install";
          else if (system.installExisting)
             pkg.rebuildReason = "reinitializing from previous install";
-         else if (!pkg.updateFromSaved(this, oldPkg, true, ctx))
+         else if (!pkg.updateFromSaved(this, oldPkg, false, ctx))
             pkg.rebuildReason = "package description changed";
          if (pkg.rebuildReason == null) {
             installedTime = oldPkg.installedTime;
@@ -151,7 +152,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
          pkg.rebuildReason += ": files out of date";
 
       // If we are installing on top of an existing directory, rename the old directory in the backup folder.  Checking tagFile because it could be version specific and don't want to back up one version to install another one
-      if (!pkg.preInstalled && rootDirExists && !isEmptyDir(rootFile) && !system.installExisting && pkg.parentPkg == null) {
+      if (!pkg.preInstalled && rootDirExists && !isEmptyDir(rootFile) && !system.installExisting && pkg.parentPkg == null && !mismatchedCase(rootFile) && !pkg.getReusePackageDirectory()) {
          Date curTime = new Date();
          String backupDir = FileUtil.concat(packageRoot, REPLACED_DIR_NAME, pkg.packageName + "." + curTime.getHours() + "." + curTime.getMinutes());
          new File(backupDir).mkdirs();
@@ -160,6 +161,27 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
          FileUtil.renameFile(pkg.getVersionRoot(), backupDir);
          rootFile.mkdirs();
       }
+   }
+
+   /**
+    * This works around a weird case - when you have to try and install a module from a parent which does not exist but has the same name (ignoring case) as
+    * an existing package.  We just need to not back up the package... then downloading the POM will fail and we'll stop trying to init the package (e.g jooq and jOOq).
+    * We could really use a better way to identify these inaccessible modules included from the parent so they do not cause problems.
+    */
+   private boolean mismatchedCase(File f) {
+      try {
+         String canonicalPath = f.getCanonicalPath();
+         if (!canonicalPath.equals(f.getPath())) {
+            if (canonicalPath.equalsIgnoreCase(f.getPath()))
+               return true;
+            else
+               System.out.println("*** Unhandled case with mismatching file names: " + canonicalPath + " != " + f.getPath());
+         }
+      }
+      catch (IOException exc) {
+         System.err.println("*** Unable to get canonical file for: " + f + ": " + exc);
+      }
+      return false;
    }
 
    public String preInstall(RepositorySource src, DependencyContext ctx, DependencyCollection deps) {
@@ -173,8 +195,13 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
 
       pkg.installedSource = pkg.currentSource;
 
-      if (pkg.preInstalled)
+      if (pkg.preInstalled) {
+         if (pkg.dependencies != null) {
+            for (RepositoryPackage depPkg:pkg.dependencies)
+               deps.addDependency(depPkg, ctx);
+         }
          return null;
+      }
 
       if (info)
          info(StringUtil.indent(DependencyContext.val(ctx)) + "Installing package: " + pkg.packageName + (pkg.rebuildReason == null ? "" : ": " + pkg.rebuildReason) + " src url: " + src.url + getDepsInfo(ctx));
@@ -255,8 +282,12 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       this.msg = handler;
    }
 
+   // TODO: can we support this URL scheme for other repositories?
+   public RepositoryPackage getOrCreatePackage(String url, RepositoryPackage parent, boolean install) {
+      MessageHandler.error(msg, "URL based packages not supported for repository type: " + getClass().getName());
+      return null;
+   }
    public RepositoryPackage createPackage(String url) {
-      // TODO: can we support this URL scheme for other repositories?
       MessageHandler.error(msg, "URL based packages not supported for repository type: " + getClass().getName());
       return null;
    }

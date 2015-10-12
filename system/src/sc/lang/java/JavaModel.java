@@ -2694,6 +2694,14 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             type.refreshBoundTypes(flags);
       }
    }
+
+   public boolean displayTypeError(String...args) {
+      if (!disableTypeErrors) {
+         reportError(getMessageString(args), this);
+         return true;
+      }
+      return false;
+   }
 }
 
 

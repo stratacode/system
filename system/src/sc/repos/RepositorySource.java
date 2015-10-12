@@ -4,6 +4,8 @@
 
 package sc.repos;
 
+import sc.util.URLUtil;
+
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.List;
@@ -63,7 +65,7 @@ public class RepositorySource implements Serializable {
 
    /** When creating a package from a URL only, this can extract the package name to use from the URL. */
    public String getDefaultPackageName() {
-      return null;
+      return url == null ? null : URLUtil.getFileName(url);
    }
 
    public String getDefaultFileName() {

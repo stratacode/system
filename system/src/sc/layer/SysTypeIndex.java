@@ -43,31 +43,34 @@ public class SysTypeIndex {
       Layer typeLayer = type.getLayer();
       String typeName = type.getFullTypeName();
       ArrayList<TypeIndex> indexEntries = inactiveTypeIndex.modifyTypeIndex.get(typeName);
-      int layerIx = 0;
+      int layerIx = -1;
 
       // First find the current type in the list we've indexed.
       if (indexEntries != null) {
          checkedTypes.add(processIdent);
+         int idxPos = 0;
          for (TypeIndex idx:indexEntries) {
-            if (idx.layerName != null && typeLayer != null && idx.layerName.equals(typeLayer.getLayerName()))
+            if (idx.layerName != null && typeLayer != null && idx.layerName.equals(typeLayer.getLayerName()) && StringUtil.equalStrings(processIdent, idx.processIdent)) {
+               layerIx = idxPos;
                break;
-            layerIx++;
+            }
+            idxPos++;
          }
 
-         if (layerIx == indexEntries.size()) {
+         if (layerIx == -1) {
             // Since we search each layered system for each type, we may just not find this type in this layered system so add no entries from it.
             return;
          }
 
          // Now add each successive entry - those are the possible modifiers.
-         for (int i = before ? 0 : layerIx+1; i < (before ? layerIx : indexEntries.size()); i++) {
+         for (int i = before ? 0 : layerIx + 1; i < (before ? layerIx : indexEntries.size()); i++) {
             TypeIndex modTypeIndex = indexEntries.get(i);
 
             // TODO: add a mode which creates stub type declarations when the type has not been loaded so we do not have to parse so much code in this operation.
             // we can use the replaced logic to swap in the new one once it's fetched and/or just populate this one when we need to by parsing it's file.
 
             // Make sure the index entry matches this process before we go and add it.
-            if (StringUtil.equalStrings(modTypeIndex.processIdent, sys.getProcessIdent())) {
+            if (StringUtil.equalStrings(modTypeIndex.processIdent, processIdent)) {
                Layer modLayer = sys.getActiveOrInactiveLayerByPath(modTypeIndex.layerName, null, false, true, true);
                if (modLayer == null) {
                   System.err.println("*** Warning unable to find modifying layer: " + modTypeIndex.layerName + " - skipping index entyr");
@@ -83,8 +86,7 @@ public class SysTypeIndex {
                            res.add(modType);
                         }
                      }
-                  }
-                  else
+                  } else
                      System.err.println("*** Unable to map layer name from system to the other");
                }
             }

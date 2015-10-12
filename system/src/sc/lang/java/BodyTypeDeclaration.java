@@ -7180,6 +7180,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       idx.layerName = layer == null ? null : layer.getLayerName();
       LayeredSystem sys = getLayeredSystem();
       idx.processIdent = sys == null ? null : sys.getProcessIdent();
+      idx.layerPosition = layer == null ? -1 : layer.layerPosition;
       ArrayList<String> baseTypes = null;
       JavaModel model = getJavaModel();
       if (model != null && model.getSrcFile() != null) {

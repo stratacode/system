@@ -76,6 +76,7 @@ public class RepositorySystem {
          return null;
       }
 
+      // TODO: use getOrCreatePackage here?
       RepositoryPackage pkg = mgr.createPackage(url);
       if (pkg == null)
          return null;
@@ -93,6 +94,10 @@ public class RepositorySystem {
          installPackage(pkg, null);
       }
       return pkg;
+   }
+
+   public RepositoryPackage getRepositoryPackage(String pkgName) {
+      return store.packages.get(pkgName);
    }
 
    public RepositoryPackage addRepositoryPackage(RepositoryPackage pkg) {

@@ -30,7 +30,6 @@ import sc.classfile.CFField;
 import sc.dyn.DynUtil;
 import sc.dyn.RDynUtil;
 import sc.parser.*;
-import sun.jvm.hotspot.utilities.GenericArray;
 
 import java.io.File;
 import java.io.StringReader;
@@ -3771,6 +3770,13 @@ public class ModelUtil {
       }
       else
          throw new UnsupportedOperationException();
+   }
+
+   public static Object getWildcardBounds(Object type) {
+      if (ModelUtil.isSuperWildcard(type))
+         return ModelUtil.getWildcardLowerBounds(type);
+      else
+         return ModelUtil.getWildcardUpperBounds(type);
    }
 
    public static Object getWildcardLowerBounds(Object type) {

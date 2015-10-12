@@ -62,11 +62,10 @@ public class MvnDescriptor implements Serializable {
          System.err.println("*** Removing invalid '/' in URL: " + origURL);
          url = url.substring(1);
       }
+      // The first part is the groupId, the last is the version and the middle is the groupId.  The group-id can have /'s for the sub-module case - e.g. "killbill/account"
       desc.version = URLUtil.getFileName(url);
-      String rest = URLUtil.getParentPath(url);
-      desc.artifactId = URLUtil.getFileName(rest);
-      desc.groupId = URLUtil.getParentPath(rest);
-      desc.depsOnly = url.startsWith("mvndeps");
+      desc.groupId = URLUtil.getRootPath(url);
+      desc.artifactId = url.substring(desc.groupId.length() + 1, url.length() - desc.version.length() - 1);
       return desc;
    }
 

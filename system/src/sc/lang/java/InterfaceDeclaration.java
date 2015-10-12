@@ -487,4 +487,8 @@ public class InterfaceDeclaration extends TypeDeclaration {
       }
       return res;
    }
+
+   public AccessLevel getDefaultAccessLevel() {
+      return AccessLevel.Public;
+   }
 }

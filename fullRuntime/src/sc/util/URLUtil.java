@@ -26,6 +26,16 @@ public class URLUtil {
       return relFileName.substring(0,ix);
    }
 
+   /** Given a/b/c.x returns a */
+   public static String getRootPath(String fileName) {
+      if (fileName == null)
+         return null;
+      int ix = fileName.indexOf('/');
+      if (ix == -1)
+         return null;
+      return fileName.substring(0, ix);
+   }
+
    /** Returns the last component of the path name - the directory name or file name part of the path */
    public static String getFileName(String pathName) {
       while (pathName.endsWith("/"))
@@ -59,7 +69,7 @@ public class URLUtil {
       ReadableByteChannel rbc;
       try {
          url = new URL(urlPath);
-         if (unzip)
+         if (unzip )
             fileName = FileUtil.addExtension(fileName, "zip");
          MessageHandler.info(msg, "Downloading url: " + urlPath + " into: " + fileName);
          URLConnection conn = url.openConnection();

@@ -345,6 +345,38 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       return pomFile;
    }
 
+   private boolean mvnFileExists(MvnDescriptor desc, String resFileName, String remoteSuffix, String remoteExt) {
+      boolean found = false;
+      if (system.installExisting && new File(resFileName).canRead()) {
+         info("Using existing file: " + resFileName);
+         return true;
+      }
+      if (useLocalRepository) {
+         String localPkgDir = FileUtil.concat(mvnRepositoryDir, desc.groupId.replace(".", FileUtil.FILE_SEPARATOR), desc.artifactId, desc.version);
+         if (new File(localPkgDir).isDirectory()) {
+            String fileName = FileUtil.concat(localPkgDir, FileUtil.addExtension(desc.artifactId + "-" + desc.version + remoteSuffix, remoteExt));
+            if (new File(fileName).canRead()) {
+               if (FileUtil.copyFile(fileName, resFileName, true))
+                  return true;
+               else
+                  info("Failed to copy from local repository: " + fileName + " to: " + resFileName);
+            }
+         }
+      }
+      for (MvnRepository repo:repositories) {
+         String pomURL = repo.getFileURL(desc.groupId, desc.artifactId, desc.version, remoteSuffix, remoteExt);
+         String resDir = FileUtil.getParentPath(resFileName);
+         new File(resDir).mkdirs();
+         String res = URLUtil.saveURLToFile(pomURL, resFileName, false, msg);
+         if (res == null) { // If success we break
+            found = true;
+            break;
+         }
+      }
+      return found;
+
+   }
+
    private boolean installMvnFile(MvnDescriptor desc, String resFileName, String remoteSuffix, String remoteExt) {
       boolean found = false;
       if (system.installExisting && new File(resFileName).canRead()) {
@@ -375,6 +407,13 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       }
       return found;
 
+   }
+
+   public RepositoryPackage getOrCreatePackage(String url, RepositoryPackage parent, boolean install) {
+      RepositorySource src = createRepositorySource(url, false);
+      String pkgName = src.getDefaultPackageName();
+      RepositoryPackage pkg = system.addPackageSource(this, pkgName, src.getDefaultFileName(), src, install, parent);
+      return pkg;
    }
 
    @Override

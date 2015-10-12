@@ -45,12 +45,15 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    public RepositorySource currentSource;
 
    /** Only set if this package is a module of another parent package */
-   public RepositoryPackage parentPkg;
+   public String parentPkgURL;
+   transient public RepositoryPackage parentPkg;
    /** If this is a package of packages, contains the sub-packages.  Otherwise null. */
-   public ArrayList<RepositoryPackage> subPackages;
+   transient public ArrayList<RepositoryPackage> subPackages;
+   public ArrayList<String> subPkgURLs;
 
    // Optional list of dependencies this package has on other packages
-   public ArrayList<RepositoryPackage> dependencies;
+   transient public ArrayList<RepositoryPackage> dependencies;
+   public ArrayList<String> depPkgURLs;
 
    public String installedRoot;
 
@@ -89,7 +92,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    }
 
    public RepositoryPackage(IRepositoryManager mgr, String pkgName, String fileName, RepositorySource src, RepositoryPackage parentPkg) {
-      fileNames.add(fileName);
+      addFileName(fileName);
       this.packageName = pkgName;
       this.sources = new RepositorySource[1];
       src.pkg = this;
@@ -105,11 +108,15 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
 
    public RepositoryPackage(IRepositoryManager mgr, String pkgName, RepositorySource[] srcs) {
       this.packageName = pkgName;
-      this.fileNames.add(pkgName);
+      addFileName(pkgName);
       this.sources = srcs;
       for (RepositorySource src:srcs)
          src.pkg = this;
       updateInstallRoot(mgr);
+   }
+
+   public void addFileName(String fn) {
+      fileNames.add(fn);
    }
 
    public void init() {
@@ -126,11 +133,11 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
                   packageName = src.getDefaultPackageName();
                String defaultFile = src.getDefaultFileName();
                if (fileNames.size() == 0 && defaultFile != null)
-                  fileNames.add(defaultFile);
+                  addFileName(defaultFile);
                // TODO: a null fileName also means to install in the packageRoot.  Do we need to support this case?
                // maybe that should be a separate flag
                if (fileNames.size() == 0)
-                  fileNames.add(packageName);
+                  addFileName(packageName);
                src.pkg = this;
                updateCurrentSource(src);
                updateInstallRoot(mgr);
@@ -161,6 +168,11 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    public String install(DependencyContext ctx) {
       if (replacedByPkg != null)
          return replacedByPkg.install(ctx);
+
+      RepositorySystem sys = mgr.getRepositorySystem();
+      RepositoryPackage oldPkg = sys.getRepositoryPackage(packageName);
+      if (oldPkg != this)
+         System.err.println("*** Warning - installing package not registered");
 
       ArrayList<RepositoryPackage> allDeps = new ArrayList<RepositoryPackage>();
       DependencyCollection depCol = new DependencyCollection();
@@ -375,14 +387,36 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
          for (RepositorySource src:sources)
             src.init(mgr.getRepositorySystem());
       }
+      /*
+      if (parentPkgURL != null) {
+         parentPkg = mgr.getOrCreatePackage(parentPkgURL, null, false);
+      }
+      if (subPkgURLs != null) {
+         ArrayList<RepositoryPackage> subs = new ArrayList<RepositoryPackage>(subPkgURLs.size());
+         for (String sub:subPkgURLs) {
+            subs.add(mgr.getOrCreatePackage(sub, this, false));
+         }
+         subPackages = subs;
+      }
+      // need to do the subPackages before the dependencies - otherwise, we might find one of them in a dependency
+      // and not know it's a child of this package - then we try to install it from scratch.
+      if (subPackages != null) {
+         for (RepositoryPackage subPkg:subPackages) {
+            subPkg.init(mgr);
+         }
+      }
+      if (depPkgURLs != null) {
+         ArrayList<RepositoryPackage> deps = new ArrayList<RepositoryPackage>(depPkgURLs.size());
+         for (String depPkgURL:depPkgURLs) {
+            deps.add(mgr.getOrCreatePackage(depPkgURL, null, false));
+         }
+         dependencies = deps;
+      }
       if (dependencies != null) {
          for (RepositoryPackage pkg:dependencies)
             pkg.init(mgr);
       }
-      if (subPackages != null) {
-         for (RepositoryPackage subPkg:subPackages)
-            subPkg.init(mgr);
-      }
+      */
       // Clearing this out since we need to potentially reinstall this package
       installed = false;
    }
@@ -420,8 +454,9 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    public boolean updateFromSaved(IRepositoryManager mgr, RepositoryPackage oldPkg, boolean install, DependencyContext ctx) {
       if (!packageName.equals(oldPkg.packageName))
          return false;
-      if (!fileNames.equals(oldPkg.fileNames))
-         return false;
+
+      // Note: We used to also compare fileNames but we can at least add to that list based on the contents of the POM
+      // so we need to restore that value instead
 
       if (oldPkg.sources == null)
          return false;
@@ -429,8 +464,11 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       if (sources == null)
          sources = new RepositorySource[0];
 
-      if (sources.length > oldPkg.sources.length)
-         return false;
+      // We might have added a source but if the current sources are the same we do not have to reinstall
+      if (sources.length > oldPkg.sources.length) {
+         if (currentSource == null || oldPkg.currentSource == null || !currentSource.equals(oldPkg.currentSource))
+            return false;
+      }
 
       // If the packet went from false to true, we need to re-install to pick up the test dependencies.  If it goes from
       // true to false we'll accept that as already being installed.
@@ -442,38 +480,42 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
 
       // Just check that the original sources match.  sources right now only has those added in the layer def files - not those that will be added
       // via dependencies if we install.
-      for (int i = 0; i < sources.length; i++)
-         if (!sources[i].equals(oldPkg.sources[i]))
-            return false;
+      if (currentSource == null || oldPkg.currentSource == null) {
+         for (int i = 0; i < sources.length; i++)
+            if (!sources[i].equals(oldPkg.sources[i]))
+               return false;
+      }
+
+      fileNames = oldPkg.fileNames;
+      definesClasses = oldPkg.definesClasses;
+      definesSrc = oldPkg.definesSrc;
+      buildFromSrc = oldPkg.buildFromSrc;
 
       RepositorySystem sys = mgr.getRepositorySystem();
 
-      if (oldPkg.subPackages != null) {
-         subPackages = new ArrayList<RepositoryPackage>();
-         for (RepositoryPackage oldSubPackage:oldPkg.subPackages) {
-            RepositoryPackage newSubPackage = sys.addPackage(mgr, oldSubPackage, this, false, ctx);
-            subPackages.add(newSubPackage);
+      if (oldPkg.parentPkgURL != null) {
+         parentPkg = mgr.getOrCreatePackage(oldPkg.parentPkgURL, null, false);
+      }
+      if (oldPkg.subPkgURLs != null) {
+         ArrayList<RepositoryPackage> subs = new ArrayList<RepositoryPackage>(oldPkg.subPkgURLs.size());
+         for (String sub:oldPkg.subPkgURLs) {
+            subs.add(mgr.getOrCreatePackage(sub, this, install));
          }
+         subPackages = subs;
+      }
+      if (oldPkg.depPkgURLs != null) {
+         ArrayList<RepositoryPackage> deps = new ArrayList<RepositoryPackage>(oldPkg.depPkgURLs.size());
+         for (String depPkgURL:oldPkg.depPkgURLs) {
+            deps.add(mgr.getOrCreatePackage(depPkgURL, null, install));
+         }
+         dependencies = deps;
       }
 
       // Restore any package aliases we migh ahve saved so those are properly resolved in the dependency mechanism
       if (oldPkg.packageAlias != null)
          mgr.getRepositorySystem().registerAlternateName(this, oldPkg.packageAlias);
 
-      // These fields are computed during the install so we update them here when we skip the install
-      ArrayList<RepositoryPackage> oldDeps = oldPkg.dependencies;
-      if (oldDeps != null) {
-         for (int i = 0; i < oldDeps.size(); i++) {
-            RepositoryPackage oldDep = oldDeps.get(i);
-            RepositoryPackage canonDep = sys.addPackage(mgr, oldDep, null, install, ctx);
-            if (canonDep != oldDep)
-               oldDeps.set(i, canonDep);
-         }
-      }
-      dependencies = oldDeps;
-
       updateCurrentSource(oldPkg.currentSource);
-      definesClasses = oldPkg.definesClasses;
 
       if (install && subPackages != null) {
          for (RepositoryPackage subPkg:subPackages)
@@ -483,10 +525,30 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       return true;
    }
 
+   private void preSave() {
+      if (dependencies != null) {
+         ArrayList<String> depPkgs = new ArrayList<String>(dependencies.size());
+         for (int i = 0; i < dependencies.size(); i++) {
+            depPkgs.add(dependencies.get(i).getPackageURL());
+         }
+         depPkgURLs = depPkgs;
+      }
+      if (parentPkg != null)
+         parentPkgURL = parentPkg.getPackageURL();
+      if (subPackages != null) {
+         ArrayList<String> subPkgs = new ArrayList<String>(subPackages.size());
+         for (int i = 0; i < subPackages.size(); i++) {
+            subPkgs.add(subPackages.get(i).getPackageURL());
+         }
+         subPkgURLs = subPkgs;
+      }
+   }
+
    public void saveToFile(File tagFile) {
       ObjectOutputStream os = null;
       FileOutputStream fos = null;
       try {
+         preSave();
          os = new ObjectOutputStream(fos = new FileOutputStream(tagFile));
          os.writeObject(this);
       }
@@ -533,7 +595,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
          List<String> cpFileNames = src.getClassPathFileNames();
          for (String cpFileName:cpFileNames) {
             if (!fileNames.contains(cpFileName))
-               fileNames.add(cpFileName);
+               addFileName(cpFileName);
          }
       }
    }
@@ -587,5 +649,17 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
          newSrcPaths[len] = srcPath;
          srcPaths = newSrcPaths;
       }
+   }
+
+   public String getPackageURL() {
+      if (currentSource == null)
+         return packageName;
+      return currentSource.url;
+   }
+
+   /** Should we skip backing up this project directory?  For maven, if there's only a pom file we do not want to redownload
+    * that file each time and yet we never save the .ser file so we can't determine that it's pre-installed. */
+   public boolean getReusePackageDirectory() {
+      return false;
    }
 }

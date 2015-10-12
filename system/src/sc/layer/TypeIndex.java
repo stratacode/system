@@ -15,6 +15,7 @@ public class TypeIndex implements Serializable {
    public String typeName;
    public String layerName;
    public String processIdent;
+   public int layerPosition;
    public List<String> baseTypes;
    public DeclarationType declType;
    public String fileName;

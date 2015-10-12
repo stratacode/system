@@ -345,6 +345,13 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
       Object defMod = getDefaultModifier();
       if (defMod != null && (lev = AccessLevel.getAccessLevel(defMod.toString())) != null)
          return lev;
+      TypeDeclaration type = getEnclosingType();
+      // Members that are in interfaces in Java need to return 'public' if nothing is set
+      if (type != null) {
+         lev = type.getDefaultAccessLevel();
+         if (lev != null)
+            return lev;
+      }
       return null;
    }
 

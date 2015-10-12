@@ -5,6 +5,7 @@
 package sc.repos.mvn;
 
 import sc.layer.Layer;
+import sc.repos.DependencyContext;
 import sc.repos.IRepositoryManager;
 import sc.repos.RepositoryPackage;
 import sc.repos.RepositorySource;
@@ -92,9 +93,34 @@ public class MvnRepositoryPackage extends RepositoryPackage {
          installFileTypes.add(null);
       for (String installFileType:installFileTypes) {
          if (installFileType == null)
-            fileNames.add(msrc.desc.getJarFileName());
+            addFileName(msrc.desc.getJarFileName());
          else if (installFileType.equals("test-jar"))
-            fileNames.add(msrc.desc.getTestJarFileName());
+            addFileName(msrc.desc.getTestJarFileName());
       }
+   }
+
+   public boolean getReusePackageDirectory() {
+      File versionRoot = new File(getVersionRoot());
+      if (versionRoot.isDirectory()) {
+         File[] files = versionRoot.listFiles();
+         if (files == null)
+            return true;
+         for (File file:files) {
+            String fileName = file.getName();
+            if (fileName.equals("pom.xml") || fileName.startsWith(".") || fileName.equals("pom.xml.notFound"))
+               continue;
+            return false;
+         }
+         return true;
+      }
+      return false;
+   }
+
+   public boolean updateFromSaved(IRepositoryManager mgr, RepositoryPackage oldPkg, boolean install, DependencyContext ctx) {
+      if (!super.updateFromSaved(mgr, oldPkg, install, ctx))
+         return false;
+      if (oldPkg instanceof MvnRepositoryPackage)
+         installFileTypes = ((MvnRepositoryPackage) oldPkg).installFileTypes;
+      return true;
    }
 }

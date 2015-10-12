@@ -281,6 +281,9 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
             return boundCompType;
          }
       }
+      // TODO: is this wildcard test right?  If we don't do this here, we can get an exception in isAssignableFrom
+      if (ModelUtil.isWildcardType(boundType))
+         boundType = ModelUtil.getWildcardBounds(boundType);
       if (ModelUtil.isTypeVariable(boundType))
          return null;
       if (!ModelUtil.isAssignableFrom(paramType, boundType, false, null, true, getLayeredSystem()))

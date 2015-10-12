@@ -12,5 +12,9 @@ public class AnnotationTypeDeclaration extends TypeDeclaration
 
    public void unregister() {
    }
+
+   public AccessLevel getDefaultAccessLevel() {
+      return AccessLevel.Public;
+   }
 }
 

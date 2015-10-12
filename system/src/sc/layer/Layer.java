@@ -892,6 +892,12 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       return model != null;
    }
 
+   /** Disable indexing of the layer's src directory */
+   public void setHasSrc(boolean val) {
+      if (false)
+         topLevelSrcDirs = Collections.EMPTY_LIST;
+   }
+
    public enum LayerEnabledState {
       Enabled, Disabled, NotSet
    }
@@ -1371,7 +1377,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    void initSrcCache(ArrayList<ReplacedType> replacedTypes) {
-      for (String dir: topLevelSrcDirs) {
+      for (int i = 0; i < topLevelSrcDirs.size(); i++) {
+         String dir = topLevelSrcDirs.get(i);
          if (!isBuildDirPath(dir))
             dir = FileUtil.getRelativeFile(layerPathName, dir);
          else {
@@ -1386,7 +1393,13 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          if (dir.contains("${"))
             System.err.println("Layer: " + getLayerName() + ": Unrecognized variable in srcPath: " + dir);
          File dirFile = new File(dir);
-         addSrcFilesToCache(dirFile, "", replacedTypes);
+         if (!addSrcFilesToCache(dirFile, "", replacedTypes)) {
+            // For hierarchical projects it's easier to specify all possible src dirs, even if some do not exist.  This is thus a warning, not an error
+            warn("Invalid src dir: " + dir);
+            // Actually remove this so it does not end up in the index
+            topLevelSrcDirs.remove(i);
+            i--;
+         }
       }
       if (globalPackages != null) {
          for (String pkg:globalPackages) {
@@ -1462,18 +1475,19 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          System.err.println(sb);
    }
 
-   private void addSrcFilesToCache(File dir, String prefix, ArrayList<ReplacedType> replacedTypes) {
+   private boolean addSrcFilesToCache(File dir, String prefix, ArrayList<ReplacedType> replacedTypes) {
       String srcDirPath = dir.getPath();
       if (!srcDirs.contains(srcDirPath))
          srcDirs.add(srcDirPath);
 
       String[] files = dir.list();
-      if (files == null)
-         return;
+      if (files == null) {
+         return false;
+      }
       if (excludedPaths != null && prefix != null) {
          for (String path:excludedPaths) {
             if (path.equals(prefix))
-               return;
+               return true;
          }
       }
 
@@ -1517,9 +1531,12 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             }
          }
          else if (!excludedFile(fn, prefix) && f.isDirectory()) {
-            addSrcFilesToCache(f, FileUtil.concat(prefix, f.getName()), replacedTypes);
+            if (!addSrcFilesToCache(f, FileUtil.concat(prefix, f.getName()), replacedTypes)) {
+               warn("Invalid child src directory: " + f);
+            }
          }
       }
+      return true;
    }
 
    private TreeSet<String> getDirIndex(String prefix) {
@@ -1692,7 +1709,6 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (topLevelSrcDirs == null)
          initSrcDirs();
 
-      layerTypeIndex.topLevelSrcDirs = topLevelSrcDirs.toArray(new String[topLevelSrcDirs.size()]);
       layerTypeIndex.layerPathName = getLayerPathName();
       if (layerTypeIndex.layerPathName == null)
          System.err.println("*** Missing layer path name for type index");
@@ -1736,6 +1752,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       // Now init our index of the files managed by this layer
       initSrcCache(replacedTypes);
 
+      // Need to save the filtered list of topLevelSrcDirs in the index so we know when this particular index is out of date.
+      layerTypeIndex.topLevelSrcDirs = topLevelSrcDirs.toArray(new String[topLevelSrcDirs.size()]);
+
       if (isBuildLayer())
          makeBuildLayer();
 
@@ -1759,11 +1778,11 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    private void initSrcDirs() {
       if (srcPath == null) {
-         topLevelSrcDirs = Collections.singletonList(LayerUtil.getLayerSrcDirectory(layerPathName));
+         topLevelSrcDirs = new ArrayList<String>(Collections.singletonList(LayerUtil.getLayerSrcDirectory(layerPathName)));
       }
       else {
          String [] srcList = srcPath.split(FileUtil.PATH_SEPARATOR);
-         topLevelSrcDirs = Arrays.asList(srcList);
+         topLevelSrcDirs = new ArrayList<String>(Arrays.asList(srcList));
          for (int i = 0; i < topLevelSrcDirs.size(); i++) {
             if (topLevelSrcDirs.get(i).equals("."))
                topLevelSrcDirs.set(i, layerPathName);
@@ -3612,7 +3631,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    public RepositoryPackage getRepositoryPackage(String pkgName) {
-      return layeredSystem.repositorySystem.store.packages.get(pkgName);
+      return layeredSystem.repositorySystem.getRepositoryPackage(pkgName);
    }
 
    public RepositoryPackage addRepositoryPackage(String url) {

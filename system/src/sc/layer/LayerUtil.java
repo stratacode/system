@@ -35,6 +35,7 @@ public class LayerUtil implements LayerConstants {
       layer.dynamic = false;
       layer.defaultModifier = "public";
       layer.buildLayer = true;
+      layer.setHasSrc(false);
       layer.initBuildDir();
       layer.makeBuildLayer();
       layer.init();

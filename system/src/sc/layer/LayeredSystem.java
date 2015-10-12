@@ -4189,6 +4189,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       runMainMethod(type, runClass, runClassArgs);
    }
 
+   static private Class MAIN_ARG = sc.type.Type.get(String.class).getArrayClass(String.class, 1);
+
    void runMainMethod(Object type, String runClass, String[] runClassArgs) {
       if (runtimeProcessor != null) {
          runtimeProcessor.runMainMethod(type, runClass, runClassArgs);
@@ -4196,7 +4198,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       Object[] args = new Object[] {processCommandArgs(runClassArgs)};
       if (type != null && ModelUtil.isDynamicType(type)) {
-         Object meth = ModelUtil.getMethod(this, type, "main", null, null, null, false, RTypeUtil.MAIN_ARG);
+         Object meth = ModelUtil.getMethod(this, type, "main", null, null, null, false, MAIN_ARG);
          if (!ModelUtil.hasModifier(meth, "static"))
             System.err.println("*** Main method missing 'static' modifier: " + runClass);
          else {
@@ -4215,7 +4217,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             return;
          }
          Class rcClass = (Class) rc;
-         Method meth = RTypeUtil.getMethod(rcClass, "main", RTypeUtil.MAIN_ARG);
+         Method meth = RTypeUtil.getMethod(rcClass, "main", MAIN_ARG);
          if (!PTypeUtil.hasModifier(meth, "static"))
             System.err.println("*** Main method missing 'static' modifier: " + runClass);
          else {

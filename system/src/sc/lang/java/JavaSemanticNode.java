@@ -364,7 +364,7 @@ public abstract class JavaSemanticNode extends SemanticNode {
    }
 
    final static int FILE_MARGIN = 70;
-   private String getMessageString(String...args) {
+   protected String getMessageString(String...args) {
       StringBuilder sb = new StringBuilder();
       sb.append(toFileString());
       int sz = sb.length();

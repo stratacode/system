@@ -18,7 +18,6 @@ public class RTypeUtil {
    static Map<Class,CoalescedHashMap<String,Class>> innerClassIndex = new WeakHashMap<Class,CoalescedHashMap<String,Class>>();
    static Map<Class,CoalescedHashMap<String,Enum>> enumIndex = new WeakHashMap<Class,CoalescedHashMap<String,Enum>>();
    static Map<Class, CoalescedHashMap<String,Method[]>> methodCache = new HashMap<Class,CoalescedHashMap<String,Method[]>>();
-   static public Class MAIN_ARG = sc.type.Type.get(String.class).getArrayClass(String.class, 1);
 
    public static boolean verboseClasses = false;
 

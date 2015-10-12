@@ -29,6 +29,8 @@ public interface IRepositoryManager {
 
    public RepositoryPackage createPackage(String url);
 
+   public RepositoryPackage getOrCreatePackage(String url, RepositoryPackage parent, boolean install);
+
    public RepositoryPackage createPackage(IRepositoryManager mgr, String packageName, String fileName, RepositorySource src, RepositoryPackage parentPkg);
 
    public RepositorySystem getRepositorySystem();

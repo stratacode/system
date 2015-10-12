@@ -1764,4 +1764,8 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    public boolean needsEnclosingClass() {
       return true;
    }
+
+   public AccessLevel getDefaultAccessLevel() {
+      return null;
+   }
 }

@@ -4,6 +4,8 @@
 
 package sc.layer;
 
+import sc.util.StringUtil;
+
 import java.util.*;
 
 /**
