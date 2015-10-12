@@ -21,8 +21,8 @@ echo "Building StrataCode into: $BUILDDIR"
 
 # For a clean build you should run this from the source directly, or first build StrataCode, then use it to build itself.
 mkdir -p $BUILDDIR
-sc -c -a coreRuntime -da $BUILDDIR
-sc -c -a system -da $BUILDDIR
+scc -c -a coreRuntime -da $BUILDDIR
+scc -c -a system -da $BUILDDIR
 
 # Now we package up the STAGEDIR/StrataCode directory.  
 rm -rf $STAGEDIR/StrataCode
