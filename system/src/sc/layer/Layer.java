@@ -289,7 +289,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    LayerTypeIndex layerTypeIndex = new LayerTypeIndex();
 
    /** Used to order the loading of layers in the layer type index.  We need to load it from the bottom up to be sure all extended types have been loaded before we load subsequent layers. */
-   private boolean layerTypesStarted = false;
+   boolean layerTypesStarted = false;
 
    /** If a Java file uses no extensions, we can either compile it from the source dir or copy it to the build dir */
    public boolean copyPlainJavaFiles = true;
@@ -367,6 +367,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    public HashMap<String,IAnnotationProcessor> annotationProcessors = null;
 
    private ArrayList<ReplacedType> replacedTypes;
+
+   /** Does this layer have any source files associated with it */
+   private boolean hasSrc = true;
 
    /**
     * Add an explicitly dependency on layer.  This will ensure that if your layer and the otherLayerName are in the stack, that this layer will be compiled along with other layer.
@@ -894,7 +897,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    /** Disable indexing of the layer's src directory */
    public void setHasSrc(boolean val) {
-      if (false)
+      hasSrc = val;
+      if (!val)
          topLevelSrcDirs = Collections.EMPTY_LIST;
    }
 
@@ -1155,7 +1159,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (excluded)
          return;
 
-      initTypeIndex();
+      // Don't initialize the core build layer - it has no indexed types anyway and this causes us to init the
+      // per-process index before we've defined the process.
+      if (hasSrc)
+         initTypeIndex();
 
       if (baseLayers != null && !activated) {
          for (Layer baseLayer:baseLayers)
@@ -1503,6 +1510,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          String srcPath = FileUtil.concat(prefix, fn);
          IFileProcessor proc = ext == null ? null : layeredSystem.getFileProcessorForExtension(ext, f.getPath(), true, this, null, false);
 
+         // This isParsed test is also used for properly setting langExtensions for the type index
          if (proc != null && proc.isParsed()) {
             // Register under both the name with and without the suffix
             srcDirCache.put(srcPath, f);
@@ -2927,11 +2935,11 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       String base = getLayerName();
       StringBuilder sb = new StringBuilder();
       if (closed)
-         sb.append(" closed");
+         sb.append(" *closed");
       if (excluded)
-         sb.append(" excluded");
+         sb.append(" *excluded");
       if (disabled)
-         sb.append(" disabled");
+         sb.append(" *disabled");
       if (packagePrefix == null || packagePrefix.length() == 0)
          return base + sb;
       else
@@ -3805,15 +3813,17 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          throw new IllegalArgumentException("Null extension pass to registerLanguage");
       //Language.registerLanguage(lang, ext);
       layeredSystem.registerFileProcessor(ext, lang, this);
-      if (layerTypeIndex.langExtensions == null) {
-         layerTypeIndex.langExtensions = new String[] {ext};
-      }
-      else {
-         String[] oldList = layerTypeIndex.langExtensions;
-         String[] newList = new String[oldList.length+1];
-         System.arraycopy(oldList, 0, newList, 0, oldList.length);
-         newList[oldList.length] = ext;
-         layerTypeIndex.langExtensions = newList;
+      // Files that are not parsed are not put into the srcDirCache and so don't get put into the type index
+      if (lang.isParsed()) {
+         if (layerTypeIndex.langExtensions == null) {
+            layerTypeIndex.langExtensions = new String[]{ext};
+         } else {
+            String[] oldList = layerTypeIndex.langExtensions;
+            String[] newList = new String[oldList.length + 1];
+            System.arraycopy(oldList, 0, newList, 0, oldList.length);
+            newList[oldList.length] = ext;
+            layerTypeIndex.langExtensions = newList;
+         }
       }
    }
 

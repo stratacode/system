@@ -25,6 +25,8 @@ public class LayerListTypeIndex {
    /** Map from typeName to the list of TypeIndex entries which define this type. */
    HashMap<String, ArrayList<TypeIndex>> modifyTypeIndex = new HashMap<String,ArrayList<TypeIndex>>();
 
+   private boolean reverseIndexBuilt = false;
+
    public LayerListTypeIndex(LayeredSystem sys, List<Layer> layers) {
       this.sys = sys;
       this.layersList = layers;
@@ -74,19 +76,32 @@ public class LayerListTypeIndex {
             modifyTypeIndex.put(layerTypeName, modifyTypes);
          }
          int ix;
+         int insertIx = -1;
+         int curPos = -1;
          for (ix = 0; ix < modifyTypes.size(); ix++) {
             TypeIndex tind = modifyTypes.get(ix);
             if (tind.layerName.equals(layerTypeIndex.layerName) && tind.typeName.equals(layerTypeIndex.typeName))
                break;
+            if (tind.layerPosition > layerTypeIndex.layerPosition && (curPos == -1 || tind.layerPosition < curPos)) {
+               curPos = tind.layerPosition;
+               insertIx = ix;
+            }
          }
-         if (ix == modifyTypes.size())
-            modifyTypes.add(layerTypeIndex);
+         if (ix == modifyTypes.size()) {
+            if (insertIx == -1)
+               modifyTypes.add(layerTypeIndex);
+            else
+               modifyTypes.add(insertIx, layerTypeIndex);
+         }
          else
             modifyTypes.set(ix, layerTypeIndex);
       }
    }
 
    public void buildReverseTypeIndex() {
+      if (reverseIndexBuilt)
+         return;
+      reverseIndexBuilt = true;
       HashSet<String> visitedLayers = new HashSet<String>();
       for (Map.Entry<String,LayerTypeIndex> typeIndexEntry:typeIndex.entrySet()) {
          String layerName = typeIndexEntry.getKey();

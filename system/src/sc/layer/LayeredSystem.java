@@ -325,6 +325,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    SysTypeIndex typeIndex;
 
+   String typeIndexDirName = null;
+
    public List<VMParameter> vmParameters;
 
    /** When you are running with the source to StrataCode, instead of just with sc.jar point this to the source root - i.e. the dir which holds coreRuntime, fullRuntime, and sc */
@@ -348,6 +350,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (!peerMode && peerSystems != null) {
             for (LayeredSystem peerSys: peerSystems) {
                peerSys.buildReverseTypeIndex();
+            }
+
+            // If we've already created a layered system for these type indexes, this will just return without
+            // doing it over again.
+            for (SysTypeIndex sti:typeIndexProcessMap.values()) {
+               sti.buildReverseTypeIndex();
             }
          }
       }
@@ -615,8 +623,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return procName == null ? runtimeName : runtimeName + "_" + procName;
    }
 
+   /** LayeredSystems have the ability to potentially share a type index but for now we are using the per-process id. */
    public String getTypeIndexIdent() {
-      return getRuntimeName(); // TODO: sometimes this should be getProcessIdent for true type uniqueness - for now we are sharing the type index across runtimes that have overlapping layers
+      return getProcessIdent();
    }
 
    /** For the IDE specifically find or create any TypeDeclaration for the type specified. */
@@ -1071,6 +1080,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       else {
          runtimeProcessor = useRuntimeProcessor;
          processDefinition = useProcessDefinition;
+         if (typeIndexDirName != null)
+            initTypeIndexDir();
       }
 
       if (runtimeProcessor != null)
@@ -1150,7 +1161,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (ProcessDefinition.compare(proc, processDefinition)) {
                // make the main layered system point to this process.
                if (processDefinition == null && proc != null)
-                  processDefinition = proc;
+                  updateProcessDefinition(proc);
                continue;
             }
 
@@ -1265,6 +1276,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                updateSystemLayers(peerSys);
             }
          }
+         if (typeIndexDirName != null)
+            initTypeIndexDir();
       }
 
       // This is set in the constructor for the new LayeredSystem so we need to restore it here
@@ -6059,7 +6072,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    private void initTypeIndexDir() {
-      File typeIndexDir = new File(getTypeIndexDir());
+      String newDirName = getTypeIndexDir();
+      if (typeIndexDirName != null) {
+          FileUtil.renameFile(typeIndexDirName, newDirName);
+      }
+      typeIndexDirName = newDirName;
+      File typeIndexDir = new File(typeIndexDirName);
       typeIndexDir.mkdirs();
       switch (options.typeIndexMode) {
          case Rebuild:
@@ -6154,6 +6172,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             System.err.println("*** Unable to access typeIndex directory: " + typeIndexDir.getPath());
             return;
          }
+         // We may create types_java directories for this layered system before we've used it for a specific process
+         if (fileNames.length == 0)
+            continue;
          HashMap<String,Boolean> filesToProcess = new HashMap<String,Boolean>();
          for (String file:fileNames)
             filesToProcess.put(file,Boolean.FALSE);
@@ -6235,8 +6256,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   }
                }
             }
-            rebuildLayersTypeIndex(layersToRebuild);
          }
+         rebuildLayersTypeIndex(layersToRebuild);
       }
 
       /*
@@ -6456,8 +6477,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (layer.baseLayerNames != null) {
                for (String baseLayerName : layer.baseLayerNames) {
                   layer.layeredSystem.leafLayerNames.remove(baseLayerName);
-                  // Find this layer in whatever layered system it lives in since it's in a different one than the parent
-                  Layer baseLayer = getInactiveLayer(baseLayerName, false, true, true, true);
+                  // Restrict the search for only layers in the parent's layered system.  We need leafLayerNames to represent
+                  // all leaf layers in each process - i.e. each layered system
+                  Layer baseLayer = layer.layeredSystem.getInactiveLayer(baseLayerName, false, false, true, true);
                   if (baseLayer != null) {
                      baseLayer.layeredSystem.leafLayerNames.remove(baseLayerName);
                   }
@@ -6510,6 +6532,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             releaseDynLock(false);
          }
       }
+      for (Layer layer:inactiveLayers) {
+         if (!layer.layerTypesStarted)
+            System.out.println("*** Warning - did not initialize layer type index for layer: " + layer);
+      }
       // Clear these out so we don't keep re-initing the same layers over and over again.
       leafLayerNames = new LinkedHashSet<String>();
    }
@@ -6517,17 +6543,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public void addLayerToRebuild(String layerName, ArrayList<Layer> layersToRebuild) {
       try {
          acquireDynLock(false);
-         Layer layer = getInactiveLayer(layerName, false, true, true, false);
+         Layer layer = getInactiveLayer(layerName, false, false, true, false);
          if (layer == null) {
             System.err.println("*** Unable to index layer: " + layerName);
             return;
-         } else if (layer.disabled) {
+         }
+         else if (layer.disabled) {
             return;
-         } else if (!layer.excluded && layer.layeredSystem == this) {
+         }
+         else if (!layer.excluded && layer.layeredSystem == this) {
             layersToRebuild.add(layer);
-         } else { // For excluded layers, hand it off to the layer's layered system
-            if (layer.layeredSystem != this) {
-               layer.layeredSystem.addLayerToRebuild(layerName, layersToRebuild);
+         }
+         if (!peerMode && peerSystems != null) {
+            for (LayeredSystem peerSys:peerSystems) {
+               peerSys.addLayerToRebuild(layerName, layersToRebuild);
             }
          }
       }
