@@ -238,15 +238,17 @@ public class ReverseDependencies implements Serializable {
          return;
       }
 
+      ObjectOutputStream os = null;
       try {
-         ObjectOutputStream os = new ObjectOutputStream(new FileOutputStream(revFile));
+         os = new ObjectOutputStream(new FileOutputStream(revFile));
          os.writeObject(reverseDeps);
       }
       catch (IOException exc) {
          System.out.println("*** can't write build srcFile: " + exc);
       }
-
-
+      finally {
+         FileUtil.safeClose(os);
+      }
    }
 
    public static ReverseDependencies readReverseDeps(String revDepsFileName, ReverseDependencies reverseDeps) {

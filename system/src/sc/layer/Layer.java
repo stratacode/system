@@ -2087,14 +2087,18 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          return;
       }
 
+      ObjectOutputStream os = null;
       try {
-         ObjectOutputStream os = new ObjectOutputStream(new FileOutputStream(buildSrcFile));
+         os = new ObjectOutputStream(new FileOutputStream(buildSrcFile));
          os.writeObject(buildSrcIndex);
 
          buildSrcIndexNeedsSave = false;
       }
       catch (IOException exc) {
          System.err.println("*** can't write build srcFile: " + exc);
+      }
+      finally {
+         FileUtil.safeClose(os);
       }
    }
 
@@ -2126,12 +2130,16 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       // For activated layers, we might not have a complete type index so we cannot save it.
       if (!activated) {
          File typeIndexFile = new File(layeredSystem.getTypeIndexFileName(getLayerName()));
+         ObjectOutputStream os = null;
          try {
-            ObjectOutputStream os = new ObjectOutputStream(new FileOutputStream(typeIndexFile));
+            os = new ObjectOutputStream(new FileOutputStream(typeIndexFile));
             os.writeObject(layerTypeIndex);
          }
          catch (IOException exc) {
             System.err.println("*** Unable to write typeIndexFile: " + exc);
+         }
+         finally {
+            FileUtil.safeClose(os);
          }
       }
    }
@@ -2214,12 +2222,16 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          return;
       }
 
+      ObjectOutputStream os = null;
       try {
-         ObjectOutputStream os = new ObjectOutputStream(new FileOutputStream(dynTypeFile));
+         os = new ObjectOutputStream(new FileOutputStream(dynTypeFile));
          os.writeObject(dynTypeIndex);
       }
       catch (IOException exc) {
          System.out.println("*** can't write dyn type index file: " + exc);
+      }
+      finally {
+         FileUtil.safeClose(os);
       }
    }
 

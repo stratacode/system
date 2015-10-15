@@ -6105,6 +6105,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          Layer inactiveLayer = inactiveLayers.get(i);
          inactiveLayer.saveTypeIndex();
       }
+      if (!peerMode && peerSystems != null) {
+         for (LayeredSystem peerSys:peerSystems) {
+            peerSys.saveTypeIndexFiles();
+         }
+      }
       /*
       for (int i = 0; i < layers.size(); i++) {
          Layer layer = layers.get(i);
@@ -6395,6 +6400,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                if (curTypeIndex == null || lastModified < subF.lastModified()) {
                   try {
                      acquireDynLock(false);
+                     if (options.verbose) {
+                        if (curTypeIndex == null)
+                           verbose("Refreshing type index: no type index entry for: " + path);
+                        else
+                           verbose("Refreshing type index: file has changed " + path);
+                     }
                      Layer newLayer = getActiveOrInactiveLayerByPath(layerName, null, false, true, true);
                      if (newLayer == null) {
                         System.err.println("*** Warning unable to find layer in type index: " + layerName + " - skipping index entyr");
@@ -6532,10 +6543,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             releaseDynLock(false);
          }
       }
+      /*
+       * For a clean build, this helps us make sure we found all of the leafLayerNames properly
       for (Layer layer:inactiveLayers) {
          if (!layer.layerTypesStarted)
             System.out.println("*** Warning - did not initialize layer type index for layer: " + layer);
       }
+      */
       // Clear these out so we don't keep re-initing the same layers over and over again.
       leafLayerNames = new LinkedHashSet<String>();
    }
