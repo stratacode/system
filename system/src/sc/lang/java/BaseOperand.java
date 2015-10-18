@@ -11,12 +11,15 @@ public abstract class BaseOperand extends JavaSemanticNode {
 
    public String toGenerateString() {
       Object rhsObj = getRhs();
-      if (operator != null && rhsObj instanceof JavaSemanticNode) {
-         StringBuilder sb = new StringBuilder();
+      StringBuilder sb = new StringBuilder();
+      if (operator != null) {
          sb.append(" ");
          sb.append(operator);
          sb.append(" ");
-         sb.append(((JavaSemanticNode) rhsObj).toGenerateString());
+         if (rhsObj instanceof JavaSemanticNode)
+            sb.append(((JavaSemanticNode) rhsObj).toGenerateString());
+         else
+            sb.append("? unknown operand: " + rhsObj);
          return sb.toString();
       }
       throw new UnsupportedOperationException();

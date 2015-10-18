@@ -719,8 +719,11 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    public void updateTypeIndex(TypeIndex typeIndex) {
-      layerTypeIndex.layerTypeIndex.put(typeIndex.typeName, typeIndex);
-      layerTypeIndex.fileIndex.put(typeIndex.fileName, typeIndex);
+      String typeName = typeIndex.typeName;
+      if (typeName != null) {
+         layerTypeIndex.layerTypeIndex.put(typeName, typeIndex);
+         layerTypeIndex.fileIndex.put(typeIndex.fileName, typeIndex);
+      }
    }
 
    // TODO: Note - there could potentially be multiple returns here - say 'desktop' and 'server' but I'm not sure we'll ever need two different 'java' runtimes activated at the same time
@@ -2122,7 +2125,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          new Throwable().printStackTrace();;
       }
 
-      useTypeIndex.typeIndex.put(getLayerName(), layerTypeIndex);
+      String layerName = getLayerName();
+      if (layerName != null)
+         useTypeIndex.typeIndex.put(layerName, layerTypeIndex);
       layerTypeIndex.baseLayerNames = baseLayerNames == null ? null : baseLayerNames.toArray(new String[baseLayerNames.size()]);
    }
 
@@ -3858,7 +3863,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       startAllTypes();
       saveTypeIndex();
       LayerListTypeIndex listTypeIndex = activated ? layeredSystem.typeIndex.activeTypeIndex : layeredSystem.typeIndex.inactiveTypeIndex;
-      listTypeIndex.typeIndex.put(getLayerName(), layerTypeIndex);
+      String name = getLayerName();
+      if (name != null)
+         listTypeIndex.typeIndex.put(name, layerTypeIndex);
    }
 
    public boolean hasDefinitionForType(String typeName) {

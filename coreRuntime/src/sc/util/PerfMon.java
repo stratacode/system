@@ -10,15 +10,21 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * For collecting runtime performance statistics.  Place PerfMon.start/end calls around your code.
+ * Each take the 'name' of the operation.   You can choose whether any given operation is included or excluded from
+ * the time of it's parent operation which helps when you have recursive operations (include) and lazy-initialized operations (exclude).
+ * You can dump stats to the console or clear them.
+ */
 public class PerfMon {
    static ThreadLocal<ArrayList<PerfOp>> currentOp = new ThreadLocal<ArrayList<PerfOp>>();
 
-   static ArrayList<String> statOrder = new ArrayList<String>();
+   final static ArrayList<String> statOrder = new ArrayList<String>();
    final static ConcurrentHashMap<String,PerfStat> statTable = new ConcurrentHashMap<String,PerfStat>();
 
-   static ConcurrentHashMap<NestedPair,Boolean> nestedPairs = new ConcurrentHashMap<NestedPair,Boolean>();
+   final static ConcurrentHashMap<NestedPair,Boolean> nestedPairs = new ConcurrentHashMap<NestedPair,Boolean>();
 
-   static ConcurrentHashMap<String,ArrayList<String>> statChildren = new ConcurrentHashMap<String,ArrayList<String>>();
+   final static ConcurrentHashMap<String,ArrayList<String>> statChildren = new ConcurrentHashMap<String,ArrayList<String>>();
 
    public static int maxSamples = 1000;
 
@@ -172,13 +178,17 @@ public class PerfMon {
          pair.parent = curOp.name;
          pair.child = name;
          if (nestedPairs.get(pair) == null) {
-            nestedPairs.put(pair, Boolean.TRUE);
-            ArrayList<String> children = statChildren.get(pair.parent);
-            if (children == null) {
-               children = new ArrayList<String>();
-               statChildren.put(pair.parent, children);
+            synchronized (statTable) {
+               if (nestedPairs.get(pair) == null) {
+                  nestedPairs.put(pair, Boolean.TRUE);
+                  ArrayList<String> children = statChildren.get(pair.parent);
+                  if (children == null) {
+                     children = new ArrayList<String>();
+                     statChildren.put(pair.parent, children);
+                  }
+                  children.add(pair.child);
+               }
             }
-            children.add(pair.child);
          }
       }
       PerfOp op = new PerfOp();
@@ -259,6 +269,12 @@ public class PerfMon {
       }
    }
 
+   /**
+    * Usually called with name = null.  In that case, it stops recording for the current operation whatever it may be.
+    * Use this if you need to do some operation which is unrelated to the current code context, and it may be included
+    * in more than one parent operation.  If you provide the name, it yields only if the current operation is the one
+    * specified.  Make sure to call resume when your nested operation is complete with the same argument.
+    */
    public static void yield(String name) {
       if (!enabled)
          return;
@@ -288,6 +304,7 @@ public class PerfMon {
       new Throwable().printStackTrace();
    }
 
+   /** Resumes after a yield - often called with null to resume the previous including operation. */
    public static void resume(String name) {
       if (!enabled)
          return;
@@ -308,13 +325,16 @@ public class PerfMon {
       perfMonError("*** resume call for: " + name + " not in the current thread's call stack");
    }
 
+   /** Dump out the currently collected statistics */
    public static void dump() {
       System.out.println("\n\nPerfMon stats\nname, options, total(secs), count(x), min(secs), max(secs)");
-      for (String statName:statOrder) {
-         PerfStat stat = statTable.get(statName);
-         // If this stat does not exist as the first of the two pairs
-         if (isRootStat(statName)) {
-            stat.printAll(null, 0);
+      synchronized(statTable) {
+         for (String statName : statOrder) {
+            PerfStat stat = statTable.get(statName);
+            // If this stat does not exist as the first of the two pairs
+            if (isRootStat(statName)) {
+               stat.printAll(null, 0);
+            }
          }
       }
       System.out.println("---");
@@ -327,6 +347,15 @@ public class PerfMon {
       }
       System.out.println("---");
       */
+   }
+
+   public static void clear() {
+      synchronized(statTable) {
+         statOrder.clear();
+         statTable.clear();
+         nestedPairs.clear();
+         statChildren.clear();
+      }
    }
 
    public static void dumpStack() {

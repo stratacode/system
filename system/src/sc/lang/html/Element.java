@@ -78,6 +78,8 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
    private transient boolean needsSuper = false;
    private transient boolean needsBody = true;
 
+   private transient boolean convertingToObject = false;
+
    private transient Object defaultExtendsType = null;
 
    /** When processing a template once we hit a parent node whose type is not available in this mode, we insert a dummy node and only process static portsion of the template until some tag sets exec="process" to turn back on processing */
@@ -2057,6 +2059,11 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       if (tagObject != null)
          return tagObject;
 
+      if (convertingToObject)
+         System.err.println("*** Already converting tag to object!");
+
+      convertingToObject = true;
+
       String objName = getObjectName();
 
       MergeMode tagMerge = getTagMergeMode();
@@ -3221,9 +3228,13 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                Element childElement = (Element) childObj;
                String childId = childElement.getElementId();
                if (childId != null && childId.equals(name)) {
-                  TypeDeclaration childType = childElement.convertToObject(getEnclosingTemplate(), tagObject, null, null, null);
-                  if (childType != null)
-                     return childType;
+                  if (childElement.convertingToObject)
+                     displayError("Recursive extend for: " + name + " in: " + tagName + " for: ");
+                  else {
+                     TypeDeclaration childType = childElement.convertToObject(getEnclosingTemplate(), tagObject, null, null, null);
+                     if (childType != null)
+                        return childType;
+                  }
                }
             }
          }

@@ -560,6 +560,7 @@ public abstract class JavaSemanticNode extends SemanticNode {
       return null;
    }
 
+   /** Return true for nodes like simple ClassType expressions "a.b.c" which can collapse into a simpler node type in the IDE. */
    public boolean isCollapsibleNode() {
       return false;
    }

@@ -368,7 +368,7 @@ public class ModifyDeclaration extends TypeDeclaration {
    private TypeDeclaration getModifyType() {
       JavaModel thisModel = getJavaModel();
       String fullTypeName = getFullTypeName();
-      if (isLayerType)
+      if (isLayerType || thisModel == null)
          return null;
       return temporaryType ? thisModel.layeredSystem.getSrcTypeDeclaration(fullTypeName, null, true) : thisModel.getPreviousDeclaration(fullTypeName);
    }
@@ -422,14 +422,15 @@ public class ModifyDeclaration extends TypeDeclaration {
          if (modifyType == null) {
             String fullTypeName = getFullTypeName();
 
-            modifyClass = thisModel.getClass(fullTypeName, false, layer, isLayerType);
+            if (thisModel != null)
+               modifyClass = thisModel.getClass(fullTypeName, false, layer, isLayerType);
 
             // For the layer object, it is registered as a global object.  Look it up with resolveName and just assign
             // the class to avoid the error.
             if (modifyClass == null)  {
                TypeDeclaration enclType = getEnclosingType();
                // If this is the top-level type in the layer, resolve it as a layer
-               if (thisModel.isLayerModel && enclType == null) {
+               if (thisModel != null && thisModel.isLayerModel && enclType == null) {
                   Object obj = thisModel.resolveName(fullTypeName, false);
                   // Originally the layer is initially registered under its type name - it gets renamed once after init
                   if (obj == null)
@@ -456,7 +457,7 @@ public class ModifyDeclaration extends TypeDeclaration {
                   }
                }
             }
-            if (!isLayerType && modifyClass != null && thisModel.getLayer() != null && !thisModel.getLayer().annotationLayer && !temporaryType)
+            if (!isLayerType && modifyClass != null && thisModel != null && thisModel.getLayer() != null && !thisModel.getLayer().annotationLayer && !temporaryType)
                displayTypeError("Unable to modify definition - " + getFullTypeName() + " have compiled definition only and layer is not an annotationLayer: " + toDefinitionString() + ": ");
          }
          else {
@@ -477,7 +478,8 @@ public class ModifyDeclaration extends TypeDeclaration {
       }
 
       if (modifyTypeDecl == null && modifyClass == null && !isLayerType && !enumConstant) {
-         displayTypeError("Modify definition for type: ", getFullTypeName(), " cannot find a definition for: ");
+         displayTypeError("Modify definition for type: ", getFullTypeName(), " no definition in previous layer for: ");
+         Object tempRes = getModifyType();
       }
 
       initExtendsTypes();

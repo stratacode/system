@@ -222,7 +222,7 @@ public class Annotation extends JavaSemanticNode implements IAnnotation {
          JavaModel model = getJavaModel();
          // Do not start stuff here just to get the full type name.  That ends up pulling in more stuff than we'd like
          // and technically this type name should be available this way without starting.
-         String imported = model.getImportedName(typeName);
+         String imported = model == null ? null : model.getImportedName(typeName);
          if (imported == null)
             return typeName;  // The type name may be absolute or not... if it's not imported It presumably must be absolute then right?
          else
