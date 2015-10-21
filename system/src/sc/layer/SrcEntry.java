@@ -76,6 +76,17 @@ public class SrcEntry {
       return CTypeUtil.prefixPath(layer == null || !prependPackage ? "" : layer.packagePrefix, getTypeNameFromRelName(relFileName));
    }
 
+   public void setTypeName(String typeName, boolean renameFile) {
+      String oldAbsFileName = absFileName;
+      String dirName = FileUtil.getParentPath(absFileName);
+      String ext = FileUtil.getExtension(baseFileName);
+      baseFileName = FileUtil.addExtension(typeName, ext);
+      absFileName = FileUtil.concat(dirName, baseFileName);
+      relFileName = FileUtil.concat(FileUtil.getParentPath(relFileName), baseFileName);
+      if (renameFile)
+         FileUtil.renameFile(oldAbsFileName, absFileName);
+   }
+
    /** Occasionally you need the type name without the prefix, i.e. when not prepending the type name on generated files */
    public String getRelTypeName() {
       return getTypeNameFromRelName(relFileName);

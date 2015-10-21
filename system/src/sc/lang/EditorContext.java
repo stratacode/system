@@ -162,7 +162,7 @@ public class EditorContext extends ClientEditorContext {
       for (JavaModel model:changedModels) {
          if (model.getSrcFile() != null) {
             model.saveModel();
-            model.layer.addNewSrcFile(model.getSrcFile());
+            model.layer.addNewSrcFile(model.getSrcFile(), true);
          }
       }
       changedModels.clear();
@@ -171,7 +171,7 @@ public class EditorContext extends ClientEditorContext {
 
    void saveModel(JavaModel model) {
       model.saveModel();
-      model.layer.addNewSrcFile(model.getSrcFile());
+      model.layer.addNewSrcFile(model.getSrcFile(), true);
    }
 
    protected JavaModel getModel() {

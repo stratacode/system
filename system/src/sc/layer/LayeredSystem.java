@@ -316,7 +316,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private boolean autoClassLoader = true;
 
    /**
-    * For the master LayeredSystem only - the map from processident to TypeIndex HashMap, used to bootstrap the TypeIndexes, before the
+    * For the master LayeredSystem only - the map from processident to TypeIndexEntry HashMap, used to bootstrap the TypeIndexes, before the
     * peerSystems are created.
     */
    HashMap<String, SysTypeIndex> typeIndexProcessMap = null;
@@ -656,10 +656,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (typeIndexProcessMap != null) {
          for (Map.Entry<String, SysTypeIndex> indexEnt : typeIndexProcessMap.entrySet()) {
             SysTypeIndex sysIndex = indexEnt.getValue();
-            ArrayList<TypeIndex> typeIndexes = sysIndex.getTypeIndexes(typeName);
-            if (typeIndexes != null) {
-               for (TypeIndex typeIndex : typeIndexes) {
-                  Layer layer = getInactiveLayerByPath(typeIndex.layerName, null, openAllLayers, true);
+            ArrayList<TypeIndexEntry> typeIndexEntries = sysIndex.getTypeIndexes(typeName);
+            if (typeIndexEntries != null) {
+               for (TypeIndexEntry typeIndexEntry : typeIndexEntries) {
+                  Layer layer = getInactiveLayerByPath(typeIndexEntry.layerName, null, openAllLayers, true);
                   if (layer != null) {
                      if (!layer.closed || openAllLayers) {
                         Object newTypeObj = layer.layeredSystem.getSrcTypeDeclaration(typeName, layer.getNextLayer(), true, false, true, layer, false);
@@ -669,13 +669,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      else {
                         boolean found = false;
                         for (Object resEnt:res) {
-                           if (typeIndex.sameType(resEnt)) {
+                           if (typeIndexEntry.sameType(resEnt)) {
                               found = true;
                               break;
                            }
                         }
                         if (!found)
-                           res.add(typeIndex);
+                           res.add(typeIndexEntry);
                      }
                   }
                }
@@ -731,6 +731,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          checkLayerPosition();
       }
+   }
+
+   public void updateTypeName(String oldFullName, String newFullName) {
+      TypeDeclarationCacheEntry tds = typesByName.remove(oldFullName);
+      if (tds != null)
+         typesByName.put(newFullName, tds);
+
+      Object inner = innerTypeCache.remove(oldFullName);
+      if (inner != null)
+         innerTypeCache.put(newFullName, inner);
+
+      typeIndex.updateTypeName(oldFullName, newFullName);
+
+      // TODO: do we do this for the other layered systems?
    }
 
    public enum BuildCommandTypes {
@@ -3441,11 +3455,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      peer.refreshSystem();
                   }
                }
-               if (sys.peerSystems != null) {
-                  for (LayeredSystem peer:sys.peerSystems) {
-                     peer.refreshSystem();
-                  }
-               }
                sys.resetBuild(true);
             }
          }
@@ -6147,7 +6156,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       String[] runtimeDirNames = typeIndexMainDir.list();
 
       if (peerMode)
-         System.err.println("*** TypeIndex should only be loaded in the main layeredSystem");
+         System.err.println("*** TypeIndexEntry should only be loaded in the main layeredSystem");
 
       // A simple guard to prevent this from being done twice - the first one to create the process map should init the index.
       acquireDynLock(false);
@@ -6392,16 +6401,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             refreshLayerTypeIndexDir(subF, FileUtil.concat(relDir, subF.getName()), layerName, typeIndex, lastModified);
          }
          else {
-            TypeIndex curTypeIndex = typeIndex.fileIndex.get(path);
-            if (curTypeIndex == TypeIndex.EXCLUDED_SENTINEL)
+            TypeIndexEntry curTypeIndexEntry = typeIndex.fileIndex.get(path);
+            if (curTypeIndexEntry == TypeIndexEntry.EXCLUDED_SENTINEL)
                continue;
             String ext = FileUtil.getExtension(path);
-            if (curTypeIndex != null || isParseable(path) || (ext != null && customSuffixes.contains(ext))) {
-               if (curTypeIndex == null || lastModified < subF.lastModified()) {
+            if (curTypeIndexEntry != null || isParseable(path) || (ext != null && customSuffixes.contains(ext))) {
+               if (curTypeIndexEntry == null || lastModified < subF.lastModified()) {
                   try {
                      acquireDynLock(false);
                      if (options.verbose) {
-                        if (curTypeIndex == null)
+                        if (curTypeIndexEntry == null)
                            verbose("Refreshing type index: no type index entry for: " + path);
                         else
                            verbose("Refreshing type index: file has changed " + path);
@@ -6422,7 +6431,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         if (proc != null) {
                            SrcEntry srcEnt = new SrcEntry(newLayer, relDir == null ? newLayer.layerPathName : FileUtil.concat(newLayer.layerPathName, relDir), relDir == null ? "" : relDir, subF.getName(), proc == null || proc.getPrependLayerPackage());
                            String typeName = srcEnt.getTypeName();
-                           TypeDeclaration newType = (TypeDeclaration) curSys.getSrcTypeDeclaration(typeName, newLayer.getNextLayer(), true, false, true, newLayer, curTypeIndex != null && curTypeIndex.isLayerType);
+                           TypeDeclaration newType = (TypeDeclaration) curSys.getSrcTypeDeclaration(typeName, newLayer.getNextLayer(), true, false, true, newLayer, curTypeIndexEntry != null && curTypeIndexEntry.isLayerType);
                            if (newType != null) {
                               // This should add it to the type index
                               ParseUtil.initAndStartComponent(newType);
@@ -7418,6 +7427,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                                  genFileExists = genFile.exists();
                                  if (genFileExists)
                                     inherited = true;
+                              }
+
+                              if (!genFileExists) {
+                                 genFile = new File(genLayer.buildClassesDir, genRelFileName);
+                                 genFileExists = genFile.exists();
                               }
                            }
 
@@ -8864,6 +8878,33 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                markBeingLoadedModel(srcEnt, newModel);
             else
                newModel.setTemporary(true);
+
+            // We want to immediate clone and update the model in the other systems as well - reduces parsing
+            // overhead but also the types in the other layered systems need to be updated eventually
+            ArrayList<JavaModel> clonedModels = null;
+            boolean activated = srcEnt.layer != null && srcEnt.layer.activated;
+            if (options.clonedParseModel && peerSystems != null) {
+               for (LayeredSystem peerSys:peerSystems) {
+                  Layer peerLayer = activated ? peerSys.getLayerByName(srcEnt.layer.layerUniqueName) : peerSys.lookupInactiveLayer(srcEnt.layer.getLayerName(), false, true);
+                  // does this layer exist in the peer runtime
+                  if (peerLayer != null) {
+                     // If the peer layer is not started, we can't clone
+                     if (peerSys.beingLoaded.get(srcEnt.absFileName) == null) {
+                        ILanguageModel oldModel = activated ? peerSys.modelIndex.get(srcEnt.absFileName) : peerSys.inactiveModelIndex.get(srcEnt.absFileName);
+                        if (oldModel == null || oldModel.getLastModifiedTime() == modTimeStart) {
+                           PerfMon.start("cloneModelBuffer");
+                           if (clonedModels == null)
+                              clonedModels = new ArrayList<JavaModel>();
+                           clonedModels.add(peerSys.cloneModel(peerLayer, (JavaModel) newModel));
+                           PerfMon.end("cloneModelBuffer");
+                        }
+                     }
+                  }
+               }
+            }
+            if (clonedModels != null)
+               initClonedModels(clonedModels, srcEnt, modTimeStart, true);
+
             try {
                initModel(srcEnt.layer, modTimeStart, newModel, srcEnt.isLayerFile(), false);
             }
@@ -8871,6 +8912,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                if (!dummy)
                   beingLoaded.remove(srcEnt.absFileName);
             }
+
+            if (clonedModels != null)
+               initClonedModels(clonedModels, srcEnt, modTimeStart, false);
          }
       }
    }
@@ -8904,86 +8948,88 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          */
 
          long modTimeStart = srcEnt.getLastModified();
-         Object result = processor.process(srcEnt, enablePartialValues);
-         if (result instanceof ParseError) {
-            if (reportErrors) {
-               System.err.println("File: " + srcEnt.absFileName + ": " +
-                       ((ParseError) result).errorStringWithLineNumbers(new File(srcEnt.absFileName)));
+         try {
+            Object result = processor.process(srcEnt, enablePartialValues);
+            if (result instanceof ParseError) {
+               if (reportErrors) {
+                  System.err.println("File: " + srcEnt.absFileName + ": " +
+                          ((ParseError) result).errorStringWithLineNumbers(new File(srcEnt.absFileName)));
 
-               if (currentBuildLayer != null && currentBuildLayer.buildState != null) {
-                  BuildState bd = currentBuildLayer.buildState;
-                  bd.anyError = true;
-                  anyErrors = true;
-                  bd.errorFiles.add(srcEnt);
-               }
-            }
-            return result;
-         }
-         else {
-            Object modelObj = ParseUtil.nodeToSemanticValue(result);
-
-            // TODO: Template file - compile these?
-            if (!(modelObj instanceof IFileProcessorResult))
-               return null;
-
-            IFileProcessorResult res = (IFileProcessorResult) modelObj;
-            res.addSrcFile(srcEnt);
-            if (srcEnt.getLastModified() != modTimeStart) {
-               System.err.println("File: " + srcEnt.absFileName + " changed during parsing");
-               return new ParseError("File changed during parsing", null, 0, 0);
-            }
-
-            if (modelObj instanceof ILanguageModel) {
-               ILanguageModel model = (ILanguageModel) modelObj;
-
-               markBeingLoadedModel(srcEnt, model);
-
-               try {
-                  boolean activatedLayer = srcEnt.layer != null && srcEnt.layer.activated;
-
-                  ILanguageModel oldModel = activatedLayer ? modelIndex.get(srcEnt.absFileName) : inactiveModelIndex.get(srcEnt.absFileName);
-                  if (oldModel instanceof JavaModel && oldModel != model && model instanceof JavaModel) {
-                     ((JavaModel) oldModel).replacedByModel = (JavaModel) model;
+                  if (currentBuildLayer != null && currentBuildLayer.buildState != null) {
+                     BuildState bd = currentBuildLayer.buildState;
+                     bd.anyError = true;
+                     anyErrors = true;
+                     bd.errorFiles.add(srcEnt);
                   }
+               }
+               return result;
+            } else {
+               Object modelObj = ParseUtil.nodeToSemanticValue(result);
 
-                  ArrayList<JavaModel> clonedModels = null;
+               // TODO: Template file - compile these?
+               if (!(modelObj instanceof IFileProcessorResult))
+                  return null;
 
-                  if (options.clonedParseModel && peerSystems != null && !isLayer && model instanceof JavaModel && checkPeers && srcEnt.layer != null) {
-                     for (LayeredSystem peerSys:peerSystems) {
-                        Layer peerLayer = peerSys.getLayerByName(srcEnt.layer.layerUniqueName);
-                        // does this layer exist in the peer runtime
-                        if (peerLayer != null) {
-                           // If the peer layer is not started, we can't clone
-                           if (!peerSys.isModelLoaded(srcEnt.absFileName)) {
-                              if (peerLayer.started) {
-                                 if (options.verbose)
-                                    verbose("Copying for runtime: " + peerSys.getRuntimeName());
-                                 if (clonedModels == null)
-                                    clonedModels = new ArrayList<JavaModel>();
-                                 PerfMon.start("cloneForRuntime");
-                                 clonedModels.add(peerSys.cloneModel(peerLayer, (JavaModel) model));
-                                 PerfMon.end("cloneForRuntime");
+               IFileProcessorResult res = (IFileProcessorResult) modelObj;
+               res.addSrcFile(srcEnt);
+               if (srcEnt.getLastModified() != modTimeStart) {
+                  System.err.println("File: " + srcEnt.absFileName + " changed during parsing");
+                  return new ParseError("File changed during parsing", null, 0, 0);
+               }
+
+               if (modelObj instanceof ILanguageModel) {
+                  ILanguageModel model = (ILanguageModel) modelObj;
+
+                  markBeingLoadedModel(srcEnt, model);
+
+                  try {
+                     boolean activatedLayer = srcEnt.layer != null && srcEnt.layer.activated;
+
+                     ILanguageModel oldModel = activatedLayer ? modelIndex.get(srcEnt.absFileName) : inactiveModelIndex.get(srcEnt.absFileName);
+                     if (oldModel instanceof JavaModel && oldModel != model && model instanceof JavaModel) {
+                        ((JavaModel) oldModel).replacedByModel = (JavaModel) model;
+                     }
+
+                     ArrayList<JavaModel> clonedModels = null;
+
+                     if (options.clonedParseModel && peerSystems != null && !isLayer && model instanceof JavaModel && checkPeers && srcEnt.layer != null) {
+                        for (LayeredSystem peerSys : peerSystems) {
+                           Layer peerLayer = peerSys.getLayerByName(srcEnt.layer.layerUniqueName);
+                           // does this layer exist in the peer runtime
+                           if (peerLayer != null) {
+                              // If the peer layer is not started, we can't clone
+                              if (!peerSys.isModelLoaded(srcEnt.absFileName)) {
+                                 if (peerLayer.started) {
+                                    if (options.verbose)
+                                       verbose("Copying for runtime: " + peerSys.getRuntimeName());
+                                    if (clonedModels == null)
+                                       clonedModels = new ArrayList<JavaModel>();
+                                    PerfMon.start("cloneForRuntime");
+                                    clonedModels.add(peerSys.cloneModel(peerLayer, (JavaModel) model));
+                                    PerfMon.end("cloneForRuntime");
+                                 } else if (options.verbose)
+                                    verbose("Not copying: " + srcEnt.absFileName + " for runtime: " + peerSys.getRuntimeName() + " peer layer not started.");
                               }
-                              else if (options.verbose)
-                                 verbose("Not copying: " + srcEnt.absFileName + " for runtime: " + peerSys.getRuntimeName() + " peer layer not started.");
                            }
                         }
                      }
+
+                     if (clonedModels != null)
+                        initClonedModels(clonedModels, srcEnt, modTimeStart, true);
+
+                     initModel(srcEnt.layer, modTimeStart, model, isLayer, false);
+
+                     if (clonedModels != null)
+                        initClonedModels(clonedModels, srcEnt, modTimeStart, false);
+                  } finally {
+                     beingLoaded.remove(srcEnt.absFileName);
                   }
-
-                  if (clonedModels != null)
-                     initClonedModels(clonedModels, srcEnt, modTimeStart, true);
-
-                  initModel(srcEnt.layer, modTimeStart, model, isLayer, false);
-
-                  if (clonedModels != null)
-                     initClonedModels(clonedModels, srcEnt, modTimeStart, false);
                }
-               finally {
-                  beingLoaded.remove(srcEnt.absFileName);
-               }
+               return modelObj;
             }
-            return modelObj;
+         }
+         catch (IllegalArgumentException exc) { // file not found
+            error("SrcFile no longer exists: " + srcEnt + ": " + exc + "");
          }
       }
       return null;
@@ -9201,6 +9247,23 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
+   public SystemRefreshInfo refreshInactiveTypes() {
+
+      UpdateInstanceInfo updateInfo = null;
+      List<Layer.ModelUpdate> changedModels = refreshSystem(null, false);
+
+      if (changedModels.size() > 0) {
+         // Once we've refreshed some of the models in the system, we now need to go and update the type references globally to point to the new references
+         // TODO: do we need to do this for inactive types or can we rely on the replacedType's doing that?
+         // refreshBoundTypes(ModelUtil.REFRESH_TYPEDEFS);
+      }
+
+      SystemRefreshInfo sysInfo = new SystemRefreshInfo();
+      sysInfo.changedModels = changedModels;
+
+      return sysInfo;
+   }
+
    public SystemRefreshInfo refreshSystem() {
       // Before we parse any files, need to clear out any invalid models
       // TODO: remove this unless we are not using clonedTransformedModels
@@ -9210,7 +9273,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       allTypesProcessed = false;
 
       UpdateInstanceInfo updateInfo = newUpdateInstanceInfo();
-      List<Layer.ModelUpdate> changedModels = refreshSystem(updateInfo);
+      List<Layer.ModelUpdate> changedModels = refreshSystem(updateInfo, true);
 
       if (changedModels.size() > 0) {
          // Once we've refreshed some of the models in the system, we now need to go and update the type references globally to point to the new references
@@ -9427,11 +9490,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * incrementally.
     * TODO: instead of using a file watcher, how about just calling this at most once every few seconds?
     */
-   public List<Layer.ModelUpdate> refreshSystem(UpdateInstanceInfo updateInfo) {
+   public List<Layer.ModelUpdate> refreshSystem(UpdateInstanceInfo updateInfo, boolean active) {
       ExecutionContext ctx = new ExecutionContext(this);
       ArrayList<Layer.ModelUpdate> refreshedModels = new ArrayList<Layer.ModelUpdate>();
-      for (Layer l:layers) {
-         l.refresh(lastRefreshTime, ctx, refreshedModels, updateInfo);
+      if (active) {
+         for (Layer l:layers) {
+            l.refresh(lastRefreshTime, ctx, refreshedModels, updateInfo);
+         }
+      }
+      else {
+         for (Layer l:inactiveLayers) {
+            l.refresh(lastRefreshTime, ctx, refreshedModels, updateInfo);
+         }
       }
       // We also have to coordinate manaagement of all of the errorModels for both layered systems in EditorContext.
       return refreshedModels;
@@ -9454,7 +9524,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** Refreshes one file and batches the changes into the supplied UpdateInstanceInfo arg */
    public Object refresh(SrcEntry srcEnt, ExecutionContext ctx, UpdateInstanceInfo info) {
       // Not using the getLanguageModel here cause we really need the old model
-      ILanguageModel oldModel = modelIndex.get(srcEnt.absFileName);
+      boolean active = srcEnt.layer == null || srcEnt.layer.activated;
+      ILanguageModel oldModel = active ? modelIndex.get(srcEnt.absFileName) : inactiveModelIndex.get(srcEnt.absFileName);
       return refresh(srcEnt, oldModel, ctx, info);
    }
 
@@ -9515,6 +9586,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       Object result = indexModel == null ? parseSrcFile(srcEnt, true) : indexModel;
 
+      boolean activated = srcEnt.layer == null || srcEnt.layer.activated;
+
       if (result instanceof JavaModel) {
          JavaModel newModel = (JavaModel) result;
          if (!newModel.isInitialized()) {
@@ -9525,12 +9598,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                JavaModel oldJavaModel = (JavaModel) oldModel;
                if (oldJavaModel.isLayerModel) // Can't update layers for now
                   return null;
-               oldJavaModel.updateModel(newModel, ctx, TypeUpdateMode.Replace, true, updateInfo);
+               oldJavaModel.updateModel(newModel, ctx, TypeUpdateMode.Replace, activated, updateInfo);
             }
             else if (newModel.modifiesModel()) {
                if (addModel)
                   addNewModel(newModel, srcEnt.layer, null, false);
-               newModel.updateLayeredModel(ctx, true, updateInfo);
+               newModel.updateLayeredModel(ctx, activated, updateInfo);
             }
             // Make sure this gets added so we don't get keep doing it over and over again
             else if (addModel)
@@ -9895,7 +9968,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return tds != null && tds.reloaded;
    }
 
-   private void addToRootNameIndex(BodyTypeDeclaration type) {
+   public void addToRootNameIndex(BodyTypeDeclaration type) {
       String rootName = type.getInnerTypeName();
       ArrayList<BodyTypeDeclaration> types = typesByRootName.get(rootName);
       if (types == null) {
@@ -9907,7 +9980,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          types.add(type);
    }
 
-   private void removeFromRootNameIndex(BodyTypeDeclaration type) {
+   public void removeFromRootNameIndex(BodyTypeDeclaration type) {
       String rootName = type.getInnerTypeName();
       ArrayList<BodyTypeDeclaration> types = typesByRootName.get(rootName);
       if (types == null) {
@@ -12239,11 +12312,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                }
             }
          }
-         LinkedHashMap<String,TypeIndex> subTypes = typeIndex.inactiveTypeIndex.subTypeIndex.get(typeName);
+         LinkedHashMap<String,TypeIndexEntry> subTypes = typeIndex.inactiveTypeIndex.subTypeIndex.get(typeName);
          if (subTypes != null) {
-            for (Map.Entry<String,TypeIndex> subTypeEnt:subTypes.entrySet()) {
+            for (Map.Entry<String,TypeIndexEntry> subTypeEnt:subTypes.entrySet()) {
                String subTypeName = subTypeEnt.getKey();
-               TypeIndex subTypeIndex = subTypeEnt.getValue();
+               TypeIndexEntry subTypeIndexEntry = subTypeEnt.getValue();
 
                if (type.isLayerType) {
                   Layer subLayer = getActiveOrInactiveLayerByPath(subTypeName.replace('.', '/'), null, openLayers, true, true);
@@ -12260,8 +12333,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      if (res.getFullTypeName().equals(subTypeName))
                         result.add(res);
                   } else {
-                     if (subTypeIndex != null) {
-                        Layer subTypeLayer = getInactiveLayer(subTypeIndex.layerName, openLayers, true, true, true);
+                     if (subTypeIndexEntry != null) {
+                        Layer subTypeLayer = getInactiveLayer(subTypeIndexEntry.layerName, openLayers, true, true, true);
 
                         if (subTypeLayer != null) {
                            if (!subTypeLayer.closed) {
@@ -12273,7 +12346,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                            }
                         } else {
                            // TODO: else cull this from the index?
-                           System.err.println("*** Warning: Layer removed: " + subTypeIndex.layerName);
+                           System.err.println("*** Warning: Layer removed: " + subTypeIndexEntry.layerName);
                         }
                      }
                   }
@@ -12300,7 +12373,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
 
-      // Now check the TypeIndex entries for any processes for which we have not yet created layeredSystems.  Create them if
+      // Now check the TypeIndexEntry entries for any processes for which we have not yet created layeredSystems.  Create them if
       // lazily if there is a match to load the types.
       if (typeIndexProcessMap != null) {
          for (Map.Entry<String,SysTypeIndex> indexEnt:typeIndexProcessMap.entrySet()) {

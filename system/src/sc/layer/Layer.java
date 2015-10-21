@@ -718,11 +718,11 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
    }
 
-   public void updateTypeIndex(TypeIndex typeIndex) {
-      String typeName = typeIndex.typeName;
+   public void updateTypeIndex(TypeIndexEntry typeIndexEntry) {
+      String typeName = typeIndexEntry.typeName;
       if (typeName != null) {
-         layerTypeIndex.layerTypeIndex.put(typeName, typeIndex);
-         layerTypeIndex.fileIndex.put(typeIndex.fileName, typeIndex);
+         layerTypeIndex.layerTypeIndex.put(typeName, typeIndexEntry);
+         layerTypeIndex.fileIndex.put(typeIndexEntry.fileName, typeIndexEntry);
       }
    }
 
@@ -1538,7 +1538,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
             // If the file is excluded but is a source file, we'll need to mark it as excluded in the type index so we do not think it's a new file.
             if (excludedFile(fn, prefix)) {
-               layerTypeIndex.fileIndex.put(FileUtil.concat(rootPath, srcPath), TypeIndex.EXCLUDED_SENTINEL);
+               layerTypeIndex.fileIndex.put(FileUtil.concat(rootPath, srcPath), TypeIndexEntry.EXCLUDED_SENTINEL);
             }
          }
          else if (!excludedFile(fn, prefix) && f.isDirectory()) {
@@ -1561,7 +1561,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       return dirIndex;
    }
    
-   public void addNewSrcFile(SrcEntry srcEnt) {
+   public void addNewSrcFile(SrcEntry srcEnt, boolean checkPeers) {
       String relFileName = srcEnt.relFileName;
       File f = new File(srcEnt.absFileName);
 
@@ -1572,6 +1572,13 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       String absPrefix = FileUtil.concat(packagePrefix.replace('.', FileUtil.FILE_SEPARATOR_CHAR), relDir);
       layeredSystem.addToPackageIndex(FileUtil.normalize(layerPathName), this, false, true, FileUtil.normalize(absPrefix), srcEnt.baseFileName);
       dirIndex.add(FileUtil.removeExtension(srcEnt.baseFileName));
+      if (checkPeers && layeredSystem.peerSystems != null) {
+         for (LayeredSystem peerSys:layeredSystem.peerSystems) {
+            Layer peerLayer = activated ? peerSys.getLayerByName(getLayerName()) : peerSys.lookupInactiveLayer(getLayerName(), false, true);
+            if (peerLayer != null)
+               peerLayer.addNewSrcFile(srcEnt, false);
+         }
+      }
    }
 
    public void removeSrcFile(SrcEntry srcEnt) {
@@ -2531,7 +2538,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                   SrcEntry srcEnt = getSrcFileFromTypeName(fullTypeName, true, depProc.getPrependLayerPackage(), subPath, false);
                   if (srcEnt != null) {
                      // This happens for Template's which do not transform into a type - e.g. sctd files.  It's important that we record something for this source file so we don't re-parse the layer etc. next time.
-                     TypeIndex dummyIndex = new TypeIndex();
+                     TypeIndexEntry dummyIndex = new TypeIndexEntry();
                      dummyIndex.typeName = fullTypeName;
                      dummyIndex.layerName = getLayerName();
                      dummyIndex.processIdent = layeredSystem.getProcessIdent();

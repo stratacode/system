@@ -11,7 +11,7 @@ import java.io.Serializable;
 import java.util.List;
 
 /** We store this information about each type in the type index - essentially one for each .sc file for each process/runtime where it's used. */
-public class TypeIndex implements Serializable {
+public class TypeIndexEntry implements Serializable {
    public String typeName;
    public String layerName;
    public String processIdent;
@@ -27,8 +27,8 @@ public class TypeIndex implements Serializable {
    }
 
    public boolean sameType(Object other) {
-      if (other instanceof TypeIndex) {
-         TypeIndex oi = (TypeIndex) other;
+      if (other instanceof TypeIndexEntry) {
+         TypeIndexEntry oi = (TypeIndexEntry) other;
          if (oi.typeName.equals(typeName) && oi.layerName.equals(layerName))
             return true;
       }
@@ -40,5 +40,5 @@ public class TypeIndex implements Serializable {
       return false;
    }
 
-   public static final TypeIndex EXCLUDED_SENTINEL = new TypeIndex();
+   public static final TypeIndexEntry EXCLUDED_SENTINEL = new TypeIndexEntry();
 }

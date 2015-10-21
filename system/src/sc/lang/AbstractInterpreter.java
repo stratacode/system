@@ -400,7 +400,7 @@ public abstract class AbstractInterpreter extends EditorContext {
          // Need to do this after we've added the type to the file system.  Otherwise, we try to lookup the type
          // before it is on the file system and that leads to an error trying to find the type
          if (newSrcEnt != null)
-            layer.addNewSrcFile(newSrcEnt);
+            layer.addNewSrcFile(newSrcEnt, true);
 
          // Must be done after adding so we get the full type name
          String typeName = ModelUtil.getTypeName(type);

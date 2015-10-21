@@ -5,7 +5,6 @@
 package sc.lang.java;
 
 import sc.classfile.CFMethod;
-import sc.classfile.ClassFile;
 import sc.dyn.IDynObjManager;
 import sc.dyn.IDynObject;
 import sc.lang.*;
@@ -978,6 +977,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return false;
    }
 
+   public Object getGeneratedFromType() {
+      return null;
+   }
+
    void checkForStaleAdd() {
       Layer l = getLayer();
       if (l != null && l.compiled && !isDynamicNew() && staleClassName == null && !isGeneratedType()) {
@@ -1374,6 +1377,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return pnodeTD.getInnerTypeName() + "." + typeName;
       }
       else if (pnode instanceof BlockStatement)
+         return null;
+      if (pnode == null)
          return null;
       throw new UnsupportedOperationException();
    }
@@ -7173,8 +7178,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    }
 
-   public TypeIndex createTypeIndex() {
-      TypeIndex idx = new TypeIndex();
+   public TypeIndexEntry createTypeIndex() {
+      TypeIndexEntry idx = new TypeIndexEntry();
       idx.typeName = getFullTypeName();
       Layer layer = getLayer();
       idx.layerName = layer == null ? null : layer.getLayerName();
@@ -8485,12 +8490,30 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       throw new UnsupportedOperationException(); // Here for client/server sync cause JavaModel gets used in it's compiled form, even when compiling the client we need this method to exist for it to compile in this mode
    }
 
-   public void updateTypeName(String newTypeName) {
+   /** Returns the name of the class from within this file - i.e. full name without the package prefix */
+   public String getFileRelativeTypeName() {
+      TypeDeclaration td = getEnclosingType();
+      if (td == null)
+         return typeName;
+      return CTypeUtil.prefixPath(td.getFileRelativeTypeName(), typeName);
+   }
+
+   public void updateTypeName(String newTypeName, boolean renameFile) {
+      String oldTypeName = typeName;
+      LayeredSystem sys = getLayeredSystem();
+      if (sys != null)
+         sys.removeFromRootNameIndex(this);
       setProperty("typeName", newTypeName);
+      JavaModel model = getJavaModel();
+      String prefix = CTypeUtil.getPackageName(getFileRelativeTypeName());
+      if (model != null)
+          model.updateTypeName(CTypeUtil.prefixPath(prefix, oldTypeName), CTypeUtil.prefixPath(prefix, typeName), renameFile);
+      if (sys != null)
+         sys.addToRootNameIndex(this);
    }
 
    public void setNodeName(String newNodeName) {
-      updateTypeName(newNodeName);
+      updateTypeName(newNodeName, false);
    }
 
    public String getNodeName() {

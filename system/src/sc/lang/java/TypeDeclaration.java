@@ -368,14 +368,6 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return null;
    }
 
-   /** Returns the name of the class from within this file - i.e. full name without the package prefix */
-   public String getFileRelativeTypeName() {
-      TypeDeclaration td = getEnclosingType();
-      if (td == null)
-         return typeName;
-      return CTypeUtil.prefixPath(td.getFileRelativeTypeName(), typeName);
-   }
-
    public ITypeDeclaration getEnclosingIType() {
       for (ISemanticNode par = parentNode; par != null; par = par.getParentNode()) {
          if (par instanceof JavaModel) {
@@ -1692,6 +1684,12 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
    public boolean isGeneratedType() {
       return element != null || modelType != null;
+   }
+
+   public Object getGeneratedFromType() {
+      if (element != null)
+         return element;
+      return modelType;
    }
 
    // TemplateDeclarations extend TypeDeclaration but are not real types so they get skipped in getEnclosingType

@@ -1443,7 +1443,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (commandInterpreter != null)
          newModel.commandInterpreter = commandInterpreter;
 
-      oldType.updateType(newType, ctx, updateMode, updateInstances, updateInfo);
+      // We only update the internal type system for activated types
+      if (newModel.layer != null && newModel.layer.activated)
+         oldType.updateType(newType, ctx, updateMode, updateInstances, updateInfo);
 
       if (updateMode == TypeUpdateMode.Remove)
          layeredSystem.removeModel(this, false); // pass in false here because types were removed in updateType
@@ -2701,6 +2703,24 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          return true;
       }
       return false;
+   }
+
+   public void updateTypeName(String oldTypeName, String newTypeName, boolean renameFile) {
+      TypeDeclaration oldType = definedTypesByName.remove(oldTypeName);
+      if (oldType != null)
+         definedTypesByName.put(newTypeName, oldType);
+      Object oldObj = typeIndex.remove(oldTypeName);
+      if (oldObj != null)
+         typeIndex.put(newTypeName, oldObj);
+
+      String pkgName = getPackagePrefix();
+      String oldFullName = CTypeUtil.prefixPath(pkgName, oldTypeName);
+      String newFullName = CTypeUtil.prefixPath(pkgName, newTypeName);
+      SrcEntry srcFile = getSrcFile();
+      if (srcFile != null)
+         srcFile.setTypeName(newTypeName, renameFile);
+      if (layeredSystem != null)
+         layeredSystem.updateTypeName(oldFullName, newFullName);
    }
 }
 
