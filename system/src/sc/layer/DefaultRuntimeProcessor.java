@@ -83,7 +83,9 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor {
    }
 
    public void resetBuild() {
+   }
 
+   public void clearRuntime() {
    }
 
    public boolean getCompiledOnly() {

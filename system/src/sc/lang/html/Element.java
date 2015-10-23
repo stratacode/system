@@ -3506,6 +3506,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
 
    public void resetTagObject() {
       tagObject = null;
+      convertingToObject = false;
       repeatWrapper = null;
       if (children != null) {
          for (Object child:children) {

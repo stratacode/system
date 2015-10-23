@@ -286,10 +286,13 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    public boolean errorsStarting = false;
 
-   LayerTypeIndex layerTypeIndex = new LayerTypeIndex();
+   LayerTypeIndex layerTypeIndex = null;
 
    /** Used to order the loading of layers in the layer type index.  We need to load it from the bottom up to be sure all extended types have been loaded before we load subsequent layers. */
    boolean layerTypesStarted = false;
+
+   /** True if we've restored the complete layer type index */
+   boolean typeIndexRestored = false;
 
    /** If a Java file uses no extensions, we can either compile it from the source dir or copy it to the build dir */
    public boolean copyPlainJavaFiles = true;
@@ -721,6 +724,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    public void updateTypeIndex(TypeIndexEntry typeIndexEntry) {
       String typeName = typeIndexEntry.typeName;
       if (typeName != null) {
+         if (layerTypeIndex == null)
+            layerTypeIndex = new LayerTypeIndex();
          layerTypeIndex.layerTypeIndex.put(typeName, typeIndexEntry);
          layerTypeIndex.fileIndex.put(typeIndexEntry.fileName, typeIndexEntry);
       }
@@ -1574,7 +1579,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       dirIndex.add(FileUtil.removeExtension(srcEnt.baseFileName));
       if (checkPeers && layeredSystem.peerSystems != null) {
          for (LayeredSystem peerSys:layeredSystem.peerSystems) {
-            Layer peerLayer = activated ? peerSys.getLayerByName(getLayerName()) : peerSys.lookupInactiveLayer(getLayerName(), false, true);
+            Layer peerLayer = activated ? peerSys.getLayerByName(getLayerUniqueName()) : peerSys.lookupInactiveLayer(getLayerName(), false, true);
             if (peerLayer != null)
                peerLayer.addNewSrcFile(srcEnt, false);
          }
@@ -1727,6 +1732,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (topLevelSrcDirs == null)
          initSrcDirs();
 
+      if (layerTypeIndex == null)
+         layerTypeIndex = new LayerTypeIndex();
       layerTypeIndex.layerPathName = getLayerPathName();
       if (layerTypeIndex.layerPathName == null)
          System.err.println("*** Missing layer path name for type index");
@@ -1964,7 +1971,12 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
           */
           // TODO: NULL is no good for the layer here - should store the layer in the build src index so we can accurately
          // compute the info below.  Maybe we put the layer name in the SrcIndexEntry
-         IFileProcessor proc = layeredSystem.getFileProcessorForFileName(path, null, BuildPhase.Process);
+         String layerName = sie.layerName;
+         Layer srcLayer = null;
+         if (layerName != null) {
+            srcLayer = layeredSystem.getLayerByDirName(layerName);
+         }
+         IFileProcessor proc = layeredSystem.getFileProcessorForFileName(path, srcLayer, BuildPhase.Process);
          String srcDir = proc == null ? buildSrcDir : proc.getOutputDirToUse(layeredSystem, buildSrcDir, buildDir);
          String fileName = FileUtil.concat(srcDir, path);
          if (!sie.inUse) {
@@ -2119,6 +2131,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       // A clean build of everything will reset the layerTypeIndex
       if (typeIndexFile.canRead() && (!activated || !getBuildAllFiles())) {
          layerTypeIndex = layeredSystem.readTypeIndexFile(getLayerName());
+         typeIndexRestored = true;
       }
       if (layerTypeIndex == null)
          layerTypeIndex = new LayerTypeIndex();
@@ -2140,7 +2153,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    public void saveTypeIndex() {
       // For activated layers, we might not have a complete type index so we cannot save it.
-      if (!activated) {
+      // For inactivated layers, we only want to save this if we've fully initialized it.
+      if (!activated && (layerTypesStarted || typeIndexRestored))  {
+         if (!started || layerTypeIndex.layerPathName == null)
+            System.err.println("*** Invalid type index during save");
          File typeIndexFile = new File(layeredSystem.getTypeIndexFileName(getLayerName()));
          ObjectOutputStream os = null;
          try {
@@ -3098,6 +3114,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             sie.hash = hash;
             sie.inUse = true;
             sie.extension = ext;
+            sie.layerName = getLayerName();
 
             if (traceBuildSrcIndex)
                System.out.println("Adding buildSrcIndex " + relFileName + " : " + sie + " runtime: " + layeredSystem.getRuntimeName());
@@ -3901,6 +3918,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       layerTypeIndex = null;
       origBuildLayer = null;
       buildInfo = null;
+      typeIndexRestored = false;
+      layerTypesStarted = false;
    }
 
    public void addSrcPath(String srcPath, String srcPathType) {

@@ -13,6 +13,9 @@ public class SrcIndexEntry implements Serializable {
    /** Not persisted - used to track entries which are no longer needed by the project */
    public transient boolean inUse;
 
+   /** Name of the layer containing the src file for this index entry */
+   public String layerName;
+
    public String toString() {
       if (hash == null)
          return "null hash";

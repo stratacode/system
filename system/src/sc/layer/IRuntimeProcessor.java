@@ -77,4 +77,7 @@ public interface IRuntimeProcessor {
 
    /** The list of process names this runtime should sync against. */
    public List<String> getSyncProcessNames();
+
+   /** Called when all of the active layers have been cleared - to reset the state for a new clean compile */
+   void clearRuntime();
 }

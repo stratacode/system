@@ -1158,6 +1158,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          }
 
          Layer lyr = ModelUtil.getLayerForType(system, type);
+         if (lyr != null && lyr.model == null) {
+            System.err.println("*** No model for layer: " + lyr);
+            return null;
+         }
          String layerModule = lyr != null && useModules ? getJSSettingsStringValue(lyr.model.getModelTypeDeclaration(), "jsModuleFile", false, false) : null;
          if (layerModule != null) {
 
@@ -2596,6 +2600,16 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          }
          catch (IOException exc) {}
       }
+   }
+
+   /** Called after we clear all of the layers to reset the JSBuildInfo state */
+   public void clearRuntime() {
+      jsBuildInfo = null;
+      resetBuild();
+      srcPathType = null;
+      templatePrefix = null;
+      genJSPrefix = null;
+      typeTemplateName = syncMergeTemplateName = updateMergeTemplateName = null;
    }
 
    public class JSUpdateInstanceInfo extends UpdateInstanceInfo {

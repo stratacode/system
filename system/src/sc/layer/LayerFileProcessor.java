@@ -172,6 +172,11 @@ public class LayerFileProcessor extends LayerFileComponent {
    }
 
    public FileEnabledState enabledForPath(String pathName, Layer fileLayer, boolean abs, boolean generatedFile) {
+      // Currently we have one data structure to store all file processors - both activated and inactivated.  We filter them out here.
+      // This is not accurate if we do not have a layer but almost all cases now do supply a layer so we should be fine.
+      if (definedInLayer != null && fileLayer != null && definedInLayer.activated != fileLayer.activated)
+         return FileEnabledState.NotEnabled;
+
       // TODO: We should not be passing in null here in general
       if (fileLayer == null || generatedFile)
          return FileEnabledState.Enabled;

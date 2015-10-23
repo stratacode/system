@@ -480,6 +480,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       generatedLayers.clear();
 
+      if (runtimeProcessor != null)
+         runtimeProcessor.clearRuntime();
+
       if (!peerMode && peerSystems != null) {
          for (LayeredSystem peerSys : peerSystems)
             peerSys.clearActiveLayers();
@@ -6112,7 +6115,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private void saveTypeIndexFiles() {
       for (int i = 0; i < inactiveLayers.size(); i++) {
          Layer inactiveLayer = inactiveLayers.get(i);
-         inactiveLayer.saveTypeIndex();
+         // We have not fully initialized the type index until the layer is started
+         if (inactiveLayer.started)
+            inactiveLayer.saveTypeIndex();
       }
       if (!peerMode && peerSystems != null) {
          for (LayeredSystem peerSys:peerSystems) {
@@ -13399,11 +13404,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public Layer getPeerLayerFromRemote(Layer layer) {
       if (layer.layeredSystem == this)
          System.err.println("*** Not from a remote system");
-      Layer res = getLayerByName(layer.getLayerName());
+      Layer res = getLayerByName(layer.getLayerUniqueName());
       if (res != null)
          return res;
       for (Layer nextLayer = layer.getNextLayer(); nextLayer != null; nextLayer = nextLayer.getNextLayer()) {
-         res = getLayerByName(nextLayer.getLayerName());
+         res = getLayerByName(nextLayer.getLayerUniqueName());
          if (res != null)
             return res;
       }
