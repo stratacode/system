@@ -1018,6 +1018,17 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       return classFile.getAnnotation(annotName);
    }
 
+   public Collection<IAnnotation> getAnnotations(){
+      if (classFile.attributes == null) {
+         return Collections.emptyList();
+      }
+      ClassFile.AnnotationsAttribute aa = ClassFile.AnnotationsAttribute.getAttribute(classFile.attributesByName);
+      if (aa == null) {
+         return null;
+      }
+      return (Collection<IAnnotation>) (Collection) aa.annotations.values();
+   }
+
    public boolean hasModifier(String modifierName) {
       return (classFile.accessFlags & ClassFile.modifierNameToAccessFlag(modifierName)) != 0;
    }
