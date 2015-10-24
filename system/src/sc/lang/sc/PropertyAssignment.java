@@ -14,10 +14,12 @@ import sc.lang.SemanticNodeList;
 import sc.lang.html.Attr;
 import sc.layer.Layer;
 import sc.obj.IObjectId;
+import sc.type.CTypeUtil;
 import sc.type.IBeanMapper;
 import sc.type.TypeUtil;
 import sc.lang.java.*;
 import sc.parser.*;
+import sc.util.StringUtil;
 
 import java.util.EnumSet;
 import java.util.IdentityHashMap;
@@ -949,14 +951,30 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       JavaModel oldModel = getJavaModel();
       if (!oldModel.removed)
          return this; // We are still valid
-      Object res = oldModel.layeredSystem.getSrcTypeDeclaration(getEnclosingType().getFullTypeName(), null, true,  false, false, oldModel.layer, oldModel.isLayerModel);
-      if (res instanceof BodyTypeDeclaration) {
-         Object newAssign = ((BodyTypeDeclaration) res).declaresMember(propertyName, MemberType.AssignmentSet, null, null);
+      BodyTypeDeclaration type = getEnclosingType().refreshNode();
+      if (type == null)
+         return this;
+      if (bindingDirection == null || bindingDirection.doForward()) {
+         Object newAssign = type.declaresMember(propertyName, MemberType.AssignmentSet, null, null);
          if (newAssign instanceof PropertyAssignment)
             return (PropertyAssignment) newAssign;
-         displayError("Property removed ", propertyName);
+         displayError("Property removed? ");
       }
-      return null;
+      // Reverose only properties are not one per type - instead we need to match them structurally to be sure we have the right one in the new type.
+      else {
+         if (type != getEnclosingType() && type.body != null) {
+            for (Statement st : type.body) {
+               if (st instanceof PropertyAssignment) {
+                  PropertyAssignment other = (PropertyAssignment) st;
+                  if (other.propertyName.equals(propertyName) && StringUtil.equalStrings(operator, other.operator) && bindingDirection == other.bindingDirection &&
+                          DynUtil.equalObjects(initializer, other.initializer))
+                     return other;
+               }
+            }
+            displayError("Property not found after refresh? ");
+         }
+      }
+      return this;
    }
 
    public ISrcStatement findFromStatement(ISrcStatement st) {

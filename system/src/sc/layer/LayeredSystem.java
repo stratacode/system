@@ -750,6 +750,50 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // TODO: do we do this for the other layered systems?
    }
 
+   public ArrayList<PropertyAssignment> getAssignmentsToProperty(VariableDefinition varDef, boolean activeOnly, boolean openLayers, boolean checkPeers) {
+      TypeDeclaration enclType = varDef.getEnclosingType();
+      if (enclType == null)
+         return null;
+
+      Iterator<TypeDeclaration> subTypes = getSubTypesOfType(enclType, activeOnly, openLayers, checkPeers);
+      ArrayList<PropertyAssignment> res = null;
+      if (subTypes != null) {
+         while (subTypes.hasNext()) {
+            TypeDeclaration subType = subTypes.next();
+
+            Object assign = subType.definesMember(varDef.variableName, JavaSemanticNode.MemberType.AssignmentSet, null, null, false, false);
+            if (assign instanceof PropertyAssignment) {
+               if (res == null)
+                  res = new ArrayList<PropertyAssignment>();
+               PropertyAssignment pa = (PropertyAssignment) assign;
+               if (!containsAssign(res, pa))
+                  res.add(pa);
+            }
+         }
+      }
+      ArrayList<TypeDeclaration> modTypes = getModifiedTypesOfType(enclType, false, checkPeers);
+      if (modTypes != null) {
+         for (TypeDeclaration modType:modTypes) {
+            Object assign = modType.definesMember(varDef.variableName, JavaSemanticNode.MemberType.AssignmentSet, null, null, false, false);
+            if (assign instanceof PropertyAssignment) {
+               if (res == null)
+                  res = new ArrayList<PropertyAssignment>();
+               PropertyAssignment pa = (PropertyAssignment) assign;
+               if (!containsAssign(res, pa))
+                  res.add(pa);
+            }
+         }
+      }
+      return res;
+   }
+
+   private static boolean containsAssign(ArrayList<PropertyAssignment> res, PropertyAssignment assign) {
+      for (PropertyAssignment pa:res)
+         if (pa.propertyName.equals(assign.propertyName) && ModelUtil.sameTypes(pa.getEnclosingType(), assign.getEnclosingType()))
+            return true;
+      return false;
+   }
+
    public enum BuildCommandTypes {
       Pre, Post, Run, Test
    }
