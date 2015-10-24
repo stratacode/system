@@ -12310,7 +12310,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (!activeOnly) {
          if (checkPeers && !peerMode && peerSystems != null) {
             for (int i = 0; i < peerSystems.size(); i++) {
-               Iterator<TypeDeclaration> peerRes = getSubTypesOfType(type, false, openLayers, false);
+               LayeredSystem peerSys = peerSystems.get(i);
+               Iterator<TypeDeclaration> peerRes = peerSys.getSubTypesOfType(type, false, openLayers, false);
                if (peerRes != null) {
                   while (peerRes.hasNext())
                      result.add(peerRes.next());
