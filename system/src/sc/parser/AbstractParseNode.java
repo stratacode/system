@@ -57,7 +57,7 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
       return toString().lastIndexOf(substr);
    }
 
-   public void styleNode(IStyleAdapter adapter) {
+   public void styleNode(IStyleAdapter adapter, Object parSemValue, ParentParseNode parParseNode, int childIx) {
       ParseUtil.styleString(adapter, null, this, toString(), true);
    }
 
@@ -65,8 +65,16 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
       return toSemanticString().length();
    }
 
+   /**
+    * Called to format a string using the styled adapter.  For basic parse nodes, we just need to pass the string to
+    * the adapter so that the current document offset is updated properly
+    */
    public void formatStyled(FormatContext ctx, IStyleAdapter adapter) {
+      IStyleAdapter oldStyleAdapter = ctx.styleAdapter;
+      // All of the appendWithStyle calls will funnel through the adapter so they are recorded in style adapter offsets before going through ctx.append()
+      ctx.styleAdapter = adapter;
       format(ctx);
+      ctx.styleAdapter = oldStyleAdapter;
    }
 
    /**

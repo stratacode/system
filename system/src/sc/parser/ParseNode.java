@@ -145,7 +145,7 @@ public class ParseNode extends AbstractParseNode {
          return ((value).toString()).charAt(ix);
    }
 
-   public void styleNode(IStyleAdapter adapter) {
+   public void styleNode(IStyleAdapter adapter, Object parSemVal, ParentParseNode parentParseNode, int chidlIx) {
       CharSequence res;
       if (value instanceof IParseNode) {
          IParseNode childParseNode = (IParseNode) value;

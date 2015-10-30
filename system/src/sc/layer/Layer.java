@@ -704,7 +704,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       dynamic = !layeredSystem.getCompiledOnly() && !compiledOnly && (baseIsDynamic || modelType.hasModifier("dynamic") || markDyn ||
               (lpi.explicitDynLayers != null && (layerDirName != null && (lpi.explicitDynLayers.contains(layerDirName) || lpi.explicitDynLayers.contains("<all>")))));
 
-      if (!liveDynamicTypes && dynamic)
+      if (!liveDynamicTypes && dynamic && activated && !disabled && !excluded)
          liveDynamicTypes = true;
 
       //if (options.verbose && markDyn && layer.compiledOnly) {
@@ -3753,7 +3753,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    public SrcEntry getSrcFileFromRelativeTypeName(String relDir, String subPath, String pkgPrefix, boolean srcOnly, boolean checkBaseLayers, boolean layerResolve) {
-      if (excluded || disabled)
+      if (excluded || disabled || subPath.length() == 0)
          return null;
 
       String relFilePath = relDir == null ? subPath : FileUtil.concat(relDir, subPath);
@@ -3765,7 +3765,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             packageMatches = false;
          }
          else {
-            relFilePath = relFilePath.substring(packagePrefix.length() + 1);
+            int pkgLen = packagePrefix.length();
+            if (pkgLen == relFilePath.length())
+               return null;
+            relFilePath = relFilePath.substring(pkgLen + 1);
             packageMatches = true;
          }
       }

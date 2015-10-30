@@ -240,7 +240,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public Object findType(String name, Object refType, TypeContext ctx) {
       if (replacedByType != null) // We've been modified
          return replacedByType.findType(name, refType, ctx);
-      
+
       Object res;
       if ((res = definesType(name, ctx)) != null) {
          return res;
@@ -469,6 +469,23 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          replacedByType.incrVersion();
    }
 
+   protected void incrSubTypeVersions() {
+      LayeredSystem sys = getLayeredSystem();
+      if (sys != null) {
+         Layer layer = getLayer();
+         if (layer != null && this instanceof TypeDeclaration) {
+            Iterator<TypeDeclaration> subTypes = sys.getSubTypesOfType((TypeDeclaration) this, layer.activated, false, false, true);
+            if (subTypes != null) {
+               while (subTypes.hasNext()) {
+                  TypeDeclaration subType = subTypes.next();
+                  subType.incrVersion();
+                  subType.incrSubTypeVersions();
+               }
+            }
+         }
+      }
+   }
+
    protected void initMemberCache() {
       memberCache = new MemberCache();
       //addToMemberCache(memberCache, null);
@@ -528,11 +545,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
       else {
          String extendsTypeName = getDerivedTypeName();
-         if (extendsTypeName != null && getDeclarationType() == DeclarationType.OBJECT &&
+         JavaModel model;
+         if (extendsTypeName != null && getDeclarationType() == DeclarationType.OBJECT && (model = getJavaModel()) != null &&
                  // Need addExternalReference for "findType" which uses this to lookup a ClassType.  Maybe need to propagate addExtReference through
                  // findType and definesMemberInternal?   This should only be true when the definesMemberInternal originates from a node within the
                  // current model.
-                 (objDecl = getJavaModel().resolveName(extendsTypeName, false, true)) != null)
+                 (objDecl = model.resolveName(extendsTypeName, false, true)) != null)
             res = ModelUtil.definesMember(objDecl.getClass(), name, mtype, refType, ctx, skipIfaces, isTransformed);
       }
       if (res != null)
@@ -584,7 +602,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             return v;
       }
 
-      v = declaresMethod(name, types, ctx, refType, staticOnly, inferredType);
+      v = declaresMethod(name, types, ctx, refType, staticOnly, inferredType, false); // false for 'includeModified' because we already traverse modified types in definesMethod
       if (v != null)
          return v;
 
@@ -630,7 +648,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    /** Just returns methods declared in this specific type */
-   public Object declaresMethod(String name, List<? extends Object> types, ITypeParamContext ctx, Object refType, boolean staticOnly, Object inferredType) {
+   public Object declaresMethod(String name, List<? extends Object> types, ITypeParamContext ctx, Object refType, boolean staticOnly, Object inferredType, boolean includeModified) {
       // Interfaces will put the complete version of the method in the hidden body so this needs to be first
       Object v = findMethodInBody(hiddenBody, name, types, ctx, refType, staticOnly, inferredType);
       if (v != null)
@@ -653,7 +671,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    // Returns the MethodDefinition, omitting the compiled types we might inherit from ComponentImpl
    AbstractMethodDefinition declaresMethodDef(String name, List<? extends Object> types) {
-      Object res = declaresMethod(name, types, null, null, false, null);
+      Object res = declaresMethod(name, types, null, null, false, null, false);
       if (res instanceof AbstractMethodDefinition)
          return (AbstractMethodDefinition) res;
       return null;
@@ -4716,7 +4734,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
          // Look for a method in this type specifically.  Anything in a modified type or extended type should not
          // get replaced since we are overriding that method in that case.
-         AbstractMethodDefinition overridden = (AbstractMethodDefinition) declaresMethod(newDef.name, newDef.getParameterList(), null, null, false, null);
+         AbstractMethodDefinition overridden = (AbstractMethodDefinition) declaresMethod(newDef.name, newDef.getParameterList(), null, null, false, null, false);
          if (overridden != null) {
             overridden.parentNode.replaceChild(overridden, newDef);
             if (overridden.overriddenMethod != null) {
@@ -4826,7 +4844,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
          // Look for a method in this type specifically.  Anything in a modified type or extended type should not
          // get replaced since we are overriding that method in that case.
-         AbstractMethodDefinition overridden = (AbstractMethodDefinition) declaresMethod(toRem.name, toRem.getParameterList(), null, null, false, null);
+         AbstractMethodDefinition overridden = (AbstractMethodDefinition) declaresMethod(toRem.name, toRem.getParameterList(), null, null, false, null, false);
          if (overridden != null) {
             overridden.parentNode.removeChild(overridden);
             removeStatement(overridden);
@@ -5130,6 +5148,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    UpdateTypeCtx buildUpdateTypeContext(BodyTypeDeclaration newType, TypeUpdateMode updateMode, UpdateInstanceInfo info) {
       UpdateTypeCtx tctx = new UpdateTypeCtx();
 
+      // TODO: performance - when the layer is not activated I think we could skip a lot of this - fields, etc.... it's nice that we can refresh type and variable references without a global refresh
+      // but maybe it's not worth it?
+
       tctx.thisOriginallyDynamic = isDynamicType();
 
       // During initialization, this type might have been turned into a dynamic type from a subsequent layer.
@@ -5269,7 +5290,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                // object used to compare newDef.equals(oldInnerType) here but if we update the parent type and not the
                // child type, it leaves things out of sync.   Next time the parent gets updated, it tries to update
                // with a version of the object that is not current.
-               else {
+               else if (newDef instanceof TypeDeclaration) {
                   TypeDeclaration newInnerType = (TypeDeclaration) newDef;
 
                   // if the types are the same, recursively replace the type.  Because property assignments can be applied to
@@ -5282,6 +5303,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                      tctx.toRemoveObjs.add(oldInnerType);
                      tctx.toAddObjs.add(newInnerType);
                   }
+               }
+               else {
+                  System.out.println("*** Not updating old inner type: " + oldInnerType.typeName + " with: " + newDef);
                }
             }
             else if (oldBodyDef instanceof AbstractMethodDefinition) {
@@ -5322,7 +5346,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             }
             else if (newBodyDef instanceof AbstractMethodDefinition) {
                AbstractMethodDefinition newMeth = (AbstractMethodDefinition) newBodyDef;
-               AbstractMethodDefinition oldMeth = (AbstractMethodDefinition) declaresMethod(newMeth.name, newMeth.getParameterList(), null, null, false, null);
+               AbstractMethodDefinition oldMeth = (AbstractMethodDefinition) declaresMethod(newMeth.name, newMeth.getParameterList(), null, null, false, null, false);
                if (oldMeth != null) {
                   if (oldMeth == newMeth)
                      System.out.println("*** Replacing a method by itself!");
@@ -5395,13 +5419,15 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    void updateTypeInternals(UpdateTypeCtx tctx, BodyTypeDeclaration newType, ExecutionContext ctx, TypeUpdateMode updateMode, boolean updateInstances, UpdateInstanceInfo info, boolean outerType) {
       dependentTypes = null;
 
+      boolean activated = layer != null && layer.activated;
+
       LayeredSystem sys = getLayeredSystem();
       // First remove any old objects - note that we're using the old indexes so this has to be done before
       // we go and update the properties table in each instance.
       for (int i = 0; i < tctx.toRemoveObjs.size(); i++) {
          // if static, null the slot in the static fields
          TypeDeclaration oldInnerType = tctx.toRemoveObjs.get(i);
-         if (ModelUtil.isObjectType(oldInnerType) || ModelUtil.isEnum(oldInnerType)) {
+         if (activated && (ModelUtil.isObjectType(oldInnerType) || ModelUtil.isEnum(oldInnerType))) {
             if (oldInnerType.hasModifier("static")) {
                if (staticValues != null) {
                   staticValues[getDynStaticFieldIndex(oldInnerType.typeName)] = null;
@@ -5470,13 +5496,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             }
          }
 
-         if (isDynamicType() || sys.isDynamicRuntime()) {
+         if (activated && (isDynamicType() || sys.isDynamicRuntime())) {
             // Need to do this before we replace the sub-type table so that we can find the old types
             updateModelBaseType(newType);
          }
 
          // Register the type now: replace it in the LayeredSystem's index tables
-         if (this instanceof TypeDeclaration)
+         if (this instanceof TypeDeclaration && activated)
             sys.replaceTypeDeclaration((TypeDeclaration) this, (TypeDeclaration) newType);
 
          if (outerType) {
@@ -5497,13 +5523,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          // we need to re-register the type under the new type name.  for example, the instance for
          // UnitConverterInst.converters would be originally registered under the type UnitConverter.ocnverters.
          //if (isDynamicType())
-         updateModelBaseType(newType);
+         if (activated)
+            updateModelBaseType(newType);
 
          // This type should already be in the global src types so no need to update that, but we do need to
          // replace the sub-types since this is now the visible type for this name in the system.  When
          // this is a "modifyInherited" case, it is not actually replacing the type, but extending it so
          // do not do the update in that case.
-         if (this instanceof TypeDeclaration) {
+         if (this instanceof TypeDeclaration && activated) {
             // TODO: this is probably not needed at all now that we store the sub-types table by type name.
             if (!(newType instanceof ModifyDeclaration) || !((ModifyDeclaration) newType).modifyInherited)
                sys.replaceSubTypes((TypeDeclaration) this, (TypeDeclaration) newType);
@@ -5555,6 +5582,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             return;
          }
       }
+
+      boolean activated = layer != null && layer.activated;
 
       if (!getTypeClassName().equals(newType.getTypeClassName())) {
          displayError("Invalid updateType - expected type: " + typeName + " but found: " + newType.typeName + " for: ");
@@ -5720,6 +5749,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          // Must be done after we remove the type from the name space as we'll skip the remove if this is not the last type for this type name
          sys.notifyInnerTypeRemoved(tctx.toRemoveObjs.get(i));
       }
+
+      // Need to flush the member cache for any sub-types of this type
+      incrSubTypeVersions();
    }
 
    public void execBlockStatement(BlockStatement bs, ExecutionContext ctx) {
@@ -7105,8 +7137,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       // We should be able to do this right after we have the extends and implements stuff bound.  Maybe we could move it later but
       // the goal is to have the index info as early as possible for the IDE.
-      if (layer != null)
-         layer.updateTypeIndex(createTypeIndex());
+      if (layer != null) {
+         TypeIndexEntry ent = createTypeIndex();
+         if (ent != null)  // Some TemplateDeclaration types don't represent real types and don't have index entries
+            layer.updateTypeIndex(ent);
+      }
    }
 
    public void validate() {
@@ -8574,7 +8609,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             if (ModelUtil.isAssignableFrom(Collection.class, extTypeDecl)) {
                if (typeParams.size() == 1)
                   return typeParams.get(0).getTypeDeclaration();
-            } else if (ModelUtil.isAssignableFrom(Map.class, extTypeDecl)) {
+            }
+            else if (ModelUtil.isAssignableFrom(Map.class, extTypeDecl)) {
                if (typeParams.size() == 2)
                   return typeParams.get(1).getTypeDeclaration();
             }

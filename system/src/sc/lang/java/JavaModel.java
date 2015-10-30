@@ -1443,8 +1443,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (commandInterpreter != null)
          newModel.commandInterpreter = commandInterpreter;
 
-      // We only update the internal type system for activated types
-      if (newModel.layer != null && newModel.layer.activated)
+      if (newModel.layer != null)
          oldType.updateType(newType, ctx, updateMode, updateInstances, updateInfo);
 
       if (updateMode == TypeUpdateMode.Remove)

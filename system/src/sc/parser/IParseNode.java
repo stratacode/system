@@ -64,7 +64,8 @@ public interface IParseNode extends CharSequence, IParseResult {
    /** Like toString but provides a parent object to handle spacing with re-generated primitive string valued nodes which do not know their parent. */
    CharSequence formatString(Object parSemVal, ParentParseNode parParseNode, int curChildIndex);
 
-   void styleNode(IStyleAdapter adapter);
+   /** Just like formatString, we need to take an optional parent semantic value, parseNode, and childIndex so we know where this element falls in the context so we can do spacing properly */
+   void styleNode(IStyleAdapter adapter, Object parSemVal, ParentParseNode parParseNode, int curChildIndex);
 
    void formatStyled(FormatContext ctx, IStyleAdapter adapter);
 

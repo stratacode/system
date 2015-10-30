@@ -81,6 +81,12 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
          mtype = MemberType.PropertyGetSetSet;
       }
 
+      // Sometimes happens during code-completion parsing
+      if (propertyName == null) {
+         super.start();
+         return;
+      }
+
       // Using "defines" here, not "find" as we do not want to inherit property assignments.  Why?  It's too easy to pick up a parent's property when a child's is not defined.  Get no error
       // and wonder why things are not working.  Secondly, we don't handle all of the cases for when the property is not in the type.  For example, when the type gets optimized away, we do not
       // implement the binding correctly.  So simpler is better.  Make sure the property is defined in the enclosing type.

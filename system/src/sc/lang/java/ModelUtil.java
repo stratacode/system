@@ -6287,7 +6287,8 @@ public class ModelUtil {
    public static boolean getLiveDynamicTypes(Object typeObj) {
       if (typeObj instanceof TypeDeclaration) {
          TypeDeclaration objType = (TypeDeclaration)typeObj;
-         return objType.getLayeredSystem().options.liveDynamicTypes && (objType.layer == null || objType.layer.liveDynamicTypes) && objType.getLiveDynamicTypesAnnotation();
+         Layer layer = objType.layer;
+         return objType.getLayeredSystem().options.liveDynamicTypes && (layer == null || layer.liveDynamicTypes) && objType.getLiveDynamicTypesAnnotation();
       }
       return false;
    }

@@ -582,7 +582,7 @@ public class ParseUtil  {
 
    public static void toStyledString(IStyleAdapter adapter, Object parseNode) {
       if (parseNode instanceof IParseNode)
-         ((IParseNode) parseNode).styleNode(adapter);
+         ((IParseNode) parseNode).styleNode(adapter, null, null, -1);
       else if (parseNode != null)
          adapter.styleString(parseNode.toString(), true, null, null);
    }
@@ -599,7 +599,7 @@ public class ParseUtil  {
       if (semanticValue instanceof ISemanticNode)
          ((ISemanticNode) semanticValue).styleNode(adapter);
       else if (result instanceof IParseNode)
-         ((IParseNode) result).styleNode(adapter);
+         ((IParseNode) result).styleNode(adapter, null, null, -1);
       else
          adapter.styleString(result.toString(), false, null, null);
       return adapter.getResult();

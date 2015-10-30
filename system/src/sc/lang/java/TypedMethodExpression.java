@@ -50,7 +50,7 @@ public class TypedMethodExpression extends IdentifierExpression {
    // and rearrange how the child parse nodes are organized.
    public void styleNode(IStyleAdapter adapter) {
       if (parseNode != null) {
-         parseNode.styleNode(adapter);
+         parseNode.styleNode(adapter, null, null, -1);
       }
       else
          throw new IllegalArgumentException("No parse tree new expression's semantic node");

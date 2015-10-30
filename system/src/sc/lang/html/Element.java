@@ -657,11 +657,14 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
             if (peer == this)
                return cachedObjectName = (parentPath + rawObjName + i);
          }
+         System.err.println("*** Did not find tag in peer list");
       }
-      else
+      else {
          System.out.println("*** Error: can't find tag under parent");
-      // not reached
-      throw new UnsupportedOperationException();
+      }
+      // This at least happens when editing an invalid schtml model
+      cachedObjectName = rawObjName;
+      return rawObjName;
    }
 
    public void removeAttribute(String name) {

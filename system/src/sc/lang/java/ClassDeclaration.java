@@ -919,7 +919,7 @@ public class ClassDeclaration extends TypeDeclaration {
       else {
          for (int i = 0; i < meths.length; i++) {
             Object meth = meths[i];
-            Object declMethObj = declaresMethod(onInitMethodName, Arrays.asList(ModelUtil.getParameterTypes(meth)), null, null, false, null);
+            Object declMethObj = declaresMethod(onInitMethodName, Arrays.asList(ModelUtil.getParameterTypes(meth)), null, null, false, null, false);
             MethodDefinition declMeth;
             if (declMethObj == null) {
                declMeth = (MethodDefinition) TransformUtil.defineRedirectMethod(this, onInitMethodName, meth, false, !ModelUtil.isAbstractMethod(meth));

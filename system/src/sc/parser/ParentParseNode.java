@@ -279,12 +279,12 @@ public class ParentParseNode extends AbstractParseNode {
       */
    }
 
-   public void styleNode(IStyleAdapter adapter) {
+   public void styleNode(IStyleAdapter adapter, Object parSemVal, ParentParseNode parNode, int childIx) {
       // If the parse node is generated, we need to use the formatting process to add in
-      // the property spacing.  If the parse node was parsed, we toString it just as it
+      // the proper spacing.  If the parse node was parsed, we toString it just as it
       // was parsed so we get back the identical input strings.
       if (generated) {
-         FormatContext ctx = createFormatContext(null, null, -1);
+         FormatContext ctx = createFormatContext(parSemVal, parNode, childIx);
          adapter.setFormatContext(ctx);
          //ctx.append(FormatContext.INDENT_STR);
          formatStyled(ctx, adapter);
@@ -306,13 +306,13 @@ public class ParentParseNode extends AbstractParseNode {
                   IParseNode childParseNode = (IParseNode) childNode;
                   childSV = childParseNode.getSemanticValue();
                   if (!(childSV instanceof ISemanticNode))
-                      childParseNode.styleNode(adapter);
+                      childParseNode.styleNode(adapter, getSemanticValue(), this, i);
                   else {
                      ISemanticNode childSVNode = (ISemanticNode) childSV;
                      if (childSVNode.getParseNode() == childNode)
                         ParseUtil.styleString(adapter, childSV, childParselet.styleName, null, false);
                      else
-                        childParseNode.styleNode(adapter);
+                        childParseNode.styleNode(adapter, getSemanticValue(), this, i);
                   }
                }
                else {

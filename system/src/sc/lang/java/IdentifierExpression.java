@@ -4090,7 +4090,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                case BoundObjectName:
                   String styleName = isStaticTarget(i) ? "staticMember" : "member";
                   adapter.styleStart(styleName);
-                  child.styleNode(adapter);
+                  child.styleNode(adapter, null, null, -1);
                   adapter.styleEnd(styleName);
                   handled = true;
                   break;
@@ -4099,11 +4099,11 @@ public class IdentifierExpression extends ArgumentsExpression {
             }
          }
          if (!handled) {
-            child.styleNode(adapter);
+            child.styleNode(adapter, null, null, -1);
          }
       }
       if (argsNode != null)
-         argsNode.styleNode(adapter);
+         argsNode.styleNode(adapter, null, null, -1);
       if (remaining != null) {
          for (Object node:remaining) {
             if (node != argsNode)

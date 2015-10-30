@@ -37,21 +37,28 @@ public class FormatContext {
 
    private Object nextValue;
 
+   IStyleAdapter styleAdapter;
+
    public FormatContext(ParentParseNode curParent, int curChildIndex, int initIndent, Object lastNextValue, Object curSemVal) {
       // If the semantic value is the node above the curParent parse node, we add it first
       // This is a bit of a hack because it only gives us one more level... we could try to find the path to the curParent if there's
       // a case where that's needed and add all of the levels in between.
+      boolean foundParent = false;
       if (curSemVal instanceof ISemanticNode) {
-         Object parseNode = ((ISemanticNode) curSemVal).getParseNode();
-         if (parseNode != curParent && parseNode instanceof ParentParseNode) {
+         ISemanticNode curSemNode = ((ISemanticNode) curSemVal);
+         Object parseNode = curSemNode.getParseNode();
+         if (parseNode instanceof ParentParseNode) {
             ParentParseNode pp = (ParentParseNode) parseNode;
-            int curValIndex;
-            if (pp.children != null && (curValIndex = pp.children.indexOf(curParent)) != -1) {
-               Entry ent = new Entry();
-               ent.currentIndex = curValIndex;
-               ent.parent = pp;
-               pendingParents.add(ent);
+            if (parseNode != curParent) {
+               int curValIndex;
+               if (pp.children != null && (curValIndex = pp.children.indexOf(curParent)) != -1) {
+                  Entry ent = new Entry();
+                  ent.currentIndex = curValIndex;
+                  ent.parent = pp;
+                  pendingParents.add(ent);
+               }
             }
+            insertPendingParents(pp, curSemNode.getParentNode(), curSemNode);
          }
       }
       // Then add the current parent
@@ -63,6 +70,83 @@ public class FormatContext {
       }
       savedIndentLevels.push(initIndent);
       nextValue = lastNextValue;
+   }
+
+   /**
+    * This handles the case where we are trying to reformat a node inside of a larger document and need
+    * the context of where this node resides in order to find the adjacent text for determining proper
+    * spacing.  For example, the ClassType semantic node ends in a spacing parse node.  There are a couple
+    * of levels of ParentParseNode between it and the parent FieldDefinition - so we need to determine the
+    * path back from the FieldDefinition to the correct ParentParseNode of the ClassType in order to add
+    * the trailing space to teh ClassType when it's name changes.
+    *
+    * If we don't find the nextChar() for the SpacingParseNode in ClassType, we'll treat it like the end of
+    * file which is not correct.  But when ClassType ends up at the end of a newline or something we do not
+    * want to insert that extra space.
+    *
+    * TODO: Currently we only go up the parent hierarchy two levels - to handle the case where you are changing
+    * an 'implements type' which is in a list inside of a class declaration before you get the following character.
+    * It's possible we need to do this more levels... or maybe we should lazily find the next level in "nextChar"
+    * when we hit the end of the top-most level?
+    */
+   private void insertPendingParents(ParentParseNode curParseNode, ISemanticNode parNode, ISemanticNode findNode) {
+      ArrayList<Entry> pathToNode = null;
+      int maxLevelCount = 2; // TODO: this might need to be higher?
+      int ct = 0;
+      do {
+         if (parNode != null) {
+            Object parParseNodeObj = parNode.getParseNode();
+            if (parParseNodeObj instanceof ParentParseNode) {
+               ParentParseNode parParseNode = (ParentParseNode) parParseNodeObj;
+               boolean found;
+               do {
+                  found = false;
+                  List parChildren = parParseNode.children;
+                  int parChildIndex = -1;
+                  if (parChildren != null) {
+                     if ((parChildIndex = parChildren.indexOf(curParseNode)) != -1) {
+                        Entry ent = new Entry();
+                        ent.currentIndex = parChildIndex;
+                        ent.parent = parParseNode;
+                        pendingParents.add(0, ent);
+                        if (pathToNode != null) {
+                           pendingParents.addAll(0, pathToNode);
+                           curParseNode = pathToNode.get(0).parent;
+                           pathToNode = null;
+                        }
+                        else
+                           curParseNode = parParseNode;
+                     } else {
+                        for (int i = 0; i < parChildren.size(); i++) {
+                           Object parChild = parChildren.get(i);
+                           if (parChild instanceof ParentParseNode) {
+                              ParentParseNode parChildPNode = (ParentParseNode) parChild;
+                              // Is this child the path to find the parent?  If so, add this to the chain, then advance to the next one.
+                              if (parChildPNode.refersToSemanticValue(findNode)) {
+                                 Entry pathEnt = new Entry();
+                                 pathEnt.currentIndex = i;
+                                 pathEnt.parent = parParseNode;
+
+                                 if (pathToNode == null)
+                                    pathToNode = new ArrayList<Entry>();
+                                 pathToNode.add(pathEnt);
+                                 found = true;
+                                 parParseNode = parChildPNode;
+                                 break;
+                              }
+                           }
+                        }
+                     }
+                  }
+               } while (found);
+            }
+         }
+         ct++;
+         if (ct == maxLevelCount)
+            parNode = null;
+         else if (parNode != null)
+            parNode = parNode.getParentNode();
+      } while (parNode != null);
    }
 
    /**
@@ -86,6 +170,14 @@ public class FormatContext {
    public void appendNoStyle(CharSequence seq) {
       if (seq != null)
          currentBuffer.append(seq);
+   }
+
+   public void appendWithStyle(CharSequence seq) {
+      // Send it to the style adapter which is responsible for calling ctx.append
+      if (styleAdapter != null)
+         styleAdapter.styleString(seq, false, null, null);
+      else
+         append(seq);
    }
 
    public void setStyleBuffer(StringBuilder styleBuffer) {
@@ -179,6 +271,12 @@ public class FormatContext {
    public void indent(int ct) {
       for (int i = 0; i < ct; i++)
            append(INDENT_STR);
+      //lastIndent = ct;
+   }
+
+   public void indentWithStyle(int ct) {
+      for (int i = 0; i < ct; i++)
+         appendWithStyle(INDENT_STR);
       //lastIndent = ct;
    }
 

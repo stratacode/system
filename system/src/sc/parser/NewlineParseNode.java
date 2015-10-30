@@ -40,7 +40,7 @@ public class NewlineParseNode extends FormattingParseNode {
       if (ctx.semanticValueOnly)
          return;
 
-      ctx.append(terminator);
+      ctx.appendWithStyle(terminator);
 
       boolean suppressNewline = false;
 
@@ -78,7 +78,7 @@ public class NewlineParseNode extends FormattingParseNode {
          switch (prevChar) {
             case '}':
                if (ctx.suppressNewlines) {
-                  ctx.append(" ");
+                  ctx.appendWithStyle(" ");
                   return;
                }
                break;
@@ -94,7 +94,7 @@ public class NewlineParseNode extends FormattingParseNode {
          indent = ctx.popIndent();
 
       if (!suppressNewline)
-         ctx.append(FileUtil.LINE_SEPARATOR);
+         ctx.appendWithStyle(FileUtil.LINE_SEPARATOR);
 
       if (indent == -1) {
          val = ctx.nextSemanticNode();
@@ -124,8 +124,8 @@ public class NewlineParseNode extends FormattingParseNode {
          ctx.pushIndent();
 
       if (!suppressNewline)
-         ctx.indent(indent + indentIncr);
+         ctx.indentWithStyle(indent + indentIncr);
       else
-         ctx.append(" ");
+         ctx.appendWithStyle(" ");
    }
 }

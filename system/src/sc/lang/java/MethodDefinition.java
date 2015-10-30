@@ -730,7 +730,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
    }
 
    private void addOverridingMethods(LayeredSystem sys, TypeDeclaration enclType, ArrayList<Object> res, List<? extends Object> ptypes) {
-      Iterator<TypeDeclaration> subTypes = sys.getSubTypesOfType(enclType);
+      Iterator<TypeDeclaration> subTypes = sys.getSubTypesOfType(enclType, false, false, true, false);
       while (subTypes.hasNext()) {
          TypeDeclaration subType = subTypes.next();
          if (subType == enclType) {
@@ -738,9 +738,21 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             return;
          }
 
-         Object result = subType.declaresMethod(name, ptypes, null, enclType, false, null);
-         if (result instanceof MethodDefinition)
+         // In this case, we need to consider all overriding methods - including those in modified types
+         Object result = subType.declaresMethod(name, ptypes, null, enclType, false, null, false);
+         if (result instanceof MethodDefinition) {
             res.add(result);
+         }
+         BodyTypeDeclaration modType = subType.getModifiedType();
+         do {
+            // If we hit this same type in the list of modified types need to stop since anything below this type is not an overriding method
+            if (modType == null || ModelUtil.sameTypes(modType, enclType) && modType.layer.getLayerName().equals(subType.layer.getLayerName()))
+               break;
+            result = modType.declaresMethod(name, ptypes, null, enclType, false, null, false);
+            if (result instanceof MethodDefinition)
+               res.add(result);
+            modType = modType.getModifiedType();
+         } while (true);
 
          addOverridingMethods(sys, subType, res, ptypes);
       }

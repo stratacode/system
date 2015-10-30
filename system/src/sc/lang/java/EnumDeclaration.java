@@ -72,8 +72,8 @@ public class EnumDeclaration extends TypeDeclaration {
       }
    }
 
-   public Object declaresMethod(String name, List<? extends Object> types, ITypeParamContext ctx, Object refType, boolean staticOnly, Object inferredType) {
-      Object o = super.declaresMethod(name, types, ctx, refType, staticOnly, inferredType);
+   public Object declaresMethod(String name, List<? extends Object> types, ITypeParamContext ctx, Object refType, boolean staticOnly, Object inferredType, boolean includeModified) {
+      Object o = super.declaresMethod(name, types, ctx, refType, staticOnly, inferredType, includeModified);
       if (o != null)
          return o;
 

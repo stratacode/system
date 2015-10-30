@@ -673,12 +673,13 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       if (replaced)
          return replacedByMethod.refreshNode();
       // Or we can look our replacement up...
-      Object newType = oldModel.layeredSystem.getSrcTypeDeclaration(getEnclosingType().getFullTypeName(), null, true,  false, false, oldModel.getLayer(), oldModel.isLayerModel);
-      if (newType instanceof BodyTypeDeclaration) {
-         return ((BodyTypeDeclaration) newType).declaresMethodDef(name, getParameterList());
+      TypeDeclaration enclType = getEnclosingType();
+      BodyTypeDeclaration newType = enclType == null ? null : enclType.refreshNode();
+      if (newType == null) {
+         System.err.println("*** Unable to refresh method enclosing type: " + (enclType == null ? " no enclosing type" : enclType.typeName));
+         return this;
       }
-      displayError("Method ", name, " removed for ");
-      return null;
+      return newType.declaresMethodDef(name, getParameterList());
    }
 
    public void addBreakpointNodes(List<ISrcStatement> res, ISrcStatement toFind) {

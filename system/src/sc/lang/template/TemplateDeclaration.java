@@ -7,6 +7,7 @@ package sc.lang.template;
 import sc.lang.ISrcStatement;
 import sc.lang.html.Element;
 import sc.lang.java.*;
+import sc.layer.TypeIndexEntry;
 
 import java.util.EnumSet;
 
@@ -25,6 +26,8 @@ public class TemplateDeclaration extends TypeDeclaration {
       if (enclTag != null && enclTag.needsObject())
          return enclTag.getFullTypeName();
       Template temp = (Template) getJavaModel();
+      if (temp == null)
+         return "_internalTemplateDeclaration";
       return temp.getModelTypeName();
    }
 
@@ -56,5 +59,11 @@ public class TemplateDeclaration extends TypeDeclaration {
                return true;
       }
       return false;
+   }
+
+   public TypeIndexEntry createTypeIndex() {
+      if (!isRealType())
+         return null;
+      return super.createTypeIndex();
    }
 }

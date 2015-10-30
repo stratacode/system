@@ -120,7 +120,11 @@ public class ModifyDeclaration extends TypeDeclaration {
             }
 
             if (modifyInherited && extendsTypes != null && extendsTypes.size() > 0) {
-               displayError("Modifying inherited type: " + modifyTypeDecl.getFullTypeName() + " from: " + getEnclosingType().getFullTypeName() + " cannot extend another type: ");
+               TypeDeclaration enclType = getEnclosingType();
+               if (enclType != null)
+                  displayError("Modifying inherited type: " + modifyTypeDecl.getFullTypeName() + " from: " + enclType.getFullTypeName() + " cannot extend another type: ");
+               else // This happens during editing in the IDE for some reason
+                  displayError("Modifying a type which is not the same: " + modifyTypeDecl.getFullTypeName());
             }
 
             JavaModel thisModel = getJavaModel();
@@ -713,6 +717,17 @@ public class ModifyDeclaration extends TypeDeclaration {
 
       if (typeObj != null)
          return ModelUtil.declaresConstructor(typeObj, types, ctx);
+      return null;
+   }
+
+   public Object declaresMethod(String name, List<? extends Object> types, ITypeParamContext ctx, Object refType, boolean staticOnly, Object inferredType, boolean includeModified) {
+      Object res = super.declaresMethod(name, types, ctx, refType, staticOnly, inferredType, includeModified);
+      if (res != null)
+         return res;
+      // if we have a modifyClass is there ever a case where we need to include those methods?  We typically use definesMethod for resolution - this is just for the IDE - overriding methods.
+      if (includeModified && modifyTypeDecl != null) {
+         return modifyTypeDecl.declaresMethod(name, types, ctx, refType, staticOnly, inferredType, includeModified);
+      }
       return null;
    }
 

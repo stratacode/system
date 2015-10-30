@@ -72,7 +72,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
       if (ModelUtil.hasTypeVariables(parameterizedType)) {
          Object res = resolveTypeParameter(parameterizedType, resolve);
          if (res == null) {
-            System.err.println("*** Returning null for type of method");
+            //System.err.println("*** Returning null for type of method"); - happens when we have unresolved stuff
             res = resolveTypeParameter(parameterizedType, resolve);
          }
          return res;

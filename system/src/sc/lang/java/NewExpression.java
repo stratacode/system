@@ -685,7 +685,7 @@ public class NewExpression extends IdentifierExpression {
    public void styleNode(IStyleAdapter adapter) {
       // TODO: is there a case where we need to do per-value styling here?
       if (parseNode != null) {
-         parseNode.styleNode(adapter);
+         parseNode.styleNode(adapter, null, null, -1);
       }
       // For this case unless it is a rootless node, we could walk up to the root node, use the start parselet from that language and generate it.
       // then presumably we'd have a parse node we could use.

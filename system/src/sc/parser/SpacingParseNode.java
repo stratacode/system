@@ -123,11 +123,11 @@ public class SpacingParseNode extends FormattingParseNode {
                               if (node == null) {
                                  node = ctx.getPrevSemanticNode();
                                  if (node != null) // last tag
-                                    ctx.append("\n");
+                                    ctx.appendWithStyle("\n");
                               }
                               else {
-                                 ctx.append("\n");
-                                 ctx.indent(node.getNestingDepth());
+                                 ctx.appendWithStyle("\n");
+                                 ctx.indentWithStyle(node.getNestingDepth());
                               }
                            }
                         }
@@ -146,7 +146,7 @@ public class SpacingParseNode extends FormattingParseNode {
                case '-':
                   // For "x++ + 3"
                   if (prevChar == '+' || prevChar == '-')
-                     ctx.append(" ");
+                     ctx.appendWithStyle(" ");
                   break;
             }
             if (ctx.tagMode) {
@@ -175,17 +175,17 @@ public class SpacingParseNode extends FormattingParseNode {
                      return;
                }
                if (newline && !suppressNewline) {
-                  ctx.append(FileUtil.LINE_SEPARATOR);
+                  ctx.appendWithStyle(FileUtil.LINE_SEPARATOR);
                   Object sv = ctx.nextSemanticValue();
                   int indent = ctx.getCurrentIndent() + 2;
                   if (sv instanceof ISemanticNode)
                      indent = ((ISemanticNode) sv).getChildNestingDepth();
-                  ctx.indent(indent);
+                  ctx.indentWithStyle(indent);
                   return;
                }
                /* Ignore suppress spacing if we have two identifier chars - e.g. New Expression */
                if (Character.isJavaIdentifierStart(nextChar)) {
-                  ctx.append(" ");
+                  ctx.appendWithStyle(" ");
                   return;
                }
             }
@@ -199,6 +199,6 @@ public class SpacingParseNode extends FormattingParseNode {
       else
          return;
       if (!ctx.suppressSpacing)
-         ctx.append(" ");
+         ctx.appendWithStyle(" ");
    }
 }
