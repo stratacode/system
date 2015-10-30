@@ -9326,6 +9326,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return sysInfo;
    }
 
+   public SystemRefreshInfo refreshSystem() {
+      return refreshSystem(true);
+   }
+
    public SystemRefreshInfo refreshSystem(boolean refreshPeers) {
       // Before we parse any files, need to clear out any invalid models
       // TODO: remove this unless we are not using clonedTransformedModels
