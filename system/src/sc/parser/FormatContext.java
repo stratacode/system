@@ -84,14 +84,14 @@ public class FormatContext {
     * file which is not correct.  But when ClassType ends up at the end of a newline or something we do not
     * want to insert that extra space.
     *
-    * TODO: Currently we only go up the parent hierarchy two levels - to handle the case where you are changing
-    * an 'implements type' which is in a list inside of a class declaration before you get the following character.
+    * TODO: Currently we only go up the parent hierarchy three levels - to handle the case where you are changing
+    * an expression inside of a binary expression.  There's a list -> identifierExpr -> BinaryOperand -> BinaryExpression
     * It's possible we need to do this more levels... or maybe we should lazily find the next level in "nextChar"
     * when we hit the end of the top-most level?
     */
    private void insertPendingParents(ParentParseNode curParseNode, ISemanticNode parNode, ISemanticNode findNode) {
       ArrayList<Entry> pathToNode = null;
-      int maxLevelCount = 2; // TODO: this might need to be higher?
+      int maxLevelCount = 3; // TODO: this might need to be higher?
       int ct = 0;
       do {
          if (parNode != null) {

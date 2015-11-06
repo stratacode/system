@@ -37,6 +37,12 @@ public class PString extends AbstractString {
       return str instanceof String || str instanceof IString;
    }
 
+   public int getStringLength(Object str) {
+      if (str instanceof CharSequence)
+         return ((CharSequence) str).length();
+      throw new UnsupportedOperationException();
+   }
+
    public static IString toIString(Object str) {
       if (str == null)
          return null;

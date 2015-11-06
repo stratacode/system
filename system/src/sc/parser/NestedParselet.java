@@ -1044,6 +1044,10 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
             if (genRes instanceof GenerateError || genRes instanceof PartialArrayResult)
                 return false;
 
+            // TODO: pnode.children here may have non-semantic parse-nodes like spacing, comments which should be merged
+            // back into the genRes children.  So instead of just clearing the children, we could walk down the old and new
+            // tree's and take from the old anything which did not have semantic content.
+
             if (pnode.children != null)
                pnode.children.clear();
 

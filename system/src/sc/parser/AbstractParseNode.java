@@ -166,4 +166,9 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
    public boolean canSkip() {
       return true;
    }
+
+   public int resetStartIndex(int ix) {
+      startIndex = ix;
+      return ix + length();
+   }
 }

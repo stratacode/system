@@ -689,6 +689,13 @@ public class ParseUtil  {
    }
 
 
+   public static void resetStartIndexes(ISemanticNode node) {
+      IParseNode rootParseNode = node.getParseNode();
+      int endIx = rootParseNode.resetStartIndex(0);
+      //if (endIx != rootParseNode.length())
+     //    System.out.println("*** End index does not match after resetStartIndex");
+   }
+
    /** Handles the case where there is a primitive boolean property.  Each getX call on that property will return a new Boolean instance.  During updateParseNode, we have a test to stop updating when we find a getX call that did not match from one to the next. */
    public static boolean equalSemanticValues(Object o1, Object o2) {
       return o1 == o2 || (o1 instanceof Boolean && o1.equals(o2));

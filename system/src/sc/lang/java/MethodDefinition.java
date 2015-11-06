@@ -730,7 +730,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
    }
 
    private void addOverridingMethods(LayeredSystem sys, TypeDeclaration enclType, ArrayList<Object> res, List<? extends Object> ptypes) {
-      Iterator<TypeDeclaration> subTypes = sys.getSubTypesOfType(enclType, false, false, true, false);
+      Iterator<TypeDeclaration> subTypes = sys.getSubTypesOfType(enclType, false, false, true, false, false);
       while (subTypes.hasNext()) {
          TypeDeclaration subType = subTypes.next();
          if (subType == enclType) {

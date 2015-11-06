@@ -84,6 +84,12 @@ public interface IParseNode extends CharSequence, IParseResult {
 
    /** Find the parse node at the specified start index.  If matchParselet is not null the match is only returned if it is the same as the parselet specified */
    IParseNode findParseNode(int startIndex, Parselet matchParselet);
+
+   /**
+    * After updating some parse nodes, you may need to reset the start indexes.  This sets the start index to the one given and returns the start index to
+    * continue after this parse node.
+    */
+   int resetStartIndex(int ix);
 }
 
 

@@ -221,6 +221,7 @@ public class ClassDeclaration extends TypeDeclaration {
       return Object.class;
    }
 
+
    public JavaType getExtendsType() {
       // If it is a cycle or not found, treat it like it is null or we can get in an infinite loop
       if (extendsInvalid)

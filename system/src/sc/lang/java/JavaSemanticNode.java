@@ -580,7 +580,8 @@ public abstract class JavaSemanticNode extends SemanticNode {
             if (origParseNode != null) {
                int startIx = origParseNode.getStartIndex();
                if (startIx != -1) {
-                  IParseNode newNode = newModel.getParseNode().findParseNode(startIx, origParseNode.getParselet());
+                  IParseNode newParseNode = newModel.getParseNode();
+                  IParseNode newNode = newParseNode == null ? null : newParseNode.findParseNode(startIx, origParseNode.getParselet());
                   if (newNode != null) {
                      Object semValue = newNode.getSemanticValue();
                      if (semValue != null && semValue.getClass() == getClass())

@@ -74,7 +74,6 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    public List<Layer> baseLayers;
 
    private boolean initialized = false;
-   private boolean initializing = false;
 
    public boolean started = false;
    public boolean validated = false;
@@ -293,6 +292,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    /** True if we've restored the complete layer type index */
    boolean typeIndexRestored = false;
+
+   /** True if we've restored the type index, then updated it and so the saved version is stale */
+   boolean typeIndexNeedsSave = false;
 
    /** If a Java file uses no extensions, we can either compile it from the source dir or copy it to the build dir */
    public boolean copyPlainJavaFiles = true;
@@ -726,8 +728,12 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (typeName != null) {
          if (layerTypeIndex == null)
             layerTypeIndex = new LayerTypeIndex();
-         layerTypeIndex.layerTypeIndex.put(typeName, typeIndexEntry);
+         TypeIndexEntry oldTypeEnt = layerTypeIndex.layerTypeIndex.put(typeName, typeIndexEntry);
          layerTypeIndex.fileIndex.put(typeIndexEntry.fileName, typeIndexEntry);
+         if (typeIndexRestored) {
+            if (oldTypeEnt == null || !oldTypeEnt.equals(typeIndexEntry))
+               typeIndexNeedsSave = true;
+         }
       }
    }
 
@@ -2157,11 +2163,14 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (!activated && (layerTypesStarted || typeIndexRestored))  {
          if (!started || layerTypeIndex.layerPathName == null)
             System.err.println("*** Invalid type index during save");
+         else if (layerTypeIndex.layerPathName.equals(layerUniqueName))
+            System.out.println("*** Invalid layer path index name");
          File typeIndexFile = new File(layeredSystem.getTypeIndexFileName(getLayerName()));
          ObjectOutputStream os = null;
          try {
             os = new ObjectOutputStream(new FileOutputStream(typeIndexFile));
             os.writeObject(layerTypeIndex);
+            typeIndexNeedsSave = false;
          }
          catch (IOException exc) {
             System.err.println("*** Unable to write typeIndexFile: " + exc);

@@ -246,18 +246,16 @@ public class ParentParseNode extends AbstractParseNode {
       // If the parse node is generated, we need to use the formatting process to add in
       // the spacing.  If the parse node was parsed, we toString it just as it
       // was parsed so we get back the identical input strings.
-      // TODO: REMOVE THE EXTRA UNCOMMENTED CODE HERE.
       // For non-generated parse nodes, the child.toString() should have all of the formatting already.  But we may have invalidated some children.
       // To get the proper spacing for those children, we need the parent parse nodes in the FormatContext - so they can find the prev/next chars to do proper spacing.
       // If there's overhead here, we could still optimize the case where there are no invalidated children nodes
-      //if (generated) {
+      if (isGeneratedTree()) {
          FormatContext ctx = createFormatContext(parSemVal, curParseNode, curChildIndex);
          //ctx.append(FormatContext.INDENT_STR);
          PerfMon.start("format", false);
          format(ctx);
          PerfMon.end("format");
          return ctx.getResult().toString();
-      /*
       }
       else {
          if (children == null)
@@ -269,14 +267,13 @@ public class ParentParseNode extends AbstractParseNode {
             return child.toString();
          }
          else {
-            StringBuffer sb = new StringBuffer();
+            StringBuilder sb = new StringBuilder();
             for (Object o:children)
                if (o != null)
                   sb.append(o);
             return sb.toString();
          }
       }
-      */
    }
 
    public void styleNode(IStyleAdapter adapter, Object parSemVal, ParentParseNode parNode, int childIx) {
@@ -284,6 +281,9 @@ public class ParentParseNode extends AbstractParseNode {
       // the proper spacing.  If the parse node was parsed, we toString it just as it
       // was parsed so we get back the identical input strings.
       if (generated) {
+         // TODO: we should have a way to avoid this case - by re-formatting a file and converting generated nodes to
+         // normal parse-nodes.  If we do it from the top-down, we can avoid the overhead of trying to recreate the
+         // context for parse-nodes that need the 'nextChar' and prevChar to do proper spacing.
          FormatContext ctx = createFormatContext(parSemVal, parNode, childIx);
          adapter.setFormatContext(ctx);
          //ctx.append(FormatContext.INDENT_STR);
@@ -310,7 +310,7 @@ public class ParentParseNode extends AbstractParseNode {
                   else {
                      ISemanticNode childSVNode = (ISemanticNode) childSV;
                      if (childSVNode.getParseNode() == childNode)
-                        ParseUtil.styleString(adapter, childSV, childParselet.styleName, null, false);
+                        ParseUtil.styleString(adapter, childSV, childParselet == null ? null : childParselet.styleName, null, false);
                      else
                         childParseNode.styleNode(adapter, getSemanticValue(), this, i);
                   }
@@ -467,7 +467,7 @@ public class ParentParseNode extends AbstractParseNode {
 
 
    public String toDebugString() {
-      StringBuffer sb = new StringBuffer();
+      StringBuilder sb = new StringBuilder();
       if (parselet != null && parselet.getName() != null)
          sb.append(parselet.getName());
       if (children == null)
@@ -771,6 +771,42 @@ public class ParentParseNode extends AbstractParseNode {
 
    public Object getSkippedValue() {
       return value;
+   }
+
+   public boolean isGeneratedTree() {
+      if (generated)
+         return true;
+      if (value instanceof ISemanticNode && !((ISemanticNode) value).isParseNodeValid())
+         return true;
+      if (children != null) {
+         int sz = children.size();
+         for (int i = 0; i < sz; i++) {
+            Object node = children.get(i);
+            if (node instanceof ParentParseNode && ((ParentParseNode) node).isGeneratedTree())
+               return true;
+         }
+      }
+      return false;
+   }
+
+   public int resetStartIndex(int ix) {
+      startIndex = ix;
+
+      if (children != null) {
+         int sz = children.size();
+         for (int i = 0; i < sz; i++) {
+            Object child = children.get(i);
+            if (child != null) {
+               if (child instanceof IParseNode) {
+                  ix = ((IParseNode) child).resetStartIndex(ix);
+               }
+               else if (child instanceof CharSequence) {
+                  ix += ((CharSequence) child).length();
+               }
+            }
+         }
+      }
+      return ix;
    }
 }
 

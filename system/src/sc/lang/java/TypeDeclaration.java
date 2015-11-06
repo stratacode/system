@@ -148,7 +148,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
       if (getEnclosingType() == null && !isLayerType) {
          JavaModel model = getJavaModel();
-         SrcEntry srcFile = model.getSrcFile();
+         SrcEntry srcFile = model == null ? null : model.getSrcFile();
          // Some Java classes have more than one type in them?
          if (srcFile != null && model.types != null && model.types.size() == 1 && model.types.get(0) == this) {
             String fileName = CTypeUtil.getClassName(model.getSrcFile().getRelTypeName());
@@ -882,6 +882,8 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
          }
       }
       if (hiddenBody != null) {
+         if (result == null)
+            result = new ArrayList<Object>();
          addAllProperties(hiddenBody, result, modifier, includeAssigns);
       }
       return result;

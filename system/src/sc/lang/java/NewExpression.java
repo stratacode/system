@@ -101,7 +101,7 @@ public class NewExpression extends IdentifierExpression {
       starting = true;
 
       JavaModel model = getJavaModel();
-      if (model == null)
+      if (model == null || typeIdentifier == null)
          return;
 
       // Need to define our type before our body so it can be used by statements in the body
@@ -519,7 +519,7 @@ public class NewExpression extends IdentifierExpression {
             anonType.operator = "class";
          }
          if (anonId == -1) {
-            anonId = enclType.allocateAnonId();
+            anonId = enclType == null ? 1 : enclType.allocateAnonId();
             anonType.typeName = ANON_TYPE_PREFIX + anonId;
          }
          anonTypeInited = true;
@@ -542,7 +542,8 @@ public class NewExpression extends IdentifierExpression {
 
          anonType.setProperty("body", classBody.deepCopy(CopyNormal, null));
          if (needsAdd) {
-            enclType.addToHiddenBody(anonType);
+            if (enclType != null)
+               enclType.addToHiddenBody(anonType);
          }
          else {
             // In case the type was started, init the type info on it again after we added the extends/implements.

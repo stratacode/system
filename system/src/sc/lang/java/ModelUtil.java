@@ -2039,7 +2039,7 @@ public class ModelUtil {
             return getAnnotation(((VariableDefinition) definition).getDefinition(), annotationName);
          else if (definition instanceof ParamTypedMember)
             return getAnnotation(((ParamTypedMember) definition).getMemberObject(), annotationName);
-         else if (definition instanceof java.lang.Enum || definition instanceof ITypeDeclaration)
+         else if (definition instanceof java.lang.Enum || definition instanceof ITypeDeclaration || ModelUtil.isTypeVariable(definition))
             return null;
          else
             throw new UnsupportedOperationException();
@@ -2577,8 +2577,11 @@ public class ModelUtil {
          int sz = statements.size();
          for (int i = 0; i < sz; i++) {
             Statement s = statements.get(i);
-            if (s instanceof VariableStatement)
-               frameSize += ((VariableStatement) s).definitions.size();
+            if (s instanceof VariableStatement) {
+               VariableStatement vs = (VariableStatement) s;
+               if (vs.definitions != null)
+                  frameSize += vs.definitions.size();
+            }
          }
       }
       return frameSize;

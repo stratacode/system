@@ -474,7 +474,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (sys != null) {
          Layer layer = getLayer();
          if (layer != null && this instanceof TypeDeclaration) {
-            Iterator<TypeDeclaration> subTypes = sys.getSubTypesOfType((TypeDeclaration) this, layer.activated, false, false, true);
+            // If there are any cached sub-types (passing cachedOnly = true), we want to invalidate their entries.
+            Iterator<TypeDeclaration> subTypes = sys.getSubTypesOfType((TypeDeclaration) this, layer.activated, false, false, true, true);
             if (subTypes != null) {
                while (subTypes.hasNext()) {
                   TypeDeclaration subType = subTypes.next();
@@ -1915,7 +1916,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // If we are refreshing after a layer has been closed/open and that layer happened to be modifying this type
       // we need to clear out that replacedByType so it is not used later
       if ((flags & ModelUtil.REFRESH_TYPEDEFS) != 0) {
-         if (replacedByType != null && !replaced) {
+         if (replacedByType != null && !replaced && !removed) {
             Layer replacedByLayer = replacedByType.getLayer();
             if (replacedByLayer.closed)
                replacedByType = null;
@@ -5811,7 +5812,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             }
          }
       }
-      else {
+      else if (ctx != null) {
          Object curObj = ctx.getCurrentObject();
          if (curObj != null)
             bs.execForObj(curObj, ctx);
@@ -6821,6 +6822,18 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public JavaType getExtendsType() {
       return null;
+   }
+
+   public String getExtendsTypeName() {
+      JavaType extType = getExtendsType();
+      if (extType == null)
+         return null;
+      return extType.getAbsoluteBaseTypeName();
+   }
+   // Only need this method so that this property appears writable so we can sync it on the client.  Easy to implement if we do ever need it.
+   @Constant
+   public void setExtendsTypeName(String str) {
+      throw new UnsupportedOperationException();
    }
 
    public List<?> getImplementsTypes() {
@@ -8571,8 +8584,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       if (!oldModel.removed)
          return this; // We are still valid
-      if (removed) // For live types we have a ref to the replacement
-         return (TypeDeclaration) replacedByType.refreshNode();
+      if (removed) { // For live types we have a ref to the replacement
+         if (replacedByType == null)
+            return null;
+         return replacedByType.refreshNode();
+      }
       Object res = oldModel.layeredSystem.getSrcTypeDeclaration(getFullTypeName(), getLayer().getNextLayer(), true, false, false, layer, oldModel.isLayerModel);
       if (res instanceof TypeDeclaration) {
          TypeDeclaration newType = (TypeDeclaration) res;

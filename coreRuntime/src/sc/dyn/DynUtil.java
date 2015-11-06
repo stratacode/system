@@ -42,7 +42,7 @@ public class DynUtil {
 
    // A table which stores the automatically assigned id for a given object instance.
    //static Map<Object,String> objectIds = (Map<Object,String>) PTypeUtil.getWeakHashMap();
-   static Map<Object,String> objectIds = new HashMap<Object,String>();
+   static Map<Object,String> objectIds = new WeakHashMap<Object,String>();
 
    public static void clearObjectIds() {
       objectIds.clear();

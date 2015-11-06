@@ -152,7 +152,7 @@ public class ModifyDeclaration extends TypeDeclaration {
                         if (!isLayerComponent()) {
                            // TODO: we should accumulate all of these layers into an index.  It's quite possible in the IDE context for us to
                            // find the same type modified by different layers... in that case representing the different possible stackings.
-                           System.out.println("**** Warning - changing modified from layer to: " + modifyTypeDecl.replacedByType.getLayer() + " to: " + getLayer());
+                           System.out.println("**** Warning - modify declaration: " + typeName + " in layer: " + getLayer() + " not replacing upstream layer of: " + modifyTypeDecl.getLayer() + " since it's already modified by: " + modifyTypeDecl.replacedByType.getLayer());
                         } else {
                            // This layer should be in front of us -
                            if (getLayer().layerPosition != -1 && getLayer().layerPosition < modifyTypeDecl.replacedByType.getLayer().layerPosition)
@@ -326,6 +326,9 @@ public class ModifyDeclaration extends TypeDeclaration {
          return;
 
       if (modifyTypeDecl != null) {
+         // Get the most recent type in case this one was replaced
+         modifyTypeDecl = modifyTypeDecl.resolve(false);
+
          // Start and validate the modified type
          ParseUtil.initAndStartComponent(modifyTypeDecl);
       }
@@ -1556,13 +1559,6 @@ public class ModifyDeclaration extends TypeDeclaration {
          }
       }
       return this;
-   }
-
-   public String getExtendsTypeName() {
-      JavaType extType = getExtendsType();
-      if (extType == null)
-         return null;
-      return extType.getAbsoluteBaseTypeName();
    }
 
    /** Our type name is always the same as the one we extend in the modify declaration */

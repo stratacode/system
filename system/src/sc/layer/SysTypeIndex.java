@@ -142,4 +142,20 @@ public class SysTypeIndex {
    public void updateTypeName(String oldTypeName, String newTypeName) {
       inactiveTypeIndex.updateTypeName(oldTypeName, newTypeName);
    }
+
+   public StringBuilder dumpCacheStats() {
+      StringBuilder sb = new StringBuilder();
+      if (activeTypeIndex != null) {
+         sb.append("  activeTypeIndex: ");
+         sb.append(activeTypeIndex.dumpCacheStats());
+         sb.append("\n");
+      }
+      if (inactiveTypeIndex != null) {
+         sb.append("  inActiveTypeIndex: ");
+         sb.append(inactiveTypeIndex.dumpCacheStats());
+         sb.append("\n");
+      }
+      sb.append("\n");
+      return sb;
+   }
 }

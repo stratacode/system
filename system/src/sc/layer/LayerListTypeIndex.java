@@ -141,4 +141,12 @@ public class LayerListTypeIndex {
       }
 
    }
+
+   public StringBuilder dumpCacheStats() {
+      StringBuilder sb = new StringBuilder();
+      sb.append(" numTypes: " + typeIndex.size());
+      sb.append(" numSubTypes: " + subTypeIndex.size());
+      sb.append(" numModTypes: " + modifyTypeIndex.size());
+      return sb;
+   }
 }

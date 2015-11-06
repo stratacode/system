@@ -1230,14 +1230,14 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       JavaModel model = getJavaModel();
       String thisPackage = model == null ? null : model.getPackagePrefix();
       int tagPackageStart = 0;
-      Layer modelLayer = model.getLayer();
+      Layer modelLayer = model != null ? model.getLayer() : null;
 
       // If we are in a tag-class that's already a top-level class and looking up from a package that's already in the tag package list, look starting from where this guy is.
       // If we are looking up an inner type that happens to be in the same package, we still need to pick up the most specific version of that type or layered inheritance does nto work.
       if (thisPackage != null && getEnclosingTag() == null) {
          int ct = 0;
          for (LayeredSystem.TagPackageListEntry tagPackage:tagPackageList) {
-            if (thisPackage.equals(tagPackage)) {
+            if (thisPackage.equals(tagPackage.name)) {
                tagPackageStart = ct+1;
                break;
             }

@@ -267,5 +267,18 @@ public class ParseNode extends AbstractParseNode {
    public Object getSkippedValue() {
       return value;
    }
+
+   public int resetStartIndex(int ix) {
+      startIndex = ix;
+      if (value != null) {
+         if (value instanceof IParseNode) {
+            return ((IParseNode) value).resetStartIndex(ix);
+         }
+         else if (value instanceof CharSequence) {
+            return startIndex + ((CharSequence) value).length();
+         }
+      }
+      return startIndex;
+   }
 }
 

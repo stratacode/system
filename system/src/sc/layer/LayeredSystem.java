@@ -384,8 +384,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return true;
       if (viewedErrors == null)
          return false;
-      if (viewedErrors.size() == 50) {
-         System.err.println(".... too many errors - disabling command line layers");
+      if (viewedErrors.size() >= 50) {
+         System.err.println(".... too many errors - disabling further console errors");
          options.disableCommandLineErrors = true;
          return true;
       }
@@ -757,7 +757,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (enclType == null)
          return null;
 
-      Iterator<TypeDeclaration> subTypes = getSubTypesOfType(enclType, activeOnly, openLayers, checkPeers, true);
+      Iterator<TypeDeclaration> subTypes = getSubTypesOfType(enclType, activeOnly, openLayers, checkPeers, true, false);
       ArrayList<PropertyAssignment> res = null;
       if (subTypes != null) {
          while (subTypes.hasNext()) {
@@ -6063,7 +6063,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       HashMap<String,PackageEntry> pkgEnt = packageIndex.get(packageName);
       if (pkgEnt == null)
          return null;
-      return packageIndex.get(packageName).keySet();
+      return pkgEnt.keySet();
    }
 
    public Set<String> getPackageNames() {
@@ -6380,6 +6380,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       saveTypeIndexFiles();
 
       cleanInactiveCache();
+   }
+
+   public void saveTypeIndexChanges() {
+      for (Layer layer:inactiveLayers) {
+         if (layer.typeIndexNeedsSave)
+            layer.saveTypeIndex();
+
+      }
    }
 
    private void cleanInactiveCache() {
@@ -9730,12 +9738,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       model.setAdded(true);
       SrcEntry srcEnt = model.getSrcFile();
       Layer srcEntLayer = srcEnt.layer;
-      if (!isLayer && srcEntLayer != null && srcEntLayer.activated) {
-         // Now we can get its types and info.
-         addTypesByName(srcEntLayer, model.getPackagePrefix(), model.getDefinedTypes(), fromLayer);
+      if (srcEntLayer != null) {
+         if (!isLayer && srcEntLayer.activated) {
+            // Now we can get its types and info.
+            addTypesByName(srcEntLayer, model.getPackagePrefix(), model.getDefinedTypes(), fromLayer);
+         }
+         // Also register it in the layer model index
+         srcEntLayer.layerModels.add(new IdentityWrapper(model));
       }
-      // Also register it in the layer model index
-      srcEntLayer.layerModels.add(new IdentityWrapper(model));
 
       updateModelIndex(srcEnt, model, ctx);
    }
@@ -12387,14 +12397,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Iterator<TypeDeclaration> getSubTypesOfType(TypeDeclaration type) {
-      return getSubTypesOfType(type, true, true, false, false);
+      return getSubTypesOfType(type, true, true, false, false, false);
    }
 
    /**
     * Returns the sub-types of the specified type.  If activeOnly is true, only those types active in this system are checked.  If activeOnly is false
     * and checkPeers is true, the type name is used to find sub-types in the peer systems as well.
     */
-   public Iterator<TypeDeclaration> getSubTypesOfType(TypeDeclaration type, boolean activeOnly, boolean openLayers, boolean checkPeers, boolean includeModifiedTypes) {
+   public Iterator<TypeDeclaration> getSubTypesOfType(TypeDeclaration type, boolean activeOnly, boolean openLayers, boolean checkPeers, boolean includeModifiedTypes, boolean cachedOnly) {
       if (!type.isRealType())
          return NO_TYPES;
       String typeName = type.getFullTypeName();
@@ -12415,7 +12425,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                Layer refLayer = type.getLayer();
                if (refLayer.layeredSystem != this)
                   refLayer = getPeerLayerFromRemote(refLayer);
-               TypeDeclaration res = (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
+               // For the cachedOnly case, we do not want to load a type which is not yet loaded - i.e. we are invalidating caches for that type
+               TypeDeclaration res = cachedOnly ? getCachedTypeDeclaration(subTypeName, null, null, false, false) : (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
                // Check the resulting class name.  getSrcTypeDeclaration may find the base-type of an inner type as it looks for inherited inner types under the parent type's name
                if (res != null && res.getFullTypeName().equals(subTypeName))
                   result.add(res);
@@ -12427,7 +12438,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (checkPeers && !peerMode && peerSystems != null) {
             for (int i = 0; i < peerSystems.size(); i++) {
                LayeredSystem peerSys = peerSystems.get(i);
-               Iterator<TypeDeclaration> peerRes = peerSys.getSubTypesOfType(type, false, openLayers, false, includeModifiedTypes);
+               Iterator<TypeDeclaration> peerRes = peerSys.getSubTypesOfType(type, false, openLayers, false, includeModifiedTypes, cachedOnly);
                if (peerRes != null) {
                   while (peerRes.hasNext())
                      result.add(peerRes.next());
@@ -13554,5 +13565,67 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return coreBuildLayer;
    }
 
+   public StringBuilder dumpCacheStats() {
+      StringBuilder sb = new StringBuilder();
+      sb.append("LayeredSystem: ");
+      sb.append(getProcessIdent());
+      sb.append("  activeLayers: ");
+      sb.append(layers.size());
+      sb.append(" inactiveLayers: ");
+      sb.append(inactiveLayers.size());
+      sb.append(" activeModels: ");
+      sb.append(modelIndex.size());
+      sb.append(" activeFiles: ");
+      sb.append(processedFileIndex.size());
+      sb.append(" inactiveModels: ");
+      sb.append(inactiveModelIndex.size());
+      sb.append("\n");
+      if (typeIndex != null)
+         sb.append(typeIndex.dumpCacheStats());
+      int totalLayerModels = 0;
+      for (Layer l:inactiveLayers) {
+         totalLayerModels += l.layerModels.size();
+      }
+      sb.append("  layerModels: " + totalLayerModels);
+      sb.append(" viewErrors: " + viewedErrors.size());
+      sb.append(" globalObjects: " + globalObjects.size());
+      sb.append(" pendingActiveLayers: " + pendingActiveLayers.size());
+      sb.append(" pendingInActiveLayers: " + pendingInactiveLayers.size());
+      sb.append(" inactiveLayerIndex: " + inactiveLayerIndex.size() + "\n");
+      sb.append("  typesByName: " + typesByName.size());
+      sb.append(" innerTypeCache: " + innerTypeCache.size());
+      sb.append(" beingLoaded: " + beingLoaded.size());
+      sb.append(" typesByRootName: " + typesByRootName.size());
+      sb.append(" templateCache: " + templateCache.size());
+      sb.append(" zipFileCache: " + zipFileCache.size() + "\n");
+
+      sb.append("  instancesByTypes: " + instancesByType.size());
+      sb.append(" innerToOuterIndex: " + innerToOuterIndex.size());
+      sb.append(" objectNameIndex: " + objectNameIndex.size());
+      sb.append(" subTypesByType: " + subTypesByType.size());
+
+      int pkgIndexSize = packageIndex.size();
+      for (HashMap<String,PackageEntry> pkgMap:packageIndex.values()) {
+         pkgIndexSize += pkgMap.size();
+      }
+      sb.append("  packageIndexSize: " + pkgIndexSize + "\n\n");
+
+      if (!peerMode && typeIndexProcessMap != null) {
+         sb.append("Peers type indexes:\n");
+         for (Map.Entry<String,SysTypeIndex> ent:typeIndexProcessMap.entrySet()) {
+            sb.append("  index for: " + ent.getKey());
+            sb.append(": ");
+            sb.append(ent.getValue().dumpCacheStats());
+         }
+      }
+
+      if (!peerMode && peerSystems != null) {
+         sb.append("Peers: \n");
+         for (LayeredSystem peerSys:peerSystems)
+            sb.append(peerSys.dumpCacheStats());
+      }
+
+      return sb;
+   }
 
 }

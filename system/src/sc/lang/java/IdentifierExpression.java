@@ -1022,7 +1022,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             referenceType = getTypeForIdentifier(idTypes, boundTypes, arguments, ix-1, expr.getJavaModel(), inferredType, expr.getEnclosingType());
 
          if (expr.getJavaModel() == null) {
-            System.err.println("*** expression missing model in checkinForBindableField!");
+            // Happens for partial expression parsing and completion constructs in the editor
             return;
          }
          // Any binding requires dynamic access to the member but if it's a forward binding, its a real binding, not referenceOnly=true
@@ -1403,7 +1403,7 @@ public class IdentifierExpression extends ArgumentsExpression {
    static Object getMemberForIdentifier(Expression expr, int ix, IdentifierType[] idTypes, Object[] boundTypes, JavaModel model) {
       IdentifierType idType = idTypes[ix];
       Object boundType = boundTypes[ix];
-      if (idType == IdentifierType.FieldName && !model.enableExtensions()) {
+      if (idType == IdentifierType.FieldName && model != null && !model.enableExtensions()) {
          if (boundType instanceof IBeanMapper)
             return ((IBeanMapper) boundType).getField();
       }
@@ -2825,7 +2825,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (idTypes[ix] != null) {
          switch (idTypes[ix]) {
             case FieldName:
-               if (!model.enableExtensions()) {
+               if (model != null && !model.enableExtensions()) {
                   // Do not expand the type into the property's type when we are in a .java file.  Otherwise, stuff won't compile
                   // like a case where an int field is shadowed by a double getX method.
                   if (boundTypes[ix] instanceof IBeanMapper) {
@@ -2889,7 +2889,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (idTypes[ix] != null) {
          switch (idTypes[ix]) {
             case FieldName:
-               if (!model.enableExtensions()) {
+               if (model != null && !model.enableExtensions()) {
                   // Do not expand the type into the property's type when we are in a .java file.  Otherwise, stuff won't compile
                   // like a case where an int field is shadowed by a double getX method.
                   if (boundTypes[ix] instanceof IBeanMapper) {
@@ -3882,6 +3882,8 @@ public class IdentifierExpression extends ArgumentsExpression {
       }
 
       JavaModel model = getJavaModel();
+      if (model == null)
+         return pos;
       boolean includeGlobals = idSize == 1 && !emptyDotName;
       if (obj != null)
          ModelUtil.suggestMembers(model, obj, lastIdent, candidates, includeGlobals, true, true);
