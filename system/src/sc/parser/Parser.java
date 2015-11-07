@@ -220,7 +220,7 @@ public class Parser implements IString {
             for (int i = 0; i < currentErrors.size(); i++)
                System.out.println("Errors: " + i + ": " + currentErrors.get(i));
          }
-         return wrapErrors();
+         result = wrapErrors();
       }
 
       if (ENABLE_STATS) {

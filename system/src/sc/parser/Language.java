@@ -200,6 +200,7 @@ public abstract class Language extends LayerFileComponent {
             if (!p.atEOF())
                parseTree = p.wrapErrors();
          }
+         postProcessResult(parseTree, fileName);
          return parseTree;
       }
       finally {
@@ -210,6 +211,29 @@ public abstract class Language extends LayerFileComponent {
             System.err.println("*** Failed to close the reader for parsing: " + fileName + ": " + exc);
          }
       }
+   }
+
+   public void postProcessResult(Object res, String fileName) {
+      if (res instanceof ParseError) {
+         ParseError err = (ParseError) res;
+         if (err.isMultiError()) {
+            Object[] args = err.errorArgs;
+            for (Object argObj : args) {
+               ParseError subErr = (ParseError) argObj;
+               postProcessResult(subErr, fileName);
+            }
+         }
+         else if (err.partialValue != null)
+            postProcessResult(err.partialValue, fileName);
+      }
+      else {
+         Object semValue = ParseUtil.nodeToSemanticValue(res);
+         postProcessSemanticValue(semValue, fileName);
+      }
+   }
+
+   /** Hook to do language specific processing on the semantic values returned from this method */
+   public void postProcessSemanticValue(Object semValue, String fileName) {
    }
 
    public Object parse(Reader reader, Parselet start) {

@@ -287,6 +287,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    LayerTypeIndex layerTypeIndex = null;
 
+   /** Keep track of new extensions added that correspond to files in this layer which must be indexed */
+   private String[] langExtensions = null;
+
    /** Used to order the loading of layers in the layer type index.  We need to load it from the bottom up to be sure all extended types have been loaded before we load subsequent layers. */
    boolean layerTypesStarted = false;
 
@@ -726,13 +729,21 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    public void updateTypeIndex(TypeIndexEntry typeIndexEntry) {
       String typeName = typeIndexEntry.typeName;
       if (typeName != null) {
-         if (layerTypeIndex == null)
+         if (layerTypeIndex == null) {
+            // Here we will be creating the layer model as part of creating the layer.  Don't put the layer into the type index until it's been restored.
+            if (typeIndexEntry.isLayerType) {
+               return;
+            }
+            if (!initialized)
+               System.out.println("*** Error - updating layer type index before the layer has been initialized");
             layerTypeIndex = new LayerTypeIndex();
+         }
          TypeIndexEntry oldTypeEnt = layerTypeIndex.layerTypeIndex.put(typeName, typeIndexEntry);
          layerTypeIndex.fileIndex.put(typeIndexEntry.fileName, typeIndexEntry);
          if (typeIndexRestored) {
-            if (oldTypeEnt == null || !oldTypeEnt.equals(typeIndexEntry))
+            if (oldTypeEnt == null || !oldTypeEnt.equals(typeIndexEntry)) {
                typeIndexNeedsSave = true;
+            }
          }
       }
    }
@@ -1177,6 +1188,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       // per-process index before we've defined the process.
       if (hasSrc)
          initTypeIndex();
+      else
+         layerTypeIndex = new LayerTypeIndex();
 
       if (baseLayers != null && !activated) {
          for (Layer baseLayer:baseLayers)
@@ -1416,7 +1429,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          File dirFile = new File(dir);
          if (!addSrcFilesToCache(dirFile, "", replacedTypes)) {
             // For hierarchical projects it's easier to specify all possible src dirs, even if some do not exist.  This is thus a warning, not an error
-            warn("Invalid src dir: " + dir);
+            warn("Missing src dir: " + dir);
             // Actually remove this so it does not end up in the index
             topLevelSrcDirs.remove(i);
             i--;
@@ -2139,8 +2152,17 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          layerTypeIndex = layeredSystem.readTypeIndexFile(getLayerName());
          typeIndexRestored = true;
       }
-      if (layerTypeIndex == null)
+      if (layerTypeIndex == null) {
          layerTypeIndex = new LayerTypeIndex();
+         layerTypeIndex.langExtensions = langExtensions;
+      }
+      // Always add the layer's type and layer components here since we've already started the layer's model and type.
+      // For most types they are updated when they are started but the layer component starts before the type index has
+      // been initialized.
+      if (model != null) {
+         TypeDeclaration modelType = model.getModelTypeDeclaration();
+         modelType.initTypeIndex();
+      }
       SysTypeIndex sysIndex = layeredSystem.typeIndex;
       if (sysIndex == null)
          sysIndex = layeredSystem.typeIndex = new SysTypeIndex(layeredSystem);
@@ -3868,15 +3890,17 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       layeredSystem.registerFileProcessor(ext, lang, this);
       // Files that are not parsed are not put into the srcDirCache and so don't get put into the type index
       if (lang.isParsed()) {
-         if (layerTypeIndex.langExtensions == null) {
-            layerTypeIndex.langExtensions = new String[]{ext};
+         if (langExtensions == null) {
+            langExtensions = new String[]{ext};
          } else {
-            String[] oldList = layerTypeIndex.langExtensions;
+            String[] oldList = langExtensions;
             String[] newList = new String[oldList.length + 1];
             System.arraycopy(oldList, 0, newList, 0, oldList.length);
             newList[oldList.length] = ext;
-            layerTypeIndex.langExtensions = newList;
+            langExtensions = newList;
          }
+         if (layerTypeIndex != null)
+            layerTypeIndex.langExtensions = langExtensions;
       }
    }
 

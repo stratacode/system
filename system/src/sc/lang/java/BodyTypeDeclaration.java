@@ -7150,7 +7150,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       // We should be able to do this right after we have the extends and implements stuff bound.  Maybe we could move it later but
       // the goal is to have the index info as early as possible for the IDE.
-      if (layer != null) {
+      if (layer != null && !isLayerType && !isLayerComponent()) {
          TypeIndexEntry ent = createTypeIndex();
          if (ent != null)  // Some TemplateDeclaration types don't represent real types and don't have index entries
             layer.updateTypeIndex(ent);
@@ -7281,6 +7281,19 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       idx.isLayerType = isLayerType;
       // TODO: inner types, methods? and property references
       return idx;
+   }
+
+   public void initTypeIndex() {
+      JavaModel model = getJavaModel();
+      model.layer.updateTypeIndex(createTypeIndex());
+      List<Object> innerTypes = getLocalInnerTypes(null);
+      if (innerTypes != null) {
+         for (Object innerType:innerTypes) {
+            if (innerType instanceof BodyTypeDeclaration) {
+               ((BodyTypeDeclaration) innerType).initTypeIndex();
+            }
+         }
+      }
    }
 
    public void process() {

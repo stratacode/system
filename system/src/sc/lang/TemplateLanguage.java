@@ -216,11 +216,8 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
     */
    public boolean statefulPages = true;
 
-   public Object parse(String fileName, Reader reader, Parselet start, boolean enablePartialValues, boolean matchOnly, Object toPopulateInst, int bufSize) {
-      Object templateObj = super.parse(fileName, reader, start, enablePartialValues, matchOnly, toPopulateInst, bufSize);
-      if (templateObj instanceof ParseError)
-         return templateObj;
-      Object semValue = ParseUtil.nodeToSemanticValue(templateObj);
+   /** Use configuration in the template language to configure properties in the result */
+   public void postProcessSemanticValue(Object semValue, String fileName) {
       if (semValue instanceof Template) {
          Template temp = (Template) semValue;
          if (processTemplate) {
@@ -246,24 +243,22 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
             temp.statefulPage = false;
 
          // Lots of properties are propagated through the template processor from the template so we need to set it even if not processing the template
-         temp.templateProcessor = new TemplateResultProcessor(temp, fileName, null);
+         temp.templateProcessor = createResultProcessor(temp, fileName);
+      }
+   }
 
-         return templateObj;
-      }
-      else {
-         // We might not be parsing the startParselet
-         return templateObj;
-      }
+   /** The ResultProcessor is a customization point for TemplateLanguages.  This hook lets you override the TemplateResultProcessor hook point in a sub-language of TemplateLanguage. */
+   public TemplateResultProcessor createResultProcessor(Template template, String fileName) {
+      return new TemplateResultProcessor(template, fileName);
    }
 
    public class TemplateResultProcessor implements ITemplateProcessor, INameContext {
       String file, result;
       Template template;
 
-      public TemplateResultProcessor(Template temp, String f, String res) {
+      public TemplateResultProcessor(Template temp, String f) {
          template = temp;
          file = f;
-         result = res;
       }
 
       public List<SrcEntry> getDependentFiles() {
@@ -524,7 +519,7 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
       }
 
       public ITemplateProcessor deepCopy(Template templ) {
-         return new TemplateResultProcessor(templ, file, result);
+         return new TemplateResultProcessor(templ, file);
       }
 
       /** By default, template languages do not escape the body.  The HTML language does though */

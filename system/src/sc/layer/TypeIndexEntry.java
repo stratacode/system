@@ -6,6 +6,7 @@ package sc.layer;
 
 import sc.lang.java.BodyTypeDeclaration;
 import sc.lang.java.DeclarationType;
+import sc.util.StringUtil;
 
 import java.io.Serializable;
 import java.util.List;
@@ -38,6 +39,21 @@ public class TypeIndexEntry implements Serializable {
             return true;
       }
       return false;
+   }
+
+   public boolean equals(Object other) {
+      if (!(other instanceof TypeIndexEntry))
+         return false;
+      TypeIndexEntry ot = (TypeIndexEntry) other;
+      if (!StringUtil.equalStrings(typeName, ot.typeName) || declType != ot.declType || lastModified != ot.lastModified)
+         return false;
+      if (baseTypes != null) {
+         if (ot.baseTypes == null)
+            return false;
+         if (!baseTypes.equals(ot.baseTypes))
+            return false;
+      }
+      return true;
    }
 
    public static final TypeIndexEntry EXCLUDED_SENTINEL = new TypeIndexEntry();

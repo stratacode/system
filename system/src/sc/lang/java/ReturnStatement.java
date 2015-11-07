@@ -64,7 +64,8 @@ public class ReturnStatement extends ExpressionStatement {
       sb.append("return ");
       if (expression == null)
          sb.append("<null>");
-      sb.append(expression.toString());
+      else
+         sb.append(expression.toString());
       return sb.toString();
    }
 }

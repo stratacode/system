@@ -84,6 +84,8 @@ public class ModelUtil {
          return varObj;
       else if (varObj instanceof Class)
          return varObj;
+      else if (ModelUtil.isTypeVariable(varObj))
+         return ModelUtil.getTypeParameterDefault(varObj);
       throw new UnsupportedOperationException();
    }
 

@@ -1141,10 +1141,13 @@ public class EditorContext extends ClientEditorContext {
    }
 
    public Object completeFullTypeContext(String codeSnippet, Parselet completeParselet, int cursor, List<String> candidates, JavaModel fileModel) {
-      Parser p = new Parser(completeParselet.getLanguage(), new StringReader(codeSnippet));
+      Language lang = completeParselet.getLanguage();
+      Parser p = new Parser(lang, new StringReader(codeSnippet));
       p.enablePartialValues = true;
       // Turn the command string into a parse-tree using the special "completionCommands" grammar
       Object parseTree = p.parseStart(completeParselet);
+
+      lang.postProcessResult(parseTree, null);
 
       Object completedResult = null;
 
