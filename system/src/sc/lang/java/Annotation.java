@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import sc.classfile.CFAnnotation;
 import sc.lang.JavaLanguage;
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
@@ -176,6 +177,19 @@ public class Annotation extends JavaSemanticNode implements IAnnotation {
       return newAnnot;
    }
 
+   public static Annotation createFromElement(IAnnotation elem) {
+      Annotation newAnnot = new Annotation();
+      newAnnot.typeName = elem.getTypeName();
+      if (ModelUtil.isComplexAnnotation(elem)) {
+         newAnnot.setProperty("elementValue", ModelUtil.getAnnotationComplexValues(elem));
+      }
+      else {
+         newAnnot.setProperty("elementValue", ModelUtil.getAnnotationSingleValue(elem));
+
+      }
+      return newAnnot;
+   }
+
    /** Converts to an Annotation if needed */
    public static Annotation toAnnotation(Object elem) {
       if (elem instanceof Annotation)
@@ -183,6 +197,9 @@ public class Annotation extends JavaSemanticNode implements IAnnotation {
 
       if (elem instanceof java.lang.annotation.Annotation)
          return createFromElement((java.lang.annotation.Annotation) elem);
+
+      if (elem instanceof CFAnnotation)
+         return createFromElement((IAnnotation) elem);
 
       throw new UnsupportedOperationException();
    }

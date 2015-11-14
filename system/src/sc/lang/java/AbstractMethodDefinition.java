@@ -49,6 +49,19 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
                      body.statements.get(0) instanceof GlueStatement;
    }
 
+   public AbstractMethodDefinition resolve(boolean modified) {
+      if (modified)
+         return resolveDefinition();
+      else {
+         AbstractMethodDefinition cur = this;
+         while (cur != null && cur.replaced)
+            cur = cur.replacedByMethod;
+         if (cur == null)
+            return this;
+         return cur;
+      }
+   }
+
    public AbstractMethodDefinition resolveDefinition() {
       AbstractMethodDefinition methDef = this, repl;
 

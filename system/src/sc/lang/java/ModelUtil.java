@@ -6313,8 +6313,9 @@ public class ModelUtil {
    public static Object resolve(Object typeObj, boolean modified) {
       if (typeObj instanceof BodyTypeDeclaration)
          return ((BodyTypeDeclaration) typeObj).resolve(modified);
-      else if (typeObj instanceof AbstractMethodDefinition) {
-         return ((AbstractMethodDefinition) typeObj).resolveDefinition();
+      // For super.meth() we do not want to ever get the current method here (as far as I can tell).  There's a weird case where
+      else if (!modified && typeObj instanceof AbstractMethodDefinition) {
+         return ((AbstractMethodDefinition) typeObj).resolve(modified);
       }
       return typeObj;
    }

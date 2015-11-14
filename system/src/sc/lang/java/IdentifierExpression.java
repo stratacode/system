@@ -24,6 +24,7 @@ import sc.util.StringUtil;
 import sc.bind.BindingDirection;
 import sc.bind.IBinding;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
@@ -1566,9 +1567,6 @@ public class IdentifierExpression extends ArgumentsExpression {
          List<IString> idents = getAllIdentifiers();
          int sz = idents.size();
 
-//         if (sz == 2 && identifiers.get(0).equals("listAvdResult") && identifiers.get(1).equals("indexOf"))
-//            System.out.println("---");
-
          JavaModel jmodel = getJavaModel();
          switch (idTypes[0]) {
             case PackageName:
@@ -1593,6 +1591,10 @@ public class IdentifierExpression extends ArgumentsExpression {
 
             case SuperExpression:
                Object type = boundTypes[0];
+
+               // If this is super(x) for a constructor the type is the enclosing type of the constructor
+               if (sz == 1 && ModelUtil.isConstructor(type))
+                  type = ModelUtil.getEnclosingType(type);
 
                BodyTypeDeclaration pendingConstructor;
 
@@ -2971,6 +2973,12 @@ public class IdentifierExpression extends ArgumentsExpression {
                return resolveType(ModelUtil.getEnumTypeFromEnum(boundTypes[ix]), ix, idTypes);
             case BoundName:
                return resolveType(boundTypes[ix] != null ? boundTypes[ix].getClass() : null, ix, idTypes);
+            case SuperExpression:
+               // If it's a super(x) for the constructor we refer to the method not the type
+               if (ix == 0 && ModelUtil.isConstructor(boundTypes[0])) {
+                  return resolveType(ModelUtil.getEnclosingType(boundTypes[0]), ix, idTypes);
+               }
+               break;
          }
       }
       Object type = resolveType(boundTypes[ix], ix, idTypes);
@@ -4230,6 +4238,8 @@ public class IdentifierExpression extends ArgumentsExpression {
             Object boundType = boundTypes[i];
             if (idTypes != null && boundType != null) {
                switch (idTypes[i]) {
+                  case SuperExpression: // Presumably we picked up the super-type already from the extends clause - it might be a method so at least we'll need to check the enclosing type
+                     break;
                   case MethodInvocation:
                   case FieldName:
                      types.add(ModelUtil.getEnclosingType(boundType));
