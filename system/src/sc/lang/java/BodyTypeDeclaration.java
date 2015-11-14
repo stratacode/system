@@ -1067,6 +1067,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return getInnerType(name, ctx, true, false, false);
    }
 
+   // TODO: For debugging purposes.  Remove at some point!  While editing some inner type in the IDE we hit an infinite loop here
+   // so this is for diagnosing that problem.
+   final static private int MAX_TYPE_NEST_COUNT = 200;
+
    public Object getInnerType(String name, TypeContext ctx, boolean checkBaseType, boolean redirected, boolean srcOnly) {
       int ix;
       boolean origSameType = ctx != null && ctx.sameType; 
@@ -1087,10 +1091,19 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                ctx.sameType = !redirected;
             }
          }
+         if (ctx != null && ctx.nestCount++ > MAX_TYPE_NEST_COUNT) {
+            System.err.println("*** Maximum nested type encountered: " + typeName);
+            return null;
+         }
+
          if (type instanceof BodyTypeDeclaration)
             nextType = ((BodyTypeDeclaration) type).getSimpleInnerType(nextTypeName, ctx, checkBaseType, redirected, srcOnly);
          else
             nextType = ModelUtil.getInnerType(type, name, ctx);
+
+         if (ctx != null)
+            ctx.nestCount--;
+
          if (nextType == null)
             return null;
 
@@ -5897,7 +5910,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       LayeredSystem sys = model.layeredSystem;
 
       // We can do some propagations on compiled instances which exist right now, but we can't change the class itself and so can't modify new instances created
-      if (!isDynamicType() && isConstructedType()) {
+      if (!isDynamicType() && isConstructedType() && model.layer.activated) {
          sys.setStaleCompiledModel(true, "Recompile needed to set property: " + ModelUtil.getPropertyName(overriddenAssign) + " on compiled type: " + typeName);
       }
 
@@ -7153,7 +7166,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (layer != null && !isLayerType && !isLayerComponent()) {
          TypeIndexEntry ent = createTypeIndex();
          if (ent != null)  // Some TemplateDeclaration types don't represent real types and don't have index entries
-            layer.updateTypeIndex(ent);
+            layer.updateTypeIndex(ent, getJavaModel().lastModifiedTime);
       }
    }
 
@@ -7285,7 +7298,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public void initTypeIndex() {
       JavaModel model = getJavaModel();
-      model.layer.updateTypeIndex(createTypeIndex());
+      model.layer.updateTypeIndex(createTypeIndex(), model.lastModifiedTime);
       List<Object> innerTypes = getLocalInnerTypes(null);
       if (innerTypes != null) {
          for (Object innerType:innerTypes) {

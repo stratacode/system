@@ -549,6 +549,42 @@ public class ParentParseNode extends AbstractParseNode {
       return len;
    }
 
+   public int getSemanticLength() {
+      if (children == null) return 0;
+      int len = 0;
+      boolean omitSpacing = true;
+
+      // Going back to front since spacing is always at the end of a node
+      for (int i = children.size()-1; i >= 0; i--) {
+         Object child = children.get(i);
+         if (child instanceof IParseNode) {
+            IParseNode childParseNode = (IParseNode) child;
+            if (omitSpacing) {
+               if (!ParseUtil.isSpacingNode(childParseNode)) {
+                  int newLen = childParseNode.getSemanticLength();
+                  if (newLen > 0)
+                     omitSpacing = false;
+                  len += newLen;
+               }
+               // else - spacing node and we haven't found any semantic value so just skip it
+            }
+            // We've found some semantic value
+            else
+               len += childParseNode.length();
+         }
+         else if (child instanceof CharSequence) {
+            int newLen = ((CharSequence) child).length();
+            if (newLen > 0)
+               omitSpacing = false;
+            len += newLen;
+         }
+         else if (child != null) {
+            len += child.toString().length();
+         }
+      }
+      return len;
+   }
+
    public boolean isEmpty() {
       if (children == null) return true;
       for (int i = 0; i < children.size(); i++) {
@@ -808,6 +844,7 @@ public class ParentParseNode extends AbstractParseNode {
       }
       return ix;
    }
+
 }
 
 

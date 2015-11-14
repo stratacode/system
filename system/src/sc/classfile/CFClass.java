@@ -563,7 +563,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       if (meths == null)
          return null;
 
-      return ModelUtil.definesConstructor(this, Arrays.asList(ModelUtil.parametersToTypeArray(parametersOrExpressions, ctx)), ctx, this, isTransformed);
+      return ModelUtil.definesConstructor(this, parametersOrExpressions, ctx, this, isTransformed);
    }
 
    public Object definesMember(String name, EnumSet<JavaSemanticNode.MemberType> mtype, Object refType, TypeContext ctx) {

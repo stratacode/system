@@ -175,16 +175,57 @@ public class IdentifierExpression extends ArgumentsExpression {
                displayTypeError("A 'this' expression does not refer to a type: ");
          }
          else if (firstIdentifier.equals("super")) {
-            idTypes[0] = IdentifierType.SuperExpression;
             ITypeDeclaration thisType = enclType;
 
             if (thisType == null) {
                displayTypeError("Invalid super expression - no enclosing type for: ");
-               return;
             }
+            else {
+               Object superType = thisType.getDerivedTypeDeclaration();
 
-            if ((boundTypes[0] = thisType.getDerivedTypeDeclaration()) == null)
-               boundTypes[0] = Object.class;
+               if (sz == 1) {
+                  if (arguments == null) {
+                     displayError("'super' must have arguments or property reference: ");
+                  }
+                  // The super(..) which implies a constructor.  Here we bind to the constructor itself, unless there is no
+                  // constructor in which case we will bind to the type.
+                  else if (superType != null) {
+                     AbstractMethodDefinition enclMeth = getEnclosingMethod();
+                     if (enclMeth == null) {
+                        displayTypeError("Invalid super method call - must be in a method: ");
+                     }
+                     else if (!(enclMeth instanceof ConstructorDefinition)) {
+                        displayTypeError("super() must be inside of a constructor: ");
+                     }
+                     else {
+                        Object constr = ModelUtil.declaresConstructor(superType, arguments, null);
+                        if (constr == null) {
+                           Object[] constructors = ModelUtil.getConstructors(superType, null);
+                           if (arguments.size() > 0 || (constructors != null && constructors.length > 0)) {
+                              String othersMessage = getOtherConstructorsMessage(enclType);
+                              displayTypeError("No constructor matching: ", ModelUtil.argumentsToString(arguments), othersMessage, " for: ");
+                           }
+                           else {
+                              boundTypes[0] = superType; // The zero arg constructor case
+                           }
+                        }
+                        else
+                           boundTypes[0] = constr;
+                     }
+                  }
+                  else {
+                     displayTypeError("No type for 'super'.  Parent type: ", enclType.getTypeName(), " has no extends or modified type for: ");
+                  }
+               }
+               else {
+                  if (superType == null)
+                     boundTypes[0] = Object.class;
+                  else
+                     boundTypes[0] = superType;
+               }
+               // Should we set this to null if it's unbound?
+               idTypes[0] = IdentifierType.SuperExpression;
+            }
          }
          else if (sz == offset()) {
             if (arguments != null && !(this instanceof NewExpression)) {
@@ -1410,6 +1451,21 @@ public class IdentifierExpression extends ArgumentsExpression {
       return boundType;
    }
 
+   private static String getOtherConstructorsMessage(Object currentType) {
+      Object[] otherMethods = ModelUtil.getConstructors(currentType, null);
+      StringBuilder otherMessage = null;
+      if (otherMethods != null && otherMethods.length > 0) {
+         otherMessage = new StringBuilder();
+         otherMessage.append("\n   Did you mean:\n");
+         for (Object otherMeth:otherMethods) {
+            otherMessage.append("      ");
+            otherMessage.append(ModelUtil.elementToString(otherMeth, false));
+            otherMessage.append("\n");
+         }
+      }
+      return otherMessage == null ? "" : otherMessage.toString();
+   }
+
    private static String getOtherMethodsMessage(Object currentType, String nextName) {
       Object[] otherMethods = ModelUtil.getMethods(currentType, nextName, null);
       StringBuilder otherMessage = null;
@@ -1559,8 +1615,6 @@ public class IdentifierExpression extends ArgumentsExpression {
                      }
                      value = ctx.getCurrentObject();
                   }
-
-
                   else {
                      // When the super refers to the same type - i.e. it's a constructor modifying the base layer's constructor, we need to invoke the base layer's constructor here.
                      BodyTypeDeclaration enclType = getEnclosingType();

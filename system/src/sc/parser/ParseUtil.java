@@ -525,6 +525,12 @@ public class ParseUtil  {
       return "</span>";
    }
 
+   public static boolean isSpacingNode(IParseNode childParseNode) {
+      if (childParseNode instanceof NewlineParseNode || childParseNode instanceof SpacingParseNode || childParseNode.getParselet().generateParseNode != null)
+         return true;
+      return false;
+   }
+
    public static class HTMLStyleAdapter implements IStyleAdapter {
       StringBuilder currentResult = new StringBuilder();
       FormatContext ctx;

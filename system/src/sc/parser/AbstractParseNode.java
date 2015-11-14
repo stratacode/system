@@ -171,4 +171,8 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
       startIndex = ix;
       return ix + length();
    }
+
+   public int getSemanticLength() {
+      return length();
+   }
 }

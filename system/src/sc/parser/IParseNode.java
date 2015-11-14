@@ -90,6 +90,9 @@ public interface IParseNode extends CharSequence, IParseResult {
     * continue after this parse node.
     */
    int resetStartIndex(int ix);
+
+   /** Returns the length of the parse node eliminating any trailing whitespace */
+   int getSemanticLength();
 }
 
 

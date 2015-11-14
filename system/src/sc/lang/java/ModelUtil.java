@@ -2221,6 +2221,10 @@ public class ModelUtil {
       return null;
    }
 
+   /**
+    * NOTE: it's rare that you want to use this method - use declaresConstructor instead.  This one searches for a matching
+    * constructor in the type hierarchy but Java does not inherit constructors automatically from one type to it's sub-types.
+    */
    public static Object definesConstructor(Object td, List<?> parameters, ITypeParamContext ctx) {
       return definesConstructor(td, parameters, ctx, null, false);
    }
@@ -2245,6 +2249,7 @@ public class ModelUtil {
       */
       else if (td instanceof Class || td instanceof CFClass) {
          int paramsLen = parameters == null ? 0 : parameters.size();
+         Object[] types = parametersToTypeArray(parameters, ctx);
          Object[] list = getConstructors(td, null);
          res = null;
          for (int i = 0; i < list.length; i++) {
@@ -2271,10 +2276,10 @@ public class ModelUtil {
                   }
                   else
                      paramType = parameterTypes[j];
-                  if (parameters.get(j) != null && !ModelUtil.isAssignableFrom(paramType, parameters.get(j), false, ctx)) {
+                  if (types[j] != null && !ModelUtil.isAssignableFrom(paramType, types[j], false, ctx)) {
                      // Repeating parameters... if the last parameter is an array match if the component type matches
                      if (j >= last && ModelUtil.isArray(paramType)) {
-                        if (!ModelUtil.isAssignableFrom(ModelUtil.getArrayComponentType(paramType), parameters.get(j), false, ctx)) {
+                        if (!ModelUtil.isAssignableFrom(ModelUtil.getArrayComponentType(paramType), types[j], false, ctx)) {
                            break;
                         }
                      }
@@ -2284,7 +2289,7 @@ public class ModelUtil {
                }
                if (j == paramsLen) {
                   if (refType == null || checkAccess(refType, toCheck))
-                     res = ModelUtil.pickMoreSpecificMethod(res, toCheck, parameters.toArray());
+                     res = ModelUtil.pickMoreSpecificMethod(res, toCheck, types);
                }
             }
          }
@@ -6308,6 +6313,9 @@ public class ModelUtil {
    public static Object resolve(Object typeObj, boolean modified) {
       if (typeObj instanceof BodyTypeDeclaration)
          return ((BodyTypeDeclaration) typeObj).resolve(modified);
+      else if (typeObj instanceof AbstractMethodDefinition) {
+         return ((AbstractMethodDefinition) typeObj).resolveDefinition();
+      }
       return typeObj;
    }
 

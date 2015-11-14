@@ -75,7 +75,19 @@ public class SysTypeIndex {
                if (modLayer == null) {
                   System.err.println("*** Warning unable to find modifying layer: " + modTypeIndexEntry.layerName + " - skipping index entyr");
                } else {
-                  Layer typeLayerInSystem = sys.getActiveOrInactiveLayerByPath(type.getLayer().getLayerName(), null, false, true, true);
+                  // The modLayer may not be in the right system but perhaps we've created that system to lookup this layer.  If so, get the right system
+                  // and use it
+                  Layer typeLayerInSystem;
+                  if (!modLayer.layeredSystem.getProcessIdent().equals(processIdent)) {
+                     LayeredSystem peerSys = sys.getPeerLayeredSystem(processIdent);
+                     if (peerSys == null)
+                        continue;
+                     modLayer = typeLayerInSystem = peerSys.getPeerLayerFromRemote(modLayer);
+                     if (modLayer == null || modLayer == Layer.ANY_INACTIVE_LAYER)
+                        continue;
+                  }
+                  else
+                     typeLayerInSystem = sys.getActiveOrInactiveLayerByPath(type.getLayer().getLayerName(), null, false, true, true);
                   if (typeLayerInSystem != null) {
                      Layer peerLayer = typeLayerInSystem.layeredSystem == sys ? typeLayerInSystem : modLayer.layeredSystem.getPeerLayerFromRemote(typeLayerInSystem);
                      if (peerLayer == null)

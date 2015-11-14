@@ -315,7 +315,30 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
       // Need to initialize this before we transform as that will change things around
       modifiedModel = getModifiedModel();
+
+      //startReplacingTypes();
    }
+
+   /**
+    * For inactive types, once we start a model which has been modified, we need to find any models in downstream
+    * layers that replace that model and start them.  Otherwise, we might end up resolving to a lower-level type
+    * because the upper level model has not been started and has not set the replacedByType of the modified type.
+    */
+   /*
+    * TODO: remove - the real bug that started this patch turned out to be that we were not starting the model
+    * before returning it in the inactiveModelIndex.  Just in case this case crops up again...
+   private void startReplacingTypes() {
+      if (layer != null && !layer.activated) {
+         String modelTypeName = getModelTypeName();
+         if (modelTypeName != null && layeredSystem != null) {
+            ArrayList<Layer> layers = layeredSystem.inactiveLayers;
+            for (int i = layers.size() - 1; i > layer.layerPosition; i--) {
+               layer.startReplacingTypes(modelTypeName);
+            }
+         }
+      }
+   }
+   */
 
    private void addStaticImportInternal(ImportDeclaration imp) {
       String impStr = imp.identifier;

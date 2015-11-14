@@ -280,5 +280,16 @@ public class ParseNode extends AbstractParseNode {
       }
       return startIndex;
    }
+
+   public int getSemanticLength() {
+      if (value instanceof IParseNode) {
+         IParseNode pnode = (IParseNode) value;
+         if (ParseUtil.isSpacingNode(pnode))
+            return 0;
+         else
+            return pnode.getSemanticLength();
+      }
+      return length();
+   }
 }
 

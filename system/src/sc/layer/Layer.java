@@ -298,6 +298,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    /** True if we've restored the type index, then updated it and so the saved version is stale */
    boolean typeIndexNeedsSave = false;
+   /** True if we need to update the last modified time of the type index file. */
+   long typeIndexFileLastModified = -1;
 
    /** If a Java file uses no extensions, we can either compile it from the source dir or copy it to the build dir */
    public boolean copyPlainJavaFiles = true;
@@ -726,7 +728,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
    }
 
-   public void updateTypeIndex(TypeIndexEntry typeIndexEntry) {
+   public void updateTypeIndex(TypeIndexEntry typeIndexEntry, long lastModified) {
       String typeName = typeIndexEntry.typeName;
       if (typeName != null) {
          if (layerTypeIndex == null) {
@@ -744,6 +746,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             if (oldTypeEnt == null || !oldTypeEnt.equals(typeIndexEntry)) {
                typeIndexNeedsSave = true;
             }
+            else if (lastModified > typeIndexFileLastModified)
+               typeIndexFileLastModified = lastModified;
          }
       }
    }
@@ -1811,7 +1815,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       // This is the list of types defined in this layer which were already loaded into the type cache.  To keep them from being stale, when this inactive layer is opened
       // we need to replace them with the ones  in this layer now that this layer is open - loading the type should do it.
       // We need to skip this when we are starting the layers for the type index - need to avoid all normal src lookups in this phase
-      if (replacedTypes != null && !closed && !layeredSystem.startingTypeIndexLayers) {
+      if (replacedTypes != null && !closed  && !layeredSystem.startingTypeIndexLayers) {
          for (ReplacedType replacedType:replacedTypes) {
             TypeDeclaration newType = (TypeDeclaration) layeredSystem.getSrcTypeDeclaration(replacedType.typeName, null, replacedType.prependPackage, false, true, this, false);
             if (newType == null)
@@ -1819,6 +1823,18 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          }
       }
    }
+
+   public void startReplacingTypes(String modelTypeName) {
+      SrcEntry srcEnt = getSrcEntryForType(modelTypeName);
+      if (srcEnt != null) {
+         TypeDeclaration td = layeredSystem.getInactiveTypeDeclaration(srcEnt);
+         if (td != null)
+            ParseUtil.realInitAndStartComponent(td);
+         else
+            System.err.println("*** Unable to find replaced type: " + modelTypeName);
+      }
+   }
+
 
    private void initSrcDirs() {
       if (srcPath == null) {
@@ -2151,6 +2167,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (typeIndexFile.canRead() && (!activated || !getBuildAllFiles())) {
          layerTypeIndex = layeredSystem.readTypeIndexFile(getLayerName());
          typeIndexRestored = true;
+         typeIndexFileLastModified = new File(getTypeIndexFileName()).lastModified();
       }
       if (layerTypeIndex == null) {
          layerTypeIndex = new LayerTypeIndex();
@@ -2179,6 +2196,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       layerTypeIndex.baseLayerNames = baseLayerNames == null ? null : baseLayerNames.toArray(new String[baseLayerNames.size()]);
    }
 
+   private String getTypeIndexFileName() {
+      return layeredSystem.getTypeIndexFileName(getLayerName());
+   }
+
    public void saveTypeIndex() {
       // For activated layers, we might not have a complete type index so we cannot save it.
       // For inactivated layers, we only want to save this if we've fully initialized it.
@@ -2187,12 +2208,13 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             System.err.println("*** Invalid type index during save");
          else if (layerTypeIndex.layerPathName.equals(layerUniqueName))
             System.out.println("*** Invalid layer path index name");
-         File typeIndexFile = new File(layeredSystem.getTypeIndexFileName(getLayerName()));
+         File typeIndexFile = new File(getTypeIndexFileName());
          ObjectOutputStream os = null;
          try {
             os = new ObjectOutputStream(new FileOutputStream(typeIndexFile));
             os.writeObject(layerTypeIndex);
             typeIndexNeedsSave = false;
+            typeIndexFileLastModified = System.currentTimeMillis();
          }
          catch (IOException exc) {
             System.err.println("*** Unable to write typeIndexFile: " + exc);
@@ -2202,6 +2224,15 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          }
       }
    }
+
+   public void updateFileIndexLastModified() {
+      if (typeIndexFileLastModified != -1) {
+         File typeIndexFile = new File(getTypeIndexFileName());
+         if (typeIndexFile.lastModified() < typeIndexFileLastModified)
+            typeIndexFile.setLastModified(typeIndexFileLastModified);
+      }
+   }
+
 
    public void markDynamicType(String typeName) {
       if (dynTypeIndex == null)
@@ -2591,7 +2622,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                      dummyIndex.processIdent = layeredSystem.getProcessIdent();
                      dummyIndex.fileName = srcEnt.absFileName;
                      dummyIndex.declType = DeclarationType.TEMPLATE; // Is it always a template?
-                     updateTypeIndex(dummyIndex);
+                     updateTypeIndex(dummyIndex, typeIndexFileLastModified);
                   } else {
                      System.err.println("*** No type or src file found for index entry for source file: " + srcFile);
                   }
@@ -3814,9 +3845,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          // Some file types (i.e. web.xml, vdoc) do not prepend the package.  We still want to look up these
          // types by their name in the layer path tree, but only return them if the type name should match
          // If the package happens to match, it is also a viable match
-         if ((proc == null && packageMatches) || proc.getPrependLayerPackage() == packageMatches || packageMatches) {
+         if ((proc == null && packageMatches) || (proc != null && proc.getPrependLayerPackage() == packageMatches) || packageMatches) {
             SrcEntry ent = new SrcEntry(this, path, relFilePath + "." + FileUtil.getExtension(path));
-            ent.prependPackage = proc.getPrependLayerPackage();
+            ent.prependPackage = proc != null && proc.getPrependLayerPackage();
             return ent;
          }
       }
@@ -3837,6 +3868,17 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                   return baseEnt;
             }
          }
+      }
+      return null;
+   }
+
+   SrcEntry getSrcEntryFromFile(File res, String relFilePath) {
+      String path = res.getPath();
+      IFileProcessor proc = layeredSystem.getFileProcessorForFileName(path, this, BuildPhase.Process);
+      if (proc != null) {
+         SrcEntry ent = new SrcEntry(this, path, relFilePath + "." + FileUtil.getExtension(path));
+         ent.prependPackage = proc.getPrependLayerPackage();
+         return ent;
       }
       return null;
    }
@@ -3929,8 +3971,12 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    public boolean hasDefinitionForType(String typeName) {
+      return getSrcEntryForType(typeName) != null;
+   }
+
+   public SrcEntry getSrcEntryForType(String typeName) {
       String subPath = typeName.replace(".", FileUtil.FILE_SEPARATOR);
-      return getSrcFileFromTypeName(typeName, true, true, subPath, false) != null;
+      return getSrcFileFromTypeName(typeName, true, true, subPath, false);
    }
 
    public void disableLayer() {

@@ -1845,6 +1845,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
+   public LayeredSystem getPeerLayeredSystem(String processIdent) {
+      if (peerSystems != null) {
+         for (LayeredSystem sys:peerSystems)
+            if (sys.getProcessIdent().equals(processIdent))
+               return sys;
+      }
+      return null;
+   }
+
    public boolean getNeedsAnonymousConversion() {
       return runtimeProcessor != null && runtimeProcessor.getNeedsAnonymousConversion();
    }
@@ -6169,6 +6178,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             peerSys.initTypeIndexDir();
    }
 
+   private static final String MAIN_SYSTEM_MARKER_FILE = "MainSystem.txt";
+
    private void saveTypeIndexFiles() {
       for (int i = 0; i < inactiveLayers.size(); i++) {
          Layer inactiveLayer = inactiveLayers.get(i);
@@ -6180,6 +6191,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          for (LayeredSystem peerSys:peerSystems) {
             peerSys.saveTypeIndexFiles();
          }
+
+         File mainSysFile = new File(getTypeIndexDir(), MAIN_SYSTEM_MARKER_FILE);
+         FileUtil.saveStringAsFile(mainSysFile, "Marker file for recognizing the main system", true);
       }
       /*
       for (int i = 0; i < layers.size(); i++) {
@@ -6236,6 +6250,25 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          releaseDynLock(false);
       }
 
+      // First we need to find the "main" system so we set our processIdent properly for this layered system
+      for (String runtimeDirName:runtimeDirNames) {
+         if (!runtimeDirName.startsWith(TYPE_INDEX_DIR_PREFIX))
+            continue;
+
+         String typeIndexIdent = runtimeDirName.substring(TYPE_INDEX_DIR_PREFIX.length());
+
+         File typeIndexDir = new File(getTypeIndexDir(typeIndexIdent));
+
+         File mainIndexFile = new File(typeIndexDir, MAIN_SYSTEM_MARKER_FILE);
+         if (mainIndexFile.exists() && processDefinition == null) {
+            String rtName = getRuntimeName();
+            if (typeIndexIdent.startsWith(rtName)) {
+               String procName = typeIndexIdent.substring(rtName.length() + 1);
+               processDefinition = ProcessDefinition.create(procName);
+            }
+         }
+      }
+
       for (String runtimeDirName:runtimeDirNames) {
          if (!runtimeDirName.startsWith(TYPE_INDEX_DIR_PREFIX))
             continue;
@@ -6252,8 +6285,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (fileNames.length == 0)
             continue;
          HashMap<String,Boolean> filesToProcess = new HashMap<String,Boolean>();
-         for (String file:fileNames)
-            filesToProcess.put(file,Boolean.FALSE);
+         for (String file:fileNames) {
+            if (file.equals(MAIN_SYSTEM_MARKER_FILE))
+               continue;
+            filesToProcess.put(file, Boolean.FALSE);
+         }
 
          LayeredSystem curSys = findSystemFromTypeIndexIdent(typeIndexIdent);
 
@@ -6386,7 +6422,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       for (Layer layer:inactiveLayers) {
          if (layer.typeIndexNeedsSave)
             layer.saveTypeIndex();
-
+         else if (layer.typeIndexFileLastModified != -1)
+            layer.updateFileIndexLastModified();
       }
    }
 
@@ -11018,6 +11055,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (model == null) {
             model = externalModelIndex.lookupJavaModel(srcEnt);
             if (model != null) {
+               ParseUtil.initAndStartComponent(model);
                inactiveModelIndex.put(srcEnt.absFileName, model);
             }
          }
@@ -13546,7 +13584,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public Layer getPeerLayerFromRemote(Layer layer) {
       if (layer.layeredSystem == this)
          System.err.println("*** Not from a remote system");
-      Layer res = getLayerByName(layer.getLayerUniqueName());
+      Layer res = layer.activated ? getLayerByName(layer.getLayerUniqueName()) : lookupInactiveLayer(layer.getLayerName(), false, true);
       if (res != null)
          return res;
       for (Layer nextLayer = layer.getNextLayer(); nextLayer != null; nextLayer = nextLayer.getNextLayer()) {

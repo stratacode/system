@@ -15,6 +15,9 @@ public class TypeContext {
    public boolean sameType;
    public boolean transformed;
 
+   /** Avoid infinite loops using the nested type context */
+   public int nestCount = 0;
+
    public TypeContext() {
    }
 
