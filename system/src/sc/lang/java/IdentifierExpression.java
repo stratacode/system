@@ -200,11 +200,17 @@ public class IdentifierExpression extends ArgumentsExpression {
                      }
                      else {
                         Object constr = ModelUtil.declaresConstructor(superType, arguments, null);
+                        // When transforming to JS, we need to resolve the super(name, ordinal) constructor which is part of the base type in JS only
+                        if (constr == null && superType instanceof EnumDeclaration && arguments.size() == 2) {
+                           constr = superType;
+                        }
                         if (constr == null) {
                            Object[] constructors = ModelUtil.getConstructors(superType, null);
                            if (arguments.size() > 0 || (constructors != null && constructors.length > 0)) {
-                              String othersMessage = getOtherConstructorsMessage(enclType);
-                              displayTypeError("No constructor matching: ", ModelUtil.argumentsToString(arguments), othersMessage, " for: ");
+                              if (model != null && !model.disableTypeErrors) {
+                                 String othersMessage = getOtherConstructorsMessage(enclType);
+                                 displayTypeError("No constructor matching: ", ModelUtil.argumentsToString(arguments), othersMessage, " for: ");
+                              }
                            }
                            else {
                               boundTypes[0] = superType; // The zero arg constructor case
