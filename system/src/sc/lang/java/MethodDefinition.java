@@ -789,4 +789,10 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
    public boolean suppressInterfaceMethod() {
       return body != null && !hasModifier("static") && !hasModifier("default");
    }
+
+   public void addMembersByName(Map<String,List<Statement>> membersByName) {
+      if (propertyName != null) {
+         addMemberByName(membersByName, propertyName);
+      }
+   }
 }

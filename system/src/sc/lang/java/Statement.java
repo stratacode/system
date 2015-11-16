@@ -12,9 +12,7 @@ import sc.type.DynType;
 import sc.type.IBeanMapper;
 import sc.type.TypeUtil;
 
-import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public abstract class Statement extends Definition implements IUserDataNode, ISrcStatement {
    public transient Object[] errorArgs;
@@ -315,5 +313,33 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
     */
    public boolean needsEnclosingClass() {
       return false;
+   }
+
+   public void addMembersByName(Map<String,List<Statement>> membesByName) {
+   }
+
+   /**
+    * Does this statement conflict with another statement in the same list with this member name.
+    * Because fields can define more than one variable, (and variableDefinitions are not Statements) we need to report
+    * conflicts on a name-by-name basis.
+    */
+   public boolean conflictsWith(Statement other, String memberName) {
+      return false;
+   }
+
+   public void addMemberByName(Map<String,List<Statement>> membersByName, String memberName) {
+      List<Statement> sts = membersByName.get(memberName);
+      if (sts == null) {
+         sts = new ArrayList<Statement>();
+         membersByName.put(memberName, sts);
+      }
+      else {
+         for (Statement oldSt : sts) {
+            if (conflictsWith(oldSt, memberName)) {
+               displayError("Duplicate " + getUserVisibleName() + ": " + memberName + ": " + oldSt + " for: ");
+            }
+         }
+      }
+      sts.add(this);
    }
 }

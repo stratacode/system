@@ -464,7 +464,7 @@ public class TransformUtil {
             return;
          }
 
-         objType.incrVersion();
+         objType.bodyChanged();
          PerfMon.start("parseClassSnippet");
          parseClassBodySnippet(accessClass, codeToInsert, applyToHiddenBody, -1, assignments, objType);
          PerfMon.end("parseClassSnippet");

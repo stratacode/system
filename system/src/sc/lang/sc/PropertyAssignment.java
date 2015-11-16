@@ -21,10 +21,7 @@ import sc.lang.java.*;
 import sc.parser.*;
 import sc.util.StringUtil;
 
-import java.util.EnumSet;
-import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public class PropertyAssignment extends Statement implements IVariableInitializer, IObjectId, INamedNode {
    public String propertyName;
@@ -1015,5 +1012,11 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       if (initializer != null)
          return initializer.needsEnclosingClass();
       return false;
+   }
+
+   public void addMembersByName(Map<String,List<Statement>> membersByName) {
+      if (propertyName != null) {
+         addMemberByName(membersByName, propertyName);
+      }
    }
 }

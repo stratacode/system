@@ -46,6 +46,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    /** Names of changed methods from the previous types if this type has been updated at runtime */
    public transient TreeSet<String> changedMethods;
 
+   /** Cached of the members */
+   public transient Map<String,List<Statement>> membersByName;
+
+   /** Cached of the methods */
+   public transient TreeMap<String,List<Statement>> methodsByName;
+
    public transient boolean replaced = false;  // Set to true when another type in the same layer has replaced this type
 
    public transient boolean removed = false;  // Set to true when another type in the same layer has replaced this type
@@ -364,19 +370,77 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public Object declaresMemberInternal(String name, EnumSet<MemberType> mtype, Object refType, TypeContext ctx) {
-      // Need to check body first... otherwise we return objects in hiddenBody which we can't transform
-      Object obj = findMemberInBody(body, name, mtype, refType, ctx);
+      if (membersByName == null) {
+         initMembersByName();
+      }
+      List<Statement> sts = membersByName.get(name);
+      Object obj = findMemberInBody(sts, name, mtype, refType, ctx);
+
+   // TODO: REMOVE
+   // Need to check body first... otherwise we return objects in hiddenBody which we can't transform
+      /*
+   Object oobj = findMemberInBody(body, name, mtype, refType, ctx);
+   if (oobj != null && oobj != obj)
+      System.out.println("***");
+   oobj = findMemberInBody(hiddenBody, name, mtype, refType, ctx);
+   if (oobj != null && oobj != obj)
+      System.out.println("***");
+      */
+
       if (obj != null)
          return obj;
-      obj = findMemberInBody(hiddenBody, name, mtype, refType, ctx);
-      if (obj != null)
-         return obj;
+
       if (isTransformedType() && isAutoComponent() && !isTransformed()) {
          obj = ModelUtil.definesMember(ComponentImpl.class, name, mtype, refType, ctx);
          if (obj != null)
             return obj;
       }
       return null;
+   }
+
+   private void initMethodsByName() {
+      methodsByName = new TreeMap<String,List<Statement>>();
+      addMethodsFromBody(body);
+      addMethodsFromBody(hiddenBody);
+   }
+
+   private void addMethodsFromBody(SemanticNodeList<Statement> bodyList) {
+      if (bodyList == null)
+         return;
+      for (Statement st:bodyList) {
+         if (st instanceof MethodDefinition) {
+            String name = ((MethodDefinition) st).name;
+            if (name != null) {
+               List<Statement> sts = methodsByName.get(name);
+               if (sts == null) {
+                  sts = new ArrayList<Statement>();
+                  methodsByName.put(name, sts);
+               }
+               sts.add(st);
+            }
+         }
+      }
+   }
+
+   private void initMembersByName() {
+      membersByName = new TreeMap<String,List<Statement>>();
+      addMembersFromBody(body);
+      addMembersFromBody(hiddenBody);
+   }
+
+   private void addMembersFromBody(SemanticNodeList<Statement> bodyList) {
+      if (bodyList == null)
+         return;
+      for (Statement st:bodyList) {
+         // This logic models the logic in findMemberInBody - each inner type can be a member - enum constant, object, etc. depending on the type
+         if (st instanceof ITypeDeclaration) {
+            ITypeDeclaration it = (ITypeDeclaration) st;
+
+            st.addMemberByName(membersByName, it.getTypeName());
+         }
+         else
+            st.addMembersByName(membersByName);
+      }
    }
 
    public Object definesPreviousMember(String name, EnumSet<MemberType> mtype, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {
@@ -459,6 +523,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
       }
       return res;
+   }
+
+   protected void bodyChanged() {
+      incrVersion();
+      membersByName = null;
+      methodsByName = null;
    }
 
    protected void incrVersion() {
@@ -656,21 +726,33 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    /** Just returns methods declared in this specific type */
    public Object declaresMethod(String name, List<? extends Object> types, ITypeParamContext ctx, Object refType, boolean staticOnly, Object inferredType, boolean includeModified) {
-      // Interfaces will put the complete version of the method in the hidden body so this needs to be first
-      Object v = findMethodInBody(hiddenBody, name, types, ctx, refType, staticOnly, inferredType);
-      if (v != null)
-         return v;
+      if (methodsByName == null) {
+         initMethodsByName();
+      }
+      List<Statement> sts = methodsByName.get(name);
+      Object obj = findMethodInBody(sts, name, types, ctx, refType, staticOnly, inferredType);
 
-      v = findMethodInBody(body, name, types, ctx, refType, staticOnly, inferredType);
-      if (v != null)
-         return v;
+   // TODO: remove
+   // Interfaces will put the complete version of the method in the hidden body so this needs to be first
+      /*
+   Object v = findMethodInBody(hiddenBody, name, types, ctx, refType, staticOnly, inferredType);
+   if (v != null && v != obj)
+      System.out.println("***");
+
+   v = findMethodInBody(body, name, types, ctx, refType, staticOnly, inferredType);
+   if (v != null && v != obj)
+      System.out.println("***");
+      */
+
+      if (obj != null)
+         return obj;
 
       if (isTransformedType() && isAutoComponent() && !isTransformed()) {
          // Note: this returns a compiled method even from the source type.  Use declaresMethodDef if you want to exclude
          // those compiled definitions.
-         v = ModelUtil.definesMethod(ComponentImpl.class, name, types, ctx, refType, true, staticOnly, inferredType);
-         if (v != null)
-            return v;
+         obj = ModelUtil.definesMethod(ComponentImpl.class, name, types, ctx, refType, true, staticOnly, inferredType);
+         if (obj != null)
+            return obj;
       }
 
       return null;
@@ -953,7 +1035,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public void initBody() {
-      incrVersion(); // Increment the version number each time we change the body so code will refresh caches
+      bodyChanged(); // Increment the version number each time we change the body so code will refresh caches
       if (body == null) {
          // This order reduces generation overhead a little...
          SemanticNodeList<Statement> newStatements = new SemanticNodeList<Statement>(1);
@@ -962,7 +1044,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public void initHiddenBody() {
-      incrVersion(); // Increment the version number each time we change the body so code will refresh caches
+      bodyChanged(); // Increment the version number each time we change the body so code will refresh caches
       if (hiddenBody == null) {
          // This order reduces generation overhead a little...
          SemanticNodeList<Statement> newStatements = new SemanticNodeList<Statement>(1);
@@ -4958,7 +5040,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public void removeStatement(Statement st) {
-      incrVersion();
+      bodyChanged();
       if (body != null) {
          for (int i = 0; i < body.size(); i++) {
             Object cur = body.get(i);

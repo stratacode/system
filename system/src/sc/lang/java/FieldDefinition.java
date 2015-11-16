@@ -23,6 +23,7 @@ import sc.util.StringUtil;
 
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class FieldDefinition extends TypedDefinition {
@@ -701,5 +702,33 @@ public class FieldDefinition extends TypedDefinition {
 
    public boolean needsEnclosingClass() {
       return true;
+   }
+
+   public void addMembersByName(Map<String,List<Statement>> membersByName) {
+      if (variableDefinitions != null) {
+         int sz = variableDefinitions.size();
+         for (int i = 0; i < sz; i++) {
+            VariableDefinition varDef = variableDefinitions.get(i);
+            // Add this field for each variable defined
+            addMemberByName(membersByName, varDef.variableName);
+         }
+      }
+   }
+
+   public boolean conflictsWith(Statement other, String memberName) {
+      if (other instanceof FieldDefinition) {
+         FieldDefinition otherF = (FieldDefinition) other;
+         if (variableDefinitions != null && otherF.variableDefinitions != null) {
+            for (VariableDefinition varDef:variableDefinitions) {
+               if (varDef.variableName.equals(memberName)) {
+                  for (VariableDefinition otherDef : otherF.variableDefinitions) {
+                     if (otherDef.variableName.equals(memberName))
+                        return true;
+                  }
+               }
+            }
+         }
+      }
+      return false;
    }
 }
