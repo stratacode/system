@@ -4,11 +4,9 @@
 
 package sc.layer;
 
-import com.sun.xml.internal.ws.api.streaming.XMLStreamReaderFactory;
 import sc.lang.java.BodyTypeDeclaration;
 import sc.lang.java.JavaSemanticNode;
 import sc.lang.java.UpdateInstanceInfo;
-import sc.layer.*;
 import sc.util.FileUtil;
 
 import java.io.*;
