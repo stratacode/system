@@ -244,7 +244,7 @@ public class ReverseDependencies implements Serializable {
          os.writeObject(reverseDeps);
       }
       catch (IOException exc) {
-         System.out.println("*** can't write build srcFile: " + exc);
+         System.out.println("*** can't save reverse deps: " + exc);
       }
       finally {
          FileUtil.safeClose(os);

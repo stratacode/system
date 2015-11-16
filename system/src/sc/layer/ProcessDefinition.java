@@ -5,15 +5,17 @@
 package sc.layer;
 
 import sc.dyn.DynUtil;
+import sc.util.FileUtil;
 import sc.util.StringUtil;
 
+import java.io.*;
 import java.util.List;
 
 /**
  * An instance of this class is used to represent each process we need to build.  If the processName is null
  * we are using the default process - i.e. no layers have defined any process constraints.
  */
-public class ProcessDefinition implements IProcessDefinition {
+public class ProcessDefinition implements IProcessDefinition, Serializable {
    String processName;
    public ProcessDefinition() {
    }
@@ -31,7 +33,7 @@ public class ProcessDefinition implements IProcessDefinition {
       processName = n;
    }
 
-   IRuntimeProcessor runtimeProcessor;
+   transient IRuntimeProcessor runtimeProcessor;
    public IRuntimeProcessor getRuntimeProcessor() {
       return runtimeProcessor;
    }
@@ -95,5 +97,62 @@ public class ProcessDefinition implements IProcessDefinition {
       if (!StringUtil.equalStrings(procName, otherProcName) && procName != null && otherProcName != null)
          return false;
       return DynUtil.equalObjects(otherDef.getRuntimeProcessor(), getRuntimeProcessor());
+   }
+
+   private static File getProcessDefinitionFile(LayeredSystem sys, String runtimeName, String procName) {
+      File typeIndexMainDir = new File(sys.getStrataCodeDir("idx"));
+      return new File(typeIndexMainDir, FileUtil.addExtension(runtimeName + "_" + procName, "ser"));
+   }
+
+   public static ProcessDefinition readProcessDefinition(LayeredSystem sys, String runtimeName, String procName) {
+      File procFile = getProcessDefinitionFile(sys, runtimeName, procName);
+      ObjectInputStream ois = null;
+      FileInputStream fis = null;
+      try {
+         ois = new ObjectInputStream(fis = new FileInputStream(procFile));
+         Object res = ois.readObject();
+         if (res instanceof ProcessDefinition) {
+            return (ProcessDefinition) res;
+         }
+         else {
+            sys.error("Invalid process file contents: " + procFile);
+            procFile.delete();
+         }
+      }
+      catch (InvalidClassException exc) {
+         System.out.println("ProcessorDefinition - serialized version changed: " + procFile);
+         procFile.delete();
+      }
+      catch (IOException exc) {
+         System.out.println("*** can't read processDefinition file: " + exc);
+      }
+      catch (ClassNotFoundException exc) {
+         System.out.println("*** can't read processDefinition file: " + exc);
+      }
+      finally {
+         FileUtil.safeClose(ois);
+         FileUtil.safeClose(fis);
+      }
+      return null;
+   }
+
+   public static void saveProcessDefinition(LayeredSystem sys, IProcessDefinition proc) {
+      // No info - we only save the runtime processor
+      if (proc.getProcessName() == null)
+         return;
+      File procFile = getProcessDefinitionFile(sys, proc.getProcessName(), proc.getRuntimeName());
+
+      ObjectOutputStream os = null;
+      try {
+         os = new ObjectOutputStream(new FileOutputStream(procFile));
+         os.writeObject(proc);
+      }
+      catch (IOException exc) {
+         System.err.println("*** can't save process definition: " + exc);
+      }
+      finally {
+         FileUtil.safeClose(os);
+      }
+
    }
 }

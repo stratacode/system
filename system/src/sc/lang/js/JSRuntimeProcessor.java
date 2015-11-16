@@ -52,10 +52,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    /** The prefix for generated individual .js files like Java "one-class-per-file".  This is a normalized path name for portability */
    public String genJSPrefix;
 
-   public JSBuildInfo jsBuildInfo;
+   public transient JSBuildInfo jsBuildInfo;
 
-   private boolean entryPointsFrozen = false;
-   private ArrayList<EntryPoint> queuedEntryPoints;
+   private transient boolean entryPointsFrozen = false;
+   private transient ArrayList<EntryPoint> queuedEntryPoints;
 
    public String typeTemplateName;
    public Template typeTemplate;
@@ -70,23 +70,23 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    /** Set this option to true to generate one big file from your entry points that includes only the classes you use. */
    public boolean disableModules = false;
 
-   public HashSet<String> changedJSFiles = new LinkedHashSet<String>();
-
-   private boolean changedDefaultType = false;
-
-   public HashSet<String> processedTypes = new HashSet<String>();
-
-   public HashMap<String,LinkedHashMap<JSFileEntry,Boolean>> typesInFileMap = new HashMap<String,LinkedHashMap<JSFileEntry,Boolean>>();
-
-   public HashMap<String,StringBuilder> jsFileBodyStore = new HashMap<String, StringBuilder>();
-
    public String scLib = "js/sc.js";
    public String jsCoreLib = "js/sccore.js";
 
    public String prototypeSuffix = "_c";
 
+   private transient HashSet<String> changedJSFiles = new LinkedHashSet<String>();
+
+   private transient boolean changedDefaultType = false;
+
+   private transient HashSet<String> processedTypes = new HashSet<String>();
+
+   private transient HashMap<String,LinkedHashMap<JSFileEntry,Boolean>> typesInFileMap = new HashMap<String,LinkedHashMap<JSFileEntry,Boolean>>();
+
+   private transient HashMap<String,StringBuilder> jsFileBodyStore = new HashMap<String, StringBuilder>();
+
    /** Set to true in the post start phase - after that phase, any other start models are not part of the build process (e.g. we might load the type declarations because they are init types when generating the page dispatcher)  */
-   private boolean postStarted = false;
+   private transient boolean postStarted = false;
 
    // For Javascript, we sync against the default runtime
    { syncRuntimes.add(null); }
@@ -115,6 +115,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
    public String mainTemplate = "<%= typeName %>" + prototypeSuffix + ".main([]);\n";
 
+   private transient ArrayList<SystemUpdate> systemUpdates = new ArrayList<SystemUpdate>();
+
    // Placeholder used to track dependencies for all "default types" - those that do not get put into their own module.
    public static final String defaultLib = "<default>";
 
@@ -140,8 +142,6 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       long updateTime;
       String jsUpdate;
    }
-
-   private ArrayList<SystemUpdate> systemUpdates = new ArrayList<SystemUpdate>();
 
    public void addSystemUpdate(String jsUpdate) {
       SystemUpdate update = new SystemUpdate();
@@ -441,7 +441,6 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       }
 
    }
-
 
    public List<SrcEntry> getProcessedFiles(IFileProcessorResult model, Layer genLayer, String buildSrcDir, boolean generate) {
       ArrayList<SrcEntry> resFiles = new ArrayList<SrcEntry>();

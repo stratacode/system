@@ -234,6 +234,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** The list of processes to build for this stack of layers */
    public static ArrayList<IProcessDefinition> processes;
 
+   private static boolean procInfoNeedsSave = false;
+
    /** A user configurable list of runtime names which are ignored */
    public ArrayList<String> disabledRuntimes;
 
@@ -1133,6 +1135,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          cmd.updateLayerState();
       }
 
+      // Init the runtimes from the main system if we are using the type index.
+      if (!peerMode && (options.typeIndexMode == TypeIndexMode.Refresh || options.typeIndexMode == TypeIndexMode.Load)) {
+         initTypeIndexRuntimes();
+      }
+
       boolean reusingDefaultRuntime = !javaIsAlwaysDefaultRuntime && runtimes != null && runtimes.size() == 1;
       if (useProcessDefinition == null) {
          if (!reusingDefaultRuntime)
@@ -1267,34 +1274,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                }
             }
 
-            String peerLayerPath = layerPath;
-            // When you run in the layer directory, the other runtime defines the root layer dir which we need as the layer path here since we specify all of the layers using absolute paths
-            if (peerLayerPath == null && newLayerDir != null)
-               peerLayerPath = newLayerDir;
-            LayeredSystem peerSys = new LayeredSystem(null, procLayerNames, explicitDynLayers, peerLayerPath, rootClassPath, options, proc, this, false, externalModelIndex);
-
-            // The LayeredSystem needs at least the main layered system in its peer list to initialize the layers.  We'll reset this later to include all of the layeredSystems.
-            if (peerSys.peerSystems == null) {
-               ArrayList<LayeredSystem> tempPeerList = new ArrayList<LayeredSystem>();
-               tempPeerList.add(this);
-               peerSys.peerSystems = tempPeerList;
-            }
-
-            // Propagate any properties which directly go across to all peers
-            if (!autoClassLoader)
-               peerSys.setFixedSystemClassLoader(systemClassLoader);
-
-            // Make sure the typeIndex and the processMap stay in sync.
-            if (typeIndexProcessMap != null)
-               peerSys.typeIndex = typeIndexProcessMap.get(peerSys.getTypeIndexIdent());
-            if (peerSys.typeIndex == null) {
-               peerSys.typeIndex = new SysTypeIndex(peerSys);
-               if (typeIndexProcessMap != null)
-                  typeIndexProcessMap.put(peerSys.getTypeIndexIdent(), peerSys.typeIndex);
-            }
-            else
-               peerSys.typeIndex.setSystem(peerSys);
-            peerSys.disabledRuntimes = disabledRuntimes;
+            LayeredSystem peerSys = createPeerSystem(proc, procLayerNames, explicitDynLayers);
 
             for (int i = 0; i < inactiveLayers.size(); i++) {
                Layer inactiveLayer = inactiveLayers.get(i);
@@ -1308,18 +1288,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             newPeers.add(peerSys);
          }
 
-         if (peerSystems == null)
-            peerSystems = newPeers;
-         else
-            peerSystems.addAll(newPeers);
-
-         // Each layered system gets a list of the other systems
-         for (LayeredSystem peer: peerSystems) {
-            ArrayList<LayeredSystem> peerPeers = (ArrayList<LayeredSystem>) peerSystems.clone();
-            peerPeers.remove(peer);
-            peerPeers.add(this);
-            peer.peerSystems = peerPeers;
-         }
+         initNewPeers(newPeers);
 
          if (modelListeners != null) {
             for (IModelListener ml: modelListeners) {
@@ -1346,6 +1315,54 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       // This is set in the constructor for the new LayeredSystem so we need to restore it here
       setCurrent(curSys);
+   }
+
+   private void initNewPeers(ArrayList<LayeredSystem> newPeers) {
+      if (peerSystems == null)
+         peerSystems = newPeers;
+      else
+         peerSystems.addAll(newPeers);
+
+      // Each layered system gets a list of the other systems
+      for (LayeredSystem peer: peerSystems) {
+         ArrayList<LayeredSystem> peerPeers = (ArrayList<LayeredSystem>) peerSystems.clone();
+         peerPeers.remove(peer);
+         peerPeers.add(this);
+         peer.peerSystems = peerPeers;
+      }
+   }
+
+   private LayeredSystem createPeerSystem(IProcessDefinition proc, ArrayList<String> procLayerNames, List<String> explicitDynLayers) {
+      String peerLayerPath = layerPath;
+      // When you run in the layer directory, the other runtime defines the root layer dir which we need as the layer path here since we specify all of the layers using absolute paths
+      if (peerLayerPath == null && newLayerDir != null)
+         peerLayerPath = newLayerDir;
+      LayeredSystem peerSys = new LayeredSystem(null, procLayerNames, explicitDynLayers, peerLayerPath, rootClassPath, options, proc, this, false, externalModelIndex);
+
+      // The LayeredSystem needs at least the main layered system in its peer list to initialize the layers.  We'll reset this later to include all of the layeredSystems.
+      if (peerSys.peerSystems == null) {
+         ArrayList<LayeredSystem> tempPeerList = new ArrayList<LayeredSystem>();
+         tempPeerList.add(this);
+         peerSys.peerSystems = tempPeerList;
+      }
+
+      // Propagate any properties which directly go across to all peers
+      if (!autoClassLoader)
+         peerSys.setFixedSystemClassLoader(systemClassLoader);
+
+      // Make sure the typeIndex and the processMap stay in sync.
+      if (typeIndexProcessMap != null)
+         peerSys.typeIndex = typeIndexProcessMap.get(peerSys.getTypeIndexIdent());
+      if (peerSys.typeIndex == null) {
+         peerSys.typeIndex = new SysTypeIndex(peerSys);
+         if (typeIndexProcessMap != null)
+            typeIndexProcessMap.put(peerSys.getTypeIndexIdent(), peerSys.typeIndex);
+      }
+      else
+         peerSys.typeIndex.setSystem(peerSys);
+      peerSys.disabledRuntimes = disabledRuntimes;
+
+      return peerSys;
    }
 
    /**
@@ -1667,6 +1684,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             addProcess(fromLayer, newProcDef);
          }
       }
+      procInfoNeedsSave = true;
    }
 
    private void updateProcessDefinition(IProcessDefinition procDef) {
@@ -1674,12 +1692,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       initTypeIndexDir();
    }
 
-   public static void addProcess(Layer fromLayer, IProcessDefinition procDef) {
+   private static void initProcessesList(IProcessDefinition procDef) {
       if (processes == null) {
          processes = new ArrayList<IProcessDefinition>();
          if (procDef != null && javaIsAlwaysDefaultRuntime)
             addProcess(null, null);
       }
+   }
+
+   public static void addProcess(Layer fromLayer, IProcessDefinition procDef) {
+      initProcessesList(procDef);
       IProcessDefinition existing = null;
       int procIndex = 0;
       for (IProcessDefinition existingProc:processes) {
@@ -1690,6 +1712,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             processes.set(procIndex, procDef);
             if (fromLayer.layeredSystem.processDefinition == null)
                fromLayer.layeredSystem.updateProcessDefinition(procDef);
+            procInfoNeedsSave = true;
             return;
          }
          else if (existingProc != null && procDef != null && procDef.getRuntimeName().equals(existingProc.getRuntimeName()) && StringUtil.equalStrings(procDef.getProcessName(), existingProc.getProcessName()))
@@ -1711,6 +1734,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          else
             processes.add(procDef);
       }
+      procInfoNeedsSave = true;
 
       // Each process has a runtimeProcessor so make sure to add that runtime, if it's not here
       IRuntimeProcessor rtProc = procDef == null ? null : procDef.getRuntimeProcessor();
@@ -1743,6 +1767,38 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       return null;
+   }
+
+   public IProcessDefinition getProcessDefinition(String runtimeName, String procName, boolean restore) {
+      if (processes != null) {
+         for (IProcessDefinition proc : processes) {
+            if (proc == null && procName == null && runtimeName == null)
+               return null;
+
+            if (proc != null && StringUtil.equalStrings(procName, proc.getProcessName()) && StringUtil.equalStrings(proc.getRuntimeName(), runtimeName))
+               return proc;
+         }
+      }
+      if (restore) {
+         ProcessDefinition proc = procName == null ? new ProcessDefinition() : ProcessDefinition.readProcessDefinition(this, runtimeName, procName);
+         if (proc != null) {
+            proc.runtimeProcessor = getOrRestoreRuntime(runtimeName);
+            initProcessesList(proc);
+            processes.add(proc);
+         }
+         return proc;
+      }
+      return null;
+   }
+
+   public IRuntimeProcessor getOrRestoreRuntime(String name) {
+      IRuntimeProcessor proc = getRuntime(name);
+      if (proc == null) {
+         proc = DefaultRuntimeProcessor.readRuntimeProcessor(this, name);
+         if (proc != null)
+            runtimes.add(proc);
+      }
+      return proc;
    }
 
    /** When there's more than one runtime, need to prefix the src, classes with the runtime name */
@@ -6181,19 +6237,42 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private static final String MAIN_SYSTEM_MARKER_FILE = "MainSystem.txt";
 
    private void saveTypeIndexFiles() {
-      for (int i = 0; i < inactiveLayers.size(); i++) {
-         Layer inactiveLayer = inactiveLayers.get(i);
-         // We have not fully initialized the type index until the layer is started
-         if (inactiveLayer.started)
-            inactiveLayer.saveTypeIndex();
-      }
-      if (!peerMode && peerSystems != null) {
-         for (LayeredSystem peerSys:peerSystems) {
-            peerSys.saveTypeIndexFiles();
+      acquireDynLock(false);
+      try {
+         for (int i = 0; i < inactiveLayers.size(); i++) {
+            Layer inactiveLayer = inactiveLayers.get(i);
+            // We have not fully initialized the type index until the layer is started
+            if (inactiveLayer.started)
+               inactiveLayer.saveTypeIndex();
          }
+         if (!peerMode && peerSystems != null) {
+            for (int i = 0; i < peerSystems.size(); i++) {
+               LayeredSystem peerSys = peerSystems.get(i);
+               peerSys.saveTypeIndexFiles();
+            }
 
-         File mainSysFile = new File(getTypeIndexDir(), MAIN_SYSTEM_MARKER_FILE);
-         FileUtil.saveStringAsFile(mainSysFile, "Marker file for recognizing the main system", true);
+            if (procInfoNeedsSave) {
+               File mainSysFile = new File(getTypeIndexDir(), MAIN_SYSTEM_MARKER_FILE);
+               FileUtil.saveStringAsFile(mainSysFile, "Marker file for recognizing the main system", true);
+
+               if (runtimes.size() > 0) {
+                  for (IRuntimeProcessor runtime : runtimes) {
+                     if (runtime != null) {
+                        DefaultRuntimeProcessor.saveRuntimeProcessor(this, runtime);
+                     }
+                  }
+               }
+               for (IProcessDefinition proc : processes) {
+                  if (proc != null) {
+                     ProcessDefinition.saveProcessDefinition(this, proc);
+                  }
+               }
+               procInfoNeedsSave = false;
+            }
+         }
+      }
+      finally {
+         releaseDynLock(false);
       }
       /*
       for (int i = 0; i < layers.size(); i++) {
@@ -6217,19 +6296,69 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
+   private String[] getRuntimeDirNames(boolean create) {
+      File typeIndexMainDir = new File(getStrataCodeDir("idx"));
+
+      if (!typeIndexMainDir.isDirectory()) {
+         if (create)
+            typeIndexMainDir.mkdirs();
+         else
+            return null;
+      }
+
+      return typeIndexMainDir.list();
+   }
+
+   private void initTypeIndexRuntimes() {
+      String[] runtimeDirNames = getRuntimeDirNames(false);
+
+      if (runtimeDirNames == null)
+         return;
+
+      String thisRuntimeName = getRuntimeName();
+
+      ArrayList<LayeredSystem> newPeers = new ArrayList<LayeredSystem>();
+
+      // First we need to find the "main" system so we set our processIdent properly for this layered system
+      for (String runtimeDirName:runtimeDirNames) {
+         if (!runtimeDirName.startsWith(TYPE_INDEX_DIR_PREFIX))
+            continue;
+
+         String typeIndexIdent = runtimeDirName.substring(TYPE_INDEX_DIR_PREFIX.length());
+         int sepIx = typeIndexIdent.indexOf('_');
+         String newRuntimeName, newProcessName;
+         if (sepIx == -1) {
+            newRuntimeName = typeIndexIdent;
+            newProcessName = null;
+         }
+         else {
+            newRuntimeName = typeIndexIdent.substring(0, sepIx);
+            newProcessName = typeIndexIdent.substring(sepIx + 1);
+         }
+
+         File typeIndexDir = new File(getTypeIndexDir(typeIndexIdent));
+
+         IProcessDefinition proc = getProcessDefinition(newRuntimeName, newProcessName, true);
+
+         File mainIndexFile = new File(typeIndexDir, MAIN_SYSTEM_MARKER_FILE);
+         if (mainIndexFile.exists() && processDefinition == null && newRuntimeName.equals(thisRuntimeName)) {
+            processDefinition = proc;
+         }
+         else {
+            LayeredSystem peerSys = createPeerSystem(proc, new ArrayList<String>(), Collections.emptyList());
+            newPeers.add(peerSys);
+         }
+      }
+
+      initNewPeers(newPeers);
+   }
+
    /**
     * The internal method to load the main type index.  In general, we do not need to be called with the dyn lock and
     * it's best if you avoid doing that because this can take a long time when rebuilding the index from scratch.
     */
    private void loadTypeIndex(Set<String> refreshedLayers) {
-      File typeIndexMainDir = new File(getStrataCodeDir("idx"));
-
-      if (!typeIndexMainDir.isDirectory()) {
-         typeIndexMainDir.mkdirs();
-         return;
-      }
-
-      String[] runtimeDirNames = typeIndexMainDir.list();
+      String[] runtimeDirNames = getRuntimeDirNames(true);
 
       if (peerMode)
          System.err.println("*** TypeIndexEntry should only be loaded in the main layeredSystem");
@@ -6250,24 +6379,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          releaseDynLock(false);
       }
 
-      // First we need to find the "main" system so we set our processIdent properly for this layered system
-      for (String runtimeDirName:runtimeDirNames) {
-         if (!runtimeDirName.startsWith(TYPE_INDEX_DIR_PREFIX))
-            continue;
-
-         String typeIndexIdent = runtimeDirName.substring(TYPE_INDEX_DIR_PREFIX.length());
-
-         File typeIndexDir = new File(getTypeIndexDir(typeIndexIdent));
-
-         File mainIndexFile = new File(typeIndexDir, MAIN_SYSTEM_MARKER_FILE);
-         if (mainIndexFile.exists() && processDefinition == null) {
-            String rtName = getRuntimeName();
-            if (typeIndexIdent.startsWith(rtName)) {
-               String procName = typeIndexIdent.substring(rtName.length() + 1);
-               processDefinition = ProcessDefinition.create(procName);
-            }
-         }
-      }
 
       for (String runtimeDirName:runtimeDirNames) {
          if (!runtimeDirName.startsWith(TYPE_INDEX_DIR_PREFIX))
@@ -8993,9 +9104,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (options.clonedParseModel && peerSystems != null) {
                for (LayeredSystem peerSys:peerSystems) {
                   Layer peerLayer = activated ? peerSys.getLayerByName(srcEnt.layer.layerUniqueName) : peerSys.lookupInactiveLayer(srcEnt.layer.getLayerName(), false, true);
-                  // does this layer exist in the peer runtime
-                  if (peerLayer != null) {
-                     // If the peer layer is not started, we can't clone
+                  // does this layer exist in the peer runtime and is it started?
+                  if (peerLayer != null && peerLayer.started) {
                      if (peerSys.beingLoaded.get(srcEnt.absFileName) == null) {
                         ILanguageModel oldModel = activated ? peerSys.modelIndex.get(srcEnt.absFileName) : peerSys.inactiveModelIndex.get(srcEnt.absFileName);
                         if (oldModel == null || oldModel.getLastModifiedTime() == modTimeStart) {
@@ -9931,16 +10041,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             JavaModel javaModel = (JavaModel) model;
             // We only do this if replacing the inactive model.  The first time, we will have parsed an unannotated layer model so don't process the update for that.
             if (layer != null && oldModel.getUserData() != null) {
-               boolean layerModelChanged;
+               boolean modelChanged;
                if (javaModel.isLayerModel)
-                  layerModelChanged = (oldModel.getLastModifiedTime() != javaModel.getLastModifiedTime() || !oldModel.sameModel(model)) && layer.updateModel(javaModel);
+                  modelChanged = (oldModel.getLastModifiedTime() != javaModel.getLastModifiedTime() || !oldModel.sameModel(model)) && layer.updateModel(javaModel);
                // If it's a regular file, not a layer, we mark the layer as having changed if the last modified time is different or the models have physically different contents.
                // the last modified time for a file edited in the IDE does not get updated until after we've updated the model here.  It is not cheap to identical models but it will
                // save a refresh of all open files when you have only changed comments or whitespace.
                else
-                  layerModelChanged = oldModel.getLastModifiedTime() != model.getLastModifiedTime() || !oldModel.sameModel(model);
-               if (layerModelChanged && externalModelIndex != null)
-                  externalModelIndex.layerChanged(layer);
+                  modelChanged = oldModel.getLastModifiedTime() != model.getLastModifiedTime() || !oldModel.sameModel(model);
+
+               if (externalModelIndex != null) {
+                  externalModelIndex.modelChanged(javaModel, modelChanged, layer);
+               }
             }
          }
          if (layer != null)

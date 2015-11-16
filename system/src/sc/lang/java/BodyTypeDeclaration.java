@@ -615,35 +615,41 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public static Object findMethodInBody(List<Statement> body, String name, List<? extends Object> types, ITypeParamContext ctx, Object refType, boolean staticOnly, Object inferredType) {
       Object v = null;
-      Object[] typesArray = null;
-      if (body != null) {
-         Object matchedObject = null;
-         for (Statement s:body) {
-            if (s instanceof ITypeDeclaration) {
-               // the getX() method should match an object definition.  Otherwise, during transform, we can't match up a getX to an object def and find no type
-               ITypeDeclaration itd = (ITypeDeclaration) s;
-               if ((types == null || types.size() == 0) && name.startsWith("get") && itd.getDeclarationType() == DeclarationType.OBJECT) {
-                  String propName = CTypeUtil.decapitalizePropertyName(name.substring(3));
-                  if (propName.equals(itd.getTypeName()))
-                     matchedObject = s;
+      PerfMon.start("findMethod");
+      try {
+         Object[] typesArray = null;
+         if (body != null) {
+            Object matchedObject = null;
+            for (Statement s : body) {
+               if (s instanceof ITypeDeclaration) {
+                  // the getX() method should match an object definition.  Otherwise, during transform, we can't match up a getX to an object def and find no type
+                  ITypeDeclaration itd = (ITypeDeclaration) s;
+                  if ((types == null || types.size() == 0) && name.startsWith("get") && itd.getDeclarationType() == DeclarationType.OBJECT) {
+                     String propName = CTypeUtil.decapitalizePropertyName(name.substring(3));
+                     if (propName.equals(itd.getTypeName()))
+                        matchedObject = s;
+                  }
+                  // One type declaration should not see the variables of an inner type
+                  continue;
                }
-               // One type declaration should not see the variables of an inner type
-               continue;
-            }
-            Object newMeth;
-            if ((newMeth = s.definesMethod(name, types, ctx, refType, false, staticOnly, inferredType)) != null) {
-               if (v == null)
-                  v = newMeth;
-               else {
-                  if (typesArray == null)
-                     typesArray = ModelUtil.parametersToTypeArray(types, ctx);
-                  v = ModelUtil.pickMoreSpecificMethod(v, newMeth, typesArray);
+               Object newMeth;
+               if ((newMeth = s.definesMethod(name, types, ctx, refType, false, staticOnly, inferredType)) != null) {
+                  if (v == null)
+                     v = newMeth;
+                  else {
+                     if (typesArray == null)
+                        typesArray = ModelUtil.parametersToTypeArray(types, ctx);
+                     v = ModelUtil.pickMoreSpecificMethod(v, newMeth, typesArray);
+                  }
                }
             }
+            // If this is for a getX and we have not transformed the object yet, still return it
+            if (v == null && matchedObject != null)
+               return matchedObject;
          }
-         // If this is for a getX and we have not transformed the object yet, still return it
-         if (v == null && matchedObject != null)
-            return matchedObject;
+      }
+      finally {
+         PerfMon.end("findMethod");
       }
       return v;
    }

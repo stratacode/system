@@ -302,6 +302,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    public void start() {
       if (started) return;
 
+      PerfMon.start("startJavaModel");
+
       // The layer model can't do this until the layer is started and its class path is set up.
       if (!isLayerModel)
          initTypeInfo();
@@ -315,6 +317,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
       // Need to initialize this before we transform as that will change things around
       modifiedModel = getModifiedModel();
+
+      PerfMon.end("startJavaModel");
 
       //startReplacingTypes();
    }

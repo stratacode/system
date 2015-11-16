@@ -33,6 +33,6 @@ public interface IExternalModelIndex {
    /** TODO: Is this needed anymore?  It was originally designed to be called to provide the timestamp of the file loaded by the external index, to help SC do a refresh but is no longer used */
    public long getModelTimestamp(ILanguageModel model);
 
-   /** Callback to notify the external index that an inactive layer was edited */
-   public void layerChanged(Layer layer);
+   /** Called to notify the index that a language model file was changed.  */
+   public void modelChanged(ILanguageModel model, boolean modelChanged, Layer layer);
 }

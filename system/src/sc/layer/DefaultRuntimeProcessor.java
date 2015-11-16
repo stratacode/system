@@ -4,11 +4,14 @@
 
 package sc.layer;
 
+import com.sun.xml.internal.ws.api.streaming.XMLStreamReaderFactory;
 import sc.lang.java.BodyTypeDeclaration;
 import sc.lang.java.JavaSemanticNode;
 import sc.lang.java.UpdateInstanceInfo;
 import sc.layer.*;
+import sc.util.FileUtil;
 
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -16,13 +19,17 @@ import java.util.List;
  * The RuntimeProcessor contains the code and configuration necessary to plug in a new runtime language, such as Javascript.
  * This default runtime processor is used to represent the default Java runtime.
  */
-public class DefaultRuntimeProcessor implements IRuntimeProcessor {
-   public LayeredSystem system;
+public class DefaultRuntimeProcessor implements IRuntimeProcessor, Serializable {
+   public transient LayeredSystem system;
 
    /** Destination name you can use to talk to this runtime. (TODO: should this be a list?) */
    public String destinationName;
 
    public String runtimeName;
+
+   boolean loadClassesInRuntime = true;
+
+   ArrayList<String> syncProcessNames;
 
    public DefaultRuntimeProcessor(String rtName) {
       runtimeName = rtName;
@@ -107,7 +114,6 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor {
       return false;
    }
 
-   boolean loadClassesInRuntime = true;
    public void setLoadClassesInRuntime(boolean val) {
       this.loadClassesInRuntime = val;
    }
@@ -115,12 +121,11 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor {
       return loadClassesInRuntime;
    }
 
-   List<String> syncProcessNames;
    public List<String> getSyncProcessNames() {
       return syncProcessNames;
    }
    public void setSyncProcessNames(List<String> syncProcessNames) {
-      this.syncProcessNames = syncProcessNames;
+      this.syncProcessNames = new ArrayList<String>(syncProcessNames);
    }
    public void addSyncProcessName(String procName) {
       if (syncProcessNames == null)
@@ -172,5 +177,63 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor {
 
    public static boolean compareRuntimes(IRuntimeProcessor proc1, IRuntimeProcessor proc2) {
       return proc1 == proc2 || (proc1 != null && proc1.equals(proc2)) || (proc2 != null && proc2.equals(proc1));
+   }
+
+   private static File getRuntimeFile(LayeredSystem sys, String runtimeName) {
+      File typeIndexMainDir = new File(sys.getStrataCodeDir("idx"));
+      return new File(typeIndexMainDir, runtimeName + ".ser");
+   }
+
+   public static IRuntimeProcessor readRuntimeProcessor(LayeredSystem sys, String runtimeName) {
+      if (runtimeName.equals(IRuntimeProcessor.DEFAULT_RUNTIME_NAME))
+         return null;
+      File runtimeFile = getRuntimeFile(sys, runtimeName);
+      ObjectInputStream ois = null;
+      FileInputStream fis = null;
+      try {
+         ois = new ObjectInputStream(fis = new FileInputStream(runtimeFile));
+         Object res = ois.readObject();
+         if (res instanceof IRuntimeProcessor) {
+            IRuntimeProcessor runtime = (IRuntimeProcessor) res;
+            return runtime;
+         }
+         else {
+            sys.error("Invalid runtime file contents: " + runtimeFile);
+            runtimeFile.delete();
+         }
+      }
+      catch (InvalidClassException exc) {
+         System.out.println("runtime processor index - version changed: " + runtimeFile);
+         runtimeFile.delete();
+      }
+      catch (IOException exc) {
+         System.out.println("*** can't read runtime processor file: " + exc);
+      }
+      catch (ClassNotFoundException exc) {
+         System.out.println("*** can't read runtime processor file: " + exc);
+      }
+      finally {
+         FileUtil.safeClose(ois);
+         FileUtil.safeClose(fis);
+      }
+      return null;
+   }
+
+   public static void saveRuntimeProcessor(LayeredSystem sys, IRuntimeProcessor runtime) {
+      if (runtime == null) // Default runtime - no need to save
+         return;
+      File runtimeFile = getRuntimeFile(sys, runtime.getRuntimeName());
+
+      ObjectOutputStream os = null;
+      try {
+         os = new ObjectOutputStream(new FileOutputStream(runtimeFile));
+         os.writeObject(runtime);
+      }
+      catch (IOException exc) {
+         System.err.println("*** can't save runtime processor in index " + exc);
+      }
+      finally {
+         FileUtil.safeClose(os);
+      }
    }
 }
