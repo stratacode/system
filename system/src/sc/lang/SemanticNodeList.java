@@ -191,9 +191,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       add(index, element, true);
    }
 
-   public void add(int index, E element, boolean changeParent) {
-      super.add(index, element);
-
+   private void updateElement(int index, E element, boolean changeParent, NestedParselet.ChangeType changeType, boolean initOnly) {
       // For semantic nodes, we'll populate the parentNode pointer.
       if (changeParent && element instanceof ISemanticNode)
          ((ISemanticNode) element).setParentNode(this);
@@ -206,6 +204,9 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
             ILifecycle lcval = (ILifecycle) element;
             if (!lcval.isInitialized()) {
                lcval.init();
+
+            }
+            if (!initOnly && !lcval.isStarted()) {
                lcval.start();
                if (validated)
                   lcval.validate();
@@ -213,9 +214,13 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
                   lcval.process();
             }
          }
-         
+
          if (parseNode == null) // not yet hooked into a semantic tree yet
-             return;
+            return;
+
+         // Is this right?  The old logic was to update/invalidate the parse nodes right after the start but is that necessary
+         if (initOnly)
+            return;
 
          Parselet parselet = parseNode.getParselet();
 
@@ -223,7 +228,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
             //if (!parselet.language.trackChanges) {
             //   parseNodeInvalid = true;
             //} else
-            if (!((NestedParselet)parselet).arrayElementChanged(parseNode, this, index, element, NestedParselet.ChangeType.ADD))
+            if (!((NestedParselet)parselet).arrayElementChanged(parseNode, this, index, element, changeType))
                System.err.println("*** Unable to regenerate after an array element add to list: " + this + " index: " + index + " element: " + element);
             //else {
             //   checkParseTree();
@@ -233,7 +238,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
             if (parselet.language.trackChanges) {
                Object parseNodeObj = parselet.generate(parselet.getLanguage().newGenerateContext(parselet, this), this);
                if (parseNodeObj instanceof GenerateError)
-                  System.err.println("*** Unable to regenerate after an array element add to list: " + this + " index: " + index + " element: " + element);
+                  System.err.println("*** Unable to regenerate after an array element: " + changeType + " " + this + " index: " + index + " element: " + element);
                else
                   parseNode = (IParseNode) parseNodeObj;
             }
@@ -241,6 +246,17 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
                invalidateParseNode();
          }
       }
+   }
+
+   public void add(int index, E element, boolean changeParent) {
+      super.add(index, element);
+
+      // For semantic nodes, we'll populate the parentNode pointer.
+      if (changeParent && element instanceof ISemanticNode)
+         ((ISemanticNode) element).setParentNode(this);
+
+      updateElement(index, element, changeParent, NestedParselet.ChangeType.ADD, false);
+
       /*
        * Use this to debug cases where an uninitailzied model is hooked up to an initialized model.  we don't automatically initialize cause there are some cases where this happens too early (if I recall correctly)
       else if (initialized) {
@@ -257,54 +273,8 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
    {
       E ret = super.set(index, element);
 
-      // For semantic nodes, we'll populate the parentNode pointer.
-      if (element instanceof ISemanticNode)
-         ((ISemanticNode) element).setParentNode(this);
+      updateElement(index, element, true, NestedParselet.ChangeType.REPLACE, false);
 
-      // Don't do this during the initial parsing phase
-      if (started) {
-         // Need to lazily initialize any non-initialized nodes.  As the model is changed, new nodes
-         // can be added so we lazily init them as they are added to an already initialized node.
-         if (element instanceof ILifecycle) {
-            ILifecycle lcval = (ILifecycle) element;
-            if (!lcval.isInitialized()) {
-               lcval.init();
-               lcval.start();
-               if (validated)
-                  lcval.validate();
-               if (processed)
-                  lcval.process();
-            }
-         }
-
-         if (parseNode == null) // not yet hooked into a semantic tree yet
-            return ret;
-
-         Parselet parselet = parseNode.getParselet();
-
-         //if (!parselet.language.trackChanges) {
-         //   parseNodeInvalid = true;
-         //} else
-         if (parselet instanceof NestedParselet) {
-            if (!((NestedParselet)parselet).arrayElementChanged(parseNode, this, index, element, NestedParselet.ChangeType.REPLACE))
-               System.err.println("*** Unable to regenerate after an array element set using list: " + this + " index: " + index + " element: " + element);
-            //else {
-            //   System.out.println("*** check parse tree");
-            //   checkParseTree();
-            //}
-         }
-         else {
-            if (parselet.language.trackChanges) {
-               Object parseNodeObj = parselet.generate(parselet.getLanguage().newGenerateContext(parselet, this), this);
-               if (parseNodeObj instanceof GenerateError)
-                  System.err.println("*** Unable to regenerate after an array element set using list: " + this + " index: " + index + " element: " + element);
-               else
-                  parseNode = (IParseNode) parseNodeObj;
-            }
-            else
-               invalidateParseNode();
-         }
-      }
       return ret;
    }
 
@@ -379,7 +349,19 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       ensureCapacity(size() + c.size());
       int i = 0;
       for (E e:c)
-         add(index + i++, e);
+         super.add(index + i++, e);
+
+      // It's best to first init and then start all components after all have been added.  Otherwise, for example, the start method
+      // after each statement will revalidate the caches.  We need init to run first so the propertyName of all methodDefinitions is set
+      // when the start method of the first entry is run.
+      i = 0;
+      for (E e:c)
+         updateElement(index + i++, e, true, NestedParselet.ChangeType.ADD, true);
+
+      i = 0;
+      for (E e:c)
+         updateElement(index + i++, e, true, NestedParselet.ChangeType.ADD, false);
+
       return i != 0;
    }
 

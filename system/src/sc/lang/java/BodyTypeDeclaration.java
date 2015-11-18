@@ -342,6 +342,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                      if (mtype.contains(MemberType.ObjectType))
                         return s;
                      if (mtype.contains(MemberType.GetMethod)) {
+                        if (res != null)
+                           return res;
                         return STOP_SEARCHING_SENTINEL;
                      }
                   }
@@ -376,17 +378,17 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       List<Statement> sts = membersByName.get(name);
       Object obj = findMemberInBody(sts, name, mtype, refType, ctx);
 
+      if (obj != null)
+         return obj;
+
    // TODO: REMOVE
    // Need to check body first... otherwise we return objects in hiddenBody which we can't transform
       /*
    Object oobj = findMemberInBody(body, name, mtype, refType, ctx);
    if (oobj != null && oobj != obj)
       System.out.println("***");
-   oobj = findMemberInBody(hiddenBody, name, mtype, refType, ctx);
-   if (oobj != null && oobj != obj)
-      System.out.println("***");
       */
-
+      obj = findMemberInBody(hiddenBody, name, mtype, refType, ctx);
       if (obj != null)
          return obj;
 
@@ -401,7 +403,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    private void initMethodsByName() {
       methodsByName = new TreeMap<String,List<Statement>>();
       addMethodsFromBody(body);
-      addMethodsFromBody(hiddenBody);
+      //addMethodsFromBody(hiddenBody);
    }
 
    private void addMethodsFromBody(SemanticNodeList<Statement> bodyList) {
@@ -425,7 +427,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    private void initMembersByName() {
       membersByName = new TreeMap<String,List<Statement>>();
       addMembersFromBody(body);
-      addMembersFromBody(hiddenBody);
+      // If we combine body and hidden body in the same list it behaves differently due to stop-searching-sentinel
+      //addMembersFromBody(hiddenBody);
    }
 
    private void addMembersFromBody(SemanticNodeList<Statement> bodyList) {
@@ -731,21 +734,19 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
       List<Statement> sts = methodsByName.get(name);
       Object obj = findMethodInBody(sts, name, types, ctx, refType, staticOnly, inferredType);
+      if (obj != null)
+         return obj;
 
-   // TODO: remove
-   // Interfaces will put the complete version of the method in the hidden body so this needs to be first
+      // Interfaces will put the complete version of the method in the hidden body so this needs to be first
+      Object v = findMethodInBody(hiddenBody, name, types, ctx, refType, staticOnly, inferredType);
+      if (v != null)
+         return v;
+
       /*
-   Object v = findMethodInBody(hiddenBody, name, types, ctx, refType, staticOnly, inferredType);
-   if (v != null && v != obj)
-      System.out.println("***");
-
    v = findMethodInBody(body, name, types, ctx, refType, staticOnly, inferredType);
    if (v != null && v != obj)
       System.out.println("***");
       */
-
-      if (obj != null)
-         return obj;
 
       if (isTransformedType() && isAutoComponent() && !isTransformed()) {
          // Note: this returns a compiled method even from the source type.  Use declaresMethodDef if you want to exclude
@@ -1044,7 +1045,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public void initHiddenBody() {
-      bodyChanged(); // Increment the version number each time we change the body so code will refresh caches
+      incrVersion(); // Increment the version number each time we change the body so code will refresh caches
       if (hiddenBody == null) {
          // This order reduces generation overhead a little...
          SemanticNodeList<Statement> newStatements = new SemanticNodeList<Statement>(1);

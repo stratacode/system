@@ -1013,6 +1013,7 @@ public class TransformUtil {
                            */
          }
 
+         propType.bodyChanged();
          propType.body.addAll(ix, list);
 
          // Need to init/start these after they have been added to the hierarchy so they can resolve etc.
