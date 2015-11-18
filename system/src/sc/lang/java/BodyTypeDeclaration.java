@@ -342,8 +342,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                      if (mtype.contains(MemberType.ObjectType))
                         return s;
                      if (mtype.contains(MemberType.GetMethod)) {
-                        if (res != null)
-                           return res;
+                        // TODOO ??? if (res != null) return res;
+                        // It is true that 'res' here may point to a field but we do not want to return it here.  There's a subtle rule where if there's an object
+                        // and a field in the same list, we need to resolve the object.  Otherwise, we may make the field bindable and create an extra getX method.
+                        // It seems like if we are going to override a field with an object we might also handle that more explicitly - by having the object find the
+                        // field and mark it as part of the object so we do not make it bindable.
+                        // This ends up why we cannot put the hiddenBody into the membersByName index.
                         return STOP_SEARCHING_SENTINEL;
                      }
                   }
@@ -403,22 +407,35 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    private void initMethodsByName() {
       methodsByName = new TreeMap<String,List<Statement>>();
       addMethodsFromBody(body);
+      // after transforming an object, we put the types into the hiddenBody.  But at that point we want body to override the clases.  But in general
+      // an object type must be resolved if there's a field in there as well.  If we store body and hiddenBody in the same list - we return the type when
+      // we should resolve the stuff in body.
       //addMethodsFromBody(hiddenBody);
+   }
+
+   private void addMethodByName(String name, Statement st) {
+      List<Statement> sts = methodsByName.get(name);
+      if (sts == null) {
+         sts = new ArrayList<Statement>();
+         methodsByName.put(name, sts);
+      }
+      sts.add(st);
    }
 
    private void addMethodsFromBody(SemanticNodeList<Statement> bodyList) {
       if (bodyList == null)
          return;
       for (Statement st:bodyList) {
-         if (st instanceof MethodDefinition) {
-            String name = ((MethodDefinition) st).name;
+         if (st instanceof AbstractMethodDefinition) {
+            String name = ((AbstractMethodDefinition) st).name;
             if (name != null) {
-               List<Statement> sts = methodsByName.get(name);
-               if (sts == null) {
-                  sts = new ArrayList<Statement>();
-                  methodsByName.put(name, sts);
-               }
-               sts.add(st);
+               addMethodByName(name, st);
+            }
+         }
+         else if (st instanceof ITypeDeclaration) {
+            ITypeDeclaration td = (ITypeDeclaration) st;
+            if (td.getDeclarationType() == DeclarationType.OBJECT) {
+               addMethodByName("get" + CTypeUtil.capitalizePropertyName(td.getTypeName()), st);
             }
          }
       }
@@ -743,9 +760,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return v;
 
       /*
-   v = findMethodInBody(body, name, types, ctx, refType, staticOnly, inferredType);
-   if (v != null && v != obj)
-      System.out.println("***");
+      v = findMethodInBody(body, name, types, ctx, refType, staticOnly, inferredType);
+      if (v != null && v != obj)
+         System.out.println("***");
       */
 
       if (isTransformedType() && isAutoComponent() && !isTransformed()) {

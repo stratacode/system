@@ -363,6 +363,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          }
       }
       needsDynAccess = true;
+
       if (!referenceOnly) {
          // If we are manually bindable, no need to force the convert get/set
          if (!bindable) {
