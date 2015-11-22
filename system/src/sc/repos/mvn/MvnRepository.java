@@ -14,11 +14,12 @@ public class MvnRepository {
       this.baseURL = baseURL;
    }
 
-   public String getFileURL(String groupId, String artifactId, String version, String suffix, String extension) {
+   public String getFileURL(String groupId, String artifactId, String version, String classifier, String suffix, String extension) {
       if (groupId == null) {
          groupId = "null";
       }
-      return baseURL + URLUtil.concat(groupId.replace('.', '/'), artifactId, version, FileUtil.addExtension(artifactId + "-" + version + suffix, extension));
+      String classifierExt = classifier == null ? "" : "-" + classifier;
+      return baseURL + URLUtil.concat(groupId.replace('.', '/'), artifactId, version, FileUtil.addExtension(artifactId + "-" + version + classifierExt + suffix, extension));
    }
 
    public String toString() {

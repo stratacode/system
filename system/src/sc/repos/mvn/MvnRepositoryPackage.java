@@ -45,6 +45,9 @@ public class MvnRepositoryPackage extends RepositoryPackage {
          MvnRepositorySource msrc = (MvnRepositorySource) src;
          type = msrc.desc.type;
       }
+      // We'll represent null as the default.
+      if (type != null && type.equals("jar"))
+         type = null;
       if (!installFileTypes.contains(type))
          installFileTypes.add(type);
    }

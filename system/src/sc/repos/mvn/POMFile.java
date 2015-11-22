@@ -174,9 +174,16 @@ public class POMFile extends XMLFileFormat {
             }
          }
          // Copy these over so they get serialized along with the parent module and to make them easier to find
-         pomPkg.subPackages = new ArrayList<RepositoryPackage>();
-         for (POMFile modPOM:modulePOMs)
-            pomPkg.subPackages.add(modPOM.pomPkg);
+         ArrayList<RepositoryPackage> subPackages = new ArrayList<RepositoryPackage>();
+         pomPkg.subPackages = subPackages;
+         for (POMFile modPOM:modulePOMs) {
+            RepositoryPackage modPkg = modPOM.pomPkg;
+            subPackages.add(modPkg);
+            // The root node accumulates all packages in all children.  We could maybe do this differently but right now
+            // methods like register() only operate on the root-level subPackages.
+            if (modPkg.subPackages != null)
+               subPackages.addAll(modPkg.subPackages);
+         }
       }
    }
 

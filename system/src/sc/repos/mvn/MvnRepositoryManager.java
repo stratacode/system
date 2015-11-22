@@ -90,7 +90,13 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
             pomFileRes = "Failed to read pom file for package: " + pkg.packageName;
       }
       else {
-         desc = MvnDescriptor.fromURL(url);
+         if (src instanceof MvnRepositorySource) {
+            desc = ((MvnRepositorySource) src).desc;
+            if (desc == null) // Does this ever happen?
+               desc = MvnDescriptor.fromURL(url);
+         }
+         else
+            desc = MvnDescriptor.fromURL(url);
          // Need this set here so the version suffix can be resolved from the pkg
          pkg.setCurrentSource(src);
          // We may have already processed a pom for this package as part of a weird module reference, before we'd decided on the right version for the package
@@ -364,7 +370,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          }
       }
       for (MvnRepository repo:repositories) {
-         String pomURL = repo.getFileURL(desc.groupId, desc.artifactId, desc.version, remoteSuffix, remoteExt);
+         String pomURL = repo.getFileURL(desc.groupId, desc.artifactId, desc.version, desc.classifier, remoteSuffix, remoteExt);
          String resDir = FileUtil.getParentPath(resFileName);
          new File(resDir).mkdirs();
          String res = URLUtil.saveURLToFile(pomURL, resFileName, false, msg);
@@ -383,10 +389,16 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          info("Using existing file: " + resFileName);
          return true;
       }
+      String classifierExt;
+      if (desc.classifier != null) {
+         classifierExt = "-" + desc.classifier;
+      }
+      else
+         classifierExt = "";
       if (useLocalRepository) {
-         String localPkgDir = FileUtil.concat(mvnRepositoryDir, desc.groupId.replace(".", FileUtil.FILE_SEPARATOR), desc.artifactId, desc.version);
+         String localPkgDir = FileUtil.concat(mvnRepositoryDir, desc.groupId.replace(".", FileUtil.FILE_SEPARATOR), desc.artifactId, desc.version, classifierExt);
          if (new File(localPkgDir).isDirectory()) {
-            String fileName = FileUtil.concat(localPkgDir, FileUtil.addExtension(desc.artifactId + "-" + desc.version + remoteSuffix, remoteExt));
+            String fileName = FileUtil.concat(localPkgDir, FileUtil.addExtension(desc.artifactId + "-" + desc.version + classifierExt + remoteSuffix, remoteExt));
             if (new File(fileName).canRead()) {
                if (FileUtil.copyFile(fileName, resFileName, true))
                   return true;
@@ -396,7 +408,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          }
       }
       for (MvnRepository repo:repositories) {
-         String pomURL = repo.getFileURL(desc.groupId, desc.artifactId, desc.version, remoteSuffix, remoteExt);
+         String pomURL = repo.getFileURL(desc.groupId, desc.artifactId, desc.version, desc.classifier, remoteSuffix, remoteExt);
          String resDir = FileUtil.getParentPath(resFileName);
          new File(resDir).mkdirs();
          String res = URLUtil.saveURLToFile(pomURL, resFileName, false, msg);

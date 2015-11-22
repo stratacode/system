@@ -997,8 +997,8 @@ public class ModelUtil {
                Object arg = types[i];
                boolean repeat1Arg = c1Types.length <= i;
                boolean repeat2Arg = c2Types.length <= i;
-               Object c1Arg = repeat1Arg ? c1Types[c1Types.length] : c1Types[i];
-               Object c2Arg = repeat2Arg ? c2Types[c2Types.length] : c2Types[i];
+               Object c1Arg = repeat1Arg ? c1Types[c1Types.length-1] : c1Types[i];
+               Object c2Arg = repeat2Arg ? c2Types[c2Types.length-1] : c2Types[i];
 
                if (c1Arg == c2Arg)
                   continue;
@@ -1688,7 +1688,10 @@ public class ModelUtil {
       }
 
       if (type2 instanceof TypeVariable) {
-         type2 = ((TypeVariable) type2).getBounds()[0];
+         do {
+            type2 = ((TypeVariable) type2).getBounds()[0];
+         }
+         while (type2 instanceof TypeVariable);
          // If we have a type parameter that's not bound and are just matching for an incompatibility, only
          // reject the match if the bounds for the type is incompatible
          if (allowUnbound) {

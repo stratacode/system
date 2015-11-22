@@ -15,6 +15,8 @@ import java.util.List;
 public class MvnDescriptor implements Serializable {
    private static final long serialVersionUID = 381740762128191325L;
 
+   private final static String DEFAULT_TYPE = "jar";
+
    public String groupId;
    public String artifactId;
    public String version;
@@ -79,7 +81,13 @@ public class MvnDescriptor implements Serializable {
 
    // relative to the pkg directory which already has group-id and artifact-id
    public String getJarFileName() {
-      return FileUtil.addExtension(artifactId + "-" + version, "jar");
+      String ext;
+      if (classifier != null) {
+         ext = "-" + classifier;
+      }
+      else
+         ext = "";
+      return FileUtil.addExtension(artifactId + "-" + version + ext, "jar");
    }
 
    public String getTestJarFileName() {
@@ -142,7 +150,8 @@ public class MvnDescriptor implements Serializable {
               // flexible match on version in this direction
               (version == null /* || other.version == null */ || strMatches(version, other.version)) &&
               // Strict match on type - each type we reference becomes a different source for the same package
-              strMatches(type, other.type) &&
+              // If type is omitted it only matches 'jar'
+              (strMatches(type, other.type) || (type == null && other.type.equals(DEFAULT_TYPE))) &&
               (classifier == null || other.classifier == null || strMatches(classifier, other.classifier));
    }
 

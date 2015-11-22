@@ -16,5 +16,15 @@ public class AnnotationTypeDeclaration extends TypeDeclaration
    public AccessLevel getDefaultAccessLevel() {
       return AccessLevel.Public;
    }
+
+   public boolean implementsType(String fullTypeName, boolean assignment, boolean allowUnbound) {
+      if (super.implementsType(fullTypeName, assignment, allowUnbound))
+         return true;
+      // This is the interface implicity implemented by all annotation types.  It is necessary that we implement this interface for the type
+      // system to resolve for example:   field.getAnnotation(AnnotationClass.class).annotationMethod()
+      if (fullTypeName.equals("java.lang.annotation.Annotation"))
+         return true;
+      return false;
+   }
 }
 
