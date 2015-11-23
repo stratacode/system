@@ -58,7 +58,10 @@ public class ForVarStatement extends ForStatement implements IVariable {
             displayTypeError("For loop - expression after the ':' must be an array or a java.lang.Iterable");
          }
          else {
-            Object componentType = ModelUtil.getArrayOrListComponentType(exprType);
+            JavaModel model = getJavaModel();
+            Object componentType = null;
+            if (model != null)
+               componentType = ModelUtil.getArrayOrListComponentType(model, exprType);
             Object varType = type.getTypeDeclaration();
             if (componentType != null && !ModelUtil.isAssignableFrom(varType, componentType) && varType != null) {
                displayTypeError("The 'for' statement's variable type: " + ModelUtil.getTypeName(varType) + " does not match the collection's component type: " + ModelUtil.getTypeName(componentType) + "\n:   ");

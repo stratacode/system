@@ -12,6 +12,7 @@ import sc.type.CTypeUtil;
 import sc.util.FileUtil;
 import sc.util.MessageHandler;
 import sc.util.StringUtil;
+import sc.util.URLUtil;
 
 import java.util.*;
 
@@ -24,6 +25,9 @@ public class POMFile extends XMLFileFormat {
    Element projElement;
 
    POMFile parentPOM;
+
+   /** If this is a module in a parent package, the module name */
+   String modulePath;
 
    // Represents the chain of includes for variable resolving
    POMFile includedFromPOM;
@@ -43,6 +47,12 @@ public class POMFile extends XMLFileFormat {
    public String artifactId;
 
    RepositoryPackage pomPkg;
+
+   public MvnDescriptor getDescriptor() {
+      if (pomPkg instanceof MvnRepositoryPackage)
+         return ((MvnRepositoryPackage) pomPkg).getDescriptor();
+      return null;
+   }
 
    public POMFile(String fileName, MvnRepositoryManager mgr, DependencyContext ctx, RepositoryPackage pomPkg, POMFile includedFromPOM) {
       super(fileName, mgr == null ? null : mgr.msg);
@@ -112,6 +122,15 @@ public class POMFile extends XMLFileFormat {
       if (projElement != null) {
          artifactId = projElement.getSimpleChildValue("artifactId");
          if (artifactId != null) {
+            MvnDescriptor desc = getDescriptor();
+            if (desc != null) {
+               desc.artifactId = artifactId;
+               // And update the URL in the source so we save it pointing to the real artifactId
+               if (pomPkg != null && pomPkg.currentSource != null)
+                  pomPkg.currentSource.url = desc.getURL();
+            }
+            else
+               System.out.println("***");
             mgr.registerNameForPackage(pomPkg, artifactId);
          }
       }
@@ -141,15 +160,19 @@ public class POMFile extends XMLFileFormat {
       // TODO: else - there is a default POM but so far, we don't need any of the contents since it's all concerned with the build
    }
 
+   private String getArtifactId() {
+      return getProperty("project.artifactId", true, true);
+   }
+
    private void initModules() {
       Element modulesRoot = projElement.getSingleChildTag(("modules"));
       modulePOMs = new ArrayList<POMFile>();
       if (modulesRoot != null) {
          Element[] modules = modulesRoot.getChildTagsWithName("module");
          if (modules != null) {
+            String parentName = getProperty("project.artifactId", true, true);
             for (Element module:modules) {
                String moduleName = module.getBodyAsString();
-               String parentName = getProperty("project.artifactId", true, true);
                while (moduleName.startsWith("../")) {
                   moduleName = moduleName.substring(3);
                   if (parentName != null)
@@ -159,10 +182,10 @@ public class POMFile extends XMLFileFormat {
                if (parentName != null) {
                   if (!isSrc)
                      moduleName = CTypeUtil.prefixPath(CTypeUtil.getPackageName(parentName), moduleName);
-                  else
-                     moduleName = parentName + "/" + moduleName;
+                  // else - when we have nested source modules, they are located in the file system in directories.  Pass that name directoy in the MvnDescriptor
                }
-               MvnDescriptor desc = new MvnDescriptor(getProperty("project.groupId", true, true), moduleName, getProperty("project.version", true, true));
+               // Initially create this with a modulePath, not the artifactId.  Later when we read the POM we set the artifactId
+               MvnDescriptor desc = new MvnDescriptor(getProperty("project.groupId", true, true), parentName, moduleName, null, getProperty("project.version", true, true));
                // Do not init the dependencies here.  We won't be able to resolve deps inbetween these modules.  We have to create them all and
                // initialize the deps for the modules when we init them for the parent.
                RepositoryPackage pkg = desc.getOrCreatePackage(mgr.getChildManager(), false, depCtx, false, isSrc ? (MvnRepositoryPackage) pomPkg : null);
@@ -179,10 +202,6 @@ public class POMFile extends XMLFileFormat {
          for (POMFile modPOM:modulePOMs) {
             RepositoryPackage modPkg = modPOM.pomPkg;
             subPackages.add(modPkg);
-            // The root node accumulates all packages in all children.  We could maybe do this differently but right now
-            // methods like register() only operate on the root-level subPackages.
-            if (modPkg.subPackages != null)
-               subPackages.addAll(modPkg.subPackages);
          }
       }
    }

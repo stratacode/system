@@ -1333,6 +1333,8 @@ public class ModelUtil {
       else if (c1 instanceof ITypeDeclaration) {
          return ((ITypeDeclaration) c1).getImplementsTypeDeclarations();
       }
+      else if (c1 instanceof ParameterizedType)
+         return getImplementsTypeDeclarations(ModelUtil.getParamTypeBaseType(c1));
       else
          throw new UnsupportedOperationException();
    }
@@ -1604,19 +1606,21 @@ public class ModelUtil {
       else throw new UnsupportedOperationException();
    }
 
-   public static Object getArrayOrListComponentType(Object arrayType) {
-      if (ModelUtil.isAssignableFrom(List.class, arrayType)) {
-         if (arrayType instanceof ParamTypeDeclaration) {
-            return ((ParamTypeDeclaration) arrayType).types.get(0);
+   public static Object getArrayOrListComponentType(JavaModel model, Object arrayType) {
+      if (arrayType instanceof TypeParameter && ((TypeParameter) arrayType).extendsType != null) {
+         if (ModelUtil.isAssignableFrom(List.class, arrayType)) {
+            System.out.println("***");
          }
-         else if (arrayType instanceof ParameterizedType) {
-            ParameterizedType pt = (ParameterizedType) arrayType;
-            return pt.getActualTypeArguments()[0];
-         }
-         else if (arrayType instanceof ITypeDeclaration) {
-            return ((ITypeDeclaration) arrayType).getArrayComponentType();
-         }
-         return Object.class;
+         System.out.println("***");
+      }
+      if (ModelUtil.isAssignableFrom(Iterable.class, arrayType)) {
+         if (ModelUtil.isTypeVariable(arrayType))
+            arrayType = ModelUtil.getTypeParameterDefault(arrayType);
+         // We want to resolve the value of T in Iterable<T> for the current type.  This method remaps the base-type's type parameter to the current type
+         Object res = ModelUtil.resolveBaseTypeParameter(arrayType, Iterable.class, ModelUtil.getTypeParameter(Iterable.class, 0));
+         if (res != null && ModelUtil.isTypeVariable(res))
+            return ModelUtil.getTypeParameterDefault(res);
+         return res;
       }
       // for java.util.Map, we'll pull out the type parameter for the value
       else if (ModelUtil.isAssignableFrom(Map.class, arrayType)) {
@@ -4097,6 +4101,80 @@ public class ModelUtil {
    }
 
    /** Computes the type parameter in type 'resultType' that corresponds to the typeParam which is a type parameter for it's base class srcType */
+   public static Object resolveBaseTypeParameter(Object subType, Object baseType, Object typeParam) {
+      if (ModelUtil.sameTypes(subType, baseType)) {
+         String typeParamName = ModelUtil.getTypeParameterName(typeParam);
+         int srcIx = ModelUtil.getTypeParameterPosition(subType, typeParamName);
+         if (srcIx == -1) {
+            System.err.println("*** Unresolveable base type parameter!");
+            return null;
+         }
+         return typeParam;
+      }
+      List<Object> extTypes = getExtendsJavaTypePath(baseType, subType);
+      if (extTypes == null || extTypes.size() == 0) {
+         System.err.println("*** No extends path from baseType to subType");
+         return null;
+      }
+      extTypes.remove(extTypes.size() - 1);
+
+      int curParamIx = -1;
+      List<?> baseTypeParams = ModelUtil.getTypeParameters(baseType);
+      int ct = 0;
+      for (Object baseTypeParam:baseTypeParams) {
+         if (ModelUtil.sameTypeParameters(baseTypeParam, typeParam)) {
+            curParamIx = ct;
+            break;
+         }
+         ct++;
+      }
+      if (curParamIx == -1) {
+         System.err.println("*** No typeParam in resultType");
+         return null;
+      }
+
+      Object nextType;
+      Object lastTypeArg = typeParam;
+      for (int i = extTypes.size()-1; i >= 0; i--) {
+         Object ext = extTypes.get(i);
+         List<?> typeArgs = ModelUtil.getTypeArguments(ext);
+         if (typeArgs == null)
+            return null;
+
+         Object typeArg = typeArgs.get(curParamIx);
+         if (typeArg instanceof JavaType)
+            typeArg = ((JavaType) typeArg).getTypeDeclaration();
+         if (!ModelUtil.isTypeVariable(typeArg)) {
+            return typeArg;
+         }
+         else {
+            lastTypeArg = typeArg;
+            String typeParamName = ModelUtil.getTypeParameterName(typeArg);
+
+            if (i == 0)
+               nextType = subType;
+            else {
+               nextType = extTypes.get(i - 1);
+               if (nextType instanceof JavaType)
+                  nextType = ((JavaType) nextType).getTypeDeclaration();
+            }
+            curParamIx = ModelUtil.getTypeParameterPosition(nextType, typeParamName);
+         }
+      }
+
+      // The type arg here also needs to be mapped.
+      int numTypeParams = ModelUtil.getNumTypeParameters(subType);
+      if (curParamIx < numTypeParams) {
+         lastTypeArg = ModelUtil.getTypeParameter(subType, curParamIx);
+         if (!ModelUtil.isTypeVariable(lastTypeArg)) {
+            return lastTypeArg;
+         }
+      }
+      // Use the default type for this type variable
+      return ModelUtil.getTypeParameterDefault(lastTypeArg);
+   }
+
+   /** Computes the type parameter in type 'resultType' that corresponds to the typeParam which is a type parameter for it's base class srcType */
    public static Object resolveTypeParameter(Object srcType, Object resultType, Object typeParam) {
       String typeParamName = ModelUtil.getTypeParameterName(typeParam);
       int srcIx = ModelUtil.getTypeParameterPosition(srcType, typeParamName);
@@ -4488,6 +4566,8 @@ public class ModelUtil {
          return ((Class) type).getSuperclass();
       else if (type instanceof ITypeDeclaration)
          return ((ITypeDeclaration) type).getDerivedTypeDeclaration();
+      else if (type instanceof ParameterizedType)
+         return getSuperclass(ModelUtil.getParamTypeBaseType(type));
       else
          throw new UnsupportedOperationException();
    }
@@ -4517,6 +4597,8 @@ public class ModelUtil {
          return ((Class) type).getGenericSuperclass();
       else if (type instanceof ITypeDeclaration)
          return ((ITypeDeclaration) type).getExtendsType();
+      else if (type instanceof ParameterizedType)
+         return getExtendsJavaType(ModelUtil.getParamTypeBaseType(type));
       else
          throw new UnsupportedOperationException();
    }
@@ -4528,6 +4610,8 @@ public class ModelUtil {
          List<?> res = ((ITypeDeclaration) type).getImplementsTypes();
          return res == null ? null : res.toArray();
       }
+      else if (type instanceof ParameterizedType)
+         return getImplementsJavaTypes(ModelUtil.getParamTypeBaseType(type));
       else
          throw new UnsupportedOperationException();
    }

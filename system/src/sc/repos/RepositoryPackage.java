@@ -193,12 +193,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
                for (String srcPath : srcPaths)
                   definedInLayer.addSrcPath(FileUtil.concat(root, srcPath), null);
 
-               if (subPackages != null) {
-                  for (RepositoryPackage subPackage:subPackages) {
-                     for (String srcPath : srcPaths)
-                        definedInLayer.addSrcPath(FileUtil.concat(subPackage.getInstalledRoot(), srcPath), null);
-                  }
-               }
+               addSrcPathsForSubPackages(definedInLayer, srcPaths);
             }
             if (webPaths != null) {
                for (String webPath:webPaths)
@@ -208,6 +203,17 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
                for (String configPath:configPaths)
                   definedInLayer.addSrcPath(FileUtil.concat(root, configPath), "config");
             }
+         }
+      }
+   }
+
+   private void addSrcPathsForSubPackages(Layer layer, String[] srcPaths) {
+      if (subPackages != null) {
+         for (RepositoryPackage subPackage:subPackages) {
+            for (String srcPath : srcPaths)
+               layer.addSrcPath(FileUtil.concat(subPackage.getInstalledRoot(), srcPath), null);
+
+            subPackage.addSrcPathsForSubPackages(layer, srcPaths);
          }
       }
    }
@@ -496,13 +502,8 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       if (oldPkg.parentPkgURL != null) {
          parentPkg = mgr.getOrCreatePackage(oldPkg.parentPkgURL, null, false);
       }
-      if (oldPkg.subPkgURLs != null) {
-         ArrayList<RepositoryPackage> subs = new ArrayList<RepositoryPackage>(oldPkg.subPkgURLs.size());
-         for (String sub:oldPkg.subPkgURLs) {
-            subs.add(mgr.getOrCreatePackage(sub, this, install));
-         }
-         subPackages = subs;
-      }
+
+      initSubPackages(oldPkg, install);
       if (oldPkg.depPkgURLs != null) {
          ArrayList<RepositoryPackage> deps = new ArrayList<RepositoryPackage>(oldPkg.depPkgURLs.size());
          for (String depPkgURL:oldPkg.depPkgURLs) {
@@ -517,12 +518,39 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
 
       updateCurrentSource(oldPkg.currentSource);
 
-      if (install && subPackages != null) {
-         for (RepositoryPackage subPkg:subPackages)
-            sys.installPackage(subPkg, ctx);
+      if (install) {
+         installSubPackages(mgr, ctx);
       }
 
       return true;
+   }
+
+   private void initSubPackages(RepositoryPackage oldPkg, boolean install) {
+      if (oldPkg.subPkgURLs != null) {
+         ArrayList<RepositoryPackage> subs = new ArrayList<RepositoryPackage>(oldPkg.subPkgURLs.size());
+         for (String sub:oldPkg.subPkgURLs) {
+            RepositoryPackage subPkg = mgr.getOrCreatePackage(sub, this, install);
+            if (subPkg != null) {
+               subs.add(subPkg);
+               // This happens when we try to install the sub-pkg
+               //subPkg.initSubPackages(oldPkg, install);
+            }
+            else {
+               System.err.println("*** Failed to create subPackage: " + sub);
+            }
+         }
+         subPackages = subs;
+      }
+   }
+
+   private void installSubPackages(IRepositoryManager mgr, DependencyContext ctx) {
+      RepositorySystem rsys = mgr.getRepositorySystem();
+      if (subPackages != null) {
+         for (RepositoryPackage subPkg:subPackages) {
+            rsys.installPackage(subPkg, ctx);
+            subPkg.installSubPackages(mgr, ctx);
+         }
+      }
    }
 
    private void preSave() {
@@ -533,12 +561,20 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
          }
          depPkgURLs = depPkgs;
       }
+      if (packageName.contains("broadleaf-profile"))
+         System.out.println("***");
       if (parentPkg != null)
          parentPkgURL = parentPkg.getPackageURL();
+      preSaveSubPackages();
+   }
+
+   private void preSaveSubPackages() {
       if (subPackages != null) {
          ArrayList<String> subPkgs = new ArrayList<String>(subPackages.size());
          for (int i = 0; i < subPackages.size(); i++) {
-            subPkgs.add(subPackages.get(i).getPackageURL());
+            RepositoryPackage subPkg = subPackages.get(i);
+            subPkgs.add(subPkg.getPackageURL());
+            subPkg.preSaveSubPackages();
          }
          subPkgURLs = subPkgs;
       }

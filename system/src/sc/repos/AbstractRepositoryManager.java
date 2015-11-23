@@ -84,6 +84,15 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
          return;
       }
 
+      if (pkg.packageName != null && pkg.packageName.contains("broadleaf-profile"))
+         System.out.println("***");
+
+      if (pkg.packageName != null && pkg.packageName.contains("broadleaf/core"))
+         System.out.println("***");
+
+      if (pkg.packageName != null && pkg.packageName.contains("broadleaf/common"))
+         System.out.println("***");
+
       if (pkg.initedSources == null)
          pkg.initedSources = new ArrayList<RepositorySource>();
       else if (pkg.initedSources.contains(src))
@@ -196,6 +205,12 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       pkg.installedSource = pkg.currentSource;
 
       if (pkg.preInstalled) {
+         // Do these first since we need to define the parent/child hierarchy in the packages to know whether everything
+         // lives when the storage of the sub-package is nested inside the parent.
+         if (pkg.subPackages != null) {
+            for (RepositoryPackage subPkg:pkg.subPackages)
+               deps.addDependency(subPkg, ctx);
+         }
          if (pkg.dependencies != null) {
             for (RepositoryPackage depPkg:pkg.dependencies)
                deps.addDependency(depPkg, ctx);
@@ -228,6 +243,12 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
          new File(tagFile.getParent()).mkdirs();
          pkg.saveToFile(tagFile);
          //FileUtil.saveStringAsFile(tagFile, String.valueOf(System.currentTimeMillis()), true);
+      }
+      ArrayList<RepositoryPackage> subPackages = pkg.subPackages;
+      if (subPackages != null) {
+         for (RepositoryPackage subPkg:subPackages) {
+            completeInstall(subPkg);
+         }
       }
 
    }

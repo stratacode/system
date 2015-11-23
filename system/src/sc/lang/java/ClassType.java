@@ -327,7 +327,7 @@ public class ClassType extends JavaType {
          }
          if (argType == null) {
             typeDefs.add(null); // An unresolved type?  Do not put ClassTypes here but are there any cases we need a TypeVariable?
-            argType = typeArg.getTypeDeclaration(ctx, false);
+            argType = typeArg.getTypeDeclaration(ctx, false); // TODO: DEBUG - remove me
          }
          else
             typeDefs.add(argType);

@@ -2021,7 +2021,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
             if (repeatExpr != null) {
                boolean started = repeatExpr.isStarted();
                Object repeatType = repeatExpr.getGenericType();
-               repeatElementType = ModelUtil.getArrayOrListComponentType(repeatType);
+               repeatElementType = ModelUtil.getArrayOrListComponentType(getJavaModel(), repeatType);
                // if this was not started we need to stop it now so the whole type gets started properly
                if (!started)
                   ParseUtil.stopComponent(repeatExpr);

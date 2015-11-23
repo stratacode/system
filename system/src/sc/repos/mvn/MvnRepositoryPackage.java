@@ -10,6 +10,7 @@ import sc.repos.IRepositoryManager;
 import sc.repos.RepositoryPackage;
 import sc.repos.RepositorySource;
 import sc.util.FileUtil;
+import sc.util.URLUtil;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -125,5 +126,44 @@ public class MvnRepositoryPackage extends RepositoryPackage {
       if (oldPkg instanceof MvnRepositoryPackage)
          installFileTypes = ((MvnRepositoryPackage) oldPkg).installFileTypes;
       return true;
+   }
+
+   public MvnDescriptor getDescriptor() {
+      if (currentSource instanceof MvnRepositorySource)
+         return ((MvnRepositorySource) currentSource).desc;
+      if (sources != null) {
+         for (RepositorySource source:sources) {
+            if (source instanceof MvnRepositorySource)
+               return ((MvnRepositorySource) source).desc;
+         }
+      }
+      return null;
+   }
+
+   public boolean hasSubPackage(MvnDescriptor depDesc) {
+      ArrayList<RepositoryPackage> subPkgs = subPackages;
+      if (subPkgs != null) {
+         for (RepositoryPackage subPkg : subPkgs) {
+            if (subPkg instanceof MvnRepositoryPackage) {
+               MvnRepositoryPackage msub = (MvnRepositoryPackage) subPkg;
+               if (msub.getDescriptor().matches(depDesc))
+                  return true;
+               if (msub.hasSubPackage(depDesc))
+                  return true;
+            }
+         }
+      }
+      return false;
+   }
+
+   public String getModuleBaseName() {
+      MvnDescriptor desc = getDescriptor();
+      if (desc != null) {
+         if (desc.modulePath != null)
+            return desc.modulePath;
+         else
+            return desc.artifactId;
+      }
+      return super.getModuleBaseName();
    }
 }

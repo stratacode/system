@@ -120,7 +120,9 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          // If we are included this package as source, don't download and include the jar files even if we could grab them from maven
          if (pomFile != null) {
             if (!pkg.buildFromSrc) {
-               if ((pomFile.packaging.equals("jar") || pomFile.packaging.equals("bundle"))) {
+               // When a repository is not downloaded in src form (i.e. from 'git') these types will have classes.  The type 'pom' usually does not but we still need to
+               // check for a jar file since it may be there.
+               if ((pomFile.packaging.equals("jar") || pomFile.packaging.equals("bundle") || pomFile.packaging.equals("pom"))) {
                   pkg.definesClasses = true;
                   pkg.definesSrc = false;
                } else {
@@ -128,6 +130,8 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
                   pkg.definesClasses = false;
                }
             } else {
+               if (pomFile.packaging == null)
+                  System.out.println("***");
                if ((pomFile.packaging.equals("jar") || pomFile.packaging.equals("bundle")) || pomFile.packaging.equals("war") || pomFile.packaging.equals("orbit")) {
                   pkg.definesSrc = true;
                   pkg.definesClasses = false;
@@ -149,6 +153,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          String typeExt = null;
 
          for (String fileType:pkg.installFileTypes) {
+            boolean optionalFile = false;
             if (fileType == null) {
                String packaging = pkg.pomFile.packaging;
                if (packaging.equals("jar") || packaging.equals("war"))
@@ -156,15 +161,26 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
                   // bundle: OSGI bundles, orbit: signed OSGI bundles - treat them like jar files
                else if (packaging.equals("bundle") || packaging.equals("orbit"))
                   typeExt = "jar";
-               else if (!packaging.equals("pom"))
+               else if (packaging.equals("pom")) {
+                  // Some pom packages - e.g. org.apache.zookeeper actually have a jar file that needs to be picked up
+                  // when you include this package as a dependency.  I don't see any way other than to try and download it
+                  // to determine if it's there.
+                  typeExt = "jar";
+                  optionalFile = true;
+               }
+               else
                   System.err.println("*** Warning - unrecognized packaging type: " + packaging);
                // If we are in source mode, do not download the jar file
-               // TODO: need to adjust if desc contains a classifier - e.g. classes?
                if (typeExt != null && pkg.definesClasses) {
                   String jarFileName = FileUtil.concat(pkg.getVersionRoot(), desc.getJarFileName());
                   boolean found = installMvnFile(desc, jarFileName, "", typeExt);
-                  if (!found)
-                     return "Maven " + typeExt + " file: " + desc.getURL() + " not found in repositories: " + repositories;
+                  if (!found) {
+                     if (optionalFile) {
+                        pkg.definesClasses = false;
+                     }
+                     else
+                        return "Maven " + typeExt + " file: " + desc.getURL() + " not found in repositories: " + repositories;
+                  }
                }
             }
             else {
@@ -233,6 +249,10 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
                   i--;
                   continue;
                }
+               if (pkg.subPackages != null && depDesc.artifactId.contains("broadleaf-profile"))
+                  System.out.println("***");
+               if (pkg.hasSubPackage(depDesc))
+                  continue;
                // Always load dependencies with the maven repository.  This repository might be git-mvn which loads the initial
                // repository with git
                if (depDesc.version != null)
