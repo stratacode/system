@@ -332,7 +332,11 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
                extendsType = extendsJavaType.getTypeDeclaration();
                // TODO: remove this when if/when support CFClasses referencing src-types
                if (extendsType instanceof BodyTypeDeclaration) {
-                  extendsType = ((BodyTypeDeclaration) extendsType).getCompiledClass();
+                  Object newExtType = ((BodyTypeDeclaration) extendsType).getCompiledClass();
+                  if (newExtType != null)
+                     extendsType = newExtType;
+                  else
+                     error("Unable to resolve compiled type for CFClass base type: " + extendsType);
                }
             }
          }
@@ -343,7 +347,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
             implementsTypes = new ArrayList<Object>(implJavaTypes.size());
             for (int i = 0; i < implJavaTypes.size(); i++) {
                String implTypeName = ((ClassType)implJavaTypes.get(i)).getFullTypeName();
-               Object implType = system.getClass(implTypeName, false);
+               Object implType = system.getClassWithPathName(implTypeName, null, false, true, false);
                if (implType == null)
                   error("Can't find interface: " + implTypeName);
                else
@@ -358,7 +362,9 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
             // Not using type declaration here as we cannot yet handle CFClasses referencing src-based TypeDeclarations.  There's at least
             // a request that we support the initMethodCache method on the ITypeDeclaration interface which is not yet done.   Note also
             // this change must be made above.
-            extendsType = system.getClass(extendsTypeName, false);
+            extendsType = system.getClassWithPathName(extendsTypeName, null, false, true, false);
+            if (extendsType == null)
+               error("No extends type: " + extendsTypeName);
          }
          int numInterfaces = classFile.getNumInterfaces();
          if (numInterfaces > 0) {
