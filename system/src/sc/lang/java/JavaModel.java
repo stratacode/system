@@ -630,9 +630,6 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          td = sys.getRelativeTypeDeclaration(typeName, getPackagePrefix(), null, prependLayerPackage, layer, isLayerModel);
       }
 
-      if (typeName.equals("Package"))
-         System.out.println("***");
-
       importedName = getImportedName(typeName);
       if (importedName != null && td != null) {
          if (!ModelUtil.getTypeName(td).equals(importedName)) {
