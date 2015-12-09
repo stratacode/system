@@ -122,7 +122,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
             if (!pkg.buildFromSrc) {
                // When a repository is not downloaded in src form (i.e. from 'git') these types will have classes.  The type 'pom' usually does not but we still need to
                // check for a jar file since it may be there.
-               if ((pomFile.packaging.equals("jar") || pomFile.packaging.equals("bundle") || pomFile.packaging.equals("pom"))) {
+               if (pomFile.packaging.equals("jar") || pomFile.packaging.equals("bundle") || pomFile.packaging.equals("pom") | pomFile.packaging.equals("war")) {
                   pkg.definesClasses = true;
                   pkg.definesSrc = false;
                } else {
@@ -130,8 +130,6 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
                   pkg.definesClasses = false;
                }
             } else {
-               if (pomFile.packaging == null)
-                  System.out.println("***");
                if ((pomFile.packaging.equals("jar") || pomFile.packaging.equals("bundle")) || pomFile.packaging.equals("war") || pomFile.packaging.equals("orbit")) {
                   pkg.definesSrc = true;
                   pkg.definesClasses = false;
@@ -156,8 +154,16 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
             boolean optionalFile = false;
             if (fileType == null) {
                String packaging = pkg.pomFile.packaging;
-               if (packaging.equals("jar") || packaging.equals("war"))
-                  typeExt = packaging;
+               if (packaging.equals("war")) {
+                  // killbill-platform-server - dependencies come with classifier = classes which seems to imply that
+                  // there's a jar file '-classes' that we download instead
+                  if (desc.classifier != null && desc.classifier.equals("classes"))
+                     typeExt = "jar";
+                  else
+                     typeExt = "war";
+               }
+               else if (packaging.equals("jar"))
+                  typeExt = "jar";
                   // bundle: OSGI bundles, orbit: signed OSGI bundles - treat them like jar files
                else if (packaging.equals("bundle") || packaging.equals("orbit"))
                   typeExt = "jar";
@@ -172,7 +178,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
                   System.err.println("*** Warning - unrecognized packaging type: " + packaging);
                // If we are in source mode, do not download the jar file
                if (typeExt != null && pkg.definesClasses) {
-                  String jarFileName = FileUtil.concat(pkg.getVersionRoot(), desc.getJarFileName());
+                  String jarFileName = FileUtil.concat(pkg.getVersionRoot(), desc.getJarFileName(typeExt));
                   boolean found = installMvnFile(desc, jarFileName, "", typeExt);
                   if (!found) {
                      if (optionalFile) {
@@ -207,7 +213,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       POMFile pomFile = pkg.pomFile;
 
       if (pomFile != null) {
-         List<MvnDescriptor> depDescs = pomFile.getDependencies(getScopesToBuild(src.pkg), true, src.pkg.parentPkg == null);
+         List<MvnDescriptor> depDescs = pomFile.getDependencies(getScopesToBuild(src.pkg), true, src.pkg.parentPkg == null, false);
          if (depDescs != null) {
             ArrayList<RepositoryPackage> depPackages = new ArrayList<RepositoryPackage>();
 
@@ -249,8 +255,6 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
                   i--;
                   continue;
                }
-               if (pkg.subPackages != null && depDesc.artifactId.contains("broadleaf-profile"))
-                  System.out.println("***");
                if (pkg.hasSubPackage(depDesc))
                   continue;
                // Always load dependencies with the maven repository.  This repository might be git-mvn which loads the initial
@@ -390,7 +394,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          }
       }
       for (MvnRepository repo:repositories) {
-         String pomURL = repo.getFileURL(desc.groupId, desc.artifactId, desc.version, desc.classifier, remoteSuffix, remoteExt);
+         String pomURL = repo.getFileURL(desc.groupId, desc.artifactId, desc.modulePath, desc.version, desc.classifier, remoteSuffix, remoteExt);
          String resDir = FileUtil.getParentPath(resFileName);
          new File(resDir).mkdirs();
          String res = URLUtil.saveURLToFile(pomURL, resFileName, false, msg);
@@ -403,6 +407,15 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
 
    }
 
+   private boolean needsClassifierSuffix(String ext) {
+      if (ext.equals("jar"))
+         return true;
+      if (ext.equals("pom"))
+         return false;
+      System.err.println("*** Unrecognized classifier suffix: " + ext);
+      return false;
+   }
+
    private boolean installMvnFile(MvnDescriptor desc, String resFileName, String remoteSuffix, String remoteExt) {
       boolean found = false;
       if (system.installExisting && new File(resFileName).canRead()) {
@@ -410,15 +423,18 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          return true;
       }
       String classifierExt;
-      if (desc.classifier != null) {
+      boolean useClassifier = false;
+      if (desc.classifier != null && needsClassifierSuffix(remoteExt)) {
          classifierExt = "-" + desc.classifier;
+         useClassifier = true;
       }
       else
          classifierExt = "";
       if (useLocalRepository) {
-         String localPkgDir = FileUtil.concat(mvnRepositoryDir, desc.groupId.replace(".", FileUtil.FILE_SEPARATOR), desc.artifactId, desc.version, classifierExt);
+         String artifactId = desc.getUseArtifactId();
+         String localPkgDir = FileUtil.concat(mvnRepositoryDir, desc.groupId.replace(".", FileUtil.FILE_SEPARATOR), artifactId, desc.version);
          if (new File(localPkgDir).isDirectory()) {
-            String fileName = FileUtil.concat(localPkgDir, FileUtil.addExtension(desc.artifactId + "-" + desc.version + classifierExt + remoteSuffix, remoteExt));
+            String fileName = FileUtil.concat(localPkgDir, FileUtil.addExtension(artifactId + "-" + desc.version + classifierExt + remoteSuffix, remoteExt));
             if (new File(fileName).canRead()) {
                if (FileUtil.copyFile(fileName, resFileName, true))
                   return true;
@@ -428,10 +444,10 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          }
       }
       for (MvnRepository repo:repositories) {
-         String pomURL = repo.getFileURL(desc.groupId, desc.artifactId, desc.version, desc.classifier, remoteSuffix, remoteExt);
+         String remoteURL = repo.getFileURL(desc.groupId, desc.artifactId, desc.modulePath, desc.version, useClassifier ? desc.classifier : null, remoteSuffix, remoteExt);
          String resDir = FileUtil.getParentPath(resFileName);
          new File(resDir).mkdirs();
-         String res = URLUtil.saveURLToFile(pomURL, resFileName, false, msg);
+         String res = URLUtil.saveURLToFile(remoteURL, resFileName, false, msg);
          if (res == null) { // If success we break
             found = true;
             break;
@@ -451,7 +467,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
    @Override
    public RepositoryPackage createPackage(String url) {
       MvnRepositorySource src = (MvnRepositorySource) createRepositorySource(url, false);
-      return new MvnRepositoryPackage(this, src.desc.getPackageName(), src.desc.getJarFileName(), src, null);
+      return new MvnRepositoryPackage(this, src.desc.getPackageName(), src.desc.getJarFileName("jar"), src, null);
    }
 
    public RepositoryPackage createPackage(IRepositoryManager mgr, String packageName, String fileName, RepositorySource src) {
@@ -496,15 +512,17 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
     * For nested modules, we create the package with one name, then once we read the POM we figure out it's name in the maven package
     * space.  If there are dependencies to a module we need to resolve them against the maven name or we'll load the whole thing again.
     */
-   public void registerNameForPackage(RepositoryPackage pkg, String name) {
+   public RepositoryPackage registerNameForPackage(RepositoryPackage pkg, String name) {
       if (pkg instanceof MvnRepositoryPackage) {
          MvnRepositoryPackage mpkg = (MvnRepositoryPackage) pkg;
          String groupId = mpkg.getGroupId();
          if (groupId != null) {
             String newName = groupId + "/" + name;
-            if (!pkg.packageName.equals(newName))
-               system.registerAlternateName(pkg, newName);
+            if (!pkg.packageName.equals(newName)) {
+               pkg = system.registerAlternateName(pkg, newName);
+            }
          }
       }
+      return pkg;
    }
 }

@@ -41,12 +41,12 @@ public class TypeParameter extends JavaSemanticNode implements ITypedObject {
       return ((List)parentNode).indexOf(this);
    }
 
-   public boolean isAssignableFrom(Object otherType, ITypeParamContext ctx) {
+   public boolean isAssignableFrom(Object otherType, ITypeParamContext ctx, boolean allowUnbound) {
       Object extType;
       if (otherType == this)
          return true;
       if (extendsType != null && (extType = extendsType.getTypeDeclaration()) != null &&
-          !ModelUtil.isAssignableFrom(extType, otherType, false, ctx))
+          !ModelUtil.isAssignableFrom(extType, otherType, false, ctx, allowUnbound, getLayeredSystem()))
          return false;
       if (ctx != null) {
          Object thisType = ctx.getTypeForVariable(this, true);

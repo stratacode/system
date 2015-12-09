@@ -81,13 +81,18 @@ public class URLUtil {
             //System.out.println("*** " + hconn.getHeaderField("Location"));
          }
          rbc = Channels.newChannel(conn.getInputStream());
-         fos = new FileOutputStream(fileName);
+         try {
+            fos = new FileOutputStream(fileName);
+         }
+         catch (FileNotFoundException fexc) {
+            return "Unable to create output file: " + fileName + " error: " + fexc.toString();
+         }
       }
       catch (MalformedURLException exc) {
          return "Bad url: " + urlPath + " error: " + exc.toString();
       }
       catch (FileNotFoundException fexc) {
-         return "Unable to create output file: " + fileName + " error: " + fexc.toString();
+         return "URL not found on server: " + urlPath;
       }
       catch (IOException ioexc) {
          return "Error opening url: " + urlPath + " error: " + ioexc.toString();

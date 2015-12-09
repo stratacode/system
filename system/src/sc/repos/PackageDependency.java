@@ -18,4 +18,8 @@ public class PackageDependency {
    public int hashCode() {
       return pkg.hashCode();
    }
+
+   public String toString() {
+      return pkg.toString();
+   }
 }

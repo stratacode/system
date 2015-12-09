@@ -8,6 +8,7 @@ import sc.classfile.CFClass;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.type.*;
+import sc.util.StringUtil;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -77,8 +78,16 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
          return false;
 
       ArrayTypeDeclaration otherTD = (ArrayTypeDeclaration) other;
-      
-      return ModelUtil.isAssignableFrom(componentType, otherTD.componentType, assignmentSemantics, null, getLayeredSystem()) && otherTD.arrayDimensions.equals(arrayDimensions);
+
+      if (otherTD.arrayDimensions.equals(arrayDimensions))
+          return ModelUtil.isAssignableFrom(componentType, otherTD.componentType, assignmentSemantics, null, getLayeredSystem());
+      else {
+         int dimDiff = otherTD.arrayDimensions.length() - arrayDimensions.length();
+         if (dimDiff < 0)
+            return false;
+         ArrayTypeDeclaration otherCompArr = new ArrayTypeDeclaration(otherTD.definedInType, otherTD.componentType, otherTD.arrayDimensions.substring(dimDiff));
+         return ModelUtil.isAssignableFrom(componentType, otherCompArr, assignmentSemantics, null, getLayeredSystem());
+      }
    }
 
    public boolean isAssignableTo(ITypeDeclaration other) {
@@ -182,16 +191,24 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
 
    public boolean implementsType(String otherTypeName, boolean assignment, boolean allowUnbound) {
       int ix = otherTypeName.indexOf("[");
-      if (ix == -1)
-         return false;
+      if (ix == -1) {
+         // All array types are assignable to Object
+         return otherTypeName.equals("java.lang.Object");
+      }
 
       // Primitive type [B, [X, etc.
       if (ix == 0) {
          int otherNdim = otherTypeName.lastIndexOf("[") + 1;
          int ourNdim = getNumDims();
 
-         if (otherNdim < ourNdim)
-            return false;
+         if (otherNdim < ourNdim) {
+            int ourResDim = ourNdim - otherNdim;
+            String otherBaseType = otherTypeName.substring(otherNdim + 1);
+            int semiIx = otherBaseType.indexOf(';');
+            if (semiIx != -1)
+               otherBaseType = otherBaseType.substring(0, semiIx);
+            return ModelUtil.implementsType(new ArrayTypeDeclaration(definedInType, componentType, StringUtil.repeat("[]", ourResDim)), otherBaseType, assignment, allowUnbound);
+         }
 
          // It has more dims than us.  Need to strip off
          if (otherNdim > ourNdim) {

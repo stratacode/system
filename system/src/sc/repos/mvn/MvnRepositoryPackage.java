@@ -16,6 +16,7 @@ import java.io.File;
 import java.util.ArrayList;
 
 public class MvnRepositoryPackage extends RepositoryPackage {
+   private static final long serialVersionUID = 8392015479919408864L;
    {
       type = "mvn";
    }
@@ -84,23 +85,26 @@ public class MvnRepositoryPackage extends RepositoryPackage {
       }
    }
 
-   public void updateCurrentSource(RepositorySource src) {
-      if (!(src instanceof MvnRepositorySource)) {
-         super.updateCurrentSource(src);
-         return;
-      }
-      MvnRepositorySource msrc = (MvnRepositorySource) src;
-      setCurrentSource(src);
+   public void updateCurrentSource(RepositorySource src, boolean resetFileNames) {
+      super.updateCurrentSource(src, resetFileNames);
+   }
 
+   public void updateCurrentFileNames(RepositorySource src) {
       fileNames.clear();
       if (installFileTypes.size() == 0)
          installFileTypes.add(null);
+      if (!(src instanceof MvnRepositorySource)) {
+         super.updateCurrentFileNames(src);
+         return;
+      }
+      MvnRepositorySource msrc = (MvnRepositorySource) src;
       for (String installFileType:installFileTypes) {
          if (installFileType == null)
-            addFileName(msrc.desc.getJarFileName());
+            addFileName(msrc.desc.getJarFileName("jar"));
          else if (installFileType.equals("test-jar"))
             addFileName(msrc.desc.getTestJarFileName());
       }
+
    }
 
    public boolean getReusePackageDirectory() {
@@ -165,5 +169,13 @@ public class MvnRepositoryPackage extends RepositoryPackage {
             return desc.artifactId;
       }
       return super.getModuleBaseName();
+   }
+
+   public String getParentPath() {
+      MvnDescriptor desc = getDescriptor();
+      if (desc != null) {
+         return desc.parentPath;
+      }
+      return null;
    }
 }

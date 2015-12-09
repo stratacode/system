@@ -44,8 +44,8 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
 
    CFClassSignature signature;
 
-   static final private int SyntheticModifier = 0x1000;
-   static final private int AccessFlagInterfaceMethod = Modifier.VOLATILE | SyntheticModifier; // Volatile & Synthetic appears to mean a method defined on the interface and inherited
+   static final int SyntheticModifier = 0x1000;
+   static final int AccessFlagInterfaceMethod = Modifier.VOLATILE | SyntheticModifier; // Volatile & Synthetic appears to mean a method defined on the interface and inherited
 
    CFClass(ClassFile cl, Layer layer) {
       classFile = cl;
@@ -330,6 +330,10 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
             else {
                extendsJavaType = sig.extendsType;
                extendsType = extendsJavaType.getTypeDeclaration();
+               // TODO: remove this when if/when support CFClasses referencing src-types
+               if (extendsType instanceof BodyTypeDeclaration) {
+                  extendsType = ((BodyTypeDeclaration) extendsType).getCompiledClass();
+               }
             }
          }
          if (extendsType instanceof ParamTypeDeclaration)
@@ -350,8 +354,12 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       }
       else {
          String extendsTypeName = classFile.getExtendsTypeName();
-         if (extendsTypeName != null)
-            extendsType = system.getTypeDeclaration(extendsTypeName);
+         if (extendsTypeName != null) {
+            // Not using type declaration here as we cannot yet handle CFClasses referencing src-based TypeDeclarations.  There's at least
+            // a request that we support the initMethodCache method on the ITypeDeclaration interface which is not yet done.   Note also
+            // this change must be made above.
+            extendsType = system.getClass(extendsTypeName, false);
+         }
          int numInterfaces = classFile.getNumInterfaces();
          if (numInterfaces > 0) {
             implementsTypes = new ArrayList<Object>(numInterfaces);

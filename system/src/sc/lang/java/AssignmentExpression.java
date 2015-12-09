@@ -127,7 +127,7 @@ public class AssignmentExpression extends TwoOperatorExpression {
              * the rhs to the type of the lhs, in other words, they are assignable the other way.
              */
             if (!rhs.getLHSAssignmentTyped() || !ModelUtil.isAssignableFrom(rhsType, lhsType, true, null, getLayeredSystem())) {
-               displayTypeError("Incompatible types: ", ModelUtil.getTypeName(lhsType, true, true), " and ", ModelUtil.getTypeName(rhsType, true, true), " for: ");
+               displayTypeError("Incompatible types for assignment: ", ModelUtil.getTypeName(lhsType, true, true), " and ", ModelUtil.getTypeName(rhsType, true, true), " for: ");
                rhsType = rhs.getGenericType(); // TODO: REMOVE For easier error debugging only
                boolean x = ModelUtil.isAssignableFrom(lhsType, rhsType, true, null, getLayeredSystem()); // TODO: REMOVE!
             }

@@ -110,7 +110,8 @@ public class EnumDeclaration extends TypeDeclaration {
    }
 
    public boolean implementsType(String fullTypeName, boolean assignment, boolean allowUnbound) {
-      if (fullTypeName.equals("java.lang.Enum"))
+      // TODO: should we implement this by just calling ModelUtil.implementsType(Enum.class, fullTypeName)
+      if (fullTypeName.equals("java.lang.Enum") || fullTypeName.equals("java.io.Serializable") || fullTypeName.equals("java.lang.Comparable"))
          return true;
       return super.implementsType(fullTypeName, assignment, allowUnbound);
    }

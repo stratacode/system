@@ -39,9 +39,19 @@ public class StringToken extends AbstractString {
       return new StringToken(baseString, startIndex + start, end - start);
    }
 
-   public static StringToken concatTokens(StringToken t1, StringToken t2) {
-      // assert t2.startIndex = t1.startIndex + len
-      return new StringToken(t1.baseString, t1.startIndex, t1.len + t2.len);
+   public static CharSequence concatTokens(StringToken t1, StringToken t2) {
+      if (t1.startIndex + t1.len == t2.startIndex) {
+         // assert t2.startIndex = t1.startIndex + len
+         return new StringToken(t1.baseString, t1.startIndex, t1.len + t2.len);
+      }
+      else {
+         // Hopefully this is an odd case or we should speed this up.  It happens when there was some whitespace or
+         // non-semantic value in between the tokens we are turning into a String.
+         StringBuilder sb = new StringBuilder();
+         sb.append(t1.toString());
+         sb.append(t2.toString());
+         return sb.toString();
+      }
    }
 
    public void getChars(int srcBegin, int srcEnd, char dst[], int dstBegin)  {

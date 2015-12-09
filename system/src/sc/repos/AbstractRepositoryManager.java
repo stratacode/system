@@ -84,15 +84,6 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
          return;
       }
 
-      if (pkg.packageName != null && pkg.packageName.contains("broadleaf-profile"))
-         System.out.println("***");
-
-      if (pkg.packageName != null && pkg.packageName.contains("broadleaf/core"))
-         System.out.println("***");
-
-      if (pkg.packageName != null && pkg.packageName.contains("broadleaf/common"))
-         System.out.println("***");
-
       if (pkg.initedSources == null)
          pkg.initedSources = new ArrayList<RepositorySource>();
       else if (pkg.initedSources.contains(src))

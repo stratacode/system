@@ -14,7 +14,7 @@ import java.util.List;
 
 public class MvnRepositorySource extends RepositorySource {
    // Do we need to serialize the exclusions?
-   MvnDescriptor desc;
+   public MvnDescriptor desc;
 
    public MvnRepositorySource(IRepositoryManager mgr, String url, boolean unzip, MvnDescriptor desc, DependencyContext ctx) {
       super(mgr, url, unzip);
@@ -30,7 +30,21 @@ public class MvnRepositorySource extends RepositorySource {
       if (desc == null)
          return super.getClassPathFileNames();
       boolean isTestJar = desc.type != null && desc.type.equals("test-jar");
-      return new ArrayList<String>(Collections.singletonList(isTestJar ? desc.getTestJarFileName() : desc.getJarFileName()));
+      return new ArrayList<String>(Collections.singletonList(isTestJar ? desc.getTestJarFileName() : desc.getJarFileName("jar")));
+   }
+
+   public boolean mergeSource(RepositorySource other) {
+      if (!super.mergeSource(other))
+         return false;
+
+      MvnRepositorySource otherm = (MvnRepositorySource) other;
+      if (desc.parentPath == null && otherm.desc.parentPath != null)
+         desc.parentPath = otherm.desc.parentPath;
+      if (desc.modulePath == null && otherm.desc.modulePath != null)
+         desc.modulePath = otherm.desc.modulePath;
+      if (desc.artifactId == null && otherm.desc.artifactId != null)
+         desc.artifactId = otherm.desc.artifactId;
+      return true;
    }
 
    /**
@@ -74,6 +88,6 @@ public class MvnRepositorySource extends RepositorySource {
    }
 
    public String getDefaultFileName() {
-      return desc.getJarFileName();
+      return desc.getJarFileName("jar");
    }
 }

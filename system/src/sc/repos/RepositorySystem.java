@@ -118,12 +118,19 @@ public class RepositorySystem {
       }
    }
 
-   public void registerAlternateName(RepositoryPackage pkg, String altName) {
+   public RepositoryPackage registerAlternateName(RepositoryPackage pkg, String altName) {
       if (!StringUtil.equalStrings(altName, pkg.packageAlias) && pkg.packageAlias != null)
          System.err.println("*** Warning - replacing existing package alias: " + pkg.packageAlias + altName);
       pkg.packageAlias = altName;
-      if (altName != null)
-         store.packages.put(altName, pkg);
+      if (altName != null) {
+         RepositoryPackage oldPkg = store.packages.get(altName);
+         if (oldPkg == null) {
+            store.packages.put(altName, pkg);
+         }
+         else
+            pkg = oldPkg;
+      }
+      return pkg;
    }
 
    public RepositoryPackage addPackageSource(IRepositoryManager mgr, String pkgName, String fileName, RepositorySource repoSrc, boolean install, RepositoryPackage parentPkg) {
@@ -136,6 +143,12 @@ public class RepositorySystem {
       }
       else {
          repoSrc = pkg.addNewSource(repoSrc);
+         // If there's a dependency on a module that's also a sub-module it will have created
+         // the package without the parent and set the installRoot as though it's an independent module, not a child
+         if (parentPkg != null && pkg.parentPkg == null) {
+            pkg.setParentPkg(parentPkg);
+            pkg.updateInstallRoot(mgr);
+         }
          // We may first encounter a package from a Maven module reference - where we are not installing the package.  That's a weaker reference
          // than if we are installing it so use this new reference.
          if (!pkg.installed && install) {
@@ -156,7 +169,7 @@ public class RepositorySystem {
       pkg = store.packages.get(pkgName);
       if (pkg == null) {
          pkg = newPkg;
-         pkg.parentPkg = parentPkg;
+         pkg.setParentPkg(parentPkg);
          store.packages.put(pkgName, pkg);
       }
       else {
@@ -168,7 +181,7 @@ public class RepositorySystem {
          // than if we are installing it so use this new reference.
          if (!pkg.installed && install) {
             RepositorySource newSrc = newPkg.currentSource == null ? newPkg.sources[0] : newPkg.currentSource;
-            pkg.updateCurrentSource(newSrc);
+            pkg.updateCurrentSource(newSrc, true);
          }
       }
 

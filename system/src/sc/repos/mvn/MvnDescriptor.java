@@ -46,9 +46,6 @@ public class MvnDescriptor implements Serializable {
       this.modulePath = modulePath;
       this.artifactId = artifactId;
       this.version = version;
-
-      if (artifactId != null && artifactId.contains("broadleaf/common"))
-         System.out.println("***");
    }
 
    public MvnDescriptor() {
@@ -58,11 +55,18 @@ public class MvnDescriptor implements Serializable {
       return depsOnly ? "mvndeps" : "mvn";
    }
 
+   private final static String PATH_SEP = "@@";
+   private final static String PARENT_SEP = "::";
+
    public static String toURL(String groupId, String parentPath, String modulePath, String artifactId, String version, boolean depsOnly) {
+      String pathId;
       if (artifactId == null) {
          artifactId = URLUtil.concat(parentPath, modulePath);
+         pathId = null;
       }
-      return getURLType(depsOnly) + "://" + URLUtil.concat(groupId, artifactId, version);
+      else
+         pathId = URLUtil.concat(parentPath == null ? null : parentPath + "::", modulePath);
+      return getURLType(depsOnly) + "://" + URLUtil.concat(groupId, artifactId, pathId == null ? null : PATH_SEP + pathId, version);
    }
 
    public static MvnDescriptor fromURL(String url) {
@@ -78,9 +82,24 @@ public class MvnDescriptor implements Serializable {
       // The first part is the groupId, the last is the version and the middle is the groupId.  The group-id can have /'s for the sub-module case - e.g. "killbill/account"
       desc.version = URLUtil.getFileName(url);
       desc.groupId = URLUtil.getRootPath(url);
-      desc.artifactId = url.substring(desc.groupId.length() + 1, url.length() - desc.version.length() - 1);
-      if (desc.artifactId != null && desc.artifactId.contains("broadleaf/common"))
-         System.out.println("***");
+      String rest = url.substring(desc.groupId.length() + 1, url.length() - desc.version.length() - 1);
+      int pathIx = rest.indexOf(PATH_SEP);
+      if (pathIx == -1) {
+         desc.artifactId = rest;
+      }
+      else {
+         desc.artifactId = rest.substring(0, pathIx - 1);
+         String pathId = rest.substring(pathIx + PATH_SEP.length());
+         int parIx = pathId.indexOf(PARENT_SEP);
+         if (parIx == -1) {
+            desc.parentPath = null;
+            desc.modulePath = pathId;
+         }
+         else {
+            desc.parentPath = pathId.substring(0, parIx);
+            desc.modulePath = pathId.substring(parIx + PARENT_SEP.length() + 1);
+         }
+      }
       return desc;
    }
 
@@ -89,35 +108,29 @@ public class MvnDescriptor implements Serializable {
    }
 
    public String getPackageName() {
-      if (artifactId == null && modulePath == null)
-         System.out.println("***");
-      return groupId + "/" + (artifactId == null ? modulePath : artifactId);
+      return groupId + "/" + getUseArtifactId();
    }
 
    // relative to the pkg directory which already has group-id and artifact-id
-   public String getJarFileName() {
-      String ext;
+   public String getJarFileName(String ext) {
+      String suffix;
       if (classifier != null) {
-         ext = "-" + classifier;
+         suffix = "-" + classifier;
       }
       else
-         ext = "";
-      return FileUtil.addExtension(artifactId + "-" + version + ext, "jar");
+         suffix = "";
+      return FileUtil.addExtension(getUseArtifactId() + "-" + version + suffix, ext);
    }
 
    public String getTestJarFileName() {
-      return FileUtil.addExtension(artifactId + "-" + version + "-tests", "jar");
+      return FileUtil.addExtension(getUseArtifactId() + "-" + version + "-tests", "jar");
    }
 
    public static MvnDescriptor getFromTag(POMFile file, Element tag, boolean dependency, boolean appendInherited, boolean required) {
       String groupId = file.getTagValue(tag, "groupId", required);
       String artifactId = file.getTagValue(tag, "artifactId", required);
-      if (artifactId.contains("broadleaf/common"))
-         System.out.println("***");
       String type = file.getTagValue(tag, "type", required);
       String version = file.getTagValue(tag, "version", required);
-      if (artifactId.contains("broadleaf/common") && version != null && version.contains("4"))
-         System.out.println("***");
       String classifier = file.getTagValue(tag, "classifier", required);
       MvnDescriptor desc = new MvnDescriptor(groupId, null, null, artifactId, version, type, classifier);
       if (appendInherited)
@@ -150,7 +163,7 @@ public class MvnDescriptor implements Serializable {
       String pkgName = getPackageName();
       RepositorySource depSrc = new MvnRepositorySource(mgr, getURL(), false, this, ctx);
 
-      RepositoryPackage pkg = mgr.system.addPackageSource(mgr, pkgName, getJarFileName(), depSrc, install, parentPkg);
+      RepositoryPackage pkg = mgr.system.addPackageSource(mgr, pkgName, getJarFileName("jar"), depSrc, install, parentPkg);
       if (pkg.parentPkg == null)
          pkg.parentPkg = parentPkg;
 
@@ -168,8 +181,6 @@ public class MvnDescriptor implements Serializable {
          return true;
       if (other.modulePath != null && modulePath != null && strMatches(other.modulePath, modulePath))
          return true;
-      if (artifactId == null || other.artifactId == null)
-         System.out.println("***");
       // Warning - It's possible we have not yet set the artifactId for a module-based POM where the POM has not been loaded.
       return false;
    }
@@ -210,11 +221,15 @@ public class MvnDescriptor implements Serializable {
       return groupId.hashCode() + (artifactId == null ? modulePath : artifactId).hashCode();
    }
 
+   public String getUseArtifactId() {
+      if (artifactId == null)
+         return URLUtil.concat(parentPath, modulePath);
+      return artifactId;
+   }
+
    public void mergeFrom(MvnDescriptor parentDesc) {
       if (version == null && parentDesc.version != null)
          version = parentDesc.version;
       // TODO: any other attributes inherited here?
-      if (artifactId.contains("broadleaf/common"))
-         System.out.println("***");
    }
 }

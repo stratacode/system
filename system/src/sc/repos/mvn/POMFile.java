@@ -122,16 +122,18 @@ public class POMFile extends XMLFileFormat {
       if (projElement != null) {
          artifactId = projElement.getSimpleChildValue("artifactId");
          if (artifactId != null) {
+            artifactId = artifactId.trim();
             MvnDescriptor desc = getDescriptor();
+            pomPkg = mgr.registerNameForPackage(pomPkg, artifactId);
             if (desc != null) {
                desc.artifactId = artifactId;
                // And update the URL in the source so we save it pointing to the real artifactId
-               if (pomPkg != null && pomPkg.currentSource != null)
+               if (pomPkg != null && pomPkg.currentSource != null) {
+                  pomPkg.packageName = desc.getPackageName();
                   pomPkg.currentSource.url = desc.getURL();
+                  pomPkg.updateInstallRoot(mgr);
+               }
             }
-            else
-               System.out.println("***");
-            mgr.registerNameForPackage(pomPkg, artifactId);
          }
       }
    }
@@ -141,7 +143,12 @@ public class POMFile extends XMLFileFormat {
       if (propRoot != null) {
          Element[] props = propRoot.getChildTags();
          for (Element prop:props) {
-            properties.put(prop.tagName, prop.getBodyAsString());
+            String value = prop.getBodyAsString();
+            if (value == null)
+               value = "";
+            else
+               value = value.trim();
+            properties.put(prop.tagName, value);
          }
       }
    }
@@ -171,6 +178,11 @@ public class POMFile extends XMLFileFormat {
          Element[] modules = modulesRoot.getChildTagsWithName("module");
          if (modules != null) {
             String parentName = getProperty("project.artifactId", true, true);
+            if (pomPkg instanceof MvnRepositoryPackage) {
+               String newParentName = ((MvnRepositoryPackage) pomPkg).getModuleBaseName();
+               if (newParentName != null && !newParentName.equals(parentName))
+                  parentName = newParentName;
+            }
             for (Element module:modules) {
                String moduleName = module.getBodyAsString();
                while (moduleName.startsWith("../")) {
@@ -242,7 +254,7 @@ public class POMFile extends XMLFileFormat {
                   i++;
                }
                if (result != null)
-                  return result;
+                  return result.trim();
             }
             else if (varPath.length == 1) {
                if (varTagName.equals("baseDir")) {
@@ -252,7 +264,9 @@ public class POMFile extends XMLFileFormat {
                Element parent = projElement;
                // Version, artifactId - any others?
                if (parent != null) {
-                  return parent.getSimpleChildValue(varPath[0]);
+                  String res = parent.getSimpleChildValue(varPath[0]);
+                  if (res != null)
+                     return res.trim();
                }
             }
          }
@@ -278,7 +292,7 @@ public class POMFile extends XMLFileFormat {
 
    public static final String DEFAULT_SCOPE = "compile";
 
-   public List<MvnDescriptor> getDependencies(String[] scopes, boolean addChildren, boolean addParent) {
+   public List<MvnDescriptor> getDependencies(String[] scopes, boolean addChildren, boolean addParent, boolean parentDefinesSrc) {
       Element[] deps = projElement.getChildTagsWithName("dependencies");
       if (deps != null && deps.length > 1)
          MessageHandler.error(msg, "Multiple tags with dependencies - should be only one");
@@ -299,18 +313,22 @@ public class POMFile extends XMLFileFormat {
          }
       }
       if (parentPOM != null && addParent) {
-         addPOMRefDependencies(parentPOM, res, scopes, false, true);
+         addPOMRefDependencies(parentPOM, res, scopes, false, true, false);
       }
-      if (pomPkg instanceof MvnRepositoryPackage && ((MvnRepositoryPackage) pomPkg).definesSrc && modulePOMs != null && addChildren) {
-         for (POMFile modulePOM:modulePOMs) {
-            addPOMRefDependencies(modulePOM, res, scopes, true, false);
+      // We either want to include modules that directly defineSrc or if the parent is a src module, we need to include the child dependencies
+      // We don't want to include dependencies from the parent-pom's modules.
+      if (pomPkg instanceof MvnRepositoryPackage && (((MvnRepositoryPackage) pomPkg).definesSrc || parentDefinesSrc) && addChildren) {
+         if (modulePOMs != null) {
+            for (POMFile modulePOM:modulePOMs) {
+               addPOMRefDependencies(modulePOM, res, scopes, true, false, true);
+            }
          }
       }
       return res;
    }
 
-   private void addPOMRefDependencies(POMFile refPOM, ArrayList<MvnDescriptor> res, String[] scopes, boolean checkChildren, boolean checkParent) {
-      List<MvnDescriptor> parentDeps = refPOM.getDependencies(scopes, checkChildren, checkParent);
+   private void addPOMRefDependencies(POMFile refPOM, ArrayList<MvnDescriptor> res, String[] scopes, boolean checkChildren, boolean checkParent, boolean parentDefinesSrc) {
+      List<MvnDescriptor> parentDeps = refPOM.getDependencies(scopes, checkChildren, checkParent, parentDefinesSrc);
       if (parentDeps != null) {
          for (MvnDescriptor parentDesc:parentDeps) {
             boolean found = false;
@@ -487,8 +505,9 @@ public class POMFile extends XMLFileFormat {
       String res;
 
       res = projElement.getSimpleChildValue("groupId");
-      if (res != null)
-         return res;
+      if (res != null) {
+         return res.trim();
+      }
 
       if (parentPOM != null)
          return parentPOM.getGroupId();

@@ -304,13 +304,30 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
             return null;
       }
       for (int i = 0; i < typeParams.size(); i++) {
-         if (ModelUtil.getTypeParameterName(typeParams.get(i)).equals(name)) {
+         Object typeParam = typeParams.get(i);
+         if (ModelUtil.getTypeParameterName(typeParam).equals(name)) {
+            // It's not enough to match the name here as the same name could be used differently in the type
+            // hierarchy - e.g.  class MultiValuedMap<K, V> extends Map<K, List<V>>
+            if (tvar != null && !ModelUtil.sameTypeParameters(typeParam, tvar)) {
+               continue;
+            }
             Object res = types.get(i);
             if (resolve && ModelUtil.hasTypeVariables(res)) {
                res = ModelUtil.getTypeParameterDefault(res);
             }
             return res;
          }
+      }
+      if (tvar != null) {
+         Object tvarDecl = ModelUtil.getTypeParameterDeclaration(tvar);
+         Object res = ModelUtil.resolveTypeParameter(tvarDecl, this, tvar);
+         if (res != null && ModelUtil.isTypeVariable(res)) {
+            if (ModelUtil.sameTypes(ModelUtil.getTypeParameterDeclaration(res), this))
+               return getTypeDeclarationForParam(ModelUtil.getTypeParameterName(res), res, resolve);
+         }
+         return ModelUtil.getTypeDeclFromType(this, res, false, getLayeredSystem(), resolve, definedInType);
+         // TODO: do we need to resolve any type parameters here before returning?
+         //return res;
       }
       return null;
    }

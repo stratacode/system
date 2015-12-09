@@ -59,6 +59,10 @@ public class RepositorySource implements Serializable {
       return url;
    }
 
+   public boolean mergeSource(RepositorySource other) {
+      return mergeExclusions(other);
+   }
+
    public boolean mergeExclusions(RepositorySource other) {
       return false;
    }

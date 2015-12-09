@@ -39,7 +39,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    transient Set<String> externalReferences = new HashSet<String>();
 
    // Explicitly imported names map to the complete string
-   transient HashMap<String,String> importsByName = new HashMap<String,String>();
+   transient HashMap<String,Object> importsByName = new HashMap<String,Object>();
 
    transient Map<String,Object> staticImportProperties;// Property name to beanmapper or Get/Set MethodDefinition
    transient Map<String,Object> staticImportMethods;   // Method name, value is type object
@@ -269,6 +269,13 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          typeIndex.put(td.typeName,td);
    }
 
+   private static class WildcardImport {
+      public String typeName;
+      public WildcardImport(String tn) {
+         typeName = tn;
+      }
+   }
+
    private void addNonStaticImportInternal(ImportDeclaration imp) {
       String impStr = imp.identifier;
       if (!imp.staticImport) {
@@ -280,7 +287,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                for (String impName:filesInPkg) {
                   // A wildcard import should not override an explicit one
                   if (importsByName.get(impName) == null)
-                     importsByName.put(impName, CTypeUtil.prefixPath(pkgName, impName));
+                     importsByName.put(impName, new WildcardImport(CTypeUtil.prefixPath(pkgName, impName)));
                }
             }
             else {
@@ -428,12 +435,16 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public String getImportedName(String name) {
-      String imported = importsByName.get(name);
-      if (imported != null)
-         return imported;
+      Object importedObj = importsByName.get(name);
+      if (importedObj != null) {
+         if (importedObj instanceof WildcardImport)
+            return ((WildcardImport) importedObj).typeName;
+         return (String) importedObj;
+      }
 
       // Next use the modified models imports - don't do this for layer models, in part because this gets called before the modified model's type info has been resolved.
       JavaModel modifiedModel = isLayerModel ? null : getUnresolvedModifiedModel();
+      String imported;
       if (modifiedModel != null) {
          if (modifiedModel != this && modifiedModel.getUnresolvedModifiedModel() != this) {
             imported = modifiedModel.getImportedName(name);
@@ -471,6 +482,14 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             return decl.identifier;
       }
       return null;
+   }
+
+   public boolean isWildcardImport(String name) {
+      if (importsByName.get(name) instanceof WildcardImport)
+         return true;
+      if (layeredSystem != null && layeredSystem.getSystemClass(name) != null)
+         return true;
+      return false;
    }
 
    public void findMatchingGlobalNames(String prefix, Set<String> candidates) {
@@ -527,7 +546,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public void addImport(String name) {
-      String old = importsByName.put(CTypeUtil.getClassName(name), name);
+      Object old = importsByName.put(CTypeUtil.getClassName(name), name);
       if (old != null) {
          if (old.equals(name))
             return;
@@ -611,9 +630,20 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          td = sys.getRelativeTypeDeclaration(typeName, getPackagePrefix(), null, prependLayerPackage, layer, isLayerModel);
       }
 
+      if (typeName.equals("Package"))
+         System.out.println("***");
+
+      importedName = getImportedName(typeName);
+      if (importedName != null && td != null) {
+         if (!ModelUtil.getTypeName(td).equals(importedName)) {
+            // If you do import foo.* that does not override a relative type name.  But if you import an explicit type name it does.
+            if (!isWildcardImport(typeName))
+               td = null;
+         }
+      }
+
       boolean imported;
       if (td == null) {
-         importedName = getImportedName(typeName);
          imported = true;
 
          if (isLayerModel && importedName != null) {
@@ -622,8 +652,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                skipSrc = true;
          }
       }
-      else
+      else {
          imported = false;
+         importedName = null; // ???
+      }
 
       if (importedName == null) {
          if (td == null) {
@@ -1828,8 +1860,18 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          if (imports == null) {
             // Define first, then set so it can be generated
             SemanticNodeList<ImportDeclaration> newImports = new SemanticNodeList<ImportDeclaration>();
-            for (int i = 0; i < autoImports.size(); i++)
-               newImports.add((ImportDeclaration) autoImports.get(i).deepCopy(CopyNormal, null));
+            for (int i = 0; i < autoImports.size(); i++) {
+               ImportDeclaration aimp = autoImports.get(i);
+               Object impType = getLayeredSystem().getTypeDeclaration(aimp.identifier);
+               // Only process this import if it corresponds to a real generated class - i.e. dynamic types should not be here
+               // unless they have a dynamic stub.
+               if (impType instanceof TypeDeclaration) {
+                  TypeDeclaration td = (TypeDeclaration) impType;
+                  if (td.isDynamicType() && !td.isDynamicStub(false))
+                     continue;
+               }
+               newImports.add((ImportDeclaration) aimp.deepCopy(CopyNormal, null));
+            }
             setProperty("imports", newImports);
          }
          else {
@@ -2439,7 +2481,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
          // Register just the imports before the transform  During transform, importsByName gets updated to include imports in merged types.
          // so we need to make a copy.
-         copy.importsByName = (HashMap<String,String>) importsByName.clone();
+         copy.importsByName = (HashMap<String,Object>) importsByName.clone();
 
          copy.definedTypesByName = definedTypesByName;
          copy.typeIndex = typeIndex;

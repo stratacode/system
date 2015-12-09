@@ -210,11 +210,14 @@ public class ModelUtil {
                   if (hasTypeParameters(argType)) {
                      if (ModelUtil.isAssignableFrom(genParam, argType)) {
                         Object resTypeParam = resolveTypeParameter(genParam, argType, typeVar);
-                        if (resTypeParam != null) {
+                        if (resTypeParam != null && ModelUtil.isTypeVariable(resTypeParam)) {
                            int resPos = ModelUtil.getTypeParameterPosition(argType, ModelUtil.getTypeParameterName(resTypeParam));
                            Object resTypeValue = ModelUtil.getTypeParameter(argType, resPos);
                            if (resTypeValue != null)
                               paramMap.put(new TypeParamKey(atp), resTypeValue);
+                        }
+                        else if (resTypeParam != null && !ModelUtil.isTypeVariable(resTypeParam)) {
+                           paramMap.put(new TypeParamKey(atp), resTypeParam);
                         }
                      }
                      else {
@@ -458,8 +461,13 @@ public class ModelUtil {
                         return ModelUtil.getTypeParameter(genericType, pix);
                      // else - in some cases, the type variable is just not bound, like when we are inside of a parameterized class.
                   }
-                  else
-                     return getTypeParameterDefault(type);
+                  else {
+                     // No type parameters were supplied so this needs to be returned as unbound
+                     if (!bindUnboundParams)
+                        return type;
+                     else
+                        return getTypeParameterDefault(type);
+                  }
                }
             }
          }
@@ -783,7 +791,7 @@ public class ModelUtil {
                      paramType = parameterTypes[j];
                   if (types[j] != null && !ModelUtil.isAssignableFrom(paramType, types[j], false, ctx, sys)) {
                      // Repeating parameters... if the last parameter is an array match if the component type matches
-                     if (j >= last && ModelUtil.isArray(paramType)) {
+                     if (j >= last && ModelUtil.isArray(paramType) && ModelUtil.isVarArgs(toCheck)) {
                         if (!ModelUtil.isAssignableFrom(ModelUtil.getArrayComponentType(paramType), types[j], false, ctx)) {
                            break;
                         }
@@ -827,7 +835,7 @@ public class ModelUtil {
                paramType = parameterTypes[j];
             if (types[j] != null && !ModelUtil.isAssignableFrom(paramType, types[j], false, ctx)) {
                // Repeating parameters... if the last parameter is an array match if the component type matches
-               if (j >= last && ModelUtil.isArray(paramType)) {
+               if (j >= last && ModelUtil.isArray(paramType) && ModelUtil.isVarArgs(toCheck)) {
                   if (!ModelUtil.isAssignableFrom(ModelUtil.getArrayComponentType(paramType), types[j], false, ctx)) {
                      return false;
                   }
@@ -1607,12 +1615,6 @@ public class ModelUtil {
    }
 
    public static Object getArrayOrListComponentType(JavaModel model, Object arrayType) {
-      if (arrayType instanceof TypeParameter && ((TypeParameter) arrayType).extendsType != null) {
-         if (ModelUtil.isAssignableFrom(List.class, arrayType)) {
-            System.out.println("***");
-         }
-         System.out.println("***");
-      }
       if (ModelUtil.isAssignableFrom(Iterable.class, arrayType)) {
          if (ModelUtil.isTypeVariable(arrayType))
             arrayType = ModelUtil.getTypeParameterDefault(arrayType);
@@ -1677,7 +1679,7 @@ public class ModelUtil {
 
       if (type1 instanceof TypeParameter) {
          // Force primitive types to be their wrapper type so we find matches for Comparable and int
-         return ((TypeParameter)type1).isAssignableFrom(wrapPrimitiveType(type2), ctx);
+         return ((TypeParameter)type1).isAssignableFrom(wrapPrimitiveType(type2), ctx, allowUnbound);
       }
       if (type2 instanceof TypeParameter) {
          if (allowUnbound) {
@@ -4100,7 +4102,7 @@ public class ModelUtil {
       return typeParamName;
    }
 
-   /** Computes the type parameter in type 'resultType' that corresponds to the typeParam which is a type parameter for it's base class srcType */
+   /** Given a subType and the typeParameter in the sub-type, returns the type or type parameter in the base type.  */
    public static Object resolveBaseTypeParameter(Object subType, Object baseType, Object typeParam) {
       if (ModelUtil.sameTypes(subType, baseType)) {
          String typeParamName = ModelUtil.getTypeParameterName(typeParam);
@@ -4109,6 +4111,8 @@ public class ModelUtil {
             System.err.println("*** Unresolveable base type parameter!");
             return null;
          }
+         if (ModelUtil.hasTypeParameters(subType) && ModelUtil.getNumTypeParameters(subType) > srcIx)
+            return ModelUtil.getTypeParameter(subType, srcIx);
          return typeParam;
       }
       List<Object> extTypes = getExtendsJavaTypePath(baseType, subType);
@@ -4116,7 +4120,7 @@ public class ModelUtil {
          System.err.println("*** No extends path from baseType to subType");
          return null;
       }
-      extTypes.remove(extTypes.size() - 1);
+      Object lastExtType = extTypes.remove(extTypes.size() - 1);
 
       int curParamIx = -1;
       List<?> baseTypeParams = ModelUtil.getTypeParameters(baseType);
@@ -4166,6 +4170,13 @@ public class ModelUtil {
       int numTypeParams = ModelUtil.getNumTypeParameters(subType);
       if (curParamIx < numTypeParams) {
          lastTypeArg = ModelUtil.getTypeParameter(subType, curParamIx);
+         if (!ModelUtil.isTypeVariable(lastTypeArg)) {
+            return lastTypeArg;
+         }
+      }
+      // The type arg is not propagated so use the last bound value we have for that type argument
+      else if (lastExtType != null && ModelUtil.hasTypeParameters(lastExtType) && curParamIx < ModelUtil.getNumTypeParameters(lastExtType)) {
+         lastTypeArg = ModelUtil.getTypeParameter(lastExtType, curParamIx);
          if (!ModelUtil.isTypeVariable(lastTypeArg)) {
             return lastTypeArg;
          }

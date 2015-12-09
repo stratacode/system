@@ -267,6 +267,12 @@ public class RTypeUtil {
 
       for (int i = 0; i < methods.length; i++) {
          Method method = methods[i];
+         if ((method.getModifiers() & 0x1000) != 0) {
+            continue;
+         }
+         if ((method.getModifiers() & Modifier.VOLATILE) != 0) {
+            continue;
+         }
          method.setAccessible(true);
          String methodName = method.getName();
 

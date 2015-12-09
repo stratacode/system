@@ -97,12 +97,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       this.sources = new RepositorySource[1];
       src.pkg = this;
       this.sources[0] = src;
-      this.parentPkg = parentPkg;
-
-      // By default inherit these values from the parent
-      if (parentPkg != null) {
-         this.buildFromSrc = parentPkg.buildFromSrc;
-      }
+      setParentPkg(parentPkg);
       updateInstallRoot(mgr);
    }
 
@@ -113,6 +108,13 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       for (RepositorySource src:srcs)
          src.pkg = this;
       updateInstallRoot(mgr);
+   }
+
+   public void setParentPkg(RepositoryPackage pp) {
+      parentPkg = pp;
+      if (pp != null && pp.buildFromSrc) {
+         buildFromSrc = true;
+      }
    }
 
    public void addFileName(String fn) {
@@ -139,7 +141,9 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
                if (fileNames.size() == 0)
                   addFileName(packageName);
                src.pkg = this;
-               updateCurrentSource(src);
+               // Since we just set the file name above, do not reset them... for root level projects we do not install
+               // a file.
+               updateCurrentSource(src, false);
                updateInstallRoot(mgr);
                // Note: if a package with this name has already been added, we use that instance
                pkg = sys.addRepositoryPackage(this);
@@ -224,6 +228,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       if ((sources == null || sources.length == 0) && currentSource != null) {
          sources = new RepositorySource[1];
          sources[0] = currentSource;
+         updateCurrentFileNames(currentSource);
       }
       if (sources != null) {
          for (RepositorySource src : sources) {
@@ -232,7 +237,15 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
                installed = true;
                String err = src.repository.preInstall(src, ctx, depCol);
                if (err == null) {
-                  updateCurrentSource(src);
+                  // This version of the currentSource may have been restored on an incremental build and have info like the classifier which is not part of the URL so only replace it if
+                  // we have a new and incompatible definition of the source.
+                  // Warning - when we install and restore from a saved file the src we use in currentSource may match
+                  // the one we tried to install but will have more info.  So we're careful to use the restored one
+                  // in that case.
+                  if (currentSource == null || !currentSource.equals(src))
+                     updateCurrentSource(src, true);
+                  else
+                     updateCurrentFileNames(currentSource);
                   break;
                } else {
                   installed = false;
@@ -263,7 +276,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       this.mgr = mgr;
       String resName;
       // Nested packages are stored with their module name inside of the parent's installed root.
-      if (parentPkg != null) {
+      if (parentPkg != null && buildFromSrc) {
          resName = FileUtil.concat(parentPkg.installedRoot, getModuleBaseName());
       }
       else {
@@ -284,8 +297,9 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
 
    public RepositorySource addNewSource(RepositorySource repoSrc) {
       if (currentSource != null && repoSrc.equals(currentSource)) {
-         // Need to reinit the dependencies if the exclusions change
-         if (currentSource.mergeExclusions(repoSrc))
+         // Need to reinit the dependencies if the exclusions change and merge modulePath, parentPath and artifactId or any other
+         // information that might be different from one source to the next.
+         if (currentSource.mergeSource(repoSrc))
             dependencies = null;
          repoSrc.ctx = DependencyContext.merge(repoSrc.ctx, currentSource.ctx);
          return currentSource;
@@ -458,7 +472,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    // Check for any changes in the package - if so, we'll re-install.  Otherwise, we'll
    // update this package with the saved info.
    public boolean updateFromSaved(IRepositoryManager mgr, RepositoryPackage oldPkg, boolean install, DependencyContext ctx) {
-      if (!packageName.equals(oldPkg.packageName))
+      if (!packageName.equals(oldPkg.packageName) && (oldPkg.packageAlias == null ||  !packageName.equals(oldPkg.packageAlias)))
          return false;
 
       // Note: We used to also compare fileNames but we can at least add to that list based on the contents of the POM
@@ -500,7 +514,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       RepositorySystem sys = mgr.getRepositorySystem();
 
       if (oldPkg.parentPkgURL != null) {
-         parentPkg = mgr.getOrCreatePackage(oldPkg.parentPkgURL, null, false);
+         setParentPkg(mgr.getOrCreatePackage(oldPkg.parentPkgURL, null, false));
       }
 
       initSubPackages(oldPkg, install);
@@ -516,7 +530,15 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       if (oldPkg.packageAlias != null)
          mgr.getRepositorySystem().registerAlternateName(this, oldPkg.packageAlias);
 
-      updateCurrentSource(oldPkg.currentSource);
+      // Move over the restored RepositorySource objects since they will have more info than
+      // these source objects that were maybe created from the URL of some reference.  Need to
+      // update the backpointer as well.
+      sources = oldPkg.sources;
+      if (sources != null) {
+         for (RepositorySource nsrc:sources)
+            nsrc.pkg = this;
+      }
+      updateCurrentSource(oldPkg.currentSource, true);
 
       if (install) {
          installSubPackages(mgr, ctx);
@@ -557,12 +579,11 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       if (dependencies != null) {
          ArrayList<String> depPkgs = new ArrayList<String>(dependencies.size());
          for (int i = 0; i < dependencies.size(); i++) {
-            depPkgs.add(dependencies.get(i).getPackageURL());
+            String depURL = dependencies.get(i).getPackageURL();
+            depPkgs.add(depURL);
          }
          depPkgURLs = depPkgs;
       }
-      if (packageName.contains("broadleaf-profile"))
-         System.out.println("***");
       if (parentPkg != null)
          parentPkgURL = parentPkg.getPackageURL();
       preSaveSubPackages();
@@ -625,8 +646,14 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       return currentSource != null ? currentSource.getClassPathFileNames() : fileNames;
    }
 
-   public void updateCurrentSource(RepositorySource src) {
+   public void updateCurrentSource(RepositorySource src, boolean resetFileNames) {
+      src.pkg = this;
       setCurrentSource(src);
+      if (resetFileNames)
+         updateCurrentFileNames(src);
+   }
+
+   public void updateCurrentFileNames(RepositorySource src) {
       if (src != null) {
          List<String> cpFileNames = src.getClassPathFileNames();
          for (String cpFileName:cpFileNames) {
@@ -688,6 +715,8 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    }
 
    public String getPackageURL() {
+      if (replacedByPkg != null)
+         return replacedByPkg.getPackageURL();
       if (currentSource == null)
          return packageName;
       return currentSource.url;
