@@ -431,6 +431,8 @@ public class ModelUtil {
             }
             else
                dit = (ITypeDeclaration) ModelUtil.getEnclosingType(typeContext);
+            if (dit == null)
+               dit = definedInType;
             return ArrayTypeDeclaration.create(compTypeDecl, ndim, dit);
          }
          return Array.newInstance((Class) compTypeDecl, dims).getClass();
