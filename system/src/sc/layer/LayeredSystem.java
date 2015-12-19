@@ -341,6 +341,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    boolean batchingModelUpdates = false;
 
+   /** When restoring serialized layered components, we need to lookup a thread-local layered system and be able to know we are doing layerResolves - to swap the name space to that of the layer. */
+   public boolean layerResolveContext = false;
+
    private void clearReverseTypeIndex() {
       typeIndex.clearReverseTypeIndex();
    }
