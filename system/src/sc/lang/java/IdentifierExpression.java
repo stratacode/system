@@ -2930,7 +2930,7 @@ public class IdentifierExpression extends ArgumentsExpression {
    /** Implements the special rule for Class<?> getClass() - the type parameter is bound to the owner class */
    static Object getSpecialMethodType(int ix, IdentifierType[] idTypes, Object[] boundTypes, JavaModel model, ITypeDeclaration definedInType) {
       if (getClassMethod == null)
-         getClassMethod = (Method) ModelUtil.getMethod(null, Class.class, "getClass", null, null, null, false, null);
+         getClassMethod = (Method) ModelUtil.getMethod(null, Class.class, "getClass", null, null, null, false, (Object[]) null);
       if (boundTypes[ix] == getClassMethod) {
          Object classType;
          if (ix > 0)
