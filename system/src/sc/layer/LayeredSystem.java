@@ -6345,7 +6345,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             processDefinition = proc;
          }
          else {
-            LayeredSystem peerSys = createPeerSystem(proc, new ArrayList<String>(), Collections.emptyList());
+            LayeredSystem peerSys = createPeerSystem(proc, new ArrayList<String>(), Collections.<String>emptyList());
             newPeers.add(peerSys);
          }
       }
