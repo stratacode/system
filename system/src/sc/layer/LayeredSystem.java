@@ -416,10 +416,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public void clearActiveLayers() {
       activatedLayerNames = null;
-      for (Layer layer: layers) {
-         layer.destroyLayer();
+
+      if (layers != null) {
+         for (Layer layer : layers) {
+            layer.destroyLayer();
+         }
+         layers.clear();
       }
-      layers.clear();
       cleanupLayerFileProcessors();
       Language.cleanupLanguages();
       layerDynStartPos = -1;
@@ -427,7 +430,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       typesByName.clear();
       typesByRootName.clear();
-      modelIndex.clear();
+
+      if (modelIndex != null) {
+         modelIndex.clear();
+      }
+
       innerTypeCache.clear();
 
       templateCache.clear();
@@ -8955,26 +8962,27 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public void cleanupLayerFileProcessors() {
       HashMap<String,IFileProcessor[]> newMap = new HashMap<String,IFileProcessor[]>();
-      for (Map.Entry<String,IFileProcessor[]> procEnt:fileProcessors.entrySet()) {
-         ArrayList<IFileProcessor> newProcs = null;
-         IFileProcessor[] procs = procEnt.getValue();
-         for (IFileProcessor proc:procs) {
-            Layer l = proc.getDefinedInLayer();
-            if (l == null || !l.removed) {
-               if (newProcs == null)
-                  newProcs = new ArrayList<IFileProcessor>();
-               newProcs.add(proc);
+      if (fileProcessors != null) {
+         for (Map.Entry<String, IFileProcessor[]> procEnt : fileProcessors.entrySet()) {
+            ArrayList<IFileProcessor> newProcs = null;
+            IFileProcessor[] procs = procEnt.getValue();
+            for (IFileProcessor proc : procs) {
+               Layer l = proc.getDefinedInLayer();
+               if (l == null || !l.removed) {
+                  if (newProcs == null)
+                     newProcs = new ArrayList<IFileProcessor>();
+                  newProcs.add(proc);
+               } else
+                  proc.setDefinedInLayer(null);
             }
-            else
-               proc.setDefinedInLayer(null);
+            if (newProcs != null)
+               newMap.put(procEnt.getKey(), newProcs.toArray(new IFileProcessor[newProcs.size()]));
          }
-         if (newProcs != null)
-            newMap.put(procEnt.getKey(), newProcs.toArray(new IFileProcessor[newProcs.size()]));
       }
       fileProcessors = newMap;
 
       LinkedHashMap<Pattern,IFileProcessor> newFilePatterns = new LinkedHashMap<Pattern,IFileProcessor>();
-      if (filePatterns.size() > 0) {
+      if (filePatterns != null && filePatterns.size() > 0) {
          for (Map.Entry<Pattern, IFileProcessor> ent : filePatterns.entrySet()) {
             Pattern patt = ent.getKey();
             IFileProcessor fproc = ent.getValue();
@@ -9685,25 +9693,33 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       anyErrors = false;
       viewedErrors.clear();
       systemCompiled = false;
-      for (int i = 0; i < layers.size(); i++) {
-         Layer l = layers.get(i);
-         BuildState bd = l.buildState;
-         if (bd != null) {
-            bd.changedModelsStarted = false;
-            bd.changedModelsPrepared = false;
-            bd.errorFiles = new ArrayList();
-            bd.anyError = false;
+      if (layers != null) {
+         for (int i = 0; i < layers.size(); i++) {
+            Layer l = layers.get(i);
+            BuildState bd = l.buildState;
+            if (bd != null) {
+               bd.changedModelsStarted = false;
+               bd.changedModelsPrepared = false;
+               bd.errorFiles = new ArrayList();
+               bd.anyError = false;
+            }
+            l.compiled = false;
          }
-         l.compiled = false;
       }
-      for (IFileProcessor[] fps:fileProcessors.values()) {
-         for (IFileProcessor fp:fps) {
+      if (fileProcessors != null) {
+         for (IFileProcessor[] fps : fileProcessors.values()) {
+            for (IFileProcessor fp : fps) {
+               fp.resetBuild();
+            }
+         }
+      }
+
+      if (filePatterns  != null) {
+         for (IFileProcessor fp : filePatterns.values()) {
             fp.resetBuild();
          }
       }
-      for (IFileProcessor fp:filePatterns.values()) {
-         fp.resetBuild();
-      }
+
       if (doPeers && peerSystems != null) {
          for (LayeredSystem peer:peerSystems) {
             peer.resetBuild(false);
