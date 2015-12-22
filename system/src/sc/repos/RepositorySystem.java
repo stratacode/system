@@ -4,6 +4,7 @@
 
 package sc.repos;
 
+import sc.util.IClassResolver;
 import sc.util.IMessageHandler;
 import sc.repos.mvn.MvnRepositoryManager;
 import sc.util.MessageHandler;
@@ -27,12 +28,15 @@ public class RepositorySystem {
 
    public HashSet<String> classPath = new HashSet<String>();
 
+   IClassResolver resolver;
+
    public IMessageHandler msg;
 
-   public RepositorySystem(RepositoryStore store, IMessageHandler handler, boolean info, boolean reinstall, boolean update, boolean installExisting) {
+   public RepositorySystem(RepositoryStore store, IMessageHandler handler, IClassResolver resolver, boolean info, boolean reinstall, boolean update, boolean installExisting) {
       this.store = store;
 
       msg = handler;
+      this.resolver = resolver;
       reinstallSystem = reinstall;
       updateSystem = update;
       this.installExisting = installExisting;
@@ -63,9 +67,9 @@ public class RepositorySystem {
       }
    }
 
-   public RepositoryPackage addPackage(String url, boolean install) {
+   public IRepositoryManager getManagerFromURL(String url) {
       int ix = url.indexOf(":");
-      if (ix == 0) {
+      if (ix <= 0) {
          MessageHandler.error(msg, "addRepoitoryPackage - invalid URL - missing type://values");
          return null;
       }
@@ -75,6 +79,11 @@ public class RepositorySystem {
          MessageHandler.error(msg, "No repository with name: " + repositoryTypeName + " for add package");
          return null;
       }
+      return mgr;
+   }
+
+   public RepositoryPackage addPackage(String url, boolean install) {
+      IRepositoryManager mgr = getManagerFromURL(url);
 
       // TODO: use getOrCreatePackage here?
       RepositoryPackage pkg = mgr.createPackage(url);
@@ -183,6 +192,9 @@ public class RepositorySystem {
             RepositorySource newSrc = newPkg.currentSource == null ? newPkg.sources[0] : newPkg.currentSource;
             pkg.updateCurrentSource(newSrc, true);
          }
+         // We are adding a new package instance but the canonical package of that name has been added already.
+         // We point this package at the canonical one so that we always refer to the right one.
+         newPkg.replacedByPkg = pkg;
       }
 
       if (install) {
@@ -243,5 +255,9 @@ public class RepositorySystem {
          pkg.update();
       }
       pkg.register();
+   }
+
+   public IClassResolver getClassResolver() {
+      return resolver;
    }
 }

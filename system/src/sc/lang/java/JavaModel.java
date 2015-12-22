@@ -1943,19 +1943,20 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          }
       }
       if (type != null) {
-         boolean ckField, ckGet, ckSet;
+         boolean ckField, ckGet, ckSet, enumSet;
          ckField = mtype.contains(MemberType.Field);
          ckGet = mtype.contains(MemberType.GetMethod);
          ckSet = mtype.contains(MemberType.SetMethod);
-         if (ckField || ckGet || ckSet) {
-            if (type != null) {
-               if (ckField && ModelUtil.isField(type))
-                  return type;
-               if (ckGet && ModelUtil.hasGetMethod(type))
-                  return type;
-               if (ckSet && ModelUtil.hasSetMethod(type))
-                  return type;
-            }
+         enumSet = mtype.contains(MemberType.Enum);
+         if (ckField || ckGet || ckSet || enumSet) {
+            if (ckField && ModelUtil.isField(type))
+               return type;
+            if (ckGet && ModelUtil.hasGetMethod(type))
+               return type;
+            if (ckSet && ModelUtil.hasSetMethod(type))
+               return type;
+            if (enumSet && ModelUtil.isEnum(type))
+               return type;
          }
       }
       return super.definesMember(name, mtype, refType, ctx, skipIfaces, isTransformed);

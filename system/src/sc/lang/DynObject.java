@@ -304,7 +304,7 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
             constr = dynType.getConstructorFromSignature(constructorSig);
          }
          else {
-            if (args.length == 0) {
+            if (args == null || args.length == 0) {
                // Look for an inherited constructor here.  If we don't find the zero arg constructor in our
                // type we'll stil have to invoke the one in the super type.
                constr = dynType.definesConstructor(null, null, false);
@@ -530,7 +530,8 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
    private void readObject(ObjectInputStream in) throws java.io.IOException, ClassNotFoundException {
       in.defaultReadObject();
       String typeName = (String) in.readObject();
-      type = LayeredSystem.getCurrent().getSrcTypeDeclaration(typeName, null, true);
+      LayeredSystem sys = LayeredSystem.getCurrent();
+      type = (BodyTypeDeclaration) sys.getSrcTypeDeclaration(typeName, null, true, false, true, null, sys.layerResolveContext);
       if (type == null)
          System.err.println("*** No type: " + typeName + " deserializing dynamic object");
       int num = in.readInt();

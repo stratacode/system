@@ -143,7 +143,7 @@ import java.util.zip.ZipFile;
  * <p/>
  * -vl - show the initial layers as in verbose
  */
-public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSystem {
+public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSystem, IClassResolver {
    {
       setCurrent(this);
    }
@@ -1114,10 +1114,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (!peerMode)
-         this.repositorySystem = new RepositorySystem(new RepositoryStore(getStrataCodeDir("pkgs")), messageHandler, options.verbose, options.reinstall, options.update, options.installExisting);
+         this.repositorySystem = new RepositorySystem(new RepositoryStore(getStrataCodeDir("pkgs")), messageHandler, this, options.verbose, options.reinstall, options.update, options.installExisting);
       else {
          messageHandler = parentSystem.messageHandler;
-         this.repositorySystem = new RepositorySystem(parentSystem.repositorySystem.store, messageHandler, options.verbose, options.reinstall, options.update, options.installExisting);
+         this.repositorySystem = new RepositorySystem(parentSystem.repositorySystem.store, messageHandler, this, options.verbose, options.reinstall, options.update, options.installExisting);
       }
 
       if (initLayerNames != null) {

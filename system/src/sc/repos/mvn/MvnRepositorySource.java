@@ -6,6 +6,7 @@ package sc.repos.mvn;
 
 import sc.repos.DependencyContext;
 import sc.repos.IRepositoryManager;
+import sc.repos.RepositoryPackage;
 import sc.repos.RepositorySource;
 
 import java.util.ArrayList;
@@ -16,8 +17,8 @@ public class MvnRepositorySource extends RepositorySource {
    // Do we need to serialize the exclusions?
    public MvnDescriptor desc;
 
-   public MvnRepositorySource(IRepositoryManager mgr, String url, boolean unzip, MvnDescriptor desc, DependencyContext ctx) {
-      super(mgr, url, unzip);
+   public MvnRepositorySource(IRepositoryManager mgr, String url, boolean unzip, RepositoryPackage parentPkg, MvnDescriptor desc, DependencyContext ctx) {
+      super(mgr, url, unzip, parentPkg);
       this.desc = desc;
       this.ctx = ctx;
    }

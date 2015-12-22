@@ -18,7 +18,7 @@ import java.util.*;
 
 /** Handles parsing and data model of the Maven POM file (pom.xml) */
 public class POMFile extends XMLFileFormat {
-   public static final POMFile NULL_SENTINEL = new POMFile(null, null, null, null, null);
+   public static final POMFile NULL_SENTINEL = new POMFile(null, null, null, null, false, null);
 
    MvnRepositoryManager mgr;
 
@@ -28,6 +28,8 @@ public class POMFile extends XMLFileFormat {
 
    /** If this is a module in a parent package, the module name */
    String modulePath;
+
+   boolean required = true;
 
    // Represents the chain of includes for variable resolving
    POMFile includedFromPOM;
@@ -54,18 +56,19 @@ public class POMFile extends XMLFileFormat {
       return null;
    }
 
-   public POMFile(String fileName, MvnRepositoryManager mgr, DependencyContext ctx, RepositoryPackage pomPkg, POMFile includedFromPOM) {
+   public POMFile(String fileName, MvnRepositoryManager mgr, DependencyContext ctx, RepositoryPackage pomPkg, boolean required, POMFile includedFromPOM) {
       super(fileName, mgr == null ? null : mgr.msg);
       this.mgr = mgr;
       depCtx = ctx;
       this.pomPkg = pomPkg;
+      this.required = required;
       if (pomPkg instanceof MvnRepositoryPackage)
          ((MvnRepositoryPackage) pomPkg).pomFile = this;
       this.includedFromPOM = includedFromPOM;
    }
 
-   public static POMFile readPOM(String fileName, MvnRepositoryManager mgr, DependencyContext depCtx, RepositoryPackage pomPkg, POMFile parentPOM, POMFile includedFromPOM) {
-      POMFile file = new POMFile(fileName, mgr, depCtx, pomPkg, includedFromPOM);
+   public static POMFile readPOM(String fileName, MvnRepositoryManager mgr, DependencyContext depCtx, RepositoryPackage pomPkg, boolean required, POMFile parentPOM, POMFile includedFromPOM) {
+      POMFile file = new POMFile(fileName, mgr, depCtx, pomPkg, required, includedFromPOM);
       file.parentPOM = parentPOM;
       // Need to put this before we try to parse it - in case we resolve another recursive reference during the parsing
       mgr.pomCache.put(fileName, file);
@@ -104,7 +107,11 @@ public class POMFile extends XMLFileFormat {
          initParent();
       // Must be after we've initialized the parent
       initCanonicalName();
-      initModules();
+      if (getUseRepositories())
+         initRepositories();
+
+      if (required)
+         initModules();
       initDependencyManagement();
 
       return true;
@@ -120,16 +127,26 @@ public class POMFile extends XMLFileFormat {
 
    private void initCanonicalName() {
       if (projElement != null) {
+         MvnDescriptor desc = getDescriptor();
+         if (desc != null) {
+            if (desc.groupId == null) {
+               desc.groupId = getGroupId();
+            }
+         }
          artifactId = projElement.getSimpleChildValue("artifactId");
          if (artifactId != null) {
             artifactId = artifactId.trim();
-            MvnDescriptor desc = getDescriptor();
             pomPkg = mgr.registerNameForPackage(pomPkg, artifactId);
             if (desc != null) {
                desc.artifactId = artifactId;
                // And update the URL in the source so we save it pointing to the real artifactId
                if (pomPkg != null && pomPkg.currentSource != null) {
-                  pomPkg.packageName = desc.getPackageName();
+                  String descPkgName = desc.getPackageName();
+                  // If we are a sub-package we might have one name that lets us find the package in the file system
+                  // and another for finding it in the repository.  Need to preserve both names for proper initialization
+                  if (pomPkg.packageName != null && (pomPkg.packageAlias == null || pomPkg.packageAlias.equals(descPkgName)) && !pomPkg.packageName.equals(descPkgName))
+                     pomPkg.packageAlias = pomPkg.packageName;
+                  pomPkg.packageName = descPkgName;
                   pomPkg.currentSource.url = desc.getURL();
                   pomPkg.updateInstallRoot(mgr);
                }
@@ -165,6 +182,42 @@ public class POMFile extends XMLFileFormat {
          }
       }
       // TODO: else - there is a default POM but so far, we don't need any of the contents since it's all concerned with the build
+   }
+
+   private void initRepositories() {
+      if (projElement != null) {
+         Element[] repos = projElement.getChildTagsWithName("repositories");
+         if (repos != null && repos.length > 1)
+            MessageHandler.error(msg, "Multiple repositories tags - only using the first one");
+         ArrayList<MvnDescriptor> res = new ArrayList<MvnDescriptor>();
+         if (repos != null) {
+            Element[] repoTags = repos[0].getChildTagsWithName("repository");
+            if (repoTags != null) {
+               for (Element repoTag : repoTags) {
+                  String repoURL = repoTag.getSimpleChildValue("url");
+                  if (repoURL == null) {
+                     MessageHandler.error(msg, "repository in POM - missing url attribute: ");
+                  }
+                  else {
+                     boolean found = false;
+                     for (MvnRepository old:mgr.repositories) {
+                        if (old.baseURL.equals(repoURL)) {
+                           found = true;
+                           break;
+                        }
+                     }
+                     if (!found)
+                        mgr.repositories.add(new MvnRepository(repoURL));
+                  }
+                  // TODO: do we need id, name, layout, releases and snapshots information
+               }
+            }
+         }
+      }
+   }
+
+   private boolean getUseRepositories() {
+      return pomPkg instanceof MvnRepositoryPackage && ((MvnRepositoryPackage) pomPkg).useRepositories;
    }
 
    private String getArtifactId() {
@@ -318,6 +371,8 @@ public class POMFile extends XMLFileFormat {
       // We either want to include modules that directly defineSrc or if the parent is a src module, we need to include the child dependencies
       // We don't want to include dependencies from the parent-pom's modules.
       if (pomPkg instanceof MvnRepositoryPackage && (((MvnRepositoryPackage) pomPkg).definesSrc || parentDefinesSrc) && addChildren) {
+         if (modulePOMs == null)
+            initModules();
          if (modulePOMs != null) {
             for (POMFile modulePOM:modulePOMs) {
                addPOMRefDependencies(modulePOM, res, scopes, true, false, true);
@@ -465,7 +520,7 @@ public class POMFile extends XMLFileFormat {
       if (visited.contains(this))
          return;
       visited.add(this);
-      if (desc.version == null || desc.type == null || desc.classifier == null) {
+      if (desc.version == null || desc.classifier == null) {
          initDependencyManagement();
          for (MvnDescriptor dep : dependencyManagement) {
             if (desc.matches(dep)) {
@@ -482,8 +537,9 @@ public class POMFile extends XMLFileFormat {
                // It does not appear that we should be inheriting the type
                //if (desc.type == null && dep.type != null)
                //   desc.type = dep.type;
-               if (desc.classifier == null && dep.classifier != null)
+               if (desc.classifier == null && dep.classifier != null) {
                   desc.classifier = dep.classifier;
+               }
             }
          }
          if (parentPOM != null)
@@ -494,6 +550,8 @@ public class POMFile extends XMLFileFormat {
             }
          }
       }
+      if (modulePOMs == null)
+         initModules();
       if (modulePOMs != null) {
          for (POMFile modPOM:modulePOMs) {
             modPOM.appendInheritedAtts(desc, visited);
@@ -513,9 +571,5 @@ public class POMFile extends XMLFileFormat {
          return parentPOM.getGroupId();
 
       return null;
-   }
-
-   public boolean isSubModule() {
-      return pomPkg.buildFromSrc && (pomPkg instanceof MvnRepositoryPackage) && ((MvnRepositoryPackage) pomPkg).subModule;
    }
 }

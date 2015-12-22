@@ -15,9 +15,16 @@ import java.util.ArrayList;
 public class GitRepositoryManager extends AbstractRepositoryManager {
    public GitRepositoryManager(RepositorySystem sys, String managerName, String rootDir, IMessageHandler handler, boolean info) {
       super(sys, managerName, rootDir, handler, info);
+      srcRepository = true;
    }
    public String doInstall(RepositorySource src, DependencyContext ctx, DependencyCollection deps) {
-      return gitInstall(src, this);
+      String res = gitInstall(src, this);
+      if (res == null && src.pkg != null && src.pkg.subPackages != null) {
+         for (RepositoryPackage subPkg:src.pkg.subPackages) {
+            deps.addDependency(subPkg, ctx);
+         }
+      }
+      return res;
    }
 
    public static String gitInstall(RepositorySource src, AbstractRepositoryManager mgr) {

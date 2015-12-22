@@ -12,9 +12,9 @@ import sc.util.FileUtil;
 @CompilerSettings(dynObjManager="sc.layer.LayerDynChildManager", propagateConstructor="sc.layer.Layer")
 public abstract class LayerComponent implements IComponent {
    /**
-    * The layer which defines this component.  Typically only layers which extend the definedInLayer can use this component.
+    * The layer which defines this component.  Layers which extend the layer which defines the component can use it.
     */
-   public Layer definedInLayer;
+   public transient Layer definedInLayer;
 
    public LayerComponent() {
    }

@@ -83,13 +83,17 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          pkg.definesClasses = false;
          // Do update the src path - this will be changed if pom packaging to false - then we pick up the src path from the sub-modules
          pkg.definesSrc = true;
-         pomFileRes = POMFile.readPOM(FileUtil.concat(pkg.getVersionRoot(), "pom.xml"), this, ctx, pkg, parentPOM, null);
+         pomFileRes = POMFile.readPOM(FileUtil.concat(pkg.getVersionRoot(), "pom.xml"), this, ctx, pkg, true, parentPOM, null);
          desc = null;
          // Can't read file returns null
          if (pomFileRes == null)
             pomFileRes = "Failed to read pom file for package: " + pkg.packageName;
       }
       else {
+         // If this is a module of a Git or other source repository it's a src package by default
+         if (pkg.parentPkg != null && pkg.parentPkg.mgr.isSrcRepository()) {
+            pkg.buildFromSrc = true;
+         }
          if (src instanceof MvnRepositorySource) {
             desc = ((MvnRepositorySource) src).desc;
             if (desc == null) // Does this ever happen?
@@ -107,7 +111,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          POMFile pomFile = pkg.pomFile;
          if (pomFile == null) {
             // If this is a nested POM this should find it's already there and not install
-            pomFileRes = installPOM(desc, pkg, ctx, false, parentPOM, null);
+            pomFileRes = installPOM(desc, pkg, ctx, pkg.parentPkg != null, true, parentPOM, null);
             if (pomFileRes instanceof POMFile) {
                pomFile = (POMFile) pomFileRes;
             } else if (pomFileRes instanceof String) {
@@ -350,7 +354,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       return FileUtil.concat(pkg.getVersionRoot(), "pom.xml");
    }
 
-   Object installPOM(MvnDescriptor desc, RepositoryPackage pkg, DependencyContext ctx, boolean checkExists, POMFile parentPOM, POMFile includedFromPOM) {
+   Object installPOM(MvnDescriptor desc, RepositoryPackage pkg, DependencyContext ctx, boolean checkExists, boolean required, POMFile parentPOM, POMFile includedFromPOM) {
       // If we are going to be the first to create the install directory, need to make sure it's been validated that we can write to it.
       // and also make sure we don't do this twice.
       preInstallPackage(pkg, ctx);
@@ -367,7 +371,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          }
       }
 
-      POMFile pomFile = POMFile.readPOM(pomFileName, this, ctx, pkg, parentPOM, includedFromPOM);
+      POMFile pomFile = POMFile.readPOM(pomFileName, this, ctx, pkg, required, parentPOM, includedFromPOM);
       if (pomFile == null) {
          pomCache.put(pomFileName, POMFile.NULL_SENTINEL);
          return "Failed to parse maven POM: " + pomFileName;
@@ -432,7 +436,8 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          classifierExt = "";
       if (useLocalRepository) {
          String artifactId = desc.getUseArtifactId();
-         String localPkgDir = FileUtil.concat(mvnRepositoryDir, desc.groupId.replace(".", FileUtil.FILE_SEPARATOR), artifactId, desc.version);
+         String groupPrefix = desc.groupId == null ? null : desc.groupId.replace(".", FileUtil.FILE_SEPARATOR);
+         String localPkgDir = FileUtil.concat(mvnRepositoryDir, groupPrefix, artifactId, desc.version);
          if (new File(localPkgDir).isDirectory()) {
             String fileName = FileUtil.concat(localPkgDir, FileUtil.addExtension(artifactId + "-" + desc.version + classifierExt + remoteSuffix, remoteExt));
             if (new File(fileName).canRead()) {
@@ -458,7 +463,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
    }
 
    public RepositoryPackage getOrCreatePackage(String url, RepositoryPackage parent, boolean install) {
-      RepositorySource src = createRepositorySource(url, false);
+      RepositorySource src = createRepositorySource(url, false, parent);
       String pkgName = src.getDefaultPackageName();
       RepositoryPackage pkg = system.addPackageSource(this, pkgName, src.getDefaultFileName(), src, install, parent);
       return pkg;
@@ -466,7 +471,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
 
    @Override
    public RepositoryPackage createPackage(String url) {
-      MvnRepositorySource src = (MvnRepositorySource) createRepositorySource(url, false);
+      MvnRepositorySource src = (MvnRepositorySource) createRepositorySource(url, false, null);
       return new MvnRepositoryPackage(this, src.desc.getPackageName(), src.desc.getJarFileName("jar"), src, null);
    }
 
@@ -486,7 +491,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
             return null;
          return res;
       }
-      Object pomRes = installPOM(desc, pkg, ctx, true, parentPOM, includedFromPOM);
+      Object pomRes = installPOM(desc, pkg, ctx, true, required, parentPOM, includedFromPOM);
       if (pomRes instanceof String) {
          if (required)
             MessageHandler.error(msg, (String) pomRes);
@@ -497,14 +502,19 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       return (POMFile) pomRes;
    }
 
-   public RepositorySource createRepositorySource(String url, boolean unzip) {
+   public RepositorySource createRepositorySource(String url, boolean unzip, RepositoryPackage parentPkg) {
       if (url.startsWith("mvn")) {
          MvnDescriptor desc = MvnDescriptor.fromURL(url);
-         MvnRepositorySource src = new MvnRepositorySource(this, url, false, desc, null);
+         MvnRepositorySource src = new MvnRepositorySource(this, url, false, parentPkg, desc, null);
          return src;
       }
       else {
-         return super.createRepositorySource(url, unzip);
+         if (parentPkg != null) {
+            MvnDescriptor desc = new MvnDescriptor(null, parentPkg.packageName, url, null, null);
+            MvnRepositorySource src = new MvnRepositorySource(this, url, false, parentPkg, desc, null);
+            return src;
+         }
+         return super.createRepositorySource(url, unzip, null);
       }
    }
 
@@ -525,4 +535,6 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       }
       return pkg;
    }
+
 }
+

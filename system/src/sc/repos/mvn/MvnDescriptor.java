@@ -55,8 +55,9 @@ public class MvnDescriptor implements Serializable {
       return depsOnly ? "mvndeps" : "mvn";
    }
 
-   private final static String PATH_SEP = "@@";
-   private final static String PARENT_SEP = "::";
+   private final static String PATH_SEP = "?p=";
+   private final static String PARENT_SEP = "&m=";
+   private final static String NO_VERSION = "<no-version>";
 
    public static String toURL(String groupId, String parentPath, String modulePath, String artifactId, String version, boolean depsOnly) {
       String pathId;
@@ -65,8 +66,10 @@ public class MvnDescriptor implements Serializable {
          pathId = null;
       }
       else
-         pathId = URLUtil.concat(parentPath == null ? null : parentPath + "::", modulePath);
-      return getURLType(depsOnly) + "://" + URLUtil.concat(groupId, artifactId, pathId == null ? null : PATH_SEP + pathId, version);
+         pathId = URLUtil.concat(parentPath == null ? null : parentPath + PARENT_SEP, modulePath);
+      if (version == null)
+         version = NO_VERSION;
+      return getURLType(depsOnly) + "://" + URLUtil.concat(groupId, artifactId, version, pathId == null ? null : PATH_SEP + pathId);
    }
 
    public static MvnDescriptor fromURL(String url) {
@@ -75,6 +78,12 @@ public class MvnDescriptor implements Serializable {
       int ix = url.indexOf("://");
       if (ix != -1)
          url = url.substring(ix+3);
+      int pathIx = url.indexOf(PATH_SEP);
+      String pathId = null;
+      if (pathIx != -1) {
+         pathId = url.substring(pathIx + PATH_SEP.length());
+         url = url.substring(0, pathIx);
+      }
       while (url.startsWith("/")) {
          System.err.println("*** Removing invalid '/' in URL: " + origURL);
          url = url.substring(1);
@@ -82,14 +91,22 @@ public class MvnDescriptor implements Serializable {
       // The first part is the groupId, the last is the version and the middle is the groupId.  The group-id can have /'s for the sub-module case - e.g. "killbill/account"
       desc.version = URLUtil.getFileName(url);
       desc.groupId = URLUtil.getRootPath(url);
+      if (desc.groupId == null || desc.version == null) {
+         System.err.println("*** Invalid URL for MvnDescriptor: " + url);
+         return null;
+      }
+
       String rest = url.substring(desc.groupId.length() + 1, url.length() - desc.version.length() - 1);
-      int pathIx = rest.indexOf(PATH_SEP);
+      while (rest.endsWith("/"))
+         rest = rest.substring(0, rest.length() - 1);
+      if (desc.version.equals(NO_VERSION))
+         desc.version = null;
+
       if (pathIx == -1) {
          desc.artifactId = rest;
       }
       else {
-         desc.artifactId = rest.substring(0, pathIx - 1);
-         String pathId = rest.substring(pathIx + PATH_SEP.length());
+         desc.artifactId = rest;
          int parIx = pathId.indexOf(PARENT_SEP);
          if (parIx == -1) {
             desc.parentPath = null;
@@ -108,11 +125,13 @@ public class MvnDescriptor implements Serializable {
    }
 
    public String getPackageName() {
-      return groupId + "/" + getUseArtifactId();
+      return (groupId == null ? "" : groupId + "/") + getUseArtifactId();
    }
 
    // relative to the pkg directory which already has group-id and artifact-id
    public String getJarFileName(String ext) {
+      if (version == null)
+         return null;
       String suffix;
       if (classifier != null) {
          suffix = "-" + classifier;
@@ -161,7 +180,7 @@ public class MvnDescriptor implements Serializable {
 
    public RepositoryPackage getOrCreatePackage(MvnRepositoryManager mgr, boolean install, DependencyContext ctx, boolean initDeps, MvnRepositoryPackage parentPkg) {
       String pkgName = getPackageName();
-      RepositorySource depSrc = new MvnRepositorySource(mgr, getURL(), false, this, ctx);
+      RepositorySource depSrc = new MvnRepositorySource(mgr, getURL(), false, parentPkg, this, ctx);
 
       RepositoryPackage pkg = mgr.system.addPackageSource(mgr, pkgName, getJarFileName("jar"), depSrc, install, parentPkg);
       if (pkg.parentPkg == null)
@@ -185,9 +204,9 @@ public class MvnDescriptor implements Serializable {
       return false;
    }
 
-   // GroupId and artifactId are required.  The others only default to being equal if not specified.
+   // GroupId and artifactId are null for a descriptor created from the file system until we have read the POM.
    public boolean matches(MvnDescriptor other) {
-      return strMatches(other.groupId, groupId) && sameArtifact(other) &&
+      return (strMatches(other.groupId, groupId) || groupId == null /* || other.groupId == null */) && sameArtifact(other) &&
               // flexible match on version in this direction
               (version == null /* || other.version == null */ || strMatches(version, other.version)) &&
               // Strict match on type - each type we reference becomes a different source for the same package

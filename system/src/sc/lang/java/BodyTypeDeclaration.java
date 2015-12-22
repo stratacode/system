@@ -25,6 +25,7 @@ import sc.dyn.DynUtil;
 import sc.dyn.IDynChildManager;
 
 import java.io.File;
+import java.io.Serializable;
 import java.util.*;
 
 /**
@@ -2591,6 +2592,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             dynTransientFields.set(i);
          dynInstFieldMap.put(n, i++);
       }
+
+      // This is a weird case - we have object pkg extends RepositoryPackage {} inside of a layer.  The layer is not
+      // serializable but the RepositoryPackage is.  We don't need to restore the parent child relationship here on de-serialize
+      // as we only care about serializing the RepositoryPackage itself so here we detect and avoid this error ahead of time.
+      Object enclInstType = getEnclosingInstType();
+      if (!ModelUtil.isAssignableFrom(Serializable.class,enclInstType))
+         dynTransientFields.set(0);
    }
 
    public BitSet getDynTransientFields() {

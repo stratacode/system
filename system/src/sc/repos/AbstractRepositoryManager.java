@@ -22,6 +22,9 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
 
    public boolean active = true;
 
+   /** Is this by default a src repository to build or one for runtime files like classes */
+   public boolean srcRepository = false;
+
    public final static String REPLACED_DIR_NAME = ".replacedPackages";
 
    public boolean isActive() {
@@ -40,8 +43,8 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       return system;
    }
 
-   public RepositorySource createRepositorySource(String url, boolean unzip) {
-      return new RepositorySource(this, url, unzip);
+   public RepositorySource createRepositorySource(String url, boolean unzip, RepositoryPackage parent) {
+      return new RepositorySource(this, url, unzip, parent);
    }
 
    public AbstractRepositoryManager(RepositorySystem sys, String mn, String reposRoot, IMessageHandler handler, boolean info) {
@@ -106,7 +109,18 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
          new File(rootParent).mkdirs();
       long installedTime = -1;
       if (rootDirExists && tagFile.canRead()) {
+         if (pkg.definedInLayer != null)
+            pkg.definedInLayer.layeredSystem.layerResolveContext = true;
          RepositoryPackage oldPkg = RepositoryPackage.readFromFile(tagFile, this);
+         if (pkg.definedInLayer != null)
+            pkg.definedInLayer.layeredSystem.layerResolveContext = false;
+
+         /* TODO: is it possible to restore a package which was not installed and then think it is installed?
+         if (oldPkg != null && !oldPkg.installed) {
+            // If we were not installed when we were saved don't make us installed now
+            preInstalled = false;
+         }
+         */
 
          if (oldPkg == null)
             pkg.rebuildReason = "failed to read scPkgCachedInfo.ser file";
@@ -314,5 +328,13 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
 
    public String toString() {
       return managerName;
+   }
+
+   public boolean isSrcRepository() {
+      return srcRepository;
+   }
+
+   public IClassResolver getClassResolver() {
+      return system.getClassResolver();
    }
 }

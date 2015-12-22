@@ -3801,7 +3801,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          if (repositoryPackages == null)
             repositoryPackages = new ArrayList<RepositoryPackage>();
 
-         RepositorySource repoSrc = mgr.createRepositorySource(url, unzip);
+         RepositorySource repoSrc = mgr.createRepositorySource(url, unzip, null);
          // Add this as a new source.  This will create the package if this is the first definition or add it
          // as a new source if it already exists.
          RepositoryPackage pkg = repoSys.addPackageSource(mgr, pkgName, fileName, repoSrc, started && !disabled, null);
