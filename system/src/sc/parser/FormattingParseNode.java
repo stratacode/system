@@ -56,4 +56,17 @@ public abstract class FormattingParseNode extends AbstractParseNode {
    public Object getSkippedValue() {
       return null;
    }
+
+   // TODO: we may need to implement these in the case we've generated some of the nodes we
+   // are editing.  Need to call format(..) to determine the textual representation and use
+   // that in the diff.  This will require that DiffContext maintain the history so we know
+   // where we are in the parse tree.  Or we could just reparse the entire file on the first change
+   // and only do the incremental stuff on the second change.
+   public void findStartDiff(DiffContext ctx) {
+      throw new UnsupportedOperationException();
+   }
+
+   public void findEndDiff(DiffContext ctx) {
+      throw new UnsupportedOperationException();
+   }
 }

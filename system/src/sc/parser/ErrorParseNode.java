@@ -57,6 +57,37 @@ public class ErrorParseNode extends AbstractParseNode {
       }
    }
 
+   @Override
+   public void findStartDiff(DiffContext ctx) {
+      if (errorText == null)
+         return;
+      String text = ctx.text;
+      for (int i = 0; i < errorText.length(); i++) {
+         if (errorText.charAt(i) != text.charAt(ctx.curOffset)) {
+            ctx.diffNode = this;
+            return;
+         }
+         else
+            ctx.curOffset++;
+      }
+   }
+
+   @Override
+   public void findEndDiff(DiffContext ctx) {
+      if (errorText == null)
+         return;
+      String text = ctx.text;
+      int len = errorText.length();
+      for (int i = len - 1; i >= 0; i--) {
+         if (errorText.charAt(i) != text.charAt(ctx.curOffset)) {
+            ctx.diffNode = this;
+            return;
+         }
+         else
+            ctx.curOffset--;
+      }
+   }
+
    public String toString() {
       return errorText == null ? "" : errorText;
    }

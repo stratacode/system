@@ -93,6 +93,11 @@ public interface IParseNode extends CharSequence, IParseResult {
 
    /** Returns the length of the parse node eliminating any trailing whitespace */
    int getSemanticLength();
+
+   /** Finds the first parse node whose text does not match the DiffContext */
+   void findStartDiff(DiffContext ctx);
+
+   void findEndDiff(DiffContext ctx);
 }
 
 

@@ -18,6 +18,7 @@ import sc.layer.Layer;
 
 import java.io.*;
 import java.util.List;
+import java.util.TreeSet;
 
 /** Static utility methods used in the parsing code */
 public class ParseUtil  {
@@ -885,5 +886,60 @@ public class ParseUtil  {
       sys.startLayers(sysLayer);
 
       return sys;
+   }
+
+   public static Object updateParseNode(IParseNode pnode, String newText) {
+      DiffContext ctx = new DiffContext();
+      ctx.text = newText;
+      ctx.curOffset = 0;
+
+      // Find the parse node which is the first one that does not match in the text.
+      pnode.findStartDiff(ctx);
+      if (ctx.diffNode == null) {
+         // Entire newText matches so no changes
+         if (newText.length() == ctx.curOffset)
+            return pnode;
+         else {
+            // TODO: text was added to the end - can we incrementally parse this case?
+            Parselet plet = pnode.getParselet();
+            return plet.getLanguage().parse(newText, plet, false);
+         }
+      }
+      else {
+         IParseNode startNode = ctx.diffNode;
+         ctx.diffNode = null;
+         // The offset at which changes start - the same in both old and new texts
+         int startChangeOffset = ctx.curOffset;
+         ctx.curOffset = newText.length() - 1;
+         pnode.findEndDiff(ctx);
+         IParseNode endNode = ctx.diffNode;
+         // Find common parent node and reparse that node
+         Object startObj = startNode.getSemanticValue();
+         Object endObj = endNode.getSemanticValue();
+         if (startObj instanceof ISemanticNode && endObj instanceof ISemanticNode) {
+            ISemanticNode startVal = (ISemanticNode) startObj;
+            ISemanticNode endVal = (ISemanticNode) endObj;
+            ISemanticNode reparseNode = findCommonParent(startVal, endVal);
+         }
+         else {
+            Parselet plet = pnode.getParselet();
+            return plet.getLanguage().parse(newText, plet, false);
+         }
+      }
+      return pnode;
+   }
+
+   public static ISemanticNode findCommonParent(ISemanticNode node1, ISemanticNode node2) {
+      if (node1 == node2)
+         return node1;
+      TreeSet<ISemanticNode> node1Parents = new TreeSet<ISemanticNode>();
+      for (ISemanticNode parent1 = node1.getParentNode(); parent1 != null; parent1 = parent1.getParentNode())
+         node1Parents.add(parent1);
+      for (ISemanticNode parent2 = node2.getParentNode(); parent2 != null; parent2 = parent2.getParentNode()) {
+         if (node1Parents.contains(parent2))
+            return parent2;
+      }
+      // Is this reached?  Shouldn't there always be a common parent?
+      return null;
    }
 }

@@ -845,6 +845,69 @@ public class ParentParseNode extends AbstractParseNode {
       return ix;
    }
 
+   public void findStartDiff(DiffContext ctx) {
+      if (children == null) {
+         return;
+      }
+      int sz = children.size();
+      for (int i = 0; i < sz; i++) {
+         Object child = children.get(i);
+         if (child != null) {
+            if (child instanceof IParseNode) {
+               IParseNode childNode = (IParseNode) child;
+               childNode.findStartDiff(ctx);
+               if (ctx.diffNode != null)
+                  return;
+            }
+            else if (child instanceof CharSequence) {
+               CharSequence childSeq = (CharSequence) child;
+               int len = childSeq.length();
+               String text = ctx.text;
+               for (int c = 0; c < len; c++) {
+                  if (childSeq.charAt(c) != text.charAt(ctx.curOffset)) {
+                     ctx.diffNode = this;
+                     return;
+                  }
+                  else {
+                     ctx.curOffset++;
+                  }
+               }
+            }
+         }
+      }
+   }
+
+   public void findEndDiff(DiffContext ctx) {
+      if (children == null) {
+         return;
+      }
+      int sz = children.size();
+      for (int i = sz - 1; i >= 0; i--) {
+         Object child = children.get(i);
+         if (child != null) {
+            if (child instanceof IParseNode) {
+               IParseNode childNode = (IParseNode) child;
+               childNode.findEndDiff(ctx);
+               if (ctx.diffNode != null)
+                  return;
+            }
+            else if (child instanceof CharSequence) {
+               CharSequence childSeq = (CharSequence) child;
+               int len = childSeq.length();
+               String text = ctx.text;
+               for (int c = len - 1; c >= 0; c--) {
+                  if (childSeq.charAt(c) != text.charAt(ctx.curOffset)) {
+                     ctx.diffNode = this;
+                     return;
+                  }
+                  else {
+                     ctx.curOffset--;
+                  }
+               }
+            }
+         }
+      }
+   }
 }
 
 
