@@ -1363,7 +1363,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       return RTypeUtil.createInstance(theClass);
    }
 
-   public void setSemanticValue(ParentParseNode parent, Object node, int index, boolean skipSemanticValue, Parser parser, boolean replaceValue) {
+   public void setSemanticValue(ParentParseNode parent, Object node, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, boolean replaceValue) {
       if (trace && parser.enablePartialValues)
          System.out.println("*** setting semantic value of traced element");
 
@@ -1376,14 +1376,14 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                   parent.setSemanticValue(createInstance(parser, getSemanticValueSlotClass()));
             }
 
-            if (index == 0 && getSemanticValueIsArray()) {
+            if (slotIndex == 0 && getSemanticValueIsArray()) {
                Object newElement = createInstance(parser, resultClass);
                ((SemanticNodeList) parent.value).add(newElement);
             }
          }
 
          if (parameterMapping != null) {
-            switch (parameterMapping[index]) {
+            switch (parameterMapping[slotIndex]) {
                case SKIP:
                    break;
 
@@ -1443,8 +1443,13 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                              parent.setSemanticValue(sv);
                          else if (replaceValue)
                             parent.value = sv;
-                         else
-                            ((List)parent.value).addAll((List) sv);
+                         else {
+                            if (childIndex == -1)
+                               ((List) parent.value).addAll((List) sv);
+                            else if (sv != parent.value) {
+                               System.err.println("*** Failed to update an array seamntic value on reparse!");
+                            }
+                         }
                       }
                       else if (sv != null) {
                          SemanticNodeList snl;
@@ -1452,7 +1457,10 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                             parent.setSemanticValue(snl = new SemanticNodeList());
                          else
                             snl = (SemanticNodeList) parent.value;
-                         snl.add(sv);
+                         if (childIndex == -1 || snl.size() <= childIndex)
+                            snl.add(sv);
+                         else
+                            snl.set(childIndex, sv);
                       }
                    }
                    else if (node != null) {
@@ -1461,7 +1469,10 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                          parent.setSemanticValue(snl = new SemanticNodeList());
                       else
                          snl = (SemanticNodeList) parent.value;
-                      snl.add(node);
+                      if (childIndex == -1 || snl.size() <= childIndex)
+                         snl.add(node);
+                      else
+                         snl.set(childIndex, node);
                    }
                    // TODO: should this be optional?  We need some empty list to hold the semantic value to differentiate
                    // between foo() and foo.
@@ -1510,7 +1521,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
       int sequenceSize = parselets.size();
 
-      if (index == sequenceSize - 1) {
+      if (slotIndex == sequenceSize - 1) {
          int childrenSize = parent.children.size();
 
          int startIx = childrenSize - sequenceSize;
@@ -2339,5 +2350,15 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
    public boolean isComplexStringType() {
       return complexStringType;
+   }
+
+   protected boolean anyReparseChanges(Parser parser, Object oldParseNode, DiffContext dctx) {
+      if (super.anyReparseChanges(parser, oldParseNode, dctx)) {
+         return true;
+      }
+
+      boolean parentChanged = oldParseNode != null && dctx.changedParents.contains(oldParseNode);
+      boolean anyChanges = parentChanged || dctx.changedRegion;
+      return anyChanges;
    }
 }

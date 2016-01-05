@@ -478,9 +478,8 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       variableInitializer.set(arrayInitializer, expression);
    }
 
-   public Sequence variableDeclarator =
-       new Sequence("VariableDefinition(*,*)", 
-                    variableDeclaratorId, new Sequence("(operator,initializer)", OPTIONAL, variableInitializerOperators, variableInitializer));
+   Sequence variableDefinition = new Sequence("(operator,initializer)", OPTIONAL, variableInitializerOperators, variableInitializer);
+   public Sequence variableDeclarator = new Sequence("VariableDefinition(*,*)", variableDeclaratorId, variableDefinition);
    Sequence variableDeclarators =
        new Sequence("([],[])", variableDeclarator,
                     new Sequence("(,[])", OPTIONAL | REPEAT, comma, variableDeclarator));

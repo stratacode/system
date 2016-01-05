@@ -63,12 +63,12 @@ public class ErrorParseNode extends AbstractParseNode {
          return;
       String text = ctx.text;
       for (int i = 0; i < errorText.length(); i++) {
-         if (errorText.charAt(i) != text.charAt(ctx.curOffset)) {
-            ctx.diffNode = this;
+         if (errorText.charAt(i) != text.charAt(ctx.startChangeOffset)) {
+            ctx.firstDiffNode = this;
             return;
          }
          else
-            ctx.curOffset++;
+            ctx.startChangeOffset++;
       }
    }
 
@@ -79,12 +79,14 @@ public class ErrorParseNode extends AbstractParseNode {
       String text = ctx.text;
       int len = errorText.length();
       for (int i = len - 1; i >= 0; i--) {
-         if (errorText.charAt(i) != text.charAt(ctx.curOffset)) {
-            ctx.diffNode = this;
+         if (errorText.charAt(i) != text.charAt(ctx.endChangeOldOffset)) {
+            ctx.lastDiffNode = this;
             return;
          }
-         else
-            ctx.curOffset--;
+         else {
+            ctx.endChangeOldOffset--;
+            ctx.endChangeNewOffset--;
+         }
       }
    }
 

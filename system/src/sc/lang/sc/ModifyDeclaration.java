@@ -2661,4 +2661,8 @@ public class ModifyDeclaration extends TypeDeclaration {
       }
       return baseLayerNames;
    }
+
+   public String getOperatorString() {
+      return "<modify>";
+   }
 }

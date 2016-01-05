@@ -81,6 +81,13 @@ public class Parser implements IString {
 
    HashMap<Integer,ParseletState> resultCache = null;
 
+   public Parser(Language l, char[] inputArray) {
+      language = l;
+      inputBuffer = inputArray;
+      bufSize = inputArray.length;
+      eof = true;
+   }
+
    public Parser(Language l, Reader reader, int bufSize) {
       inputBuffer = new char[bufSize];
       language = l;
@@ -201,15 +208,21 @@ public class Parser implements IString {
       return currentBufferPos + bufSize;
    }
 
-   public final Object parseStart(Parselet parselet) {
+   private void initParseState(Parselet parselet) {
       currentErrors.clear();
       currentErrorStartIndex = currentErrorEndIndex = -1;
       currentIndex = 0;
       currentStreamPos = 0; // The character index of the last char read from the input stream
       numAccepted = 0;
-      eof = false;
+      // If inputReader == null, inputBuffer points to the complete source array
+      if (inputReader != null)
+         eof = false;
 
       semanticContext = language.newSemanticContext(parselet, null);
+   }
+
+   public final Object parseStart(Parselet parselet) {
+      initParseState(parselet);
 
       Object result = parseNext(parselet);
 
@@ -226,6 +239,23 @@ public class Parser implements IString {
       if (ENABLE_STATS) {
          System.out.println("*** cache stats:");
          System.out.println(getCacheStats());
+      }
+      return result;
+   }
+
+   public final Object reparseStart(Parselet parselet, Object oldParseNode, DiffContext dctx) {
+      initParseState(parselet);
+
+      Object result = reparseNext(parselet, oldParseNode, dctx);
+
+      // Always return the error which occurred furthers into the stream.  Probably should return the whole
+      // list of these errors if there is more than one.
+      if ((result == null || result instanceof ParseError) && currentErrors != null) {
+         if (language.debug) {
+            for (int i = 0; i < currentErrors.size(); i++)
+               System.out.println("Errors: " + i + ": " + currentErrors.get(i));
+         }
+         result = wrapErrors();
       }
       return result;
    }
@@ -321,6 +351,89 @@ public class Parser implements IString {
          currentParselet = parselet;
 
          value = parselet.parse(this);
+
+         if (doCache) {
+            if (resultCache == null)
+               resultCache = new HashMap<Integer,ParseletState>();
+            ParseletState newState = new ParseletState(parselet, value, currentIndex);
+            ParseletState currentState;
+            if (ENABLE_STATS) {
+               currentState = resultCache.get(lastStartIndex);
+               if (currentState != null)
+                  currentState = findMatchingState(currentState, parselet);
+            }
+            else
+               currentState = null;
+            if (currentState == null) {
+               currentState = resultCache.put(lastStartIndex, newState);
+               if (currentState != null) {
+                  newState.next = currentState;
+               }
+            }
+         }
+
+         if (ENABLE_STATS) {
+            parselet.attemptCount++;
+            testedNodes++;
+
+            if (!(value instanceof ParseError) && value != null) {
+               parselet.successCount++;
+               matchedNodes++;
+            }
+         }
+      }
+      finally {
+         inProgressCount--;
+         currentParselet = saveParselet;
+         lastStartIndex = saveLastStartIndex;
+
+         if (ENABLE_RESULT_TRACE && disableDebug)
+            language.debug = false;
+         if (parselet.trace)
+            traceCt--;
+         if (parselet.negated)
+            negatedCt--;
+      }
+
+      /*
+      if (language.debug || parselet.trace) {
+         if (value instanceof ParseError) {
+            if (!language.debugSuccessOnly)
+               System.out.println(indent(inProgressCount) + "Error" +
+                       (parselet.getName() != null ? "<" + parselet.getName() + ">: " : ": ") +
+                       value + " next: " + getLookahead(8));
+         }
+         else
+            System.out.println(indent(inProgressCount) + "Result" +
+                    (parselet.getName() != null ? "<" + parselet.getName() + ">:" : ":") +
+                    ParseUtil.escapeObject(value) + " next: " + getLookahead(8));
+      }
+      */
+      return value;
+   }
+
+   public final Object reparseNext(Parselet parselet, Object oldParseNode, DiffContext dctx) {
+      Parselet saveParselet = null;
+      int saveLastStartIndex = -1;
+      Object value;
+      boolean doCache = false;
+
+      /*
+      if ((language.debug || parselet.trace) && !language.debugSuccessOnly)
+         System.out.println(indent(inProgressCount) + "Next: " + getLookahead(8) + " testing rule: " + parselet.toString());
+      */
+
+      boolean disableDebug = false;
+      if (parselet.negated)
+         negatedCt++;
+      try {
+         saveLastStartIndex = lastStartIndex;
+         lastStartIndex = currentIndex;
+         inProgressCount++;
+         saveParselet = currentParselet;
+         currentParselet = parselet;
+
+         value = parselet.reparse(this, oldParseNode, dctx);
 
          if (doCache) {
             if (resultCache == null)

@@ -220,18 +220,29 @@ public class TestUtil {
                   opts.layerMode = true;
                   break;
                case 'r':
-                  if (opt.length() > 1)
-                     usage(args);
-                  try {
-                     if (args.length < i + 1)
-                        System.err.println("*** No count argument to -r option for repeating the parse <n> times. ");
-                     else {
+                  if (opt.length() > 1) {
+                     if (opt.equals("rp")) {
                         i++;
-                        opts.repeatCount = Integer.parseInt(args[i]);
+                        if (args.length < i + 1)
+                           System.err.println("*** No file argument to -rp option for reparsing files.");
+                        else
+                           opts.reparseFile = args[i];
                      }
+                     else
+                        usage(args);
                   }
-                  catch (NumberFormatException exc) {
-                     System.err.println("*** bad value to repeat count");
+                  else {
+                     try {
+                        if (args.length < i + 1)
+                           System.err.println("*** No count argument to -r option for repeating the parse <n> times. ");
+                        else {
+                           i++;
+                           opts.repeatCount = Integer.parseInt(args[i]);
+                        }
+                     }
+                     catch (NumberFormatException exc) {
+                        System.err.println("*** bad value to repeat count");
+                     }
                   }
                   break;
                default:
@@ -323,6 +334,7 @@ public class TestUtil {
       String externalClassPath;
       String srcPath;
       String findClassName;
+      String reparseFile;
    }
 
    public static void parseTestFiles(Object[] inputFiles, TestOptions opts) {
@@ -410,7 +422,30 @@ public class TestUtil {
 
          System.out.println("*** parsed: " + fileName + " " + opts.repeatCount + (opts.repeatCount == 1 ? " time" : " times") + " in: " + rangeToSecs(startTime, parseResultTime));
 
-         if (verifyResults) {
+         if (opts.reparseFile != null) {
+            String reparsedString = ParseUtil.readFileString(new File(opts.reparseFile));
+            if (reparsedString == null) {
+               System.err.println("*** Unable to open -rp - reparse file: " + opts.reparseFile);
+            }
+            else {
+               Object newRes = ParseUtil.reparse((IParseNode) result, reparsedString);
+               if (verifyResults) {
+                  Object reparsedModelObj = getTestResult(newRes);
+                  Object reparseComplete = lang.parseString(reparsedString, opts.enablePartialValues);
+                  if (reparseComplete instanceof IParseNode) {
+                     Object reparseOrigObj = getTestResult(reparseComplete);
+
+                     if (reparsedModelObj instanceof ISemanticNode) {
+                        if (!((ISemanticNode) reparsedModelObj).deepEquals(reparseOrigObj))
+                           System.err.println("*** FAILURE: Reparsed result does not match parsed result: " + opts.reparseFile);
+                        else
+                           System.out.println("*** Success: Reparsed result matches");
+                     }
+                  }
+               }
+            }
+         }
+         else if (verifyResults) {
             if (result == null || !input.equals(result.toString())) {
                if (result instanceof ParseError)
                   System.out.println("File: " + fileName + ": " + ((ParseError) result).errorStringWithLineNumbers(file));
@@ -497,6 +532,7 @@ public class TestUtil {
                }
                System.out.println();
             }
+
          }
       }
    }

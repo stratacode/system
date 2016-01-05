@@ -126,6 +126,7 @@ public class Symbol extends Parselet {
       }
    }
 
+
    private String getSymbolValue()
    {
       return getPrefixSymbol() + (expectedValue == null ? "EOF" : expectedValue.equals(ANYCHAR) ? "ANY" : "'" + ParseUtil.escapeString(expectedValue) + "'");

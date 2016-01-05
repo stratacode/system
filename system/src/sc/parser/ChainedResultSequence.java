@@ -312,4 +312,16 @@ public class ChainedResultSequence extends Sequence {
          return true;
       return parselets.get(1).dataTypeMatches(other);
    }
+
+   protected Object getReparseChildNode(Object oldParseNode, int ix) {
+      if (oldParseNode instanceof ParentParseNode) {
+         ParentParseNode pp = (ParentParseNode) oldParseNode;
+         // This parselet produced the result - so it was the match
+         if (pp.getParselet() == this)
+            return super.getReparseChildNode(oldParseNode, ix);
+      }
+      // This parse noded matched the "chained result" the first slot but not the second.  Skip the second one altogether.
+      // propagate the value to the first slot
+      return ix == 0 ? oldParseNode : SKIP_CHILD;
+   }
 }

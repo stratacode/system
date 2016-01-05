@@ -213,6 +213,15 @@ public abstract class Language extends LayerFileComponent {
       }
    }
 
+   public Object reparse(IParseNode pnode, DiffContext dctx, String newText, boolean enablePartialValues) {
+      Parselet start = pnode.getParselet();
+
+      Parser parser = new Parser(this, newText.toCharArray());
+      parser.enablePartialValues = enablePartialValues;
+      Object parseTree = parser.reparseStart(start, pnode, dctx);
+      return parseTree;
+   }
+
    public void postProcessResult(Object res, String fileName) {
       if (res instanceof ParseError) {
          ParseError err = (ParseError) res;
@@ -747,4 +756,5 @@ public abstract class Language extends LayerFileComponent {
          }
       }
    }
+
 }

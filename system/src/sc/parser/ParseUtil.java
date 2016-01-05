@@ -888,32 +888,44 @@ public class ParseUtil  {
       return sys;
    }
 
-   public static Object updateParseNode(IParseNode pnode, String newText) {
+   public static Object reparse(IParseNode pnode, String newText) {
+      int oldLen = pnode.length();
+      int newLen = newText.length();
+
+      // First we make a pass over the parse node tree to find two mark points in the file - where the changes
+      // start and where the text becomes the same again.  We are optimizing for the "single edit" case - global
+      // edits currently will require a complete reparse (not that we could not handle this case - it will just be
+      // easier for the 90+% case).
       DiffContext ctx = new DiffContext();
       ctx.text = newText;
-      ctx.curOffset = 0;
+      ctx.startChangeOffset = 0;
 
       // Find the parse node which is the first one that does not match in the text.
       pnode.findStartDiff(ctx);
-      if (ctx.diffNode == null) {
+      if (ctx.firstDiffNode == null) {
          // Entire newText matches so no changes
-         if (newText.length() == ctx.curOffset)
+         if (oldLen == newLen && newLen == ctx.startChangeOffset)
             return pnode;
          else {
-            // TODO: text was added to the end - can we incrementally parse this case?
+            // TODO: text was added to the end or removed from the end - can we incrementally parse this case?
+            // Probably we should just reparse with no end node so we replace what comes after the start.
             Parselet plet = pnode.getParselet();
-            return plet.getLanguage().parse(newText, plet, false);
+            return plet.getLanguage().parseString(null, newText, plet, false);
          }
       }
       else {
-         IParseNode startNode = ctx.diffNode;
-         ctx.diffNode = null;
          // The offset at which changes start - the same in both old and new texts
-         int startChangeOffset = ctx.curOffset;
-         ctx.curOffset = newText.length() - 1;
+         ctx.endChangeNewOffset = newText.length() - 1;
+         ctx.endChangeOldOffset = pnode.length() - 1;
          pnode.findEndDiff(ctx);
-         IParseNode endNode = ctx.diffNode;
+
+         // Now we walk the parselet tree in a way similar to how we parsed it in the first place, but accepting
+         // the pnode.  We'll update this existing pnode with changes so it looks the same as if we'd reparsed
+         // the whole thing.
+         Object newRes = pnode.getParselet().getLanguage().reparse(pnode, ctx, newText, true);
+
          // Find common parent node and reparse that node
+         /*
          Object startObj = startNode.getSemanticValue();
          Object endObj = endNode.getSemanticValue();
          if (startObj instanceof ISemanticNode && endObj instanceof ISemanticNode) {
@@ -925,8 +937,9 @@ public class ParseUtil  {
             Parselet plet = pnode.getParselet();
             return plet.getLanguage().parse(newText, plet, false);
          }
+         */
+         return newRes;
       }
-      return pnode;
    }
 
    public static ISemanticNode findCommonParent(ISemanticNode node1, ISemanticNode node2) {

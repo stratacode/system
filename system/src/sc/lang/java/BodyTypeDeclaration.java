@@ -1995,7 +1995,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          sb.append(modifiers.toLanguageString(JavaLanguage.getJavaLanguage().modifiers));
          sb.append(" ");
       }
-      sb.append(getDeclarationType().keyword);
+      if (isInitialized())
+         sb.append(getDeclarationType().keyword);
+      else
+         sb.append(getOperatorString());
       sb.append(" ");
       sb.append(typeName);
       sb.append(" ");
@@ -8793,5 +8796,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public boolean isLayerComponent() {
       JavaModel model = getJavaModel();
       return model != null && model.isLayerModel;
+   }
+
+   public String getOperatorString() {
+      return "<unkown>";
    }
 }

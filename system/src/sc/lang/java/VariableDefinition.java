@@ -251,8 +251,16 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       Definition def = getDefinition();
       if (def instanceof TypeDeclaration)
          return ((TypeDeclaration) def).typeName;
-      String typeName = frozenTypeDecl != null ? ModelUtil.getTypeName(frozenTypeDecl) :
-              ((TypedDefinition) def).type.getFullTypeName();
+      String typeName;
+      if (frozenTypeDecl != null)
+         typeName = ModelUtil.getTypeName(frozenTypeDecl);
+      else {
+         TypedDefinition tdef = (TypedDefinition) def;
+         if (tdef.type != null)
+            typeName = tdef.type.getFullTypeName();
+         else
+            typeName = "<no type>";
+      }
 
       // Handles old school array dimensions after the variable name
       if (arrayDimensions == null)

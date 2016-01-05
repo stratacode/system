@@ -176,4 +176,8 @@ public class EnumConstant extends BodyTypeDeclaration {
       // enum constants are always public... at least they do not take modifiers :)
       return AccessLevel.Public;
    }
+
+   public String getOperatorString() {
+      return "<enum constant>";
+   }
 }

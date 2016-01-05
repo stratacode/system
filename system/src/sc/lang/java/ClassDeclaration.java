@@ -38,7 +38,7 @@ public class ClassDeclaration extends TypeDeclaration {
       if (initialized) return;
 
       if (operator == null) {
-         displayError("Invalid class - no operator");
+         displayError("Invalid class - no operator - ");
       }
       else {
          char c = operator.charAt(0);
@@ -1400,5 +1400,9 @@ public class ClassDeclaration extends TypeDeclaration {
          }
       }
       return false;
+   }
+
+   public String getOperatorString() {
+      return operator;
    }
 }

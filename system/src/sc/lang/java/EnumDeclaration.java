@@ -322,4 +322,8 @@ public class EnumDeclaration extends TypeDeclaration {
    public boolean useDefaultModifier() {
       return true;
    }
+
+   public String getOperatorString() {
+      return "enum";
+   }
 }

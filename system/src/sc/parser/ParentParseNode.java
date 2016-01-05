@@ -5,7 +5,6 @@
 package sc.parser;
 
 import sc.lang.ISemanticNode;
-import sc.lang.java.IfStatement;
 import sc.util.PerfMon;
 
 import java.util.ArrayList;
@@ -40,6 +39,8 @@ public class ParentParseNode extends AbstractParseNode {
    }
 
    public void setSemanticValue(Object val) {
+      if (val == value)
+         return;
       // First clear out the old value
       if (value != null) {
          ParseUtil.clearSemanticValue(value, this);
@@ -53,6 +54,24 @@ public class ParentParseNode extends AbstractParseNode {
       value = val;
       if (value instanceof ISemanticNode)
          ((ISemanticNode) value).setParseNode(this);
+   }
+
+   public void addForReparse(Object node, Parselet p, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, Object oldChildParseNode, DiffContext dctx) {
+      // If there's no old value or we are inserting off the end, we must be inserting a new value
+      if ((node != oldChildParseNode && oldChildParseNode == null) || children == null || childIndex >= children.size())
+         add(node, p, slotIndex, skipSemanticValue, parser);
+      else {
+         if (node != oldChildParseNode) {
+            if (node != children.get(childIndex)) {
+               children.set(childIndex, node);
+            }
+         }
+
+         // Need to call this even if the parse node did not change.  A child of the parse-node might have changed.  This will
+         // cause some properties to be changed to the same value but it may be good to signal the model that something underneath
+         // has changed.
+         parselet.setSemanticValue(this, node, childIndex, slotIndex, skipSemanticValue, parser, false);
+      }
    }
 
    public void add(Object node, Parselet p, int index, boolean skipSemanticValue, Parser parser) {
@@ -104,7 +123,7 @@ public class ParentParseNode extends AbstractParseNode {
          children.add(node);
 
       // Only nested parselets should be using the ParentParseNode
-      parselet.setSemanticValue(this, node, index, skipSemanticValue, parser, false);
+      parselet.setSemanticValue(this, node, -1, index, skipSemanticValue, parser, false);
    }
 
    public void set(Object node, Parselet p, int index, boolean skipSemanticValue, Parser parser) {
@@ -153,7 +172,7 @@ public class ParentParseNode extends AbstractParseNode {
          children.set(index, node);
 
       // Only nested parselets should be using the ParentParseNode
-      parselet.setSemanticValue(this, node, index, skipSemanticValue, parser, true);
+      parselet.setSemanticValue(this, node, -1, index, skipSemanticValue, parser, true);
    }
 
    public void addGeneratedNode(Object node) {
@@ -856,20 +875,22 @@ public class ParentParseNode extends AbstractParseNode {
             if (child instanceof IParseNode) {
                IParseNode childNode = (IParseNode) child;
                childNode.findStartDiff(ctx);
-               if (ctx.diffNode != null)
+               if (ctx.firstDiffNode != null) {
+                  ctx.addChangedParent(this);
                   return;
+               }
             }
             else if (child instanceof CharSequence) {
                CharSequence childSeq = (CharSequence) child;
                int len = childSeq.length();
                String text = ctx.text;
                for (int c = 0; c < len; c++) {
-                  if (childSeq.charAt(c) != text.charAt(ctx.curOffset)) {
-                     ctx.diffNode = this;
+                  if (childSeq.charAt(c) != text.charAt(ctx.startChangeOffset)) {
+                     ctx.firstDiffNode = this;
                      return;
                   }
                   else {
-                     ctx.curOffset++;
+                     ctx.startChangeOffset++;
                   }
                }
             }
@@ -888,20 +909,26 @@ public class ParentParseNode extends AbstractParseNode {
             if (child instanceof IParseNode) {
                IParseNode childNode = (IParseNode) child;
                childNode.findEndDiff(ctx);
-               if (ctx.diffNode != null)
+               if (ctx.lastDiffNode != null) {
+                  // If the lastDiff is a child of the firstDiffNode, we won't find it as we prune the first diff node
+                  // Instead, treat the entire node as changed.
+                  if (ctx.firstDiffNode == this)
+                     ctx.lastDiffNode = this;
                   return;
+               }
             }
             else if (child instanceof CharSequence) {
                CharSequence childSeq = (CharSequence) child;
                int len = childSeq.length();
                String text = ctx.text;
                for (int c = len - 1; c >= 0; c--) {
-                  if (childSeq.charAt(c) != text.charAt(ctx.curOffset)) {
-                     ctx.diffNode = this;
+                  if (childSeq.charAt(c) != text.charAt(ctx.endChangeNewOffset)) {
+                     ctx.lastDiffNode = this;
                      return;
                   }
                   else {
-                     ctx.curOffset--;
+                     ctx.endChangeOldOffset--;
+                     ctx.endChangeNewOffset--;
                   }
                }
             }

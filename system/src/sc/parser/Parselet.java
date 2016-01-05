@@ -499,7 +499,54 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       node.formatStyled(ctx, adapter);
    }
 
-   abstract public Object parse(Parser p);
+   public abstract Object parse(Parser p);
+
+   protected boolean anyReparseChanges(Parser parser, Object oldParseNode, DiffContext dctx) {
+      if (!dctx.changedRegion && !dctx.sameAgain) {
+         if (oldParseNode == dctx.firstDiffNode) {
+            dctx.changedRegion = true;
+         }
+      }
+      return dctx.changedRegion;
+   }
+
+   protected void checkForSameAgainRegion(Parser parser, Object oldParseNode, DiffContext dctx) {
+      if (dctx.changedRegion && !dctx.sameAgain && dctx.lastDiffNode == oldParseNode) {
+         dctx.changedRegion = false;
+         dctx.sameAgain = true;
+      }
+   }
+
+   protected void advancePointer(Parser parser, Object oldParseNode, DiffContext dctx) {
+      // If nothing has changed, just advance the currentIndex beyond this token since this is a match
+      if (oldParseNode != null) {
+         if (oldParseNode instanceof IParseNode) {
+            IParseNode oldp = (IParseNode) oldParseNode;
+            int newStartIx = oldp.getStartIndex() + dctx.getNewOffset() + oldp.length();
+            parser.changeCurrentIndex(newStartIx);
+
+            if (dctx.sameAgain)
+               oldp.resetStartIndex(newStartIx);
+         }
+         else {
+            parser.changeCurrentIndex(parser.currentIndex + ((CharSequence) oldParseNode).length());
+         }
+      }
+
+   }
+
+   public Object reparse(Parser parser, Object oldParseNode, DiffContext dctx) {
+      Object res;
+      if (anyReparseChanges(parser, oldParseNode, dctx)) {
+         res = parse(parser);
+      }
+      else {
+         res = oldParseNode;
+         advancePointer(parser, oldParseNode, dctx);
+      }
+
+      return res;
+   }
 
    /** An optional method for parsing a repeating parselet.  Used in the context when we know there are errors in the file and
     * we know the parent parselet failed to parse the exit parselet in the current context.  The parselet previous to exit parselet is called
@@ -632,4 +679,5 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
    public boolean isComplexStringType() {
       return false;
    }
+
 }
