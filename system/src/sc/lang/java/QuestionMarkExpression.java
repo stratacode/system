@@ -24,11 +24,13 @@ public class QuestionMarkExpression extends Expression {
       getTypeDeclaration();
    }
 
-   public void setInferredType(Object type) {
+   public boolean setInferredType(Object type) {
+      boolean res = false;
       if (trueChoice != null)
-         trueChoice.setInferredType(type);
+         res = trueChoice.setInferredType(type);
       if (falseChoice != null)
-         falseChoice.setInferredType(type);
+         res |= falseChoice.setInferredType(type);
+      return res;
    }
 
    public boolean propagatesInferredType(Expression child) {

@@ -66,7 +66,7 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
    }
 
    public String getFullBaseTypeName() {
-      return ModelUtil.getTypeName(baseType);
+      return getFullTypeName(false, false);
    }
 
    public String getInnerTypeName() {
@@ -100,8 +100,8 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
       return ModelUtil.isDynamicStub(baseType, includeExtends);
    }
 
-   public Object definesMethod(String name, List<? extends Object> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType) {
-      return ModelUtil.definesMethod(baseType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType);
+   public Object definesMethod(String name, List<? extends Object> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
+      return ModelUtil.definesMethod(baseType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
    }
 
    public Object declaresConstructor(List<?> parametersOrExpressions, ITypeParamContext ctx) {
@@ -131,6 +131,8 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
       Object typeToUse = baseType;
       if (isTypeVar)
          typeToUse = ModelUtil.getTypeParameterDefault(typeToUse);
+      if (typeToUse == null)
+         typeToUse = Object.class;
       // TODO: should we verify that our parameters match if the other type has assigned params too?
       return ModelUtil.implementsType(typeToUse, otherTypeName, assignment, allowUnbound);
    }
@@ -155,6 +157,8 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
    }
 
    public List<Object> getMethods(String methodName, String modifier, boolean includeExtends) {
+      if (baseType == null)
+         return null;
       Object type = baseType;
       if (ModelUtil.isTypeVariable(type))
          type = ModelUtil.getTypeParameterDefault(type);

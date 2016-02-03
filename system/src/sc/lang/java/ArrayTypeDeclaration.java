@@ -158,8 +158,8 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
       return arrayDimensions.length() >> 1;
    }
 
-   public Object definesMethod(String name, List<? extends Object> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType) {
-      Object res = ModelUtil.definesMethod(OBJECT_ARRAY_CLASS, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType);
+   public Object definesMethod(String name, List<? extends Object> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
+      Object res = ModelUtil.definesMethod(OBJECT_ARRAY_CLASS, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
       // The clone method in an array declaration seems to magically know the return value is an array even though reflection on the class does not detect a clone method.
       if (name.equals("clone")) {
          return new ArrayCloneMethod(this, res, definedInType.getJavaModel());

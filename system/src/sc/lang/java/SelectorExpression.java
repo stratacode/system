@@ -321,8 +321,7 @@ public class SelectorExpression extends ChainedExpression {
       }
 
       int last = selectors.size()-1;
-      // TODO: isn't this just boundTypes[last]?
-      return IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, getArguments(last), last, getJavaModel(), last == 0 ? expression.getGenericType() : getGenericTypeForSelector(last-1, null), inferredType, getEnclosingType());
+      return IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, getArguments(last), last, getJavaModel(), last == 0 ? expression.getGenericType() : getGenericTypeForSelector(last, null), inferredType, getEnclosingType());
    }
 
    private Object getGenericTypeForSelector(int i, Object currentType) {
@@ -1005,10 +1004,11 @@ public class SelectorExpression extends ChainedExpression {
       return false;
    }
 
-   public void setInferredType(Object inferredType) {
+   public boolean setInferredType(Object inferredType) {
       this.inferredType = inferredType;
       // Re-resolve this now that we have the inferred type
       resolveTypeDeclaration();
+      return false;
    }
 
    // We propagate to arguments in VariableSelectors but not to the root expression

@@ -144,8 +144,10 @@ public class IdentifierExpression extends ArgumentsExpression {
                   break;
                }
             // This type was copied via deepCopy - it's already been resolved so no need to try and do that again.
-            if (resolved)
+            if (resolved) {
+               propagateInferredTypes();
                return;
+            }
          }
          if (boundTypes == null || boundTypes.length != sz)
             boundTypes = new Object[sz];
@@ -165,6 +167,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   idTypes[i] = IdentifierType.PackageName; // TODO: or bound type if there's a super-type?
                idTypes[sz-1] = IdentifierType.ResolvedObjectName;
                boundTypes[sz-1] = type;
+               propagateInferredTypes();
                return;
             }
          }
@@ -238,7 +241,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             if (arguments != null && !(this instanceof NewExpression)) {
                Object foundMeth = findMethod(firstIdentifier, arguments, this, enclType, isStatic(), inferredType);
                if (foundMeth != null) {
-                  foundMeth = parameterizeMethod(this, foundMeth, null, inferredType, arguments);
+                  foundMeth = parameterizeMethod(this, foundMeth, null, inferredType, arguments, getMethodTypeArguments());
                   idTypes[0] = IdentifierType.MethodInvocation;
                   boundTypes[0] = foundMeth;
                }
@@ -547,7 +550,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       }
    }
 
-   static Object parameterizeMethod(Expression rootExpr, Object foundMeth, Object currentType, Object inferredType, List<Expression> arguments) {
+   static Object parameterizeMethod(Expression rootExpr, Object foundMeth, Object currentType, Object inferredType, List<Expression> arguments, List<JavaType> methodTypeArgs) {
       if (foundMeth != null) {
          if (!(foundMeth instanceof ParamTypedMethod) && ModelUtil.isMethod(foundMeth) && (ModelUtil.hasMethodTypeParameters(foundMeth) || currentType instanceof ITypeParamContext)) {
             TypeDeclaration definedInType = rootExpr.getEnclosingType();
@@ -558,7 +561,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                if (definedInType == null)
                   System.err.println("*** Unable to parametrize reference - no enclosing type");
             }
-            ParamTypedMethod ptm = new ParamTypedMethod(foundMeth, currentType instanceof ITypeParamContext ? (ITypeParamContext) currentType : null, definedInType, arguments, inferredType);
+            ParamTypedMethod ptm = new ParamTypedMethod(foundMeth, currentType instanceof ITypeParamContext ? (ITypeParamContext) currentType : null, definedInType, arguments, inferredType, methodTypeArgs);
             foundMeth = ptm;
          }
          if (inferredType != null) {
@@ -572,7 +575,6 @@ public class IdentifierExpression extends ArgumentsExpression {
 
    static void propagateInferredArgs(Expression rootExpr, Object meth, List<Expression> arguments) {
       Object[] paramTypes = ModelUtil.getActualParameterTypes(meth, true);
-      int i = 0;
       int plen = paramTypes == null ? 0 : paramTypes.length;
       int last = plen - 1;
       int argLen = arguments.size();
@@ -585,23 +587,47 @@ public class IdentifierExpression extends ArgumentsExpression {
       }
 
       if (paramTypes != null) {
-         for (Expression arg : arguments) {
-            Object pType = i >= plen ? paramTypes[plen-1] : paramTypes[i];
-            Object useType = pType;
-            // Handling repeating parameters - it's a varargs method and the last element is an array
-            if (i >= last && ModelUtil.isVarArgs(meth)) {
-               if (ModelUtil.isArray(pType)) {
-                  // If we are supplying an array, leave the type as an array
-                  if (!ModelUtil.isArray(arg.getTypeDeclaration()))
-                     useType = ModelUtil.getArrayComponentType(pType);
-               }
-            }
-            if (ModelUtil.isTypeVariable(useType))
-               useType = ModelUtil.getTypeParameterDefault(useType);
-            arg.setInferredType(useType);
-            i++;
+
+         doPropagateInferredArgs(rootExpr, meth, arguments, paramTypes);
+
+         // Need to do this once again after we've propagated all of the argument type
+         if (meth instanceof ParamTypedMethod) {
+            ParamTypedMethod pmeth = (ParamTypedMethod) meth;
+            int i = 0;
+            doPropagateInferredArgs(rootExpr, meth, arguments, paramTypes);
          }
       }
+   }
+
+   static private void doPropagateInferredArgs(Expression rootExpr, Object meth, List<Expression> arguments, Object[] paramTypes) {
+      int i = 0;
+      int plen = paramTypes.length;
+      int last = plen - 1;
+      for (Expression arg : arguments) {
+         Object pType = i >= plen ? paramTypes[last] : paramTypes[i];
+         Object useType = pType;
+         // Handling repeating parameters - it's a varargs method and the last element is an array
+         if (i >= last && ModelUtil.isVarArgs(meth)) {
+            if (ModelUtil.isArray(pType)) {
+               // If we are supplying an array, leave the type as an array
+               if (!ModelUtil.isArray(arg.getTypeDeclaration()))
+                  useType = ModelUtil.getArrayComponentType(pType);
+            }
+         }
+         if (ModelUtil.isTypeVariable(useType))
+            useType = ModelUtil.getTypeParameterDefault(useType);
+         boolean changed = arg.setInferredType(useType);
+
+         if (meth instanceof ParamTypedMethod && changed) {
+            ParamTypedMethod pmeth = (ParamTypedMethod) meth;
+
+            // The subsequent parameter types might need to change.
+            // TODO: we should probably also go and update 0 through i-1 as well.
+            paramTypes = pmeth.resolveParameterTypes(true, pmeth.boundTypes, i+1, true);
+         }
+         i++;
+      }
+
    }
 
    private void propagateInferredTypes() {
@@ -1026,7 +1052,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                String getName = ModelUtil.getMethodName(getMethod);
                referenceTD = (TypeDeclaration) encType;
                String setName = "set" + (getName.startsWith("is") ? getName.substring(2) : getName.substring(3));
-               Object setMethod = referenceTD.definesMethod(setName, Collections.singletonList(typeForIdentifier), null, null, referenceTD.isTransformedType(), false, null);
+               Object setMethod = referenceTD.definesMethod(setName, Collections.singletonList(typeForIdentifier), null, null, referenceTD.isTransformedType(), false, null, null);
                if (setMethod != null) {
                   // Do dynamic access only if the property is marked as manually bindable.
                   referenceTD.addPropertyToMakeBindable(propertyName, boundType, expr.getJavaModel(), ModelUtil.isManualBindable(setMethod));
@@ -1244,7 +1270,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             meth = ((BodyTypeDeclaration) peerType).findMethod(methodName, arguments, expr, peerType, isStatic, inferredType);
          }
          else
-            meth = ModelUtil.definesMethod(peerType, methodName, arguments, null, enclPeerType, false, isStatic, inferredType);
+            meth = ModelUtil.definesMethod(peerType, methodName, arguments, null, enclPeerType, false, isStatic, inferredType, expr.getMethodTypeArguments());
          if (meth != null) {
             boundTypes[ix] = meth;
             idTypes[ix] = IdentifierType.RemoteMethodInvocation;
@@ -1272,18 +1298,20 @@ public class IdentifierExpression extends ArgumentsExpression {
          currentType = ModelUtil.getParamTypeBaseType(currentType);
 
       ITypeDeclaration enclosingType = expr.getEnclosingIType();
+      List<JavaType> methodTypeArgs = expr.getMethodTypeArguments();
+
       if (currentType instanceof ITypeDeclaration) {
          ITypeDeclaration currentTypeDecl = (ITypeDeclaration) currentType;
 
          if (isMethod) {
-            Object methVar = currentTypeDecl.definesMethod(nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType);
+            Object methVar = currentTypeDecl.definesMethod(nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs);
             if (methVar != null) {
                // getX() can return a ClassDeclaration in some cases
                if (methVar instanceof ITypeDeclaration) {
                   idTypes[i] = IdentifierType.BoundObjectName;
                }
                else {
-                  methVar = parameterizeMethod(expr, methVar, currentTypeDecl, inferredType, arguments);
+                  methVar = parameterizeMethod(expr, methVar, currentTypeDecl, inferredType, arguments, methodTypeArgs);
                   idTypes[i] = IdentifierType.MethodInvocation;
                }
                boundTypes[i] = methVar;
@@ -1296,7 +1324,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                if (i > 0 && idTypes[i-1] == IdentifierType.SuperExpression && enclosingType != null) {
                   Object newCurrentType = ModelUtil.getExtendsClass(enclosingType);
                   if (newCurrentType != null && newCurrentType != currentType) {
-                     methVar = ModelUtil.definesMethod(newCurrentType, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType);
+                     methVar = ModelUtil.definesMethod(newCurrentType, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs);
                      if (methVar != null) {
                         idTypes[i] = methVar instanceof ITypeDeclaration ? IdentifierType.BoundObjectName : IdentifierType.MethodInvocation;
                         boundTypes[i] = methVar;
@@ -1368,9 +1396,9 @@ public class IdentifierExpression extends ArgumentsExpression {
       else if (currentType instanceof Class) {
          Class currentClass = (Class) currentType;
          if (isMethod) {
-            Method methObj = (Method) ModelUtil.definesMethod(currentClass, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType);
+            Method methObj = (Method) ModelUtil.definesMethod(currentClass, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs);
             if (methObj != null) {
-               Object meth = parameterizeMethod(expr, methObj, currentClass, inferredType, arguments);
+               Object meth = parameterizeMethod(expr, methObj, currentClass, inferredType, arguments, methodTypeArgs);
                idTypes[i] = IdentifierType.MethodInvocation;
                boundTypes[i] = meth;
             }
@@ -1381,7 +1409,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   if (model != null && !model.disableTypeErrors) {
                      String otherMethods = getOtherMethodsMessage(currentClass, nextName);
                      expr.displayTypeError("No method: ", nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentClass), otherMethods, " for ");
-                     methObj = (Method) ModelUtil.definesMethod(currentClass, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType); // TODO: remove - for debugging only
+                     methObj = (Method) ModelUtil.definesMethod(currentClass, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs); // TODO: remove - for debugging only
                   }
                }
             }
@@ -1821,16 +1849,16 @@ public class IdentifierExpression extends ArgumentsExpression {
             }
             // Need to use the compiled class to resolve the _super_x method
             else if (superMethod) {
-               method = ModelUtil.definesMethod(ModelUtil.getCompiledClass(DynUtil.getType(value)), methodName, arguments, null, null, false, false, null);
+               method = ModelUtil.definesMethod(ModelUtil.getCompiledClass(DynUtil.getType(value)), methodName, arguments, null, null, false, false, null, getMethodTypeArguments());
                // Stub did not generate an _super method so just get the method itself.  Maybe the super.x() should force method x to be
                // included as a dynamic method in the stub?  Is there a case here where we will not get the real super method?
                if (method == null && methodName.startsWith("_super")) {
                   methodName = methodName.substring("_super_".length());
-                  method = ModelUtil.definesMethod(ModelUtil.getCompiledClass(DynUtil.getType(value)), methodName, arguments, null, null, false, false, null);
+                  method = ModelUtil.definesMethod(ModelUtil.getCompiledClass(DynUtil.getType(value)), methodName, arguments, null, null, false, false, null, getMethodTypeArguments());
                }
             }
             else
-               method = ModelUtil.definesMethod(DynUtil.getType(value), methodName, arguments, null, null, false, false, null);
+               method = ModelUtil.definesMethod(DynUtil.getType(value), methodName, arguments, null, null, false, false, null, getMethodTypeArguments());
 
             /*
               Java ignores anyway?
@@ -2306,11 +2334,11 @@ public class IdentifierExpression extends ArgumentsExpression {
 
                      // super(x, y, z) - i.e. refer to the constructor.
                      if (sz == 1) {
-                        refMethObj = itype.definesMethod(itype.getTypeName(), arguments, null, null, itype.isTransformedType(), false, null);
+                        refMethObj = itype.definesMethod(itype.getTypeName(), arguments, null, null, itype.isTransformedType(), false, null, getMethodTypeArguments());
                      }
                      // super.method(x,y,z)
                      else if (sz > 1) {
-                         refMethObj = itype.definesMethod(idents.get(1).toString(), arguments, null, null, itype.isTransformedType(), false, null);
+                         refMethObj = itype.definesMethod(idents.get(1).toString(), arguments, null, null, itype.isTransformedType(), false, null, getMethodTypeArguments());
                      }
                      else {
                          break; // Not sure why we'd get here
@@ -2338,7 +2366,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                            while (true) {
                               Layer methLayer = model.getLayeredSystem().getLayerByName(refMeth.overriddenLayer);
                               if (methLayer.getLayerPosition() > overrideLayer.getLayerPosition()) {
-                                 refMethObj = itype.definesMethod(refMeth.overriddenMethodName, arguments, null, null, itype.isTransformedType(), false, null);
+                                 refMethObj = itype.definesMethod(refMeth.overriddenMethodName, arguments, null, null, itype.isTransformedType(), false, null, getMethodTypeArguments());
                                  if (refMethObj != null && refMethObj instanceof AbstractMethodDefinition) {
                                     refMeth = (AbstractMethodDefinition) refMethObj;
                                     if (refMeth.overriddenMethodName == null) {
@@ -4962,15 +4990,17 @@ public class IdentifierExpression extends ArgumentsExpression {
       return false;
    }
 
-   public void setInferredType(Object inferredType) {
+   public boolean setInferredType(Object inferredType) {
       this.inferredType = inferredType;
 
       // TODO: do we need to re-resolve all type references now?
       reresolveTypeReference();
       //propagateInferredTypes();
+      return false;
    }
 
    public boolean propagatesInferredType(Expression child) {
       return true;
    }
+
 }

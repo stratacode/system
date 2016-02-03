@@ -1965,14 +1965,14 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    public Object findMethod(String name, List<? extends Object> params, Object fromChild, Object refType, boolean staticOnly, Object inferredType) {
       Object v;
 
-      if ((v = definesMethod(name, params, null, refType, nonTransformedModel != null, staticOnly, inferredType)) != null)
+      if ((v = definesMethod(name, params, null, refType, nonTransformedModel != null, staticOnly, inferredType, null)) != null)
          return v;
 
       // If this is an inner type, we still need to check the parent
       return super.findMethod(name, params, this, refType, staticOnly, inferredType);
    }
 
-   public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType) {
+   public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
       Object v;
       Object type = null;
 
@@ -1989,11 +1989,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       }
 
       if (type != null) {
-         v = ModelUtil.definesMethod(type, name, types, ctx, refType, isTransformed, staticOnly, inferredType);
+         v = ModelUtil.definesMethod(type, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
          if (v != null && ModelUtil.hasModifier(v, "static"))
             return v;
       }
-      return super.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType);
+      return super.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
    }
 
    public boolean needsCompile() {

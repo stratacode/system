@@ -65,8 +65,8 @@ public class BoundType extends JavaType {
       return baseType;
    }
 
-   public Object getTypeDeclaration(ITypeParamContext ctx, boolean resolve) {
-      return getFirstType().getTypeDeclaration(ctx, resolve);
+   public Object getTypeDeclaration(ITypeParamContext ctx, ITypeDeclaration itd, boolean resolve, boolean refreshParams, boolean bindUnbound) {
+      return getFirstType().getTypeDeclaration(ctx, itd, resolve, refreshParams, bindUnbound);
    }
 
    public void initType(LayeredSystem sys, ITypeDeclaration itd, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer, Object typeParam) {

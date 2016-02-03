@@ -2088,7 +2088,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          return true;
       if (type == depType)
          return true;
-      if (depType instanceof EnumConstant)
+      if (depType instanceof EnumConstant || depType instanceof ExtendsType.WildcardTypeDeclaration)
          return true;
       return false;
    }

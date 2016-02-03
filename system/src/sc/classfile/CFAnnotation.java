@@ -51,7 +51,7 @@ public class CFAnnotation implements IAnnotation {
                type.setTypeDeclaration(annotType = classFile.cfClass.system.getTypeDeclaration(typeName));
 
             if (annotType != null) {
-               Object mem = ModelUtil.definesMethod(annotType, name, null, null, null, false, false, null);
+               Object mem = ModelUtil.definesMethod(annotType, name, null, null, null, false, false, null, null);
                if (mem != null) {
                   Object dataType = ModelUtil.getReturnType(mem, true);
                   if (ModelUtil.isBoolean(dataType)) {

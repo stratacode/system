@@ -85,7 +85,7 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       return super.findMember(memberName, type, this, refType, ctx, skipIfaces);
    }
 
-   public Object definesMethod(String methodName, List<?> methParams, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType) {
+   public Object definesMethod(String methodName, List<?> methParams, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
       if (name != null && methodName.equals(name)) {
          if (parametersMatch(methParams, ctx)) {
             // In Java, it's possible to have static and non-static methods with the identical signature.  If we are calling this from a static
@@ -95,13 +95,14 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
             if (refType == null || ModelUtil.checkAccess(refType, this)) {
                // TODO: I think we may have to do this if the method has any unbound type parameters in any of it declared types
                if (typeParameters != null) {
-                  ParamTypedMethod paramMethod = new ParamTypedMethod(this, ctx, getEnclosingType(), methParams, inferredType);
+                  ParamTypedMethod paramMethod = new ParamTypedMethod(this, ctx, getEnclosingType(), methParams, inferredType, methodTypeArgs);
                   if (inferredType != null) {
                      // Turn off the binding of parameter types while we do a match for this method.  We can't have the parameter types setting type parameters
                      // here - only the inferred type to be sure it does not conflict with the parameter type match.
                      paramMethod.bindParamTypes = false;
-                     if (!ModelUtil.parameterTypesMatch(paramMethod.getParameterTypes(true), ModelUtil.parametersToTypeArray(methParams, ctx), paramMethod, refType, ctx))
+                     if (!ModelUtil.parameterTypesMatch(paramMethod.getParameterTypes(true), ModelUtil.parametersToTypeArray(methParams, ctx), paramMethod, refType, ctx)) {
                         return null;
+                     }
                      paramMethod.bindParamTypes = true;
                   }
                   return paramMethod;
@@ -147,8 +148,15 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
          if (otherP instanceof ITypedObject)
              otherP = ((ITypedObject) otherP).getTypeDeclaration();
 
+         // If it's an unbound lambda expression, we still need to do some basic checks to see if this one is a match.
+         if (otherP instanceof BaseLambdaExpression.LambdaInferredType) {
+            BaseLambdaExpression.LambdaInferredType lambdaType = (BaseLambdaExpression.LambdaInferredType) otherP;
+            if (!lambdaType.rootExpr.lambdaParametersMatch(thisType))
+               return false;
+         }
+
          // Null entry means match
-         if (otherP == null || thisP == null || otherP instanceof BaseLambdaExpression.LambdaInferredType)
+         if (otherP == null || thisP == null)
             continue;
 
          // Take a conservative approach... if types are not available, just match
@@ -463,11 +471,11 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       if (compiledClass == null) {
          System.err.println("*** No compiled class for: " + getDeclaringType());
       }
-      Object res = ModelUtil.definesMethod(compiledClass, name, getParameterList(), null, null, false, false, null);
+      Object res = ModelUtil.definesMethod(compiledClass, name, getParameterList(), null, null, false, false, null, null);
       if (res == null) {
          System.err.println("*** No runtime method for: " + name);
          boolean x = isDynMethod();
-         Object y = ModelUtil.definesMethod(compiledClass, name, getParameterList(), null, null, false, false, null);
+         Object y = ModelUtil.definesMethod(compiledClass, name, getParameterList(), null, null, false, false, null, null);
       }
       return res;
    }

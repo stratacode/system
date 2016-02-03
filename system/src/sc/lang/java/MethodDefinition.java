@@ -94,7 +94,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       Object modType = methodType.getDerivedTypeDeclaration();
       if (extendsType == null)
          extendsType = Object.class;
-      Object overridden = ModelUtil.definesMethod(extendsType, name, getParameterList(), null, null, false, false, null);
+      Object overridden = ModelUtil.definesMethod(extendsType, name, getParameterList(), null, null, false, false, null, null);
       superMethod = overridden;
       if (overridden instanceof MethodDefinition) {
          MethodDefinition superMeth = (MethodDefinition) overridden;
@@ -132,7 +132,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          if (overridden == null && methodType.implementsBoundTypes != null) {
             Object implMeth;
             for (Object impl:methodType.implementsBoundTypes) {
-               implMeth = ModelUtil.definesMethod(impl, name, getParameterList(), null, null, false, false, null);
+               implMeth = ModelUtil.definesMethod(impl, name, getParameterList(), null, null, false, false, null, null);
                if (implMeth != null && ModelUtil.isCompiledMethod(implMeth)) {
                   methodType.setNeedsDynamicStub(true);
                   overridesCompiled = true;
@@ -141,7 +141,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          }
 
          if (modType != extendsType) {
-            overridden = ModelUtil.definesMethod(modType, name, getParameterList(), null, null, false, false, null);
+            overridden = ModelUtil.definesMethod(modType, name, getParameterList(), null, null, false, false, null, null);
             if (overridden instanceof MethodDefinition) {
                MethodDefinition overMeth = (MethodDefinition) overridden;
                if (overMeth == this)
@@ -630,12 +630,12 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
 
       Object res;
       if (ext != null) {
-         res = ModelUtil.definesMethod(ext, name, getParameterList(), null, null, false, false, null);
+         res = ModelUtil.definesMethod(ext, name, getParameterList(), null, null, false, false, null, null);
          if (res != null)
             return res;
       }
       if (ext != base && base != null) {
-         res = ModelUtil.definesMethod(base, name, getParameterList(), null, null, false, false, null);
+         res = ModelUtil.definesMethod(base, name, getParameterList(), null, null, false, false, null, null);
          if (res != null)
             return res;
       }
@@ -739,7 +739,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          }
 
          // In this case, we need to consider all overriding methods - including those in modified types
-         Object result = subType.declaresMethod(name, ptypes, null, enclType, false, null, false);
+         Object result = subType.declaresMethod(name, ptypes, null, enclType, false, null, null, false);
          if (result instanceof MethodDefinition) {
             res.add(result);
          }
@@ -748,7 +748,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             // If we hit this same type in the list of modified types need to stop since anything below this type is not an overriding method
             if (modType == null || ModelUtil.sameTypes(modType, enclType) && modType.layer.getLayerName().equals(subType.layer.getLayerName()))
                break;
-            result = modType.declaresMethod(name, ptypes, null, enclType, false, null, false);
+            result = modType.declaresMethod(name, ptypes, null, enclType, false, null, null, false);
             if (result instanceof MethodDefinition)
                res.add(result);
             modType = modType.getModifiedType();
@@ -763,7 +763,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
    }
 
    public Object getInferredReturnType() {
-      Object retType = null;
+      Object infRetType = null;
       if (body != null) {
          ArrayList<Statement> returns = new ArrayList<Statement>();
          body.addReturnStatements(returns);
@@ -771,17 +771,23 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             for (int i = 0; i < returns.size(); i++) {
                ReturnStatement ret = (ReturnStatement) returns.get(i);
                if (ret.expression != null) {
-                  Object newRetType = ret.expression.getTypeDeclaration();
+                  Object newRetType = ret.expression.getGenericType();
                   if (newRetType != null && newRetType != NullLiteral.NULL_TYPE) {
-                     if (retType == null)
-                        retType = newRetType;
+                     if (infRetType == null) {
+                        //infRetType = ModelUtil.findCommonSuperClass(newRetType, getTypeDeclaration());
+                        infRetType = newRetType;
+                     }
                      else
-                        retType = ModelUtil.findCommonSuperClass(newRetType, retType);
+                        infRetType = ModelUtil.findCommonSuperClass(newRetType, infRetType);
                   }
                }
             }
          }
       }
+      Object retType = getTypeDeclaration();
+      // Make sure the inferredType is more specific than the actual return type
+      if (retType == null || ModelUtil.isAssignableFrom(retType, infRetType))
+         return infRetType;
       return retType;
    }
 

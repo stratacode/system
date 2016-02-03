@@ -1798,8 +1798,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       IRuntimeProcessor proc = getRuntime(name);
       if (proc == null) {
          proc = DefaultRuntimeProcessor.readRuntimeProcessor(this, name);
-         if (proc != null)
+         if (proc != null) {
+            if (runtimes == null) {
+               runtimes = new ArrayList<IRuntimeProcessor>();
+               if (proc != null && javaIsAlwaysDefaultRuntime)
+                  addRuntime(null, null);
+            }
             runtimes.add(proc);
+         }
       }
       return proc;
    }

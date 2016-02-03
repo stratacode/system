@@ -9,6 +9,7 @@ import sc.parser.IStyleAdapter;
 import sc.parser.PString;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -19,7 +20,8 @@ public class TypedMethodExpression extends IdentifierExpression {
    public String typedIdentifier; // the name of the method being called with explicit type parameters
    public List<JavaType> typeArguments;
 
-   // This contains a copy of identifiers with typeIdentifier appended.
+   // This contains a copy of inherited identifiers member variable's list with typeIdentifier appended at the end (so it includes
+   // all of the identifiers of this expression).
    private transient List<IString> aidentifiers;
 
    public List<IString> getAllIdentifiers() {
@@ -41,6 +43,30 @@ public class TypedMethodExpression extends IdentifierExpression {
       return 0;
    }
    */
+
+   public List<JavaType> getMethodTypeArguments() {
+      return typeArguments;
+   }
+
+   private Object[] getMethodTypeParams() {
+      if (boundTypes != null && typeArguments != null) {
+         int last = boundTypes.length - 1;
+         Object method = boundTypes[last];
+         if (method != null) {
+            return ModelUtil.getMethodTypeParameters(method);
+         }
+      }
+      return null;
+   }
+
+   public void start() {
+      super.start();
+
+      Object[] methTypeParams = getMethodTypeParams();
+      if (methTypeParams != null && methTypeParams.length != typeArguments.size()) {
+         displayError("Mismatching number of method type parameters: " + Arrays.asList(methTypeParams) + " and supplied types: " + typeArguments + " for: ");
+      }
+   }
 
    public boolean isReferenceInitializer() {
       return false;
@@ -99,5 +125,24 @@ public class TypedMethodExpression extends IdentifierExpression {
          return false;
       }
       return super.applyPartialValue(value);
+   }
+
+   public Object getTypeDeclaration() {
+      return getGenericType();
+   }
+
+   public Object getGenericType() {
+      Object type = super.getGenericType();
+      if (type instanceof ParamTypeDeclaration) {
+         ParamTypeDeclaration ptd = ((ParamTypeDeclaration) type).copy();
+         int numParams = ptd.types.size();
+         if (numParams == typeArguments.size()) {
+            for (int i = 0; i < numParams; i++) {
+               ptd.types.set(i, typeArguments.get(i).getTypeDeclaration());
+            }
+         }
+         return ptd;
+      }
+      return type;
    }
 }

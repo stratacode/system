@@ -72,8 +72,8 @@ public class EnumDeclaration extends TypeDeclaration {
       }
    }
 
-   public Object declaresMethod(String name, List<? extends Object> types, ITypeParamContext ctx, Object refType, boolean staticOnly, Object inferredType, boolean includeModified) {
-      Object o = super.declaresMethod(name, types, ctx, refType, staticOnly, inferredType, includeModified);
+   public Object declaresMethod(String name, List<? extends Object> types, ITypeParamContext ctx, Object refType, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs, boolean includeModified) {
+      Object o = super.declaresMethod(name, types, ctx, refType, staticOnly, inferredType, methodTypeArgs, includeModified);
       if (o != null)
          return o;
 
@@ -91,16 +91,16 @@ public class EnumDeclaration extends TypeDeclaration {
       // the values and valueOf methods.   For other methods, get the runtime type.  if it is a dynamic enum type,
       // we use DynEnumConstant.class to get the method.  For static ones, return the method on the enum class itself.
       
-      return ModelUtil.definesMethod(DynEnumConstant.class, name, types, ctx, refType, false, staticOnly, inferredType);
+      return ModelUtil.definesMethod(DynEnumConstant.class, name, types, ctx, refType, false, staticOnly, inferredType, methodTypeArgs);
    }
 
-   public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType) {
-      Object o = super.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType);
+   public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
+      Object o = super.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
       if (o != null)
          return o;
 
       // All enum types inherit the methods from the java.lang.Enum
-      o = ModelUtil.definesMethod(java.lang.Enum.class, name, types, ctx, refType, isTransformed, staticOnly, inferredType);
+      o = ModelUtil.definesMethod(java.lang.Enum.class, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
       if (o != null)
          return o;
       return null;

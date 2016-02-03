@@ -115,4 +115,10 @@ public class CastExpression extends ChainedExpression {
          return type.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
       return -1;
    }
+
+   public boolean setInferredType(Object infType) {
+      if (expression != null)
+         return expression.setInferredType(type.getTypeDeclaration());
+      return false;
+   }
 }

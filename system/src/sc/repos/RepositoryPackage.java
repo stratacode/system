@@ -301,6 +301,13 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
                      updateCurrentSource(src, true);
                   else
                      updateCurrentFileNames(currentSource);
+
+                  if (subPackages != null) {
+                     for (RepositoryPackage subPkg:subPackages) {
+                        if (!subPkg.installed)
+                           subPkg.preInstall(ctx, depCol);
+                     }
+                  }
                   break;
                } else {
                   installed = false;
@@ -693,7 +700,8 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
          for (int i = 0; i < subPackages.size(); i++) {
             RepositoryPackage subPkg = subPackages.get(i);
             subPkgs.add(subPkg.getPackageURL());
-            subPkg.preSaveSubPackages();
+            // Each package will have it's preSave called before saving the package file so no need to recurse
+            //subPkg.preSaveSubPackages();
          }
          subPkgURLs = subPkgs;
       }

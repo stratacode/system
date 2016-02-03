@@ -386,13 +386,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (obj != null)
          return obj;
 
-   // TODO: REMOVE
    // Need to check body first... otherwise we return objects in hiddenBody which we can't transform
-      /*
-   Object oobj = findMemberInBody(body, name, mtype, refType, ctx);
-   if (oobj != null && oobj != obj)
-      System.out.println("***");
-      */
       obj = findMemberInBody(hiddenBody, name, mtype, refType, ctx);
       if (obj != null)
          return obj;
@@ -678,33 +672,33 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (replacedByType != null && !isTransformedType())
          return replacedByType.findMethod(name, params, fromChild, refType, staticOnly, inferredType);
 
-      if ((v = definesMethod(name, params, null, refType, isTransformedType(), staticOnly, inferredType)) != null)
+      if ((v = definesMethod(name, params, null, refType, isTransformedType(), staticOnly, inferredType, null)) != null)
          return v;
 
       // If this is an inner type, we still need to check the parent
       return super.findMethod(name, params, this, refType, staticOnly, inferredType);
    }
 
-   public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType) {
+   public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
       Object v;
 
       if (isTransformed && transformedType != null) {
-         v = transformedType.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType);
+         v = transformedType.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
          if (v != null)
             return v;
       }
 
-      v = declaresMethod(name, types, ctx, refType, staticOnly, inferredType, false); // false for 'includeModified' because we already traverse modified types in definesMethod
+      v = declaresMethod(name, types, ctx, refType, staticOnly, inferredType, methodTypeArgs, false); // false for 'includeModified' because we already traverse modified types in definesMethod
       if (v != null)
          return v;
 
-      if ((v = extendsDefinesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType)) != null)
+      if ((v = extendsDefinesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs)) != null)
          return v;
 
-      return super.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType);
+      return super.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
    }
 
-   public static Object findMethodInBody(List<Statement> body, String name, List<? extends Object> types, ITypeParamContext ctx, Object refType, boolean staticOnly, Object inferredType) {
+   public static Object findMethodInBody(List<Statement> body, String name, List<? extends Object> types, ITypeParamContext ctx, Object refType, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
       Object v = null;
       PerfMon.start("findMethod");
       try {
@@ -724,7 +718,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                   continue;
                }
                Object newMeth;
-               if ((newMeth = s.definesMethod(name, types, ctx, refType, false, staticOnly, inferredType)) != null) {
+               if ((newMeth = s.definesMethod(name, types, ctx, refType, false, staticOnly, inferredType, methodTypeArgs)) != null) {
                   if (v == null)
                      v = newMeth;
                   else {
@@ -746,30 +740,24 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    /** Just returns methods declared in this specific type */
-   public Object declaresMethod(String name, List<? extends Object> types, ITypeParamContext ctx, Object refType, boolean staticOnly, Object inferredType, boolean includeModified) {
+   public Object declaresMethod(String name, List<? extends Object> types, ITypeParamContext ctx, Object refType, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs, boolean includeModified) {
       if (methodsByName == null) {
          initMethodsByName();
       }
       List<Statement> sts = methodsByName.get(name);
-      Object obj = findMethodInBody(sts, name, types, ctx, refType, staticOnly, inferredType);
+      Object obj = findMethodInBody(sts, name, types, ctx, refType, staticOnly, inferredType, methodTypeArgs);
       if (obj != null)
          return obj;
 
       // Interfaces will put the complete version of the method in the hidden body so this needs to be first
-      Object v = findMethodInBody(hiddenBody, name, types, ctx, refType, staticOnly, inferredType);
+      Object v = findMethodInBody(hiddenBody, name, types, ctx, refType, staticOnly, inferredType, methodTypeArgs);
       if (v != null)
          return v;
-
-      /*
-      v = findMethodInBody(body, name, types, ctx, refType, staticOnly, inferredType);
-      if (v != null && v != obj)
-         System.out.println("***");
-      */
 
       if (isTransformedType() && isAutoComponent() && !isTransformed()) {
          // Note: this returns a compiled method even from the source type.  Use declaresMethodDef if you want to exclude
          // those compiled definitions.
-         obj = ModelUtil.definesMethod(ComponentImpl.class, name, types, ctx, refType, true, staticOnly, inferredType);
+         obj = ModelUtil.definesMethod(ComponentImpl.class, name, types, ctx, refType, true, staticOnly, inferredType, methodTypeArgs);
          if (obj != null)
             return obj;
       }
@@ -779,7 +767,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    // Returns the MethodDefinition, omitting the compiled types we might inherit from ComponentImpl
    AbstractMethodDefinition declaresMethodDef(String name, List<? extends Object> types) {
-      Object res = declaresMethod(name, types, null, null, false, null, false);
+      Object res = declaresMethod(name, types, null, null, false, null, null, false);
       if (res instanceof AbstractMethodDefinition)
          return (AbstractMethodDefinition) res;
       return null;
@@ -861,11 +849,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return null;
    }
 
-   public Object extendsDefinesMethod(String name, List<?> parameters, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType) {
+   public Object extendsDefinesMethod(String name, List<?> parameters, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
       Object td = getDerivedTypeDeclaration();
 
       if (td != null)
-         return ModelUtil.definesMethod(td, name, parameters, ctx, refType, isTransformed, staticOnly, inferredType);
+         return ModelUtil.definesMethod(td, name, parameters, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
 
       return null;
    }
@@ -3254,9 +3242,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    private Object definesComponentMethod(String name) {
-      Object res = definesMethod(name, null, null, this, false, false, null);
+      Object res = definesMethod(name, null, null, this, false, false, null, null);
       if (res == null)
-         res = definesMethod("_" + name, null, null, this, false, false, null); // Check the Alt version _preInit, _init, etc.
+         res = definesMethod("_" + name, null, null, this, false, false, null, null); // Check the Alt version _preInit, _init, etc.
       return res;
    }
 
@@ -3372,9 +3360,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                   }
                }
 
-               Object initMethod = definesMethod("init", null, null, this, false, false, null);
+               Object initMethod = definesMethod("init", null, null, this, false, false, null, null);
                if (initMethod == null)
-                  initMethod = ModelUtil.definesMethod(rtType, "init", null, null, this, false, false, null);
+                  initMethod = ModelUtil.definesMethod(rtType, "init", null, null, this, false, false, null, null);
                if (initMethod != null) {
                   initMethod = ModelUtil.getRuntimeMethod(initMethod);
                   try {
@@ -4865,7 +4853,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
          // Look for a method in this type specifically.  Anything in a modified type or extended type should not
          // get replaced since we are overriding that method in that case.
-         AbstractMethodDefinition overridden = (AbstractMethodDefinition) declaresMethod(newDef.name, newDef.getParameterList(), null, null, false, null, false);
+         AbstractMethodDefinition overridden = (AbstractMethodDefinition) declaresMethod(newDef.name, newDef.getParameterList(), null, null, false, null, null, false);
          if (overridden != null) {
             overridden.parentNode.replaceChild(overridden, newDef);
             if (overridden.overriddenMethod != null) {
@@ -4975,7 +4963,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
          // Look for a method in this type specifically.  Anything in a modified type or extended type should not
          // get replaced since we are overriding that method in that case.
-         AbstractMethodDefinition overridden = (AbstractMethodDefinition) declaresMethod(toRem.name, toRem.getParameterList(), null, null, false, null, false);
+         AbstractMethodDefinition overridden = (AbstractMethodDefinition) declaresMethod(toRem.name, toRem.getParameterList(), null, null, false, null, null, false);
          if (overridden != null) {
             overridden.parentNode.removeChild(overridden);
             removeStatement(overridden);
@@ -5441,7 +5429,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             }
             else if (oldBodyDef instanceof AbstractMethodDefinition) {
                AbstractMethodDefinition oldMeth = (AbstractMethodDefinition) oldBodyDef;
-               Object methObj = newType.definesMethod(oldMeth.name, oldMeth.getParameterList(), null, null, false, false, null);
+               Object methObj = newType.definesMethod(oldMeth.name, oldMeth.getParameterList(), null, null, false, false, null, null);
                if (methObj instanceof AbstractMethodDefinition) {
                   AbstractMethodDefinition newMeth = (AbstractMethodDefinition) methObj;
                   oldMeth.replaced = true;
@@ -5477,7 +5465,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             }
             else if (newBodyDef instanceof AbstractMethodDefinition) {
                AbstractMethodDefinition newMeth = (AbstractMethodDefinition) newBodyDef;
-               AbstractMethodDefinition oldMeth = (AbstractMethodDefinition) declaresMethod(newMeth.name, newMeth.getParameterList(), null, null, false, null, false);
+               AbstractMethodDefinition oldMeth = (AbstractMethodDefinition) declaresMethod(newMeth.name, newMeth.getParameterList(), null, null, false, null, null, false);
                if (oldMeth != null) {
                   if (oldMeth == newMeth)
                      System.out.println("*** Replacing a method by itself!");

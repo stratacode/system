@@ -80,20 +80,21 @@ public class ExtendsType extends JavaType {
       return sb.toString();
    }
 
-   public Object getTypeDeclaration(ITypeParamContext ctx, boolean resolve) {
+   public Object getTypeDeclaration(ITypeParamContext ctx, ITypeDeclaration definedInType, boolean resolve, boolean refreshParams, boolean bindUnbound) {
       if (typeArgument == null)
-         return Object.class;
+         return resolve ? Object.class : new WildcardTypeDeclaration();
       if (operator != null && operator.equals("super")) {
-         Object typeDecl = typeArgument.getTypeDeclaration(ctx, resolve);
+         Object typeDecl = typeArgument.getTypeDeclaration(ctx, definedInType, resolve, refreshParams, bindUnbound);
          if (typeDecl == null)
-            return Object.class;
+            return bindUnbound ? Object.class : null;
          if (typeDecl instanceof LowerBoundsTypeDeclaration)
             return typeDecl;
          return new LowerBoundsTypeDeclaration(typeDecl);
       }
-      return typeArgument.getTypeDeclaration(ctx, resolve);
+      return typeArgument.getTypeDeclaration(ctx, definedInType, resolve, refreshParams, bindUnbound);
    }
 
+   /** Represents a ? super X type */
    public static class LowerBoundsTypeDeclaration extends WrappedTypeDeclaration {
       LowerBoundsTypeDeclaration(Object lbType) {
          super(lbType);
@@ -105,14 +106,27 @@ public class ExtendsType extends JavaType {
       public boolean isAssignableFrom(ITypeDeclaration other, boolean assignmentSemantics) {
          // ? super X = other
          if (baseType == null)
-            return ModelUtil.isAssignableFrom(Object.class, other);
-         return ModelUtil.isAssignableFrom(other, baseType);
+            return ModelUtil.isAssignableFrom(Object.class, other, assignmentSemantics, null, false, null);
+         if (other instanceof LowerBoundsTypeDeclaration) {
+            Object otherObj = ((LowerBoundsTypeDeclaration) other).baseType;
+            if (otherObj == null)
+               return true;
+            return ModelUtil.isAssignableFrom(this, otherObj, assignmentSemantics, null, false, null);
+         }
+         // This switches the directions intentionally because the super construct matches the same type or base-types of that type
+         return ModelUtil.isAssignableFrom(other, baseType, assignmentSemantics, null, false, null);
       }
 
       @Override
       public boolean isAssignableTo(ITypeDeclaration other) {
          if (baseType == null)
             return ModelUtil.isAssignableFrom(other, Object.class);
+         if (other instanceof LowerBoundsTypeDeclaration) {
+            Object otherObj = ((LowerBoundsTypeDeclaration) other).baseType;
+            if (otherObj == null)
+               return true;
+            return ModelUtil.isAssignableFrom(otherObj, this, false, null, false, null);
+         }
          return ModelUtil.isAssignableFrom(baseType, other);
       }
 
@@ -129,7 +143,7 @@ public class ExtendsType extends JavaType {
       }
 
       public Object resolveTypeVariables(ITypeParamContext ctx, boolean resolve) {
-         if (ModelUtil.isTypeVariable(baseType)) {
+         if (baseType != null && ModelUtil.isTypeVariable(baseType)) {
             Object newBase = ctx.getTypeDeclarationForParam(ModelUtil.getTypeParameterName(baseType), baseType, resolve);
             return new LowerBoundsTypeDeclaration(newBase);
          }
@@ -142,7 +156,36 @@ public class ExtendsType extends JavaType {
       }
 
       public String toString() {
+         if (baseType == null)
+            return "?";
          return "? super " + String.valueOf(baseType);
+      }
+   }
+
+   public static class WildcardTypeDeclaration extends LowerBoundsTypeDeclaration {
+      WildcardTypeDeclaration() {
+         super(Object.class);
+      }
+      public String getFullTypeName(boolean includeDims, boolean includeTypeParams) {
+         return "?";
+      }
+
+      public boolean isAssignableFrom(ITypeDeclaration other, boolean assignmentSemantics) {
+         return true;
+      }
+
+      @Override
+      public boolean isAssignableTo(ITypeDeclaration other) {
+         return true;
+      }
+
+      @Override
+      public boolean isAssignableFromClass(Class other) {
+         return true;
+      }
+
+      public boolean equals(Object obj) {
+         return obj instanceof WildcardTypeDeclaration;
       }
    }
 
@@ -204,11 +247,11 @@ public class ExtendsType extends JavaType {
       return true;
    }
 
-   public static ExtendsType createFromType(Object type, ITypeParamContext ctx) {
+   public static ExtendsType createFromType(Object type, ITypeParamContext ctx, ITypeDeclaration definedInType) {
       if (type instanceof WildcardType)
          return create((WildcardType) type);
       else if (type instanceof LowerBoundsTypeDeclaration) {
-         return createSuper((LowerBoundsTypeDeclaration) type, ctx);
+         return createSuper((LowerBoundsTypeDeclaration) type, ctx, definedInType);
       }
       else
          throw new UnsupportedOperationException();
@@ -241,13 +284,13 @@ public class ExtendsType extends JavaType {
       return res;
    }
 
-   public static ExtendsType createSuper(LowerBoundsTypeDeclaration argType, ITypeParamContext ctx) {
+   public static ExtendsType createSuper(LowerBoundsTypeDeclaration argType, ITypeParamContext ctx, ITypeDeclaration definedInType) {
       ExtendsType res = new ExtendsType();
       res.operator = "super";
       res.questionMark = true;
 
       if (argType.baseType != null) {
-         Object baseType = JavaType.createFromParamType(argType.baseType, ctx, null);
+         Object baseType = JavaType.createFromParamType(argType.baseType, ctx, definedInType);
          res.setProperty("typeArgument", baseType);
       }
       return res;

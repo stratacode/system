@@ -512,7 +512,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    private KeywordSpace whileKeyword = new KeywordSpace("while");
 
-   Sequence tryResources = new Sequence("(,[],[],,)", OPTIONAL, openParen, localVariableDeclaration, new Sequence("(,[])", REPEAT, semicolonEOL, localVariableDeclaration), optSemicolon, closeParenSkipOnError);
+   Sequence tryResources = new Sequence("(,[],[],,)", OPTIONAL, openParen, localVariableDeclaration, new Sequence("(,[])", OPTIONAL | REPEAT, semicolonEOL, localVariableDeclaration), optSemicolon, closeParenSkipOnError);
 
    Sequence doStatement =
       new Sequence("WhileStatement(operator,statement,,expression,)", new KeywordSpace("do"), statement,

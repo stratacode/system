@@ -949,7 +949,8 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       return null;
    }
 
-   public void setInferredType(Object type) {
+   public boolean setInferredType(Object type) {
+      return false;
    }
 
    public boolean propagatesInferredType(Expression child) {
@@ -976,5 +977,9 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
          parent = parent.getParentNode();
       }
       return false;
+   }
+
+   public List<JavaType> getMethodTypeArguments() {
+      return null;
    }
 }

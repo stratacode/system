@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import sc.classfile.CFClass;
 import sc.classfile.CFMethod;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
@@ -21,6 +22,9 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
    public Object method;
    ITypeParamContext paramTypeDecl;
    Object[] methodTypeParams;
+
+   /* For method invocations which bind specific types to parameters - e.g. foo.<type1,type2>methodCall() - this stores type1, type2 */
+   List<JavaType> methodTypeArgs;
 
    // Stores the target type of the method expression.  Since Java8 this is an alternate source
    // for type parameter values used in resolving parameter types of the method invocation.
@@ -48,17 +52,19 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
    // This is the type declaration which defines the use of this param typed method
    ITypeDeclaration definedInType;
 
-   public ParamTypedMethod(Object meth, ITypeParamContext paramTypeDeclaration, ITypeDeclaration definedInType, List<? extends Object> parametersOrExpressions, Object inferredType) {
+   public ParamTypedMethod(Object meth, ITypeParamContext paramTypeDeclaration, ITypeDeclaration definedInType, List<? extends Object> parametersOrExpressions, Object inferredType, List<JavaType> methodTypeArgs) {
       if (meth == null)
          System.out.println("*** Warning null method for method typed parameter");
 
       method = meth;
       paramTypeDecl = paramTypeDeclaration;
       this.inferredType = inferredType;
+      this.methodTypeArgs = methodTypeArgs;
       methodTypeParams = ModelUtil.getMethodTypeParameters(method);
       this.definedInType = definedInType;
-      if (parametersOrExpressions != null)
+      if (parametersOrExpressions != null) {
          boundJavaTypes = ModelUtil.parametersToJavaTypeArray(this, parametersOrExpressions, this);
+      }
       paramTypes = null; // Need to recompute this once we've set the boundJavaTypes
       resolvedParamJavaTypes = null;
    }
@@ -162,6 +168,17 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
    }
 
    private Object resolveMethodTypeParameter(String typeVarName, Object typeVar) {
+      if (methodTypeArgs != null) {
+         if (methodTypeArgs.size() == methodTypeParams.length) {
+            for (int i = 0; i < methodTypeArgs.size(); i++) {
+               if (ModelUtil.getTypeParameterName(methodTypeParams[i]).equals(typeVarName)) {
+                  if (!ModelUtil.sameTypeParameters(typeVar, methodTypeParams[i]))
+                     System.out.println("*** Error - invalid method type parameter case");
+                  return methodTypeArgs.get(i);
+               }
+            }
+         }
+      }
       // For method type parameters, do we need to derive the type of each parameter from types we were able to resolve
       // from the parameters?
       // TODO: We may be in the midst of creating the parameters and so can't use these values yet - since they are not defined
@@ -191,7 +208,13 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
                if (bindParamTypes && boundJavaTypes != null && i < boundJavaTypes.length) {
                   JavaType boundJavaType = boundJavaTypes[i];
                   if (boundJavaType != null) {
-                     Object boundParamType = boundJavaType.getTypeDeclaration();
+                     Object boundParamType;
+                     // Once we have computed the bound types - use these type decls.  We modify these types
+                     // when inferring type parameters
+                     if (boundTypes != null)
+                        boundParamType = boundTypes[i];
+                     else
+                        boundParamType = boundJavaType.getTypeDeclaration();
                      Object paramType = paramJavaType.getTypeDeclaration();
                      boolean varArgsParam = i == boundJavaTypes.length - 1 && ModelUtil.isVarArgs(method) && ModelUtil.isArray(boundParamType);
                      if (varArgsParam && !ModelUtil.isArray(paramType)) {
@@ -296,7 +319,11 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
             Object typeParamArg = ModelUtil.getTypeArgument(paramJavaType, i);
             Object typeParam = ModelUtil.getTypeDeclFromType(null, typeParamArg, false, getLayeredSystem(), false, getDefinedInType());
             Object boundParam = ModelUtil.getTypeParameter(boundType, i);
-            Object nestedRes = extractTypeParameter(typeParamArg, typeParam, boundParam, typeVar, i == numParams - 1 && ModelUtil.isVarArgs(method));
+            // Do not try to extract the ? as it does not add any information and makes this parameter seem bound when it's not
+            if (boundParam instanceof ExtendsType.WildcardTypeDeclaration) {
+               continue;
+            }
+            Object nestedRes = extractTypeParameter(typeParamArg, typeParam, boundParam, typeVar, false);
             if (nestedRes != null)
                return nestedRes;
          }
@@ -337,18 +364,27 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
          if (paramTypes != null)
             return paramTypes;
       }
+      return resolveParameterTypes(bound, null, 0, false);
+   }
+
+   public Object[] resolveParameterTypes(boolean bound, Object[] oldRes, int startIx, boolean refreshParams) {
       JavaType[] javaTypes = bound ? getResolvedParameterJavaTypes() : getParameterJavaTypes(true);
       if (javaTypes == null)
          return null;
       int len = javaTypes.length;
-      Object[] res = new Object[len];
-      for (int i = 0; i < len; i++) {
+      Object[] res = oldRes == null ? new Object[len] : oldRes;
+      for (int i = startIx; i < len; i++) {
          JavaType paramJavaType = javaTypes[i];
-         res[i] = paramJavaType.getTypeDeclaration(bound ? this : null, false);
+         res[i] = paramJavaType.getTypeDeclaration(bound ? this : null, definedInType, false, refreshParams, true);
          if (res[i] instanceof ClassType) {
             Object newRes = javaTypes[i].getTypeDeclaration();
             if (newRes != null)
                res[i] = newRes;
+         }
+         // We need to make a copy here because we might change these parameters for this particular instantiation of this method:
+         //   - i.e. we set an inferredType on one of our arguments - a LambdaExpression and it further refines the type represented by this parameter
+         if (bound && res[i] instanceof ParamTypeDeclaration) {
+            res[i] = ((ParamTypeDeclaration) res[i]).cloneForNewTypes();
          }
          if (res[i] == null)
             System.out.println("*** Warning - null value for parameter type");
@@ -361,6 +397,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
       else
          paramTypes = res;
       return res;
+
    }
 
    public JavaType[] getResolvedParameterJavaTypes() {
@@ -398,6 +435,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
          if (len == 0)
             return null;
          JavaType[] res = new JavaType[len];
+
          for (int i = 0; i < len; i++) {
             Object paramType = paramTypes[i];
             if (paramType instanceof ExtendsType.LowerBoundsTypeDeclaration)
@@ -433,6 +471,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
          return paramJavaTypes;
       if (!convertRepeating)
          System.out.println("*** Error deprecated mode!");
+
       if (method instanceof IMethodDefinition) {
          JavaType[] paramTypes = ((IMethodDefinition) method).getParameterJavaTypes(convertRepeating);
          if (paramTypes == null)
@@ -558,7 +597,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
                      Object res = resolveMethodTypeParameter(typeVarName, typeParam);
                      if (res == null) {
                         if (typeParam instanceof JavaType)
-                           return ((JavaType) typeParam).getTypeDeclaration(paramTypeDecl, false); // Is it right to pass paramTypeDecl here?
+                           return ((JavaType) typeParam).getTypeDeclaration(paramTypeDecl, definedInType, false, false, true); // Is it right to pass paramTypeDecl here?
                         return typeParam; // An unresolved type parameter - return the type param since it at least matched.
                      }
                      if (res instanceof JavaType) {
@@ -580,6 +619,22 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
             }
             else {
                res = null;
+            }
+            if (inferredType != null && (res == null || ModelUtil.hasTypeVariables(res)) && ModelUtil.isAssignableFrom(inferredType, def) && inferredType != Object.class) {
+               srcIx = ModelUtil.getTypeParameterPosition(inferredType, typeVarName);
+               if (srcIx != -1) {
+                  if (ModelUtil.sameTypes(inferredType, def)) {
+                     Object newRes = ModelUtil.getTypeParameter(inferredType, srcIx);
+                     if (newRes != null && newRes != Object.class && !ModelUtil.isTypeVariable(newRes)) {
+                         if (res == null || ModelUtil.isTypeVariable(res) || (ModelUtil.isAssignableFrom(res, newRes) && !ModelUtil.isAssignableFrom(newRes, res)))
+                           return newRes;
+                     }
+                  }
+                  else {
+                     // Here we might have inferredType as a base-type to the definition of the type parameter.
+                     // To get the type parameter's value, we need to call:
+                  }
+               }
             }
             if (resolve && res != null && ModelUtil.hasTypeVariables(res)) {
                return ModelUtil.getTypeParameterDefault(res);
@@ -612,11 +667,15 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
       if (inferredType != this.inferredType) {
          this.inferredType = inferredType;
 
-         // Invalidate these since they might be refined once the inferred type is set
-         paramTypes = null;
-         boundTypes = null;
-         resolvedParamJavaTypes = null;
+         resetParameterTypes();
       }
+   }
+
+   public void resetParameterTypes() {
+      // Invalidate these since they might be refined once the inferred type is set
+      paramTypes = null;
+      boundTypes = null;
+      resolvedParamJavaTypes = null;
    }
 
    public String toString() {

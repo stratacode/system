@@ -442,13 +442,13 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return !isLayerType && !isDynamicType();
    }
 
-   public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType) {
-      Object v = super.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType);
+   public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
+      Object v = super.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
       if (v != null)
          return v;
 
       if (modelType != null) {
-         v = modelType.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType);
+         v = modelType.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
          if (v != null)
             return v;
       }
@@ -457,7 +457,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
       if (implementsBoundTypes != null) {
          for (Object impl:implementsBoundTypes) {
-            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType)) != null)
+            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs)) != null)
                return v;
          }
       }
@@ -1124,7 +1124,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
                if (ModelUtil.isPropertyIs(member)) {
                   String getName = "get" + CTypeUtil.capitalizePropertyName(propName);
                   Object membType = ModelUtil.getPropertyType(member);
-                  Object existingMeth = definesMethod(getName, null, null, null, true, false, null);
+                  Object existingMeth = definesMethod(getName, null, null, null, true, false, null, null);
                   if (existingMeth == null || existingMeth == res || ModelUtil.isAbstractMethod(existingMeth)) {
                      MethodDefinition meth = new MethodDefinition();
                      meth.name = getName;
