@@ -445,7 +445,10 @@ public class ClassType extends JavaType {
          chainedTypes.get(chainedTypes.size()-1).typeArguments = typeArguments;
       }
 
-      if (node != null)
+      // Looking up type parameters by name is not good here
+      if (typeParam != null && ModelUtil.isTypeVariable(typeParam))
+         type = typeParam;
+      else if (node != null)
          type = node.findType(fullTypeName);
       // In the parametrized type info we create ClassTypes which are defined as part of a compiled method - so no relative type info is available.
       // fortunately imports and local references are always made absolute at this level
@@ -1010,7 +1013,7 @@ public class ClassType extends JavaType {
 
          if (ModelUtil.isTypeVariable(baseType)) {
             Object newType = t.getTypeForVariable(baseType, resolveUnbound); // was false
-            if (newType == null)
+            if (newType == null && resolveUnbound)
                newType = ModelUtil.getTypeParameterDefault(baseType);
             if (newType != null && newType != baseType && !(newType instanceof ExtendsType.LowerBoundsTypeDeclaration)) {
                superWildcard = new ExtendsType.LowerBoundsTypeDeclaration(newType);

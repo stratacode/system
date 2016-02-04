@@ -168,7 +168,8 @@ public abstract class BaseLambdaExpression extends Expression {
       ITypeDeclaration enclType = getEnclosingType();
 
       newMeth.setProperty("parameters", parameters = createLambdaParams(lambdaParams, ifaceMeth, typeCtx, enclType));
-      newMeth.setProperty("type", JavaType.createFromParamType(ModelUtil.getParameterizedReturnType(ifaceMeth, null, true), typeCtx, enclType));
+      Object lambdaMethodReturnType = ModelUtil.getParameterizedReturnType(ifaceMeth, null, true);
+      newMeth.setProperty("type", JavaType.createFromParamType(lambdaMethodReturnType, typeCtx, enclType));
       lambdaMethod = newMeth;
 
       // Doing this after we have defined the parameters here so we can resolve the references
@@ -185,6 +186,9 @@ public abstract class BaseLambdaExpression extends Expression {
       Statement lambdaBody = getLambdaBody(ifaceMeth);
 
       BlockStatement methodBody;
+      ReturnStatement returnBodyExpr = null;
+      Expression bodyExpr = null;
+
       if (lambdaBody instanceof BlockStatement) {
          methodBody = (BlockStatement) lambdaBody.deepCopy(ISemanticNode.CopyNormal, null);
       }
@@ -194,9 +198,11 @@ public abstract class BaseLambdaExpression extends Expression {
             // The method is void and so does not return anything.  Just use <expr>
             methodBody.addStatementAt(0, ((Expression) lambdaBody).deepCopy(ISemanticNode.CopyNormal, null));
          }
-         else{
+         else {
+            bodyExpr = (Expression) lambdaBody.deepCopy(ISemanticNode.CopyNormal, null);
+            returnBodyExpr = ReturnStatement.create(bodyExpr);
             // Do the return <expr> ;
-            methodBody.addStatementAt(0, ReturnStatement.create(((Expression) lambdaBody).deepCopy(ISemanticNode.CopyNormal, null)));
+            methodBody.addStatementAt(0, returnBodyExpr);
          }
       }
       else {
@@ -208,6 +214,20 @@ public abstract class BaseLambdaExpression extends Expression {
       classBody.add(newMeth);
       newExpr.setProperty("classBody", classBody);
       newExpr.parentNode = parentNode;
+
+      // Weird case here - it's minBy(t -> t, naturalOrder()) in Agg.java of jool.  First param is a Function<T, R> - we know 'R' from the naturalOrder() return type
+      // but have no way to know T except that t -> t - basically could allow us to change the type of 't' to R by back-propagating the type.
+      // Should we go back and rewrite the type of the parameter 't'?   Based on IntelliJ's lack of knowledge of the type of 't' expedience of the fix, I'm inserting a cast
+      if (bodyExpr != null && bodyExpr instanceof IdentifierExpression) {
+         IdentifierExpression ibodyExpr = (IdentifierExpression) bodyExpr;
+         if (ibodyExpr.identifiers != null && ibodyExpr.identifiers.size() == 1 && ibodyExpr.arguments == null) {
+            Object bodyExprType = bodyExpr.getGenericType();
+            if (bodyExprType != null && !ModelUtil.isAssignableFrom(lambdaMethodReturnType, bodyExprType))
+               returnBodyExpr.setProperty("expression", CastExpression.create(
+                           JavaType.createFromParamType(lambdaMethodReturnType, typeCtx, null),
+                           returnBodyExpr.expression));
+         }
+      }
 
       // In the most general case, the type parameters for type of this expression are determined from the inferred return
       // type of the method.  That means searching through all return's and building up the common superclass.
@@ -242,7 +262,7 @@ public abstract class BaseLambdaExpression extends Expression {
             if (typeParam instanceof JavaType)
                typeParams.add((JavaType) ((JavaType) typeParam).deepCopy(ISemanticNode.CopyNormal, null));
             else if (typeParam instanceof WildcardType || typeParam instanceof ParameterizedType || typeParam instanceof ExtendsType.LowerBoundsTypeDeclaration) {
-               typeParams.add((JavaType.createFromParamType(typeParam, inferredType instanceof ITypeParamContext ? (ITypeParamContext) inferredType : null, null)));
+               typeParams.add((JavaType.createFromParamType(typeParam, typeCtx, null)));
             }
             else
                typeParams.add(ClassType.create(ModelUtil.getTypeName(typeParam)));
@@ -251,6 +271,7 @@ public abstract class BaseLambdaExpression extends Expression {
       }
 
       propagateInferredType(inferredType, paramReturnType);
+
    }
 
    void addTypeParameterMapping(Object ifaceMeth, Object ifaceMethType, Object newMethType) {

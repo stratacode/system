@@ -1551,6 +1551,8 @@ public class ModelUtil {
          return (String) type;
       else if (type instanceof ParameterizedType)
          return getTypeName(((ParameterizedType) type).getRawType(), includeDims);
+      else if (type instanceof WildcardType)
+         return type.toString();
       //else if (ModelUtil.isTypeVariable(type))
       //   return ModelUtil.getTypeParameterName(type);
       throw new UnsupportedOperationException();
@@ -1757,7 +1759,7 @@ public class ModelUtil {
             // TODO: enforce the extends type in the TypeParameter
             return true;
          }
-         return ((TypeParameter)type2).isAssignableTo(type1, ctx);
+         return ((TypeParameter)type2).isAssignableTo(type1, ctx, true /* allowUnbound */);
       }
 
       while (type1 instanceof TypeVariable) {
@@ -1980,6 +1982,9 @@ public class ModelUtil {
          Class typeClass = RTypeUtil.loadClass(implClass.getClassLoader(), fullTypeName, false);
 
          return typeClass != null && typeClass.isAssignableFrom(implClass);
+      }
+      else if (implType instanceof ParameterizedType) {
+         return implementsType(((ParameterizedType) implType).getRawType(), fullTypeName, assignment, allowUnbound);
       }
       else
          throw new UnsupportedOperationException();

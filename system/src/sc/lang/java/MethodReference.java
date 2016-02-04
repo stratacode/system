@@ -151,7 +151,7 @@ public class MethodReference extends BaseLambdaExpression {
             //if (!ModelUtil.isAssignableFrom(paramTypes[0], methReturnType))
             //   continue;
 
-            if (!ModelUtil.isAssignableFrom(refType, paramTypes[0], sys))
+            if (!ModelUtil.isAssignableFrom(refType, paramTypes[0], false, null, true, sys))
                continue;
             Object[] refParamTypes = ModelUtil.getParameterTypes(meth, true);
             if (ModelUtil.parametersMatch(refParamTypes, nextParamTypes, true, sys)) {

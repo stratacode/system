@@ -74,7 +74,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
    }
 
    public Object getTypeDeclaration(List<? extends ITypedObject> args, boolean resolve) {
-      Object parameterizedType = ModelUtil.getParameterizedReturnType(method, args, resolve);
+      Object parameterizedType = ModelUtil.getParameterizedReturnType(method, args, false);
       if (ModelUtil.hasTypeVariables(parameterizedType)) {
          Object res = resolveTypeParameter(parameterizedType, resolve);
          if (res == null) {

@@ -2912,6 +2912,8 @@ public class IdentifierExpression extends ArgumentsExpression {
    static Object getGenericTypeForIdentifier(IdentifierType[] idTypes, Object[] boundTypes, List<Expression> arguments, int ix, JavaModel model, Object rootType, Object inferredType, ITypeDeclaration definedInType) {
       if (boundTypes == null)
          return null;
+      if (rootType != null && ModelUtil.isTypeVariable(rootType))
+         rootType = ModelUtil.getTypeParameterDefault(rootType);
       if (idTypes[ix] != null) {
          switch (idTypes[ix]) {
             case FieldName:

@@ -113,6 +113,13 @@ public class ExtendsType extends JavaType {
                return true;
             return ModelUtil.isAssignableFrom(this, otherObj, assignmentSemantics, null, false, null);
          }
+         // If we have ? super T  changing that to ? super Object does not work which is what happens in the reverse
+         // assignment.  This should always match, or at least always match all objects.
+         if (ModelUtil.isTypeVariable(baseType)) {
+            if (!ModelUtil.isAssignableFrom(Object.class, other))
+               System.out.println("*** Warning - unresolved code path for ? super T");
+            return true;
+         }
          // This switches the directions intentionally because the super construct matches the same type or base-types of that type
          return ModelUtil.isAssignableFrom(other, baseType, assignmentSemantics, null, false, null);
       }
