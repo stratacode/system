@@ -1665,7 +1665,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    private String getJSPathPrefix(Layer buildLayer) {
-      return templatePrefix != null ? templatePrefix : buildLayer.getSrcPathBuildPrefix(srcPathType);
+      // We used to use the buildlayer here for the SrcPathPrefix but the build layer may not depend directly on the
+      // necessary layers which define the JS path - e.g. if I run scc js/allInOne test/java7Misc - the build layer
+      // is java7Misc and it does not define the 'web' srcPathPrefix so the generated JS files don't go in the right place.
+      return templatePrefix != null ? templatePrefix : system.getSrcPathBuildPrefix(srcPathType);
    }
 
    public void postProcess(LayeredSystem sys, Layer genLayer) {

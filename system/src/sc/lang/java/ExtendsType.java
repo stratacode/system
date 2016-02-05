@@ -152,7 +152,8 @@ public class ExtendsType extends JavaType {
       public Object resolveTypeVariables(ITypeParamContext ctx, boolean resolve) {
          if (baseType != null && ModelUtil.isTypeVariable(baseType)) {
             Object newBase = ctx.getTypeDeclarationForParam(ModelUtil.getTypeParameterName(baseType), baseType, resolve);
-            return new LowerBoundsTypeDeclaration(newBase);
+            if (!(newBase instanceof WildcardTypeDeclaration))
+               return new LowerBoundsTypeDeclaration(newBase);
          }
          return this;
       }
@@ -193,6 +194,10 @@ public class ExtendsType extends JavaType {
 
       public boolean equals(Object obj) {
          return obj instanceof WildcardTypeDeclaration;
+      }
+
+      public String toString() {
+         return "?";
       }
    }
 

@@ -801,7 +801,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return false;
    }
 
-
    public enum BuildCommandTypes {
       Pre, Post, Run, Test
    }
@@ -2391,7 +2390,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       // Used to only do this for the final build layer or build ssparate.  But if there's a final layer in there
       // we can load the classes as soon as we've finished building it
-      //if (mode.doLibs() || sysLayer.buildSeparate || sysLayer == buildLayer) {
       if (mode.doLibs() || sysLayer.isBuildLayer()) {
          if (sysLayer != null) {
 
@@ -2430,16 +2428,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             buildClassLoader = getClass().getClassLoader();
             Thread.currentThread().setContextClassLoader(buildClassLoader);
          }
-
-         /*
-         try {
-            buildClassLoader = new URLClassLoader(new URL[] { buildDirFile.toURL() }, getClass().getClassLoader());
-
-         }
-         catch (MalformedURLException exc) {
-            System.err.println("*** Unable to create build class loader" + exc);
-         }
-         */
 
          if (updateSystemClassLoader) {
             // Once we've finished compiling, we can add the buildDir to the classpath.  At this point we also
@@ -13787,4 +13775,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return sb;
    }
 
+   /** Returns the prefix to prepend onto files generated for the given srcPathType (e.g. 'web', 'config', etc.) */
+   public String getSrcPathBuildPrefix(String srcPathType) {
+      for (int i = layers.size() - 1; i >= 0; i--) {
+         Layer layer = layers.get(i);
+         String res = layer.getSrcPathBuildPrefix(srcPathType);
+         if (res != null)
+            return res;
+      }
+      return null;
+   }
 }
+
