@@ -205,10 +205,11 @@ public class MvnDescriptor implements Serializable {
    }
 
    // GroupId and artifactId are null for a descriptor created from the file system until we have read the POM.
-   public boolean matches(MvnDescriptor other) {
+   public boolean matches(MvnDescriptor other, boolean matchVersion) {
+
       return (strMatches(other.groupId, groupId) || groupId == null /* || other.groupId == null */) && sameArtifact(other) &&
               // flexible match on version in this direction
-              (version == null /* || other.version == null */ || strMatches(version, other.version)) &&
+              (!matchVersion || (version == null /* || other.version == null */ || strMatches(version, other.version))) &&
               // Strict match on type - each type we reference becomes a different source for the same package
               // If type is omitted it only matches 'jar'
               (strMatches(type, other.type) || (type == null && other.type.equals(DEFAULT_TYPE))) &&

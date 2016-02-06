@@ -161,7 +161,7 @@ public class MvnRepositoryPackage extends RepositoryPackage {
          for (RepositoryPackage subPkg : subPkgs) {
             if (subPkg instanceof MvnRepositoryPackage) {
                MvnRepositoryPackage msub = (MvnRepositoryPackage) subPkg;
-               if (msub.getDescriptor().matches(depDesc))
+               if (msub.getDescriptor().matches(depDesc, false))
                   return true;
                if (msub.hasSubPackage(depDesc))
                   return true;
@@ -195,6 +195,12 @@ public class MvnRepositoryPackage extends RepositoryPackage {
       if (this.url != null && this.url.equals(otherURL))
          return true;
       MvnDescriptor otherDesc = MvnDescriptor.fromURL(otherURL);
-      return desc.matches(otherDesc);
+      return desc.matches(otherDesc, true);
+   }
+
+   public boolean overrideVersion(MvnDescriptor desc) {
+      if (pomFile != null)
+         return pomFile.overrideVersion(desc);
+      return false;
    }
 }

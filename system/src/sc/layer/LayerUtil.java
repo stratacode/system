@@ -96,11 +96,11 @@ public class LayerUtil implements LayerConstants {
       suppressedCompilerMessages.add("Note: Recompile with -Xlint:unchecked for details.");
    }
 
-   public static int compileJavaFilesInternal(Collection<SrcEntry> srcEnts, String buildDir, String classPath, boolean debug, IMessageHandler messageHandler) {
+   public static int compileJavaFilesInternal(Collection<SrcEntry> srcEnts, String buildDir, String classPath, boolean debug, String srcVersion, IMessageHandler messageHandler) {
       JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
       if (compiler == null) {
          System.err.println("*** No internal java compiler found - Do you have the JDK installed and is tools.jar in the system classpath? - trying javac");
-         return compileJavaFiles(srcEnts, buildDir, classPath, debug, messageHandler);
+         return compileJavaFiles(srcEnts, buildDir, classPath, debug, srcVersion, messageHandler);
       }
 
       DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<JavaFileObject>();
@@ -121,6 +121,10 @@ public class LayerUtil implements LayerConstants {
          options.add(buildDir);
          options.add("-cp");
          options.add(classPath);
+         if (srcVersion != null) {
+            options.add("-source");
+            options.add(srcVersion);
+         }
          if (debug)
             options.add("-g");
          //options.add("-target");
@@ -196,7 +200,7 @@ public class LayerUtil implements LayerConstants {
       }
    }
    
-   public static int compileJavaFiles(Collection<SrcEntry> srcEnts, String buildDir, String classPath, boolean debug, IMessageHandler handler) {
+   public static int compileJavaFiles(Collection<SrcEntry> srcEnts, String buildDir, String classPath, boolean debug, String srcVersion, IMessageHandler handler) {
       if (srcEnts.size() > 0) {
          List<String> args = new ArrayList<String>(srcEnts.size() + 5);
          args.add("javac");
@@ -207,6 +211,10 @@ public class LayerUtil implements LayerConstants {
          args.add(buildDir);
          args.add("-cp");
          args.add(classPath);
+         if (srcVersion != null) {
+            args.add("-source");
+            args.add(srcVersion);
+         }
          if (debug)
             args.add("-g");
          // args.add("-target");

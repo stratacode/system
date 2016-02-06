@@ -144,6 +144,7 @@ import java.util.zip.ZipFile;
  * -vl - show the initial layers as in verbose
  */
 public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSystem, IClassResolver {
+
    {
       setCurrent(this);
    }
@@ -227,6 +228,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public boolean serverEnabled = false;
 
    public String url; // The system URL
+
+   /** If set, specifies the -source option to the javac compiler */
+   public String javaSrcVersion;
 
    /** The list of runtimes required to execute this stack of layers (e.g. javascript and java).  If java is in the list, it will be the first one and represented by a "null" entry. */
    public static ArrayList<IRuntimeProcessor> runtimes;
@@ -8471,7 +8475,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                info("Compiling Java: " + bd.toCompile.size() + " files into " + genLayer.getBuildClassesDir());
 
             PerfMon.start("javaCompile");
-            if (LayerUtil.compileJavaFilesInternal(bd.toCompile, genLayer.getBuildClassesDir(), getClassPathForLayer(genLayer, true, genLayer.getBuildClassesDir(), true), options.debug, messageHandler) == 0) {
+            if (LayerUtil.compileJavaFilesInternal(bd.toCompile, genLayer.getBuildClassesDir(), getClassPathForLayer(genLayer, true, genLayer.getBuildClassesDir(), true), options.debug, javaSrcVersion, messageHandler) == 0) {
                if (!buildInfo.buildJars())
                   compileFailed = true;
             }

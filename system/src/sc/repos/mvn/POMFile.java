@@ -345,7 +345,7 @@ public class POMFile extends XMLFileFormat {
 
    public static final String DEFAULT_SCOPE = "compile";
 
-   public List<MvnDescriptor> getDependencies(String[] scopes, boolean addChildren, boolean addParent, boolean parentDefinesSrc) {
+   public List<MvnDescriptor> getDependencies(String[] scopes, boolean addChildren, boolean addParent, boolean parentDefinesSrc, DependencyContext ctx) {
       Element[] deps = projElement.getChildTagsWithName("dependencies");
       if (deps != null && deps.length > 1)
          MessageHandler.error(msg, "Multiple tags with dependencies - should be only one");
@@ -359,14 +359,29 @@ public class POMFile extends XMLFileFormat {
                   depScope = DEFAULT_SCOPE;
                if (includesScope(scopes, depScope)) {
                   MvnDescriptor desc = MvnDescriptor.getFromTag(this, depTag, true, true, true);
+                  if (ctx != null) {
+                     List<RepositoryPackage> incPkgs = ctx.getIncludingPackages();
+                     if (incPkgs != null) {
+                        for (RepositoryPackage incPkg:incPkgs) {
+                           // Maven packages which are in the dependency chain from this package should override the version number for any
+                           // dependencies in the dependencyManagement section.  This list starts at the root and goes to the last one so
+                           // as soon as we see an override we stop.
+                           if (incPkg instanceof MvnRepositoryPackage) {
+                              if (((MvnRepositoryPackage) incPkg).overrideVersion(desc))
+                                 break;
+                           }
+                        }
+                     }
+                  }
                   if (!desc.optional || (pomPkg instanceof MvnRepositoryPackage && ((MvnRepositoryPackage) pomPkg).includeOptional))
                      res.add(desc);
+
                }
             }
          }
       }
       if (parentPOM != null && addParent) {
-         addPOMRefDependencies(parentPOM, res, scopes, false, true, false);
+         addPOMRefDependencies(parentPOM, res, scopes, false, true, false, ctx);
       }
       // We either want to include modules that directly defineSrc or if the parent is a src module, we need to include the child dependencies
       // We don't want to include dependencies from the parent-pom's modules.
@@ -375,20 +390,20 @@ public class POMFile extends XMLFileFormat {
             initModules();
          if (modulePOMs != null) {
             for (POMFile modulePOM:modulePOMs) {
-               addPOMRefDependencies(modulePOM, res, scopes, true, false, true);
+               addPOMRefDependencies(modulePOM, res, scopes, true, false, true, ctx);
             }
          }
       }
       return res;
    }
 
-   private void addPOMRefDependencies(POMFile refPOM, ArrayList<MvnDescriptor> res, String[] scopes, boolean checkChildren, boolean checkParent, boolean parentDefinesSrc) {
-      List<MvnDescriptor> parentDeps = refPOM.getDependencies(scopes, checkChildren, checkParent, parentDefinesSrc);
+   private void addPOMRefDependencies(POMFile refPOM, ArrayList<MvnDescriptor> res, String[] scopes, boolean checkChildren, boolean checkParent, boolean parentDefinesSrc, DependencyContext ctx) {
+      List<MvnDescriptor> parentDeps = refPOM.getDependencies(scopes, checkChildren, checkParent, parentDefinesSrc, ctx);
       if (parentDeps != null) {
          for (MvnDescriptor parentDesc:parentDeps) {
             boolean found = false;
             for (MvnDescriptor childDesc:res) {
-               if (childDesc.matches(parentDesc)) {
+               if (childDesc.matches(parentDesc, false)) {
                   found = true;
                   childDesc.mergeFrom(parentDesc);
                   break;
@@ -523,7 +538,7 @@ public class POMFile extends XMLFileFormat {
       if (desc.version == null || desc.classifier == null) {
          initDependencyManagement();
          for (MvnDescriptor dep : dependencyManagement) {
-            if (desc.matches(dep)) {
+            if (desc.matches(dep, false)) {
                if (desc.version == null && dep.version != null) {
                   desc.version = dep.version;
                   if (desc.version.contains("${")) {
@@ -571,5 +586,22 @@ public class POMFile extends XMLFileFormat {
          return parentPOM.getGroupId();
 
       return null;
+   }
+
+   /** TODO: performance - build up a hash-table of these dependencies by group-id/artifactId so we can filter them quickly */
+   public boolean overrideVersion(MvnDescriptor desc) {
+      initDependencyManagement();
+      if (dependencyManagement != null) {
+         for (MvnDescriptor depDesc:dependencyManagement) {
+            if (depDesc.version != null && depDesc.matches(desc, false)) {
+               if (desc.version == null || !desc.version.equals(depDesc.version))
+                  desc.version = depDesc.version;
+               return true;
+            }
+         }
+      }
+      if (parentPOM != null)
+         parentPOM.overrideVersion(desc);
+      return false;
    }
 }

@@ -4170,7 +4170,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             System.out.println("Compiling: " + toCompileEnts + " into build dir: " + bd + " with classpath: " + cp);
          else if (sys.options.info)
             System.out.println("Compiling: " + toCompileEnts.size() + " stub files");
-         if (doCompile && LayerUtil.compileJavaFilesInternal(toCompileEnts, bd, cp, sys.options.debug, sys.messageHandler) != 0) {
+         if (doCompile && LayerUtil.compileJavaFilesInternal(toCompileEnts, bd, cp, sys.options.debug, sys.javaSrcVersion, sys.messageHandler) != 0) {
             displayError("Failed compile step for dynamic type: " + getFullTypeName() + " for ");
          }
       }

@@ -282,6 +282,13 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       if (typeInfoInitialized)
          return;
       typeInfoInitialized = true;
+
+
+      // Need to make sure the parent type is initialized before the sub-type since we need to search the parent types extends/implementBoundTypes to possibly find the implements types here
+      TypeDeclaration enclType = getEnclosingType();
+      if (enclType != null)
+         enclType.initTypeInfo();
+
       JavaModel m = getJavaModel();
 
       if (implementsTypes != null && m != null) {
@@ -851,6 +858,12 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       if (implementsBoundTypes != null) {
          for (Object impl:implementsBoundTypes) {
             if (impl != null) {
+               // TODO: If we do this, it creates a lot more work to map type-parameters etc, but the ParamTypeDeclaration
+               // does have the mapping between the type parameters of the implementing class and the interface.  Do we
+               // need that?  I feel like ordinarily we would expect the type parameters to be in the context of the interface
+               // anyway so unwrapping it here.
+               if (impl instanceof ParamTypeDeclaration)
+                  impl = ((ParamTypeDeclaration) impl).baseType;
                Object[] implResult = ModelUtil.getMethods(impl, methodName, modifier);
                if (implResult != null && implResult.length > 0) {
                   result = ModelUtil.appendInheritedMethods(implResult, result);

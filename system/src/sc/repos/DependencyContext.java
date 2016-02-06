@@ -6,11 +6,14 @@ package sc.repos;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.List;
 
 public class DependencyContext implements Serializable {
    public int depth;
    public RepositoryPackage fromPkg;
    public DependencyContext parent;
+
+   private List<RepositoryPackage> incPkgs = null;
 
    public DependencyContext(int depth, RepositoryPackage initPkg, DependencyContext parent) {
       this.depth = depth;
@@ -53,4 +56,18 @@ public class DependencyContext implements Serializable {
       }
       return sb.toString();
    }
+
+   /** Returns the list of packages that defined this dependency, starting with the root package */
+   public List<RepositoryPackage> getIncludingPackages() {
+      if (incPkgs != null)
+         return incPkgs;
+      incPkgs = new ArrayList<RepositoryPackage>();
+      if (parent != null) {
+         incPkgs.addAll(parent.getIncludingPackages());
+      }
+      if (fromPkg != null)
+         incPkgs.add(fromPkg);
+      return incPkgs;
+   }
+
 }

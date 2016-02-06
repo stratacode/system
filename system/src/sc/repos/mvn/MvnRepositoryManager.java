@@ -220,7 +220,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       POMFile pomFile = pkg.pomFile;
 
       if (pomFile != null) {
-         List<MvnDescriptor> depDescs = pomFile.getDependencies(getScopesToBuild(src.pkg), true, src.pkg.parentPkg == null, false);
+         List<MvnDescriptor> depDescs = pomFile.getDependencies(getScopesToBuild(src.pkg), true, src.pkg.parentPkg == null, false, ctx);
          if (depDescs != null) {
             ArrayList<RepositoryPackage> depPackages = new ArrayList<RepositoryPackage>();
 
@@ -243,7 +243,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
                if (exclusions != null) {
                   boolean excluded = false;
                   for (MvnDescriptor exclDesc : exclusions) {
-                     if (exclDesc.matches(depDesc)) {
+                     if (exclDesc.matches(depDesc, false)) {
                         excluded = true;
                         // Need to remove these because right now we do not save/restore the MvnDescriptor which stores
                         // the exclusions.  We'll just get rid of them from the dependencies list so they don't interfere
@@ -289,7 +289,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
             List<MvnDescriptor> exclusions = msrc.desc.exclusions;
             if (exclusions != null) {
                for (MvnDescriptor exclDesc:exclusions) {
-                  if (exclDesc.matches(desc))
+                  if (exclDesc.matches(desc, false))
                      return true;
                }
             }

@@ -4013,7 +4013,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    /**
-    *  Adds a new src path with the optional srcPathType.  The srcPathType specifies the nature of the files under this
+    *  Adds a new src path with srcPathType.  The srcPathType specifies the nature of the files under this
     * directory - e.g. for web/** the srcPathType is 'web'.   The default type for normal source files is null.
     */
    public void addSrcPath(String srcPath, String srcPathType, String buildPrefix) {

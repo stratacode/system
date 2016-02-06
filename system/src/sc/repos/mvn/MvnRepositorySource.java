@@ -70,7 +70,7 @@ public class MvnRepositorySource extends RepositorySource {
          MvnDescriptor excl = desc.exclusions.get(i);
          boolean found = false;
          for (MvnDescriptor otherExcl:otherSrc.desc.exclusions) {
-            if (otherExcl.matches(excl)) {
+            if (otherExcl.matches(excl, false)) {
                found = true;
                break;
             }
