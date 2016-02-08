@@ -220,7 +220,9 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
          modified = true;
       }
 
-      if (body != null) {
+      boolean isOverrideMethod = this instanceof MethodDefinition && ((MethodDefinition) this).override;
+
+      if (!isOverrideMethod) {
          if (overridden != null) {
             boolean overriddenIsAbstract = overridden.hasModifier("abstract");
             TypeDeclaration enclType = overridden.getEnclosingType();
@@ -252,7 +254,7 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
 
          base.addBodyStatementIndent(this);
       }
-      else if (this instanceof MethodDefinition && ((MethodDefinition) this).override) {
+      else {
          if (overridden != null) {
             overridden.mergeModifiers(this, false, true);
          }
