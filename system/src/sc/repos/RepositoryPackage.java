@@ -308,6 +308,12 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
                            subPkg.preInstall(ctx, depCol);
                      }
                   }
+                  if (dependencies != null) {
+                     for (RepositoryPackage depPkg:dependencies) {
+                        if (!depPkg.installed)
+                           depPkg.preInstall(ctx, depCol);
+                     }
+                  }
                   break;
                } else {
                   installed = false;
@@ -355,6 +361,10 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       if (ix != -1)
          return packageName.substring(ix+1);
       return packageName;
+   }
+
+   public String getIndexFileName() {
+      return getModuleBaseName() + "-" + getVersionSuffix() + ".ser";
    }
 
    public RepositorySource addNewSource(RepositorySource repoSrc) {
@@ -616,8 +626,9 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       // update the backpointer as well.
       sources = oldPkg.sources;
       if (sources != null) {
-         for (RepositorySource nsrc:sources)
-            nsrc.pkg = this;
+         for (RepositorySource nsrc:sources) {
+            nsrc.updateAfterRestore(this);
+         }
       }
       updateCurrentSource(oldPkg.currentSource, true);
 

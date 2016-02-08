@@ -77,4 +77,11 @@ public class RepositorySource implements Serializable {
    public String getDefaultFileName() {
       return null;
    }
+
+   public void updateAfterRestore(RepositoryPackage pkg) {
+      this.pkg = pkg;
+      if (ctx != null) {
+         ctx.updateAfterRestore(repository);
+      }
+   }
 }

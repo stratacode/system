@@ -10,14 +10,16 @@ import java.util.List;
 
 public class DependencyContext implements Serializable {
    public int depth;
-   public RepositoryPackage fromPkg;
+   public transient RepositoryPackage fromPkg;
+   public String fromPkgURL;
    public DependencyContext parent;
 
-   private List<RepositoryPackage> incPkgs = null;
+   private transient List<RepositoryPackage> incPkgs = null;
 
    public DependencyContext(int depth, RepositoryPackage initPkg, DependencyContext parent) {
       this.depth = depth;
       fromPkg = initPkg;
+      fromPkgURL = fromPkg.getPackageURL();
       this.parent = parent;
    }
 
@@ -68,6 +70,13 @@ public class DependencyContext implements Serializable {
       if (fromPkg != null)
          incPkgs.add(fromPkg);
       return incPkgs;
+   }
+
+   public void updateAfterRestore(IRepositoryManager manager) {
+      if (fromPkgURL != null && fromPkg == null)
+         fromPkg = manager.getOrCreatePackage(fromPkgURL, null, false);
+      if (parent != null)
+         parent.updateAfterRestore(manager);
    }
 
 }

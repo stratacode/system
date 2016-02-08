@@ -72,7 +72,13 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
    // Putting this into the version-specific installed root so it more reliably gets removed if the folder itself is removed
    // and so that for versioned packaged, we can store more than one version in the repository at the same time.
    private File getTagFile(RepositoryPackage pkg) {
-      File tagFile = new File(pkg.getVersionRoot(), "scPkgCachedInfo.ser");
+      String rootPath = getRepositorySystem().pkgIndexRoot;
+      // When we are initializing the layers, before we've set up a build layer, we may encounter some packages in
+      // the layer's start method.  For now, storing them in the shared package directory.
+      if (rootPath == null) {
+         return new File(pkg.getVersionRoot(), pkg.getIndexFileName());
+      }
+      File tagFile = new File(rootPath, pkg.getIndexFileName());
       return tagFile;
    }
 
@@ -108,7 +114,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       if (rootParent != null)
          new File(rootParent).mkdirs();
       long installedTime = -1;
-      if (rootDirExists && tagFile.canRead()) {
+      if (rootDirExists && tagFile != null && tagFile.canRead()) {
          if (pkg.definedInLayer != null)
             pkg.definedInLayer.layeredSystem.layerResolveContext = true;
          RepositoryPackage oldPkg = RepositoryPackage.readFromFile(tagFile, this);
@@ -239,15 +245,17 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
    public void completeInstall(RepositoryPackage pkg) {
       File tagFile = getTagFile(pkg);
       if (pkg.installError != null) {
-         tagFile.delete();
+         if (tagFile != null)
+            tagFile.delete();
          System.err.println("Installing package: " + pkg.packageName + " failed: " + pkg.installError);
       }
       else {
          pkg.installedTime = System.currentTimeMillis();
-         // Make the version specific directory if necessary
-         new File(tagFile.getParent()).mkdirs();
-         pkg.saveToFile(tagFile);
-         //FileUtil.saveStringAsFile(tagFile, String.valueOf(System.currentTimeMillis()), true);
+         if (tagFile != null) {
+            // Make the version specific directory if necessary
+            new File(tagFile.getParent()).mkdirs();
+            pkg.saveToFile(tagFile);
+         }
       }
       ArrayList<RepositoryPackage> subPackages = pkg.subPackages;
       if (subPackages != null) {

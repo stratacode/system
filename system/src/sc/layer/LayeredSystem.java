@@ -2007,6 +2007,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
             */
             buildDir = buildLayer.buildDir;
+            if (repositorySystem != null) {
+               repositorySystem.pkgIndexRoot = FileUtil.concat(buildDir, "pkgIndex");
+            }
 
             // Only set the first time
             if (commonBuildDir == null) {
@@ -3119,7 +3122,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       @Constant public boolean update;
    }
 
-   @MainSettings(produceJar = true, produceScript = true, produceBAT = true, execName = "bin/scc", debug = false, maxMemory = 1024, defaultArgs = "-restartArgsFile <%= getTempDir(\"restart\", \"tmp\") %>")
+   @MainSettings(produceJar = true, produceScript = true, produceBAT = true, execName = "bin/scc", debug = false, maxMemory = 1280, defaultArgs = "-restartArgsFile <%= getTempDir(\"restart\", \"tmp\") %>")
    public static void main(String[] args) {
       String buildLayerName = null;
       List<String> includeLayers = null;
@@ -3627,8 +3630,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                sys.cmd.readParseLoop();
          }
 
-         // Run any unit tests before starting the program
+         boolean haveReset = false;
+
          if (options.testPattern != null) {
+            if (!haveReset)
+               sys.resetClassLoader();
             // First run the unit tests which match (i.e. those installed with the @Test annotation)
             Thread.currentThread().setContextClassLoader(sys.getSysClassLoader());
             sys.buildInfo.runMatchingTests(options.testPattern);
@@ -3652,7 +3658,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // tomcat's connection pool implementation will load a jdbc driver that is in a subsequent layer's classpath.
             // TODO should we have some way for layers to turn this on or off?  Most SC frameworks do not do this injected class
             // dependency thing and work fine without the rest.  It means we hav eto reload all classes.
-            sys.resetClassLoader();
+            if (!haveReset)
+               sys.resetClassLoader();
+            haveReset = true;
             if (commandThread != null)
                commandThread.setContextClassLoader(sys.getSysClassLoader());
 
@@ -8631,6 +8639,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       Thread.currentThread().setContextClassLoader(getSysClassLoader());
       refreshBoundTypes(ModelUtil.REFRESH_CLASSES);
+
+      // Test processors and other instances need to be refreshed with the new class loader
+      if (buildInfo != null)
+         buildInfo.reload();
    }
 
    public void setSystemClassLoader(ClassLoader loader) {

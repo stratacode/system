@@ -47,24 +47,27 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
 
    public void init() {
       if (initialized) return;
-      
-      if (name != null && type != null) {
+
+      if (name != null) {
          JavaType[] paramJavaTypes = parameters == null ? null : parameters.getParameterJavaTypes(true);
-         if ((propertyName = ModelUtil.isGetMethod(name, paramJavaTypes, type)) != null)
-            propertyMethodType = propertyName.startsWith("i") ? PropertyMethodType.Is : PropertyMethodType.Get;
-         else if ((propertyName = ModelUtil.isSetMethod(name, paramJavaTypes, type)) != null)
-            propertyMethodType = PropertyMethodType.Set;
-         else if ((propertyName = ModelUtil.isSetIndexMethod(name, paramJavaTypes, type)) != null)
-            propertyMethodType = PropertyMethodType.SetIndexed;
-         else if ((propertyName = ModelUtil.isGetIndexMethod(name, paramJavaTypes, type)) != null)
-            propertyMethodType = PropertyMethodType.GetIndexed;
-         isMain = name.equals("main") && type.isVoid() && paramJavaTypes != null && paramJavaTypes.length == 1 &&
+         if (type != null) {
+            if ((propertyName = ModelUtil.isGetMethod(name, paramJavaTypes, type)) != null)
+               propertyMethodType = propertyName.startsWith("i") ? PropertyMethodType.Is : PropertyMethodType.Get;
+            else if ((propertyName = ModelUtil.isSetMethod(name, paramJavaTypes, type)) != null)
+               propertyMethodType = PropertyMethodType.Set;
+            else if ((propertyName = ModelUtil.isSetIndexMethod(name, paramJavaTypes, type)) != null)
+               propertyMethodType = PropertyMethodType.SetIndexed;
+            else if ((propertyName = ModelUtil.isGetIndexMethod(name, paramJavaTypes, type)) != null)
+               propertyMethodType = PropertyMethodType.GetIndexed;
+         }
+         isMain = name.equals("main") && (type == null || type.isVoid()) && paramJavaTypes != null && paramJavaTypes.length == 1 &&
                  ModelUtil.typeIsStringArray(paramJavaTypes[0]) && hasModifier("static");
       }
 
       // Do this after our propertyName is set so that other initializers can use that info
       super.init();
    }
+
 
    public boolean isDynamicType() {
       return dynamicType || super.isDynamicType();
@@ -96,9 +99,6 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          extendsType = Object.class;
       Object overridden = ModelUtil.definesMethod(extendsType, name, getParameterList(), null, null, false, false, null, null);
       superMethod = overridden;
-      if (overridden instanceof MethodDefinition) {
-         MethodDefinition superMeth = (MethodDefinition) overridden;
-      }
 
       /* Dynamic methods need to find any overridden method and make sure calls to that one are also made dynamic.
        * This is here in the validate because the isDynamic method on our parents is not valid until we've propagated
@@ -140,18 +140,6 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             }
          }
 
-         if (modType != extendsType) {
-            overridden = ModelUtil.definesMethod(modType, name, getParameterList(), null, null, false, false, null, null);
-            if (overridden instanceof MethodDefinition) {
-               MethodDefinition overMeth = (MethodDefinition) overridden;
-               if (overMeth == this)
-                  System.out.println("*** replacing a method by itself");
-               if (ModelUtil.sameTypes(methodType, overMeth.getEnclosingType())) {
-                  overMeth.replacedByMethod = this;
-                  overriddenMethod = overMeth;
-               }
-            }
-         }
       }
       else {
          boolean makeBindable = false;
@@ -171,6 +159,20 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                enclType.addPropertyToMakeBindable(propertyName, this, null);
          }
       }
+      // TODO: shouldn't this be moved to the start method?
+      if (modType != extendsType) {
+         overridden = ModelUtil.definesMethod(modType, name, getParameterList(), null, null, false, false, null, null);
+         if (overridden instanceof MethodDefinition) {
+            MethodDefinition overMeth = (MethodDefinition) overridden;
+            if (overMeth == this)
+               System.out.println("*** replacing a method by itself");
+            if (ModelUtil.sameTypes(methodType, overMeth.getEnclosingType())) {
+               overMeth.replacedByMethod = this;
+               overriddenMethod = overMeth;
+            }
+         }
+      }
+      overrides = overriddenMethod;
       super.validate();
    }
 
@@ -462,7 +464,9 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
 
       JavaModel model;
       if (isMain && (model = getJavaModel()) != null) {
-         Object mainSettings = getAnnotation("sc.obj.MainSettings");
+         // If we've been replaced by another method on this same type, let that method do the processing since it will
+         // have the complete merged annotations
+         Object mainSettings = replacedByMethod == null ? getAnnotation("sc.obj.MainSettings") : null;
          if (mainSettings != null) {
             Boolean disabled = (Boolean) ModelUtil.getAnnotationValue(mainSettings, "disabled");
             if (disabled == null || !disabled) {
@@ -712,6 +716,8 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          res.dynamicType = dynamicType;
          res.overridesCompiled = overridesCompiled;
          res.needsDynAccess = needsDynAccess;
+         res.overriddenMethod = overriddenMethod;
+         res.overrides = overrides;
       }
       return res;
    }
@@ -800,5 +806,22 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       if (propertyName != null) {
          addMemberByName(membersByName, propertyName);
       }
+   }
+
+   public Object getAnnotation(String annotation) {
+      Object thisAnnot = super.getAnnotation(annotation);
+      if (overriddenMethod != null) {
+         Object overriddenAnnotation = ModelUtil.getAnnotation(overriddenMethod, annotation);
+
+         if (thisAnnot == null) {
+            return overriddenAnnotation == null ? null : Annotation.toAnnotation(overriddenAnnotation);
+         }
+         if (overriddenAnnotation == null)
+            return thisAnnot;
+
+         thisAnnot = ModelUtil.mergeAnnotations(thisAnnot, overriddenAnnotation, false);
+         return thisAnnot;
+      }
+      return thisAnnot;
    }
 }

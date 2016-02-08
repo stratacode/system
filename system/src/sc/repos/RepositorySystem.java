@@ -32,6 +32,8 @@ public class RepositorySystem {
 
    public IMessageHandler msg;
 
+   public String pkgIndexRoot;
+
    public RepositorySystem(RepositoryStore store, IMessageHandler handler, IClassResolver resolver, boolean info, boolean reinstall, boolean update, boolean installExisting) {
       this.store = store;
 
@@ -144,6 +146,7 @@ public class RepositorySystem {
 
    public RepositoryPackage addPackageSource(IRepositoryManager mgr, String pkgName, String fileName, RepositorySource repoSrc, boolean install, RepositoryPackage parentPkg) {
       RepositoryPackage pkg;
+
       pkg = store.packages.get(pkgName);
       if (pkg == null) {
          pkg = mgr.createPackage(mgr, pkgName, fileName, repoSrc, parentPkg);

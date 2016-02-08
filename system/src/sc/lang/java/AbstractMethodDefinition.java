@@ -220,36 +220,43 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
          modified = true;
       }
 
-      if (overridden != null) {
-         boolean overriddenIsAbstract = overridden.hasModifier("abstract");
-         TypeDeclaration enclType = overridden.getEnclosingType();
-         if (overriddenIsAbstract) {
-            enclType.removeStatement(overridden);
-         }
-         else {
-            boolean overriddenIsStatic = overridden.hasModifier("static");
-            boolean thisIsStatic = hasModifier("static");
-            if (!overriddenIsStatic == thisIsStatic) {
-               if (overriddenIsStatic)
-                  addModifier("static");
+      if (body != null) {
+         if (overridden != null) {
+            boolean overriddenIsAbstract = overridden.hasModifier("abstract");
+            TypeDeclaration enclType = overridden.getEnclosingType();
+            if (overriddenIsAbstract) {
+               enclType.removeStatement(overridden);
+            }
+            else {
+               boolean overriddenIsStatic = overridden.hasModifier("static");
+               boolean thisIsStatic = hasModifier("static");
+               if (!overriddenIsStatic == thisIsStatic) {
+                  if (overriddenIsStatic)
+                     addModifier("static");
+                  else
+                     displayError("Cannot make an instance method static in a derived layer: ");
+               }
+               // Needs to be unique per layer, per-type  TODO: is there a shorter way to make this unique?
+               overriddenMethodName = "_super_" + enclType.getLayer().getLayerUniqueName().replace('.', '_') + "_" + enclType.getInnerTypeName().replace('.', '_') + '_' + origName;
+
+               overrides = overridden;
+
+               /* Constructors need to be void so we need to change them to a method definition */
+               if (overridden instanceof ConstructorDefinition) {
+                  ((ConstructorDefinition) overridden).convertToMethod(overriddenMethodName);
+               }
                else
-                  displayError("Cannot make an instance method static in a derived layer: ");
+                  overridden.setProperty("name", overriddenMethodName);
             }
-            // Needs to be unique per layer, per-type  TODO: is there a shorter way to make this unique?
-            overriddenMethodName = "_super_" + enclType.getLayer().getLayerUniqueName().replace('.','_') + "_" + enclType.getInnerTypeName().replace('.', '_') + '_' +  origName;
+         }
 
-            overrides = overridden;
-
-            /* Constructors need to be void so we need to change them to a method definition */
-            if (overridden instanceof ConstructorDefinition) {
-               ((ConstructorDefinition) overridden).convertToMethod(overriddenMethodName);
-            }
-            else
-               overridden.setProperty("name", overriddenMethodName);
+         base.addBodyStatementIndent(this);
+      }
+      else if (this instanceof MethodDefinition && ((MethodDefinition) this).override) {
+         if (overridden != null) {
+            overridden.mergeModifiers(this, false, true);
          }
       }
-
-      base.addBodyStatementIndent(this);
       return this;
    }
 

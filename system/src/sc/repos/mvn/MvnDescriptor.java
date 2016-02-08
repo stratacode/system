@@ -33,6 +33,8 @@ public class MvnDescriptor implements Serializable {
    public boolean pomOnly;
 
    public List<MvnDescriptor> exclusions;
+   /** Set to true for descriptors that come from URLs - i.e. that did not define the exclusions at all */
+   public boolean reference;
 
    public MvnDescriptor(String groupId, String parentPath, String modulePath, String artifactId, String version, String type, String classifier) {
       this(groupId, parentPath, modulePath, artifactId, version);
@@ -91,6 +93,7 @@ public class MvnDescriptor implements Serializable {
       // The first part is the groupId, the last is the version and the middle is the groupId.  The group-id can have /'s for the sub-module case - e.g. "killbill/account"
       desc.version = URLUtil.getFileName(url);
       desc.groupId = URLUtil.getRootPath(url);
+      desc.reference = true;
       if (desc.groupId == null || desc.version == null) {
          System.err.println("*** Invalid URL for MvnDescriptor: " + url);
          return null;
