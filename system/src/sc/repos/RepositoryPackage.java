@@ -356,15 +356,20 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       installedRoot = resName;
    }
 
+   public String getIndexFileName() {
+      String resName = packageName;
+      // Nested packages are stored with their module name inside of the parent's installed root.
+      String versionSuffix = getVersionSuffix();
+      if (versionSuffix != null)
+         resName = resName + "-" + versionSuffix;
+      return FileUtil.addExtension(resName.replace("/", "__"), "ser");
+   }
+
    public String getModuleBaseName() {
       int ix = packageName.lastIndexOf("/");
       if (ix != -1)
          return packageName.substring(ix+1);
       return packageName;
-   }
-
-   public String getIndexFileName() {
-      return getModuleBaseName() + "-" + getVersionSuffix() + ".ser";
    }
 
    public RepositorySource addNewSource(RepositorySource repoSrc) {
