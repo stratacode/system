@@ -230,7 +230,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       }
 
       if (info)
-         info(StringUtil.indent(DependencyContext.val(ctx)) + "Installing package: " + pkg.packageName + (pkg.rebuildReason == null ? "" : ": " + pkg.rebuildReason) + " src url: " + src.url + getDepsInfo(ctx));
+         info(StringUtil.indent(DependencyContext.val(ctx)) + "Installing package: " + pkg.packageName + (pkg.rebuildReason == null ? "" : ": " + pkg.rebuildReason) + " src url: " + src.toString() + getDepsInfo(ctx));
       pkg.installError = doInstall(src, ctx, deps);
       if (pkg.installError != null)
          return pkg.installError;

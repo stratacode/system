@@ -211,7 +211,7 @@ public class RepositorySystem {
          // We do the install and update immediately after they are added so that the layer definition file has
          // access to the installed state, to for example, list the contents of the lib directory to get the jar files
          // to add to the classpath.
-         String err = pkg.preInstall(ctx, depCol);
+         String err = pkg.preInstall(ctx, depCol, true);
          if (err != null) {
             MessageHandler.error(msg, "Failed to install repository package: " + pkg.packageName + " error: " + err);
          }
@@ -226,7 +226,7 @@ public class RepositorySystem {
          DependencyCollection nextDeps = new DependencyCollection();
          for (PackageDependency pkgDep : instDeps.neededDeps) {
             if (!pkgDep.pkg.installed)
-               pkgDep.pkg.preInstall(pkgDep.ctx, nextDeps);
+               pkgDep.pkg.preInstall(pkgDep.ctx, nextDeps, true);
             else
                pkgDep.pkg.register();
             allDeps.add(pkgDep.pkg);

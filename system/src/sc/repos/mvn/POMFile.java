@@ -147,7 +147,11 @@ public class POMFile extends XMLFileFormat {
                   if (pomPkg.packageName != null && (pomPkg.packageAlias == null || pomPkg.packageAlias.equals(descPkgName)) && !pomPkg.packageName.equals(descPkgName))
                      pomPkg.packageAlias = pomPkg.packageName;
                   pomPkg.packageName = descPkgName;
+                  // The currentSource.srcURL will stay as the original URL
                   pomPkg.currentSource.url = desc.getURL();
+                  // We only can have a different srcURL if we have no parent - for child packages, we actually update the url to include parent + module name here.
+                  if (pomPkg.currentSource.srcURL == null || pomPkg.parentPkg != null)
+                     pomPkg.currentSource.srcURL = pomPkg.currentSource.url;
                   pomPkg.updateInstallRoot(mgr);
                }
             }
@@ -254,6 +258,8 @@ public class POMFile extends XMLFileFormat {
                // Do not init the dependencies here.  We won't be able to resolve deps inbetween these modules.  We have to create them all and
                // initialize the deps for the modules when we init them for the parent.
                RepositoryPackage pkg = desc.getOrCreatePackage(mgr.getChildManager(), false, depCtx, false, isSrc ? (MvnRepositoryPackage) pomPkg : null);
+               if (!isSrc && pkg.currentSource != null)
+                  pkg.currentSource.srcURL = null;
                if (pkg != null) {
                   POMFile modPOM = mgr.getPOMFile(desc, pkg, depCtx, isSrc, isSrc ? this : null, null);
                   if (modPOM != null)

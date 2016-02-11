@@ -195,7 +195,21 @@ public class MvnRepositoryPackage extends RepositoryPackage {
       if (this.url != null && this.url.equals(otherURL))
          return true;
       MvnDescriptor otherDesc = MvnDescriptor.fromURL(otherURL);
+      if (desc == null) {
+         return false;
+      }
       return desc.matches(otherDesc, true);
+   }
+
+   /**
+    * This exists because parent packages can have two URLs - one from git, the other a mvn URL.  During init, before
+    * we've read the POM, we may not know the maven URL so we need to match purely based on the package name.
+    */
+   public boolean sameParentURL(String otherURL) {
+      if (this.url != null && this.url.equals(otherURL))
+         return true;
+      MvnDescriptor otherDesc = MvnDescriptor.fromURL(otherURL);
+      return otherDesc != null && (packageName.equals(otherDesc.getPackageName()) || packageName.equals(otherDesc.artifactId));
    }
 
    public boolean overrideVersion(MvnDescriptor desc) {

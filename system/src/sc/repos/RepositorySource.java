@@ -24,6 +24,7 @@ public class RepositorySource implements Serializable {
    public transient IRepositoryManager repository;
    public String managerName;
    public String url;
+   public String srcURL;
    public transient RepositoryPackage parentPkg; // For sources defined inside of a sub-directory.  This is the path from the package root to the parent's folder, then url is the modulePath (or path to the package's directory)
    public boolean unzip;
 
@@ -37,6 +38,7 @@ public class RepositorySource implements Serializable {
       this.repository = mgr;
       this.managerName = mgr.getManagerName();
       this.url = url;
+      this.srcURL = url;
       this.unzip = unzip;
       this.parentPkg = parentPkg;
    }
@@ -44,7 +46,9 @@ public class RepositorySource implements Serializable {
    public boolean equals(Object other) {
       if (!(other instanceof RepositorySource))
          return false;
-      return ((RepositorySource) other).url.equals(url);
+      RepositorySource otherSrc = (RepositorySource) other;
+      // Sometimes the url will not be set to the canonical URL but the srcURL might be set properly
+      return otherSrc.url.equals(url) || (srcURL != null && otherSrc.srcURL != null && srcURL.equals(otherSrc.srcURL));
    }
 
    /** If the version number is in the file name, it will be different for each source */
@@ -58,6 +62,9 @@ public class RepositorySource implements Serializable {
    }
 
    public String toString() {
+      if (srcURL != null && url != null && !url.equals(srcURL)) {
+         return url + "(" + srcURL + ")";
+      }
       return url;
    }
 
@@ -83,5 +90,11 @@ public class RepositorySource implements Serializable {
       if (ctx != null) {
          ctx.updateAfterRestore(repository);
       }
+   }
+
+   public String getPackageSrcURL() {
+      if (srcURL != null)
+         return srcURL;
+      return url;
    }
 }

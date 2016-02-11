@@ -34,7 +34,7 @@ public class GitRepositoryManager extends AbstractRepositoryManager {
       // TODO: make this configurable?
       args.add("--depth");
       args.add("1");
-      args.add(src.url);
+      args.add(src.getPackageSrcURL());
       String resDir = src.pkg.installedRoot;
       args.add(resDir);
       File resDirFile = new File(resDir);

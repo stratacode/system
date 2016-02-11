@@ -19,7 +19,7 @@ public class DependencyContext implements Serializable {
    public DependencyContext(int depth, RepositoryPackage initPkg, DependencyContext parent) {
       this.depth = depth;
       fromPkg = initPkg;
-      fromPkgURL = fromPkg.getPackageURL();
+      fromPkgURL = fromPkg.getPackageSrcURL();
       this.parent = parent;
    }
 

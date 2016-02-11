@@ -225,7 +225,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
 
       ArrayList<RepositoryPackage> allDeps = new ArrayList<RepositoryPackage>();
       DependencyCollection depCol = new DependencyCollection();
-      String err = preInstall(ctx, depCol);
+      String err = preInstall(ctx, depCol, true);
       if (err == null) {
          installSubPackages(mgr, ctx);
          err = RepositorySystem.installDeps(depCol, allDeps);
@@ -277,7 +277,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       }
    }
 
-   public String preInstall(DependencyContext ctx, DependencyCollection depCol) {
+   public String preInstall(DependencyContext ctx, DependencyCollection depCol, boolean preInstallDeps) {
       installed = false;
       StringBuilder errors = null;
       if ((sources == null || sources.length == 0) && currentSource != null) {
@@ -289,8 +289,11 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
          for (RepositorySource src : sources) {
             if (src.repository.isActive()) {
                // Mark as installed to prevent recursive installs
-               installed = true;
-               String err = src.repository.preInstall(src, ctx, depCol);
+               String err = null;
+               if (!installed) {
+                  installed = true;
+                  err = src.repository.preInstall(src, ctx, depCol);
+               }
                if (err == null) {
                   // This version of the currentSource may have been restored on an incremental build and have info like the classifier which is not part of the URL so only replace it if
                   // we have a new and incompatible definition of the source.
@@ -302,16 +305,25 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
                   else
                      updateCurrentFileNames(currentSource);
 
+                  // Need to get through all of the sub-packages before we start installing the dependencies
                   if (subPackages != null) {
                      for (RepositoryPackage subPkg:subPackages) {
                         if (!subPkg.installed)
-                           subPkg.preInstall(ctx, depCol);
+                           subPkg.preInstall(ctx, depCol, false);
                      }
                   }
-                  if (dependencies != null) {
-                     for (RepositoryPackage depPkg:dependencies) {
-                        if (!depPkg.installed)
-                           depPkg.preInstall(ctx, depCol);
+                  if (preInstallDeps) {
+                     if (subPackages != null) {
+                        for (RepositoryPackage subPkg:subPackages) {
+                           if (!subPkg.installed)
+                              subPkg.preInstall(ctx, depCol, true);
+                        }
+                     }
+                     if (dependencies != null) {
+                        for (RepositoryPackage depPkg : dependencies) {
+                           if (!depPkg.installed)
+                              depPkg.preInstall(ctx, depCol, true);
+                        }
                      }
                   }
                   break;
@@ -356,12 +368,22 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       installedRoot = resName;
    }
 
+   /**
+    * Like the logic from updateInstallRoot, we need to compute a name for the package which is consistent across the
+    * lifespan of the package.  For maven packages, they first get a package name based on their file storage (i.e.
+    * parentModule/childModule, then after we read the POM, the real package name is known - groupId/artifactId).
+    * Here we need to use the original name parent__child since that's the only name we'll have when we need to restore the
+    * package from the tag file.
+    */
    public String getIndexFileName() {
       String resName = packageName;
+      if (parentPkg != null && buildFromSrc) {
+         resName = FileUtil.removeExtension(parentPkg.getIndexFileName()) + "__" + getModuleBaseName();
+      }
+
+      //if (packageAlias != null)
+      //   resName = packageAlias;
       // Nested packages are stored with their module name inside of the parent's installed root.
-      String versionSuffix = getVersionSuffix();
-      if (versionSuffix != null)
-         resName = resName + "-" + versionSuffix;
       return FileUtil.addExtension(resName.replace("/", "__"), "ser");
    }
 
@@ -599,7 +621,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
 
       if (oldPkg.parentPkgURL != null) {
          if (parentPkg != null) {
-            if (!parentPkg.sameURL(oldPkg.parentPkgURL)) {
+            if (!parentPkg.sameParentURL(oldPkg.parentPkgURL)) {
                System.err.println("*** parentPkgURL changed - reinstalling");
                return false;
             }
@@ -700,13 +722,13 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       if (dependencies != null) {
          ArrayList<String> depPkgs = new ArrayList<String>(dependencies.size());
          for (int i = 0; i < dependencies.size(); i++) {
-            String depURL = dependencies.get(i).getPackageURL();
+            String depURL = dependencies.get(i).getPackageSrcURL();
             depPkgs.add(depURL);
          }
          depPkgURLs = depPkgs;
       }
       if (parentPkg != null)
-         parentPkgURL = parentPkg.getPackageURL();
+         parentPkgURL = parentPkg.getPackageSrcURL();
       preSaveSubPackages();
    }
 
@@ -715,7 +737,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
          ArrayList<String> subPkgs = new ArrayList<String>(subPackages.size());
          for (int i = 0; i < subPackages.size(); i++) {
             RepositoryPackage subPkg = subPackages.get(i);
-            subPkgs.add(subPkg.getPackageURL());
+            subPkgs.add(subPkg.getPackageSrcURL());
             // Each package will have it's preSave called before saving the package file so no need to recurse
             //subPkg.preSaveSubPackages();
          }
@@ -836,11 +858,21 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       }
    }
 
+   public String getPackageSrcURL() {
+      if (replacedByPkg != null)
+         return replacedByPkg.getPackageSrcURL();
+      if (currentSource == null)
+         return packageName;
+      // Using the srcURL here
+      return currentSource.getPackageSrcURL();
+   }
+
    public String getPackageURL() {
       if (replacedByPkg != null)
          return replacedByPkg.getPackageURL();
       if (currentSource == null)
          return packageName;
+      // Using the srcURL here
       return currentSource.url;
    }
 
@@ -858,7 +890,12 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       return false;
    }
 
+   // We can match against either the original srcURL (sometimes a 'git' URL) and the canonical package url - i.e. mvn://groupId/artifactId/version
    public boolean sameURL(String url) {
-      return getPackageURL().equals(url);
+      return getPackageURL().equals(url) || getPackageSrcURL().equals(url);
+   }
+
+   public boolean sameParentURL(String url) {
+      return sameURL(url);
    }
 }

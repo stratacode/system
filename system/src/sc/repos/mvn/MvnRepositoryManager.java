@@ -191,8 +191,9 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
                      if (optionalFile) {
                         pkg.definesClasses = false;
                      }
-                     else
+                     else {
                         return "Maven " + typeExt + " file: " + desc.getURL() + " not found in repositories: " + repositories;
+                     }
                   }
                }
             }

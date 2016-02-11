@@ -99,7 +99,11 @@ public class MvnDescriptor implements Serializable {
          return null;
       }
 
-      String rest = url.substring(desc.groupId.length() + 1, url.length() - desc.version.length() - 1);
+      String rest;
+      if (url.length() - desc.version.length() - 1 <= desc.groupId.length() + 1)
+         rest = "";
+      else
+         rest = url.substring(desc.groupId.length() + 1, url.length() - desc.version.length() - 1);
       while (rest.endsWith("/"))
          rest = rest.substring(0, rest.length() - 1);
       if (desc.version.equals(NO_VERSION))
