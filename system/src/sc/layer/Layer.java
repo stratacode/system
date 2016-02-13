@@ -2457,7 +2457,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    public String getLayerName() {
       String base = layerDirName;
       if (base == null || base.equals(".")) {
-         if (packagePrefix != null && packagePrefix.length() > 1 && packagePrefix.length() > layerUniqueName.length())
+         if (packagePrefix != null && packagePrefix.length() > 1 && packagePrefix.length() < layerUniqueName.length())
             base = layerUniqueName.substring(packagePrefix.length()+1);
          else
             base = layerUniqueName;
