@@ -369,6 +369,10 @@ public class SelectorExpression extends ChainedExpression {
       return null;
    }
 
+   public Object getBoundType(int ix) {
+      return boundTypes == null || boundTypes.length <= ix ? null : boundTypes[ix];
+   }
+
    private List<Expression> getArguments(int ix) {
       Selector sel = selectors.get(ix);
       if (sel instanceof VariableSelector)
