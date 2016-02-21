@@ -37,9 +37,14 @@ public class Parameter extends AbstractVariable implements IVariable {
    public void init() {
       if (initialized)
          return;
-      
+
       // Propagate the old-school C array dimension syntax to the type
+      if (arrayDimensions != null) {
+         type.arrayDimensions = arrayDimensions;
+      }
+
       if (variableName != null && variableName.endsWith("[]")) {
+         System.err.println("*** Is this reached?");
          int dimsIx = variableName.indexOf("[]");
          type.arrayDimensions = variableName.substring(dimsIx);
          variableName = variableName.substring(0,dimsIx);
@@ -71,8 +76,11 @@ public class Parameter extends AbstractVariable implements IVariable {
          return null;
       if (repeatingParameter)
          baseType = new ArrayTypeDeclaration(getJavaModel().getModelTypeDeclaration(), baseType,"[]");
+      /*
+       * This is now applied during init or when the parameter is first retrieved from the list
       if (arrayDimensions != null)
          baseType = new ArrayTypeDeclaration(getJavaModel().getModelTypeDeclaration(), baseType, arrayDimensions);
+      */
       return baseType;
    }
 
@@ -130,6 +138,9 @@ public class Parameter extends AbstractVariable implements IVariable {
    public JavaType[] getParameterJavaTypes(boolean convertRepeating) {
       if (nextParameter == null) {
          JavaType retType = type;
+         // Old style array dimensions
+         if (!initialized && arrayDimensions != null && retType.arrayDimensions == null)
+            retType.arrayDimensions = arrayDimensions;
          if (convertRepeating && repeatingParameter)
             retType = retType.convertToArray(null);
          return new JavaType[]{retType};
@@ -143,6 +154,8 @@ public class Parameter extends AbstractVariable implements IVariable {
             if (current.repeatingParameter)
                useType = useType.convertToArray(null);
             arr[ix++] = useType;
+            if (!current.initialized && arrayDimensions != null && useType.arrayDimensions == null)
+               useType.arrayDimensions = current.arrayDimensions;
             current = current.nextParameter;
          }
          return arr;

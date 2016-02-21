@@ -12,9 +12,9 @@ import java.io.Reader;
 import java.util.*;
 
 /**
- * This is the basic parser class. For the most part external users won't see this - they
- * use the Language class.  This class maintains the input buffer and the location of the current parsed
- * position in the input buffer.  It also stores the current set of errors.
+ * This is the parser class which holds state for a given parse of a file or buffer.  Usually you access this
+ * class via Language.  Parser maintains the input buffer and the location of the current parsed
+ * position in the input buffer.  It also stores the current set of errors, parsing statistics, adn the current parselet.
  */
 public class Parser implements IString {
    public final static boolean ENABLE_STATS = false;

@@ -208,7 +208,12 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       Definition def = getDefinition();
       if (def instanceof TypeDeclaration)
          return def;
-      Object type = ((TypedDefinition) def).type.getTypeDeclaration();
+
+      TypedDefinition tdef = (TypedDefinition) def;
+      JavaType varType = tdef.type;
+      if (varType == null)
+         return null;
+      Object type = varType.getTypeDeclaration();
 
       // Handles old school array dimensions after the variable name
       if (arrayDimensions == null)

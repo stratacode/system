@@ -315,6 +315,44 @@ public abstract class Language extends LayerFileComponent {
       return styleFile(layerName, fileName, displayError, isLayer, true);
    }
 
+   /**
+    * Styles a file in the build directory.  If layerName is specified, the file name is taken from the layer's build directory.  The buildPathPrefix
+    * specifies a prefix to add onto the file which is not displayed in the file's path in the UI.
+    * fileName is also added onto the path and is displayed as the file name in the display of the file.
+    */
+   @sc.obj.HTMLSettings(returnsHTML=true)
+   public Object styleBuildFile(String layerName, String buildPathPrefix, String fileName, boolean displayError, boolean isLayer, boolean layerEnabled) {
+      LayeredSystem sys = LayeredSystem.getCurrent().getMainLayeredSystem();
+      fileName = FileUtil.unnormalize(fileName);
+      String absFileName = fileName;
+      // TODO: this is a hack!  Add a new parameter or maybe disabled:layerName?
+      if (layerName != null) {
+         Layer layer = sys.getActiveOrInactiveLayerByPathSync(layerName, null, true, true, layerEnabled);
+         if (layer == null) {
+            System.err.println("No layer named: " + layerName + " for styleFile method");
+            return null;
+         }
+         absFileName = FileUtil.concat(layer.getDefaultBuildDir(), buildPathPrefix == null ? null : FileUtil.unnormalize(buildPathPrefix), fileName);
+         // Want to start the layer before we start loading types into it.  Otherwise, when it gets started we see that we have types to replace when we really don't.
+         layer.checkIfStarted();
+      }
+      // TODO should we check the system.getCachedModel to see if we have this guy already?
+      File file = new File(absFileName);
+      try {
+         Object result = parse(file);
+         if (result instanceof ParseError) {
+            System.err.println("Error parsing string to be styled - no styling for this section: " + file + ": " + ((ParseError) result).errorStringWithLineNumbers(file));
+            return "";
+         }
+         return ParseUtil.styleParseResult(layerName, layerName, fileName, displayError, isLayer, result, layerEnabled);
+      }
+      catch (IllegalArgumentException exc) {
+         System.err.println("Error reading file to be styled: " + absFileName + ": " + exc);
+         return "Missing file: " + absFileName;
+      }
+
+   }
+
    @sc.obj.HTMLSettings(returnsHTML=true)
    public Object styleFile(String layerName, String fileName, boolean displayError, boolean isLayer, boolean layerEnabled) {
       LayeredSystem sys = LayeredSystem.getCurrent().getMainLayeredSystem();

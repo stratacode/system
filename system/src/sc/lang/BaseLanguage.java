@@ -262,7 +262,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
       identifierSp.setName("('','',)");
    }
 
-   Sequence optIdentifier = new Sequence("(.)", OPTIONAL, identifier);
+   public Sequence optIdentifier = new Sequence("(.)", OPTIONAL, identifier);
 
    public Sequence qualifiedIdentifier = new Sequence("('','')", identifier,
            new Sequence("('','')", OPTIONAL | REPEAT, new SymbolSpace("."), identifier));
@@ -275,21 +275,21 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
     * negate that case.
     */
    public class KeywordSpace extends Sequence {
-      KeywordSpace(String name, int options, String symbol) {
+      public KeywordSpace(String name, int options, String symbol) {
          super(name, options | NOERROR);
          add(new Symbol(symbol), new Sequence(NOT | LOOKAHEAD | NOERROR, identifierChar), spacing);
          styleName = "keyword";
       }
-      KeywordSpace(String symbol, int options) {
+      public KeywordSpace(String symbol, int options) {
          this("<keyword_" + symbol + ">" + "('',,)", options, symbol);
       }
-      KeywordSpace(String symbol) {
+      public KeywordSpace(String symbol) {
          this(symbol, 0);
       }
    }
 
    public class KeywordNewline extends KeywordSpace {
-      KeywordNewline(String symbol) {
+      public KeywordNewline(String symbol) {
          super(symbol);
          set(2, spacingEOL);
       }

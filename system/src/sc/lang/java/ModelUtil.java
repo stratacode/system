@@ -38,6 +38,18 @@ import java.lang.reflect.*;
 import java.lang.reflect.Type;
 import java.util.*;
 
+/**
+ * This interface contains a wide range of operations on Java objects defined in either java.lang.Class, or ITypeDeclaration as the
+ * primary types.  For ITypeDeclaration there are two primary implementations: CFClass - the .class file parser, or sc.lang.java.TypeDeclaration,
+ * a main type for source files parsed in Java or StrataCode.
+ * We use Object here as the core type to avoid the need to create wrapper types for java.lang.Class to implement ITypeDeclaration.
+ * From a performance perspective, lots of wrapper classes is not efficient but it means we do more casting.  If it were only classes, it would
+ * not be a good tradeoff but this same decision affects all meta-data: java.lang.reflect.Field etc. which are more numerous.  Casting and Object
+ * provides some flexibility for such a core API from an integration perspective, especially if we use it with layers down the road to add new languages
+ * to this base API.
+ *
+ * TODO: this class has gotten too big.  Are there any feature chunks we can break off to improve modularization?
+ */
 public class ModelUtil {
    public static final String CHILDREN_ANNOTATION = "Children";
    public static final String PARENT_ANNOTATION = "Parent";

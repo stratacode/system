@@ -324,7 +324,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
             parameterMapping = new ParameterMapping[params.length];
 
             if (parameterMapping.length != parselets.size())
-               throw new IllegalArgumentException("Number of parselet parameters does not match number of child parselets: " + this + " " + name);
+               throw new IllegalArgumentException("Number of parselet parameters does not match number of child parselets: " + this + " " + name + " has: " + parameterMapping.length + " declared but only " + parselets.size() + " defined parselets");
 
             for (int i = 0; i < params.length; i++) {
                String p = params[i].trim();

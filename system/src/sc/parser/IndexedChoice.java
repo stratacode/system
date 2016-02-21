@@ -4,8 +4,17 @@
 
 package sc.parser;
 
+import sc.util.IntStack;
+
 import java.util.*;
 
+/**
+ * Some elements of a choice might be deterministic based on some prefix in the text.
+ * For example, if a statement starts with string if the only possible match is an if statement.
+ * This is an easy-to-manage performance optimization.  Instead of just listing choices in order,
+ * you associate each parselet with a string prefix.  Parselets that do not have a prefix are added
+ * as 'default parselets'.
+ */
 public class IndexedChoice extends OrderedChoice {
    SymbolChoice indexedKeys = new SymbolChoice(LOOKAHEAD | SKIP | NOERROR);
    Map<CharSequence,OrderedChoice.MatchResult> indexedParselets = new HashMap<CharSequence,OrderedChoice.MatchResult>();
@@ -123,6 +132,54 @@ public class IndexedChoice extends OrderedChoice {
       }
    }
 
+   /** When modifying an inherited grammar, you might need to remove a child parselet from the IndexedChoice */
+   public void removeParselet(Parselet oldParselet) {
+      int oldIx;
+      for (oldIx = 0; oldIx < parselets.size(); oldIx++) {
+         if (parselets.get(oldIx) == oldParselet) {
+            super.remove(oldIx);
+            break;
+         }
+      }
+      if (oldIx == parselets.size()) {
+         System.err.println("*** removeParselet for: " + this + " not found");
+         return;
+      }
+      int defIx;
+      for (defIx = 0; defIx < defaultParselets.size(); defIx++) {
+         if (defaultParselets.get(defIx) == oldParselet) {
+            defaultParselets.remove(defIx);
+            break;
+         }
+      }
+      CharSequence removeKey = null;
+      for (Map.Entry<CharSequence, OrderedChoice.MatchResult> ent:indexedParselets.entrySet()) {
+         OrderedChoice.MatchResult mr = ent.getValue();
+         IntStack elems = mr.slotIndexes;
+         int sz = elems.size();
+         for (int i = 0; i < sz; i++) {
+            int old = elems.get(i);
+            // If we remove the i'th entry, we need to update any indexes after that guy
+            if (old > oldIx)
+               elems.set(i, old - 1);
+            // This is the guy we removed
+            else if (old == oldIx) {
+               // When we are removing the last non-default parselet, just remove that index entirely
+               if (sz == defaultParselets.size() + 1) {
+                  removeKey = ent.getKey();
+               }
+               else {
+                  elems.remove(i);
+               }
+            }
+         }
+      }
+      // No more entries for the key this child was registered under so remove it entirely
+      if (removeKey != null) {
+         indexedParselets.remove(removeKey);
+         indexedKeys.removeExpectedValue(PString.toIString(removeKey));
+      }
+   }
 
    public void addDefault(Parselet... toAdd)
    {

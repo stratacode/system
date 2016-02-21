@@ -856,6 +856,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       globalLayerImports.put("BuildPhase", ImportDeclaration.create("sc.layer.BuildPhase"));
       globalLayerImports.put("CodeType", ImportDeclaration.create("sc.layer.CodeType"));
       globalLayerImports.put("CodeFunction", ImportDeclaration.create("sc.layer.CodeFunction"));
+      globalLayerImports.put("Sync", ImportDeclaration.create("sc.obj.Sync"));
+      globalLayerImports.put("SyncMode", ImportDeclaration.create("sc.obj.SyncMode"));
    }
 
    // The globally scoped objects which have been defined.
@@ -1230,9 +1232,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // Create a new LayeredSystem for each additional runtime we need to satisfy the active set of layers.
       // Then purge any layers from this LayeredSystem which should not be here.
       if (processes != null && processes.size() > 1 && (peerSystems == null || peerSystems.size() < processes.size() - 1)) {
-         // We want all of the layered systems to use the same buildDir so pass it through options as though you had used the -d option.  Of course if you use -d, it will happen automatically.
+         // We want all of the layered systems to use the same buildDir so pass it through options as though you had used the -da option.  Of course if you use -d, it will happen automatically.
          if (options.buildDir == null) {
-            if (lastLayer != null && !lastLayer.buildSeparate)
+            if (lastLayer != null && !lastLayer.buildSeparate && options.buildLayerAbsDir == null)
                options.buildLayerAbsDir = lastLayer.getDefaultBuildDir();
          }
 

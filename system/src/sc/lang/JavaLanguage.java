@@ -132,7 +132,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    public Sequence classBody = new Sequence("<classBody>(,[],)");
    public OrderedChoice classDeclarationWithoutModifiers = new OrderedChoice();
    public Sequence classDeclaration = new Sequence("<classDeclaration>(modifiers,.)");
-   Sequence block = new Sequence("BlockStatement(,statements,)");
+   public Sequence block = new Sequence("BlockStatement(,statements,)");
    public OrderedChoice blockStatements = new OrderedChoice("([],[],[])", REPEAT | OPTIONAL);
    {
       blockStatements.disableTagMode = true;
@@ -279,7 +279,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    // Note on this definition - we define a result class here and also propagate one.  If identifierSuffix returns
    // null we'll use the result class on this parent node and create a default IdentifierExpression.   If not, we
    // just set the identifiers property on the identifierSuffix object.
-   Sequence remainingIdentifiers = new Sequence("(,[])", REPEAT | OPTIONAL, periodSpace, identifier);
+   public Sequence remainingIdentifiers = new Sequence("(,[])", REPEAT | OPTIONAL, periodSpace, identifier);
    {
       // When matching "a." with enablePartialValues we need an empty string in there to tell the difference between "a" and "a."
       remainingIdentifiers.allowEmptyPartialElements = true;
@@ -330,6 +330,14 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    Sequence selectorExpression = new Sequence("SelectorExpression(selectors)", OPTIONAL, new Sequence("([])", REPEAT | OPTIONAL, selector));
    Sequence postfixUnaryExpression = new Sequence("PostfixUnaryExpression(operator)", OPTIONAL, new SemanticTokenChoice("++", "--"));
 
+   // This is a hook for other languages (like JS) to add to the endStatement symbol
+   /*
+   public SymbolChoiceSpace endStatement = new SymbolChoiceSpace(SKIP_ON_ERROR, ";");
+   {
+      endStatement.generateParseNode = new NewlineParseNode(";");
+   }
+   */
+   public SymbolSpace endStatement = semicolonEOL;
    ChainedResultSequence primaryExpression =
                                 // If the optional second part matches, we get either a SelectorExpress or PostFixUnary.  Set that's chainedExpression
                                 // property to the primary part of the expression.
@@ -466,8 +474,8 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    // Forward declarations
    public OrderedChoice variableInitializer = new OrderedChoice("<variableInitializer>");
-   Sequence localVariableDeclaration = new Sequence("VariableStatement(variableModifiers, type, definitions):(.,.,.)");
-   Sequence localVariableDeclarationStatement = new Sequence("<localVariableDeclaration>(.,)", localVariableDeclaration, semicolonEOL);
+   public Sequence localVariableDeclaration = new Sequence("VariableStatement(variableModifiers, type, definitions):(.,.,.)");
+   public Sequence localVariableDeclarationStatement = new Sequence("<localVariableDeclaration>(.,)", localVariableDeclaration, endStatement);
    {
       arrayInitializer.set(
            openBrace,
@@ -478,9 +486,9 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       variableInitializer.set(arrayInitializer, expression);
    }
 
-   Sequence variableDefinition = new Sequence("(operator,initializer)", OPTIONAL, variableInitializerOperators, variableInitializer);
+   public Sequence variableDefinition = new Sequence("(operator,initializer)", OPTIONAL, variableInitializerOperators, variableInitializer);
    public Sequence variableDeclarator = new Sequence("VariableDefinition(*,*)", variableDeclaratorId, variableDefinition);
-   Sequence variableDeclarators =
+   public Sequence variableDeclarators =
        new Sequence("([],[])", variableDeclarator,
                     new Sequence("(,[])", OPTIONAL | REPEAT, comma, variableDeclarator));
 
@@ -514,9 +522,27 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    Sequence tryResources = new Sequence("(,[],[],,)", OPTIONAL, openParen, localVariableDeclaration, new Sequence("(,[])", OPTIONAL | REPEAT, semicolonEOL, localVariableDeclaration), optSemicolon, closeParenSkipOnError);
 
+   public Sequence syncStatement = new Sequence("SynchronizedStatement(,expression,statement)", new KeywordSpace("synchronized"), parenExpression, block);
+
    Sequence doStatement =
       new Sequence("WhileStatement(operator,statement,,expression,)", new KeywordSpace("do"), statement,
       whileKeyword, parenExpression, semicolonEOL);
+
+   Sequence whileStatement = new Sequence("WhileStatement(operator, expression, statement)", whileKeyword, parenExpression, statement);
+   Sequence tryStatement = new Sequence("TryStatement(, resources, statements,*)", new KeywordSpace("try"), tryResources, block,
+                   new Sequence("(catchStatements,finallyStatement)",
+                           new Sequence("([])", OPTIONAL | REPEAT,
+                                   new Sequence("CatchStatement(,parameters,statements)",  new KeywordSpace("catch"),
+                                           catchParameter, block)),
+                           new Sequence("FinallyStatement(,statements)", OPTIONAL, new KeywordSpace("finally"), block)));
+   Sequence switchStatement = new Sequence("SwitchStatement(,expression,,statements,)", new KeywordSpace("switch"), parenExpression, openBraceEOL, switchBlockStatementGroups, closeBraceEOL);
+   Sequence returnStatement = new Sequence("ReturnStatement(operator,expression,)", new KeywordSpace("return"), optExpression, endStatement);
+   Sequence throwStatement = new Sequence("ThrowStatement(operator,expression,)", new KeywordSpace("throw"), expression, endStatement);
+   Sequence breakStatement = new Sequence("BreakContinueStatement(operator,labelName,)", new KeywordSpace("break"), optIdentifier, endStatement);
+   Sequence continueStatement = new Sequence("BreakContinueStatement(operator,labelName,)", new KeywordSpace("continue"), optIdentifier, endStatement);
+   Sequence assertStatement = new Sequence("AssertStatement(,expression,otherExpression,)", new KeywordSpace("assert"), expression, new Sequence("(,.)", OPTIONAL, colon, expression), endStatement);
+   Sequence exprStatement = new Sequence("<exprStatement>(.,)", expression, endStatement);
+   Sequence labelStatement = new Sequence("LabelStatement(labelName,,statement)", identifier, colonEOL, statement);
 
    {
       doStatement.suppressNewlines = true;
@@ -526,31 +552,21 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       statement.put("{", block);
       statement.put("if", ifStatement);
       statement.put("for", forStatement);
-      statement.put("while", new Sequence("WhileStatement(operator, expression, statement)", whileKeyword, parenExpression, statement));
+      statement.put("while", whileStatement);
       statement.put("do", doStatement);
       // Note: this does not enforce the try must have one catch or finally rule.
-      statement.put("try",
-         new Sequence("TryStatement(, resources, statements,*)", new KeywordSpace("try"), tryResources, block,
-                      new Sequence("(catchStatements,finallyStatement)",
-                         new Sequence("([])", OPTIONAL | REPEAT,
-                               new Sequence("CatchStatement(,parameters,statements)",  new KeywordSpace("catch"),
-                                            catchParameter, block)),
-                         new Sequence("FinallyStatement(,statements)", OPTIONAL, new KeywordSpace("finally"), block))));
-      statement.put("switch", new Sequence("SwitchStatement(,expression,,statements,)", 
-                    new KeywordSpace("switch"), parenExpression, openBraceEOL, switchBlockStatementGroups, closeBraceEOL));
-      statement.put("synchronized", new Sequence("SynchronizedStatement(,expression,statement)",
-                    new KeywordSpace("synchronized"), parenExpression, block));
-      statement.put("return", new Sequence("ReturnStatement(operator,expression,)", new KeywordSpace("return"), optExpression, semicolonEOL));
-      statement.put("throw", new Sequence("ThrowStatement(operator,expression,)", new KeywordSpace("throw"), expression, semicolonEOL));
-      statement.put("break", new Sequence("BreakContinueStatement(operator,labelName,)", new KeywordSpace("break"), optIdentifier, semicolonEOL));
-      statement.put("continue", new Sequence("BreakContinueStatement(operator,labelName,)", new KeywordSpace("continue"), optIdentifier, semicolonEOL));
-      statement.put("assert", new Sequence("AssertStatement(,expression,otherExpression,)", new KeywordSpace("assert"), expression,
-                                           new Sequence("(,.)", OPTIONAL, colon, expression), semicolonEOL));
+      statement.put("try",tryStatement);
+      statement.put("switch", switchStatement);
+      statement.put("synchronized", syncStatement);
+      statement.put("return", returnStatement);
+      statement.put("throw", throwStatement);
+      statement.put("break", breakStatement);
+      statement.put("continue", continueStatement);
+      statement.put("assert", assertStatement);
       statement.put(";", semicolonEOL);
 
       // Default rules in case the indexed ones do not match
-      statement.addDefault(new Sequence("<exprStatement>(.,)", expression, semicolonEOL),
-                           new Sequence("LabelStatement(labelName,,statement)", identifier, colonEOL, statement));
+      statement.addDefault(exprStatement, labelStatement);
 
       localVariableDeclaration.set(variableModifiers, type, variableDeclarators);
 
@@ -647,6 +663,10 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    KeywordChoice classModifierKeywords = new KeywordChoice(true, "public", "protected", "private", "abstract", "static", "final", "strictfp");
    public OrderedChoice classModifiers = new OrderedChoice("([],[])", OPTIONAL | REPEAT, annotation, classModifierKeywords);
 
+   /**
+    * The list of operators for defining a new type - this is a choice because SCLanguage needs to add to this list and it's easier to add to it then to
+    * replace all references to a new one.
+    */
    public KeywordChoice classOperators = new KeywordChoice("class");
 
    Sequence extendsType = new Sequence("<extends>(,.)", OPTIONAL, extendsKeyword, type);

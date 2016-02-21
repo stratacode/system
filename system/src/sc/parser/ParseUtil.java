@@ -869,6 +869,14 @@ public class ParseUtil  {
       return null;
    }
 
+   /**
+    * Creates a LayeredSystem from a single classPath, externalClassPath, and srcPath.   You use this method
+    * when you do not have any layers but still want to leverage the low-level language processing capabilities of
+    * StrataCode.
+    * You can optionally provide an implementation of IExternalModelIndex to provide control over how models
+    * are cached and managed on the file system.  This is useful to help synchronize the LayeredSystem's copy of a
+    * particular model with the version of the model managed by an external tool like an IDE.
+    */
    public static LayeredSystem createSimpleParser(String classPath, String externalClassPath, String srcPath, IExternalModelIndex modelIndex) {
       LayeredSystem.Options options = new LayeredSystem.Options();
       options.installLayers = false;
