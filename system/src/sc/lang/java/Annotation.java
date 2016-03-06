@@ -9,6 +9,7 @@ import sc.lang.JavaLanguage;
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
 
+import java.lang.reflect.Array;
 import java.util.IdentityHashMap;
 import java.util.List;
 
@@ -61,6 +62,19 @@ public class Annotation extends JavaSemanticNode implements IAnnotation {
          displayTypeError("No annotation: ", typeName, " ");
          boundType = model.findTypeDeclaration(typeName, true);
       }
+
+      /* Debug code to test that we can retrieve annotation values from any annotation
+      if (elementValue instanceof List) {
+         List ev = (List) elementValue;
+         for (Object eva :ev) {
+            Object res = getAnnotationValue(((AnnotationValue) eva).identifier);
+            if (res instanceof Object[]) {
+
+
+            }
+         }
+      }
+      */
    }
 
    /**
@@ -155,13 +169,33 @@ public class Annotation extends JavaSemanticNode implements IAnnotation {
          else if (av.elementValue instanceof List) {
             Object annotType = getAnnotationValueType(identifier);
             Class rtClass = ModelUtil.getCompiledClass(annotType);
-            return ArrayInitializer.initializeArray(rtClass, (List<Expression>) av.elementValue, new ExecutionContext());
+            return initAnnotationArray(rtClass, (List<Expression>) av.elementValue, new ExecutionContext());
          }
          // When copied over from the compile time versions
          else if (av.elementValue instanceof String)
             return av.elementValue;
       }
       return null;
+   }
+
+   Object initAnnotationArray(Class rtClass, List<?> initializers, ExecutionContext ctx) {
+      int size = initializers.size();
+      Class componentType = rtClass.getComponentType();
+      if (componentType.isAnnotation())
+         componentType = Annotation.class;
+      else {
+         // TODO: check if there are any annotations in this list - if so, it should be an error
+         return ArrayInitializer.initializeArray(rtClass, (List<Expression>) initializers, ctx);
+      }
+      Object[] value = (Object[]) Array.newInstance(componentType, size);
+      for (int i = 0; i < size; i++) {
+         Object init = initializers.get(i);
+         if (init instanceof Expression)
+            value[i] = ((Expression) init).eval(componentType, ctx);
+         else // Annotation - we map annotations into the sc.lang.java.Annotation object directly
+            value[i] = init;
+      }
+      return value;
    }
 
    public static Annotation createFromElement(java.lang.annotation.Annotation elem) {
