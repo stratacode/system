@@ -15,7 +15,8 @@ public class JSFunctionDeclaration extends Expression {
    public String toString() {
       StringBuilder sb = new StringBuilder();
       sb.append("function ");
-      sb.append(name);
+      if (name != null)
+         sb.append(name);
       sb.append("(");
       sb.append(parameterNames);
       sb.append(")");

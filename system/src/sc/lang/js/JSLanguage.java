@@ -36,7 +36,7 @@ public class JSLanguage extends SCLanguage implements IParserConstants {
       return JAVA_VARNAME_KEYWORD_SET;
    }
 
-   public KeywordSpace optVarKeyword = new KeywordSpace("var", OPTIONAL);
+   public KeywordSpace varKeyword = new KeywordSpace("var");
 
    public Sequence identifierList = new Sequence("([],[])", OPTIONAL, identifier, remainingIdentifiers);
 
@@ -44,9 +44,8 @@ public class JSLanguage extends SCLanguage implements IParserConstants {
       // For JS, you can end statements with a ; either a newline or a line feed
       //endStatement.add("\n", "\r");
 
-      /*
-      localVariableDeclaration.setName("JSVariableStatement(,definitions)");
-      localVariableDeclaration.set(optVarKeyword, variableDeclarators);
+      localVariableDeclaration.setName("VariableStatement(type,definitions)");
+      localVariableDeclaration.set(new Sequence("ClassType(typeName)", OPTIONAL, varKeyword), variableDeclarators);
 
       blockStatements.setName("([])");
       blockStatements.set(statement);
@@ -55,7 +54,6 @@ public class JSLanguage extends SCLanguage implements IParserConstants {
       statement.put("var", localVariableDeclarationStatement);
       // Be careful with the name here - there's one entry that's ommitted - the for a semicolon without anything in front of it.
       statement.setName("<statement>(.,.,.,.,.,.,.,.,.,.,.,.,,.,.,.)");
-      */
    }
 
    public Sequence parameterNameList = new Sequence("(,.,)", openParen, identifierList, closeParen);

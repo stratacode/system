@@ -152,9 +152,18 @@ public class ParseNode extends AbstractParseNode {
          Object childSV = childParseNode.getSemanticValue();
          if ((childSV instanceof ISemanticNode)) {
             ISemanticNode childSVNode = (ISemanticNode) childSV;
-            if (childSVNode.getParseNode() == childParseNode) {
+            Object childSVParseNode = childSVNode.getParseNode();
+            if (childSVParseNode == childParseNode) {
                ParseUtil.styleString(adapter, childSV, childParseNode.getParselet().styleName, null, false);
                return;
+            }
+            // TODO: This only handles 1-level of parseNode wrapped in parseNode.  We might need more than one for some grammars?
+            else if (childParseNode instanceof ParseNode) {
+               Object childValue = ((ParseNode) childParseNode).value;
+               if (childSVParseNode == childValue && childValue instanceof IParseNode) {
+                  ParseUtil.styleString(adapter, childSV, ((IParseNode) childValue).getParselet().styleName, null, false);
+                  return;
+               }
             }
          }
          res = childParseNode.toString();

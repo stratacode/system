@@ -559,7 +559,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                // to resolve this reference so no need to find the accurate tag object.
                definedInType = rootExpr.getJavaModel().getModelTypeDeclaration();
                if (definedInType == null)
-                  System.err.println("*** Unable to parametrize reference - no enclosing type");
+                  System.err.println("*** Unable to parameterize reference - no enclosing type");
             }
             ParamTypedMethod ptm = new ParamTypedMethod(foundMeth, currentType instanceof ITypeParamContext ? (ITypeParamContext) currentType : null, definedInType, arguments, inferredType, methodTypeArgs);
             foundMeth = ptm;
