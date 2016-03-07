@@ -7486,9 +7486,14 @@ public class ModelUtil {
       if (ModelUtil.isPrimitive(newVal)) {
          if (newVal instanceof PrimitiveType) {
             primTypeName = ((PrimitiveType) newVal).typeName;
-         } else if (newVal instanceof Class) {
+         }
+         else if (newVal instanceof Class) {
             primTypeName = ((Class) newVal).getName();
-         } else
+         }
+         else if (newVal instanceof WrappedTypeDeclaration) {
+            return wrapPrimitiveType(((WrappedTypeDeclaration) newVal).getBaseType());
+         }
+         else
             throw new UnsupportedOperationException();
          String wrapperTypeName = ClassType.getPrimitiveWrapperName(primTypeName);
          return RTypeUtil.loadClass(null, "java.lang." + wrapperTypeName, true);

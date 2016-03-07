@@ -9126,7 +9126,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             boolean activated = srcEnt.layer != null && srcEnt.layer.activated;
             if (options.clonedParseModel && peerSystems != null) {
                for (LayeredSystem peerSys:peerSystems) {
-                  Layer peerLayer = activated ? peerSys.getLayerByName(srcEnt.layer.layerUniqueName) : peerSys.lookupInactiveLayer(srcEnt.layer.getLayerName(), false, true);
+                  Layer peerLayer = activated ? peerSys.getLayerByName(srcEnt.layer.layerUniqueName) : srcEnt.layer == null ? null : peerSys.lookupInactiveLayer(srcEnt.layer.getLayerName(), false, true);
                   // does this layer exist in the peer runtime and is it started?
                   if (peerLayer != null && peerLayer.started) {
                      if (peerSys.beingLoaded.get(srcEnt.absFileName) == null) {

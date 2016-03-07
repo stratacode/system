@@ -141,7 +141,7 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
       JavaType newType = null;
       ITypeDeclaration typeCtx = ctx instanceof ITypeDeclaration ? (ITypeDeclaration) ctx : ctx != null ? ctx.getDefinedInType() : definedInType;
 
-      LayeredSystem sys = ctx != null ? ctx.getLayeredSystem() : definedInType.getLayeredSystem();
+      LayeredSystem sys = ctx != null ? ctx.getLayeredSystem() : definedInType == null ? null : definedInType.getLayeredSystem();
       if (ModelUtil.hasTypeParameters(type)) {
          SemanticNodeList<JavaType> typeParams = new SemanticNodeList<JavaType>();
          int numParams = ModelUtil.getNumTypeParameters(type);

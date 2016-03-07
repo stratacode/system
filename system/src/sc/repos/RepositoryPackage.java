@@ -211,6 +211,8 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       Layer layer = getDefinedInLayer();
       if (layer != null)
          return layer.layeredSystem.repositorySystem;
+      if (mgr != null)
+         return mgr.getRepositorySystem();
       return null;
    }
 
@@ -670,6 +672,10 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       if (oldPkg.subPkgURLs != null) {
          ArrayList<RepositoryPackage> newSubs = new ArrayList<RepositoryPackage>(oldPkg.subPkgURLs.size());
          RepositorySystem repoSys = getRepositorySystem();
+         if (repoSys == null) {
+            System.err.println("*** Error - repository package without system.");
+            return;
+         }
          for (String sub:oldPkg.subPkgURLs) {
             if (subPackages != null) {
                boolean found = false;
