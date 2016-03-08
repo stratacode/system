@@ -339,7 +339,9 @@ public abstract class BaseLambdaExpression extends Expression {
       }
       else if (lambdaParams instanceof Parameter) {
          Object[] paramTypes = ((Parameter) lambdaParams).getParameterTypes();
-         return ModelUtil.parametersMatch(paramTypes, params, false, sys); // TODO: should we allow unbound type parameters to match here
+         // Need to pass true here for SeqTest - Seq.unfold(0, (Integer i -> ...)   The lamda param there needs to match even though we do not have
+         // a parameter type.  Or should we be binding "U" because of the Integer i somehow?
+         return ModelUtil.parametersMatch(paramTypes, params, true, sys);
       }
       // () turns into null?
       else if (lambdaParams == null) {
