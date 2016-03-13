@@ -39,8 +39,8 @@ cp -rf $BUILDDIR $STAGEDIR/StrataCode
 
 echo "cd $STAGEDIR"
 cd $STAGEDIR
-echo "zip StrataCode.zip StrataCode/bin/* StrataCode/README.md"
-zip StrataCode.zip StrataCode/bin/* StrataCode/README.md
+echo "zip StrataCode.zip StrataCode/bin/* StrataCode/README.md layers/* bundles/*"
+zip StrataCode.zip StrataCode/bin/* StrataCode/README.md layers/* bundles/* conf/*
 
 if [ "$RESDIR" != "$STAGEDIR" ]; then
    mv StrataCode.zip $RESDIR/

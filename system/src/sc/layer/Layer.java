@@ -3115,6 +3115,11 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          addSrcFilesToCache(f, prefix, null);
       }
 
+      if (!f.isDirectory()) {
+         System.err.println("*** Invalid layer source directory: " + f);
+         return;
+      }
+
       File[] files = f.listFiles();
       for (File subF:files) {
          String path = subF.getPath();

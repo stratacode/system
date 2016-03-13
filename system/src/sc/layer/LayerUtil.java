@@ -17,8 +17,6 @@ import java.io.*;
 import java.lang.reflect.Field;
 import java.util.*;
 import java.util.regex.Pattern;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
 
 public class LayerUtil implements LayerConstants {
 
@@ -64,12 +62,12 @@ public class LayerUtil implements LayerConstants {
          return sys.options.buildLayerAbsDir;
       }
       String sysBuildDir = srcDir && sys.options.buildSrcDir != null ?  sys.options.buildSrcDir : sys.options.buildDir;
-      String mainLayerDir = sys.mainLayerDir;
+      String mainLayerDir = sys.strataCodeMainDir;
       if (mainLayerDir == null) {
          mainLayerDir = System.getProperty("user.dir");
       }
       // If we use the -dyn option to selectively make layers dynamic, use a different build dir so that we can quickly switch back and forth between -dyn and not without rebuilding everything.
-      String prefix = sysBuildDir == null ?  FileUtil.concat(mainLayerDir, SC_DIR, sys.options.anyDynamicLayers ? "dynbuild" : "build") : sysBuildDir;
+      String prefix = sysBuildDir == null ?  FileUtil.concat(mainLayerDir, sys.options.anyDynamicLayers ? "dynbuild" : "build") : sysBuildDir;
       prefix = FileUtil.concat(prefix, layer.getUnderscoreName());
       // TODO: remove this comment - this was a naive solution that caused headaches between JS marks all layers as compiled
       //return prefix + FileUtil.FILE_SEPARATOR + (layer.dynamic ? DYN_BUILD_DIRECTORY : BUILD_DIRECTORY);

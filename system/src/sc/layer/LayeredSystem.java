@@ -175,6 +175,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public Map<String,Layer> layerFileIndex = new HashMap<String,Layer>(); // <layer-pkg> + layerName
    public Map<String,Layer> layerPathIndex = new HashMap<String,Layer>(); // layer-group name
    public String layerPath;
+   public List<File> layerPathDirs;
    public String rootClassPath; /* The classpath passed to the layered system constructor - usually the system */
    public String classPath;  /* The complete external class path, used for javac, not for looking up internal classes */
    public String userClassPath;  /* The part of the above which is user specified - i.e. to be used for scripts */
@@ -269,7 +270,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public boolean useCanonicalPaths = false;
 
    private Set<String> changedDirectoryIndex = new HashSet<String>();
-   private List<File> layerPathDirs;
    private Map<String,Object> otherClassCache; // Only used for CFClass - when crossCompile is true
    private Map<String,Class> compiledClassCache = new HashMap<String,Class>(); // Class
    {
@@ -898,7 +898,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public String newLayerDir = null; // Directory for creating new layers
 
-   public String mainLayerDir = null; // Directory containing .stratacode dir be using by this stack - this is the last .stratacode dir found in the layer path.
+   /** Set to true when we have identified the real StrataCode directory structure (as opposed to the older looser collection of layers) */
+   boolean isStrataCodeDir = false;
+   public String strataCodeMainDir = null; // Directory containing .stratacode dir.  It's either the StrataCode install dir or a layer dir if you are running a layer not in the context of the install dir.
 
    /** Set to "layers" or "../layers" when we are running in the StrataCode main/bin directories.  In this case we look for and by default install the layers folder next to the bin directory  */
    public String layersFilePathPrefix = null;
@@ -1010,11 +1012,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public TreeSet<String> overrideFinalPackages = new TreeSet<String>();
 
    public String getStrataCodeDir(String dirName) {
-      String dir = mainLayerDir;
+      String dir = strataCodeMainDir;
       if (dir == null) {
          dir = System.getProperty("user.dir");
       }
-      return FileUtil.concat(dir, SC_DIR, dirName);
+      return FileUtil.concat(dir, dirName);
+   }
+
+   public String getStrataCodeConfDir(String dirName) {
+      return getStrataCodeDir(FileUtil.concat("conf", dirName));
    }
 
    public LayeredSystem(String lastLayerName, List<String> initLayerNames, List<String> explicitDynLayers, String layerPathNames, String rootClassPath, Options options, IProcessDefinition useProcessDefinition, LayeredSystem parentSystem, boolean startInterpreter, IExternalModelIndex extModelIndex) {
@@ -1091,11 +1097,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          else
             newLayerDir = mapLayerDirName(".");
       }
-      if (mainLayerDir == null)
-         mainLayerDir = newLayerDir;
+      // We could not find the real StrataCode install dir but we could find a layer so use that
+      if (strataCodeMainDir == null)
+         strataCodeMainDir = newLayerDir;
 
       if (!peerMode) {
-         String scSourceConfig = getStrataCodeDir(SC_SOURCE_PATH);
+         String scSourceConfig = getStrataCodeConfDir(SC_SOURCE_PATH);
          if (new File(scSourceConfig).canRead()) {
             scSourcePath = FileUtil.getFileAsString(scSourceConfig);
             if (scSourcePath != null) {
@@ -1524,7 +1531,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
 
          if (input.trim().length() > 0) {
-            mainLayerDir = newLayerDir = input;
+            strataCodeMainDir = newLayerDir = input;
 
             if (isValidLayersDir(newLayerDir)) {
                systemInstalled = true;
@@ -3068,6 +3075,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       @Constant public boolean autoRefresh = true;
 
       @Constant public boolean retryAfterFailedBuild = false;
+
+      /** Directly containing layerBundle directories.  Each directory in the bundleDir is added to the initial layerPath */
+      @Constant public String bundleDir = "./bundles";
 
       @Constant String testPattern = null;
 
@@ -5164,8 +5174,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    private Layer findLayerInPath(String layerPathName, String relDir, String relPath, boolean markDynamic, LayerParamInfo lpi) {
       // defaults to using paths relative to the current directory
-      if (layerPathDirs == null || relDir != null)
-         return findLayer(relDir == null ? "." : relDir, layerPathName, relDir, relPath, markDynamic, lpi);
+      if (layerPathDirs == null || relDir != null) {
+         Layer res = findLayer(relDir == null ? "." : relDir, layerPathName, relDir, relPath, markDynamic, lpi);
+         if (res != null)
+            return res;
+      }
 
       for (File pathDir:layerPathDirs) {
          Layer l = findLayer(pathDir.getPath(), layerPathName, null, relPath, markDynamic, lpi);
@@ -5255,9 +5268,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             layerPathPrefix = null;
          }
          else {
+            return null;
+            /*
             layerTypeName = FileUtil.getFileName(layerFileName);
             layerPathPrefix = null;
             layerGroup = "";
+            */
          }
          inLayerDir = true;
       }
@@ -5759,6 +5775,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return sb.toString();
    }
 
+   /** TODO: can we remove this and instead rely on the stricter StrataCode directory organization (in initStratCodeDir0 for identifying a layer directory? */
    public boolean isValidLayersDir(String dirName) {
       String layerPathFileName = FileUtil.concat(dirName, SC_DIR, LAYER_PATH_FILE);
       File layerPathFile = new File(layerPathFileName);
@@ -5792,11 +5809,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       else {
          String scDirName = FileUtil.concat(dirName, SC_DIR);
          // TODO: picking the last directory in the layer path because right now that's how IntelliJ orders them and it seems
-         // like a potentially 'too powerful' idea to let someone replace a layer in a subsequent layer path, for the same reasons Java makes it so hard to replace a class
+         // like a potentially 'too powerful' idea to let someone to modify a layer in an upstream path entry.
          // You can just replace the types to fix the layer if you need to in an incremental way.
          // Down the road we could reverse this decision to make it consistent.
-         if (new File(scDirName).isDirectory()) {
-            mainLayerDir = dirName;
+         if (!isStrataCodeDir && new File(scDirName).isDirectory()) {
+            strataCodeMainDir = dirName;
          }
          String layerPathFileName = FileUtil.concat(dirName, SC_DIR, LAYER_PATH_FILE);
          File layerPathFile = new File(layerPathFileName);
@@ -5838,104 +5855,139 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          systemInstalled = true;
 
          String [] dirNames = layerPath.split(FileUtil.PATH_SEPARATOR);
-         List dirNameList = Arrays.asList(dirNames);
          layerPathDirs = new ArrayList<File>(dirNames.length);
          for (String d:dirNames) {
             addLayerPathDir(d);
          }
+
+         verbose("Using explicit layer path: " + layerPath);
       }
       else {
-         String layerPathFileName = FileUtil.concat(".", SC_DIR, LAYER_PATH_FILE);
-         File layerPathFile = new File(layerPathFileName);
-         if (layerPathFile.canRead()) {
-            systemInstalled = true;
-         }
+         String currentDir = System.getProperty("user.dir");
+         if (initStrataCodeDir(currentDir))
+            return;
          else {
-            layerPathFileName = FileUtil.concat("layers", SC_DIR, LAYER_PATH_FILE);
-            layerPathFile = new File(layerPathFileName);
-            // This is the case where have installed into the StrataCode dist directory
-            if (layerPathFile.canRead()) {
+            if (isValidLayersDir(".")) {
                systemInstalled = true;
-               if (layerPath == null) {
-                  String currentDir = System.getProperty("user.dir");
-                  mainLayerDir = newLayerDir = FileUtil.concat(currentDir, "layers");
-                  layerPath = newLayerDir;
-                  layerPathDirs = new ArrayList<File>();
-                  layerPathDirs.add(new File(layerPath));
-               }
             }
-            else {
-               String currentDir = System.getProperty("user.dir");
-               if (currentDir != null) {
-                  // If we are in the bin directory, check for the layers up and over one level
-                  if (FileUtil.getFileName(currentDir).equals("bin")) {
-                     layerPathFileName = FileUtil.concat("..", "layers", ".layerPath");
-                     layerPathFile = new File(layerPathFileName);
-                     if (layerPathFile.canRead()) {
-                        systemInstalled = true;
-                        if (layerPath == null) {
-                           // newLayerDir needs to be absolute
-                           String newDir = getLayersDirFromBinDir();
-                           if (newDir != null) {
-                              mainLayerDir = newLayerDir = newDir;
-                              layerPath = newLayerDir;
+            else if (currentDir != null) {
+               // If we are in the bin directory, check for the layers up and over one level
+               if (FileUtil.getFileName(currentDir).equals("bin") && initStrataCodeDir(FileUtil.getParentPath(currentDir))) {
+                  return;
+               }
+               else {
+                  // Are we running from a StrataCodeDir that does not yet have layers or bundles?
+                  File currentFile = new File(currentDir);
+                  String parentName;
+                  File binDir = new File(currentFile, "bin");
+                  if (binDir.isDirectory()) {
+                     File scJarFile = new File(binDir, "sc.jar");
+                     // When running from the StrataCode dist directory, we put the results in 'layers' mostly because
+                     // git needs an empty directory to start from.
+                     if (scJarFile.canRead()) {
+                        layersFilePathPrefix = "layers";
+                     }
+                  }
+                  else {
+                     // Perhaps running from the bin directory of a StrataCode install dir without layers
+                     String parentDir = FileUtil.getParentPath(currentDir);
+                     if (parentDir != null) {
+                        binDir = new File(parentDir, "bin");
+                        if (binDir.isDirectory()) {
+                           File scJarFile = new File(binDir, "sc.jar");
+                           if (scJarFile.canRead()) {
+                              layersFilePathPrefix = ".." + FileUtil.FILE_SEPARATOR + "layers";
+                           }
+                        }
+                     }
+                  }
+
+                  do {
+                     parentName = currentFile.getParent();
+                     if (parentName != null) {
+                        if (initStrataCodeDir(parentName))
+                           return;
+
+                        File layerPathFile = new File(FileUtil.concat(parentName, SC_DIR));
+                        // There's a .stratacode here - it's a layer bundle - either layers or inside of bundles?
+                        if (layerPathFile.isDirectory()) {
+                           String parentParent = FileUtil.getParentPath(parentName);
+                           // We are in the layers directory
+                           if (parentParent != null) {
+                              if (initStrataCodeDir(parentParent))
+                                 return;
+                              String ppp = FileUtil.getParentPath(parentParent);
+                              // In the bundles directory
+                              if (initStrataCodeDir(ppp))
+                                 return;
+                           }
+                           // Otherwise, we are in a layer bundle directory that's not in the normal structure.  Just put this path
+                           // in the layer path.
+                           if (layerPath == null) {
+                              strataCodeMainDir = newLayerDir = parentName;
+                              layerPath = parentName;
                               layerPathDirs = new ArrayList<File>();
                               layerPathDirs.add(new File(layerPath));
-                           }
-                        }
-                     }
-                  }
-                  // We may be inside of a layer directory in the layer path.  We'll figure that out later on but for now just
-                  // find the .layerPath above us so we do not install incorrectly.
-                  else {
-                     File currentFile = new File(currentDir);
-                     String parentName;
-                     File binDir = new File(currentFile, "bin");
-                     if (binDir.isDirectory()) {
-                        File scJarFile = new File(binDir, "sc.jar");
-                        // When running from the StrataCode dist directory, we put the results in 'layers' mostly because
-                        // git needs an empty directory to start from.
-                        if (scJarFile.canRead()) {
-                           layersFilePathPrefix = "layers";
-                        }
-                     }
-                     else {
-                        // Perhaps running from the bin directory
-                        String parentDir = FileUtil.getParentPath(currentDir);
-                        if (parentDir != null) {
-                           binDir = new File(parentDir, "bin");
-                           if (binDir.isDirectory()) {
-                              File scJarFile = new File(binDir, "sc.jar");
-                              if (scJarFile.canRead()) {
-                                 layersFilePathPrefix = ".." + FileUtil.FILE_SEPARATOR + "layers";
-                              }
-                           }
-                        }
-                     }
 
-                     do {
-                        parentName = currentFile.getParent();
-                        if (parentName != null) {
-                           layerPathFile = new File(FileUtil.concat(parentName, SC_DIR));
-                           if (layerPathFile.isDirectory()) {
                               systemInstalled = true;
-                              // Need to at least install it in the right place
-                              if (layerPath == null) {
-                                 mainLayerDir = newLayerDir = parentName;
-                                 layerPath = parentName;
-                                 layerPathDirs = new ArrayList<File>();
-                                 layerPathDirs.add(new File(layerPath));
-                              }
+                              return;
                            }
-                           else
-                              currentFile = new File(parentName);
                         }
-                     } while (parentName != null && !systemInstalled);
-                  }
+                        else
+                           currentFile = new File(parentName);
+                     }
+                  } while (parentName != null);
                }
             }
          }
       }
+   }
+
+   private boolean initStrataCodeDir(String dir) {
+      if (dir == null)
+         return false;
+
+      String bundlesFileName = FileUtil.concat(dir, "bundles");
+      File bundlesFile = new File(bundlesFileName);
+      boolean inited = false;
+      StringBuilder layerPathBuf = new StringBuilder();
+      if (bundlesFile.isDirectory()) {
+         String[] bundleNames = bundlesFile.list();
+         for (String bundleName:bundleNames) {
+            String bundleDirName = FileUtil.concat(bundlesFileName, bundleName);
+            File bundleDir = new File(bundleDirName);
+            if (layerPathBuf.length() > 0)
+               layerPathBuf.append(FileUtil.PATH_SEPARATOR_CHAR);
+            layerPathBuf.append(bundleDirName);
+            if (layerPathDirs == null)
+               layerPathDirs = new ArrayList<File>();
+            layerPathDirs.add(bundleDir);
+         }
+         inited = true;
+      }
+
+      String layersFileName = FileUtil.concat(".", "layers");
+      File layersFile = new File(layersFileName);
+      if (layersFile.isDirectory()) {
+         newLayerDir = mapLayerDirName(layersFileName);
+         if (layerPathDirs == null)
+            layerPathDirs = new ArrayList<File>();
+         layerPathDirs.add(layersFile);
+         if (layerPathBuf.length() > 0)
+            layerPathBuf.append(FileUtil.PATH_SEPARATOR_CHAR);
+         layerPathBuf.append(layersFileName);
+         inited = true;
+      }
+
+      if (inited) {
+         layerPath = layerPathBuf.toString();
+         strataCodeMainDir = dir;
+         systemInstalled = true;
+         isStrataCodeDir = true;
+
+         verbose("Initialized layer path: " + layerPath + " from StrataCode main dir: " + dir);
+      }
+      return inited;
    }
 
    public String getNewLayerDir() {
@@ -5949,7 +6001,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public String getUndoDirPath() {
-      String undoDirPath = FileUtil.concat(mainLayerDir, ".undo");
+      String undoDirPath = FileUtil.concat(strataCodeMainDir, ".undo");
       File undoDir = new File(undoDirPath);
       if (!undoDir.isDirectory())
          undoDir.mkdirs();
@@ -12009,7 +12061,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             relDir = FileUtil.concat("..", relDir);
          if (newLayerDir == null || newLayerDir.equals(mapLayerDirName("."))) {
             // Need to make this absolute before we start running the app - which involves switching the current directory sometimes.
-            mainLayerDir = newLayerDir = mapLayerDirName(relDir);
+            newLayerDir = mapLayerDirName(relDir);
+            if (strataCodeMainDir == null)
+               strataCodeMainDir = newLayerDir;
          }
          //globalObjects.remove(defFile.layer.layerUniqueName);
          defFile.layer.layerUniqueName = modelTypeName;
