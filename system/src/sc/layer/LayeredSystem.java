@@ -5180,10 +5180,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             return res;
       }
 
-      for (File pathDir:layerPathDirs) {
-         Layer l = findLayer(pathDir.getPath(), layerPathName, null, relPath, markDynamic, lpi);
-         if (l != null)
-            return l;
+      if (layerPathDirs != null) {
+         for (File pathDir : layerPathDirs) {
+            Layer l = findLayer(pathDir.getPath(), layerPathName, null, relPath, markDynamic, lpi);
+            if (l != null)
+               return l;
+         }
       }
       return null;
    }
