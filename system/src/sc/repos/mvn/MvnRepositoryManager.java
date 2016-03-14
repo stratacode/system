@@ -364,7 +364,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       preInstallPackage(pkg, ctx);
       String pomFileName = getPOMFileName(pkg);
       String notExistsFile = pomFileName + ".notFound";
-      if (system.installExisting && new File(notExistsFile).canRead())
+      if (!system.reinstallSystem && new File(notExistsFile).canRead())
          return "POM file: " + pomFileName + " did not exist when last checked.";
       if (!checkExists || !new File(pomFileName).canRead()) {
          boolean found = installMvnFile(desc, pomFileName, "", "pom");
@@ -385,7 +385,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
 
    private boolean mvnFileExists(MvnDescriptor desc, String resFileName, String remoteSuffix, String remoteExt) {
       boolean found = false;
-      if (system.installExisting && new File(resFileName).canRead()) {
+      if (!system.reinstallSystem && new File(resFileName).canRead()) {
          info("Using existing file: " + resFileName);
          return true;
       }
@@ -426,7 +426,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
 
    private boolean installMvnFile(MvnDescriptor desc, String resFileName, String remoteSuffix, String remoteExt) {
       boolean found = false;
-      if (system.installExisting && new File(resFileName).canRead()) {
+      if (!system.reinstallSystem && new File(resFileName).canRead()) {
          info("Using existing file: " + resFileName);
          return true;
       }

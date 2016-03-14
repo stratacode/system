@@ -5862,7 +5862,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             addLayerPathDir(d);
          }
 
-         verbose("Using explicit layer path: " + layerPath);
+         if (!peerMode)
+            verbose("Using explicit layer path: " + layerPath);
       }
       else {
          String currentDir = System.getProperty("user.dir");
