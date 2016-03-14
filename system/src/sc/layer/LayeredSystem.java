@@ -5963,6 +5963,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          for (String bundleName:bundleNames) {
             String bundleDirName = FileUtil.concat(bundlesFileName, bundleName);
             File bundleDir = new File(bundleDirName);
+            if (!bundleDir.isDirectory())
+               continue;
             if (layerPathBuf.length() > 0)
                layerPathBuf.append(FileUtil.PATH_SEPARATOR_CHAR);
             layerPathBuf.append(bundleDirName);
