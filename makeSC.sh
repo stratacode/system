@@ -39,7 +39,7 @@ cp -rf $BUILDDIR $STAGEDIR/StrataCode
 
 echo "cd $STAGEDIR"
 cd $STAGEDIR
-echo "zip StrataCode.zip StrataCode/bin/* StrataCode/README.md layers/* bundles/*"
+echo "zip StrataCode.zip StrataCode/bin/* StrataCode/README.md StrataCode/layers/* StrataCode/bundles/*"
 zip StrataCode.zip StrataCode/bin/* StrataCode/README.md layers/* bundles/* conf/*
 
 if [ "$RESDIR" != "$STAGEDIR" ]; then
