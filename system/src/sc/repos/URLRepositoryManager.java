@@ -7,6 +7,8 @@ package sc.repos;
 import sc.util.IMessageHandler;
 import sc.util.URLUtil;
 
+import java.io.File;
+
 /**
  * For this RepoistoryManager, packages are stored from the URL and downloaded via the URL protocol handler built into Java.
  * From there they are transfered to the installedRoot, which is then typically unzipped.
@@ -18,6 +20,12 @@ public class URLRepositoryManager extends AbstractRepositoryManager {
 
    public String doInstall(RepositorySource src, DependencyContext ctx, DependencyCollection deps) {
       src.pkg.definesClasses = false;
+      if (!system.reinstallSystem) {
+         if (new File(src.pkg.installedRoot).isDirectory()) {
+            info("Using downloaded package for: " + src);
+            return null;
+         }
+      }
       return URLUtil.saveURLToFile(src.url, src.pkg.installedRoot, src.unzip, msg);
    }
 
