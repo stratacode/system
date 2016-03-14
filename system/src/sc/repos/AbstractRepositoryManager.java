@@ -172,7 +172,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
          pkg.rebuildReason += ": files out of date";
 
       // If we are installing on top of an existing directory, rename the old directory in the backup folder.  Checking tagFile because it could be version specific and don't want to back up one version to install another one
-      if (!pkg.preInstalled && rootDirExists && !isEmptyDir(rootFile) && !system.installExisting && pkg.parentPkg == null && !mismatchedCase(rootFile) && !pkg.getReusePackageDirectory()) {
+      if (!pkg.preInstalled && rootDirExists && !isEmptyDir(rootFile) && system.reinstallSystem && pkg.parentPkg == null && !mismatchedCase(rootFile) && !pkg.getReusePackageDirectory()) {
          Date curTime = new Date();
          String backupDir = FileUtil.concat(packageRoot, REPLACED_DIR_NAME, pkg.packageName + "." + curTime.getHours() + "." + curTime.getMinutes());
          new File(backupDir).mkdirs();
