@@ -363,16 +363,22 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       // and also make sure we don't do this twice.
       preInstallPackage(pkg, ctx);
       String pomFileName = getPOMFileName(pkg);
+      File pomFileFile = new File(pomFileName);
       String notExistsFile = pomFileName + ".notFound";
-      if (!system.reinstallSystem && new File(notExistsFile).canRead())
+      File notExistsFileFile = new File(notExistsFile);
+      if (!system.reinstallSystem && notExistsFileFile.canRead())
          return "POM file: " + pomFileName + " did not exist when last checked.";
-      if (!checkExists || !new File(pomFileName).canRead()) {
+      if (!checkExists || !pomFileFile.canRead()) {
          boolean found = installMvnFile(desc, pomFileName, "", "pom");
          if (!found) {
             pomCache.put(pomFileName, POMFile.NULL_SENTINEL);
             FileUtil.saveStringAsFile(notExistsFile, "does not exist", true);
+            if (pomFileFile.canRead())
+               pomFileFile.delete();
             return "Maven pom file: " + desc.groupId + "/" + desc.artifactId + "/" + desc.version + " not found in repositories: " + repositories;
          }
+         else
+            notExistsFileFile.delete();
       }
 
       POMFile pomFile = POMFile.readPOM(pomFileName, this, ctx, pkg, required, parentPOM, includedFromPOM);
