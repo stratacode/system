@@ -1041,8 +1041,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          else if (options.verbose)
             verbose("Disable runtimes: " + disabledRuntimes);
       }
-      else
+      else {
          disabledRuntimes = parentSystem.disabledRuntimes;
+         strataCodeMainDir = parentSystem.strataCodeMainDir;
+         isStrataCodeDir = parentSystem.isStrataCodeDir;
+      }
 
       IRuntimeProcessor useRuntimeProcessor = useProcessDefinition == null ? null : useProcessDefinition.getRuntimeProcessor();
 
@@ -1068,6 +1071,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       JSLanguage.INSTANCE.initialize();
 
       layerPath = layerPathNames;
+
       initLayerPath();
 
       // Sets the coreBuildLayer - used for storing dynamic stubs needed for the layer init process
