@@ -5949,6 +5949,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (dir == null)
          return false;
 
+      // Must either have a bin or .stratacode directory to be considered an install dir - otherwise, anything with layers or bundles in
+      // them is considered an install dir.
+      if (!new File(dir, "bin").isDirectory() && !new File(dir, SC_DIR).isDirectory() && !new File(dir, "conf").isDirectory())
+         return false;
+
       String bundlesFileName = FileUtil.concat(dir, "bundles");
       File bundlesFile = new File(bundlesFileName);
       boolean inited = false;
