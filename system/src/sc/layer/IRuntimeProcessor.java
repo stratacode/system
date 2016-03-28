@@ -22,6 +22,9 @@ public interface IRuntimeProcessor {
 
    public void saveRuntime();
 
+   /** Called after this runtime has been deserialized to init any transient fields */
+   public void initAfterRestore();
+
    public void start(BodyTypeDeclaration def);
 
    public void process(BodyTypeDeclaration def);

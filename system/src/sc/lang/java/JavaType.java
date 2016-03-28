@@ -88,6 +88,8 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
       return null;
    }
 
+   public abstract void convertToSrcReference();
+
    abstract public void initType(LayeredSystem sys, ITypeDeclaration definedInType, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer, Object typeParam);
 
    public static JavaType createJavaType(Object typeDeclaration) {

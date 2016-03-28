@@ -22,7 +22,7 @@ public class URLRepositoryManager extends AbstractRepositoryManager {
       src.pkg.definesClasses = false;
       if (!system.reinstallSystem) {
          if (new File(src.pkg.installedRoot).isDirectory()) {
-            info("Using downloaded package for: " + src);
+            info("Package already downloaded: " + src);
             return null;
          }
       }

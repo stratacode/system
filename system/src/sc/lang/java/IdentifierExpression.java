@@ -1341,6 +1341,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   if (model != null && !model.disableTypeErrors) {
                      String otherMessage = getOtherMethodsMessage(currentType, nextName);
                      expr.displayTypeError("No method: ", nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentTypeDecl),otherMessage == null ? "" : otherMessage.toString(),  " for ");
+                     methVar = currentTypeDecl.definesMethod(nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs);
                   }
                }
             }

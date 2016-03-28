@@ -1834,8 +1834,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    public void resetBuildLayerState() {
-      processedTypes.clear();
-      typesInFileMap.clear();
+      if (processedTypes != null)
+         processedTypes.clear();
+      if (typesInFileMap != null)
+         typesInFileMap.clear();
    }
 
    public void resetBuild() {
@@ -2602,6 +2604,13 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          }
          catch (IOException exc) {}
       }
+   }
+
+   public void initAfterRestore() {
+      processedTypes = new HashSet<String>();
+      typesInFileMap = new HashMap<String,LinkedHashMap<JSFileEntry,Boolean>>();
+      jsFileBodyStore = new HashMap<String, StringBuilder>();
+      changedJSFiles = new LinkedHashSet<String>();
    }
 
    /** Called after we clear all of the layers to reset the JSBuildInfo state */

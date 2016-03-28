@@ -141,7 +141,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
          }
       }
       else
-         pkg.rebuildReason = "first install";
+         pkg.rebuildReason = "No cached package info for: " + system.pkgIndexRoot;
       long packageTime = getLastModifiedTime(src);
 
       // No last modified time for this source... assume it's up to date unless it's not installed

@@ -881,7 +881,7 @@ public class ParseUtil  {
       LayeredSystem.Options options = new LayeredSystem.Options();
       options.installLayers = false;
 
-      LayeredSystem sys = new LayeredSystem(null, null, null, null, classPath, options, null, null, false, modelIndex);
+      LayeredSystem sys = new LayeredSystem(null, null, null, null, classPath, options, null, null, false, modelIndex, null, null);
 
       /** Create a single layer to manage externalClasses and source files given to us to parse */
       Layer sysLayer = sys.createLayer("sysLayer", null, null, false, false, false, false, false);

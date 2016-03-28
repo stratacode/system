@@ -635,6 +635,31 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       }
    }
 
+   public Object mapTypeParameters(Map<TypeParamKey, Object> paramMap) {
+      if (types == null) {
+         return this;
+      }
+      ParamTypeDeclaration res = null;
+      int ix = 0;
+      for (Object paramType:types) {
+         if (ModelUtil.isTypeVariable(paramType)) {
+            Object defaultParamType = ModelUtil.getTypeParameterDefault(paramType);
+            Object newParamType = paramMap.get(new TypeParamKey(paramType));
+            if (newParamType == defaultParamType)
+               continue;
+            if (newParamType != null && newParamType != paramType) {
+               if (res == null)
+                  res = copy();
+               res.types.set(ix, newParamType);
+            }
+         }
+         ix++;
+      }
+      if (res != null)
+         return res;
+      return this;
+   }
+
    static class TypeParamMap {
       Object fromVar;
       Object toVar;

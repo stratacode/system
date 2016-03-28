@@ -736,6 +736,17 @@ public class LayerUtil implements LayerConstants {
       errorHandler.reportMessage(error, srcEnt == null ? null : srcEnt.getJarUrl(), line, col, type);
    }
 
+   public static String installLayerBundle(String projectDir, IMessageHandler handler, boolean verbose, String gitURL) {
+      RepositorySystem sys = new RepositorySystem(new RepositoryStore(projectDir), handler, null, verbose, false, false, false);
+      sys.pkgIndexRoot = FileUtil.concat(projectDir, "idx", "pkgIndex");
+      IRepositoryManager mgr = sys.getRepositoryManager("git");
+      String fileName = FileUtil.concat("bundles", FileUtil.removeExtension(URLUtil.getFileName(gitURL))); // Remove the '.git' suffix and take the last name as the file name.
+      // Just install this package into the packageRoot - don't add the packageName like we do for most packages
+      RepositoryPackage pkg = new RepositoryPackage(mgr, fileName, null, new RepositorySource(mgr, gitURL, false, null), null);
+      String err = pkg.install(null);
+      return err;
+   }
+
    public static String installDefaultLayers(String resultDir, IMessageHandler handler, boolean verbose, String gitURL) {
       RepositorySystem sys = new RepositorySystem(new RepositoryStore(resultDir), handler, null, verbose, false, false, false);
       IRepositoryManager mgr = sys.getRepositoryManager("git");

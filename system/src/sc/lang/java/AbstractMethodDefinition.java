@@ -31,7 +31,6 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
    public transient String overriddenLayer = null;
    public transient Object[] parameterTypes;
 
-
    /** A method to be used in place of the previous method - either because it was modified (replaced=false) or a type was reloaded (replaced=true) */
    public transient AbstractMethodDefinition replacedByMethod;
    public transient AbstractMethodDefinition overriddenMethod; // TODO: rename this to "modifiedMethod"
@@ -40,6 +39,10 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
 
    transient String origName;
    private transient boolean templateBody;
+
+   public static final String METHOD_TYPE_PREFIX = "_M__";
+
+   private transient int anonMethodId = 0;
 
    public void init() {
       if (initialized) return;
@@ -188,6 +191,26 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
    }
 
    public Object definesType(String name, TypeContext ctx) {
+      // No classes have been defined in this method yet so no possible matches
+      if (anonMethodId == 0)
+         return null;
+      /** We can look up a specific local method's class name using the special method type prefix */
+      if (name.startsWith(METHOD_TYPE_PREFIX)) {
+         int prefLen = METHOD_TYPE_PREFIX.length();
+         int i;
+         for (i = prefLen + 1; i < name.length() && name.charAt(i) >= '0' && name.charAt(i) <= '9'; i++) {
+         }
+         int endIdIx = i;
+         if (endIdIx == -1)
+            return null;
+         String idStr = name.substring(prefLen, endIdIx);
+         try {
+            int id = Integer.parseInt(idStr);
+            if (id == anonMethodId)
+               name = name.substring(endIdIx);
+         }
+         catch (NumberFormatException exc) {}
+      }
       if (body != null) {
          List<Statement> statements = body.statements;
          if (statements != null) {
@@ -738,5 +761,12 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
    public void stop() {
       super.stop();
       parameterTypes = null;
+   }
+
+   public String getInnerTypeName() {
+      if (anonMethodId == 0)
+         anonMethodId = getEnclosingType().allocateAnonMethodId();
+      // Java names these just parentType$1InnerType
+      return METHOD_TYPE_PREFIX + anonMethodId;
    }
 }

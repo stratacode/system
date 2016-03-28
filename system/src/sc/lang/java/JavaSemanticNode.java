@@ -575,7 +575,7 @@ public abstract class JavaSemanticNode extends SemanticNode {
       if (myModel != null) {
          JavaModel newModel = (JavaModel) myModel.getLayeredSystem().getAnnotatedModel(myModel.getSrcFile());
          // Our file model is not the current one managed by the system so we need to find the corresponding node.
-         if (newModel != myModel) {
+         if (newModel != myModel && newModel != null) {
             IParseNode origParseNode = getParseNode();
             if (origParseNode != null) {
                int startIx = origParseNode.getStartIndex();

@@ -222,7 +222,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
 
       RepositorySystem sys = mgr.getRepositorySystem();
       RepositoryPackage oldPkg = sys.getRepositoryPackage(packageName);
-      if (oldPkg != this)
+      if (oldPkg != this && oldPkg != null)
          System.err.println("*** Warning - installing package not registered");
 
       ArrayList<RepositoryPackage> allDeps = new ArrayList<RepositoryPackage>();

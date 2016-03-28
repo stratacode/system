@@ -57,7 +57,7 @@ public class TypeParameter extends JavaSemanticNode implements ITypedObject {
             return ModelUtil.isAssignableFrom(thisType, otherType, false, ctx);
       }
       // Type parameters can match anything right?  For primitive types, they are automatically boxed to the object type.  Should we just return true here?
-      return ModelUtil.isAssignableFrom(Object.class, otherType) || ModelUtil.isPrimitive(otherType) || ModelUtil.isTypeVariable(otherType);
+      return ModelUtil.isAssignableFrom(Object.class, otherType) || ModelUtil.isPrimitive(otherType) || ModelUtil.isTypeVariable(otherType) || ModelUtil.typeIsVoid(otherType);
    }
 
    public boolean isAssignableTo(Object otherType, ITypeParamContext ctx, boolean allowUnbound) {

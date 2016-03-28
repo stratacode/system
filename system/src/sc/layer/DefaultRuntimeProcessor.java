@@ -48,6 +48,9 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor, Serializable 
    public void saveRuntime() {
    }
 
+   public void initAfterRestore() {
+   }
+
    public void start(BodyTypeDeclaration def) {
    }
 
@@ -193,6 +196,7 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor, Serializable 
          Object res = ois.readObject();
          if (res instanceof IRuntimeProcessor) {
             IRuntimeProcessor runtime = (IRuntimeProcessor) res;
+            runtime.initAfterRestore();
             return runtime;
          }
          else {

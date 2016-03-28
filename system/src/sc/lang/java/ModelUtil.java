@@ -129,6 +129,8 @@ public class ModelUtil {
          // This happens with undefined references
          //if (boundType == null || boundType.equals("<null>"))
          //   System.out.println("*** Null type parameter default");
+         if (boundType instanceof ExtendsType.WildcardTypeDeclaration)
+            continue;
          if (boundType != Object.class)
             paramMap.put(new TypeParamKey(tp), boundType);
       }
@@ -193,8 +195,11 @@ public class ModelUtil {
       else if (ModelUtil.isGenericArray(genParam)) {
          Object paramComponentType = ModelUtil.getGenericComponentType(genParam);
          // Sometimes we get an Object type which is a valid array type but does not add any info to the type parameter so just ignore it
-         if (ModelUtil.isTypeVariable(paramComponentType) && argType != Object.class)
-            paramMap.put(new TypeParamKey(paramComponentType), ModelUtil.getGenericComponentType(argType));
+         if (ModelUtil.isTypeVariable(paramComponentType) && argType != Object.class) {
+            Object newComponentType = ModelUtil.getGenericComponentType(argType);
+            if (!(newComponentType instanceof ExtendsType.WildcardTypeDeclaration))
+               paramMap.put(new TypeParamKey(paramComponentType), newComponentType);
+         }
       }
       else if (genParam instanceof ExtendsType.LowerBoundsTypeDeclaration) {
          // TODO: I don't think there is anything we need to do here.
@@ -215,7 +220,8 @@ public class ModelUtil {
                   // assert curParamType.isAssignableFrom(atp)
                   if (curParamType != null && ModelUtil.isAssignableFrom(curParamType, paramArgType)) {
                      argType = paramArgType;
-                     paramMap.put(new TypeParamKey(atp), argType);
+                     if (!(argType instanceof ExtendsType.WildcardTypeDeclaration))
+                         paramMap.put(new TypeParamKey(atp), argType);
                   }
                }
                else {
@@ -225,11 +231,12 @@ public class ModelUtil {
                         if (resTypeParam != null && ModelUtil.isTypeVariable(resTypeParam)) {
                            int resPos = ModelUtil.getTypeParameterPosition(argType, ModelUtil.getTypeParameterName(resTypeParam));
                            Object resTypeValue = ModelUtil.getTypeParameter(argType, resPos);
-                           if (resTypeValue != null)
+                           if (!(resTypeValue instanceof ExtendsType.WildcardTypeDeclaration) && resTypeValue != null)
                               paramMap.put(new TypeParamKey(atp), resTypeValue);
                         }
                         else if (resTypeParam != null && !ModelUtil.isTypeVariable(resTypeParam)) {
-                           paramMap.put(new TypeParamKey(atp), resTypeParam);
+                           if (!(resTypeParam instanceof ExtendsType.WildcardTypeDeclaration))
+                              paramMap.put(new TypeParamKey(atp), resTypeParam);
                         }
                      }
                      else {
@@ -349,6 +356,10 @@ public class ModelUtil {
                         typeDefs.add(paramMappedType);
                      }
                      else {
+                        // We might have type variables defined at this level which we can substitute in this type param declaration
+                        if (typeParam instanceof ParamTypeDeclaration && paramMap.size() > 0) {
+                           typeParam = ((ParamTypeDeclaration) typeParam).mapTypeParameters(paramMap);
+                        }
                         Object res = getTypeDeclFromType(typeContext, typeParam, false, sys, false, definedInType);
                         typeDefs.add(res);
                      }
@@ -1763,6 +1774,9 @@ public class ModelUtil {
          return true;
 
       if (type1 instanceof TypeParameter) {
+         // There java.lang.Void.class will match a type parameter
+         //if (typeIsVoid(type2))
+         //   return false;
          // Force primitive types to be their wrapper type so we find matches for Comparable and int
          return ((TypeParameter)type1).isAssignableFrom(wrapPrimitiveType(type2), ctx, allowUnbound);
       }
@@ -1821,8 +1835,11 @@ public class ModelUtil {
 
       if (type1 instanceof Class) {
          // Accepts double and other types assuming the unboxing rules in Java
-         if (type1 == Object.class)
+         if (type1 == Object.class) {
+            if (typeIsVoid(type2))
+               return false;
             return true;
+         }
          if (type2 instanceof ITypeDeclaration) {
             // In this case, we need to invert the direction of the test.  Let's see if our TypeDeclaration
             // implements a type with the same name.

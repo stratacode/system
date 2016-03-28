@@ -313,6 +313,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
    class JavaCommandInfo {
       String command, restartCommand, sharedArgs;
       Boolean produceJar;
+      String jarFileName;
       Boolean produceScript;
       Boolean produceBAT;
       String execCommandTemplateName;
@@ -337,6 +338,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          this.model = model;
          this.fullTypeName = fullTypeName;
          produceJar = (Boolean) ModelUtil.getAnnotationValue(mainSettings, "produceJar");
+         jarFileName = (String) ModelUtil.getAnnotationValue(mainSettings, "jarFileName");
          produceScript = (Boolean) ModelUtil.getAnnotationValue(mainSettings, "produceScript");
          produceBAT = (Boolean) ModelUtil.getAnnotationValue(mainSettings, "produceBAT");
          execCommandTemplateName = (String) ModelUtil.getAnnotationValue(mainSettings, "execCommandTemplate");
@@ -408,6 +410,9 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             execName = model.getModelTypeName().replace('.', '/');
             scriptSuffix = "." + shellType;
          }
+         // jarFileName lets you override the jar name used.  Defaults to execName.
+         if (jarFileName == null || jarFileName.length() == 0)
+            jarFileName = FileUtil.addExtension(execName, "jar");
          String debugStr = debug != null && debug ?
                  " -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=" + (debugPort == null ? "5005": debugPort)  :
                  "";
@@ -427,9 +432,9 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             // TODO: need to find a way to inject command line args into the jar process
             if (dynStr.length() > 0)
                System.err.println("*** Unable to produce script with jar option for dynamic layers");
-            lsys.buildInfo.addModelJar(model, model.getModelTypeName(), execName + ".jar", null, false, includeDepsInJar == null || includeDepsInJar);
+            lsys.buildInfo.addModelJar(model, model.getModelTypeName(), jarFileName, null, false, includeDepsInJar == null || includeDepsInJar);
             sharedArgs =  "java" + debugStr + memStr + vmParams +
-                    " -jar \"" + varString("DIRNAME") + sepStr + getFileNamePart(execName, "/") + ".jar\"";
+                    " -jar \"" + varString("DIRNAME") + sepStr + getFileNamePart(jarFileName, "/") + "\"";
          }
          else {
             lsys.buildInfo.addMainCommand(model, execName, defaultArgList);

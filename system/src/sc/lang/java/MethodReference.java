@@ -117,8 +117,10 @@ public class MethodReference extends BaseLambdaExpression {
          return false;
 
       Object[] meths;
+      boolean isConstructor = false;
       if (methodName.equals("new")) {
          meths = ModelUtil.getConstructors(refType, getEnclosingType());
+         isConstructor = true;
       }
       else {
          meths = ModelUtil.getMethods(refType, methodName, null);
@@ -136,7 +138,11 @@ public class MethodReference extends BaseLambdaExpression {
       // Find the method in the list which matches the type parameters of the inferred type method
       // First pass is to look for a method where all of the parameters match each other
       for (Object meth:meths) {
-         if (ModelUtil.parametersMatch(ModelUtil.getParameterTypes(meth, true), paramTypes, true, sys) && ModelUtil.isAssignableFrom(returnType, ModelUtil.getReturnType(meth, true), sys)) {
+         Object methReturnType = ModelUtil.getReturnType(meth, true);
+         // Need to skip void methods here.  They will be assignable from a type parameter but here we know returnType is a real value (I think)
+         if (ModelUtil.typeIsVoid(returnType) != ModelUtil.typeIsVoid(methReturnType))
+            continue;
+         if (ModelUtil.parametersMatch(ModelUtil.getParameterTypes(meth, true), paramTypes, true, sys) && (isConstructor || ModelUtil.isAssignableFrom(returnType, methReturnType, sys))) {
             return true;
          }
       }
@@ -170,8 +176,10 @@ public class MethodReference extends BaseLambdaExpression {
       }
 
       Object[] meths;
+      boolean isConstructor = false;
       if (methodName.equals("new")) {
          meths = ModelUtil.getConstructors(refType, getEnclosingType());
+         isConstructor = true;
       }
       else {
          meths = ModelUtil.getMethods(refType, methodName, null);
@@ -196,7 +204,10 @@ public class MethodReference extends BaseLambdaExpression {
          // Find the method in the list which matches the type parameters of the inferred type method
          // First pass is to look for a method where all of the parameters match each other
          for (Object meth:meths) {
-            if (ModelUtil.parametersMatch(ModelUtil.getParameterTypes(meth, true), paramTypes, true, sys) && ModelUtil.isAssignableFrom(returnType, ModelUtil.getReturnType(meth, true), sys)) {
+            Object methReturnType = ModelUtil.getReturnType(meth, true);
+            if (!isConstructor && ModelUtil.typeIsVoid(methReturnType) != ModelUtil.typeIsVoid(returnType))
+               continue;
+            if (ModelUtil.parametersMatch(ModelUtil.getParameterTypes(meth, true), paramTypes, true, sys) && (isConstructor || ModelUtil.isAssignableFrom(returnType, methReturnType, sys))) {
                if (res == null)
                   res = meth;
                else

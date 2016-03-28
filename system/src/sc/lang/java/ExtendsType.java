@@ -4,14 +4,9 @@
 
 package sc.lang.java;
 
-import sc.layer.Layer;
 import sc.layer.LayeredSystem;
-import sc.type.DynType;
 
-import java.lang.reflect.Type;
-import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
-import java.util.*;
 
 public class ExtendsType extends JavaType {
    public boolean questionMark;
@@ -204,6 +199,11 @@ public class ExtendsType extends JavaType {
    public void initType(LayeredSystem sys, ITypeDeclaration itd, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer, Object typeParam) {
       if (typeArgument != null)
          typeArgument.initType(sys, itd, node, ctx, displayError, isLayer, typeParam);
+   }
+
+   public void convertToSrcReference() {
+      if (typeArgument != null)
+         typeArgument.convertToSrcReference();
    }
 
    public String getBaseSignature() {

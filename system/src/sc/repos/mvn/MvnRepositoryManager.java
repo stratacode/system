@@ -392,7 +392,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
    private boolean mvnFileExists(MvnDescriptor desc, String resFileName, String remoteSuffix, String remoteExt) {
       boolean found = false;
       if (!system.reinstallSystem && new File(resFileName).canRead()) {
-         info("Using existing file: " + resFileName);
+         info("File already downloaded: " + resFileName);
          return true;
       }
       if (useLocalRepository) {
@@ -433,7 +433,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
    private boolean installMvnFile(MvnDescriptor desc, String resFileName, String remoteSuffix, String remoteExt) {
       boolean found = false;
       if (!system.reinstallSystem && new File(resFileName).canRead()) {
-         info("Using existing file: " + resFileName);
+         info("File already downloaded: " + resFileName);
          return true;
       }
       String classifierExt;

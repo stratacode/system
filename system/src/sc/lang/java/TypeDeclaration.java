@@ -122,7 +122,9 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       initDynamicType();
 
       if (m != null) {
-         m.addTypeDeclaration(getFileRelativeTypeName(), this);
+         // Types defined inside of a method are not globally visible within the file
+         if (getEnclosingMethod() == null)
+            m.addTypeDeclaration(getFileRelativeTypeName(), this);
       }
 
       super.init();

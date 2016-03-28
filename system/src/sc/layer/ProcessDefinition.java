@@ -140,7 +140,7 @@ public class ProcessDefinition implements IProcessDefinition, Serializable {
       // No info - we only save the runtime processor
       if (proc.getProcessName() == null)
          return;
-      File procFile = getProcessDefinitionFile(sys, proc.getProcessName(), proc.getRuntimeName());
+      File procFile = getProcessDefinitionFile(sys, proc.getRuntimeName(), proc.getProcessName());
 
       ObjectOutputStream os = null;
       try {

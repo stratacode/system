@@ -33,6 +33,8 @@ public class ClassType extends JavaType {
    //private transient String compiledTypeName;
    transient Object[] errorArgs;
 
+   transient boolean srcOnly = false;
+
    public final static Object FAILED_TO_INIT_SENTINEL = "Invalid type sentinel";
 
    /** Sentinel used to refer to a parameter type whose accurate type is not known until the inferred type has been propagated.  */
@@ -456,7 +458,7 @@ public class ClassType extends JavaType {
          type = it.findTypeDeclaration(fullTypeName, true);
       }
       else if (sys != null) {
-         type = sys.getTypeDeclaration(fullTypeName, false, ctx == null ? null : ctx.getRefLayer(), false);
+         type = sys.getTypeDeclaration(fullTypeName, srcOnly, ctx == null ? null : ctx.getRefLayer(), false);
       }
 
       boolean userType = false;
@@ -1061,7 +1063,7 @@ public class ClassType extends JavaType {
          }
          ix++;
       }
-      if (cloneArgs != null && type != null) {
+      if (cloneArgs != null && type != null && type != FAILED_TO_INIT_SENTINEL) {
          JavaType res = createTypeFromTypeParams(type, cloneArgs.toArray(new JavaType[cloneArgs.size()]));
          res.parentNode = parentNode;
          return res;
@@ -1099,4 +1101,20 @@ public class ClassType extends JavaType {
          newType.type = ArrayTypeDeclaration.create(type, 1, definedInType == null ? getEnclosingIType() : definedInType);
       return newType;
    }
+
+   public void convertToSrcReference() {
+      if (!srcOnly) {
+         srcOnly = true;
+         if (type != null) {
+            // TODO: not handling ParamTypeDeclaration - or ParameterizedType
+            if (type instanceof Class) {
+               Object newType = ModelUtil.resolveSrcTypeDeclaration(getLayeredSystem(), type);
+               if (newType != null && newType instanceof BodyTypeDeclaration)
+                  type = newType;
+            }
+         }
+      }
+   }
+
+
 }

@@ -75,6 +75,8 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
 
    public Object getTypeDeclaration(List<? extends ITypedObject> args, boolean resolve) {
       Object parameterizedType = ModelUtil.getParameterizedReturnType(method, args, false);
+      if (parameterizedType == null)
+         return null; // Unresolved type reference
       if (ModelUtil.hasTypeVariables(parameterizedType)) {
          Object res = resolveTypeParameter(parameterizedType, resolve);
          if (res == null) {
@@ -307,17 +309,35 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
       // TODO: is this wildcard test right?  If we don't do this here, we can get an exception in isAssignableFrom
       if (ModelUtil.isWildcardType(boundType))
          boundType = ModelUtil.getWildcardBounds(boundType);
+      if (boundType instanceof ExtendsType.LowerBoundsTypeDeclaration)
+         boundType = ((ExtendsType.LowerBoundsTypeDeclaration) boundType).baseType;
       if (ModelUtil.isTypeVariable(boundType))
          return null;
-      if (!ModelUtil.isAssignableFrom(paramType, boundType, false, null, true, getLayeredSystem()))
-         return null;
+      if (!ModelUtil.isAssignableFrom(paramType, boundType, false, null, true, getLayeredSystem())) {
+         // If the parameter type is a sub-type of the bound type, we still need to see if we can map
+         // the desired type parameter to a bound-type parameter in boundType.   Apparently the inferredType
+         // can be a base-type of the type from which we get type variables
+         if (!ModelUtil.isAssignableFrom(boundType, paramType)) {
+            return null;
+         }
+         //else
+         //    TODO: Do we need to map typeVar or paramType or maybe boundType so we take into account type parameters which have been renamed?
+      }
 
+      if (paramJavaType instanceof ExtendsType) {
+         paramJavaType = ((ExtendsType) paramJavaType).typeArgument;
+         if (paramJavaType == null)
+            return null;
+      }
       int numParams = ModelUtil.getNumTypeParameters(paramType);
       int boundParams = ModelUtil.getNumTypeParameters(boundType);
       if (numParams == boundParams) {
          for (int i = 0; i < numParams; i++) {
             Object typeParamArg = ModelUtil.getTypeArgument(paramJavaType, i);
             Object typeParam = ModelUtil.getTypeDeclFromType(null, typeParamArg, false, getLayeredSystem(), false, getDefinedInType());
+            // Unresolved type
+            if (typeParam == null)
+               continue;
             Object boundParam = ModelUtil.getTypeParameter(boundType, i);
             // Do not try to extract the ? as it does not add any information and makes this parameter seem bound when it's not
             if (boundParam instanceof ExtendsType.WildcardTypeDeclaration) {
@@ -386,8 +406,9 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
          if (bound && res[i] instanceof ParamTypeDeclaration) {
             res[i] = ((ParamTypeDeclaration) res[i]).cloneForNewTypes();
          }
-         if (res[i] == null)
-            System.out.println("*** Warning - null value for parameter type");
+         // Happens for unresolved type references
+         //if (res[i] == null)
+         //   System.out.println("*** Warning - null value for parameter type");
       }
       // Don't cache the result if this flag is temporarily turned off
       if (!bindParamTypes)

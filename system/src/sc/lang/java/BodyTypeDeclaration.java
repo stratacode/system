@@ -1250,6 +1250,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             ctx.sameType = false;
       }
 
+      boolean isMethod = name.startsWith(AbstractMethodDefinition.METHOD_TYPE_PREFIX);
       for (int i = 0; i < 2; i++) {
          SemanticNodeList<Statement> theBody = i == 0 ? body : hiddenBody;
          if (theBody != null && !skipBody)
@@ -1261,6 +1262,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                   else if (st.typeName.equals(name)) {
                      return s;
                   }
+               }
+               else if (isMethod && s instanceof AbstractMethodDefinition) {
+                  Object res = s.definesType(name, ctx);
+                  if (res != null)
+                     return res;
                }
                // Check for transformed inner types - make sure to exclude the outer type's name.
                /*
@@ -1434,19 +1440,29 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    private String getFullTypeName(String innerTypeSep) {
       ISemanticNode pnode = parentNode instanceof BodyTypeDeclaration || parentNode instanceof JavaModel ? parentNode : parentNode == null ? null : parentNode.getParentNode(); // Skip the list, not there for command completion
+
+      String useTypeName = typeName;
       // Local methods - those inside of blocks - for now, just naming them like they are innner classes but that might cause problems because they can't be found from
       // that absolute type name.
-      while (pnode instanceof AbstractBlockStatement || pnode instanceof AbstractMethodDefinition || pnode instanceof SemanticNodeList)
+      while (pnode instanceof AbstractBlockStatement || pnode instanceof AbstractMethodDefinition || pnode instanceof SemanticNodeList) {
+         if (pnode instanceof AbstractMethodDefinition) {
+            // Classes defined inside of methods get an internal name in their class name $1TypeName.  We're using a prefix like _M__1 only because then we can generate the Java code... maybe we should
+            // use the $ and ensure these type names never make it into the type system?   We are not putting a "." here because we don't want the method to need to implement ITypeDeclaration just so it
+            // can have sub-types.   Really these classes are only visible in the method and so these references only exist for global operations like refresh so we just need to be able to find our way
+            // back to the same class in a different instance.
+            useTypeName = ((AbstractMethodDefinition) pnode).getInnerTypeName() + typeName;
+         }
          pnode = pnode.getParentNode();
+      }
       String res;
-      if (pnode instanceof JavaModel || pnode instanceof TemplateStatement) {
+      if (pnode instanceof JavaModel) {
          JavaModel model = getJavaModel();
          // We are treating the layer's type name as just the part in the layer path.   This is the main identifier we use
          // for finding the layer.  The package prefix is used for finding types inside of the layer.
          if (model.isLayerModel)
-            return typeName;
+            return useTypeName;
          else
-            res = CTypeUtil.prefixPath(getJavaModel().getPackagePrefix(), typeName);
+            res = CTypeUtil.prefixPath(getJavaModel().getPackagePrefix(), useTypeName);
       }
       else if (pnode instanceof ITypeDeclaration) {
          ITypeDeclaration itd = (ITypeDeclaration) pnode;
@@ -1454,12 +1470,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          // TODO? should we could use the layer's package prefix?  If so, we probably need a way for one layer to set other
          // layer's properties so you are not limited what you can do in a layer def file.
          String parentName = itd.isLayerType() ? LayerConstants.LAYER_COMPONENT_FULL_TYPE_NAME : itd.getFullTypeName();
-         res = parentName + innerTypeSep + typeName;
+         res = parentName + innerTypeSep + useTypeName;
       }
-      else if (pnode instanceof BlockStatement)
-         res = null;
       else if (pnode == null)
-         res = typeName;
+         res = useTypeName;
       else
          throw new UnsupportedOperationException();
       return res;
@@ -6942,6 +6956,18 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return null;
    }
 
+   public void convertToSrcReference() {
+      JavaType extType = getExtendsType();
+      if (extType != null)
+         extType.convertToSrcReference();
+      List<?> implTypes = getImplementsTypes();
+      if (implTypes != null) {
+         for (Object implObj:implTypes)
+            if (implObj instanceof JavaType)
+               ((JavaType) implObj).convertToSrcReference();
+      }
+   }
+
    public String getExtendsTypeName() {
       JavaType extType = getExtendsType();
       if (extType == null)
@@ -7627,6 +7653,17 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return res.allocateAnonId();
    }
 
+   transient int anonMethodIdsAllocated = 0;
+
+   public int allocateAnonMethodId() {
+      BodyTypeDeclaration res = resolve(true);
+      if (res == this) {
+         anonMethodIdsAllocated++;
+         return anonMethodIdsAllocated;
+      }
+      return res.allocateAnonMethodId();
+   }
+
    public void mergeDynInvokeMethods(Map<String,Object> otherDIMs) {
       if (dynInvokeMethods == null)
          dynInvokeMethods = new TreeMap<String,Object>();
@@ -8034,6 +8071,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       PerfMon.start("initSyncProperties");
 
+      // Make sure we resolve all members as source types if possible.  We rely on being able to determine if a property has a := binding for auto-sync
+      convertToSrcReference();
+
       List<String> filterDestinations = null;
       String syncGroup = null;
       int flags = 0;
@@ -8105,6 +8145,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             syncType = syncMode == SyncMode.Automatic? (TypeDeclaration) syncSys.getSrcTypeDeclaration(typeName, null, true, false, true, syncLayer, false) : null;
             if (syncType != null && syncType.isTransformed())
                System.err.println("*** Sync type has been transformed!");
+
+            if (syncType != null)
+               syncType.convertToSrcReference();
          }
 
          List<Object> syncProps = new ArrayList<Object>();
@@ -8788,5 +8831,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public String getOperatorString() {
       return "<unkown>";
+   }
+
+   public void ensureExtendsAreSource() {
    }
 }
