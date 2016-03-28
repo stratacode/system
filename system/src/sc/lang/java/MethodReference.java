@@ -140,7 +140,7 @@ public class MethodReference extends BaseLambdaExpression {
       for (Object meth:meths) {
          Object methReturnType = ModelUtil.getReturnType(meth, true);
          // Need to skip void methods here.  They will be assignable from a type parameter but here we know returnType is a real value (I think)
-         if (ModelUtil.typeIsVoid(returnType) != ModelUtil.typeIsVoid(methReturnType))
+         if (!isConstructor && ModelUtil.typeIsVoid(returnType) != ModelUtil.typeIsVoid(methReturnType))
             continue;
          if (ModelUtil.parametersMatch(ModelUtil.getParameterTypes(meth, true), paramTypes, true, sys) && (isConstructor || ModelUtil.isAssignableFrom(returnType, methReturnType, sys))) {
             return true;
