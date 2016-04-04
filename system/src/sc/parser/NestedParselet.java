@@ -1363,7 +1363,18 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       return RTypeUtil.createInstance(theClass);
    }
 
-   public void setSemanticValue(ParentParseNode parent, Object node, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, boolean replaceValue) {
+   ParentParseNode resetOldParseNode(ParentParseNode parent, int startIndex) {
+      if (parent == null)
+         return (ParentParseNode) newParseNode(startIndex);
+
+      // Need to reset the initial value when reparsing a string node
+      if (parameterType == ParameterType.STRING) {
+         parent.value = "";
+      }
+      return parent;
+   }
+
+   public void setSemanticValue(ParentParseNode parent, Object node, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, boolean replaceValue, boolean reparse) {
       if (trace && parser.enablePartialValues)
          System.out.println("*** setting semantic value of traced element");
 
@@ -1373,7 +1384,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                // If we are propagating a value and have a result class specified, we wait to create this until
                // we see if the propagated value is null or not.  It only gets created if it is null.
                if (propagatedValueIndex == -1)
-                  parent.setSemanticValue(createInstance(parser, getSemanticValueSlotClass()));
+                  parent.setSemanticValue(createInstance(parser, getSemanticValueSlotClass()), !reparse);
             }
 
             if (slotIndex == 0 && getSemanticValueIsArray()) {
@@ -1394,8 +1405,11 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                   // If the child value is null, we create an instance of the class specified by the parent.
                   if (sval == null && resultClassName != null)
                      sval = createInstance(parser, getSemanticValueClass());
-                  
-                  parent.setSemanticValue(sval);
+
+                  // If we are reparsing, do not clear the semantic value - That ends up clearing all properties and
+                  // for example when we are propagating slot mappings, we'll clear out properties we need to reset them
+                  // on the new value.
+                  parent.setSemanticValue(sval, !reparse);
 
                   // We are propagating the node's value - override the node we store for 
                   // this semantic node's parse node.
@@ -1440,54 +1454,55 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                       Object sv = ((IParseNode) node).getSemanticValue();
                       if (sv instanceof List) {
                          if (parent.value == null)
-                             parent.setSemanticValue(sv);
+                             parent.setSemanticValue(sv, !reparse);
                          else if (replaceValue)
                             parent.value = sv;
                          else {
                             if (childIndex == -1)
                                ((List) parent.value).addAll((List) sv);
                             else if (sv != parent.value) {
-                               System.err.println("*** Failed to update an array seamntic value on reparse!");
+                               // TODO: Are there any cases where this is not the right thing?
+                               parent.value = sv;
                             }
                          }
                       }
                       else if (sv != null) {
                          SemanticNodeList snl;
                          if (parent.value == null)
-                            parent.setSemanticValue(snl = new SemanticNodeList());
+                            parent.setSemanticValue(snl = new SemanticNodeList(), !reparse);
                          else
                             snl = (SemanticNodeList) parent.value;
                          if (childIndex == -1 || snl.size() <= childIndex)
-                            snl.add(sv);
+                            snl.add(sv, true, false);
                          else
-                            snl.set(childIndex, sv);
+                            snl.set(childIndex, sv, true, false);
                       }
                    }
                    else if (node != null) {
                       SemanticNodeList snl;
                       if (parent.value == null)
-                         parent.setSemanticValue(snl = new SemanticNodeList());
+                         parent.setSemanticValue(snl = new SemanticNodeList(), !reparse);
                       else
                          snl = (SemanticNodeList) parent.value;
                       if (childIndex == -1 || snl.size() <= childIndex)
-                         snl.add(node);
+                         snl.add(node, true, false);
                       else
-                         snl.set(childIndex, node);
+                         snl.set(childIndex, node, true, false);
                    }
                    // TODO: should this be optional?  We need some empty list to hold the semantic value to differentiate
                    // between foo() and foo.
                    else {
-                      List values = (List) parent.getSemanticValue();
+                      SemanticNodeList values = (SemanticNodeList) parent.getSemanticValue();
                       if (values == null) {
                          values = new SemanticNodeList(0);
-                         parent.setSemanticValue(values);
+                         parent.setSemanticValue(values, !reparse);
                       }
                       // This is false for typical identifier expression "a." but for partial values we need
                       // to preserve that null
                       if (allowNullElements)
-                         values.add(null);
+                         values.add(null, true, false);
                       else if (allowEmptyPartialElements && parser.enablePartialValues)
-                         values.add(PString.toIString(""));
+                         values.add(PString.toIString(""), true, false);
                    }
 
                    break;
@@ -1543,7 +1558,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
                /* Create the new parse node which will hold this result */
                Object newValue = createInstance(parser, getSemanticValueClass());
-               newParent.setSemanticValue(newValue);
+               newParent.setSemanticValue(newValue, !reparse);
 
                Object lastParent = parent.getSemanticValue();
                Object lastNode = TypeUtil.getPropertyValue(lastParent, chainedPropertyMappings[1]);
@@ -1656,7 +1671,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          ISemanticNode childNode = (ISemanticNode) value;
          SemanticNodeList snl = new SemanticNodeList(1);
          snl.setParentNode(childNode.getParentNode());
-         snl.add(value);
+         snl.add(value, true, false);
          TypeUtil.setProperty(semNode, beanMapper.getSetSelector(), snl);
          snl.setParentNode((ISemanticNode) semNode);
       }
@@ -1917,7 +1932,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       IParseNode pnode = newParseNode();
 
       // associate the new parse node in both directions with the semantic value.
-      pnode.setSemanticValue(value);
+      pnode.setSemanticValue(value, true);
       //if (value instanceof ISemanticNode)
       //   ((ISemanticNode) value).setParseNode(pnode);
 
@@ -1987,7 +2002,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       // Add nodes to a semantic list here but do not change the parent node
       // those values need to stay part of their original graph
       for (int i = arrayIndex; i < l.size(); i++)
-         sub.add(l.get(i), false);
+         sub.add(l.get(i), false, true);
       return sub;
    }
 

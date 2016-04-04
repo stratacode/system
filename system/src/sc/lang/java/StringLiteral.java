@@ -11,7 +11,7 @@ import sc.type.CTypeUtil;
 * When stringValue is null, that's really the empty string.  This is because of how the parser works.
 */
 public class StringLiteral extends AbstractLiteral {
-   public String stringValue;
+   public transient String stringValue;
 
    public Object getLiteralValue() {
       if (stringValue == null)

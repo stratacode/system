@@ -17,6 +17,7 @@ import java.util.*;
  * position in the input buffer.  It also stores the current set of errors, parsing statistics, adn the current parselet.
  */
 public class Parser implements IString {
+   // Java won't include code behind these flags
    public final static boolean ENABLE_STATS = false;
 
    private final static boolean ENABLE_RESULT_TRACE = false;
@@ -75,6 +76,10 @@ public class Parser implements IString {
 
    int traceCt = 0; // # of nodes we are currently tracing for debug information
    int negatedCt = 0; // # of parselets in the stack with the negated flag - don't store errors while negated
+
+   int totalParseCt = 0;
+   int reparseCt = 0; // For reparse operations the # of nodes that are actually reparsed
+   int reparseSkippedCt = 0; // For reparse operations the # of nodes that are the same
 
    // When this is true, we do not produce a semantic value - just perform the match part.
    public boolean matchOnly = false;
@@ -372,6 +377,8 @@ public class Parser implements IString {
             }
          }
 
+         totalParseCt++;
+
          if (ENABLE_STATS) {
             parselet.attemptCount++;
             testedNodes++;
@@ -454,6 +461,8 @@ public class Parser implements IString {
                }
             }
          }
+
+         totalParseCt++;
 
          if (ENABLE_STATS) {
             parselet.attemptCount++;
@@ -623,7 +632,7 @@ public class Parser implements IString {
       node.value = value;
       node.startIndex = lastStartIndex;
       if (!skipSemanticValue)
-         node.setSemanticValue(ParseUtil.nodeToSemanticValue(value));
+         node.setSemanticValue(ParseUtil.nodeToSemanticValue(value), true);
       return node;
    }
 

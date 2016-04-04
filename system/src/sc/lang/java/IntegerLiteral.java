@@ -18,7 +18,7 @@ public class IntegerLiteral extends AbstractLiteral {
 
    // Not part of the language model directly but we need to copy it etc so it's not transient
    public int valueType;
-   long longValue;
+   public transient long longValue;
 
    public static Expression create(int value) {
       return create(value, null);

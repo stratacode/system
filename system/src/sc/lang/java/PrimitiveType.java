@@ -21,6 +21,10 @@ public class PrimitiveType extends JavaType {
    }
 
    public Class getRuntimeBaseClass() {
+      if (typeName == null) {
+         System.out.println("*** Error - invalid primitive type");
+         return null;
+      }
       char c = typeName.charAt(0);
 
       Class base;

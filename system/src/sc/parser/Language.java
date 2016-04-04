@@ -60,6 +60,8 @@ public abstract class Language extends LayerFileComponent {
 
    public boolean debug = false;
 
+   public boolean debugReparse = false;
+
    public boolean initialized = false;
 
    /** The generation scheme works in two modes: when trackTranges=true, each property change automatically updates the generated result.  When it is false, we invalidate changed nodes and only revalidate them as needed.  tracking changes is better for debugging but a little slower */
@@ -200,6 +202,10 @@ public abstract class Language extends LayerFileComponent {
             if (!p.atEOF())
                parseTree = p.wrapErrors();
          }
+
+         if (debugReparse)
+            System.out.println("*** Total node check count: " + p.totalParseCt);
+
          postProcessResult(parseTree, fileName);
          return parseTree;
       }
@@ -219,6 +225,19 @@ public abstract class Language extends LayerFileComponent {
       Parser parser = new Parser(this, newText.toCharArray());
       parser.enablePartialValues = enablePartialValues;
       Object parseTree = parser.reparseStart(start, pnode, dctx);
+
+      if (debugReparse) {
+         if (parseTree instanceof IParseNode) {
+            String newTextReparsed = parseTree.toString();
+            if (!newTextReparsed.equals(newText)) {
+               System.err.println("Failure reparsing: " + parser.reparseCt + " - reparsed results do not match.  Reparsed text:\n" + newTextReparsed + "\n != original:\n" +  newText);
+            }
+            else {
+               System.out.println("Reparsed: " + parser.reparseCt + " nodes, skipped: " + parser.reparseSkippedCt + " total: " + parser.totalParseCt);
+            }
+         }
+      }
+
       return parseTree;
    }
 

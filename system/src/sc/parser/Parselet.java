@@ -503,7 +503,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
 
    protected boolean anyReparseChanges(Parser parser, Object oldParseNode, DiffContext dctx) {
       if (!dctx.changedRegion && !dctx.sameAgain) {
-         if (oldParseNode == dctx.firstDiffNode) {
+         if (oldParseNode == dctx.firstDiffNode || oldParseNode == dctx.beforeFirstNode) {
             dctx.changedRegion = true;
          }
       }
@@ -511,10 +511,15 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
    }
 
    protected void checkForSameAgainRegion(Parser parser, Object oldParseNode, DiffContext dctx) {
-      if (dctx.changedRegion && !dctx.sameAgain && dctx.lastDiffNode == oldParseNode) {
-         dctx.changedRegion = false;
+      if (dctx.changedRegion && !dctx.sameAgain && dctx.afterLastNode == oldParseNode) {
          dctx.sameAgain = true;
       }
+
+      // If we've already passed the last node in the set of nodes that have changed, but have not yet passed
+      // the end of the changed region, we might parse things differently so do not mark changedRegion false until
+      // the first
+      if (dctx.sameAgain && dctx.changedRegion && parser.currentIndex > dctx.endChangeNewOffset)
+         dctx.changedRegion = false;
    }
 
    protected void advancePointer(Parser parser, Object oldParseNode, DiffContext dctx) {
@@ -538,10 +543,12 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
    public Object reparse(Parser parser, Object oldParseNode, DiffContext dctx) {
       Object res;
       if (anyReparseChanges(parser, oldParseNode, dctx)) {
+         parser.reparseCt++;
          res = parse(parser);
       }
       else {
          res = oldParseNode;
+         parser.reparseSkippedCt++;
          advancePointer(parser, oldParseNode, dctx);
       }
 

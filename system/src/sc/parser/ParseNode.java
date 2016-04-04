@@ -33,9 +33,8 @@ public class ParseNode extends AbstractParseNode {
       return semanticValue;
    }
 
-   public void setSemanticValue(Object val) {
-      if (semanticValue != null)
-      {
+   public void setSemanticValue(Object val, boolean clearOld) {
+      if (clearOld && semanticValue != null) {
          ParseUtil.clearSemanticValue(semanticValue, this);
          ParseUtil.clearSemanticValue(value, this);
       }

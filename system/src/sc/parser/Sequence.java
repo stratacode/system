@@ -6,7 +6,6 @@ package sc.parser;
 
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
-import sc.lang.java.ClassDeclaration;
 import sc.lang.java.JavaSemanticNode;
 
 import java.util.ArrayList;
@@ -265,16 +264,19 @@ public class Sequence extends NestedParselet  {
    }
 
 
-   // TODO: this is a copy of the parse() method but duplicates a lot of code.  Refactor that into utility
-   // methods or even condense them into one with runtime conditions?
+   // TODO: this is a copy of the parse() method but duplicates a lot of code.  Can we refactor the common code into utility
+   // methods or even condense them into one with runtime overhead?
    public Object reparse(Parser parser, Object oldParseNode, DiffContext dctx) {
       if (trace)
-         System.out.println("*** parse sequence: " + this + " at " + parser.currentIndex);
+         System.out.println("*** reparse sequence: " + this + " at " + parser.currentIndex);
 
       if (!anyReparseChanges(parser, oldParseNode, dctx)) {
          advancePointer(parser, oldParseNode, dctx);
+         parser.reparseSkippedCt++;
          return oldParseNode;
       }
+
+      parser.reparseCt++;
 
       if (repeat) {
          Object res = reparseRepeatingSequence(parser, false, null, oldParseNode, dctx);
@@ -397,8 +399,9 @@ public class Sequence extends NestedParselet  {
                      if (err.optionalContinuation) {
                         ParentParseNode errVal;
                         if (pv != null) {
-                           if (value == null)
-                              errVal = oldParseNode == null ? (ParentParseNode) newParseNode(startIndex) : (ParentParseNode) oldParseNode;
+                           if (value == null) {
+                              errVal = resetOldParseNode((ParentParseNode) oldParseNode, startIndex);
+                           }
                            else {
                               // Here we need to clone the semantic value so we keep track of the state that
                               // represents this error path separate from the default path which is going to match
@@ -427,7 +430,7 @@ public class Sequence extends NestedParselet  {
                         // First complete the value with any partial value from this error and nulls for everything
                         // else.
                         if (value == null)
-                           value = oldParseNode == null ? (ParentParseNode) newParseNode(startIndex) : (ParentParseNode) oldParseNode;
+                           value = resetOldParseNode((ParentParseNode) oldParseNode, startIndex);
                         value.addForReparse(pv, childParselet, newChildCount++, i, false, parser, oldChildParseNode, dctx);
                         // Add these null slots so that we do all of the node processing
                         for (int k = i+1; k < numParselets; k++)
@@ -469,7 +472,7 @@ public class Sequence extends NestedParselet  {
          }
 
          if (value == null) {
-            value = oldParseNode == null ? (ParentParseNode) newParseNode(startIndex) : (ParentParseNode) oldParseNode;
+            value = resetOldParseNode((ParentParseNode) oldParseNode, startIndex);
          }
 
          if (!childParselet.getLookahead())
@@ -510,7 +513,20 @@ public class Sequence extends NestedParselet  {
    protected static final String SKIP_CHILD = "SkipChildParseletSentinel";
 
    protected Object getReparseChildNode(Object oldParent, int ix) {
-      return oldParent == null ? null : ((ParentParseNode) oldParent).children.get(ix);
+      if (oldParent == null)
+         return null;
+      if (oldParent instanceof ParseNode) {
+         System.err.println("***");
+         return null;
+      }
+      if (oldParent instanceof ErrorParseNode) {
+         System.out.println("***");
+         return null;
+      }
+      ParentParseNode oldpn = (ParentParseNode) oldParent;
+      if (ix < oldpn.children.size())
+         return oldpn.children.get(ix);
+      return null;
    }
 
    private boolean extendsPartialValue(Parser parser, Parselet childParselet, ParentParseNode value, boolean anyContent, int startIndex, ParseError childError) {
@@ -1084,7 +1100,7 @@ public class Sequence extends NestedParselet  {
                   if (newVal instanceof GenerateError) {
                      if (optional)
                         break;
-                     pnode.setSemanticValue(null);
+                     pnode.setSemanticValue(null, true);
                      return newVal;
                   }
                   else if (newVal == null)
@@ -1105,7 +1121,7 @@ public class Sequence extends NestedParselet  {
             for (int i = 0; i < nodeListSize; i++) {
                Object arrVal = generateOne(ctx, pnode, nodeList.get(i));
                if (arrVal instanceof GenerateError) {
-                  pnode.setSemanticValue(null);
+                  pnode.setSemanticValue(null, true);
                   ((GenerateError)arrVal).progress += progress;
                   return arrVal;
                }
@@ -1130,7 +1146,7 @@ public class Sequence extends NestedParselet  {
                   if (numProcessed != 0)
                      return new PartialArrayResult(numProcessed, pnode, (GenerateError)arrVal);
                   else {
-                     pnode.setSemanticValue(null);
+                     pnode.setSemanticValue(null, true);
                      ((GenerateError)arrVal).progress += progress;
                      return arrVal;
                   }
@@ -1157,7 +1173,7 @@ public class Sequence extends NestedParselet  {
             if (nextValue != null &&
                     !getSemanticValueClass().isInstance(nextValue)) {
                if (pnode != null)
-                  pnode.setSemanticValue(null);
+                  pnode.setSemanticValue(null, true);
 
                return ctx.error(this, INVALID_TYPE_IN_CHAIN, nextValue, progress);
             }
@@ -1186,7 +1202,7 @@ public class Sequence extends NestedParselet  {
             ctx.unmaskProperty(nextValue, chainedPropertyMappings[0]);
 
             if (res instanceof GenerateError) {
-               pnode.setSemanticValue(null);
+               pnode.setSemanticValue(null, true);
                if (optional && emptyValue(ctx, value)) {
                   return generateResult(ctx, null);
                }
@@ -1208,7 +1224,7 @@ public class Sequence extends NestedParselet  {
             return generateResult(ctx, origParseNode);
 
          if (pnode != null)
-            pnode.setSemanticValue(null);
+            pnode.setSemanticValue(null, true);
 
          return ctx.error(this, NO_OBJECT_FOR_SLOT, value, progress);
       }
@@ -1218,7 +1234,7 @@ public class Sequence extends NestedParselet  {
 
          Object res = generateOne(ctx, pnode, value);
          if (res instanceof GenerateError) {
-            pnode.setSemanticValue(null);
+            pnode.setSemanticValue(null, true);
             if (optional && emptyValue(ctx, value))
                return generateResult(ctx, null);
             return res;
@@ -1228,7 +1244,7 @@ public class Sequence extends NestedParselet  {
          // If we did not matching anything, do not associate this parse node with the semantic value.  This
          // acts as a signal to the caller that the value was not consumed, so it won't advance the array.
          else if (res == null)
-            pnode.setSemanticValue(null);
+            pnode.setSemanticValue(null, true);
       }
       return generateResult(ctx, pnode);
    }

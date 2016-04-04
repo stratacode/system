@@ -25,7 +25,7 @@ public class ErrorParseNode extends AbstractParseNode {
       return error == null || !(error.partialValue instanceof IParseNode) ? null : ((IParseNode) error.partialValue).getSemanticValue();
    }
 
-   public void setSemanticValue(Object value) {
+   public void setSemanticValue(Object value, boolean clearOld) {
       if (value != null)
          throw new UnsupportedOperationException();
    }

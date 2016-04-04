@@ -157,7 +157,7 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
    public CharSequence formatToJS(JSFormatMode mode) {
       SemanticNodeList<Statement> sts = new SemanticNodeList<Statement>();
       sts.parentNode = parentNode; // Plug it into the hierarchy so it gets the right nesting level
-      sts.add(this, false);
+      sts.add(this, false, true);
 
       // Using blockStatements here to include VariableStatement.  Since it is a choice of items and an array it expects an array value so just wrap it here.
       String res = sts.toLanguageString(JSLanguage.getJSLanguage().blockStatements);

@@ -256,8 +256,11 @@ public class OrderedChoice extends NestedParselet  {
 
       if (!anyReparseChanges(parser, oldParseNode, dctx)) {
          advancePointer(parser, oldParseNode, dctx);
+         parser.reparseSkippedCt++;
          return oldParseNode;
       }
+
+      parser.reparseCt++;
 
       if (repeat) {
          Object res = reparseRepeatingChoice(parser, oldParseNode, dctx);
@@ -438,6 +441,8 @@ public class OrderedChoice extends NestedParselet  {
 
       int newChildCount = 0;
 
+      int oldLen = oldParent == null ? -1 : oldParent.length();
+
       do {
          matched = false;
          lastMatchStart = parser.currentIndex;
@@ -449,6 +454,13 @@ public class OrderedChoice extends NestedParselet  {
             Parselet matchedParselet = matchingParselets.get(i);
             int slotIx = getSlotIndex(matchingParselets, i);
             Object oldChildParseNode = oldParent == null || oldParent.children.size() <= newChildCount ? null : oldParent.children.get(newChildCount);
+
+            // We are taking a different path than the last time? e.g. intIntelliJIdeazz to int - now we match a different parselet
+            if (oldChildParseNode != null && (!(oldChildParseNode instanceof IParseNode) || ((IParseNode) oldChildParseNode).getParselet() != matchedParselet)) {
+               if (!dctx.changedRegion)
+                  dctx.changedRegion = true;
+               oldChildParseNode = null;
+            }
 
             Object nestedValue = parser.reparseNext(matchedParselet, oldChildParseNode, dctx);
             emptyMatch = nestedValue == null;
@@ -482,6 +494,15 @@ public class OrderedChoice extends NestedParselet  {
             }
             parser.changeCurrentIndex(startIndex);
 
+            // If we are producing a smaller result than we did in the previous result, and we are at the end of the
+            // changes - so that the old result was at least partially in the "same again" region, make sure we extend
+            // the changes so we reparse those old characters we stripped off again (test/re5)
+            if (!lookahead && oldLen > 0 && dctx.changedRegion) {
+               if (startIndex + oldLen > dctx.endChangeNewOffset && dctx.endChangeNewOffset > dctx.endChangeOldOffset) {
+                  dctx.endChangeNewOffset = startIndex + oldLen;
+               }
+            }
+
             // If we are a repeat optional choice with mappings of '' and we match no elements, we should return an empty string, not null.
             if (!lookahead && repeat && isStringParameterMapping() && parser.peekInputChar(0) != '\0') {
                return parseResult(parser, "", false);
@@ -499,6 +520,23 @@ public class OrderedChoice extends NestedParselet  {
          return parseError(parser, "Expecting one or more of: {0}", this);
       }
       else {
+         // If we are reparsing, we might have produced fewer children than before.  if so, we need to pull them off the the end.
+         if (oldParent == value) {
+            while (value.children.size() > newChildCount) {
+               // TODO: in the current test case these are ErrorParseNodes but if they are not errors, do we need to update the semantic value?
+               value.children.remove(value.children.size()-1);
+            }
+         }
+         // If we are producing a smaller result than we did in the previous result, and we are at the end of the
+         // changes - so that the old result was at least partially in the "same again" region, make sure we extend
+         // the changes so we reparse those old characters we stripped off again (test/re5)
+         if (!lookahead && oldParseNode != null && dctx.changedRegion) {
+            int newLen = value.length();
+            int diffLen = oldLen - newLen;
+            if (diffLen > 0 && lastMatchStart + diffLen > dctx.endChangeNewOffset && dctx.endChangeNewOffset > dctx.endChangeOldOffset) {
+               dctx.endChangeNewOffset = lastMatchStart + diffLen + 1;
+            }
+         }
          // If we are doing the partial values case, we might have partially matched one more statement.  if so, this is part of the partial results
          if (parser.enablePartialValues && bestError != null && /*bestError.eof && */ bestError.partialValue != null && bestError.startIndex == lastMatchStart) {
             Object oldChildParseNode = oldParent == null || oldParent.children.size() <= newChildCount ? null : oldParent.children.get(newChildCount);
@@ -683,7 +721,7 @@ public class OrderedChoice extends NestedParselet  {
                         if (matchedAny)
                            return generateResult(ctx, pnode);
 
-                        pnode.setSemanticValue(null);
+                        pnode.setSemanticValue(null, true);
                         if (optional && emptyValue(ctx, value)) {
                            return generateResult(ctx, null);
                         }
@@ -731,7 +769,7 @@ public class OrderedChoice extends NestedParselet  {
                      while (strValue != null && strValue.length() > 0) {
                         Object childNode = generateElement(ctx, strValue, true);
                         if (childNode instanceof GenerateError) {
-                           pnode.setSemanticValue(null);
+                           pnode.setSemanticValue(null, true);
                            if (optional && emptyValue(ctx, value)) {
                               return generateResult(ctx, null);
                            }
@@ -771,7 +809,7 @@ public class OrderedChoice extends NestedParselet  {
                            return new PartialArrayResult(i, pnode, (GenerateError) childNode);
 
                         if (optional && emptyValue(ctx, value)) {
-                           pnode.setSemanticValue(null);
+                           pnode.setSemanticValue(null, true);
                            return generateResult(ctx, null);
                         }
                         ((GenerateError) childNode).progress += progress;
@@ -801,7 +839,7 @@ public class OrderedChoice extends NestedParselet  {
                      if (numProcessed != 0)
                         return new PartialArrayResult(numProcessed, pnode, (GenerateError) arrVal);
                      else {
-                        pnode.setSemanticValue(null);
+                        pnode.setSemanticValue(null, true);
                         ((GenerateError) arrVal).progress += progress;
                         return arrVal;
                      }

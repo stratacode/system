@@ -216,7 +216,7 @@ public class SCLanguage extends JavaLanguage {
             //System.out.println("Bindable result: " + result);
 
             // Clear out the old parse-tree
-            node.setSemanticValue(null);
+            node.setSemanticValue(null, true);
             System.out.println();
 
             // For debugging the generation rpocess only

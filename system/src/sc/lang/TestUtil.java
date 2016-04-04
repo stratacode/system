@@ -225,8 +225,34 @@ public class TestUtil {
                         i++;
                         if (args.length < i + 1)
                            System.err.println("*** No file argument to -rp option for reparsing files.");
-                        else
-                           opts.reparseFile = args[i];
+                        else {
+                           String rpArg = args[i];
+                           opts.reparseFiles = rpArg.split(",");
+                        }
+                     }
+                     else if (opt.equals("ri")) {
+                        i++;
+                        if (args.length < i + 1)
+                           System.err.println("*** No file argument to -ri option for reparsing files.");
+                        else {
+                           String indexArg = args[i];
+                           String[] repeatArgs = indexArg.split(",");
+                           ArrayList<String> reparseIndexes = opts.reparseIndexes = new ArrayList<String>(Arrays.asList(repeatArgs));
+                           for (int curIx = 0; curIx < reparseIndexes.size(); curIx++) {
+                              String ra = reparseIndexes.get(curIx);
+                              int dashIx = ra.indexOf('-');
+                              if (dashIx != -1) {
+                                 reparseIndexes.remove(curIx);
+                                 String[] minMaxStr = ra.split("-");
+                                 int min = Integer.parseInt(minMaxStr[0]);
+                                 int max = Integer.parseInt(minMaxStr[1]);
+                                 for (int reparseIx = min; reparseIx <= max; reparseIx++) {
+                                    reparseIndexes.add(curIx, String.valueOf(reparseIx));
+                                    curIx++;
+                                 }
+                              }
+                           }
+                        }
                      }
                      else
                         usage(args);
@@ -334,7 +360,8 @@ public class TestUtil {
       String externalClassPath;
       String srcPath;
       String findClassName;
-      String reparseFile;
+      String[] reparseFiles;
+      ArrayList<String> reparseIndexes;
    }
 
    public static void parseTestFiles(Object[] inputFiles, TestOptions opts) {
@@ -386,6 +413,7 @@ public class TestUtil {
                lang = Language.getLanguageByExtension(ext);
                if (lang == null)
                   throw new IllegalArgumentException("No language for: " + file.getPath());
+               lang.debugReparse = true;
                result = lang.parse(fileName, new StringReader(input), lang.getStartParselet(), opts.enablePartialValues);
             }
             else {
@@ -422,25 +450,48 @@ public class TestUtil {
 
          System.out.println("*** parsed: " + fileName + " " + opts.repeatCount + (opts.repeatCount == 1 ? " time" : " times") + " in: " + rangeToSecs(startTime, parseResultTime));
 
-         if (opts.reparseFile != null) {
-            String reparsedString = ParseUtil.readFileString(new File(opts.reparseFile));
-            if (reparsedString == null) {
-               System.err.println("*** Unable to open -rp - reparse file: " + opts.reparseFile);
+         if (opts.reparseIndexes != null) {
+            opts.reparseFiles = new String[opts.reparseIndexes.size()];
+            int rix = 0;
+            String fileNoExt = FileUtil.removeExtension(fileName);
+            for (String reparseIndex:opts.reparseIndexes) {
+               opts.reparseFiles[rix] = FileUtil.addExtension(fileNoExt + reparseIndex, ext);
+               rix++;
             }
-            else {
-               Object newRes = ParseUtil.reparse((IParseNode) result, reparsedString);
-               if (verifyResults) {
-                  Object reparsedModelObj = getTestResult(newRes);
-                  Object reparseComplete = lang.parseString(reparsedString, opts.enablePartialValues);
-                  if (reparseComplete instanceof IParseNode) {
-                     Object reparseOrigObj = getTestResult(reparseComplete);
+         }
 
-                     if (reparsedModelObj instanceof ISemanticNode) {
-                        if (!((ISemanticNode) reparsedModelObj).deepEquals(reparseOrigObj))
-                           System.err.println("*** FAILURE: Reparsed result does not match parsed result: " + opts.reparseFile);
-                        else
-                           System.out.println("*** Success: Reparsed result matches");
+         if (opts.reparseFiles != null) {
+            for (String reparseFile:opts.reparseFiles) {
+               String reparsedString = ParseUtil.readFileString(new File(reparseFile));
+               if (reparsedString == null) {
+                  System.err.println("*** Unable to open -rp - reparse file: " + reparseFile);
+               }
+               else {
+                  if (result instanceof ParseError) {
+                     result = ((ParseError) result).partialValue;
+                  }
+                  Object newRes = ParseUtil.reparse((IParseNode) result, reparsedString);
+                  if (verifyResults) {
+                     Object reparsedModelObj = getTestResult(newRes);
+                     Object reparseComplete = lang.parseString(reparsedString, opts.enablePartialValues);
+                     if (reparseComplete instanceof IParseNode) {
+                        Object reparseOrigObj = getTestResult(reparseComplete);
+
+                        if (!newRes.toString().equals(reparsedString))
+                           System.err.println("*** FAILURE: Reparsed parse-node text does not match");
+
+                        if (reparsedModelObj instanceof ISemanticNode) {
+                           if (!((ISemanticNode) reparsedModelObj).deepEquals(reparseOrigObj))
+                              System.err.println("*** FAILURE: Reparsed result does not match parsed result: " + reparseFile);
+                           else
+                              System.out.println("*** Success: Reparsed result matches for: " + reparseFile);
+                        }
                      }
+                     else if (reparseComplete instanceof ParseError) {
+                        System.out.println("File: " + fileName + ": " + ((ParseError) reparseComplete).errorStringWithLineNumbers(reparseFile));
+                     }
+                     else
+                        System.err.println("*** Unrecognized return from reparse: " + reparseComplete);
                   }
                }
             }
@@ -486,7 +537,7 @@ public class TestUtil {
                //System.out.println("Bindable result: " + result);
 
                // Clear out the old parse-tree
-               node.setSemanticValue(null);
+               node.setSemanticValue(null, true);
 
                // For debugging the generation rpocess only
                lang.debug = false;

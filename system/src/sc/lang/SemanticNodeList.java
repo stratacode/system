@@ -188,7 +188,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
    }
 
    public void add(int index, E element) {
-      add(index, element, true);
+      add(index, element, true, true);
    }
 
    private void updateElement(int index, E element, boolean changeParent, NestedParselet.ChangeType changeType, boolean initOnly, boolean updateParseNodes) {
@@ -246,14 +246,14 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       }
    }
 
-   public void add(int index, E element, boolean changeParent) {
+   public void add(int index, E element, boolean changeParent, boolean updateParseNodes) {
       super.add(index, element);
 
       // For semantic nodes, we'll populate the parentNode pointer.
       if (changeParent && element instanceof ISemanticNode)
          ((ISemanticNode) element).setParentNode(this);
 
-      updateElement(index, element, changeParent, NestedParselet.ChangeType.ADD, false, true);
+      updateElement(index, element, changeParent, NestedParselet.ChangeType.ADD, false, updateParseNodes);
 
       /*
        * Use this to debug cases where an uninitailzied model is hooked up to an initialized model.  we don't automatically initialize cause there are some cases where this happens too early (if I recall correctly)
@@ -267,11 +267,14 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       */
    }
 
-   public E set(int index, E element)
-   {
+   public E set(int index, E element) {
+      return set(index, element, true, true);
+   }
+
+   public E set(int index, E element, boolean changeParent, boolean updateParseNodes) {
       E ret = super.set(index, element);
 
-      updateElement(index, element, true, NestedParselet.ChangeType.REPLACE, false, true);
+      updateElement(index, element, changeParent, NestedParselet.ChangeType.REPLACE, false, updateParseNodes);
 
       return ret;
    }
@@ -325,12 +328,12 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
    }
 
    public boolean add(E element) {
-      add(size(), element, true);
+      add(size(), element, true, true);
       return true;
    }
 
-   public boolean add(E element, boolean setParent) {
-      add(size(), element, setParent);
+   public boolean add(E element, boolean setParent, boolean updateParseNodes) {
+      add(size(), element, setParent, updateParseNodes);
       return true;
    }
 
@@ -481,7 +484,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
 
             if ((options & CopyParseNode) == 0) {
                newList.parseNode = newPP = new ParentParseNode(p);
-               newList.parseNode.setSemanticValue(newList);
+               newList.parseNode.setSemanticValue(newList, true);
                newPP.setStartIndex(parseNode.getStartIndex());
                newList.parseNodeInvalid = true;
             }

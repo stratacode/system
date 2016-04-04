@@ -6594,8 +6594,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         }
                         if (layerTypeIndex != null)
                            curTypeIndex.inactiveTypeIndex.typeIndex.put(layerName, layerTypeIndex);
-                        else
+                        else {
+                           // The layer was removed - remove the type index entry and the file behind it to avoid this problem next itme
                            curTypeIndex.inactiveTypeIndex.typeIndex.remove(layerName);
+                           removeTypeIndexFile(typeIndexIdent, layerName);
+                        }
                         if (layerTypeIndex != null && layerTypeIndex.langExtensions != null)
                            customSuffixes.addAll(Arrays.asList(layerTypeIndex.langExtensions));
 
@@ -6976,6 +6979,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          FileUtil.safeClose(fis);
       }
       return null;
+   }
+
+   public void removeTypeIndexFile(String typeIndexIdent, String layerName) {
+      File typeIndexFile = new File(getTypeIndexFileName(typeIndexIdent, layerName));
+      typeIndexFile.delete();
    }
 
    private void initBuildDirIndex() {
@@ -9202,7 +9210,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (result instanceof ParseError) {
             if (enablePartialValues) {
                Object val = ((ParseError) result).getRootPartialValue();
-               initNewBufferModel(srcEnt, val, modTimeStart, dummy);
+               initNewBufferModel(srcEnt, val, modTimeStart, dummy, false);
             }
             return result;
          }
@@ -9212,7 +9220,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (!(modelObj instanceof IFileProcessorResult))
                return modelObj;
 
-            initNewBufferModel(srcEnt, modelObj, modTimeStart, dummy);
+            initNewBufferModel(srcEnt, modelObj, modTimeStart, dummy, false);
 
             return modelObj;
          }
@@ -9220,7 +9228,42 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       throw new IllegalArgumentException(("No language processor for file: " + srcEnt.relFileName));
    }
 
-   private void initNewBufferModel(SrcEntry srcEnt, Object modelObj, long modTimeStart, boolean dummy) {
+   /**
+    * For IDE-like operations where we need to parse a file but using the current-in memory copy for fast model validation.  This method
+    * should not alter the runtime code model
+    */
+   public Object reparseSrcBuffer(SrcEntry srcEnt, ILanguageModel oldModel, boolean enablePartialValues, String buffer, boolean dummy) {
+      IParseNode pnode = oldModel.getParseNode();
+      if (pnode == null)
+         return parseSrcBuffer(srcEnt, enablePartialValues, buffer, dummy);
+
+      long modTimeStart = srcEnt.getLastModified();
+      IFileProcessor processor = getFileProcessorForSrcEnt(srcEnt, null, false);
+      if (processor instanceof Language) {
+         Language lang = (Language) processor;
+         Object result = ParseUtil.reparse(oldModel.getParseNode(), buffer);
+         if (result instanceof ParseError) {
+            if (enablePartialValues) {
+               Object val = ((ParseError) result).getRootPartialValue();
+               initNewBufferModel(srcEnt, val, modTimeStart, dummy, true);
+            }
+            return result;
+         }
+         else {
+            Object modelObj = ParseUtil.nodeToSemanticValue(result);
+
+            if (!(modelObj instanceof IFileProcessorResult))
+               return modelObj;
+
+            initNewBufferModel(srcEnt, modelObj, modTimeStart, dummy, true);
+
+            return modelObj;
+         }
+      }
+      throw new IllegalArgumentException(("No language processor for file: " + srcEnt.relFileName));
+   }
+
+   private void initNewBufferModel(SrcEntry srcEnt, Object modelObj, long modTimeStart, boolean dummy, boolean incremental) {
       if (modelObj instanceof IFileProcessorResult) {
          IFileProcessorResult res = (IFileProcessorResult) modelObj;
          res.addSrcFile(srcEnt);
@@ -9236,7 +9279,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // overhead but also the types in the other layered systems need to be updated eventually
             ArrayList<JavaModel> clonedModels = null;
             boolean activated = srcEnt.layer != null && srcEnt.layer.activated;
-            if (options.clonedParseModel && peerSystems != null) {
+            if (!dummy && !incremental && options.clonedParseModel && peerSystems != null) {
                for (LayeredSystem peerSys:peerSystems) {
                   Layer peerLayer = activated ? peerSys.getLayerByName(srcEnt.layer.layerUniqueName) : srcEnt.layer == null ? null : peerSys.lookupInactiveLayer(srcEnt.layer.getLayerName(), false, true);
                   // does this layer exist in the peer runtime and is it started?

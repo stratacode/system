@@ -340,7 +340,7 @@ public class ParseUtil  {
           return;
       
       if (value instanceof IParseNode)
-         ((IParseNode) value).setSemanticValue(null);
+         ((IParseNode) value).setSemanticValue(null, true);
       else if (value instanceof SemanticNode) {
          SemanticNode node = (SemanticNode) value;
          // many parse nodes may point to a value but we only need to clear if we
@@ -348,7 +348,7 @@ public class ParseUtil  {
          node.setParseNode(null);
       }
       else if (value instanceof IParseNode)
-           ((IParseNode) value).setSemanticValue(null);
+           ((IParseNode) value).setSemanticValue(null, true);
       else if (value instanceof SemanticNodeList) {
          SemanticNodeList nodeList = (SemanticNodeList) value;
          nodeList.setParseNode(null);
@@ -910,6 +910,9 @@ public class ParseUtil  {
 
       // Find the parse node which is the first one that does not match in the text.
       pnode.findStartDiff(ctx);
+
+      // Clear this out so it's not set for findEndDiff
+      ctx.lastVisitedNode = null;
       if (ctx.firstDiffNode == null) {
          // Entire newText matches so no changes
          if (oldLen == newLen && newLen == ctx.startChangeOffset)
@@ -927,10 +930,12 @@ public class ParseUtil  {
          ctx.endChangeOldOffset = pnode.length() - 1;
          pnode.findEndDiff(ctx);
 
+         Language lang = pnode.getParselet().getLanguage();
+
          // Now we walk the parselet tree in a way similar to how we parsed it in the first place, but accepting
          // the pnode.  We'll update this existing pnode with changes so it looks the same as if we'd reparsed
          // the whole thing.
-         Object newRes = pnode.getParselet().getLanguage().reparse(pnode, ctx, newText, true);
+         Object newRes = lang.reparse(pnode, ctx, newText, true);
 
          // Find common parent node and reparse that node
          /*
