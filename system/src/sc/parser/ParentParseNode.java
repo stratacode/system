@@ -56,10 +56,10 @@ public class ParentParseNode extends AbstractParseNode {
          ((ISemanticNode) value).setParseNode(this);
    }
 
-   public void addForReparse(Object node, Parselet p, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, Object oldChildParseNode, DiffContext dctx) {
+   public boolean addForReparse(Object node, Parselet p, int svIndex, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, Object oldChildParseNode, DiffContext dctx) {
       // If there's no old value or we are inserting off the end, we must be inserting a new value
       if (children == null || childIndex >= children.size())
-         add(node, p, slotIndex, skipSemanticValue, parser);
+         return add(node, p, slotIndex, skipSemanticValue, parser);
       else {
          if (node != oldChildParseNode) {
             if (node != children.get(childIndex)) {
@@ -70,11 +70,11 @@ public class ParentParseNode extends AbstractParseNode {
          // Need to call this even if the parse node did not change.  A child of the parse-node might have changed.  This will
          // cause some properties to be changed to the same value but it may be good to signal the model that something underneath
          // has changed.
-         parselet.setSemanticValue(this, node, childIndex, slotIndex, skipSemanticValue, parser, false, true);
+         return parselet.setSemanticValue(this, node, svIndex, slotIndex, skipSemanticValue, parser, false, true);
       }
    }
 
-   public void add(Object node, Parselet p, int index, boolean skipSemanticValue, Parser parser) {
+   public boolean add(Object node, Parselet p, int index, boolean skipSemanticValue, Parser parser) {
       if (children == null)
          children = new ArrayList<Object>(parselet.parselets.size());
 
@@ -86,7 +86,7 @@ public class ParentParseNode extends AbstractParseNode {
       // all of this element's children.
       if (node instanceof StringToken) {
          if (p.getDiscard() || p.getLookahead())
-            return;
+            return false;
          if (p.skip && !(parselet.needsChildren())) {
             if (children.size() == 1) {
                Object child = children.get(0);
@@ -99,7 +99,7 @@ public class ParentParseNode extends AbstractParseNode {
       }
       else if (node instanceof String) {
          if (p.discard || p.lookahead)
-            return;
+            return false;
          if (p.skip && !(parselet.needsChildren())) {
             if (children.size() == 1)  {
                Object child = children.get(0);
@@ -116,14 +116,14 @@ public class ParentParseNode extends AbstractParseNode {
          Parselet childParselet = pnode.getParselet();
 
          if (!childParselet.addResultToParent(pnode, this, index, parser))
-            return;
+            return false;
       }
 
       if (addChild)
          children.add(node);
 
       // Only nested parselets should be using the ParentParseNode
-      parselet.setSemanticValue(this, node, -1, index, skipSemanticValue, parser, false, false);
+      return parselet.setSemanticValue(this, node, -1, index, skipSemanticValue, parser, false, false);
    }
 
    public void set(Object node, Parselet p, int index, boolean skipSemanticValue, Parser parser) {

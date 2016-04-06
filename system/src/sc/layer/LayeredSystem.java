@@ -2140,7 +2140,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          else
             return scRuntimePath;
       }
-      return "Error - sourcePath is not set in layers/.stratacode/scSourcePath";
+      return "Error - sourcePath is not set in: " + getStrataCodeConfDir(SC_SOURCE_PATH);
    }
 
    private static String getSystemBuildLayer(String buildDirName) {

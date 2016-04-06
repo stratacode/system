@@ -501,13 +501,13 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
 
    public abstract Object parse(Parser p);
 
-   protected boolean anyReparseChanges(Parser parser, Object oldParseNode, DiffContext dctx) {
+   protected boolean anyReparseChanges(Parser parser, Object oldParseNode, DiffContext dctx, boolean forceReparse) {
       if (!dctx.changedRegion && !dctx.sameAgain) {
          if (oldParseNode == dctx.firstDiffNode || oldParseNode == dctx.beforeFirstNode) {
             dctx.changedRegion = true;
          }
       }
-      return dctx.changedRegion;
+      return dctx.changedRegion || forceReparse;
    }
 
    protected void checkForSameAgainRegion(Parser parser, Object oldParseNode, DiffContext dctx) {
@@ -540,9 +540,9 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
 
    }
 
-   public Object reparse(Parser parser, Object oldParseNode, DiffContext dctx) {
+   public Object reparse(Parser parser, Object oldParseNode, DiffContext dctx, boolean forceReparse) {
       Object res;
-      if (anyReparseChanges(parser, oldParseNode, dctx)) {
+      if (anyReparseChanges(parser, oldParseNode, dctx, forceReparse)) {
          parser.reparseCt++;
          res = parse(parser);
       }

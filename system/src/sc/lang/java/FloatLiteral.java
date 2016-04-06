@@ -5,6 +5,7 @@
 package sc.lang.java;
 
 public class FloatLiteral extends AbstractLiteral {
+   // Computed during the init method by parsing 'value' - not parsed but not transient so it's cloned
    public double doubleValue;
 
    public static Expression create(Object value) {

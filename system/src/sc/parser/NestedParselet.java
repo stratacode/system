@@ -1374,9 +1374,11 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       return parent;
    }
 
-   public void setSemanticValue(ParentParseNode parent, Object node, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, boolean replaceValue, boolean reparse) {
+   public boolean setSemanticValue(ParentParseNode parent, Object node, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, boolean replaceValue, boolean reparse) {
       if (trace && parser.enablePartialValues)
          System.out.println("*** setting semantic value of traced element");
+
+      boolean hasValue = true;
 
       if (!skipSemanticValue && !parser.matchOnly) {
          if (resultClass != null && !getSkip()) {
@@ -1396,7 +1398,8 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          if (parameterMapping != null) {
             switch (parameterMapping[slotIndex]) {
                case SKIP:
-                   break;
+                  hasValue = false;
+                  break;
 
                case PROPAGATE:
                   Object sval = ParseUtil.nodeToSemanticValue(node);
@@ -1450,6 +1453,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                   break;
 
                 case ARRAY:
+                   boolean appendArray = slotIndex > 0 && hasPreviousArray(slotIndex);
                    if (node instanceof IParseNode) {
                       Object sv = ((IParseNode) node).getSemanticValue();
                       if (sv instanceof List) {
@@ -1461,8 +1465,31 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                             if (childIndex == -1)
                                ((List) parent.value).addAll((List) sv);
                             else if (sv != parent.value) {
-                               // TODO: Are there any cases where this is not the right thing?
-                               parent.value = sv;
+                               // Two different cases here - if we have a pattern like ([], []) we are combining two arrays and
+                               // so need to replace the old one starting at childIndex with the new one.  This case probably requires
+                               // more work in more complex situations of reparsing
+                               // The other case is (,[],) where we have childIndex == 1 but it is all one array.
+                               if (childIndex > 0 && appendArray) {
+                                  List parentList = (List) parent.value;
+                                  List newList = (List) sv;
+                                  int newSize = newList.size();
+                                  int oldSize = parentList.size();
+                                  // The new list is smaller than the old one so trim the old one down first
+                                  while (oldSize > newSize + childIndex) {
+                                     parentList.remove(oldSize-1);
+                                     oldSize--;
+                                  }
+                                  for (int newIx = 0; newIx < newSize; newIx++) {
+                                     if (newIx + childIndex < parentList.size())
+                                        parentList.set(newIx + childIndex, newList.get(newIx));
+                                     else
+                                        parentList.add(newList.get(newIx));
+                                  }
+                               }
+                               else {
+                                  // TODO: Are there any cases where this is not the right thing?
+                                  parent.value = sv;
+                               }
                             }
                          }
                       }
@@ -1611,6 +1638,15 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                        "    " + parent + " => " + parent.getSemanticValue());
          }
       }
+      return hasValue;
+   }
+
+   /** Is this a parselet which is building up the semantic value of an array with a previous slot? */
+   private boolean hasPreviousArray(int slotIndex) {
+      for (int i = 0; i < slotIndex; i++)
+         if (parameterMapping[i] == ParameterMapping.ARRAY)
+            return true;
+      return false;
    }
 
    public void processSlotMappings(int startIx, ParentParseNode srcNode, Object dstNode, boolean recurse) {
@@ -2367,8 +2403,8 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       return complexStringType;
    }
 
-   protected boolean anyReparseChanges(Parser parser, Object oldParseNode, DiffContext dctx) {
-      if (super.anyReparseChanges(parser, oldParseNode, dctx)) {
+   protected boolean anyReparseChanges(Parser parser, Object oldParseNode, DiffContext dctx, boolean forceReparse) {
+      if (super.anyReparseChanges(parser, oldParseNode, dctx, forceReparse)) {
          return true;
       }
 

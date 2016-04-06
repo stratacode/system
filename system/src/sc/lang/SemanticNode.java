@@ -58,6 +58,8 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       return processed;
    }
 
+   public static boolean debugEquals = false;
+
    public void init() {
       if (initialized)
           return;
@@ -491,8 +493,12 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
          // If both are null it is ok.  If thisProp is not null it has to equal other prop to go on.
          if (thisProp != otherProp &&
                 (thisProp == null || otherProp == null ||
-                   !(thisProp instanceof ISemanticNode ? ((ISemanticNode) thisProp).deepEquals(otherProp) : thisProp.equals(otherProp))))
+                   !(thisProp instanceof ISemanticNode ? ((ISemanticNode) thisProp).deepEquals(otherProp) : thisProp.equals(otherProp)))) {
+            if (debugEquals) {
+               System.out.println("Instance of " + getClass().getName() + " - this." + field.getName() + " = " + thisProp + " other's = " + otherProp);
+            }
             return false;
+         }
       }
       return true;
    }

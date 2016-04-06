@@ -362,11 +362,34 @@ public class TestUtil {
       String findClassName;
       String[] reparseFiles;
       ArrayList<String> reparseIndexes;
+
+      public String toString() {
+         StringBuilder sb = new StringBuilder();
+         sb.append("(");
+         boolean first = true;
+         if (enablePartialValues) {
+            sb.append("enablePartialValues");
+            first = false;
+         }
+         if (reparseIndexes != null) {
+            if (!first)
+               sb.append(" ,");
+            sb.append("reparse: ");
+            sb.append(reparseIndexes);
+            first = false;
+         }
+         return sb.toString();
+      }
    }
 
    public static void parseTestFiles(Object[] inputFiles, TestOptions opts) {
       JavaLanguage.register();
       SCLanguage.register();
+
+      System.out.println("Running language test: " + StringUtil.arrayToString(inputFiles) + ": options: " + opts.toString());
+
+      // When we find two objects are not equal, this prints debug messages to help track down what's not the same.
+      SemanticNode.debugEquals = true;
       
       for (Object fileObj : inputFiles) {
          String fileName;
@@ -481,8 +504,12 @@ public class TestUtil {
                            System.err.println("*** FAILURE: Reparsed parse-node text does not match");
 
                         if (reparsedModelObj instanceof ISemanticNode) {
+                           // These must be inited so some properties get set which are compared - it would be nice to have a way to compare just the parsed models but we need two categories of these
+                           // semantic properties - cloned, parsed?
+                           ParseUtil.initComponent(reparseOrigObj);
+                           ParseUtil.initComponent(reparsedModelObj);
                            if (!((ISemanticNode) reparsedModelObj).deepEquals(reparseOrigObj))
-                              System.err.println("*** FAILURE: Reparsed result does not match parsed result: " + reparseFile);
+                              System.out.println("*** Warning reparsed model object does not exactly match parsed result: " + reparseFile);
                            else
                               System.out.println("*** Success: Reparsed result matches for: " + reparseFile);
                         }
