@@ -172,8 +172,11 @@ public class ClassDeclaration extends TypeDeclaration {
 
    public void unregister() {
       Object ext = getExtendsTypeDeclaration();
-      if (ext != null && ext instanceof TypeDeclaration)
-         getJavaModel().layeredSystem.removeSubType((TypeDeclaration) ext, this);
+      if (ext != null && ext instanceof TypeDeclaration) {
+         JavaModel model = getJavaModel();
+         if (model != null && model.layeredSystem != null)
+            model.layeredSystem.removeSubType((TypeDeclaration) ext, this);
+      }
    }
 
    public Object getDerivedTransformedTypeDeclaration() {

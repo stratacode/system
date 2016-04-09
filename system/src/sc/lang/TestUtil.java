@@ -493,6 +493,12 @@ public class TestUtil {
                   if (result instanceof ParseError) {
                      result = ((ParseError) result).partialValue;
                   }
+                  /*
+                  if (reparseFile.contains("562")) {
+                     System.out.println("***");
+                     SCLanguage.getSCLanguage().classBodyDeclarations.trace = true;
+                  }
+                  */
                   Object newRes = ParseUtil.reparse((IParseNode) result, reparsedString);
                   if (verifyResults) {
                      Object reparsedModelObj = getTestResult(newRes);
@@ -507,7 +513,9 @@ public class TestUtil {
                            // These must be inited so some properties get set which are compared - it would be nice to have a way to compare just the parsed models but we need two categories of these
                            // semantic properties - cloned, parsed?
                            ParseUtil.initComponent(reparseOrigObj);
-                           ParseUtil.initComponent(reparsedModelObj);
+                           // Need to reinit so we catch the reparsed models - TODO: ideally we'd clear the inited flag of any parents who have children which are modified in the reparse so we only
+                           // have to reinit those.
+                           ParseUtil.reinitComponent(reparsedModelObj);
                            if (!((ISemanticNode) reparsedModelObj).deepEquals(reparseOrigObj))
                               System.out.println("*** Warning reparsed model object does not exactly match parsed result: " + reparseFile);
                            else

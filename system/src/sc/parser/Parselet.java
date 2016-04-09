@@ -441,7 +441,8 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
    }
 
 
-   public IParseNode newParseNode() { return newParseNode(-1);
+   public IParseNode newParseNode() {
+      return newParseNode(-1);
    }
 
    public IParseNode newGeneratedParseNode(Object value) {

@@ -498,6 +498,11 @@ public class ParseUtil  {
       ParseUtil.initAndStartComponent(obj);
    }
 
+   public static void reinitComponent(Object obj) {
+      ParseUtil.stopComponent(obj);
+      ParseUtil.initComponent(obj);
+   }
+
    public static void styleString(IStyleAdapter adapter, Object semanticValue, IParseNode node, String strVal, boolean escape) {
       if (node == null || node.getParselet() == null)
          adapter.styleString(strVal, false, null, null);

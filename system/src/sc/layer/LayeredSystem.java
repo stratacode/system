@@ -12761,7 +12761,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
             else {
                Layer refLayer = type.getLayer();
-               if (refLayer.layeredSystem != this)
+               if (refLayer == null)
+                  System.err.println("*** Error node without a parent layer");
+               if (refLayer != null && refLayer.layeredSystem != this)
                   refLayer = getPeerLayerFromRemote(refLayer);
                // For the cachedOnly case, we do not want to load a type which is not yet loaded - i.e. we are invalidating caches for that type
                TypeDeclaration res = cachedOnly ? getCachedTypeDeclaration(subTypeName, null, null, false, false) : (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
@@ -12796,7 +12798,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                }
                else {
                   Layer refLayer = type.getLayer();
-                  if (refLayer.layeredSystem != this)
+                  if (refLayer == null)
+                     System.err.println("*** Error node without a parent layer");
+                  if (refLayer != null && refLayer.layeredSystem != this)
                      refLayer = getPeerLayerFromRemote(refLayer);
                   TypeDeclaration res = (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
                   // Check the resulting class name.  getSrcTypeDeclaration may find the base-type of an inner type as it looks for inherited inner types under the parent type's name

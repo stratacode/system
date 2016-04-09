@@ -1363,12 +1363,14 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       return RTypeUtil.createInstance(theClass);
    }
 
-   ParentParseNode resetOldParseNode(ParentParseNode parent, int startIndex) {
+   ParentParseNode resetOldParseNode(ParentParseNode parent, int startIndex, boolean resetString) {
       if (parent == null)
          return (ParentParseNode) newParseNode(startIndex);
+      else
+         parent.startIndex = startIndex;
 
       // Need to reset the initial value when reparsing a string node
-      if (parameterType == ParameterType.STRING) {
+      if (resetString && parameterType == ParameterType.STRING) {
          parent.value = "";
       }
       return parent;
@@ -1570,6 +1572,15 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          if (startIx < 0)
             startIx = 0;
 
+         // For non string/array parslets, we should always expect an even number of children for a parse.  But when reparsing or parsing partial values
+         // we might have a null where we expect a value and so end up with the wrong parse index using the above algorithm.  This is a quick fix for those types
+         // of problems.  It's at least a good way to catch those problems but for now is a workaround.
+         if (startIx != 0 && childrenSize % sequenceSize != sequenceSize - 1 && parameterType != ParameterType.STRING && parameterType != ParameterType.ARRAY) {
+            int newStartIx = (((childrenSize + 1) / sequenceSize) - 1) * sequenceSize;
+
+            startIx = newStartIx;
+         }
+
          Object toProcess = null;
 
          if (chainedPropertyMappings != null) {
@@ -1677,12 +1688,12 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
             }
 
             Object value;
-            if (startIx+i >= srcNode.children.size())
-                System.out.println("*** ack");
-
-            Object oldResult = srcNode.children.get(startIx + i);
-            value = ParseUtil.nodeToSemanticValue(oldResult);
-            setSemanticProperty(dstNode, slotMapping[i], value);
+            if (startIx+i < srcNode.children.size()) {
+               Object oldResult = srcNode.children.get(startIx + i);
+               value = ParseUtil.nodeToSemanticValue(oldResult);
+               setSemanticProperty(dstNode, slotMapping[i], value);
+            }
+            // else - when dealing with partial results, we might not have parsed this slot so don't bother with the semantic value
          }
       }
 

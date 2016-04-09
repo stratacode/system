@@ -123,7 +123,8 @@ public class Sequence extends NestedParselet  {
                      ctxState = parser.resetCurrentIndex(((IParseNode) oldValue).getStartIndex());
                   }
                   Object newPrevValue = prevParselet.parseExtendedErrors(parser, childParselet);
-                  if (newPrevValue != null && !(newPrevValue instanceof ParseError)) {
+                  // If we have a successful extended error parse that's longer than the previous one, we should try parsing again
+                  if (newPrevValue != null && !(newPrevValue instanceof ParseError) && (oldValue == null || ((CharSequence) newPrevValue).length() > ((CharSequence) oldValue).length())) {
                      value.set(newPrevValue, childParselet, prevIx, false, parser);
 
                      // Go back and retry the current child parselet now that we've parsed the previous one again successfully... we know it should match because we just peeked it in the previous parselet.
@@ -404,7 +405,7 @@ public class Sequence extends NestedParselet  {
                         ParentParseNode errVal;
                         if (pv != null) {
                            if (value == null) {
-                              errVal = resetOldParseNode((ParentParseNode) oldParseNode, startIndex);
+                              errVal = resetOldParseNode((ParentParseNode) oldParseNode, startIndex, true);
                            }
                            else {
                               // Here we need to clone the semantic value so we keep track of the state that
@@ -434,7 +435,7 @@ public class Sequence extends NestedParselet  {
                         // First complete the value with any partial value from this error and nulls for everything
                         // else.
                         if (value == null)
-                           value = resetOldParseNode((ParentParseNode) oldParseNode, startIndex);
+                           value = resetOldParseNode((ParentParseNode) oldParseNode, startIndex, true);
                         value.addForReparse(pv, childParselet, newChildCount, newChildCount++, i, false, parser, oldChildParseNode, dctx);
                         // Add these null slots so that we do all of the node processing
                         for (int k = i+1; k < numParselets; k++)
@@ -476,7 +477,7 @@ public class Sequence extends NestedParselet  {
          }
 
          if (value == null) {
-            value = resetOldParseNode((ParentParseNode) oldParseNode, startIndex);
+            value = resetOldParseNode((ParentParseNode) oldParseNode, startIndex, true);
          }
 
          if (!childParselet.getLookahead())
@@ -904,7 +905,7 @@ public class Sequence extends NestedParselet  {
             if (anyContent) {
                if (matchedValues != null) {
                   if (value == null)
-                     value = oldParent == null ? (ParentParseNode) newParseNode(lastMatchIndex) : oldParent;
+                     value = resetOldParseNode(oldParent, lastMatchIndex, false);
                   for (i = 0; i < numMatchedValues; i++) {
                      Object nv = matchedValues.get(i);
                      oldChildParseNode = oldParent == null || i >= oldParent.children.size() ? null : oldParent.children.get(i);
@@ -940,8 +941,9 @@ public class Sequence extends NestedParselet  {
                      return null;
                   }
 
-                  if (value == null)
-                     value = oldParent == null ? (ParentParseNode) newParseNode(lastMatchIndex) : oldParent;
+                  if (value == null) {
+                     value = resetOldParseNode(oldParent, lastMatchIndex, false);
+                  }
                   value.addForReparse(new ErrorParseNode(new ParseError(skipOnErrorParselet, "Expected {0}", new Object[]{this}, errorStart, parser.currentIndex), errorRes.toString()), skipOnErrorParselet, newChildCount, newChildCount, -1, true, parser, oldChildParseNode, dctx);
                   extendedErrorMatches = true;
                   matched = true;

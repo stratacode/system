@@ -230,7 +230,7 @@ public abstract class Language extends LayerFileComponent {
          if (parseTree instanceof IParseNode) {
             String newTextReparsed = parseTree.toString();
             if (!newTextReparsed.equals(newText)) {
-               System.err.println("Failure reparsing: " + parser.reparseCt + " - reparsed results do not match.  Reparsed text:\n" + newTextReparsed + "\n != original:\n" +  newText);
+               System.err.println("Failure reparsing - reparsed results do not match.  Reparsed text:\n" + newTextReparsed + "\n != original:\n" +  newText + " (reparsed: " + parser.reparseCt + " nodes)");
             }
             else {
                System.out.println("Reparsed: " + parser.reparseCt + " nodes, skipped: " + parser.reparseSkippedCt + " total: " + parser.totalParseCt);
