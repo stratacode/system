@@ -133,7 +133,7 @@ public class ProcessDefinition implements IProcessDefinition, Serializable {
          FileUtil.safeClose(ois);
          FileUtil.safeClose(fis);
       }
-      return null;
+      return LayeredSystem.INVALID_PROCESS_SENTINEL;
    }
 
    public static void saveProcessDefinition(LayeredSystem sys, IProcessDefinition proc) {

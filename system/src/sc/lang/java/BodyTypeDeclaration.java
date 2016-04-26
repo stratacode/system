@@ -7597,7 +7597,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    boolean computeObjectSetProperty() {
       BodyTypeDeclaration outer = getEnclosingType();
-      if (outer == null)
+      if (outer == null || typeName == null)
          return false;
 
       if (getDeclarationType() != DeclarationType.OBJECT)

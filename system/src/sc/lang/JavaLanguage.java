@@ -159,8 +159,10 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    Sequence innerCreator =
            new Sequence("NewExpression(typeArguments, typeIdentifier, *)", simpleTypeArguments, identifier, classCreatorRest);
 
+   public Sequence arrayElementExpression = new Sequence("ArrayElementExpression(arrayDimensions)", new Sequence("(,[],)", REPEAT, openSqBracket, expression, closeSqBracket));
+
    OrderedChoice identifierSuffix = new OrderedChoice(OPTIONAL,
-         new Sequence("ArrayElementExpression(arrayDimensions)", new Sequence("(,[],)", REPEAT, openSqBracket, expression, closeSqBracket)),
+         arrayElementExpression,
          new Sequence("IdentifierExpression(arguments)", arguments),
          new Sequence("TypedMethodExpression(,typeArguments,typedIdentifier,arguments)", periodSpace, simpleTypeArguments, identifier, arguments),
          new Sequence("(,,.)", periodSpace, newKeyword, innerCreator));
@@ -734,9 +736,13 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       interfaceDeclaration.set(classModifiers, interfaceDeclarationWithoutModifiers);
    }
 
-   public OrderedChoice typeDeclaration = new OrderedChoice("(.,.,)", classDeclaration, interfaceDeclaration, semicolonEOL);
+   /**
+    * The semicolon here is part of the language spec - a concession to C programmers who put semis at the end of class declarations.
+    * Do not use semicolonEOL here because it has skip-on-error and we'd rather match a partial error in class or interface declaration
+    */
+   public OrderedChoice typeDeclaration = new OrderedChoice("(.,.,)", classDeclaration, interfaceDeclaration, semicolon);
 
-   Sequence typeDeclarations = new Sequence("<types>([])", OPTIONAL | REPEAT, typeDeclaration);
+   Sequence typeDeclarations = new Sequence("<typeDeclarations>([])", OPTIONAL | REPEAT, typeDeclaration);
 
    Sequence packageDeclaration = new Sequence("Package(annotations,,name,)", OPTIONAL);
 

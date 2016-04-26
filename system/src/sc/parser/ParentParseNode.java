@@ -56,21 +56,81 @@ public class ParentParseNode extends AbstractParseNode {
          ((ISemanticNode) value).setParseNode(this);
    }
 
-   public boolean addForReparse(Object node, Parselet p, int svIndex, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, Object oldChildParseNode, DiffContext dctx) {
+   public boolean addForReparse(Object node, Parselet p, int svIndex, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, Object oldChildParseNode, DiffContext dctx,
+                                 boolean removeExtraNodes, boolean parseArray) {
       // If there's no old value or we are inserting off the end, we must be inserting a new value
       if (children == null || childIndex >= children.size())
          return add(node, p, slotIndex, skipSemanticValue, parser);
       else {
+         boolean insert = false;
          if (node != oldChildParseNode) {
-            if (node != children.get(childIndex)) {
-               children.set(childIndex, node);
+            Object oldNode = children.get(childIndex);
+            if (parseArray && oldNode instanceof IParseNode) {
+               IParseNode oldPN = (IParseNode) oldNode;
+               // If the old parse-node in the matching slot fits in nicely after this one, just insert it rather than replacing it
+               if (oldPN.getStartIndex() + dctx.getNewOffset() == parser.currentIndex) {
+                  insert = true;
+               }
             }
+            if (!insert) {
+               if (node != children.get(childIndex)) {
+                  Object replaced = children.set(childIndex, node);
+               }
+            }
+            else {
+               children.add(childIndex, node);
+            }
+         }
+
+         if (removeExtraNodes) {
+            clearParsedOldNodes(parser, childIndex + 1, dctx);
          }
 
          // Need to call this even if the parse node did not change.  A child of the parse-node might have changed.  This will
          // cause some properties to be changed to the same value but it may be good to signal the model that something underneath
          // has changed.
          return parselet.setSemanticValue(this, node, svIndex, slotIndex, skipSemanticValue, parser, false, true);
+      }
+   }
+
+   public void clearParsedOldNodes(Parser parser, int startIx, DiffContext dctx) {
+      int sz = children.size();
+      for (int c = startIx; c < sz; c++) {
+         Object oldChild = children.get(c);
+         if (oldChild instanceof IParseNode) {
+            IParseNode oldPN = (IParseNode) oldChild;
+            int oldChildLen = oldPN.length();
+
+            int oldStart = oldPN.getStartIndex() + dctx.getNewOffset();
+            if (oldStart + oldChildLen  <= parser.currentIndex) {
+               // This parse-node is from sameAgain region which we have not yet reached so don't remove it
+               if (!dctx.sameAgain && oldStart > dctx.endChangeOldOffset) {
+                  break;
+               }
+               parselet.removeForReparse(parser, this, c);
+               int newSz = children.size();
+               // If we removed one readjust...
+               if (newSz != sz) {
+                  sz = newSz;
+                  c--;
+               }
+            }
+            else
+               break;
+         }
+         // else - should we handle StringTokens here?  We could compute the startIndex relative to the parent and do the same thing?
+      }
+   }
+
+   public boolean removeForReparse(int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser) {
+      // If there's no old value or we are inserting off the end, we must be inserting a new value
+      if (children == null || childIndex >= children.size()) {
+         System.err.println("*** Unable to remove parse node - no children");
+         return false;
+      }
+      else {
+         Object node = children.remove(childIndex);
+         return parselet.removeFromSemanticValue(this, node, slotIndex, skipSemanticValue, parser, false, true);
       }
    }
 
@@ -844,7 +904,9 @@ public class ParentParseNode extends AbstractParseNode {
       return false;
    }
 
-   public int resetStartIndex(int ix) {
+   public int resetStartIndex(int ix, boolean validate) {
+      if (validate && ix != startIndex)
+         System.out.println("*** Invalid start index found");
       startIndex = ix;
 
       if (children != null) {
@@ -853,7 +915,7 @@ public class ParentParseNode extends AbstractParseNode {
             Object child = children.get(i);
             if (child != null) {
                if (child instanceof IParseNode) {
-                  ix = ((IParseNode) child).resetStartIndex(ix);
+                  ix = ((IParseNode) child).resetStartIndex(ix, validate);
                }
                else if (child instanceof CharSequence) {
                   ix += ((CharSequence) child).length();
@@ -864,7 +926,39 @@ public class ParentParseNode extends AbstractParseNode {
       return ix;
    }
 
-   public void findStartDiff(DiffContext ctx) {
+   public boolean isLastChild(int ix) {
+      if (children == null)
+         return true;
+
+      int sz = children.size();
+      int lastIx = sz - 1;
+      if (lastIx == ix)
+         return true;
+      while (lastIx > ix && children.get(lastIx) == null)
+         lastIx--;
+      return lastIx == ix;
+   }
+
+   public boolean isFirstChild(int ix) {
+      if (children == null)
+         return true;
+
+      if (ix == 0)
+         return true;
+
+      int sz = children.size();
+      if (ix >= sz) {
+         System.err.println("*** Invalid child index");
+         return false;
+      }
+      for (int i = 1; i < ix; i++) {
+         if (children.get(i) != null)
+            return false;
+      }
+      return true;
+   }
+
+   public void findStartDiff(DiffContext ctx, boolean atEnd) {
       if (children == null) {
          return;
       }
@@ -872,9 +966,10 @@ public class ParentParseNode extends AbstractParseNode {
       for (int i = 0; i < sz; i++) {
          Object child = children.get(i);
          if (child != null) {
+            boolean last = atEnd && isLastChild(i);
             if (child instanceof IParseNode) {
                IParseNode childNode = (IParseNode) child;
-               childNode.findStartDiff(ctx);
+               childNode.findStartDiff(ctx, last);
                if (ctx.firstDiffNode != null) {
                   ctx.addChangedParent(this);
                   return;
@@ -884,19 +979,35 @@ public class ParentParseNode extends AbstractParseNode {
             else if (child instanceof CharSequence) {
                CharSequence childSeq = (CharSequence) child;
                int len = childSeq.length();
+               int startChange = ctx.startChangeOffset;
                String text = ctx.text;
+               int textLen = text.length();
                for (int c = 0; c < len; c++) {
-                  if (childSeq.charAt(c) != text.charAt(ctx.startChangeOffset)) {
+                  if (startChange >= textLen || childSeq.charAt(c) != text.charAt(startChange)) {
                      ctx.firstDiffNode = this;
-                     if (c == 0)
+                     // Is there any content inside of this node?  If so, the change starts inside the node.  Otherwise,
+                     // we need to choose the previous node so we "bracket" the changed region.
+                     // TODO: In test re22/GenerateUCs32.sc - we detect the change inside of the first space so c == 1 here
+                     // clear '2' is not right here - maybe we always use the lastVisitedNode?   Should we always do this for
+                     // spacing parselets by adding a new 'glueContent' or something attribute to the parselet?
+                     if (c < 2)
                         ctx.beforeFirstNode = ctx.lastVisitedNode;
                      else
                         ctx.beforeFirstNode = this;
+                     ctx.startChangeOffset = startChange;
                      return;
                   }
                   else {
-                     ctx.startChangeOffset++;
+                     startChange++;
                   }
+               }
+               ctx.startChangeOffset = startChange;
+               if (last && text.length() > startChange) {
+                  ctx.firstDiffNode = this;
+                  // Not using lastVisitedNode since in this case the containing parent node tree is all we need to find
+                  // the right place to start changes.
+                  ctx.beforeFirstNode = ctx.firstDiffNode;
+                  return;
                }
             }
          }
@@ -923,8 +1034,12 @@ public class ParentParseNode extends AbstractParseNode {
                   }
                   // Also reset the afterLastNode if it happens to be the last child we've processed.  Once we are processing
                   // a change,
-                  if (ctx.afterLastNode == lastChildNode)
-                     ctx.afterLastNode = this;
+                  /*  this ends up marking way too much as changed in some cases */
+                  /*
+                  if (ctx.afterLastNode == lastChildNode) {
+                     //ctx.afterLastNode = this;
+                  }
+                  */
                   return;
                }
                lastChildNode = childNode;
@@ -933,11 +1048,12 @@ public class ParentParseNode extends AbstractParseNode {
                CharSequence childSeq = (CharSequence) child;
                int len = childSeq.length();
                String text = ctx.text;
-               for (int c = len - 1; c >= 0; c--) {
+               for (int c = len - 1; c >= 0 && ctx.endChangeNewOffset >= 0 && ctx.endChangeOldOffset >= 0; c--) {
                   if (childSeq.charAt(c) != text.charAt(ctx.endChangeNewOffset)) {
                      ctx.lastDiffNode = this;
                      // TODO: if c != 0 or c != len - 1 can we optimize this and choose this node instead of the "afterLast' node
                      ctx.afterLastNode = ctx.lastVisitedNode;
+                     break;
                   }
                   else {
                      ctx.endChangeOldOffset--;

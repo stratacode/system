@@ -111,11 +111,9 @@ public class BuildInfo {
 
    public void runMatchingMainMethods(String runClass, String[] runClassArgs, List<Layer> theLayers) {
       if (mainMethods == null || mainMethods.size() == 0) {
-         if (system != null && system.options.verbose) {
+         if (system != null && system.options.info) {
             if (runClass.equals(".*"))
                System.out.println("No main methods defined - nothing to run.");
-            else
-               System.out.println("No main methods defined matching: " + runClass);
          }
          return;
       }
@@ -124,12 +122,18 @@ public class BuildInfo {
       for (int i = 0; i < mainMethods.size(); i++) {
          MainMethod m = mainMethods.get(i);
          if (p.matcher(m.typeName).matches()) {
-            system.runMainMethod(m.typeName, m.args == null ? runClassArgs : m.args, theLayers);
+            String res = system.runMainMethod(m.typeName, m.args == null ? runClassArgs : m.args, theLayers);
+            if (res != null)
+               system.error(res);
             any = true;
          }
       }
-      if (!any)
-         System.out.println("No main methods match pattern: " + runClass + " in: " + mainMethods);
+      if (!any) {
+         // Let them specify a main class to run even if they don't use MainSettings
+         String res = system.runMainMethod(runClass, runClassArgs, theLayers);
+         if (res != null)
+            system.error(res);
+      }
    }
 
    public void runMatchingMainMethods(String runClass, String[] runClassArgs, int lowestLayer) {

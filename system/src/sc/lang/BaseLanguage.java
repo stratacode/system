@@ -78,7 +78,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
 
    public IndexedChoice whiteSpace = new IndexedChoice("<whitespace>", NOERROR | OPTIONAL);
    {
-      whiteSpace.put(" ", new Symbol(" "));
+      whiteSpace.put(" ", new Symbol(REPEAT, " "));
       whiteSpace.put("\t", new Symbol("\t"));
       whiteSpace.put("\f", new Symbol("\f"));
       whiteSpace.put("\r", lineTerminator);

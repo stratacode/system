@@ -1293,7 +1293,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
                // Since we may have added layers, for each process see if those layers also need to go into the peer.
                if (processPeer != null) {
-                  updateSystemLayers(processPeer);
+                  String runtimeName = processPeer.getRuntimeName();
+                  if (!isRuntimeDisabled(runtimeName) && (!active || isRuntimeActivated(runtimeName)))
+                     updateSystemLayers(processPeer);
                   continue;
                }
             }
@@ -1830,7 +1832,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             proc.runtimeProcessor = getOrRestoreRuntime(runtimeName);
             if (proc.runtimeProcessor == null && !runtimeName.equals(IRuntimeProcessor.DEFAULT_RUNTIME_NAME)) {
                error("Error - unable to restore cached definition of runtime: " + runtimeName);
-               return null;
+               return INVALID_PROCESS_SENTINEL;
             }
             initProcessesList(proc);
             processes.add(proc);
@@ -3729,7 +3731,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
 
          if (options.verbose) {
-            sys.verbose("Run completed in: " + StringUtil.formatFloat((System.currentTimeMillis() - sys.sysStartTime)/1000.0));
+            sys.verbose("Run completed in: " + StringUtil.formatFloat((System.currentTimeMillis() - sys.sysStartTime)/1000.0) + "at: " + new Date().toString());
          }
 
       }
@@ -4362,48 +4364,49 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return result.toArray(new String[result.size()]);
    }
 
-   void runMainMethod(String runClass, String[] runClassArgs, int lowestLayer) {
+   String runMainMethod(String runClass, String[] runClassArgs, int lowestLayer) {
       Object type = getRuntimeTypeDeclaration(runClass);
       if (lowestLayer != -1) {
          if (type instanceof TypeDeclaration) {
             Layer typeLayer = ((TypeDeclaration) type).getLayer();
             // Already ran this one before
             if (typeLayer.layerPosition <= lowestLayer)
-               return;
+               return null;
          }
          else
-            return;
+            return null;
       }
-      runMainMethod(type, runClass, runClassArgs);
+      return runMainMethod(type, runClass, runClassArgs);
    }
 
-   void runMainMethod(String runClass, String[] runClassArgs, List<Layer> theLayers) {
+   String runMainMethod(String runClass, String[] runClassArgs, List<Layer> theLayers) {
       Object type = getRuntimeTypeDeclaration(runClass);
       if (theLayers != null) {
          if (type instanceof TypeDeclaration) {
             Layer typeLayer = ((TypeDeclaration) type).getLayer();
             // Already ran this one before or the layer is not part of the current layers
             if (!theLayers.contains(typeLayer) || !typeLayer.activated)
-               return;
+               return null;
          }
          else
-            return;
+            return null;
       }
-      runMainMethod(type, runClass, runClassArgs);
+      return runMainMethod(type, runClass, runClassArgs);
    }
 
    static private Class MAIN_ARG = sc.type.Type.get(String.class).getArrayClass(String.class, 1);
 
-   void runMainMethod(Object type, String runClass, String[] runClassArgs) {
+   String runMainMethod(Object type, String runClass, String[] runClassArgs) {
       if (runtimeProcessor != null) {
-         runtimeProcessor.runMainMethod(type, runClass, runClassArgs);
-         return;
+         return runtimeProcessor.runMainMethod(type, runClass, runClassArgs);
       }
       Object[] args = new Object[] {processCommandArgs(runClassArgs)};
       if (type != null && ModelUtil.isDynamicType(type)) {
          Object meth = ModelUtil.getMethod(this, type, "main", null, null, null, false, MAIN_ARG);
+         if (meth == null)
+            return "No method named: 'main' on type: " + ModelUtil.getTypeName(type);
          if (!ModelUtil.hasModifier(meth, "static"))
-            System.err.println("*** Main method missing 'static' modifier: " + runClass);
+            return "Main method missing 'static' modifier: " + runClass;
          else {
             if (options.info)
                System.out.println("Running dynamic: " + runClass);
@@ -4416,20 +4419,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       else {
          Object rc = getCompiledClass(runClass);
          if (rc == null) {
-            System.err.println("*** Can't find main class to run: " + runClass);
-            return;
+            return "No main class to run: " + runClass;
          }
          Class rcClass = (Class) rc;
          Method meth = RTypeUtil.getMethod(rcClass, "main", MAIN_ARG);
          if (!PTypeUtil.hasModifier(meth, "static"))
-            System.err.println("*** Main method missing 'static' modifier: " + runClass);
+            return "Main method missing 'static' modifier: " + runClass;
          else {
             if (options.info)
-               System.out.println("Running compiled: " + runClass);
+               System.out.println("Running compiled main for class: " + runClass);
             runClassStarted = true;
             TypeUtil.invokeMethod(null, meth, args);
          }
       }
+      return null;
    }
 
    void runScript(String execName, String[] execArgs) {
@@ -6431,6 +6434,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return typeIndexMainDir.list();
    }
 
+   public static final ProcessDefinition INVALID_PROCESS_SENTINEL = new ProcessDefinition();
+
    private void initTypeIndexRuntimes() {
       String[] runtimeDirNames = getRuntimeDirNames(false);
 
@@ -6470,6 +6475,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             continue;
 
          IProcessDefinition proc = getProcessDefinition(newRuntimeName, newProcessName, true);
+
+         if (proc == INVALID_PROCESS_SENTINEL)
+            continue;
 
          File mainIndexFile = new File(typeIndexDir, MAIN_SYSTEM_MARKER_FILE);
          if (mainIndexFile.exists() && processDefinition == null && newRuntimeName.equals(thisRuntimeName)) {
@@ -13867,6 +13875,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public boolean isRuntimeDisabled(String runtimeName) {
       return disabledRuntimes.contains(runtimeName);
+   }
+
+   public boolean isRuntimeActivated(String runtimeName) {
+      // Default runtime does not have to be activated
+      if (runtimeName == null)
+         return true;
+      // For these other runtimes, make sure the layer which defined the runtime is included.
+      for (int i = 0; i < layers.size(); i++) {
+         Layer layer = layers.get(i);
+         if (layer.definedRuntime != null && StringUtil.equalStrings(layer.definedRuntime.getRuntimeName(), runtimeName))
+            return true;
+      }
+      return false;
    }
 
    public boolean isDisabled() {

@@ -25,6 +25,8 @@ public class PString extends AbstractString {
       return str.length();
    }
 
+   public static PString EMPTY_STRING = new PString("");
+
    public static PString toPString(Object str) {
       if (str == null)
          return null;

@@ -49,7 +49,7 @@ public interface IRuntimeProcessor {
 
    public LayeredSystem getLayeredSystem();
 
-   public void runMainMethod(Object type, String runClass, String[] runClassArgs);
+   public String runMainMethod(Object type, String runClass, String[] runClassArgs);
 
    public String getDestinationName();
 

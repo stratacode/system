@@ -1499,7 +1499,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (commandInterpreter != null)
          newModel.commandInterpreter = commandInterpreter;
 
-      if (newModel.layer != null)
+      if (newModel.layer != null && oldType != null && newType != null)
          oldType.updateType(newType, ctx, updateMode, updateInstances, updateInfo);
 
       if (updateMode == TypeUpdateMode.Remove)

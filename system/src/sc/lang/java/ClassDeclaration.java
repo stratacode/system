@@ -71,6 +71,11 @@ public class ClassDeclaration extends TypeDeclaration {
          if (layer != null && !layer.activated) {
             if (!thisModel.isLayerModel) {
                String fullTypeName = getFullTypeName();
+               if (fullTypeName == null) {
+                  super.start();
+                  // Perhaps a model fragment or something we can't really start
+                  return;
+               }
                TypeDeclaration prevDecl = thisModel.getPreviousDeclaration(fullTypeName);
                if (prevDecl != null && prevDecl != this && prevDecl.getFullTypeName().equals(fullTypeName))
                   prevDecl.replacedByType = this;

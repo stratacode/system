@@ -90,8 +90,8 @@ public class SCLanguage extends JavaLanguage {
    public OrderedChoice arrayVariableInitializer = new OrderedChoice("<arrayVariableInitializer>", variableInitializer, mapEntry);
 
    {
-      // Redefine Java's type declaration parameter mapping and children to add the "modifyDeclaration"
-      typeDeclaration.set("(.,.,.,)", classDeclaration, interfaceDeclaration, modifyDeclaration, semicolonEOL);
+      // Redefine Java's type declaration parameter mapping and children to add the "modifyDeclaration".  Just like Java use semicolon not semicolonEOL so we do not get skipOnError
+      typeDeclaration.set("(.,.,.,)", classDeclaration, interfaceDeclaration, modifyDeclaration, semicolon);
 
       // The operator is now a valid object.  We are overriding the class declaration for now even though objects don't
       // support implements

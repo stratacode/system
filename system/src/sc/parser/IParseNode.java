@@ -89,13 +89,13 @@ public interface IParseNode extends CharSequence, IParseResult {
     * After updating some parse nodes, you may need to reset the start indexes.  This sets the start index to the one given and returns the start index to
     * continue after this parse node.
     */
-   int resetStartIndex(int ix);
+   int resetStartIndex(int ix, boolean validate);
 
    /** Returns the length of the parse node eliminating any trailing whitespace */
    int getSemanticLength();
 
    /** Finds the first parse node whose text does not match the DiffContext */
-   void findStartDiff(DiffContext ctx);
+   void findStartDiff(DiffContext ctx, boolean atEnd);
 
    void findEndDiff(DiffContext ctx);
 }

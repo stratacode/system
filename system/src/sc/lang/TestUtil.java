@@ -386,7 +386,7 @@ public class TestUtil {
       JavaLanguage.register();
       SCLanguage.register();
 
-      System.out.println("Running language test: " + StringUtil.arrayToString(inputFiles) + ": options: " + opts.toString());
+      System.out.println("Running language test: " + StringUtil.arrayToString(inputFiles) + ": options: " + opts.toString() + " in dir: " + System.getProperty("user.dir"));
 
       // When we find two objects are not equal, this prints debug messages to help track down what's not the same.
       SemanticNode.debugEquals = true;
@@ -491,23 +491,78 @@ public class TestUtil {
                }
                else {
                   if (result instanceof ParseError) {
-                     result = ((ParseError) result).partialValue;
+                     ParseError err = ((ParseError) result);
+                     result = err.getBestPartialValue();
                   }
                   /*
-                  if (reparseFile.contains("562")) {
+                  if (reparseFile.contains("4")) {
                      System.out.println("***");
                      SCLanguage.getSCLanguage().classBodyDeclarations.trace = true;
                   }
                   */
+                  if (result == null)
+                     System.out.println("*** FAILURE: No previous result for reparse");
                   Object newRes = ParseUtil.reparse((IParseNode) result, reparsedString);
-                  if (verifyResults) {
-                     Object reparsedModelObj = getTestResult(newRes);
-                     Object reparseComplete = lang.parseString(reparsedString, opts.enablePartialValues);
-                     if (reparseComplete instanceof IParseNode) {
-                        Object reparseOrigObj = getTestResult(reparseComplete);
+                  boolean reparseError = false;
+                  if (newRes instanceof ParseError) {
+                     reparseError = true;
+                     System.out.println("Reparse errors for: " + fileName + ": " + ((ParseError) newRes).errorStringWithLineNumbers(reparseFile));
+                     Object newPV = ((ParseError) newRes).getBestPartialValue();
+                     if (newPV == null)
+                        System.err.println("*** FAILURE: no reparse result!");
+                     else
+                        newRes = newPV;
+                  }
 
-                        if (!newRes.toString().equals(reparsedString))
-                           System.err.println("*** FAILURE: Reparsed parse-node text does not match");
+                  if (verifyResults) {
+                     if (newRes instanceof IParseNode) {
+                        // We should have already updated the startIndex in all of the parse nodes but we are validating that they are set correctly here
+                        ((IParseNode) newRes).resetStartIndex(0, true);
+                     }
+
+                     Object reparsedModelObj = getTestResult(newRes);
+                     Object parseComplete = lang.parseString(reparsedString, opts.enablePartialValues);
+                     boolean parseError = false;
+                     if (parseComplete instanceof ParseError) {
+                        parseError = true;
+                        System.out.println("Parse complete errors for: " + fileName + ": " + ((ParseError) parseComplete).errorStringWithLineNumbers(reparseFile));
+                        parseComplete = ((ParseError) parseComplete).getBestPartialValue();
+                        if (parseComplete == null)
+                           System.err.println("No partial value for file with syntax errors: " + reparseFile);
+                     }
+
+                     if (parseComplete instanceof IParseNode) {
+                        Object reparseOrigObj = getTestResult(parseComplete);
+
+                        String newResStr = newRes.toString();
+                        String parseStr = parseComplete.toString();
+
+                        boolean reparseSameAsOrig = newResStr.equals(reparsedString);
+                        boolean parseSameAsOrig = parseStr.equals(reparsedString);
+                        boolean reparseSameAsParse = newResStr.equals(parseStr);
+
+                        if (parseError) { // NOTE: sometimes reparseError will be false - if we reparse a document that was originally an error and then is not changed on the reparse - we just return the original
+                           // If we have an error in both parse and reparse and everything else matches and we have at least a partial parse of the
+                           // value it's ok
+                           if (reparsedString.startsWith(newResStr) && reparsedString.startsWith(parseStr)) {
+                              if (reparseSameAsParse)
+                                  parseSameAsOrig = reparseSameAsOrig = true;
+                              else {
+                                 System.err.println("*** FAILURE: Reparsed partial match does not match parsed partial match ");
+                              }
+                           }
+                        }
+
+                        if (!reparseSameAsOrig || !parseSameAsOrig || !reparseSameAsParse) {
+                           if (!parseSameAsOrig)
+                              System.err.println("*** PARSE FAILURE - parsed text does not match original - reparse matches parse: " + reparseSameAsParse);
+                           else {
+                              if (!reparseSameAsOrig)
+                                 System.err.println("*** REPARSE FAILURE - reparsed text does not match");
+                              else
+                                 System.err.println("*** REPARSE FAILURE - reparsed text does not match - parsed"); // is this possible?
+                           }
+                        }
 
                         if (reparsedModelObj instanceof ISemanticNode) {
                            // These must be inited so some properties get set which are compared - it would be nice to have a way to compare just the parsed models but we need two categories of these
@@ -522,11 +577,8 @@ public class TestUtil {
                               System.out.println("*** Success: Reparsed result matches for: " + reparseFile);
                         }
                      }
-                     else if (reparseComplete instanceof ParseError) {
-                        System.out.println("File: " + fileName + ": " + ((ParseError) reparseComplete).errorStringWithLineNumbers(reparseFile));
-                     }
-                     else
-                        System.err.println("*** Unrecognized return from reparse: " + reparseComplete);
+                     else if (parseComplete != null)
+                        System.err.println("*** Unrecognized return from reparse: " + parseComplete);
                   }
                }
             }

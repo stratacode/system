@@ -199,8 +199,19 @@ public abstract class Language extends LayerFileComponent {
          p.populateInst = toPopulateInst;
          Object parseTree = p.parseStart(start);
          if (parseTree instanceof IParseNode) {
-            if (!p.atEOF())
-               parseTree = p.wrapErrors();
+            if (!p.atEOF()) {
+               if (enablePartialValues) {
+                  IParseNode parseNode = (IParseNode) parseTree;
+                  postProcessResult(parseTree, fileName);
+                  if (debugReparse)
+                     System.out.println("*** Encountered EOF from start parselet: " + parseNode.length() + " out of: " + p.length() + " characters parsed");
+                  return p.parseError(start, parseTree, null, "Invalid text at end of file", 0, p.length());
+               }
+               else {
+                  // TODO: should we always do the above?
+                  parseTree = p.wrapErrors();
+               }
+            }
          }
 
          if (debugReparse)
@@ -230,7 +241,12 @@ public abstract class Language extends LayerFileComponent {
          if (parseTree instanceof IParseNode) {
             String newTextReparsed = parseTree.toString();
             if (!newTextReparsed.equals(newText)) {
-               System.err.println("Failure reparsing - reparsed results do not match.  Reparsed text:\n" + newTextReparsed + "\n != original:\n" +  newText + " (reparsed: " + parser.reparseCt + " nodes)");
+               // This is the case where we missed some characters in the reparse - e.g. an unterminated commentBody which did not parse the last character and was the last thing we could parse or
+               // we just do not have the ability to parse the end of the file.
+               if (!newText.startsWith(newTextReparsed))
+                  System.err.println("Failure reparsing - reparsed results do not match.  Reparsed text:\n" + newTextReparsed + "\n != original:\n" +  newText + " (reparsed: " + parser.reparseCt + " nodes)");
+               else
+                  System.out.println("Partial reparse of: " + parser.reparseCt + " nodes, skipped: " + parser.reparseSkippedCt + " total: " + parser.totalParseCt + " " + newTextReparsed.length() + " out of: " + newText.length() + " chars parsed");
             }
             else {
                System.out.println("Reparsed: " + parser.reparseCt + " nodes, skipped: " + parser.reparseSkippedCt + " total: " + parser.totalParseCt);

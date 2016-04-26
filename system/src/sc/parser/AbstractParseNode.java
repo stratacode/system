@@ -167,7 +167,9 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
       return true;
    }
 
-   public int resetStartIndex(int ix) {
+   public int resetStartIndex(int ix, boolean validate) {
+      if (validate && ix != startIndex)
+         System.err.println("Invalid start index found");
       startIndex = ix;
       return ix + length();
    }

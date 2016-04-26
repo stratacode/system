@@ -82,8 +82,7 @@ public class OrderedChoice extends NestedParselet  {
       if (trace)
          System.out.println("Trace: choice parselet resolving semantic value class: " + this);
 
-      for (Parselet p:parselets)
-      {
+      for (Parselet p:parselets) {
          // Don't consider classes which are nulled out anyway
          if (skipSemanticValue(i))
              continue;
@@ -264,7 +263,7 @@ public class OrderedChoice extends NestedParselet  {
 
       if (repeat) {
          Object res = reparseRepeatingChoice(parser, oldParseNode, dctx, forceReparse);
-         checkForSameAgainRegion(parser, oldParseNode, dctx);
+         checkForSameAgainRegion(parser, oldParseNode, dctx, res == null || res instanceof ParseError, forceReparse);
          return res;
       }
 
@@ -285,18 +284,41 @@ public class OrderedChoice extends NestedParselet  {
       }
 
       if (dctx.changedRegion) {
-         oldChildNode = null;
+         //oldChildNode = null;
          forceReparse = true;
       }
 
       Parselet oldChildParselet = !(oldChildNode instanceof IParseNode) ? null : ((IParseNode) oldChildNode).getParselet();
 
+      boolean oldChildMismatch = false;
+
+      // If this parselet does not match any of the children start out with it as a 'mismatch'
+      // TODO: rework this to avoid extra calls to producesParselet - just call it once and store the array
+      if (oldChildParselet != null) {
+         boolean foundOldChild = false;
+         for (Parselet p:matchingParselets) {
+            if (p.producesParselet(oldChildParselet)) {
+               foundOldChild = true;
+               break;
+            }
+         }
+         if (!foundOldChild)
+            oldChildMismatch = true;
+      }
+
       int numMatches = matchingParselets.size();
       for (int i = 0; i < numMatches; i++) {
          Parselet subParselet = matchingParselets.get(i);
 
-         if (oldChildParselet != null && !subParselet.producesParselet(oldChildParselet))
+         // If there's an oldChildParselet we want to first process the old child parselet so skip to that guy.  If we have already tried the old parselet and it does not match we go back to the
+         // beginning and try everything except the one we already tried.
+         if (oldChildParselet != null && oldChildMismatch == subParselet.producesParselet(oldChildParselet))
             continue;
+
+         if (oldChildMismatch && oldChildNode != null) {
+            //oldChildNode = null;
+            forceReparse = true;
+         }
 
          Object nestedValue = parser.reparseNext(subParselet, oldChildNode, dctx, forceReparse);
          if (!(nestedValue instanceof ParseError)) {
@@ -308,7 +330,7 @@ public class OrderedChoice extends NestedParselet  {
             }
             if (lookahead) {
                // Reset back to the beginning of the sequence
-               parser.changeCurrentIndex(startIndex);
+               dctx.changeCurrentIndex(parser, startIndex);
             }
 
             // IndexedChoice returns a special type which lets us get the position of the match in the list so
@@ -316,7 +338,7 @@ public class OrderedChoice extends NestedParselet  {
             // we go through all parselets.
             int slotIx = getSlotIndex(matchingParselets, i);
 
-            checkForSameAgainRegion(parser, oldChildNode, dctx);
+            checkForSameAgainRegion(parser, oldChildNode, dctx, nestedValue == null, forceReparse);
 
             return parseResult(parser, nestedValue, skipSemanticValue(slotIx));
          }
@@ -330,10 +352,23 @@ public class OrderedChoice extends NestedParselet  {
                if (bestError == null || Parser.isBetterError(bestError.startIndex, bestError.endIndex, error.startIndex, error.endIndex, false))
                   bestError = error;
             }
+            if (oldChildParselet == subParselet) {
+               if (oldChildMismatch)
+                  System.err.println("*** Logic error: repeating the oldChildPareelet");
+               else {
+                  oldChildMismatch = true;
+
+                  // Retry the matches from the beginning because we skipped
+                  if (i != 0) {
+                     // Restart at the beginning
+                     i = -1;
+                  }
+               }
+            }
          }
       }
       if (optional) {
-         parser.changeCurrentIndex(startIndex);
+         dctx.changeCurrentIndex(parser, startIndex);
 
          if (parser.enablePartialValues && bestError != null && bestError.partialValue != null) {
             bestError.optionalContinuation = true;
@@ -342,7 +377,7 @@ public class OrderedChoice extends NestedParselet  {
          return null;
       }
 
-      checkForSameAgainRegion(parser, oldChildNode, dctx);
+      checkForSameAgainRegion(parser, oldChildNode, dctx, true, forceReparse);
 
       if (bestError != null)
          return bestError;
@@ -432,6 +467,8 @@ public class OrderedChoice extends NestedParselet  {
    }
 
    public Object reparseRepeatingChoice(Parser parser, Object oldParseNode, DiffContext dctx, boolean forceReparse) {
+      if (trace)
+         System.out.println("*** reparse traced repeating choice");
       int startIndex = parser.currentIndex;
       int lastMatchStart;
       ParentParseNode value = null;
@@ -439,14 +476,14 @@ public class OrderedChoice extends NestedParselet  {
       ParseError bestError = null;
       int bestErrorSlotIx = -1;
 
-      ParentParseNode oldParent = (ParentParseNode) oldParseNode;
+      ParentParseNode oldParent = oldParseNode instanceof ParentParseNode ? (ParentParseNode) oldParseNode : null;
 
       boolean emptyMatch = false;
 
       int newChildCount = 0;
       int svCount = 0;
 
-      int oldLen = oldParent == null ? -1 : oldParent.length();
+      int oldLen = oldParseNode == null ? -1 : ((CharSequence) oldParseNode).length();
 
       do {
          matched = false;
@@ -463,28 +500,71 @@ public class OrderedChoice extends NestedParselet  {
                oldChildParseNode = null;
                forceReparse = true;
             }
-            else
-               oldChildParseNode = oldParent.children.get(newChildCount);
-
-            // We are taking a different path than the last time? e.g. intIntelliJIdeazz to int - now we match a different parselet
-            if (oldChildParseNode != null && (!(oldChildParseNode instanceof IParseNode) || ((IParseNode) oldChildParseNode).getParselet() != matchedParselet)) {
-               if (!dctx.changedRegion)
-                  dctx.changedRegion = true;
-               oldChildParseNode = null;
-               forceReparse = true;
+            else {
+               // Before we start parsing, we might need to skip some previously parsed content so we end up with the proper old node
+               oldParent.clearParsedOldNodes(parser, newChildCount, dctx);
+               if (oldParent.children.size() > newChildCount) {
+                  oldChildParseNode = oldParent.children.get(newChildCount);
+               }
+               else {
+                  oldChildParseNode = null;
+                  forceReparse = true;
+               }
             }
 
-            Object nestedValue = parser.reparseNext(matchedParselet, oldChildParseNode, dctx, forceReparse);
+            Object nextChildParseNode = oldChildParseNode;
+            boolean nextChildReparse = false;
+            // We may be taking a different path than the last time? e.g. intIntelliJIdeazz to int - now we match a different parselet
+            // TODO: should we try the oldChildParseNode's parselet first here?   I don't think we can safely do that because it could parse incorrectly
+            if (oldChildParseNode != null && (!(oldChildParseNode instanceof IParseNode) || ((IParseNode) oldChildParseNode).getParselet() != matchedParselet)) {
+               if (!(oldChildParseNode instanceof IParseNode)) {
+                  nextChildParseNode = null;
+                  nextChildReparse = true;
+               }
+               else {
+                  IParseNode oldChildNode = (IParseNode) oldChildParseNode;
+                  Parselet oldParselet = oldChildNode.getParselet();
+                  if (!matchedParselet.producesParselet(oldParselet)) {
+                     // TODO: should we do this if the matchedParselets does not contain a parselet which produces ths node's parselet?  Otherwise, it seems like
+                     // here we want to force a reparse of this child only until we hit the matched parselet.
+                     // TODO: this is too broad a test.  When matchedparslets contains the right parselet we should not mark a change here and perhaps parse that guy first?
+                     if (!dctx.changedRegion)
+                        dctx.setChangedRegion(parser, true);
+                     nextChildParseNode = null;
+                     nextChildReparse = true;
+                  }
+               }
+            }
+
+            int oldChildLen = oldChildParseNode != null ? ((CharSequence) oldChildParseNode).length() : -1;
+
+            Object nestedValue = parser.reparseNext(matchedParselet, nextChildParseNode, dctx, forceReparse || nextChildReparse);
             emptyMatch = nestedValue == null;
             if (!(nestedValue instanceof ParseError)) {
                if (value == null) {
-                  value = resetOldParseNode(oldParent, lastMatchStart, false);
+                  value = resetOldParseNode(nextChildReparse ? null : oldParent, lastMatchStart, false);
                }
 
                if (nestedValue != null || parser.peekInputChar(0) != '\0') {
-                  if (value.addForReparse(nestedValue, matchedParselet, svCount, newChildCount++, slotIx, false, parser, oldChildParseNode, dctx))
+                  int oldSize = value.children == null ? 0 : value.children.size();
+                  if (value.addForReparse(nestedValue, matchedParselet, svCount, newChildCount++, slotIx, false, parser, nextChildParseNode, dctx, true, true))
                      svCount++;
 
+                  // TODO: we should have addForReparse take a ReparseStatus object with two values - hasSemanticValue and replaced.  For now, just using the size to figure that out
+                  int newSize = value.children == null ? 0 : value.children.size();
+                  boolean replaced = newSize == oldSize;
+
+                  // Make sure we really replaced the old parse node - somtimes we add to it.  Also
+                  // do not adjust children for parselets which compress their parse-node down to a string (e.g. spacing) for the logic in ParentParseNode.add(..)
+                  if (replaced && (!matchedParselet.skip || needsChildren())) {
+                     int newChildLen = nestedValue == null ? 0 : ((CharSequence) nestedValue).length();
+                     // If we parsed a child and did not parse text which we did parse on the previous parse for this parse-node, we need to increase the range of the "changed region" to include
+                     // the text we did not parse this time around.
+                     int diffLen = oldChildLen - newChildLen;
+                     if (diffLen > 0 && startIndex + oldChildLen > dctx.endParseChangeNewOffset && dctx.endParseChangeNewOffset > dctx.endChangeOldOffset) {
+                        dctx.endParseChangeNewOffset = startIndex + oldChildLen + dctx.getDiffOffset();
+                     }
+                  }
                   matched = true;
                   break;
                }
@@ -506,14 +586,14 @@ public class OrderedChoice extends NestedParselet  {
                Object oldChildParseNode = oldParent == null || oldParent.children.size() <= newChildCount ? null : oldParent.children.get(newChildCount);
                return reparsePartialErrorValue(parser, bestError, lastMatchStart, newChildCount, bestErrorSlotIx, oldChildParseNode, dctx);
             }
-            parser.changeCurrentIndex(startIndex);
+            dctx.changeCurrentIndex(parser, startIndex);
 
             // If we are producing a smaller result than we did in the previous result, and we are at the end of the
             // changes - so that the old result was at least partially in the "same again" region, make sure we extend
             // the changes so we reparse those old characters we stripped off again (test/re5)
             if (!lookahead && oldLen > 0 && dctx.changedRegion) {
-               if (startIndex + oldLen > dctx.endChangeNewOffset && dctx.endChangeNewOffset > dctx.endChangeOldOffset) {
-                  dctx.endChangeNewOffset = startIndex + oldLen;
+               if (startIndex + oldLen > dctx.endParseChangeNewOffset && dctx.endParseChangeNewOffset > dctx.endChangeOldOffset) {
+                  dctx.endParseChangeNewOffset = startIndex + oldLen;
                }
             }
 
@@ -536,10 +616,7 @@ public class OrderedChoice extends NestedParselet  {
       else {
          // If we are reparsing, we might have produced fewer children than before.  if so, we need to pull them off the the end.
          if (oldParent == value) {
-            while (value.children.size() > newChildCount) {
-               // TODO: in the current test case these are ErrorParseNodes but if they are not errors, do we need to update the semantic value?
-               value.children.remove(value.children.size()-1);
-            }
+            removeChildrenForReparse(parser, value, newChildCount);
          }
          // If we are producing a smaller result than we did in the previous result, and we are at the end of the
          // changes - so that the old result was at least partially in the "same again" region, make sure we extend
@@ -547,24 +624,25 @@ public class OrderedChoice extends NestedParselet  {
          if (!lookahead && oldParseNode != null && dctx.changedRegion) {
             int newLen = value.length();
             int diffLen = oldLen - newLen;
-            if (diffLen > 0 && lastMatchStart + diffLen > dctx.endChangeNewOffset && dctx.endChangeNewOffset > dctx.endChangeOldOffset) {
-               dctx.endChangeNewOffset = lastMatchStart + diffLen + 1;
+            if (diffLen > 0 && lastMatchStart + diffLen > dctx.endParseChangeNewOffset && dctx.endParseChangeNewOffset > dctx.endChangeOldOffset) {
+               dctx.endParseChangeNewOffset = lastMatchStart + diffLen + 1;
             }
          }
          // If we are doing the partial values case, we might have partially matched one more statement.  if so, this is part of the partial results
          if (parser.enablePartialValues && bestError != null && /*bestError.eof && */ bestError.partialValue != null && bestError.startIndex == lastMatchStart) {
             Object oldChildParseNode = oldParent == null || oldParent.children.size() <= newChildCount ? null : oldParent.children.get(newChildCount);
-            value.addForReparse(bestError.partialValue, bestError.parselet, newChildCount, newChildCount, bestErrorSlotIx, false, parser, oldChildParseNode, dctx);
+            value.addForReparse(bestError.partialValue, bestError.parselet, newChildCount, newChildCount, bestErrorSlotIx, false, parser, oldChildParseNode, dctx, true, true);
 
             return parsePartialError(parser, value, bestError, bestError.parselet, bestError.errorCode, bestError.errorArgs);
          }
          if (lookahead)
-            parser.changeCurrentIndex(startIndex);
+            dctx.changeCurrentIndex(parser, startIndex);
          else
-            parser.changeCurrentIndex(lastMatchStart);
+            dctx.changeCurrentIndex(parser, lastMatchStart);
          return parseResult(parser, value, false);
       }
    }
+
 
    private int getSlotIndex(List<Parselet> matchingParselets, int i) {
       return matchingParselets instanceof MatchResult ? ((MatchResult) matchingParselets).slotIndexes.get(i) : i;
@@ -572,6 +650,8 @@ public class OrderedChoice extends NestedParselet  {
 
    /** Code copied alert!  This is a lot like parseRepeatingChoice but skipping and stopping on exitParselet. */
    public Object parseExtendedErrors(Parser parser, Parselet exitParselet) {
+      if (trace)
+         System.out.println("*** tracing extended errors for ordered choice");
       if (skipOnErrorParselet == null)
          return null;
 
@@ -579,7 +659,7 @@ public class OrderedChoice extends NestedParselet  {
       int lastMatchStart;
       ParentParseNode value = null;
       boolean matched;
-      ParseError bestError = null;
+      ParseError bestError;
       int bestErrorSlotIx = -1;
 
       boolean emptyMatch = false;
@@ -587,6 +667,9 @@ public class OrderedChoice extends NestedParselet  {
       do {
          matched = false;
          lastMatchStart = parser.currentIndex;
+
+         // Since we've parsed on from this point, need to clear out the last error
+         bestError = null;
 
          List<Parselet> matchingParselets = getMatchingParselets(parser);
 
@@ -650,6 +733,7 @@ public class OrderedChoice extends NestedParselet  {
                      errorRes = parser.parseNext(skipOnErrorParselet);
                      if (errorRes instanceof ParseError)
                         return value;
+
                   }
                }
 
@@ -711,7 +795,7 @@ public class OrderedChoice extends NestedParselet  {
 
    private Object reparsePartialErrorValue(Parser parser, ParseError bestError, int lastMatchStart, int childIndex, int bestErrorSlotIx, Object oldChildParseNode, DiffContext dctx) {
       ParentParseNode value = (ParentParseNode) newParseNode(lastMatchStart);
-      value.addForReparse(bestError.partialValue, bestError.parselet, childIndex, childIndex, bestErrorSlotIx, false, parser, oldChildParseNode, dctx);
+      value.addForReparse(bestError.partialValue, bestError.parselet, childIndex, childIndex, bestErrorSlotIx, false, parser, oldChildParseNode, dctx, false, true);
       return parsePartialError(parser, value, bestError, bestError.parselet, bestError.errorCode, bestError.errorArgs);
    }
 
@@ -1254,4 +1338,5 @@ public class OrderedChoice extends NestedParselet  {
       }
       return super.handlesProperty(selector);
    }
+
 }

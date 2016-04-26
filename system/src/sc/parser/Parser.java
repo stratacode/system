@@ -207,9 +207,11 @@ public class Parser implements IString {
    }
 
    public final int length() {
-      while (!eof)
-         growBuffer();
-
+      int ct = 0;
+      while (!eof) {
+         if (peekInputChar(ct++) == '\0')
+            break;
+      }
       return currentBufferPos + bufSize;
    }
 
@@ -237,6 +239,14 @@ public class Parser implements IString {
          if (language.debug) {
             for (int i = 0; i < currentErrors.size(); i++)
                System.out.println("Errors: " + i + ": " + currentErrors.get(i));
+         }
+         if (enablePartialValues && result != null) {
+            ParseError err = (ParseError) result;
+            if (err.partialValue != null && err.endIndex != length()) {
+               if (language.debug)
+                  System.out.println("Partial value did not consume all of file - wrapping error node to parent element!");
+
+            }
          }
          result = wrapErrors();
       }
@@ -586,7 +596,7 @@ public class Parser implements IString {
             int lastIx = currentErrors.size();
             if (lastIx != 0) {
                ParseError lastError = currentErrors.get(lastIx-1);
-               if (lastError.parselet == childParselet)
+               if (childParselet != null && childParselet.producesParselet(lastError.parselet))
                   currentErrors.set(lastIx-1, e);
                else
                   addError(e);

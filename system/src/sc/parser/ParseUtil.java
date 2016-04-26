@@ -703,7 +703,7 @@ public class ParseUtil  {
 
    public static void resetStartIndexes(ISemanticNode node) {
       IParseNode rootParseNode = node.getParseNode();
-      int endIx = rootParseNode.resetStartIndex(0);
+      int endIx = rootParseNode.resetStartIndex(0, false);
       //if (endIx != rootParseNode.length())
      //    System.out.println("*** End index does not match after resetStartIndex");
    }
@@ -914,28 +914,27 @@ public class ParseUtil  {
       ctx.startChangeOffset = 0;
 
       // Find the parse node which is the first one that does not match in the text.
-      pnode.findStartDiff(ctx);
+      pnode.findStartDiff(ctx, true);
+      Parselet plet = pnode.getParselet();
+      Language lang = plet.getLanguage();
 
       // Clear this out so it's not set for findEndDiff
       ctx.lastVisitedNode = null;
-      if (ctx.firstDiffNode == null) {
-         // Entire newText matches so no changes
-         if (oldLen == newLen && newLen == ctx.startChangeOffset)
-            return pnode;
-         else {
-            // TODO: text was added to the end or removed from the end - can we incrementally parse this case?
-            // Probably we should just reparse with no end node so we replace what comes after the start.
-            Parselet plet = pnode.getParselet();
-            return plet.getLanguage().parseString(null, newText, plet, false);
-         }
-      }
+      // Exact same contents - just return the originl
+      if (ctx.firstDiffNode == null && oldLen == newLen && newLen == ctx.startChangeOffset)
+         return pnode;
       else {
          // The offset at which changes start - the same in both old and new texts
          ctx.endChangeNewOffset = newText.length() - 1;
          ctx.endChangeOldOffset = pnode.length() - 1;
          pnode.findEndDiff(ctx);
 
-         Language lang = pnode.getParselet().getLanguage();
+         if (ctx.afterLastNode == null)
+            ctx.afterLastNode = ctx.lastDiffNode;
+
+         // Start out with these two the same.  endParseChangeNewOffset can be adjusted during the reparse to force us to
+         // parse more characters, even when we should be "sameAgain"
+         ctx.endParseChangeNewOffset = ctx.endChangeNewOffset;
 
          // Now we walk the parselet tree in a way similar to how we parsed it in the first place, but accepting
          // the pnode.  We'll update this existing pnode with changes so it looks the same as if we'd reparsed

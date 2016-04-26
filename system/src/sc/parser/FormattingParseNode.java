@@ -62,7 +62,7 @@ public abstract class FormattingParseNode extends AbstractParseNode {
    // that in the diff.  This will require that DiffContext maintain the history so we know
    // where we are in the parse tree.  Or we could just reparse the entire file on the first change
    // and only do the incremental stuff on the second change.
-   public void findStartDiff(DiffContext ctx) {
+   public void findStartDiff(DiffContext ctx, boolean atEnd) {
       throw new UnsupportedOperationException();
    }
 

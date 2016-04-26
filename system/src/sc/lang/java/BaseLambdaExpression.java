@@ -372,7 +372,7 @@ public abstract class BaseLambdaExpression extends Expression {
 
    public void validate() {
       if (inferredType == null)
-         displayError("Unrecognized use of lambda expression: ");
+         displayError("No inferredType for lambda expression: ");
       if (needsStart) {
          needsStart = false;
          super.start();

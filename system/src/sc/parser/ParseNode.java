@@ -276,11 +276,13 @@ public class ParseNode extends AbstractParseNode {
       return value;
    }
 
-   public int resetStartIndex(int ix) {
+   public int resetStartIndex(int ix, boolean validate) {
+      if (validate && startIndex != ix)
+         System.err.println("*** Invalid start index found");
       startIndex = ix;
       if (value != null) {
          if (value instanceof IParseNode) {
-            return ((IParseNode) value).resetStartIndex(ix);
+            return ((IParseNode) value).resetStartIndex(ix, validate);
          }
          else if (value instanceof CharSequence) {
             return startIndex + ((CharSequence) value).length();
@@ -301,9 +303,9 @@ public class ParseNode extends AbstractParseNode {
    }
 
    @Override
-   public void findStartDiff(DiffContext ctx) {
+   public void findStartDiff(DiffContext ctx, boolean atEnd) {
       if (value instanceof IParseNode) {
-         ((IParseNode) value).findStartDiff(ctx);
+         ((IParseNode) value).findStartDiff(ctx, atEnd);
          if (ctx.firstDiffNode != null)
             ctx.addChangedParent(this);
       }
@@ -311,13 +313,22 @@ public class ParseNode extends AbstractParseNode {
          CharSequence parsedText = (CharSequence) value;
          int plen = parsedText.length();
          String text = ctx.text;
+         int startChange = ctx.startChangeOffset;
+         int textLen = text.length();
          for (int i = 0; i < plen; i++) {
-            if (parsedText.charAt(i) != text.charAt(ctx.startChangeOffset)) {
+            if (startChange >= textLen || parsedText.charAt(i) != text.charAt(startChange)) {
                ctx.firstDiffNode = this;
+               ctx.beforeFirstNode = ctx.lastVisitedNode;
+               ctx.startChangeOffset = startChange;
                return;
             }
             else
-               ctx.startChangeOffset++;
+               startChange++;
+         }
+         ctx.startChangeOffset = startChange;
+         if (atEnd && textLen > startChange) {
+            ctx.firstDiffNode = this;
+            ctx.beforeFirstNode = ctx.firstDiffNode;
          }
       }
    }
@@ -332,7 +343,7 @@ public class ParseNode extends AbstractParseNode {
          int plen = parsedText.length();
          String text = ctx.text;
          for (int i = plen - 1; i >= 0; i--) {
-            if (parsedText.charAt(i) != text.charAt(ctx.endChangeOldOffset)) {
+            if (parsedText.charAt(i) != text.charAt(ctx.endChangeNewOffset)) {
                ctx.lastDiffNode = this;
                return;
             }
