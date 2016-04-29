@@ -86,6 +86,8 @@ public class ErrorParseNode extends AbstractParseNode {
       for (int i = len - 1; i >= 0; i--) {
          if (errorText.charAt(i) != text.charAt(ctx.endChangeNewOffset)) {
             ctx.lastDiffNode = this;
+            ctx.afterLastNode = ctx.lastVisitedNode;
+            ctx.addSameAgainChildren(ctx.lastVisitedNode);
             return;
          }
          else {

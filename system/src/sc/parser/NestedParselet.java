@@ -1389,7 +1389,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       if (trace && parser.enablePartialValues)
          System.out.println("*** setting semantic value of traced element");
 
-      boolean hasValue = true;
+      boolean hasValue = !skipSemanticValue;
 
       if (!skipSemanticValue && !parser.matchOnly) {
          if (resultClass != null && !getSkip()) {
@@ -1520,6 +1520,9 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                         else
                            snl.set(childIndex, sv, true, false);
                      }
+                     // sv == null has no value so don't increment the svcount
+                     else
+                        hasValue = false;
                   }
                   else if (node != null) {
                      SemanticNodeList snl;
@@ -1888,7 +1891,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                // We are adding a nested child which is marked as being skipped.  At this
                // point we add its children directly to the parentNode node - we'll throw away
                // this temporary parentNode node.  At this point, the value is the semantic value
-               parent.add(c, this, index, false, parser);
+               parent.add(c, this, -1, index, false, parser);
             }
             return false; // Do not add to the parentNode node
          }

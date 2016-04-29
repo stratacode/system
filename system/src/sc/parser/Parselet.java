@@ -249,7 +249,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       if (getSkip()) {
          AbstractParseNode pn = (AbstractParseNode) node;
          if (pn.canSkip()) {
-            parent.add(pn.getSkippedValue(), this, index, true, parser);
+            parent.add(pn.getSkippedValue(), this, -1, index, true, parser);
             return false;
          }
       }
@@ -511,8 +511,10 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
    public abstract Object parse(Parser p);
 
    protected boolean anyReparseChanges(Parser parser, Object oldParseNode, DiffContext dctx, boolean forceReparse) {
+      dctx.updateStateForPosition(parser.currentIndex);
+
       // We are about to parse the parselet for
-      if (dctx.changedRegion && !dctx.sameAgain && dctx.afterLastNode != null && dctx.afterLastNode == oldParseNode) {
+      if (/*dctx.changedRegion && */ !dctx.sameAgain && dctx.isAfterLastNode(oldParseNode)) {
          checkForSameAgainRegion(parser, oldParseNode, dctx, true, forceReparse);
       }
       // Still need to possibly clear the changed region before we reparse the next round
@@ -523,6 +525,11 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
          if (oldParseNode == dctx.firstDiffNode || oldParseNode == dctx.beforeFirstNode) {
             dctx.setChangedRegion(parser, true);
          }
+         /* Breaks re22, 415
+         if (!dctx.changedRegion && parser.currentIndex >= dctx.startChangeOffset) {
+            dctx.setChangedRegion(parser, true);
+         }
+         */
       }
       /* This is some logic we had to validate that the start index in the old parse node matches and force a reparse when it does not.
        * instead we should be setting the endNewOffset when we see we are not parsing the same thing at the same location so changedRegion is
@@ -536,15 +543,20 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
          }
       }
       */
-      return dctx.changedRegion || forceReparse;
+      boolean anyChanges = dctx.changedRegion || forceReparse;
+      if (!anyChanges && parser.currentIndex >= dctx.newLen)
+         return true;
+      return anyChanges;
    }
 
    protected void checkForSameAgainRegion(Parser parser, Object oldParseNode, DiffContext dctx, boolean beforeMatch, boolean forceReparse) {
       // When do we restore the reparse mode so it's looking at the oldParseNode again to find cached values?
       // If we find the "afterLastNode" or in some cases we have cleared out oldParseNode - so in those situations, when we've parsed
       // beyond the "changeNewOffset" we set this to true.
-      if (dctx.changedRegion && !dctx.sameAgain && dctx.afterLastNode == oldParseNode && dctx.afterLastNode != null) {
-         if (!beforeMatch || (oldParseNode instanceof IParseNode && ((IParseNode) oldParseNode).getStartIndex() + dctx.getDiffOffset() == parser.currentIndex)) {
+      if (/*dctx.changedRegion && */ !dctx.sameAgain && dctx.isAfterLastNode(oldParseNode)) {
+         if (!beforeMatch ||
+             (oldParseNode instanceof IParseNode && ((IParseNode) oldParseNode).getStartIndex() + dctx.getDiffOffset() == parser.currentIndex &&
+              parser.currentIndex > dctx.endParseChangeNewOffset)) {
             dctx.setSameAgain(parser, true);
          }
       }
@@ -556,7 +568,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       // If we've already passed the last node in the set of nodes that have changed, but have not yet passed
       // the end of the changed region, we might parse things differently so do not mark changedRegion false until
       // the first
-      if (dctx.sameAgain && dctx.changedRegion && parser.currentIndex >= dctx.endParseChangeNewOffset) {
+      if (dctx.sameAgain && dctx.changedRegion && parser.currentIndex > dctx.endParseChangeNewOffset) {
          boolean clearChangedFlag = !forceReparse;
          // If we are about to reparse a parse-node
          if (!clearChangedFlag && beforeMatch) {
@@ -566,8 +578,11 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
                   clearChangedFlag = true;
             }
          }
-         if (clearChangedFlag && parser.currentIndex == dctx.endParseChangeNewOffset)
-            clearChangedFlag = false;
+         if (clearChangedFlag && parser.currentIndex == dctx.endParseChangeNewOffset) {
+            // In re14/UnitConverter6.sc we hit the case where endParseChangeNewOffset represents the first "sameAgain" character which was part of the part we wanted to reuse
+            System.out.println("*** Warning - some tests need this test to work!");
+            //clearChangedFlag = false;
+         }
          if (clearChangedFlag)
             dctx.setChangedRegion(parser, false);
       }
@@ -615,6 +630,10 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
     * @return null if we cannot extend our value.  In this case, the parent parselet just uses the value it already has for this match.
     */
    public Object parseExtendedErrors(Parser p, Parselet exitParselet) {
+      return null;
+   }
+
+   public Object reparseExtendedErrors(Parser p, Parselet exitParselet, Object oldChildNode, DiffContext dctx, boolean forceReparse) {
       return null;
    }
 

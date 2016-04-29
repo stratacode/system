@@ -60,15 +60,17 @@ public class ParentParseNode extends AbstractParseNode {
                                  boolean removeExtraNodes, boolean parseArray) {
       // If there's no old value or we are inserting off the end, we must be inserting a new value
       if (children == null || childIndex >= children.size())
-         return add(node, p, slotIndex, skipSemanticValue, parser);
+         return add(node, p, svIndex, slotIndex, skipSemanticValue, parser);
       else {
          boolean insert = false;
          if (node != oldChildParseNode) {
             Object oldNode = children.get(childIndex);
             if (parseArray && oldNode instanceof IParseNode) {
                IParseNode oldPN = (IParseNode) oldNode;
-               // If the old parse-node in the matching slot fits in nicely after this one, just insert it rather than replacing it
-               if (oldPN.getStartIndex() + dctx.getNewOffset() == parser.currentIndex) {
+               int startIx = oldPN.getStartIndex();
+               // If the old parse-node in the matching slot fits in nicely after this one, just insert it rather than replacing it.  SameAgain may not be true here even after we've passed
+               // the
+               if (oldPN.getStartIndex() + dctx.getNewOffsetForPos(startIx) == parser.currentIndex) {
                   insert = true;
                }
             }
@@ -134,7 +136,13 @@ public class ParentParseNode extends AbstractParseNode {
       }
    }
 
-   public boolean add(Object node, Parselet p, int index, boolean skipSemanticValue, Parser parser) {
+   /**
+    * Adds a child parse node to this parent node for the given child parselet.  The svIndex can be used for multi-valued
+    * parselets to add the semantic-value to a specific array index for reparsing.  Usually it's -1 for appending the element.
+    * The index specifies the slot index of the parselet 'p' in the parent.  If skipSemanticValue is true, the parse node is
+    * added without updating the semantic value.
+    */
+   public boolean add(Object node, Parselet p, int svIndex, int index, boolean skipSemanticValue, Parser parser) {
       if (children == null)
          children = new ArrayList<Object>(parselet.parselets.size());
 
@@ -183,7 +191,7 @@ public class ParentParseNode extends AbstractParseNode {
          children.add(node);
 
       // Only nested parselets should be using the ParentParseNode
-      return parselet.setSemanticValue(this, node, -1, index, skipSemanticValue, parser, false, false);
+      return parselet.setSemanticValue(this, node, svIndex, index, skipSemanticValue, parser, false, false);
    }
 
    public void set(Object node, Parselet p, int index, boolean skipSemanticValue, Parser parser) {
@@ -1053,6 +1061,7 @@ public class ParentParseNode extends AbstractParseNode {
                      ctx.lastDiffNode = this;
                      // TODO: if c != 0 or c != len - 1 can we optimize this and choose this node instead of the "afterLast' node
                      ctx.afterLastNode = ctx.lastVisitedNode;
+                     ctx.addSameAgainChildren(ctx.afterLastNode);
                      break;
                   }
                   else {
@@ -1065,6 +1074,7 @@ public class ParentParseNode extends AbstractParseNode {
       }
       ctx.lastVisitedNode = this;
    }
+
 }
 
 

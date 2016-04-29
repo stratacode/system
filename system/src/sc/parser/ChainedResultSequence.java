@@ -48,7 +48,7 @@ public class ChainedResultSequence extends Sequence {
    public boolean addResultToParent(Object node, ParentParseNode parent, int index, Parser parser) {
       ParentParseNode pnode = (ParentParseNode) node;
       if (pnode.children.get(1) == null) {
-         parent.add(pnode.children.get(0), this, index, false, parser);
+         parent.add(pnode.children.get(0), this, -1, index, false, parser);
 
          return false;
       }
@@ -313,15 +313,15 @@ public class ChainedResultSequence extends Sequence {
       return parselets.get(1).dataTypeMatches(other);
    }
 
-   protected Object getReparseChildNode(Object oldParseNode, int ix) {
+   protected Object getReparseChildNode(Object oldParseNode, int ix, boolean forceReparse) {
       if (oldParseNode instanceof ParentParseNode) {
          ParentParseNode pp = (ParentParseNode) oldParseNode;
          // This parselet produced the result - so it was the match
          if (pp.getParselet() == this)
-            return super.getReparseChildNode(oldParseNode, ix);
+            return super.getReparseChildNode(oldParseNode, ix, forceReparse);
       }
       // This parse noded matched the "chained result" the first slot but not the second.  Skip the second one altogether.
       // propagate the value to the first slot
-      return ix == 0 ? oldParseNode : SKIP_CHILD;
+      return ix == 0 || forceReparse ? oldParseNode : SKIP_CHILD;
    }
 }

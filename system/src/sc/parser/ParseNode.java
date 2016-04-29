@@ -345,6 +345,8 @@ public class ParseNode extends AbstractParseNode {
          for (int i = plen - 1; i >= 0; i--) {
             if (parsedText.charAt(i) != text.charAt(ctx.endChangeNewOffset)) {
                ctx.lastDiffNode = this;
+               ctx.afterLastNode = ctx.lastVisitedNode;
+               ctx.addSameAgainChildren(ctx.lastVisitedNode);
                return;
             }
             else {

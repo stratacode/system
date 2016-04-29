@@ -178,7 +178,7 @@ public class Sequence extends NestedParselet  {
                               else
                                  errVal = value.deepCopy();
                            }
-                           errVal.add(pv, childParselet, i, false, parser);
+                           errVal.add(pv, childParselet, -1, i, false, parser);
                         }
                         else
                            errVal = value;
@@ -195,10 +195,10 @@ public class Sequence extends NestedParselet  {
                         // else.
                         if (value == null)
                            value = (ParentParseNode) newParseNode(startIndex);
-                        value.add(pv, childParselet, i, false, parser);
+                        value.add(pv, childParselet, -1, i, false, parser);
                         // Add these null slots so that we do all of the node processing
                         for (int k = i+1; k < numParselets; k++)
-                           value.add(null, parselets.get(k), k, false, parser);
+                           value.add(null, parselets.get(k), -1, k, false, parser);
 
                         // Now see if this computed value extends any of our most specific errors.  If so, this error
                         // can be used to itself extend other errors based on the EOF parsing.
@@ -235,9 +235,9 @@ public class Sequence extends NestedParselet  {
             value = (ParentParseNode) newParseNode(startIndex);
 
          if (!childParselet.getLookahead())
-            value.add(nestedValue, childParselet, i, false, parser);
+            value.add(nestedValue, childParselet, -1, i, false, parser);
          else if (slotMapping != null) // Need to preserve the specific index in the results if we have a mapping
-            value.add(null, childParselet, i, true, parser);
+            value.add(null, childParselet, -1, i, true, parser);
 
          if (nestedValue != null || childParselet.isNullValid())
             anyContent = minContentSlot <= i;
@@ -310,6 +310,7 @@ public class Sequence extends NestedParselet  {
 
       int startIndex = parser.currentIndex;
       ParentParseNode value = null;
+      Object[] savedOrigChildren = null;
 
       boolean anyContent = false;
 
@@ -320,25 +321,14 @@ public class Sequence extends NestedParselet  {
          Parselet childParselet = parselets.get(i);
          boolean nextChildReparse = false;
 
-         Object oldChildParseNode = getReparseChildNode(oldParseNode, i);
+         Object oldChildParseNode = getReparseChildNode(oldParseNode, i, forceReparse);
 
          if (oldChildParseNode == SKIP_CHILD) {
-            value.addForReparse(null, childParselet, newChildCount, newChildCount++, i, false, parser, null, dctx, true, false);
+            value.addForReparse(null, childParselet, newChildCount, newChildCount++, i, false, parser, null, dctx, false, false);
             continue;
          }
 
-         if (oldChildParseNode instanceof IParseNode) {
-            IParseNode oldChildPN = (IParseNode) oldChildParseNode;
-            if (!childParselet.producesParselet(oldChildPN.getParselet())) {
-               //oldChildParseNode = null;
-               nextChildReparse = true;
-            }
-            // We might be in the same again region for the new text but still in the changed region for the old text so do not include those children
-            else if (dctx.sameAgain && oldChildPN.getStartIndex() < dctx.endChangeOldOffset) {
-               //oldChildParseNode = null;
-               nextChildReparse = true;
-            }
-         }
+         nextChildReparse = !oldChildMatches(oldChildParseNode, childParselet, dctx);
 
          Object nestedValue = parser.reparseNext(childParselet, oldChildParseNode, dctx, forceReparse || nextChildReparse);
          if (nestedValue instanceof ParseError) {
@@ -382,13 +372,17 @@ public class Sequence extends NestedParselet  {
                   int prevIx = i - 1;
                   Parselet prevParselet = parselets.get(prevIx);
                   Object oldValue = value.children.get(prevIx);
+                  Object origOldChild = value == origOldParseNode ? oldValue : null;
+                  if (savedOrigChildren != null) {
+                     origOldChild = savedOrigChildren[prevIx];
+                  }
+                  boolean prevChildReparse = !oldChildMatches(origOldChild, prevParselet, dctx);
                   int saveIndex = parser.currentIndex;
                   Object ctxState = null;
                   if (oldValue instanceof IParseNode) {
                      ctxState = parser.resetCurrentIndex(((IParseNode) oldValue).getStartIndex());
                   }
-                  // TODO: should call a new reparseExtendedErrors for optimal efficiency
-                  Object newPrevValue = prevParselet.parseExtendedErrors(parser, childParselet);
+                  Object newPrevValue = prevParselet.reparseExtendedErrors(parser, childParselet, origOldChild, dctx, forceReparse || prevChildReparse);
                   if (newPrevValue != null && !(newPrevValue instanceof ParseError)) {
                      value.set(newPrevValue, childParselet, prevIx, false, parser);
 
@@ -406,7 +400,7 @@ public class Sequence extends NestedParselet  {
                   // the immediate one afterwards is optional.  To handle this we can take the list of parselets following in the sequence
                   // and pass them all then peek them as a list.
                   if (!exitParselet.optional) {
-                     Object extendedValue = childParselet.parseExtendedErrors(parser, exitParselet);
+                     Object extendedValue = childParselet.reparseExtendedErrors(parser, exitParselet, oldChildParseNode, dctx, forceReparse || nextChildReparse);
                      if (extendedValue != null) {
                         nestedValue = extendedValue;
                         err = nestedValue instanceof ParseError ? (ParseError) nestedValue : null;
@@ -444,7 +438,7 @@ public class Sequence extends NestedParselet  {
                               else
                                  errVal = value.deepCopy();
                            }
-                           errVal.addForReparse(pv, childParselet, newChildCount, newChildCount++, i, false, parser, oldChildParseNode, dctx, true, false);
+                           errVal.addForReparse(pv, childParselet, newChildCount, newChildCount++, i, false, parser, oldChildParseNode, dctx, false, false);
                         }
                         else
                            errVal = value;
@@ -461,7 +455,7 @@ public class Sequence extends NestedParselet  {
                         // else.
                         if (value == null)
                            value = resetOldParseNode(nextChildReparse || forceReparse ? null : oldParseNode, startIndex, true);
-                        value.addForReparse(pv, childParselet, newChildCount, newChildCount++, i, false, parser, oldChildParseNode, dctx, true, false);
+                        value.addForReparse(pv, childParselet, newChildCount, newChildCount++, i, false, parser, oldChildParseNode, dctx, false, false);
                         // Add these null slots so that we do all of the node processing
                         for (int k = i+1; k < numParselets; k++)
                            value.addForReparse(null, parselets.get(k), newChildCount, newChildCount++, k, false, parser, oldChildParseNode, dctx, true, false);
@@ -505,10 +499,15 @@ public class Sequence extends NestedParselet  {
             value = resetOldParseNode(nextChildReparse || forceReparse ? null : oldParseNode, startIndex, true);
          }
 
-         if (!childParselet.getLookahead())
-            value.addForReparse(nestedValue, childParselet, newChildCount, newChildCount++, i, false, parser, oldChildParseNode, dctx, true, false);
+         if (!childParselet.getLookahead()) {
+            // When we get an error parsing this sequence, if we've changed the children array we need to make a backup copy so we can pull out the original old parse-nodes
+            if (savedOrigChildren == null && value == origOldParseNode && value.children != null && newChildCount < value.children.size() && value.children.get(newChildCount) != nestedValue) {
+               savedOrigChildren = value.children.toArray();
+            }
+            value.addForReparse(nestedValue, childParselet, newChildCount, newChildCount++, i, false, parser, oldChildParseNode, dctx, false, false);
+         }
          else if (slotMapping != null) // Need to preserve the specific index in the results if we have a mapping
-            value.addForReparse(null, childParselet, newChildCount, newChildCount++, i, true, parser, oldChildParseNode, dctx, true, false);
+            value.addForReparse(null, childParselet, newChildCount, newChildCount++, i, true, parser, oldChildParseNode, dctx, false, false);
 
          if (nestedValue != null || childParselet.isNullValid())
             anyContent = minContentSlot <= i;
@@ -540,9 +539,26 @@ public class Sequence extends NestedParselet  {
          return null;
    }
 
+   private boolean oldChildMatches(Object oldChildParseNode, Parselet childParselet, DiffContext dctx) {
+      boolean matches = true;
+      if (oldChildParseNode instanceof IParseNode) {
+         IParseNode oldChildPN = (IParseNode) oldChildParseNode;
+         if (!childParselet.producesParselet(oldChildPN.getParselet())) {
+            //oldChildParseNode = null;
+            matches = false;
+         }
+         // We might be in the same again region for the new text but still in the changed region for the old text so do not include those children
+         else if (dctx.sameAgain && oldChildPN.getStartIndex() < dctx.endChangeOldOffset) {
+            //oldChildParseNode = null;
+            matches = false;
+         }
+      }
+      return matches;
+   }
+
    protected static final String SKIP_CHILD = "SkipChildParseletSentinel";
 
-   protected Object getReparseChildNode(Object oldParent, int ix) {
+   protected Object getReparseChildNode(Object oldParent, int ix, boolean forceReparse) {
       if (oldParent == null)
          return null;
       if (oldParent instanceof ParseNode) {
@@ -747,7 +763,7 @@ public class Sequence extends NestedParselet  {
                   for (i = 0; i < numMatchedValues; i++) {
                      Object nv = matchedValues.get(i);
                      //if (nv != null) // need an option to preserve nulls?
-                     value.add(nv, parselets.get(i), i, false, parser);
+                     value.add(nv, parselets.get(i), -1, i, false, parser);
                   }
                }
                matched = true;
@@ -777,7 +793,7 @@ public class Sequence extends NestedParselet  {
 
                   if (value == null)
                      value = (ParentParseNode) newParseNode(lastMatchIndex);
-                  value.add(new ErrorParseNode(new ParseError(skipOnErrorParselet, "Expected {0}", new Object[]{this}, errorStart, parser.currentIndex), errorRes.toString()), skipOnErrorParselet, -1, true, parser);
+                  value.add(new ErrorParseNode(new ParseError(skipOnErrorParselet, "Expected {0}", new Object[]{this}, errorStart, parser.currentIndex), errorRes.toString()), skipOnErrorParselet, -1, -1, true, parser);
                   extendedErrorMatches = true;
                   matched = true;
                }
@@ -877,7 +893,12 @@ public class Sequence extends NestedParselet  {
       ArrayList<Object> errorValues = null;
       Object oldChildParseNode = null;
 
-      ParentParseNode oldParent = (ParentParseNode) oldParseNode;
+      ParentParseNode oldParent = oldParseNode instanceof ParentParseNode ? (ParentParseNode) oldParseNode : null;
+      // This parent is not for our parselet
+      if (oldParent != null && !producesParselet(oldParent.parselet)) {
+         oldParent = null;
+         forceReparse = true;
+      }
 
       boolean anyContent;
       boolean extendedErrorMatches = false;
@@ -1091,6 +1112,12 @@ public class Sequence extends NestedParselet  {
       return parseRepeatingSequence(parser, true, exitParselet);
    }
 
+   public Object reparseExtendedErrors(Parser parser, Parselet exitParselet, Object oldChildNode, DiffContext dctx, boolean forceReparse) {
+      if (skipOnErrorParselet == null)
+         return null;
+      return reparseRepeatingSequence(parser, true, exitParselet, oldChildNode, dctx, forceReparse);
+   }
+
    ParentParseNode newRepeatSequenceResult(ArrayList<Object> matchedValues, ParentParseNode value,
                                            int lastMatchIndex, Parser parser) {
       if (matchedValues != null) {
@@ -1100,7 +1127,7 @@ public class Sequence extends NestedParselet  {
          int numParselets = parselets.size();
          for (int i = 0; i < numParselets; i++) {
             Object nv = i < numMatchedValues ?  matchedValues.get(i) : null;
-            value.add(nv, parselets.get(i), i, false, parser);
+            value.add(nv, parselets.get(i), -1, i, false, parser);
          }
       }
       return value;
@@ -1109,8 +1136,9 @@ public class Sequence extends NestedParselet  {
    ParentParseNode newRepeatSequenceResultReparse(ArrayList<Object> matchedValues, ParentParseNode value,
                                                   int svCount, int newChildCount, int lastMatchIndex, Parser parser, ParentParseNode oldParent, DiffContext dctx) {
       if (matchedValues != null) {
-         if (value == null)
-            value = oldParent == null ? (ParentParseNode) newParseNode(lastMatchIndex) : oldParent;
+         if (value == null) {
+            value = resetOldParseNode(oldParent, lastMatchIndex, false);
+         }
          int numMatchedValues = matchedValues.size();
          int numParselets = parselets.size();
          for (int i = 0; i < numParselets; i++) {

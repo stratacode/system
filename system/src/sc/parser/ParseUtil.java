@@ -911,6 +911,7 @@ public class ParseUtil  {
       // easier for the 90+% case).
       DiffContext ctx = new DiffContext();
       ctx.text = newText;
+      ctx.newLen = newLen;
       ctx.startChangeOffset = 0;
 
       // Find the parse node which is the first one that does not match in the text.
@@ -925,9 +926,15 @@ public class ParseUtil  {
          return pnode;
       else {
          // The offset at which changes start - the same in both old and new texts
-         ctx.endChangeNewOffset = newText.length() - 1;
-         ctx.endChangeOldOffset = pnode.length() - 1;
+         ctx.endChangeNewOffset = newLen - 1;
+         ctx.endChangeOldOffset = oldLen - 1;
          pnode.findEndDiff(ctx);
+
+         // If we are still on the last character, it's really that there's no overlap so advance past the last char
+         if (ctx.endChangeNewOffset == newLen - 1)
+            ctx.endChangeNewOffset = newLen;
+         if (ctx.endChangeOldOffset == oldLen - 1)
+            ctx.endChangeOldOffset = oldLen;
 
          if (ctx.afterLastNode == null)
             ctx.afterLastNode = ctx.lastDiffNode;
