@@ -511,7 +511,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
    public abstract Object parse(Parser p);
 
    protected boolean anyReparseChanges(Parser parser, Object oldParseNode, DiffContext dctx, boolean forceReparse) {
-      dctx.updateStateForPosition(parser.currentIndex);
+      //dctx.updateStateForPosition(parser.currentIndex);
 
       // We are about to parse the parselet for
       if (/*dctx.changedRegion && */ !dctx.sameAgain && dctx.isAfterLastNode(oldParseNode)) {
