@@ -67,10 +67,10 @@ public class ParentParseNode extends AbstractParseNode {
             Object oldNode = children.get(childIndex);
             if (parseArray && oldNode instanceof IParseNode) {
                IParseNode oldPN = (IParseNode) oldNode;
-               int startIx = oldPN.getStartIndex();
+               int startIx = oldPN.getOrigStartIndex();
                // If the old parse-node in the matching slot fits in nicely after this one, just insert it rather than replacing it.  SameAgain may not be true here even after we've passed
                // the
-               if (oldPN.getStartIndex() + dctx.getNewOffsetForPos(startIx) == parser.currentIndex) {
+               if (startIx + dctx.getNewOffsetForOldPos(startIx) == parser.currentIndex) {
                   insert = true;
                }
             }
@@ -103,7 +103,7 @@ public class ParentParseNode extends AbstractParseNode {
             IParseNode oldPN = (IParseNode) oldChild;
             int oldChildLen = oldPN.length();
 
-            int oldStart = oldPN.getStartIndex() + dctx.getNewOffset();
+            int oldStart = oldPN.getOrigStartIndex() + dctx.getNewOffset();
             if (oldStart + oldChildLen  <= parser.currentIndex) {
                // This parse-node is from sameAgain region which we have not yet reached so don't remove it
                if (!dctx.sameAgain && oldStart > dctx.endChangeOldOffset) {
@@ -152,14 +152,19 @@ public class ParentParseNode extends AbstractParseNode {
       // we'll just accumulate one string as our value.  When this guy gets 
       // added to its parentNode, it will get removed and the string goes on to represent
       // all of this element's children.
-      if (node instanceof StringToken) {
-         if (p.getDiscard() || p.getLookahead())
-            return false;
+      if (node instanceof StringToken || node == null) {
+         if (p.getDiscard() || p.getLookahead()) {
+            if (node != null)
+               return false;
+            // TODO: else - is this the right code path here?
+         }
          if (p.skip && !(parselet.needsChildren())) {
             if (children.size() == 1) {
                Object child = children.get(0);
                if (child instanceof StringToken) {
-                  children.set(0, StringToken.concatTokens((StringToken)child, (StringToken)node));
+                  // For null nodes, be careful not to add an empty slot here cause then the next string won't get appended
+                  if (node != null)
+                     children.set(0, StringToken.concatTokens((StringToken)child, (StringToken)node));
                   addChild = false;
                }
             }
@@ -763,6 +768,21 @@ public class ParentParseNode extends AbstractParseNode {
       return res;
    }
 
+   public ParentParseNode shallowCopy() {
+      ParentParseNode res = (ParentParseNode) super.clone();
+      ArrayList<Object> newChildren;
+      if (children != null) {
+         res.children = newChildren = new ArrayList<Object>(children.size());
+         for (Object child:children) {
+            if (child instanceof IParseNode)
+               newChildren.add(child);
+            else
+               newChildren.add(child);
+         }
+      }
+      return res;
+   }
+
    public void updateSemanticValue(IdentityHashMap<Object, Object> oldNewMap) {
       if (value != null && value instanceof ISemanticNode) {
          ISemanticNode oldVal = (ISemanticNode) value;
@@ -913,9 +933,10 @@ public class ParentParseNode extends AbstractParseNode {
    }
 
    public int resetStartIndex(int ix, boolean validate) {
-      if (validate && ix != startIndex)
+      if (validate && ix != getStartIndex())
          System.out.println("*** Invalid start index found");
       startIndex = ix;
+      newStartIndex = -1;
 
       if (children != null) {
          int sz = children.size();
@@ -947,6 +968,29 @@ public class ParentParseNode extends AbstractParseNode {
       return lastIx == ix;
    }
 
+   // Returns the index of the last parse-node which should be considering at the ending spot if there's an error
+   // after this parse node.  If we return the children.size() it means there are no error parse nodes here.
+   public int getEndingErrorIx() {
+      if (children == null)
+         return 0;
+
+      int sz = children.size();
+      boolean foundError = false;
+      int i;
+      for (i = sz - 1; i >= 0; i--) {
+         Object child = children.get(i);
+         if (child != null) {
+            if (child instanceof ErrorParseNode) {
+               foundError = true;
+            }
+            else {
+               break;
+            }
+         }
+      }
+      return foundError ? i : sz;
+   }
+
    public boolean isFirstChild(int ix) {
       if (children == null)
          return true;
@@ -971,10 +1015,16 @@ public class ParentParseNode extends AbstractParseNode {
          return;
       }
       int sz = children.size();
+      // If our parented ended with an ErrorParseNode then there's an error after this parse-node.
+      // We also may have an ErrorParseNode here at the end.  This is an indication of an incomplete parse
+      // and so a signal for us to set the beforeFirstNode in front of the error so we do not accept it as
+      // a complete parse when the extra text is added.
+      int endingErrorIx = getEndingErrorIx();
       for (int i = 0; i < sz; i++) {
          Object child = children.get(i);
          if (child != null) {
-            boolean last = atEnd && isLastChild(i);
+            boolean lastChild = isLastChild(i);
+            boolean last = atEnd && lastChild;
             if (child instanceof IParseNode) {
                IParseNode childNode = (IParseNode) child;
                childNode.findStartDiff(ctx, last);
@@ -982,7 +1032,12 @@ public class ParentParseNode extends AbstractParseNode {
                   ctx.addChangedParent(this);
                   return;
                }
-               ctx.lastVisitedNode = childNode;
+               // ARG - this doesn't work because we don't have a way to tease apart the boundary at the edge.  In some cases we want to include
+               // an entire parent parse-node with it's children
+               //if (!last || !endsWithError)
+               if (i == 0 || !(childNode instanceof ErrorParseNode))
+                  ctx.lastVisitedNode = childNode;
+               // else - this node ends with an error so don't mark it as visited
             }
             else if (child instanceof CharSequence) {
                CharSequence childSeq = (CharSequence) child;
@@ -1074,8 +1129,5 @@ public class ParentParseNode extends AbstractParseNode {
       }
       ctx.lastVisitedNode = this;
    }
-
 }
-
-
 

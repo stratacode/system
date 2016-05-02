@@ -62,6 +62,9 @@ public abstract class Language extends LayerFileComponent {
 
    public boolean debugReparse = false;
 
+   public int globalParseCt = 0;
+   public int globalReparseCt = 0;
+
    public boolean initialized = false;
 
    /** The generation scheme works in two modes: when trackTranges=true, each property change automatically updates the generated result.  When it is false, we invalidate changed nodes and only revalidate them as needed.  tracking changes is better for debugging but a little slower */
@@ -200,11 +203,14 @@ public abstract class Language extends LayerFileComponent {
          Object parseTree = p.parseStart(start);
          if (parseTree instanceof IParseNode) {
             if (!p.atEOF()) {
+               parseTree = wrapPartialParseNode(parseTree, p);
                if (enablePartialValues) {
                   IParseNode parseNode = (IParseNode) parseTree;
                   postProcessResult(parseTree, fileName);
-                  if (debugReparse)
-                     System.out.println("*** Encountered EOF from start parselet: " + parseNode.length() + " out of: " + p.length() + " characters parsed");
+                  if (debugReparse) {
+                     System.out.println("*** EOF - parsed: " + parseNode.length() + " out of: " + p.length() + " characters");
+                     globalParseCt += p.totalParseCt;
+                  }
                   return p.parseError(start, parseTree, null, "Invalid text at end of file", 0, p.length());
                }
                else {
@@ -213,9 +219,15 @@ public abstract class Language extends LayerFileComponent {
                }
             }
          }
+         else if (parseTree instanceof ParseError) {
+            if (!p.atEOF()) {
+               wrapPartialValues((ParseError) parseTree, p);
+            }
+         }
 
-         if (debugReparse)
-            System.out.println("*** Total node check count: " + p.totalParseCt);
+         if (debugReparse) {
+            globalParseCt += p.totalParseCt;
+         }
 
          postProcessResult(parseTree, fileName);
          return parseTree;
@@ -230,6 +242,27 @@ public abstract class Language extends LayerFileComponent {
       }
    }
 
+   private void wrapPartialValues(ParseError err, Parser parser) {
+      if (err.isMultiError()) {
+         Object[] args = err.errorArgs;
+         for (Object argObj : args) {
+            ParseError subErr = (ParseError) argObj;
+            wrapPartialValues(subErr, parser);
+         }
+      }
+      else if (err.partialValue instanceof ParentParseNode) {
+         err.partialValue = wrapPartialParseNode(err.partialValue, parser);
+      }
+   }
+
+   private Object wrapPartialParseNode(Object parseTree, Parser parser) {
+      if (parseTree instanceof ParentParseNode) {
+         ParentParseNode parseNode = (ParentParseNode) parseTree;
+         parseTree = PartialValueParseNode.copyFrom(parseNode, parser.length() - parseNode.length());
+      }
+      return parseTree;
+   }
+
    public Object reparse(IParseNode pnode, DiffContext dctx, String newText, boolean enablePartialValues) {
       Parselet start = pnode.getParselet();
 
@@ -237,7 +270,15 @@ public abstract class Language extends LayerFileComponent {
       parser.enablePartialValues = enablePartialValues;
       Object parseTree = parser.reparseStart(start, pnode, dctx);
 
+      if (!parser.atEOF()) {
+         if (parseTree instanceof ParentParseNode)
+            parseTree = wrapPartialParseNode(parseTree, parser);
+         else if (parseTree instanceof ParseError)
+            wrapPartialValues((ParseError) parseTree, parser);
+      }
+
       if (debugReparse) {
+         /*
          if (parseTree instanceof IParseNode) {
             String newTextReparsed = parseTree.toString();
             if (!newTextReparsed.equals(newText)) {
@@ -249,9 +290,11 @@ public abstract class Language extends LayerFileComponent {
                   System.out.println("Partial reparse of: " + parser.reparseCt + " nodes, skipped: " + parser.reparseSkippedCt + " total: " + parser.totalParseCt + " " + newTextReparsed.length() + " out of: " + newText.length() + " chars parsed");
             }
             else {
-               System.out.println("Reparsed: " + parser.reparseCt + " nodes, skipped: " + parser.reparseSkippedCt + " total: " + parser.totalParseCt);
+               //System.out.println("Reparsed: " + parser.reparseCt + " nodes, skipped: " + parser.reparseSkippedCt + " total: " + parser.totalParseCt);
             }
          }
+         */
+         globalReparseCt += parser.reparseCt;
       }
 
       return parseTree;

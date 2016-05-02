@@ -10,6 +10,8 @@ import java.util.List;
 
 public abstract class AbstractParseNode implements IParseNode, Cloneable {
    int startIndex = -1;
+   /** Set during the reparse process as a node is moved from the old to the new tree.  TODO: we could eliminate this perhaps by copying the parse-node tree? */
+   int newStartIndex = -1;
 
    public void setParselet(Parselet p) {}
 
@@ -22,6 +24,12 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
    }
 
    public int getStartIndex() {
+      if (newStartIndex != -1)
+         return newStartIndex;
+      return startIndex;
+   }
+
+   public int getOrigStartIndex() {
       return startIndex;
    }
 
@@ -168,9 +176,10 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
    }
 
    public int resetStartIndex(int ix, boolean validate) {
-      if (validate && ix != startIndex)
+      if (validate && ix != getStartIndex())
          System.err.println("Invalid start index found");
       startIndex = ix;
+      newStartIndex = -1;
       return ix + length();
    }
 

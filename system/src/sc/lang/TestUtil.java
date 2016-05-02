@@ -17,6 +17,7 @@ import sc.util.StringUtil;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.StringReader;
+import java.text.DecimalFormat;
 import java.util.*;
 
 public class TestUtil {
@@ -390,6 +391,8 @@ public class TestUtil {
 
       // When we find two objects are not equal, this prints debug messages to help track down what's not the same.
       SemanticNode.debugEquals = true;
+
+      ArrayList<String> reparseStats = new ArrayList<String>();
       
       for (Object fileObj : inputFiles) {
          String fileName;
@@ -495,19 +498,23 @@ public class TestUtil {
                      result = err.getBestPartialValue();
                   }
                   /*
-                  if (reparseFile.contains("4")) {
+                  if (reparseFile.contains("8")) {
                      System.out.println("***");
                      SCLanguage.getSCLanguage().classBodyDeclarations.trace = true;
                   }
                   */
                   if (result == null)
                      System.out.println("*** FAILURE: No previous result for reparse");
+
+                  // Reset the stats for each file
+                  lang.globalReparseCt = lang.globalParseCt = 0;
+
                   Object newRes = ParseUtil.reparse((IParseNode) result, reparsedString);
-                  boolean reparseError = false;
+                  String reparseErrorMessage = null;
                   if (newRes instanceof ParseError) {
-                     reparseError = true;
-                     System.out.println("Reparse errors for: " + fileName + ": " + ((ParseError) newRes).errorStringWithLineNumbers(reparseFile));
-                     Object newPV = ((ParseError) newRes).getBestPartialValue();
+                     ParseError newErr = (ParseError) newRes;
+                     reparseErrorMessage = newErr.toString();
+                     Object newPV = newErr.getBestPartialValue();
                      if (newPV == null)
                         System.err.println("*** FAILURE: no reparse result!");
                      else
@@ -525,12 +532,16 @@ public class TestUtil {
                      boolean parseError = false;
                      if (parseComplete instanceof ParseError) {
                         parseError = true;
-                        System.out.println("Parse complete errors for: " + fileName + ": " + ((ParseError) parseComplete).errorStringWithLineNumbers(reparseFile));
-                        parseComplete = ((ParseError) parseComplete).getBestPartialValue();
+                        ParseError parseCompleteErr = (ParseError) parseComplete;
+                        String parseCompleteErrorMessage = parseCompleteErr.toString();
+                        if (reparseErrorMessage != null && !parseCompleteErrorMessage.equals(reparseErrorMessage))
+                           System.err.println("*** Error - reparse returned different error - reparse: " + reparseErrorMessage + " complete: " + parseCompleteErrorMessage);
+                        parseComplete = parseCompleteErr.getBestPartialValue();
                         if (parseComplete == null)
                            System.err.println("No partial value for file with syntax errors: " + reparseFile);
                      }
 
+                     boolean exactMatch = false;
                      if (parseComplete instanceof IParseNode) {
                         Object reparseOrigObj = getTestResult(parseComplete);
 
@@ -571,14 +582,22 @@ public class TestUtil {
                            // Need to reinit so we catch the reparsed models - TODO: ideally we'd clear the inited flag of any parents who have children which are modified in the reparse so we only
                            // have to reinit those.
                            ParseUtil.reinitComponent(reparsedModelObj);
-                           if (!((ISemanticNode) reparsedModelObj).deepEquals(reparseOrigObj))
-                              System.out.println("*** Warning reparsed model object does not exactly match parsed result: " + reparseFile);
+                           SemanticNode.debugEqualsMessage = null;
+                           if (!((ISemanticNode) reparsedModelObj).deepEquals(reparseOrigObj)) {
+                              System.out.println("*** Warning mismatched reparse models " + reparseFile + ": " + SemanticNode.debugEqualsMessage);
+                              SemanticNode.debugEqualsMessage = null;
+                           }
                            else
-                              System.out.println("*** Success: Reparsed result matches for: " + reparseFile);
+                              exactMatch = true;
                         }
                      }
                      else if (parseComplete != null)
                         System.err.println("*** Unrecognized return from reparse: " + parseComplete);
+
+                     double reparsePer = 100.0 * lang.globalReparseCt / (double) lang.globalParseCt;
+                     String per = new DecimalFormat("#").format(reparsePer);
+                     reparseStats.add(per);
+                     System.out.println("*** Reparsed: " + reparseFile + ": "  + per + "% nodes (" + lang.globalReparseCt + "/" + lang.globalParseCt + ")" + (exactMatch ? "" : " - modelMismatch"));
                   }
                }
             }
@@ -670,8 +689,10 @@ public class TestUtil {
                }
                System.out.println();
             }
-
          }
+
+         if (reparseStats.size() != 0)
+            System.out.println("Summary of reparse percentages: " + reparseStats);
       }
    }
    private static Object getTestResult(Object node) {

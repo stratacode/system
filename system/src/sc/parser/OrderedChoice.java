@@ -538,8 +538,10 @@ public class OrderedChoice extends NestedParselet  {
                      // TODO: should we do this if the matchedParselets does not contain a parselet which produces ths node's parselet?  Otherwise, it seems like
                      // here we want to force a reparse of this child only until we hit the matched parselet.
                      // TODO: this is too broad a test.  When matchedparslets contains the right parselet we should not mark a change here and perhaps parse that guy first?
-                     if (!dctx.changedRegion)
-                        dctx.setChangedRegion(parser, true);
+                     //if (!dctx.changedRegion) {
+                     //   System.out.println("***");
+                     //   dctx.setChangedRegion(parser, true);
+                     //}
                      nextChildParseNode = null;
                      nextChildReparse = true;
                   }
@@ -552,7 +554,7 @@ public class OrderedChoice extends NestedParselet  {
             emptyMatch = nestedValue == null;
             if (!(nestedValue instanceof ParseError)) {
                if (value == null) {
-                  value = resetOldParseNode(nextChildReparse ? null : oldParent, lastMatchStart, false);
+                  value = resetOldParseNode(nextChildReparse ? null : oldParent, lastMatchStart, false, false);
                }
 
                if (nestedValue != null || parser.peekInputChar(0) != '\0') {
@@ -628,8 +630,8 @@ public class OrderedChoice extends NestedParselet  {
                         // TODO: should we do this if the matchedParselets does not contain a parselet which produces ths node's parselet?  Otherwise, it seems like
                         // here we want to force a reparse of this child only until we hit the matched parselet.
                         // TODO: this is too broad a test.  When matchedparslets contains the right parselet we should not mark a change here and perhaps parse that guy first?
-                        if (!dctx.changedRegion)
-                           dctx.setChangedRegion(parser, true);
+                        //if (!dctx.changedRegion)
+                        //   dctx.setChangedRegion(parser, true);
                         nextChildParseNode = null;
                         nextChildReparse = true;
                      }
@@ -651,7 +653,7 @@ public class OrderedChoice extends NestedParselet  {
                   IParseNode errorNode = (IParseNode) errorRes;
                   // If one of the partial value errors is better we can start the skip parse from that error preserving more of the model
                   if (bestError != null && errorNode.length() < bestError.endIndex - bestError.startIndex && bestError.partialValue != null) {
-                     value = value == null ? resetOldParseNode(nextChildReparse ? null : oldParent, bestError.startIndex, false) : value;
+                     value = value == null ? resetOldParseNode(nextChildReparse ? null : oldParent, bestError.startIndex, false, false) : value;
                      if (value.addForReparse(bestError.partialValue, bestError.parselet, svCount, newChildCount++, bestErrorSlotIx, false, parser, nextChildParseNode, dctx, true, true))
                         svCount++;
                      errorStart = bestError.endIndex;
@@ -674,7 +676,7 @@ public class OrderedChoice extends NestedParselet  {
 
                if (useError) {
                   if (value == null)
-                     value = resetOldParseNode(oldParent, lastMatchStart, false);
+                     value = resetOldParseNode(oldParent, lastMatchStart, false, false);
                   if (value.addForReparse(new ErrorParseNode(new ParseError(skipOnErrorParselet, "Expected {0}", new Object[]{this}, errorStart, parser.currentIndex),
                                           errorRes.toString()), skipOnErrorParselet, svCount, newChildCount++, -1, true, parser, nextChildParseNode, dctx, true, true))
                      svCount++;

@@ -46,6 +46,9 @@ public interface IParseNode extends CharSequence, IParseResult {
    /** Returns the offset in characters from the beginning of the file */
    int getStartIndex();
 
+   /** If we have a parse-node which has been copied from an old definition, the original start index */
+   int getOrigStartIndex();
+
    void setStartIndex(int s);
 
    /** Returns the index of the string relative to the start of this parse node */

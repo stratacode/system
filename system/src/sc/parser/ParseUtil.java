@@ -925,15 +925,23 @@ public class ParseUtil  {
       if (ctx.firstDiffNode == null && oldLen == newLen && newLen == ctx.startChangeOffset)
          return pnode;
       else {
+         int unparsedLen = pnode instanceof PartialValueParseNode ? ((PartialValueParseNode) pnode).unparsedLen : 0;
+         ctx.unparsedLen = unparsedLen;
+
+         ctx.diffLen = newLen - (oldLen + unparsedLen);
+
+         int origNewLen = newLen - unparsedLen - 1;
+         int origOldLen = oldLen - unparsedLen - 1;
+
          // The offset at which changes start - the same in both old and new texts
-         ctx.endChangeNewOffset = newLen - 1;
-         ctx.endChangeOldOffset = oldLen - 1;
+         ctx.endChangeNewOffset = origNewLen;
+         ctx.endChangeOldOffset = origOldLen;
          pnode.findEndDiff(ctx);
 
-         // If we are still on the last character, it's really that there's no overlap so advance past the last char
-         if (ctx.endChangeNewOffset == newLen - 1)
+         // If we are still on the last character we checked - there's no overlap in these files so advance the count beyond the last char
+         if (ctx.endChangeNewOffset == origNewLen)
             ctx.endChangeNewOffset = newLen;
-         if (ctx.endChangeOldOffset == oldLen - 1)
+         if (ctx.endChangeOldOffset == origOldLen)
             ctx.endChangeOldOffset = oldLen;
 
          if (ctx.afterLastNode == null)

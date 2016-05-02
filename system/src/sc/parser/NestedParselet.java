@@ -1367,12 +1367,16 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       return RTypeUtil.createInstance(theClass);
    }
 
-   ParentParseNode resetOldParseNode(Object parent, int startIndex, boolean resetString) {
+   ParentParseNode resetOldParseNode(Object parent, int startIndex, boolean resetString, boolean clone) {
       if (parent == null || !(parent instanceof ParentParseNode))
          return (ParentParseNode) newParseNode(startIndex);
 
       ParentParseNode pn = (ParentParseNode) parent;
-      pn.startIndex = startIndex;
+
+      if (clone)
+         pn = pn.shallowCopy();
+
+      pn.newStartIndex = startIndex;
 
       if (pn.parselet != this) {
          return (ParentParseNode) newParseNode(startIndex);
@@ -2521,6 +2525,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
       boolean parentChanged = oldParseNode != null && dctx.changedParents.contains(oldParseNode);
       boolean anyChanges = parentChanged || dctx.changedRegion;
+
       return anyChanges;
    }
 

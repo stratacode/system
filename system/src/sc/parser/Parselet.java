@@ -546,6 +546,29 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       boolean anyChanges = dctx.changedRegion || forceReparse;
       if (!anyChanges && parser.currentIndex >= dctx.newLen)
          return true;
+      if (!anyChanges && parser.currentIndex > dctx.startChangeOffset && dctx.changeEndOffset == -1) {
+         return true;
+      }
+
+      // Finally we've determined we are in a state where we can cache the old parse-node.  It's in an unchanged
+      // region of the text.  But it's possible we hit this oldParseNode at the wrong position in the text
+      if (!anyChanges) {
+         if (oldParseNode instanceof IParseNode) {
+            int curIndex = parser.currentIndex;
+            if (((IParseNode) oldParseNode).getOrigStartIndex() + dctx.getNewOffsetForNewPos(curIndex) != curIndex)
+               return true;
+         }
+         else {
+            if (oldParseNode != null) {
+               CharSequence seq = (CharSequence) oldParseNode;
+               int oldLen = seq.length();
+               for (int i = 0; i < oldLen; i++) {
+                  if (seq.charAt(i) != parser.peekInputChar(i))
+                     return true;
+               }
+            }
+         }
+      }
       return anyChanges;
    }
 
@@ -555,7 +578,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       // beyond the "changeNewOffset" we set this to true.
       if (/*dctx.changedRegion && */ !dctx.sameAgain && dctx.isAfterLastNode(oldParseNode)) {
          if (!beforeMatch ||
-             (oldParseNode instanceof IParseNode && ((IParseNode) oldParseNode).getStartIndex() + dctx.getDiffOffset() == parser.currentIndex &&
+             (oldParseNode instanceof IParseNode && ((IParseNode) oldParseNode).getOrigStartIndex() + dctx.getDiffOffset() == parser.currentIndex &&
               parser.currentIndex > dctx.endParseChangeNewOffset)) {
             dctx.setSameAgain(parser, true);
          }
@@ -574,7 +597,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
          if (!clearChangedFlag && beforeMatch) {
             if ((oldParseNode instanceof IParseNode)) {
                IParseNode oldPN = (IParseNode) oldParseNode;
-               if (oldPN.getStartIndex() + dctx.getNewOffset() == parser.currentIndex && oldPN.getParselet() == this)
+               if (oldPN.getOrigStartIndex() + dctx.getNewOffset() == parser.currentIndex && oldPN.getParselet() == this)
                   clearChangedFlag = true;
             }
          }
@@ -594,7 +617,9 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
          if (oldParseNode instanceof IParseNode) {
             IParseNode oldp = (IParseNode) oldParseNode;
             // ? assert oldp.getStartIndex() == parser.currentIndex
-            int newStartIx = oldp.getStartIndex() + dctx.getNewOffset();
+            int newStartIx = oldp.getOrigStartIndex() + dctx.getNewOffset();
+            if (newStartIx != parser.currentIndex)
+               System.out.println("***");
             boolean sameAgain = dctx.sameAgain;
             dctx.changeCurrentIndex(parser, newStartIx + oldp.length());
 

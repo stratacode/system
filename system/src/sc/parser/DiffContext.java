@@ -46,6 +46,12 @@ public class DiffContext {
    // The last changed parse-node
    IParseNode lastDiffNode;
 
+   // Difference in the length of the new file compared to the old
+   int diffLen;
+
+   // The number of characters in the original document which were not parsed in the document - any unparseable stuff at the end
+   int unparsedLen;
+
    // During the reparse operation, set to true when we have hit the 'afterLastNode'
    boolean parsedAfterLast = false;
 
@@ -79,12 +85,16 @@ public class DiffContext {
       return !sameAgain ? 0 : getDiffOffset();
    }
 
-   public int getNewOffsetForPos(int pos) {
+   public int getNewOffsetForOldPos(int pos) {
       return pos >= endChangeOldOffset ? getDiffOffset() : 0;
    }
 
+   public int getNewOffsetForNewPos(int pos) {
+      return pos >= endChangeNewOffset ? getDiffOffset() : 0;
+   }
+
    public int getDiffOffset() {
-      return endChangeNewOffset - endChangeOldOffset;
+      return diffLen;
    }
 
    public void setChangedRegion(Parser parser, boolean newVal) {
