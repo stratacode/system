@@ -387,6 +387,12 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       language = l;
    }
 
+   public ParseError reparseError(Parser parser, Parselet childParselet, DiffContext dctx, String errorCode, Object... args) {
+      ParseError res = parseError(parser, childParselet, errorCode, args);
+      dctx.updateForNewIndex(parser.currentIndex);
+      return res;
+   }
+
    public ParseError parseError(Parser parser, Parselet childParselet, String errorCode, Object... args) {
       return parseError(parser, null, null, childParselet, errorCode, args);
    }
@@ -410,6 +416,18 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       ParseError error = parseError(parser, partialValue, chain, childParselet, errorCode, args);
       error.eof = true;
       return error;
+   }
+
+   public ParseError reparsePartialError(Parser parser, DiffContext dctx, Object partialValue, ParseError chain, Parselet childParselet, String errorCode, Object... args) {
+      ParseError res = parsePartialError(parser, partialValue, chain, childParselet, errorCode, args);
+
+      dctx.updateForNewIndex(parser.currentIndex);
+
+      return res;
+   }
+
+   public ParseError reparseError(Parser parser, DiffContext dctx, String errorCode, Object... args) {
+      return reparseError(parser, null, dctx, errorCode, args);
    }
 
    public ParseError parseError(Parser parser, String errorCode, Object... args) {
@@ -514,7 +532,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       //dctx.updateStateForPosition(parser.currentIndex);
 
       // We are about to parse the parselet for
-      if (/*dctx.changedRegion && */ !dctx.sameAgain && dctx.isAfterLastNode(oldParseNode)) {
+      if (/*dctx.changedRegion && */ !dctx.sameAgain && dctx.isAfterLastNode(oldParseNode, true)) {
          checkForSameAgainRegion(parser, oldParseNode, dctx, true, forceReparse);
       }
       // Still need to possibly clear the changed region before we reparse the next round
@@ -546,7 +564,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       boolean anyChanges = dctx.changedRegion || forceReparse;
       if (!anyChanges && parser.currentIndex >= dctx.newLen)
          return true;
-      if (!anyChanges && parser.currentIndex > dctx.startChangeOffset && dctx.changeEndOffset == -1) {
+      if (!anyChanges && parser.currentIndex >= dctx.startChangeOffset && dctx.changeEndOffset == -1) {
          return true;
       }
 
@@ -576,10 +594,9 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       // When do we restore the reparse mode so it's looking at the oldParseNode again to find cached values?
       // If we find the "afterLastNode" or in some cases we have cleared out oldParseNode - so in those situations, when we've parsed
       // beyond the "changeNewOffset" we set this to true.
-      if (/*dctx.changedRegion && */ !dctx.sameAgain && dctx.isAfterLastNode(oldParseNode)) {
-         if (!beforeMatch ||
-             (oldParseNode instanceof IParseNode && ((IParseNode) oldParseNode).getOrigStartIndex() + dctx.getDiffOffset() == parser.currentIndex &&
-              parser.currentIndex > dctx.endParseChangeNewOffset)) {
+      if (/*dctx.changedRegion && */ !dctx.sameAgain && dctx.isAfterLastNode(oldParseNode, false)) {
+         if (parser.currentIndex > dctx.endParseChangeNewOffset && (!beforeMatch ||
+             oldParseNode instanceof IParseNode && ((IParseNode) oldParseNode).getOrigStartIndex() + dctx.getDiffOffset() == parser.currentIndex)) {
             dctx.setSameAgain(parser, true);
          }
       }
@@ -619,7 +636,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
             // ? assert oldp.getStartIndex() == parser.currentIndex
             int newStartIx = oldp.getOrigStartIndex() + dctx.getNewOffset();
             if (newStartIx != parser.currentIndex)
-               System.out.println("***");
+               System.out.println("*** Error - reusing old parse node that is not in the right place!");
             boolean sameAgain = dctx.sameAgain;
             dctx.changeCurrentIndex(parser, newStartIx + oldp.length());
 
@@ -783,4 +800,23 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       return false;
    }
 
+   public IParseNode getBeforeFirstNode(IParseNode beforeFirstNode) {
+      // To handle the case where we have a large parse-node like the classBodyDeclarations.  if this node happens to be in front of
+      // the changed region by a character, choose the last child and make that the "beforeFirstNode" so we can avoid reparsing a large repeat parselet
+      if (repeat && beforeFirstNode instanceof ParentParseNode) {
+         ParentParseNode parent = (ParentParseNode) beforeFirstNode;
+         if (parent.children != null) {
+            int sz = parent.children.size();
+            for (int i = sz - 1; i >= 0; i--) {
+               Object child = parent.children.get(i);
+               if (child != null) {
+                  if (child instanceof IParseNode)
+                     return (IParseNode) child;
+                  break;
+               }
+            }
+         }
+      }
+      return beforeFirstNode;
+   }
 }

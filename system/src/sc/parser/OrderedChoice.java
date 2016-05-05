@@ -484,6 +484,8 @@ public class OrderedChoice extends NestedParselet  {
       int bestErrorSlotIx = -1;
 
       ParentParseNode oldParent = oldParseNode instanceof ParentParseNode ? (ParentParseNode) oldParseNode : null;
+      if (oldParent != null && !producesParselet(oldParent.getParselet()))
+         oldParent = null;
 
       boolean emptyMatch = false;
 
@@ -568,15 +570,17 @@ public class OrderedChoice extends NestedParselet  {
 
                   // Make sure we really replaced the old parse node - somtimes we add to it.  Also
                   // do not adjust children for parselets which compress their parse-node down to a string (e.g. spacing) for the logic in ParentParseNode.add(..)
+                  /*
                   if (replaced && (!matchedParselet.skip || needsChildren())) {
                      int newChildLen = nestedValue == null ? 0 : ((CharSequence) nestedValue).length();
                      // If we parsed a child and did not parse text which we did parse on the previous parse for this parse-node, we need to increase the range of the "changed region" to include
                      // the text we did not parse this time around.
                      int diffLen = oldChildLen - newChildLen;
-                     if (diffLen > 0 && startIndex + oldChildLen > dctx.endParseChangeNewOffset && dctx.endParseChangeNewOffset > dctx.endChangeOldOffset) {
-                        dctx.endParseChangeNewOffset = startIndex + oldChildLen + dctx.getDiffOffset();
+                     if (newChildLen > 0 && startIndex + newChildLen > dctx.endParseChangeNewOffset && dctx.endParseChangeNewOffset > dctx.endChangeOldOffset) {
+                        dctx.endParseChangeNewOffset = startIndex + newChildLen + dctx.getDiffOffset();
                      }
                   }
+                  */
                   matched = true;
                   break;
                }
@@ -592,7 +596,7 @@ public class OrderedChoice extends NestedParselet  {
          }
          if (extendErrors && (!matched || emptyMatch)) {
             if (trace)
-               System.out.println("***");
+               System.out.println("*** tracing ordered choice repeat error");
             // Keep applying the skipOnErrorParselet until we hit the exit parselet
             if (!exitParselet.peek(parser)) {
                int errorStart = parser.currentIndex;
@@ -700,11 +704,15 @@ public class OrderedChoice extends NestedParselet  {
             // If we are producing a smaller result than we did in the previous result, and we are at the end of the
             // changes - so that the old result was at least partially in the "same again" region, make sure we extend
             // the changes so we reparse those old characters we stripped off again (test/re5)
+            /*
             if (!lookahead && oldLen > 0 && dctx.changedRegion) {
+               // TODO: change oldLen here to oldLen when diffLen > 0 and oldLen + 1? otherwise
                if (startIndex + oldLen > dctx.endParseChangeNewOffset && dctx.endParseChangeNewOffset > dctx.endChangeOldOffset) {
-                  dctx.endParseChangeNewOffset = startIndex + oldLen;
+                  //   dctx.endParseChangeNewOffset = startIndex + oldLen;
+                  System.out.println("***");
                }
             }
+            */
 
             // If we are a repeat optional choice with mappings of '' and we match no elements, we should return an empty string, not null.
             if (!lookahead && repeat && isStringParameterMapping() && parser.peekInputChar(0) != '\0') {
@@ -730,13 +738,16 @@ public class OrderedChoice extends NestedParselet  {
          // If we are producing a smaller result than we did in the previous result, and we are at the end of the
          // changes - so that the old result was at least partially in the "same again" region, make sure we extend
          // the changes so we reparse those old characters we stripped off again (test/re5)
+         /*
          if (!lookahead && oldParseNode != null && dctx.changedRegion) {
             int newLen = value.length();
-            int diffLen = oldLen - newLen;
-            if (diffLen > 0 && lastMatchStart + diffLen > dctx.endParseChangeNewOffset && dctx.endParseChangeNewOffset > dctx.endChangeOldOffset) {
-               dctx.endParseChangeNewOffset = lastMatchStart + diffLen + 1;
+            //int diffLen = oldLen - newLen;
+            if (newLen > 0 && lastMatchStart + newLen > dctx.endParseChangeNewOffset && dctx.endParseChangeNewOffset > dctx.endChangeOldOffset) {
+               //dctx.endParseChangeNewOffset = lastMatchStart + diffLen + 1;
+               //dctx.endParseChangeNewOffset = lastMatchStart + newLen + 1;
             }
          }
+         */
          // If we are doing the partial values case, we might have partially matched one more statement.  if so, this is part of the partial results
          if (parser.enablePartialValues && bestError != null && /*bestError.eof && */ bestError.partialValue != null && bestError.startIndex == lastMatchStart) {
             Object oldChildParseNode = oldParent == null || oldParent.children.size() <= newChildCount ? null : oldParent.children.get(newChildCount);

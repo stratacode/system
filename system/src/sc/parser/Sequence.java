@@ -383,7 +383,7 @@ public class Sequence extends NestedParselet  {
                   int saveIndex = parser.currentIndex;
                   Object ctxState = null;
                   if (oldValue instanceof IParseNode) {
-                     ctxState = parser.resetCurrentIndex(((IParseNode) oldValue).getStartIndex());
+                     ctxState = dctx.resetCurrentIndex(parser, ((IParseNode) oldValue).getStartIndex());
                   }
                   Object newPrevValue = prevParselet.reparseExtendedErrors(parser, childParselet, origOldChild, dctx, forceReparse || prevChildReparse);
                   if (newPrevValue != null && !(newPrevValue instanceof ParseError)) {
@@ -394,7 +394,7 @@ public class Sequence extends NestedParselet  {
                      continue;
                   }
                   else
-                     parser.restoreCurrentIndex(saveIndex, ctxState);
+                     dctx.restoreCurrentIndex(parser, saveIndex, ctxState);
                }
 
                if (i < parselets.size() - 1) {
@@ -491,7 +491,7 @@ public class Sequence extends NestedParselet  {
                }
 
                if (reportError)
-                  return parseError(parser, childParselet, "Expected: {0}", this);
+                  return reparseError(parser, childParselet, dctx, "Expected: {0}", this);
                else
                  dctx.changeCurrentIndex(parser, startIndex);
 
@@ -533,11 +533,11 @@ public class Sequence extends NestedParselet  {
          if ((customError = accept(parser.semanticContext, value, startIndex, parser.currentIndex)) != null) {
             if (negated)
                return value;
-            return parseError(parser, customError, value, this);
+            return reparseError(parser, dctx, customError, value, this);
          }
 
          if (negated)
-            return parseError(parser, "Negated rule: value {0} matched rule: {1}", value, this);
+            return reparseError(parser, dctx, "Negated rule: value {0} matched rule: {1}", value, this);
          return value;
       }
       else
@@ -555,6 +555,9 @@ public class Sequence extends NestedParselet  {
          // We might be in the same again region for the new text but still in the changed region for the old text so do not include those children
          else if (dctx.sameAgain && oldChildPN.getOrigStartIndex() < dctx.endChangeOldOffset) {
             //oldChildParseNode = null;
+            matches = false;
+         }
+         else if (oldChildParseNode instanceof ErrorParseNode) {
             matches = false;
          }
       }
@@ -1028,6 +1031,9 @@ public class Sequence extends NestedParselet  {
                if (errorValues == null)
                   errorValues = new ArrayList<Object>();
                errorValues.add(pv);
+               // Temporarily advance the index so parser.currentIndex is where we ended parsing this error.  We use parser.currentIndex here to
+               // determine whether to insert or replace the parse node.  We'll reset current index in parsePartialError anyway.
+               dctx.changeCurrentIndex(parser, lastError.endIndex);
                // Add these null slots so that we do all of the node processing
                value = newRepeatSequenceResultReparse(errorValues, value, svCount, newChildCount, lastMatchIndex, parser, oldParent, dctx);
                newChildCount += errorValues.size();
@@ -1037,7 +1043,7 @@ public class Sequence extends NestedParselet  {
                   removeChildrenForReparse(parser, value, newChildCount);
                }
 
-               return parsePartialError(parser, value, lastError, childParselet, "Partial array match: {0} ", this);
+               return reparsePartialError(parser, dctx, value, lastError, childParselet, "Partial array match: {0} ", this);
             }
             if (pv == null && optional && anyContent) {
                value = newRepeatSequenceResultReparse(errorValues, value, svCount, newChildCount, lastMatchIndex, parser, oldParent, dctx);
@@ -1047,7 +1053,7 @@ public class Sequence extends NestedParselet  {
                   removeChildrenForReparse(parser, value, newChildCount);
                }
 
-               ParseError err = parsePartialError(parser, value, lastError, childParselet, "Optional continuation: {0} ", this);
+               ParseError err = reparsePartialError(parser, dctx, value, lastError, childParselet, "Optional continuation: {0} ", this);
                err.optionalContinuation = true;
                return err;
             }
@@ -1057,7 +1063,7 @@ public class Sequence extends NestedParselet  {
             dctx.changeCurrentIndex(parser, startIndex);
             return null;
          }
-         return parseError(parser, "Expecting one or more of {0}", this);
+         return reparseError(parser, dctx, "Expecting one or more of {0}", this);
       }
       else {
          if (parser.enablePartialValues && !lookahead && lastError != null) {
@@ -1104,7 +1110,7 @@ public class Sequence extends NestedParselet  {
 
       String customError;
       if ((customError = accept(parser.semanticContext, value, startIndex, parser.currentIndex)) != null)
-         return parseError(parser, customError, value, this);
+         return reparseError(parser, dctx, customError, value, this);
 
       if (lookahead)
          dctx.changeCurrentIndex(parser, startIndex);

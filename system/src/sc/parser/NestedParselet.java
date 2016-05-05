@@ -1547,12 +1547,31 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                         values = new SemanticNodeList(0);
                         parent.setSemanticValue(values, !reparse);
                      }
-                     // This is false for typical identifier expression "a." but for partial values we need
-                     // to preserve that null
-                     if (allowNullElements)
-                        values.add(null, true, false);
-                     else if (allowEmptyPartialElements && parser.enablePartialValues)
-                        values.add(PString.EMPTY_STRING, true, false);
+                     if (childIndex == -1 || values.size() <= childIndex) {
+                        // This is false for typical identifier expression "a." but for partial values we need
+                        // to preserve that null
+                        if (allowNullElements)
+                           values.add(null, true, false);
+                        else if (allowEmptyPartialElements && parser.enablePartialValues)
+                           values.add(PString.EMPTY_STRING, true, false);
+                     }
+                     else {
+                        // If this parselet is adding to a regular array deal with the specific index.  If it's propagating an array value, the null
+                        // needs to clear out the old value
+                        if (!propagatesArray()) {
+                           if (allowNullElements)
+                              values.set(childIndex, null, true, false);
+                           else if (allowEmptyPartialElements && parser.enablePartialValues)
+                              values.set(childIndex, PString.EMPTY_STRING, true, false);
+                           else
+                              values.remove(childIndex);
+                        }
+                        else {
+                           // TODO: for the cases when we are combining two arrays, how can we map from slot index to array range
+                           // to update this correctly?
+                           values.clear();
+                        }
+                     }
                   }
 
                   break;
@@ -1671,6 +1690,23 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          }
       }
       return hasValue;
+   }
+
+   boolean propagatesArray() {
+      int pix = 0;
+      if (parameterType != ParameterType.ARRAY)
+         return false;
+      for (ParameterMapping childMap:parameterMapping) {
+         if (childMap != ParameterMapping.SKIP && childMap != ParameterMapping.ARRAY && childMap != ParameterMapping.PROPAGATE)
+            return false;
+
+         if (childMap == ParameterMapping.ARRAY || childMap == ParameterMapping.PROPAGATE) {
+            if (parselets.get(pix).getSemanticValueIsArray())
+               return true;
+         }
+         pix++;
+      }
+      return false;
    }
 
    public boolean removeFromSemanticValue(ParentParseNode parent, Object node, int slotIndex, boolean skipSemanticValue, Parser parser, boolean replaceValue, boolean reparse) {

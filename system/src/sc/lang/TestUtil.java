@@ -123,6 +123,8 @@ public class TestUtil {
            */
    };
 
+   public static int numErrors = 0;
+
    public static void main(String[] args) {
 
       TestOptions opts = new TestOptions();
@@ -335,6 +337,16 @@ public class TestUtil {
          System.out.println("*** Stats:");
          System.out.println(Parser.getStatInfo(JavaLanguage.INSTANCE.compilationUnit));
       }
+
+      if (numErrors != 0) {
+         System.err.println("*** FAILED with " + numErrors + " errors");
+         System.exit(numErrors);
+      }
+   }
+
+   static void error(String message) {
+      numErrors++;
+      System.err.println(message);
    }
 
    static void usage(String[] args) {
@@ -498,9 +510,9 @@ public class TestUtil {
                      result = err.getBestPartialValue();
                   }
                   /*
-                  if (reparseFile.contains("8")) {
+                  if (reparseFile.contains("264")) {
                      System.out.println("***");
-                     SCLanguage.getSCLanguage().classBodyDeclarations.trace = true;
+                     SCLanguage.getSCLanguage().classBody.trace = true;
                   }
                   */
                   if (result == null)
@@ -516,7 +528,7 @@ public class TestUtil {
                      reparseErrorMessage = newErr.toString();
                      Object newPV = newErr.getBestPartialValue();
                      if (newPV == null)
-                        System.err.println("*** FAILURE: no reparse result!");
+                        error("*** FAILURE: no reparse result!");
                      else
                         newRes = newPV;
                   }
@@ -535,10 +547,10 @@ public class TestUtil {
                         ParseError parseCompleteErr = (ParseError) parseComplete;
                         String parseCompleteErrorMessage = parseCompleteErr.toString();
                         if (reparseErrorMessage != null && !parseCompleteErrorMessage.equals(reparseErrorMessage))
-                           System.err.println("*** Error - reparse returned different error - reparse: " + reparseErrorMessage + " complete: " + parseCompleteErrorMessage);
+                           error("*** Error - reparse returned different error - reparse: " + reparseErrorMessage + " complete: " + parseCompleteErrorMessage);
                         parseComplete = parseCompleteErr.getBestPartialValue();
                         if (parseComplete == null)
-                           System.err.println("No partial value for file with syntax errors: " + reparseFile);
+                           error("No partial value for file with syntax errors: " + reparseFile);
                      }
 
                      boolean exactMatch = false;
@@ -559,19 +571,19 @@ public class TestUtil {
                               if (reparseSameAsParse)
                                   parseSameAsOrig = reparseSameAsOrig = true;
                               else {
-                                 System.err.println("*** FAILURE: Reparsed partial match does not match parsed partial match ");
+                                 error("*** FAILURE: Reparsed partial match does not match parsed partial match ");
                               }
                            }
                         }
 
                         if (!reparseSameAsOrig || !parseSameAsOrig || !reparseSameAsParse) {
                            if (!parseSameAsOrig)
-                              System.err.println("*** PARSE FAILURE - parsed text does not match original - reparse matches parse: " + reparseSameAsParse);
+                              error("*** PARSE FAILURE - parsed text does not match original - reparse matches parse: " + reparseSameAsParse);
                            else {
                               if (!reparseSameAsOrig)
-                                 System.err.println("*** REPARSE FAILURE - reparsed text does not match");
+                                 error("*** REPARSE FAILURE - reparsed text does not match");
                               else
-                                 System.err.println("*** REPARSE FAILURE - reparsed text does not match - parsed"); // is this possible?
+                                 error("*** REPARSE FAILURE - reparsed text does not match - parsed"); // is this possible?
                            }
                         }
 
@@ -592,7 +604,7 @@ public class TestUtil {
                         }
                      }
                      else if (parseComplete != null)
-                        System.err.println("*** Unrecognized return from reparse: " + parseComplete);
+                        error("*** Unrecognized return from reparse: " + parseComplete);
 
                      double reparsePer = 100.0 * lang.globalReparseCt / (double) lang.globalParseCt;
                      String per = new DecimalFormat("#").format(reparsePer);
@@ -608,7 +620,7 @@ public class TestUtil {
                   System.out.println("File: " + fileName + ": " + ((ParseError) result).errorStringWithLineNumbers(file));
                else
                {
-                  System.err.println("*** FAILURE: Parsed results do not match for file: " + fileName);
+                  error("*** FAILURE: Parsed results do not match for file: " + fileName);
                   System.out.println(input + " => " + result);
                }
             }
@@ -655,7 +667,7 @@ public class TestUtil {
 
                Object generateResult = lang.generate(modelObj, opts.finalGenerate);
                if (generateResult instanceof GenerateError)
-                  System.err.println("**** FAILURE during generation: " + generateResult);
+                  error("**** FAILURE during generation: " + generateResult);
                else {
                   String genResult = generateResult.toString();
 
@@ -671,16 +683,16 @@ public class TestUtil {
 
                   Object reparsedResult = lang.parse(new StringReader(genResult));
                   if (reparsedResult instanceof ParseError)
-                     System.err.println("FAILURE: Unable to parse result: " + genFileName + " e: " + reparsedResult);
+                     error("FAILURE: Unable to parse result: " + genFileName + " e: " + reparsedResult);
                   else {
                      if (!reparsedResult.toString().equals(genResult))
-                        System.err.println("**** FAILURE - reparsed result does not match generated result: " + fileName);
+                        error("**** FAILURE - reparsed result does not match generated result: " + fileName);
 
                      Object mnew = getTestResult(reparsedResult);
                      // TODO: this breaks for schtml files - Element.equals uses == cause the deep version of that implementation is too expensive for large pages
                      // TODO: Semantic node list - add deepEquals and use that here
                      if (!((ISemanticNode) mnew).deepEquals(modelObj)) {
-                        System.err.println("**** FAILURE - reparsed model does not match for: " + fileName);
+                        error("**** FAILURE - reparsed model does not match for: " + fileName);
                         mnew.equals(modelObj);
                      }
                      else

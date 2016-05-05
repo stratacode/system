@@ -49,6 +49,9 @@ public interface IParseNode extends CharSequence, IParseResult {
    /** If we have a parse-node which has been copied from an old definition, the original start index */
    int getOrigStartIndex();
 
+   /** If this parse-node has been reparsed already, this returns the new start index.  Otherwise -1 */
+   int getNewStartIndex();
+
    void setStartIndex(int s);
 
    /** Returns the index of the string relative to the start of this parse node */

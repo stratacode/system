@@ -33,6 +33,10 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
       return startIndex;
    }
 
+   public int getNewStartIndex() {
+      return newStartIndex;
+   }
+
    public void setStartIndex(int ix) {
       startIndex = ix;
    }

@@ -67,11 +67,14 @@ public class ParentParseNode extends AbstractParseNode {
             Object oldNode = children.get(childIndex);
             if (parseArray && oldNode instanceof IParseNode) {
                IParseNode oldPN = (IParseNode) oldNode;
-               int startIx = oldPN.getOrigStartIndex();
-               // If the old parse-node in the matching slot fits in nicely after this one, just insert it rather than replacing it.  SameAgain may not be true here even after we've passed
-               // the
-               if (startIx + dctx.getNewOffsetForOldPos(startIx) == parser.currentIndex) {
-                  insert = true;
+               // If this parse-node has not been reparsed yet (otherwise, we will duplicate it
+               if (oldPN.getNewStartIndex() == -1) {
+                  int startIx = oldPN.getOrigStartIndex();
+                  // If the old parse-node in the matching slot fits in nicely after this one, just insert it rather than replacing it.  SameAgain may not be true here even after we've passed
+                  // the
+                  if (startIx + dctx.getNewOffsetForOldPos(startIx) == parser.currentIndex) {
+                     insert = true;
+                  }
                }
             }
             if (!insert) {
@@ -102,13 +105,20 @@ public class ParentParseNode extends AbstractParseNode {
          if (oldChild instanceof IParseNode) {
             IParseNode oldPN = (IParseNode) oldChild;
             int oldChildLen = oldPN.length();
+            // We've already reparsed this old parse node so it must be in the right place.
+            if (oldPN.getNewStartIndex() != -1)
+               break;
 
-            int oldStart = oldPN.getOrigStartIndex() + dctx.getNewOffset();
-            if (oldStart + oldChildLen  <= parser.currentIndex) {
-               // This parse-node is from sameAgain region which we have not yet reached so don't remove it
+            int oldStartOld = oldPN.getOrigStartIndex();
+            int oldStartNew = oldStartOld + dctx.getNewOffsetForOldPos(oldStartOld+oldChildLen);
+            if (oldStartNew + oldChildLen  <= parser.currentIndex) {
+               // Used to have this test to avoid removing old parse nodes in the same again region which we haven't reached yet but
+               /* caused us to we fail to remove parse-nodes we need to remove to do efficient incremental reparses.
                if (!dctx.sameAgain && oldStart > dctx.endChangeOldOffset) {
-                  break;
+                  System.out.println("***");
+                  //break;
                }
+               */
                parselet.removeForReparse(parser, this, c);
                int newSz = children.size();
                // If we removed one readjust...
@@ -1053,8 +1063,13 @@ public class ParentParseNode extends AbstractParseNode {
                      // TODO: In test re22/GenerateUCs32.sc - we detect the change inside of the first space so c == 1 here
                      // clear '2' is not right here - maybe we always use the lastVisitedNode?   Should we always do this for
                      // spacing parselets by adding a new 'glueContent' or something attribute to the parselet?
-                     if (c < 2)
-                        ctx.beforeFirstNode = ctx.lastVisitedNode;
+                     if (c < 2) {
+                        IParseNode lastVisited = ctx.lastVisitedNode;
+                        if (lastVisited != null)
+                           ctx.beforeFirstNode = lastVisited.getParselet().getBeforeFirstNode(lastVisited);
+                        else
+                           ctx.beforeFirstNode = this;
+                     }
                      else
                         ctx.beforeFirstNode = this;
                      ctx.startChangeOffset = startChange;

@@ -1,7 +1,6 @@
 package sc.parser;
 
 import java.util.HashSet;
-import java.util.TreeSet;
 
 /**
  * In order to perform an efficient reparse, we first make a pass over the old parse-node and the new text string to
@@ -103,28 +102,62 @@ public class DiffContext {
             changeStartOffset = parser.currentIndex;
       }
       else {
-         if (changeEndOffset == -1 || changeEndOffset < parser.currentIndex)
+         if (changeEndOffset == -1 || changeEndOffset < parser.currentIndex) {
+            if (parser.currentIndex < endParseChangeNewOffset)
+               System.out.println("*** Warning - parseChangeNewOffset end ahead of changeEndOffset");
             changeEndOffset = parser.currentIndex;
+         }
       }
       changedRegion = newVal;
    }
 
    public void setSameAgain(Parser parser, boolean newVal) {
       if (newVal) {
-         if (sameAgainOffset == -1 || sameAgainOffset < parser.currentIndex)
+         if (sameAgainOffset == -1 || sameAgainOffset < parser.currentIndex) {
             sameAgainOffset = parser.currentIndex;
+            // the changed end offset might get set till after sameAgain but should never be unset when sameAgain is true
+            if (changeEndOffset == -1) {
+               changeEndOffset = sameAgainOffset;
+               if (changeEndOffset < endParseChangeNewOffset) {
+                  changeEndOffset = endParseChangeNewOffset;
+               }
+            }
+         }
       }
       sameAgain = newVal;
    }
 
+   public Object resetCurrentIndex(Parser parser, int newIndex) {
+      Object res = parser.resetCurrentIndex(newIndex);
+      updateForNewIndex(newIndex);
+      return res;
+   }
+
+   public void restoreCurrentIndex(Parser parser, int index, Object semanticContext) {
+      parser.restoreCurrentIndex(index, semanticContext);
+      updateForNewIndex(index);
+   }
+
    public void changeCurrentIndex(Parser parser, int newIndex) {
       parser.changeCurrentIndex(newIndex);
-      if (changeStartOffset != -1 && changeEndOffset != -1) {
-         if (newIndex >= changeStartOffset && newIndex < changeEndOffset) {
-            changedRegion = true;
+      updateForNewIndex(newIndex);
+      // updateStateForPosition(newIndex);
+   }
+
+   public void updateForNewIndex(int newIndex) {
+      if (changeStartOffset != -1) {
+         if (changeEndOffset != -1) {
+            if (newIndex >= changeStartOffset && newIndex < changeEndOffset) {
+               changedRegion = true;
+            }
+            else if (changedRegion)
+               changedRegion = false;
          }
-         else if (changedRegion)
-            changedRegion = false;
+         // If only the start is set, we still need to change it to false if we move before the start
+         else {
+            if (newIndex < changeStartOffset && changedRegion)
+               changedRegion = false;
+         }
       }
       if (sameAgainOffset != -1) {
          if (!sameAgain && newIndex >= sameAgainOffset) {
@@ -133,8 +166,6 @@ public class DiffContext {
          else if (sameAgain && newIndex < sameAgainOffset)
             sameAgain = false;
       }
-
-      // updateStateForPosition(newIndex);
    }
 
    /*
@@ -199,14 +230,22 @@ public class DiffContext {
       }
    }
 
-   public boolean isAfterLastNode(Object node) {
+   public boolean isAfterLastNode(Object node, boolean beforeMatch) {
       if (node != null && node == afterLastNode)
          return true;
       if (node instanceof IParseNode) {
          if (sameAgainChildren.contains(node))
             return true;
-         if (afterLastNode != null && ((IParseNode) node).getStartIndex() >= afterLastNode.getStartIndex())
-            return true;
+         // Before the match we check if the node plus it's length is greater
+         if (afterLastNode != null) {
+            IParseNode pn = (IParseNode) node;
+            int nodeStartIndex = pn.getStartIndex();
+            // TODO: try this out to reset the sameAgain sooner
+            //if (!beforeMatch)
+            //   nodeStartIndex += pn.length();
+            if (nodeStartIndex >= afterLastNode.getStartIndex())
+               return true;
+         }
       }
       return false;
    }
