@@ -703,7 +703,7 @@ public class ParseUtil  {
 
    public static void resetStartIndexes(ISemanticNode node) {
       IParseNode rootParseNode = node.getParseNode();
-      int endIx = rootParseNode.resetStartIndex(0, false);
+      int endIx = rootParseNode.resetStartIndex(0, false, false);
       //if (endIx != rootParseNode.length())
      //    System.out.println("*** End index does not match after resetStartIndex");
    }

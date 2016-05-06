@@ -292,7 +292,6 @@ public class Sequence extends NestedParselet  {
 
       // If the changes in the text begin before this node, just reparse it from scratch
       if (dctx.changedRegion && oldParseNode != null) {
-         //oldParseNode = null;
          forceReparse = true;
       }
 

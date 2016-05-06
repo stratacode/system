@@ -573,7 +573,13 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       if (!anyChanges) {
          if (oldParseNode instanceof IParseNode) {
             int curIndex = parser.currentIndex;
-            if (((IParseNode) oldParseNode).getOrigStartIndex() + dctx.getNewOffsetForNewPos(curIndex) != curIndex)
+            IParseNode oldPN = (IParseNode) oldParseNode;
+            int oldStart = oldPN.getOrigStartIndex();
+            if (oldStart + dctx.getNewOffsetForNewPos(curIndex) != curIndex)
+               return true;
+            // If the old parse node ends right at the start of the changes we should reparse it in case there's more to the old parse node
+            int oldEnd = oldStart + oldPN.length();
+            if (oldEnd >= dctx.startChangeOffset && oldStart < dctx.startChangeOffset)
                return true;
          }
          else {
@@ -641,7 +647,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
             dctx.changeCurrentIndex(parser, newStartIx + oldp.length());
 
             if (sameAgain)
-               oldp.resetStartIndex(newStartIx, false);
+               oldp.resetStartIndex(newStartIx, false, true);
          }
          else {
             dctx.changeCurrentIndex(parser, parser.currentIndex + ((CharSequence) oldParseNode).length());
@@ -810,7 +816,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
             for (int i = sz - 1; i >= 0; i--) {
                Object child = parent.children.get(i);
                if (child != null) {
-                  if (child instanceof IParseNode)
+                  if (child instanceof IParseNode && !(child instanceof ErrorParseNode))
                      return (IParseNode) child;
                   break;
                }

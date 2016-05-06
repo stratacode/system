@@ -1603,6 +1603,40 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          }
       }
 
+      // This is the case where we have an error in the slot - when we are reparsing, we can't always skip the update as we
+      // may need to update it to remove whatever was in this slot.
+      if (skipSemanticValue && reparse) {
+         if (parameterMapping != null && slotIndex != -1) {
+            switch (parameterMapping[slotIndex]) {
+               case SKIP:
+                  break;
+
+               case PROPAGATE:
+                  break;
+
+               case STRING:
+                  break;
+
+               case ARRAY:
+                  SemanticNodeList values = (SemanticNodeList) parent.getSemanticValue();
+                  if (values != null) {
+                     if (propagatesArray())
+                        values.clear();
+                     else if (childIndex != -1 && values.size() > childIndex)
+                        values.remove(childIndex);
+                  }
+                  break;
+                /*
+                 * This is the case where we want to set properties on the parentNode node from the child node
+                 * as we walk up the tree.  The parentNode node specifies "*" in the slot for the child node.
+                 * The child node just lists the properties it wants to set on the parentNode.
+                 */
+               case INHERIT:
+                  break;
+            }
+         }
+      }
+
       int sequenceSize = parselets.size();
 
       if (slotIndex == sequenceSize - 1) {

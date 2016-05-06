@@ -528,7 +528,7 @@ public class OrderedChoice extends NestedParselet  {
             boolean nextChildReparse = false;
             // We may be taking a different path than the last time? e.g. intIntelliJIdeazz to int - now we match a different parselet
             // TODO: should we try the oldChildParseNode's parselet first here?   I don't think we can safely do that because it could parse incorrectly
-            if (oldChildParseNode != null && (!(oldChildParseNode instanceof IParseNode) || ((IParseNode) oldChildParseNode).getParselet() != matchedParselet)) {
+            if (oldChildParseNode != null) {
                if (!(oldChildParseNode instanceof IParseNode)) {
                   nextChildParseNode = null;
                   nextChildReparse = true;
@@ -536,7 +536,12 @@ public class OrderedChoice extends NestedParselet  {
                else {
                   IParseNode oldChildNode = (IParseNode) oldChildParseNode;
                   Parselet oldParselet = oldChildNode.getParselet();
-                  if (!matchedParselet.producesParselet(oldParselet)) {
+                  int origStart = oldChildNode.getOrigStartIndex();
+                  if (origStart + dctx.getNewOffsetForOldPos(origStart) != parser.currentIndex) {
+                     nextChildParseNode = null;
+                     nextChildReparse = true;
+                  }
+                  else if (!matchedParselet.producesParselet(oldParselet)) {
                      // TODO: should we do this if the matchedParselets does not contain a parselet which produces ths node's parselet?  Otherwise, it seems like
                      // here we want to force a reparse of this child only until we hit the matched parselet.
                      // TODO: this is too broad a test.  When matchedparslets contains the right parselet we should not mark a change here and perhaps parse that guy first?
@@ -551,6 +556,12 @@ public class OrderedChoice extends NestedParselet  {
             }
 
             int oldChildLen = oldChildParseNode != null ? ((CharSequence) oldChildParseNode).length() : -1;
+
+            // This is here to override the case where the "beforeFirstNode" is a parent of some large sequence which eventually is the same.
+            // TODO - should we check that the nextChildParseNode starts at the right spot here as well?
+            if (nextChildParseNode != null && !nextChildReparse && forceReparse && dctx.sameAgain && !dctx.changedRegion) {
+               forceReparse = false;
+            }
 
             Object nestedValue = parser.reparseNext(matchedParselet, nextChildParseNode, dctx, forceReparse || nextChildReparse);
             emptyMatch = nestedValue == null;
@@ -667,7 +678,7 @@ public class OrderedChoice extends NestedParselet  {
                      // fact that it's not a complete statement.
                      if (exitParselet.peek(parser)) {
                         if (value.addForReparse(new ErrorParseNode(new ParseError(bestError.parselet, bestError.errorCode, bestError.errorArgs, bestError.endIndex, bestError.endIndex), ""), 
-                                                bestError.parselet, svCount, newChildCount++, -1, true, parser, nextChildParseNode, dctx, true, true))
+                                                bestError.parselet, svCount, newChildCount++, bestErrorSlotIx, true, parser, nextChildParseNode, dctx, true, true))
                            svCount++;
                         return value;
                      }
@@ -682,7 +693,7 @@ public class OrderedChoice extends NestedParselet  {
                   if (value == null)
                      value = resetOldParseNode(oldParent, lastMatchStart, false, false);
                   if (value.addForReparse(new ErrorParseNode(new ParseError(skipOnErrorParselet, "Expected {0}", new Object[]{this}, errorStart, parser.currentIndex),
-                                          errorRes.toString()), skipOnErrorParselet, svCount, newChildCount++, -1, true, parser, nextChildParseNode, dctx, true, true))
+                                          errorRes.toString()), skipOnErrorParselet, svCount, newChildCount++, bestErrorSlotIx, true, parser, nextChildParseNode, dctx, true, true))
                      svCount++;
                   matched = true;
                   emptyMatch = false;

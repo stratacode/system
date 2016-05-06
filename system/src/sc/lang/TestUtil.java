@@ -510,9 +510,9 @@ public class TestUtil {
                      result = err.getBestPartialValue();
                   }
                   /*
-                  if (reparseFile.contains("264")) {
+                  if (reparseFile.contains("23")) {
                      System.out.println("***");
-                     SCLanguage.getSCLanguage().classBody.trace = true;
+                     SCLanguage.getSCLanguage().classBodyDeclarations.trace = true;
                   }
                   */
                   if (result == null)
@@ -536,7 +536,7 @@ public class TestUtil {
                   if (verifyResults) {
                      if (newRes instanceof IParseNode) {
                         // We should have already updated the startIndex in all of the parse nodes but we are validating that they are set correctly here
-                        ((IParseNode) newRes).resetStartIndex(0, true);
+                        ((IParseNode) newRes).resetStartIndex(0, true, false);
                      }
 
                      Object reparsedModelObj = getTestResult(newRes);

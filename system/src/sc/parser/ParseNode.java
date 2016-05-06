@@ -276,19 +276,25 @@ public class ParseNode extends AbstractParseNode {
       return value;
    }
 
-   public int resetStartIndex(int ix, boolean validate) {
-      if (validate && startIndex != ix)
+   public int resetStartIndex(int ix, boolean validate, boolean updateNewIndex) {
+      if (validate && getStartIndex() != ix)
          System.err.println("*** Invalid start index found");
-      startIndex = ix;
+      if (!updateNewIndex) {
+         startIndex = ix;
+         newStartIndex = -1;
+      }
+      else {
+         newStartIndex = ix;
+      }
       if (value != null) {
          if (value instanceof IParseNode) {
-            return ((IParseNode) value).resetStartIndex(ix, validate);
+            return ((IParseNode) value).resetStartIndex(ix, validate, updateNewIndex);
          }
          else if (value instanceof CharSequence) {
-            return startIndex + ((CharSequence) value).length();
+            return getStartIndex() + ((CharSequence) value).length();
          }
       }
-      return startIndex;
+      return getStartIndex();
    }
 
    public int getSemanticLength() {

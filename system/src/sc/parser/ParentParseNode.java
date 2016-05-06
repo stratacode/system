@@ -942,11 +942,16 @@ public class ParentParseNode extends AbstractParseNode {
       return false;
    }
 
-   public int resetStartIndex(int ix, boolean validate) {
+   public int resetStartIndex(int ix, boolean validate, boolean updateNewIndex) {
       if (validate && ix != getStartIndex())
          System.out.println("*** Invalid start index found");
-      startIndex = ix;
-      newStartIndex = -1;
+      if (!updateNewIndex) {
+         startIndex = ix;
+         newStartIndex = -1;
+      }
+      else {
+         newStartIndex = ix;
+      }
 
       if (children != null) {
          int sz = children.size();
@@ -954,7 +959,7 @@ public class ParentParseNode extends AbstractParseNode {
             Object child = children.get(i);
             if (child != null) {
                if (child instanceof IParseNode) {
-                  ix = ((IParseNode) child).resetStartIndex(ix, validate);
+                  ix = ((IParseNode) child).resetStartIndex(ix, validate, updateNewIndex);
                }
                else if (child instanceof CharSequence) {
                   ix += ((CharSequence) child).length();

@@ -95,7 +95,7 @@ public interface IParseNode extends CharSequence, IParseResult {
     * After updating some parse nodes, you may need to reset the start indexes.  This sets the start index to the one given and returns the start index to
     * continue after this parse node.
     */
-   int resetStartIndex(int ix, boolean validate);
+   int resetStartIndex(int ix, boolean validate, boolean newIndex);
 
    /** Returns the length of the parse node eliminating any trailing whitespace */
    int getSemanticLength();

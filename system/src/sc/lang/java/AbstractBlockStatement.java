@@ -365,7 +365,7 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
 
    public String toString() {
       if (statements == null) {
-         return "<undefined block statement>";
+         return "{}";
       }
       StringBuilder sb = new StringBuilder();
       if (staticEnabled)
