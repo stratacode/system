@@ -567,7 +567,7 @@ public class OrderedChoice extends NestedParselet  {
             emptyMatch = nestedValue == null;
             if (!(nestedValue instanceof ParseError)) {
                if (value == null) {
-                  value = resetOldParseNode(nextChildReparse ? null : oldParent, lastMatchStart, false, false);
+                  value = resetOldParseNode(oldParent, lastMatchStart, true, false);
                }
 
                if (nestedValue != null || parser.peekInputChar(0) != '\0') {
@@ -668,7 +668,7 @@ public class OrderedChoice extends NestedParselet  {
                   IParseNode errorNode = (IParseNode) errorRes;
                   // If one of the partial value errors is better we can start the skip parse from that error preserving more of the model
                   if (bestError != null && errorNode.length() < bestError.endIndex - bestError.startIndex && bestError.partialValue != null) {
-                     value = value == null ? resetOldParseNode(nextChildReparse ? null : oldParent, bestError.startIndex, false, false) : value;
+                     value = value == null ? resetOldParseNode(oldParent, bestError.startIndex, false, false) : value;
                      if (value.addForReparse(bestError.partialValue, bestError.parselet, svCount, newChildCount++, bestErrorSlotIx, false, parser, nextChildParseNode, dctx, true, true))
                         svCount++;
                      errorStart = bestError.endIndex;

@@ -72,7 +72,7 @@ public class ParentParseNode extends AbstractParseNode {
                   int startIx = oldPN.getOrigStartIndex();
                   // If the old parse-node in the matching slot fits in nicely after this one, just insert it rather than replacing it.  SameAgain may not be true here even after we've passed
                   // the
-                  if (startIx + dctx.getNewOffsetForOldPos(startIx) == parser.currentIndex) {
+                  if (startIx + dctx.getNewOffsetForOldPos(startIx) >= parser.currentIndex) {
                      insert = true;
                   }
                }

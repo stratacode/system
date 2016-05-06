@@ -510,7 +510,7 @@ public class TestUtil {
                      result = err.getBestPartialValue();
                   }
                   /*
-                  if (reparseFile.contains("23")) {
+                  if (reparseFile.contains("1")) {
                      System.out.println("***");
                      SCLanguage.getSCLanguage().classBodyDeclarations.trace = true;
                   }
