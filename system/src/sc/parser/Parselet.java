@@ -655,7 +655,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       }
    }
 
-   public Object reparse(Parser parser, Object oldParseNode, DiffContext dctx, boolean forceReparse) {
+   public Object reparse(Parser parser, Object oldParseNode, DiffContext dctx, boolean forceReparse, Parselet exitParselet) {
       Object res;
       if (anyReparseChanges(parser, oldParseNode, dctx, forceReparse)) {
          parser.reparseCt++;

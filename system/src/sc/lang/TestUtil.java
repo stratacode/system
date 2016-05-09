@@ -510,9 +510,9 @@ public class TestUtil {
                      result = err.getBestPartialValue();
                   }
                   /*
-                  if (reparseFile.contains("1")) {
+                  if (reparseFile.contains("24")) {
                      System.out.println("***");
-                     SCLanguage.getSCLanguage().classBodyDeclarations.trace = true;
+                     SCLanguage.getSCLanguage().blockStatements.trace = true;
                   }
                   */
                   if (result == null)

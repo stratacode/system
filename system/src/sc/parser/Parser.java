@@ -261,7 +261,7 @@ public class Parser implements IString {
    public final Object reparseStart(Parselet parselet, Object oldParseNode, DiffContext dctx) {
       initParseState(parselet);
 
-      Object result = reparseNext(parselet, oldParseNode, dctx, false);
+      Object result = reparseNext(parselet, oldParseNode, dctx, false, null);
 
       // Always return the error which occurred furthers into the stream.  Probably should return the whole
       // list of these errors if there is more than one.
@@ -429,7 +429,7 @@ public class Parser implements IString {
       return value;
    }
 
-   public final Object reparseNext(Parselet parselet, Object oldParseNode, DiffContext dctx, boolean forceReparse) {
+   public final Object reparseNext(Parselet parselet, Object oldParseNode, DiffContext dctx, boolean forceReparse, Parselet exitParselet) {
       Parselet saveParselet = null;
       int saveLastStartIndex = -1;
       Object value;
@@ -450,7 +450,7 @@ public class Parser implements IString {
          saveParselet = currentParselet;
          currentParselet = parselet;
 
-         value = parselet.reparse(this, oldParseNode, dctx, forceReparse);
+         value = parselet.reparse(this, oldParseNode, dctx, forceReparse, exitParselet);
 
          if (doCache) {
             if (resultCache == null)

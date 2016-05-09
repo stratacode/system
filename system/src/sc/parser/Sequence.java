@@ -264,10 +264,11 @@ public class Sequence extends NestedParselet  {
          return null;
    }
 
+   private static final boolean alwaysExtendErrors = true;
 
    // TODO: this is a copy of the parse() method but duplicates a lot of code.  Can we refactor the common code into utility
    // methods or even condense them into one with runtime overhead?
-   public Object reparse(Parser parser, Object oldParseNode, DiffContext dctx, boolean forceReparse) {
+   public Object reparse(Parser parser, Object oldParseNode, DiffContext dctx, boolean forceReparse, Parselet exitParselet) {
       if (trace)
          System.out.println("*** reparse sequence: " + this + " at " + parser.currentIndex);
 
@@ -285,7 +286,7 @@ public class Sequence extends NestedParselet  {
       parser.reparseCt++;
 
       if (repeat) {
-         Object res = reparseRepeatingSequence(parser, false, null, oldParseNode, dctx, forceReparse);
+         Object res = reparseRepeatingSequence(parser, exitParselet != null, exitParselet, oldParseNode, dctx, forceReparse);
          checkForSameAgainRegion(parser, origOldParseNode, dctx, res == null || res instanceof ParseError, forceReparse);
          return res;
       }
@@ -332,7 +333,7 @@ public class Sequence extends NestedParselet  {
 
          nextChildReparse = !oldChildMatches(oldChildParseNode, childParselet, dctx);
 
-         Object nestedValue = parser.reparseNext(childParselet, oldChildParseNode, dctx, forceReparse || nextChildReparse);
+         Object nestedValue = parser.reparseNext(childParselet, oldChildParseNode, dctx, forceReparse || nextChildReparse, getExitParselet(i));
          if (nestedValue instanceof ParseError) {
             if (negated) {
                // Reset back to the beginning of the sequence
@@ -397,12 +398,12 @@ public class Sequence extends NestedParselet  {
                }
 
                if (i < parselets.size() - 1) {
-                  Parselet exitParselet = parselets.get(i+1);
+                  Parselet nextExitParselet = parselets.get(i+1);
                   // TODO: for the simpleTag case where we are completing tagAttributes, we have / and > as following parselets where
                   // the immediate one afterwards is optional.  To handle this we can take the list of parselets following in the sequence
                   // and pass them all then peek them as a list.
-                  if (!exitParselet.optional) {
-                     Object extendedValue = childParselet.reparseExtendedErrors(parser, exitParselet, oldChildParseNode, dctx, forceReparse || nextChildReparse);
+                  if (!nextExitParselet.optional) {
+                     Object extendedValue = childParselet.reparseExtendedErrors(parser, nextExitParselet, oldChildParseNode, dctx, forceReparse || nextChildReparse);
                      if (extendedValue != null) {
                         nestedValue = extendedValue;
                         err = nestedValue instanceof ParseError ? (ParseError) nestedValue : null;
@@ -422,6 +423,7 @@ public class Sequence extends NestedParselet  {
                      err = null;
                   }
                   else {
+                     int origChildCount = newChildCount;
                      if (err.optionalContinuation) {
                         ParentParseNode errVal;
                         if (pv != null) {
@@ -449,6 +451,13 @@ public class Sequence extends NestedParselet  {
                         err.optionalContinuation = false;
                         nestedValue = null; // Switch this to optional
                         err = null; // cancel the error
+
+                        // Here we also need to clear out any parse-nodes we did not reparse from the old time.
+                        if (value == origOldParseNode) {
+                           // TODO: should we be doing this for other places where we return value?  It seems like general,
+                           value.cullUnparsedNodes(parser, origChildCount, dctx);
+                           newChildCount = origChildCount;
+                        }
                      }
                      // Always call this to try and extend the current error... also see if we can generate a new error
                      else if (!childParselet.getLookahead()) {
@@ -541,6 +550,15 @@ public class Sequence extends NestedParselet  {
       }
       else
          return null;
+   }
+
+   private Parselet getExitParselet(int ix) {
+      if (!alwaysExtendErrors || ix == parselets.size() - 1)
+         return null;
+      Parselet child = parselets.get(ix);
+      if (child instanceof NestedParselet && ((NestedParselet) child).skipOnErrorParselet != null)
+         return parselets.get(ix+1);
+      return null;
    }
 
    private boolean oldChildMatches(Object oldChildParseNode, Parselet childParselet, DiffContext dctx) {
@@ -948,7 +966,7 @@ public class Sequence extends NestedParselet  {
                forceReparse = true;
             }
 
-            Object nestedValue = parser.reparseNext(childParselet, oldChildParseNode, dctx, forceReparse);
+            Object nestedValue = parser.reparseNext(childParselet, oldChildParseNode, dctx, forceReparse, getExitParselet(i));
             if (nestedValue instanceof ParseError) {
                matched = false;
                errorValues = matchedValues;
@@ -1001,7 +1019,7 @@ public class Sequence extends NestedParselet  {
                   // This will consume whatever it is that we can't parse until we get to the next statement.  We have to be careful with the
                   // design of the skipOnErrorParselet so that it leaves us in the state for the next match on this choice.  It should not breakup
                   // an identifier for example.
-                  Object errorRes = parser.reparseNext(skipOnErrorParselet, oldChildParseNode, dctx, forceReparse);
+                  Object errorRes = parser.reparseNext(skipOnErrorParselet, oldChildParseNode, dctx, forceReparse, null);
                   if (errorRes instanceof ParseError) {
                      // We never found the exitParselet - i.e. > so the parent sequence will fail just like it did before.
                      // When this method returns null, we go with the result we produced in the first call to parseRepeatingSequence method.
@@ -1123,6 +1141,8 @@ public class Sequence extends NestedParselet  {
    }
 
    public Object reparseExtendedErrors(Parser parser, Parselet exitParselet, Object oldChildNode, DiffContext dctx, boolean forceReparse) {
+      if (alwaysExtendErrors)
+         return null; // already did this so don't do it again
       if (skipOnErrorParselet == null)
          return null;
       return reparseRepeatingSequence(parser, true, exitParselet, oldChildNode, dctx, forceReparse);

@@ -1395,6 +1395,8 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
       boolean hasValue = !skipSemanticValue;
 
+      int sequenceSize = parselets.size();
+
       if (!skipSemanticValue && !parser.matchOnly) {
          if (resultClass != null && !getSkip()) {
             if (parent.value == null) {
@@ -1404,9 +1406,15 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                   parent.setSemanticValue(createInstance(parser, getSemanticValueSlotClass()), !reparse);
             }
 
+            // If this is a repeating sequence which produces an object for each element, we create that first element here when setting the first slot (e.g. maybe the '.' in a ClassType)
+            // Later in processSlotMappings, we'll grab this element and update it's properties.  For the reparse case, it's possible we already have an element we can just update.
             if (slotIndex == 0 && getSemanticValueIsArray()) {
-               Object newElement = createInstance(parser, resultClass);
-               ((SemanticNodeList) parent.value).add(newElement);
+               SemanticNodeList parentList = (SemanticNodeList) parent.value;
+               if (childIndex == -1 || parentList.size() <= childIndex) {
+                  Object newElement = createInstance(parser, resultClass);
+                  parentList.add(newElement);
+               }
+               // TODO: else - do we need to check if the element parentList.get(childIndex) is an instanceof resultClass?
             }
          }
 
@@ -1416,6 +1424,12 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
             switch (parameterMapping[slotIndex]) {
                case SKIP:
                   hasValue = false;
+                  break;
+
+               case NAMED_SLOT:
+                  // For named slots with arrays we only count a value when we match the last node (i.e. we process the slot mappings
+                  if (getSemanticValueIsArray())
+                     hasValue = slotIndex == sequenceSize - 1;
                   break;
 
                case PROPAGATE:
@@ -1590,10 +1604,10 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                            if (semValList.size() == 0)
                               System.err.println("**** Warning: not processing slot mappings for value: " + pnode);
                            else
-                              pnode.parselet.processSlotMappings(0, pnode, semValList.get(semValList.size() - 1), true);
+                              pnode.parselet.processSlotMappings(0, pnode, semValList.get(semValList.size() - 1), true, childIndex);
                         }
                         else
-                           pnode.parselet.processSlotMappings(0, pnode, parent.getSemanticValue(), true);
+                           pnode.parselet.processSlotMappings(0, pnode, parent.getSemanticValue(), true, childIndex);
                      }
                   }
                   else if (node != null)
@@ -1637,8 +1651,6 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          }
       }
 
-      int sequenceSize = parselets.size();
-
       if (slotIndex == sequenceSize - 1) {
          int childrenSize = parent.children.size();
 
@@ -1653,6 +1665,11 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
             int newStartIx = (((childrenSize + 1) / sequenceSize) - 1) * sequenceSize;
 
             startIx = newStartIx;
+         }
+
+         // We're given the starting index during the reparse case.  For reparse, we are not always using the childrenSize to figure out how many elements to process.
+         if (reparse && childIndex != -1 && repeat && getSemanticValueIsArray()) {
+            startIx = childIndex * sequenceSize;
          }
 
          Object toProcess = null;
@@ -1716,7 +1733,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
             // Two reasons to wait: 1) for chained sequences and 2) for propagated values
             // so that we don't try to set the value before the propagated slot has been
             // processed.
-            processSlotMappings(startIx, parent, toProcess, false);
+            processSlotMappings(startIx, parent, toProcess, false, childIndex);
 
             if (trace && parser.enablePartialValues)
                System.out.println("*** Semantic value of: " + this + FileUtil.LINE_SEPARATOR +
@@ -1843,14 +1860,16 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       return false;
    }
 
-   public void processSlotMappings(int startIx, ParentParseNode srcNode, Object dstNode, boolean recurse) {
+   public void processSlotMappings(int startIx, ParentParseNode srcNode, Object dstNode, boolean recurse, int childIndex) {
       if (dstNode == null)
          return;
 
       if (getSemanticValueIsArray()) {
          List dstList = (List) dstNode;
+         if (childIndex == -1)
+            childIndex = dstList.size() - 1;
          // We are populating the last node in the list
-         dstNode = dstList.get(dstList.size() - 1);
+         dstNode = dstList.get(childIndex);
       }
 
       if (slotMapping == null)
@@ -1888,7 +1907,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          for (int inheritSlot : inheritSlots)
             if (srcNode.parselet.slotMapping != null)
                ((NestedParselet) parselets.get(inheritSlot)).processSlotMappings(0,
-                       (ParentParseNode) srcNode.children.get(inheritSlot), dstNode, true);
+                       (ParentParseNode) srcNode.children.get(inheritSlot), dstNode, true, childIndex);
       }
 
       if (language.debug)

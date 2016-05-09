@@ -73,7 +73,9 @@ public class ParentParseNode extends AbstractParseNode {
                   // If the old parse-node in the matching slot fits in nicely after this one, just insert it rather than replacing it.  SameAgain may not be true here even after we've passed
                   // the
                   if (startIx + dctx.getNewOffsetForOldPos(startIx) >= parser.currentIndex) {
-                     insert = true;
+                     // If this node occupies no space we can't insert because we move a valid node
+                     if (node != null)
+                        insert = true;
                   }
                }
             }
@@ -98,6 +100,35 @@ public class ParentParseNode extends AbstractParseNode {
       }
    }
 
+   public void cullUnparsedNodes(Parser parser, int startChild, DiffContext dctx) {
+      int sz = children.size();
+      for (int c = startChild; c < sz; c++) {
+         Object oldChild = children.get(c);
+         if (oldChild instanceof IParseNode) {
+            IParseNode oldPN = (IParseNode) oldChild;
+            int oldChildLen = oldPN.length();
+            // We've already reparsed this old parse node so it must be in the right place.
+            if (oldPN.getNewStartIndex() != -1)
+               break;
+
+            int oldStartOld = oldPN.getOrigStartIndex();
+            int oldStartNew = oldStartOld + dctx.getNewOffsetForOldPos(oldStartOld+oldChildLen);
+            if (oldStartNew >= parser.currentIndex) {
+               parselet.removeForReparse(parser, this, c);
+               int newSz = children.size();
+               // If we removed one readjust...
+               if (newSz != sz) {
+                  sz = newSz;
+                  c--;
+               }
+            }
+            else
+               break;
+         }
+         // else - should we handle StringTokens here?  We could compute the startIndex relative to the parent and do the same thing?
+      }
+   }
+
    public void clearParsedOldNodes(Parser parser, int startIx, DiffContext dctx) {
       int sz = children.size();
       for (int c = startIx; c < sz; c++) {
@@ -111,7 +142,9 @@ public class ParentParseNode extends AbstractParseNode {
 
             int oldStartOld = oldPN.getOrigStartIndex();
             int oldStartNew = oldStartOld + dctx.getNewOffsetForOldPos(oldStartOld+oldChildLen);
-            if (oldStartNew + oldChildLen  <= parser.currentIndex) {
+            // If the entire old next parse-node exists before the currently parsed contents we cull these nodes.
+            // For zero length nodes that are on the boundary, we also remove to keep them from hanging around.
+            if (oldStartNew + oldChildLen < parser.currentIndex || (oldChildLen == 0 && oldStartNew == parser.currentIndex)) {
                // Used to have this test to avoid removing old parse nodes in the same again region which we haven't reached yet but
                /* caused us to we fail to remove parse-nodes we need to remove to do efficient incremental reparses.
                if (!dctx.sameAgain && oldStart > dctx.endChangeOldOffset) {
