@@ -120,4 +120,8 @@ public class ErrorParseNode extends AbstractParseNode {
    public boolean canSkip() {
       return false;
    }
+
+   public boolean isErrorNode() {
+      return true;
+   }
 }

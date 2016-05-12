@@ -239,7 +239,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
             value = ((IParseNode) value).getSemanticValue();
 
          if (value != null && !(value instanceof StringToken))
-            value = value.toString();
+            value = PString.toIString(value);
          if (getLanguage() == null)
             throw new IllegalArgumentException("*** No language defined for parselet: " + this);
          if (!(value instanceof NonKeywordString) && !((BaseLanguage) getLanguage()).getKeywords().contains(value))

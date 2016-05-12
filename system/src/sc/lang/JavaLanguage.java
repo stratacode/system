@@ -306,6 +306,8 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       // Matching typeIdentifier - which can be either a type or an identifier expression first.  That type picks the right one at runtime.  After that we match type,
       // then primary since a type name can match more than a primary expression in some cases.
       methodReference.set(new OrderedChoice(new Sequence("TypeExpression(typeIdentifier,)", typeIdentifier, new Symbol(LOOKAHEAD, "::")), type, primary), new SymbolSpace("::"), optTypeArguments, new OrderedChoice(identifier, newKeyword));
+      // Since the first slot is an identifier, type, or expression make sure we at least fill in the :: before we consider this a method reference.
+      methodReference.minContentSlot = 1;
    }
 
    // Forward
@@ -403,6 +405,8 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    {
       lambdaParameters.ignoreEmptyList = false;
       lambdaExpression.set(lambdaParameters, new SymbolSpace("->"), lambdaBody);
+      // Don't parse () as a partial lambda expression - we need it to match at least the -> in slot 1 before we consider that a partial value
+      lambdaExpression.minContentSlot = 1;
    }
 
    Sequence assignment = new Sequence("AssignmentExpression(operator, rhs)", OPTIONAL, assignmentOperator, expression);
@@ -531,11 +535,10 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       whileKeyword, parenExpression, semicolonEOL);
 
    Sequence whileStatement = new Sequence("WhileStatement(operator, expression, statement)", whileKeyword, parenExpression, statement);
+   Sequence catchStatement = new Sequence("CatchStatement(,parameters,statements)",  new KeywordSpace("catch"), catchParameter, block);
    Sequence tryStatement = new Sequence("TryStatement(, resources, statements,*)", new KeywordSpace("try"), tryResources, block,
                    new Sequence("(catchStatements,finallyStatement)",
-                           new Sequence("([])", OPTIONAL | REPEAT,
-                                   new Sequence("CatchStatement(,parameters,statements)",  new KeywordSpace("catch"),
-                                           catchParameter, block)),
+                           new Sequence("([])", OPTIONAL | REPEAT, catchStatement),
                            new Sequence("FinallyStatement(,statements)", OPTIONAL, new KeywordSpace("finally"), block)));
    Sequence switchStatement = new Sequence("SwitchStatement(,expression,,statements,)", new KeywordSpace("switch"), parenExpression, openBraceEOL, switchBlockStatementGroups, closeBraceEOL);
    Sequence returnStatement = new Sequence("ReturnStatement(operator,expression,)", new KeywordSpace("return"), optExpression, endStatement);

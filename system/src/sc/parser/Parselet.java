@@ -564,8 +564,14 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       boolean anyChanges = dctx.changedRegion || forceReparse;
       if (!anyChanges && parser.currentIndex >= dctx.newLen)
          return true;
-      if (!anyChanges && parser.currentIndex >= dctx.startChangeOffset && dctx.changeEndOffset == -1) {
-         return true;
+      if (dctx.changeEndOffset == -1 && !anyChanges) {
+         int startChange = dctx.startChangeOffset;
+         if (dctx.changeStartOffset != -1)
+            startChange = dctx.changeStartOffset;
+         else if (dctx.beforeFirstNode != null && dctx.beforeFirstNode.getStartIndex() < startChange)
+            startChange = dctx.beforeFirstNode.getStartIndex();
+         if (parser.currentIndex >= startChange)
+            return true;
       }
 
       // Finally we've determined we are in a state where we can cache the old parse-node.  It's in an unchanged

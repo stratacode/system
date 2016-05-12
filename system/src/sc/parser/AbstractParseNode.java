@@ -12,6 +12,8 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
    int startIndex = -1;
    /** Set during the reparse process as a node is moved from the old to the new tree.  TODO: we could eliminate this perhaps by copying the parse-node tree? */
    int newStartIndex = -1;
+   /** Set to true for any parse-nodes which are generated as part of an error state */
+   boolean errorNode = false;
 
    public void setParselet(Parselet p) {}
 
@@ -193,5 +195,13 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
 
    public int getSemanticLength() {
       return length();
+   }
+
+   public boolean isErrorNode() {
+      return errorNode;
+   }
+
+   public void setErrorNode(boolean val) {
+      errorNode = val;
    }
 }

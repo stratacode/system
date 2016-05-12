@@ -212,6 +212,9 @@ public class TestUtil {
                      usage(args);
                   opts.finalGenerate = false;
                   break;
+               case 'q':
+                  quietOutput = true;
+                  break;
                case 'p':
                   if (opt.length() > 1)
                      usage(args);
@@ -239,6 +242,7 @@ public class TestUtil {
                            System.err.println("*** No file argument to -ri option for reparsing files.");
                         else {
                            String indexArg = args[i];
+                           opts.testArgsId = indexArg;
                            String[] repeatArgs = indexArg.split(",");
                            ArrayList<String> reparseIndexes = opts.reparseIndexes = new ArrayList<String>(Arrays.asList(repeatArgs));
                            for (int curIx = 0; curIx < reparseIndexes.size(); curIx++) {
@@ -249,6 +253,7 @@ public class TestUtil {
                                  String[] minMaxStr = ra.split("-");
                                  int min = Integer.parseInt(minMaxStr[0]);
                                  int max = Integer.parseInt(minMaxStr[1]);
+
                                  for (int reparseIx = min; reparseIx <= max; reparseIx++) {
                                     reparseIndexes.add(curIx, String.valueOf(reparseIx));
                                     curIx++;
@@ -328,20 +333,27 @@ public class TestUtil {
                System.err.println("*** Find class name: " + opts.findClassName + " not found");
             }
             else {
-               System.out.println("Success - found " + opts.findClassName + ": " + res);
+               out("Success - found " + opts.findClassName + ": " + res);
             }
          }
       }
 
       if (dumpStats) {
-         System.out.println("*** Stats:");
-         System.out.println(Parser.getStatInfo(JavaLanguage.INSTANCE.compilationUnit));
+         out("*** Stats:");
+         out(Parser.getStatInfo(JavaLanguage.INSTANCE.compilationUnit));
       }
 
       if (numErrors != 0) {
          System.err.println("*** FAILED with " + numErrors + " errors");
          System.exit(numErrors);
       }
+   }
+
+   static void out(String message) {
+      if (!quietOutput)
+         System.out.println(message);
+      testOutput.append(message);
+      testOutput.append(FileUtil.LINE_SEPARATOR);
    }
 
    static void error(String message) {
@@ -358,6 +370,7 @@ public class TestUtil {
 
    static boolean verifyResults = true;
    static boolean dumpStats = false;
+   static boolean quietOutput = false;
 
    public static class TestOptions {
       boolean enableModelToString = false;
@@ -375,6 +388,9 @@ public class TestUtil {
       String findClassName;
       String[] reparseFiles;
       ArrayList<String> reparseIndexes;
+
+      String testBaseName;
+      String testArgsId = "";
 
       public String toString() {
          StringBuilder sb = new StringBuilder();
@@ -395,23 +411,30 @@ public class TestUtil {
       }
    }
 
+   static StringBuilder testOutput = new StringBuilder();
+
    public static void parseTestFiles(Object[] inputFiles, TestOptions opts) {
       JavaLanguage.register();
       SCLanguage.register();
 
-      System.out.println("Running language test: " + StringUtil.arrayToString(inputFiles) + ": options: " + opts.toString() + " in dir: " + System.getProperty("user.dir"));
+      out("Running language test: " + StringUtil.arrayToString(inputFiles) + ": options: " + opts.toString() + " in dir: " + System.getProperty("user.dir"));
 
       // When we find two objects are not equal, this prints debug messages to help track down what's not the same.
       SemanticNode.debugEquals = true;
 
       ArrayList<String> reparseStats = new ArrayList<String>();
-      
+
+      StringBuilder testVerifyOutput = new StringBuilder();
+
       for (Object fileObj : inputFiles) {
          String fileName;
          File file;
          if (fileObj instanceof File) {
             file = (File) fileObj;
             fileName = file.toString();
+
+            if (opts.testBaseName == null)
+               opts.testBaseName = FileUtil.removeExtension(fileName);
          }
          else {
             fileName = (String) fileObj;
@@ -420,6 +443,9 @@ public class TestUtil {
             else if (fileName.equals("-")) // stop processing files when we hit a -
                return;
             file = new File(fileName);
+
+            if (opts.testBaseName == null)
+               opts.testBaseName = FileUtil.removeExtension(fileName);
          }
          if (file.isDirectory()) {
             Object[] files;
@@ -486,7 +512,7 @@ public class TestUtil {
 
          long parseResultTime = System.currentTimeMillis();
 
-         System.out.println("*** parsed: " + fileName + " " + opts.repeatCount + (opts.repeatCount == 1 ? " time" : " times") + " in: " + rangeToSecs(startTime, parseResultTime));
+         out("Parsed: " + fileName + " " + opts.repeatCount + (opts.repeatCount == 1 ? " time" : " times") + " in: " + rangeToSecs(startTime, parseResultTime));
 
          if (opts.reparseIndexes != null) {
             opts.reparseFiles = new String[opts.reparseIndexes.size()];
@@ -510,13 +536,14 @@ public class TestUtil {
                      result = err.getBestPartialValue();
                   }
                   /*
-                  if (reparseFile.contains("24")) {
+                  if (reparseFile.contains("298")) {
                      System.out.println("***");
-                     SCLanguage.getSCLanguage().blockStatements.trace = true;
+                     SCLanguage.getSCLanguage().catchStatement.trace = true;
+                     //SemanticNode.debugDiffTrace = true;
                   }
                   */
                   if (result == null)
-                     System.out.println("*** FAILURE: No previous result for reparse");
+                     out("*** FAILURE: No previous result for reparse");
 
                   // Reset the stats for each file
                   lang.globalReparseCt = lang.globalParseCt = 0;
@@ -554,6 +581,7 @@ public class TestUtil {
                      }
 
                      boolean exactMatch = false;
+                     boolean modelErrorsOk = false;
                      if (parseComplete instanceof IParseNode) {
                         Object reparseOrigObj = getTestResult(parseComplete);
 
@@ -587,6 +615,7 @@ public class TestUtil {
                            }
                         }
 
+
                         if (reparsedModelObj instanceof ISemanticNode) {
                            // These must be inited so some properties get set which are compared - it would be nice to have a way to compare just the parsed models but we need two categories of these
                            // semantic properties - cloned, parsed?
@@ -594,13 +623,46 @@ public class TestUtil {
                            // Need to reinit so we catch the reparsed models - TODO: ideally we'd clear the inited flag of any parents who have children which are modified in the reparse so we only
                            // have to reinit those.
                            ParseUtil.reinitComponent(reparsedModelObj);
-                           SemanticNode.debugEqualsMessage = null;
-                           if (!((ISemanticNode) reparsedModelObj).deepEquals(reparseOrigObj)) {
-                              System.out.println("*** Warning mismatched reparse models " + reparseFile + ": " + SemanticNode.debugEqualsMessage);
-                              SemanticNode.debugEqualsMessage = null;
+                           StringBuilder diffs = new StringBuilder();
+                           ISemanticNode reparsedNode = (ISemanticNode) reparsedModelObj;
+                           reparsedNode.diffNode(reparseOrigObj, diffs);
+
+                           String modelNewErrorsFile = FileUtil.addExtension(FileUtil.removeExtension(reparseFile), "mismatch");
+                           String modelOkErrorsFile = FileUtil.addExtension(FileUtil.removeExtension(reparseFile), "mismatchOK");
+                           if (diffs.length() > 0) {
+                              String diffStr = diffs.toString();
+                              boolean saveNew = false;
+                              if (new File(modelOkErrorsFile).canRead()) {
+                                 String acceptErrors = FileUtil.getFileAsString(modelOkErrorsFile);
+                                 if (!acceptErrors.equals(diffStr)) {
+                                    error("*** Changed model errors for: " + reparseFile + " Old ok'd errors:\n" + acceptErrors);
+                                    System.err.println("New model errors:\n" + diffStr);
+                                    saveNew = true;
+                                 }
+                                 else {
+                                    modelErrorsOk = true;
+                                 }
+                              }
+                              else {
+                                 error("*** New model errors for: " + reparseFile + " old:\n" + diffStr);
+                                 saveNew = true;
+                              }
+                              if (saveNew)
+                                 FileUtil.saveStringAsFile(modelNewErrorsFile, diffStr, false);
                            }
-                           else
+                           else {
                               exactMatch = true;
+                              File modelErrorFile = new File(modelNewErrorsFile);
+                              if (modelErrorFile.canRead()) {
+                                 System.out.println("*** Warning - removing old model errors for: " + reparseFile);
+                                 modelErrorFile.delete();
+                              }
+                              File modelOkFile = new File(modelOkErrorsFile);
+                              if (modelOkFile.canRead()) {
+                                 System.out.println("*** Warning - removing ok'd old model errors for: " + reparseFile);
+                                 modelOkFile.delete();
+                              }
+                           }
                         }
                      }
                      else if (parseComplete != null)
@@ -609,7 +671,8 @@ public class TestUtil {
                      double reparsePer = 100.0 * lang.globalReparseCt / (double) lang.globalParseCt;
                      String per = new DecimalFormat("#").format(reparsePer);
                      reparseStats.add(per);
-                     System.out.println("*** Reparsed: " + reparseFile + ": "  + per + "% nodes (" + lang.globalReparseCt + "/" + lang.globalParseCt + ")" + (exactMatch ? "" : " - modelMismatch"));
+                     out("Reparsed: " + reparseFile + ": "  + per + "% nodes (" + lang.globalReparseCt + "/" + lang.globalParseCt + ")" +
+                         (exactMatch ? "" : (modelErrorsOk ? " ok'd modelMismatch" : " modelMismatch")));
                   }
                }
             }
@@ -617,16 +680,16 @@ public class TestUtil {
          else if (verifyResults) {
             if (result == null || !input.equals(result.toString())) {
                if (result instanceof ParseError)
-                  System.out.println("File: " + fileName + ": " + ((ParseError) result).errorStringWithLineNumbers(file));
+                  out("File: " + fileName + ": " + ((ParseError) result).errorStringWithLineNumbers(file));
                else
                {
                   error("*** FAILURE: Parsed results do not match for file: " + fileName);
-                  System.out.println(input + " => " + result);
+                  out(input + " => " + result);
                }
             }
             else {
                IParseNode node = (IParseNode) result;
-               System.out.println("parse results match for: " + fileName);
+               out("parse results match for: " + fileName);
 
                //if (result instanceof IParseNode)
                //   System.out.println(((IParseNode)result).toDebugString());
@@ -638,11 +701,11 @@ public class TestUtil {
                StringBuilder sb = new StringBuilder();
 
                if (opts.enableModelToString)
-                  System.out.println("Parsed model: " + (modelObj instanceof ISemanticNode ? ((ISemanticNode)modelObj).toModelString() : modelObj.toString()));
+                  out("Parsed model: " + (modelObj instanceof ISemanticNode ? ((ISemanticNode)modelObj).toModelString() : modelObj.toString()));
 
                //((JavaLanguage) lang).identifierExpression.trace = true;
                if (opts.enableStyle)
-                  System.out.println("Styled output: " + ParseUtil.styleSemanticValue(modelObj, result));
+                  out("Styled output: " + ParseUtil.styleSemanticValue(modelObj, result));
 
                if (modelObj instanceof JavaModel) {
                   JavaModel m = (JavaModel) modelObj;
@@ -678,7 +741,7 @@ public class TestUtil {
                   sb.append(genResult);
                   FileUtil.saveStringAsFile(genFileName, sb.toString(), true);
 
-                  System.out.println("*** processed: " + fileName + " bytes: " + sb.length() +
+                  out("*** processed: " + fileName + " bytes: " + sb.length() +
                           " generate: " + rangeToSecs(generateStartTime, generateResultTime));
 
                   Object reparsedResult = lang.parse(new StringReader(genResult));
@@ -696,15 +759,59 @@ public class TestUtil {
                         mnew.equals(modelObj);
                      }
                      else
-                        System.out.println("***** SUCCESS: models match for: " + fileName);
+                        out("***** SUCCESS: models match for: " + fileName);
                   }
                }
-               System.out.println();
+               out("ln");
             }
          }
 
-         if (reparseStats.size() != 0)
-            System.out.println("Summary of reparse percentages: " + reparseStats);
+         if (reparseStats.size() != 0) {
+            testVerifyOutput.append("Reparse percentages: " + reparseStats.toString());
+            out("Summary of reparse percentages: " + reparseStats);
+         }
+      }
+
+      String testName = opts.testBaseName + opts.testArgsId;
+      String testId = System.getProperty("user.dir") + "/" + testName;
+      String testOutputFileName = FileUtil.addExtension(testName, "goodOut");
+      String testVerifyFileName = FileUtil.addExtension(testName, "goodVerify");
+      String newOutputFileName = FileUtil.replaceExtension(testOutputFileName , "newOut");
+      String newVerifyFileName = FileUtil.replaceExtension(testOutputFileName , "newVerify");
+      File testOutputFile = new File(testOutputFileName);
+      File testVerifyFile = new File(testVerifyFileName);
+      String testVerifyStr = testVerifyOutput.toString();
+      String testOutputStr = testOutput.toString();
+      boolean needsSave = false;
+
+      FileUtil.saveStringAsFile(newVerifyFileName, testVerifyStr, false);
+      FileUtil.saveStringAsFile(newOutputFileName, testOutputStr, false);
+
+      if (testVerifyFile.canRead()) {
+         String oldVerify = FileUtil.getFileAsString(testVerifyFileName);
+         if (oldVerify == null) {
+            testVerifyFile.delete();
+         }
+         else if (!oldVerify.equals(testVerifyStr)) {
+            error("Test output different - new output:\n" + testVerifyStr + "\ngood output:\n" + oldVerify);
+
+            //System.out.println("Run: diff " + testVerifyFile.getAbsolutePath() + " " + new File(newVerifyFileName).getAbsolutePath());
+            System.out.println("*** Run diff command for details:");
+            System.out.println("diff " + testOutputFile.getAbsolutePath() + " " + new File(newOutputFileName).getAbsolutePath());
+         }
+         else {
+            if (numErrors == 0) {
+               System.out.println("Success: test passes: " + testId);
+            }
+            else {
+               System.out.println("Failed: " + numErrors + " errors (but verify output matches): " + testId);
+            }
+         }
+      }
+      else {
+         System.out.println("First run - saving verify out: " + testVerifyFileName + ", test output: " + testOutputFileName + " for: " + testId);
+         FileUtil.saveStringAsFile(testVerifyFile, testVerifyStr, false);
+         FileUtil.saveStringAsFile(testOutputFile, testOutputStr, false);
       }
    }
    private static Object getTestResult(Object node) {

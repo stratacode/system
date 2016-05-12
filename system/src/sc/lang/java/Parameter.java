@@ -197,4 +197,19 @@ public class Parameter extends AbstractVariable implements IVariable {
          nextParameter.addDependentTypes(types);
    }
 
+   public String toString() {
+      StringBuilder sb = new StringBuilder();
+      if (type != null)
+         sb.append(type);
+      else
+         sb.append("<null>");
+      sb.append(" ");
+      if (variableName != null)
+         sb.append(variableName);
+      else
+         sb.append("<null>");
+
+      return sb.toString();
+   }
+
 }

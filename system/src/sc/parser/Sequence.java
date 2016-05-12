@@ -18,6 +18,7 @@ public class Sequence extends NestedParselet  {
 
    public int skipOnErrorSlot = -1;
 
+   /** The minimum number of slots that should be filled before completing a partial value with this sequence. */
    public int minContentSlot = 0;
 
    public Sequence() { super(); }
@@ -72,7 +73,7 @@ public class Sequence extends NestedParselet  {
       ParentParseNode value = null;
       int startIndex = parser.currentIndex;
 
-      boolean anyContent = false;
+      boolean anyContent = false, errorNode = false;
 
       int numParselets = parselets.size();
       for (int i = 0; i < numParselets; i++) {
@@ -158,6 +159,7 @@ public class Sequence extends NestedParselet  {
                      parser.addSkippedError(err);
                      // Record the error but move on
                      nestedValue = new ErrorParseNode(err, "");
+                     errorNode = true;
                      err = null;
                   }
                   else {
@@ -189,7 +191,7 @@ public class Sequence extends NestedParselet  {
                         err = null; // cancel the error
                      }
                      // Always call this to try and extend the current error... also see if we can generate a new error
-                     else if (!childParselet.getLookahead()) {
+                     else if (!childParselet.getLookahead() && i >= minContentSlot) {
 
                         // First complete the value with any partial value from this error and nulls for everything
                         // else.
@@ -229,19 +231,32 @@ public class Sequence extends NestedParselet  {
                   parser.changeCurrentIndex(startIndex);
                return nestedValue;
             }
+
          }
 
          if (value == null)
             value = (ParentParseNode) newParseNode(startIndex);
 
-         if (!childParselet.getLookahead())
+         if (!childParselet.getLookahead()) {
+            if (nestedValue instanceof IParseNode) {
+               IParseNode nestedParseNode = (IParseNode) nestedValue;
+               // If the last parselet we parse which has content is not an error we do not propagate the error for the
+               // containing node.  We want to ignore internal errors but catch when this sequence ends in an error - i.e.
+               // is some kind of fragment that must be reparsed, even if the beginning content has not changed.
+               if (!nestedParseNode.isEmpty())
+                  errorNode = nestedParseNode.isErrorNode();
+            }
             value.add(nestedValue, childParselet, -1, i, false, parser);
+         }
          else if (slotMapping != null) // Need to preserve the specific index in the results if we have a mapping
             value.add(null, childParselet, -1, i, true, parser);
 
          if (nestedValue != null || childParselet.isNullValid())
             anyContent = minContentSlot <= i;
       }
+
+      if (errorNode && value != null)
+         value.setErrorNode(true);
 
       if (lookahead) {
          // Reset back to the beginning of the sequence
@@ -315,7 +330,7 @@ public class Sequence extends NestedParselet  {
       ParentParseNode value = null;
       Object[] savedOrigChildren = null;
 
-      boolean anyContent = false;
+      boolean anyContent = false, errorNode = false;
 
       int numParselets = parselets.size();
       int newChildCount = 0;
@@ -420,6 +435,7 @@ public class Sequence extends NestedParselet  {
                      parser.addSkippedError(err);
                      // Record the error but move on
                      nestedValue = new ErrorParseNode(err, "");
+                     errorNode = true;
                      err = null;
                   }
                   else {
@@ -460,12 +476,12 @@ public class Sequence extends NestedParselet  {
                         }
                      }
                      // Always call this to try and extend the current error... also see if we can generate a new error
-                     else if (!childParselet.getLookahead()) {
-
+                     else if (!childParselet.getLookahead() && i >= minContentSlot) {
                         // First complete the value with any partial value from this error and nulls for everything
                         // else.  Note: we have clone = true for this call to resetOldParseNode because there's a chance we end up clearing
                         // out the old value and not returning this as a result from this parselet.  The parent parselet will then try to use the
                         // cleared out "oldParseNode" as though it was not cleared out.
+
                         if (value == null)
                            value = resetOldParseNode(nextChildReparse || forceReparse ? null : oldParseNode, startIndex, true, true);
                         value.addForReparse(pv, childParselet, newChildCount, newChildCount++, i, false, parser, oldChildParseNode, dctx, false, false);
@@ -517,6 +533,14 @@ public class Sequence extends NestedParselet  {
             if (savedOrigChildren == null && value == origOldParseNode && value.children != null && newChildCount < value.children.size() && value.children.get(newChildCount) != nestedValue) {
                savedOrigChildren = value.children.toArray();
             }
+            if (nestedValue instanceof IParseNode) {
+               IParseNode nestedParseNode = (IParseNode) nestedValue;
+               // If the last parselet we parse which has content is not an error we do not propagate the error for the
+               // containing node.  We want to ignore internal errors but catch when this sequence ends in an error - i.e.
+               // is some kind of fragment that must be reparsed, even if the beginning content has not changed.
+               if (!nestedParseNode.isEmpty())
+                  errorNode = nestedParseNode.isErrorNode();
+            }
             value.addForReparse(nestedValue, childParselet, newChildCount, newChildCount++, i, false, parser, oldChildParseNode, dctx, false, false);
          }
          else if (slotMapping != null) // Need to preserve the specific index in the results if we have a mapping
@@ -525,6 +549,9 @@ public class Sequence extends NestedParselet  {
          if (nestedValue != null || childParselet.isNullValid())
             anyContent = minContentSlot <= i;
       }
+
+      if (errorNode && value != null)
+         value.setErrorNode(true);
 
       if (lookahead) {
          // Reset back to the beginning of the sequence

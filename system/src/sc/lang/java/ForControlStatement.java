@@ -5,6 +5,7 @@
 package sc.lang.java;
 
 import sc.lang.SemanticNodeList;
+import sc.util.StringUtil;
 
 import java.util.EnumSet;
 
@@ -106,5 +107,24 @@ public class ForControlStatement extends ForStatement {
          condition.transformToJS();
       }
       return this;
+   }
+
+   public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append("for (");
+      if (forInit != null)
+         sb.append(StringUtil.arrayToString(forInit.toArray()));
+      else
+         sb.append("null");
+      sb.append("; ");
+      sb.append(condition);
+      sb.append("; ");
+      sb.append(repeat);
+      sb.append(") ");
+
+      if (statement != null)
+         sb.append(statement);
+
+      return sb.toString();
    }
 }

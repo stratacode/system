@@ -60,6 +60,9 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
 
    public static boolean debugEquals = false;
    public static String debugEqualsMessage = null;
+   public static boolean debugEqualsTrace = false;
+
+   public static boolean debugDiffTrace = false;
 
    public void init() {
       if (initialized)
@@ -496,12 +499,67 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
                 (thisProp == null || otherProp == null ||
                    !(thisProp instanceof ISemanticNode ? ((ISemanticNode) thisProp).deepEquals(otherProp) : thisProp.equals(otherProp)))) {
             if (debugEquals && debugEqualsMessage == null) {
+               if (debugEqualsTrace)
+                  System.out.println("***");
                debugEqualsMessage = "Instance of " + getClass().getName() + " - this." + field.getName() + " = " + thisProp + " other's = " + otherProp;
             }
             return false;
          }
       }
       return true;
+   }
+
+   static void diffAppend(StringBuilder diffs, Object val) {
+      if (debugDiffTrace)
+         diffs = diffs;
+      diffs.append(val);
+   }
+
+   /**
+    * The semantic node classes are treated like value classes - they are equal if all of their properties
+    * are equal.
+    */
+   public void diffNode(Object other, StringBuilder diffs) {
+      if (other == this)
+         return;
+
+      if (other == null) {
+         diffAppend(diffs, "No other model for comparison against this: " + toString());
+         return;
+      }
+
+      if (getClass() != other.getClass()) {
+         diffAppend(diffs, "class mismatch - this: " + CTypeUtil.getClassName(getClass().getName()) + " = " + toString() + " other: " + CTypeUtil.getClassName(other.getClass().getName()) + " = " + other.toString());
+         return;
+      }
+
+      DynType type = TypeUtil.getPropertyCache(getClass());
+      IBeanMapper[] props = type.getSemanticPropertyList();
+      for (int i = 0; i < props.length; i++) {
+         Field field = (Field) props[i].getField();
+         Object thisProp = PTypeUtil.getProperty(this, field);
+         Object otherProp = PTypeUtil.getProperty(other, field);
+         // If both are null it is ok.  If thisProp is not null it has to equal other prop to go on.
+         if (thisProp != otherProp) {
+            if (thisProp instanceof ISemanticNode && otherProp != null) {
+               ISemanticNode thisPropNode = (ISemanticNode) thisProp;
+               StringBuilder newDiffs = new StringBuilder();
+               thisPropNode.diffNode(otherProp, newDiffs);
+               if (newDiffs.length() != 0) {
+                  diffAppend(diffs, field.getName());
+                  diffAppend(diffs, "->");
+                  diffAppend(diffs, newDiffs);
+               }
+               else if (!thisPropNode.deepEquals(otherProp)) {
+                  diffAppend(diffs, CTypeUtil.getClassName(getClass().getName()) + "." + field.getName() + " = " + thisProp + " other's = " + otherProp);
+                  diffAppend(diffs, FileUtil.LINE_SEPARATOR);
+               }
+            }
+            else if (thisProp == null || otherProp == null || !thisProp.equals(otherProp)) {
+               diffAppend(diffs, CTypeUtil.getClassName(getClass().getName()) + "." + field.getName() + " = " + thisProp + " other's = " + otherProp);
+            }
+         }
+      }
    }
 
    public boolean equals(Object other) {

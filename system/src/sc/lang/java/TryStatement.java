@@ -185,4 +185,19 @@ public class TryStatement extends Statement implements IBlockStatement {
       if (finallyStatement != null)
          finallyStatement.addReturnStatements(res);
    }
+
+   public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append("try ");
+      if (statements != null) {
+         sb.append(statements.toString());
+      }
+      if (catchStatements != null) {
+         sb.append(catchStatements.toString());
+      }
+      if (finallyStatement != null) {
+         sb.append(finallyStatement.toString());
+      }
+      return sb.toString();
+   }
 }

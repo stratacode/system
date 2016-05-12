@@ -145,6 +145,9 @@ public interface ISemanticNode {
    /** Returns true if this object equals the other object by comparing all other properties with deepEquals */
    public boolean deepEquals(Object other);
 
+   /** For debugging - produce a string representation of the diffs between two models */
+   public void diffNode(Object other, StringBuilder diffs);
+
    /** For nodes that are able to re-resolve themselves to the latest version, return the latest version.  otherwise returns this. */
    public ISemanticNode refreshNode();
 

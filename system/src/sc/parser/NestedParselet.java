@@ -1378,6 +1378,9 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
       pn.newStartIndex = startIndex;
 
+      // Clearing this because we may reuse this same parse-node in a new non-error context.
+      pn.errorNode = false;
+
       if (pn.parselet != this) {
          return (ParentParseNode) newParseNode(startIndex);
       }
@@ -1562,12 +1565,22 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                         parent.setSemanticValue(values, !reparse);
                      }
                      if (childIndex == -1 || values.size() <= childIndex) {
-                        // This is false for typical identifier expression "a." but for partial values we need
-                        // to preserve that null
-                        if (allowNullElements)
-                           values.add(null, true, false);
-                        else if (allowEmptyPartialElements && parser.enablePartialValues)
-                           values.add(PString.EMPTY_STRING, true, false);
+                        // If we are just propagating the array value of one of our children and that value has a null we clear the value we are propagating.
+                        // Maybe we should set this to null here?
+                        if (propagatesArray() && !allowNullElements) {
+                           if (values.size() > 0)
+                              values.clear();
+                           if (allowEmptyPartialElements)
+                              System.out.println("***");
+                        }
+                        else {
+                           // This is false for typical identifier expression "a." but for partial values we need
+                           // to preserve that null
+                           if (allowNullElements)
+                              values.add(null, true, false);
+                           else if (allowEmptyPartialElements && parser.enablePartialValues)
+                              values.add(PString.EMPTY_STRING, true, false);
+                        }
                      }
                      else {
                         // If this parselet is adding to a regular array deal with the specific index.  If it's propagating an array value, the null
@@ -1747,17 +1760,21 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       int pix = 0;
       if (parameterType != ParameterType.ARRAY)
          return false;
+      boolean arraySlotFound = false;
       for (ParameterMapping childMap:parameterMapping) {
          if (childMap != ParameterMapping.SKIP && childMap != ParameterMapping.ARRAY && childMap != ParameterMapping.PROPAGATE)
             return false;
 
          if (childMap == ParameterMapping.ARRAY || childMap == ParameterMapping.PROPAGATE) {
-            if (parselets.get(pix).getSemanticValueIsArray())
-               return true;
+            if (childMap == ParameterMapping.ARRAY || parselets.get(pix).getSemanticValueIsArray()) {
+               if (arraySlotFound)
+                  return false;
+               arraySlotFound = true;
+            }
          }
          pix++;
       }
-      return false;
+      return arraySlotFound;
    }
 
    public boolean removeFromSemanticValue(ParentParseNode parent, Object node, int slotIndex, boolean skipSemanticValue, Parser parser, boolean replaceValue, boolean reparse) {

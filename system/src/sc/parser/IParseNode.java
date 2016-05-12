@@ -104,6 +104,11 @@ public interface IParseNode extends CharSequence, IParseResult {
    void findStartDiff(DiffContext ctx, boolean atEnd);
 
    void findEndDiff(DiffContext ctx);
+
+   /** Returns true for ErrorParseNode or parse nodes which are part of an error */
+   boolean isErrorNode();
+
+   void setErrorNode(boolean val);
 }
 
 

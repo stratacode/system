@@ -76,4 +76,15 @@ public class CatchStatement extends NonIndentedStatement {
          statements.transformToJS();
       return this;
    }
+
+   public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append("catch (");
+      if (parameters != null)
+         sb.append(parameters);
+      sb.append(") ");
+      if (statements != null)
+         sb.append(statements);
+      return sb.toString();
+   }
 }

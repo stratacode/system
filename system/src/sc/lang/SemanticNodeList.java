@@ -6,6 +6,8 @@ package sc.lang;
 
 import sc.lifecycle.ILifecycle;
 import sc.parser.*;
+import sc.type.CTypeUtil;
+import sc.util.FileUtil;
 
 import java.util.*;
 
@@ -653,6 +655,77 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
             return false;
       }
       return true;
+   }
+
+   private static void diffAppend(StringBuilder diffs, Object val) {
+      if (SemanticNode.debugDiffTrace)
+         diffs = diffs;
+      diffs.append(val);
+   }
+
+   public void diffNode(Object o, StringBuilder diffs) {
+      if (o == this)
+         return;
+      if (!(o instanceof List)) {
+         diffAppend(diffs, "Other item is not a list!");
+         diffs.append(FileUtil.LINE_SEPARATOR);
+         return;
+      }
+
+      int sz = size();
+      List oList = (List) o;
+      int osz = oList.size();
+
+      int diffSz = sz;
+      if (sz != osz) {
+         diffAppend(diffs, "List size: " + sz + " != other size: " + osz);
+         diffs.append(FileUtil.LINE_SEPARATOR);
+
+         diffSz = Math.min(sz, osz);
+      }
+
+      for (int i = 0; i < diffSz; i++) {
+         Object otherProp = oList.get(i);
+         Object thisProp = get(i);
+         // If both are null it is ok.  If thisProp is not null it has to equal other prop to go on.
+         if (thisProp != otherProp) {
+            if (thisProp instanceof ISemanticNode && otherProp != null) {
+               ISemanticNode thisPropNode = (ISemanticNode) thisProp;
+               StringBuilder newDiffs = new StringBuilder();
+               thisPropNode.diffNode(otherProp, newDiffs);
+               if (newDiffs.length() != 0) {
+                  diffAppend(diffs, "[" + i + "]->");
+                  diffs.append(newDiffs);
+               }
+               else if (!thisPropNode.deepEquals(otherProp)) {
+                  diffAppend(diffs, CTypeUtil.getClassName(getClass().getName()) + " - [" + i + "] = " + thisProp + " other's = " + otherProp);
+                  diffs.append(", ");
+               }
+            }
+            else if (thisProp == null || otherProp == null || !thisProp.equals(otherProp)) {
+               diffAppend(diffs, CTypeUtil.getClassName(getClass().getName()) + " - [" + i + "] = " + thisProp + " other's = " + otherProp);
+               diffs.append(", ");
+            }
+         }
+      }
+      if (sz > diffSz) {
+         diffs.append(" - extra in this: ");
+         for (int i = diffSz; i < sz; i++) {
+            diffs.append("[");
+            diffs.append(i);
+            diffs.append("] = ");
+            diffs.append(get(i));
+         }
+      }
+      else if (osz > diffSz) {
+         diffs.append(" - extra in other: ");
+         for (int i = diffSz; i < osz; i++) {
+            diffs.append("[");
+            diffs.append(i);
+            diffs.append("] = ");
+            diffs.append(oList.get(i));
+         }
+      }
    }
 
    public String getNodeErrorText() {

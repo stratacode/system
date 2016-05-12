@@ -362,5 +362,9 @@ public class ParseNode extends AbstractParseNode {
          }
       }
    }
+
+   public boolean isErrorNode() {
+      return errorNode || (value instanceof IParseNode && ((IParseNode) value).isErrorNode());
+   }
 }
 

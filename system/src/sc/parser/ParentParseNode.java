@@ -144,7 +144,10 @@ public class ParentParseNode extends AbstractParseNode {
             int oldStartNew = oldStartOld + dctx.getNewOffsetForOldPos(oldStartOld+oldChildLen);
             // If the entire old next parse-node exists before the currently parsed contents we cull these nodes.
             // For zero length nodes that are on the boundary, we also remove to keep them from hanging around.
-            if (oldStartNew + oldChildLen < parser.currentIndex || (oldChildLen == 0 && oldStartNew == parser.currentIndex)) {
+
+            // For re24 - UnitConverter4 must detect that we remove the misparsed block statement so we can reuse the rest.
+            //if (oldStartNew + oldChildLen < parser.currentIndex || (oldChildLen == 0 && oldStartNew == parser.currentIndex))
+            if (oldStartNew + oldChildLen <= parser.currentIndex) {
                // Used to have this test to avoid removing old parse nodes in the same again region which we haven't reached yet but
                /* caused us to we fail to remove parse-nodes we need to remove to do efficient incremental reparses.
                if (!dctx.sameAgain && oldStart > dctx.endChangeOldOffset) {
@@ -1016,58 +1019,11 @@ public class ParentParseNode extends AbstractParseNode {
       return lastIx == ix;
    }
 
-   // Returns the index of the last parse-node which should be considering at the ending spot if there's an error
-   // after this parse node.  If we return the children.size() it means there are no error parse nodes here.
-   public int getEndingErrorIx() {
-      if (children == null)
-         return 0;
-
-      int sz = children.size();
-      boolean foundError = false;
-      int i;
-      for (i = sz - 1; i >= 0; i--) {
-         Object child = children.get(i);
-         if (child != null) {
-            if (child instanceof ErrorParseNode) {
-               foundError = true;
-            }
-            else {
-               break;
-            }
-         }
-      }
-      return foundError ? i : sz;
-   }
-
-   public boolean isFirstChild(int ix) {
-      if (children == null)
-         return true;
-
-      if (ix == 0)
-         return true;
-
-      int sz = children.size();
-      if (ix >= sz) {
-         System.err.println("*** Invalid child index");
-         return false;
-      }
-      for (int i = 1; i < ix; i++) {
-         if (children.get(i) != null)
-            return false;
-      }
-      return true;
-   }
-
    public void findStartDiff(DiffContext ctx, boolean atEnd) {
       if (children == null) {
          return;
       }
       int sz = children.size();
-      // If our parented ended with an ErrorParseNode then there's an error after this parse-node.
-      // We also may have an ErrorParseNode here at the end.  This is an indication of an incomplete parse
-      // and so a signal for us to set the beforeFirstNode in front of the error so we do not accept it as
-      // a complete parse when the extra text is added.
-      int endingErrorIx = getEndingErrorIx();
       for (int i = 0; i < sz; i++) {
          Object child = children.get(i);
          if (child != null) {
@@ -1083,7 +1039,8 @@ public class ParentParseNode extends AbstractParseNode {
                // ARG - this doesn't work because we don't have a way to tease apart the boundary at the edge.  In some cases we want to include
                // an entire parent parse-node with it's children
                //if (!last || !endsWithError)
-               if (i == 0 || !(childNode instanceof ErrorParseNode))
+               //if (i == 0 || !(childNode instanceof ErrorParseNode))
+               if (!childNode.isErrorNode())
                   ctx.lastVisitedNode = childNode;
                // else - this node ends with an error so don't mark it as visited
             }
@@ -1182,5 +1139,15 @@ public class ParentParseNode extends AbstractParseNode {
       }
       ctx.lastVisitedNode = this;
    }
+
+   public void setErrorNode(boolean val) {
+      super.setErrorNode(val);
+      if (children != null) {
+         for (Object child:children)
+            if (child instanceof IParseNode)
+               ((IParseNode) child).setErrorNode(val);
+      }
+   }
 }
+
 
