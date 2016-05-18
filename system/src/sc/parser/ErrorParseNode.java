@@ -62,18 +62,27 @@ public class ErrorParseNode extends AbstractParseNode {
       if (errorText == null)
          return;
       String text = ctx.text;
+      int textLen = text.length();
       for (int i = 0; i < errorText.length(); i++) {
-         if (errorText.charAt(i) != text.charAt(ctx.startChangeOffset)) {
-            ctx.firstDiffNode = this;
-            ctx.beforeFirstNode = ctx.lastVisitedNode;
+         if (ctx.startChangeOffset >= textLen) {
             return;
          }
-         else
+         if (errorText.charAt(i) != text.charAt(ctx.startChangeOffset)) {
+            IParseNode last = ctx.lastVisitedNode;
+            // For error nodes, we want the last visited node to start the diff since it's possible extensions to the content of an error node
+            // will change the previously incomplete parsed result.
+            ctx.firstDiffNode = last.getParselet().getBeforeFirstNode(last);
+            ctx.beforeFirstNode = ctx.firstDiffNode;
+            return;
+         }
+         else {
             ctx.startChangeOffset++;
+         }
       }
       if (atEnd && text.length() > ctx.startChangeOffset) {
-         ctx.firstDiffNode = this;
-         ctx.beforeFirstNode = ctx.lastVisitedNode;
+         IParseNode last = ctx.lastVisitedNode;
+         ctx.firstDiffNode = last.getParselet().getBeforeFirstNode(last);
+         ctx.beforeFirstNode = ctx.firstDiffNode;
       }
    }
 

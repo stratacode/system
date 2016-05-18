@@ -116,6 +116,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
       spacing.put("/*", blockComment);
 
       spacing.generateParseNode = new SpacingParseNode(spacing, false);
+      spacing.alwaysReparse = true;
    }
 
    public IndexedChoice spacingEOL = (IndexedChoice) spacing.clone();

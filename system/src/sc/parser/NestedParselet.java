@@ -1570,8 +1570,6 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                         if (propagatesArray() && !allowNullElements) {
                            if (values.size() > 0)
                               values.clear();
-                           if (allowEmptyPartialElements)
-                              System.out.println("***");
                         }
                         else {
                            // This is false for typical identifier expression "a." but for partial values we need
@@ -1807,7 +1805,8 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                   if (node instanceof IParseNode) {
                      Object sv = ((IParseNode) node).getSemanticValue();
                      if (sv != null) {
-                        System.err.println("*** Not removing from string value");
+                        if (!sv.toString().equals(node.toString()))
+                           System.err.println("*** Not removing from string value");
                      }
                   }
                   else if (node instanceof StringToken) {
@@ -2680,4 +2679,18 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       else
          value.children.remove(childIx);
    }
+
+   /*
+   public IParseNode getBeforeFirstNode(IParseNode beforeFirstNode) {
+      if (parameterType == ParameterType.PROPAGATE && beforeFirstNode instanceof ParentParseNode) {
+         ParentParseNode beforeParent = (ParentParseNode) beforeFirstNode;
+         Object propNode;
+         if (beforeParent.children != null && (propNode = beforeParent.children.get(propagatedValueIndex)) instanceof IParseNode) {
+            IParseNode propPN = (IParseNode) propNode;
+            return propPN.getParselet().getBeforeFirstNode(propPN);
+         }
+      }
+      return super.getBeforeFirstNode(beforeFirstNode);
+   }
+   */
 }

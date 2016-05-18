@@ -14,6 +14,7 @@ import sc.util.ExtensionFilenameFilter;
 import sc.util.FileUtil;
 import sc.util.StringUtil;
 
+import java.io.Console;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.StringReader;
@@ -378,6 +379,7 @@ public class TestUtil {
       boolean finalGenerate = true;
       boolean enablePartialValues = false;
       boolean crossCompile = false;
+      boolean interactive = true;
       int repeatCount = 1;
       boolean layerMode = false;
       // If layerMode = true, the LayeredSystem used
@@ -419,12 +421,10 @@ public class TestUtil {
 
       out("Running language test: " + StringUtil.arrayToString(inputFiles) + ": options: " + opts.toString() + " in dir: " + System.getProperty("user.dir"));
 
-      // When we find two objects are not equal, this prints debug messages to help track down what's not the same.
-      SemanticNode.debugEquals = true;
-
       ArrayList<String> reparseStats = new ArrayList<String>();
 
       StringBuilder testVerifyOutput = new StringBuilder();
+      ArrayList<String> newModelErrors = new ArrayList<String>();
 
       for (Object fileObj : inputFiles) {
          String fileName;
@@ -536,9 +536,9 @@ public class TestUtil {
                      result = err.getBestPartialValue();
                   }
                   /*
-                  if (reparseFile.contains("298")) {
+                  if (reparseFile.contains("3")) {
                      System.out.println("***");
-                     SCLanguage.getSCLanguage().catchStatement.trace = true;
+                     SCLanguage.getSCLanguage().classBodyDeclarations.trace = true;
                      //SemanticNode.debugDiffTrace = true;
                   }
                   */
@@ -647,8 +647,10 @@ public class TestUtil {
                                  error("*** New model errors for: " + reparseFile + " old:\n" + diffStr);
                                  saveNew = true;
                               }
-                              if (saveNew)
+                              if (saveNew) {
                                  FileUtil.saveStringAsFile(modelNewErrorsFile, diffStr, false);
+                                 newModelErrors.add(modelNewErrorsFile);
+                              }
                            }
                            else {
                               exactMatch = true;
@@ -798,6 +800,16 @@ public class TestUtil {
             //System.out.println("Run: diff " + testVerifyFile.getAbsolutePath() + " " + new File(newVerifyFileName).getAbsolutePath());
             System.out.println("*** Run diff command for details:");
             System.out.println("diff " + testOutputFile.getAbsolutePath() + " " + new File(newOutputFileName).getAbsolutePath());
+
+            Console c = System.console();
+            if (opts.interactive && c != null) {
+               String ans = c.readLine("Accept new output? [yn]?");
+               if (ans.equalsIgnoreCase("y") || ans.equalsIgnoreCase("yes")) {
+                  FileUtil.renameFile(newVerifyFileName, testVerifyFileName);
+                  FileUtil.renameFile(newOutputFileName, testOutputFileName);
+                  numErrors = 0; // So we exit with a valid code to continue the script
+               }
+            }
          }
          else {
             if (numErrors == 0) {
@@ -805,6 +817,16 @@ public class TestUtil {
             }
             else {
                System.out.println("Failed: " + numErrors + " errors (but verify output matches): " + testId);
+               Console c = System.console();
+               if (opts.interactive && c != null && newModelErrors.size() > 0) {
+                  String ans = c.readLine("Accept new model errors? [yn]?");
+                  if (ans.equalsIgnoreCase("y") || ans.equalsIgnoreCase("yes")) {
+                     numErrors = 0; // So we exit with a valid code to continue the script
+                     for (String newModelError:newModelErrors) {
+                        FileUtil.renameFile(newModelError, FileUtil.replaceExtension(newModelError, "mismatchOK"));
+                     }
+                  }
+               }
             }
          }
       }

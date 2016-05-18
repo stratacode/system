@@ -290,35 +290,19 @@ public class OrderedChoice extends NestedParselet  {
 
       Parselet oldChildParselet = !(oldChildNode instanceof IParseNode) ? null : ((IParseNode) oldChildNode).getParselet();
 
-      boolean oldChildMismatch = false;
-
-      // If this parselet does not match any of the children start out with it as a 'mismatch'
-      // TODO: rework this to avoid extra calls to producesParselet - just call it once and store the array
-      if (oldChildParselet != null) {
-         boolean foundOldChild = false;
-         for (Parselet p:matchingParselets) {
-            if (p.producesParselet(oldChildParselet)) {
-               foundOldChild = true;
-               break;
-            }
-         }
-         if (!foundOldChild)
-            oldChildMismatch = true;
-      }
-
       int numMatches = matchingParselets.size();
       for (int i = 0; i < numMatches; i++) {
          Parselet subParselet = matchingParselets.get(i);
 
          boolean nestedChildReparse = false;
 
-         Object nextChildNode = oldChildNode;
+         //Object nextChildNode = oldChildNode;
 
          // If there's an oldChildParselet we want to first process the old child parselet so skip to that guy.  If we have already tried the old parselet and it does not match we go back to the
          // beginning and try everything except the one we already tried.
          if (oldChildParselet != null && !subParselet.producesParselet(oldChildParselet)) {
             nestedChildReparse = true;
-            nextChildNode = null;
+            //nextChildNode = null;
          }
 
          Object nestedValue = parser.reparseNext(subParselet, oldChildNode, dctx, forceReparse || nestedChildReparse, null);
@@ -350,24 +334,13 @@ public class OrderedChoice extends NestedParselet  {
             if (parser.enablePartialValues) {
                ParseError error = (ParseError) nestedValue;
                // Use replace=false for isBetterError because we want the first error which matches the longest text for the partial errors thing
-               if (bestError == null || Parser.isBetterError(bestError.startIndex, bestError.endIndex, error.startIndex, error.endIndex, false))
+               if (bestError == null || Parser.isBetterError(bestError.startIndex, bestError.endIndex, error.startIndex, error.endIndex, false)) {
                   bestError = error;
-            }
-            /*
-            if (oldChildParselet == subParselet) {
-               if (oldChildMismatch)
-                  System.err.println("*** Logic error: repeating the oldChildPareelet");
-               else {
-                  oldChildMismatch = true;
-
-                  // Retry the matches from the beginning because we skipped
-                  if (i != 0) {
-                     // Restart at the beginning
-                     i = -1;
+                  if (bestError.partialValue != null && bestError.partialValue != oldParseNode) {
+                     bestError.partialValue = subParselet.propagateResult(bestError.partialValue);
                   }
                }
             }
-            */
          }
       }
       if (optional) {
@@ -382,8 +355,9 @@ public class OrderedChoice extends NestedParselet  {
 
       checkForSameAgainRegion(parser, oldChildNode, dctx, true, forceReparse);
 
-      if (bestError != null)
+      if (bestError != null) {
          return bestError;
+      }
       return parseError(parser, "Expecting one of: {0}", this);
    }
 

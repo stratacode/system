@@ -91,6 +91,9 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
     */
    public IParseNode generateParseNode;
 
+   /** Set to true for parselets such as spacing that tend to glue together other parse nodes.  Those need to be reparsed always. */
+   public boolean alwaysReparse = false;
+
    /**
     * Assign a default style for semantic values produced by this parse node.  Often, but not always the style for a text node
     * is associated with it's grammar node.  If you need to customize the style for a given node, override the styleNode method.
@@ -564,8 +567,8 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       boolean anyChanges = dctx.changedRegion || forceReparse;
       if (!anyChanges && parser.currentIndex >= dctx.newLen)
          return true;
+      int startChange = dctx.startChangeOffset;
       if (dctx.changeEndOffset == -1 && !anyChanges) {
-         int startChange = dctx.startChangeOffset;
          if (dctx.changeStartOffset != -1)
             startChange = dctx.changeStartOffset;
          else if (dctx.beforeFirstNode != null && dctx.beforeFirstNode.getStartIndex() < startChange)
@@ -585,7 +588,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
                return true;
             // If the old parse node ends right at the start of the changes we should reparse it in case there's more to the old parse node
             int oldEnd = oldStart + oldPN.length();
-            if (oldEnd >= dctx.startChangeOffset && oldStart < dctx.startChangeOffset)
+            if (oldEnd >= startChange && oldStart < startChange)
                return true;
          }
          else {
@@ -597,6 +600,9 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
                      return true;
                }
             }
+            // A null old parser right on the boundary needs to be extended
+            else if (startChange <= parser.currentIndex && parser.currentIndex < dctx.endChangeNewOffset)
+               return true;
          }
       }
       return anyChanges;
@@ -815,15 +821,21 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
    public IParseNode getBeforeFirstNode(IParseNode beforeFirstNode) {
       // To handle the case where we have a large parse-node like the classBodyDeclarations.  if this node happens to be in front of
       // the changed region by a character, choose the last child and make that the "beforeFirstNode" so we can avoid reparsing a large repeat parselet
-      if (repeat && beforeFirstNode instanceof ParentParseNode) {
+      if (beforeFirstNode instanceof ParentParseNode) {
          ParentParseNode parent = (ParentParseNode) beforeFirstNode;
          if (parent.children != null) {
             int sz = parent.children.size();
             for (int i = sz - 1; i >= 0; i--) {
                Object child = parent.children.get(i);
                if (child != null) {
-                  if (child instanceof IParseNode && !(child instanceof ErrorParseNode))
-                     return (IParseNode) child;
+                  if (child instanceof IParseNode && !(child instanceof ErrorParseNode)) {
+                     IParseNode childPN = (IParseNode) child;
+                     Parselet childParselet = childPN.getParselet();
+                     if (!childParselet.alwaysReparse) {
+                        // Might have to do this for multiple levels to avoid the really big nested block statements
+                        return childPN.getParselet().getBeforeFirstNode(childPN);
+                     }
+                  }
                   break;
                }
             }

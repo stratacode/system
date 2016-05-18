@@ -65,4 +65,13 @@ public class StringLiteral extends AbstractLiteral {
          val = "";
       return '"' + val + '"';
    }
+
+   public String toString() {
+      if (value != null)
+         return value;
+      Object val = getLiteralValue();
+      if (val == null)
+         return "null";
+      return val.toString();
+   }
 }

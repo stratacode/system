@@ -314,17 +314,12 @@ public class Sequence extends NestedParselet  {
       // If the primitive node has changed or we have an ErrorParseNode, just reparse it since we don't maintain enough info to split the value
       // apart and incrementally update it
       if (!(oldParseNode instanceof IParseNode) && oldParseNode != null) {
-         //oldParseNode = null;
          forceReparse = true;
       }
 
       if (oldParseNode instanceof IParseNode && !producesParselet(((IParseNode) oldParseNode).getParselet())) {
-         //oldParseNode = null;
          forceReparse = true;
       }
-
-      //if (forceReparse)
-      //   oldParseNode = null;
 
       int startIndex = parser.currentIndex;
       ParentParseNode value = null;
@@ -339,7 +334,7 @@ public class Sequence extends NestedParselet  {
          Parselet childParselet = parselets.get(i);
          boolean nextChildReparse = false;
 
-         Object oldChildParseNode = getReparseChildNode(oldParseNode, i, forceReparse);
+         Object oldChildParseNode = getReparseChildNode(oldParseNode, newChildCount, forceReparse);
 
          if (oldChildParseNode == SKIP_CHILD) {
             value.addForReparse(null, childParselet, newChildCount, newChildCount++, i, false, parser, null, dctx, false, false);
@@ -590,6 +585,9 @@ public class Sequence extends NestedParselet  {
 
    private boolean oldChildMatches(Object oldChildParseNode, Parselet childParselet, DiffContext dctx) {
       boolean matches = true;
+      // Since lookahead nodes do not store their result in the parseNode tree at all we have to reparse them always.
+      if (childParselet.lookahead)
+         return false;
       if (oldChildParseNode instanceof IParseNode) {
          IParseNode oldChildPN = (IParseNode) oldChildParseNode;
          if (!childParselet.producesParselet(oldChildPN.getParselet())) {
@@ -1017,7 +1015,7 @@ public class Sequence extends NestedParselet  {
             if (anyContent) {
                if (matchedValues != null) {
                   if (value == null)
-                     value = resetOldParseNode(forceReparse ? null : oldParent, lastMatchIndex, false, false);
+                     value = resetOldParseNode(forceReparse ? null : oldParent, lastMatchIndex, true, false);
                   for (i = 0; i < numMatchedValues; i++) {
                      Object nv = matchedValues.get(i);
                      oldChildParseNode = oldParent == null || i >= oldParent.children.size() ? null : oldParent.children.get(i);

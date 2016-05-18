@@ -58,10 +58,6 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       return processed;
    }
 
-   public static boolean debugEquals = false;
-   public static String debugEqualsMessage = null;
-   public static boolean debugEqualsTrace = false;
-
    public static boolean debugDiffTrace = false;
 
    public void init() {
@@ -498,11 +494,6 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
          if (thisProp != otherProp &&
                 (thisProp == null || otherProp == null ||
                    !(thisProp instanceof ISemanticNode ? ((ISemanticNode) thisProp).deepEquals(otherProp) : thisProp.equals(otherProp)))) {
-            if (debugEquals && debugEqualsMessage == null) {
-               if (debugEqualsTrace)
-                  System.out.println("***");
-               debugEqualsMessage = "Instance of " + getClass().getName() + " - this." + field.getName() + " = " + thisProp + " other's = " + otherProp;
-            }
             return false;
          }
       }
