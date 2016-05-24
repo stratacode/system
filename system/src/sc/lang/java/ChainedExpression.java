@@ -22,6 +22,8 @@ public abstract class ChainedExpression extends Expression {
    }
 
    public Object getTypeDeclaration() {
+      if (expression == null)
+         return null;
       return expression.getTypeDeclaration();
    }
 

@@ -538,6 +538,10 @@ public class OrderedChoice extends NestedParselet  {
             }
 
             Object nestedValue = parser.reparseNext(matchedParselet, nextChildParseNode, dctx, forceReparse || nextChildReparse, null);
+            if (!(nestedValue instanceof ParseError) && bestError != null && bestError.partialValue != null && ParseUtil.toLength(bestError.partialValue) > ParseUtil.toLength(nestedValue)) {
+               System.out.println("***");
+               continue;
+            }
             emptyMatch = nestedValue == null;
             if (!(nestedValue instanceof ParseError)) {
                if (value == null) {

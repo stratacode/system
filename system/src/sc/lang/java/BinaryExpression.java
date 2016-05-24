@@ -42,6 +42,8 @@ public class BinaryExpression extends Expression {
    }
 
    static OperatorType getOperatorType(String operator) {
+      if (operator == null)
+         return null;
       if (operator.equals("instanceof"))
          return OperatorType.InstanceOf;
 
@@ -88,7 +90,8 @@ public class BinaryExpression extends Expression {
          addOperands(operands);
       }
       else {
-         assert operands.size() >= 1;
+         if (operands == null || operands.size() < 1)
+            return;
 
          BaseOperand op = operands.get(0);
          operator = op.operator;
@@ -482,6 +485,8 @@ public class BinaryExpression extends Expression {
          return Boolean.TYPE;
       else if (opType == OperatorType.InstanceOf)
          return Boolean.TYPE;
+      else if (opType == null)
+         return null; // Could be a partial value
       throw new UnsupportedOperationException();
    }
 

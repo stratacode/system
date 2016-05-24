@@ -101,9 +101,9 @@ public interface IParseNode extends CharSequence, IParseResult {
    int getSemanticLength();
 
    /** Finds the first parse node whose text does not match the DiffContext */
-   void findStartDiff(DiffContext ctx, boolean atEnd);
+   void findStartDiff(DiffContext ctx, boolean atEnd, Object parSemVal, ParentParseNode parParseNode, int childIx);
 
-   void findEndDiff(DiffContext ctx);
+   void findEndDiff(DiffContext ctx, Object parSemVal, ParentParseNode parParseNode, int childIx);
 
    /** Returns true for ErrorParseNode or parse nodes which are part of an error */
    boolean isErrorNode();

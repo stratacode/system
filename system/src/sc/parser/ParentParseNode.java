@@ -1019,7 +1019,7 @@ public class ParentParseNode extends AbstractParseNode {
       return lastIx == ix;
    }
 
-   public void findStartDiff(DiffContext ctx, boolean atEnd) {
+   public void findStartDiff(DiffContext ctx, boolean atEnd, Object parSemVal, ParentParseNode parParseNode, int childIx) {
       if (children == null) {
          return;
       }
@@ -1031,7 +1031,7 @@ public class ParentParseNode extends AbstractParseNode {
             boolean last = atEnd && lastChild;
             if (child instanceof IParseNode) {
                IParseNode childNode = (IParseNode) child;
-               childNode.findStartDiff(ctx, last);
+               childNode.findStartDiff(ctx, last, getSemanticValue(), this, i);
                if (ctx.firstDiffNode != null) {
                   ctx.addChangedParent(this);
                   return;
@@ -1087,7 +1087,7 @@ public class ParentParseNode extends AbstractParseNode {
       }
    }
 
-   public void findEndDiff(DiffContext ctx) {
+   public void findEndDiff(DiffContext ctx, Object parSemVal, ParentParseNode parParseNode, int childIx) {
       if (children == null) {
          return;
       }
@@ -1098,7 +1098,7 @@ public class ParentParseNode extends AbstractParseNode {
          if (child != null) {
             if (child instanceof IParseNode) {
                IParseNode childNode = (IParseNode) child;
-               childNode.findEndDiff(ctx);
+               childNode.findEndDiff(ctx, getSemanticValue(), this, i);
                if (ctx.lastDiffNode != null) {
                   // If the lastDiff is a child of the firstDiffNode, we won't find it as we prune the first diff node
                   // Instead, treat the entire node as changed.

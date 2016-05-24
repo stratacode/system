@@ -390,6 +390,15 @@ public class ParseUtil  {
       return value.toString().length();
    }
 
+   public static int toLength(Object val) {
+      if (val == null)
+         return 0;
+      if (val instanceof CharSequence)
+         return ((CharSequence) val).length();
+      throw new UnsupportedOperationException();
+   }
+
+
    public static boolean isArrayParselet(Parselet parselet) {
       Class svClass;
       return parselet.getSemanticValueIsArray() ||
@@ -915,7 +924,7 @@ public class ParseUtil  {
       ctx.startChangeOffset = 0;
 
       // Find the parse node which is the first one that does not match in the text.
-      pnode.findStartDiff(ctx, true);
+      pnode.findStartDiff(ctx, true, null, null, -1);
       Parselet plet = pnode.getParselet();
       Language lang = plet.getLanguage();
 
@@ -936,7 +945,7 @@ public class ParseUtil  {
          // The offset at which changes start - the same in both old and new texts
          ctx.endChangeNewOffset = origNewLen;
          ctx.endChangeOldOffset = origOldLen;
-         pnode.findEndDiff(ctx);
+         pnode.findEndDiff(ctx, null, null, -1);
 
          // If we are still on the last character we checked - there's no overlap in these files so advance the count beyond the last char
          if (ctx.endChangeNewOffset == origNewLen)

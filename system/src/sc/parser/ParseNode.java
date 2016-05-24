@@ -309,9 +309,9 @@ public class ParseNode extends AbstractParseNode {
    }
 
    @Override
-   public void findStartDiff(DiffContext ctx, boolean atEnd) {
+   public void findStartDiff(DiffContext ctx, boolean atEnd, Object parSemVal, ParentParseNode parParseNode, int childIx) {
       if (value instanceof IParseNode) {
-         ((IParseNode) value).findStartDiff(ctx, atEnd);
+         ((IParseNode) value).findStartDiff(ctx, atEnd, null, null, -1);
          if (ctx.firstDiffNode != null)
             ctx.addChangedParent(this);
       }
@@ -340,9 +340,9 @@ public class ParseNode extends AbstractParseNode {
    }
 
    @Override
-   public void findEndDiff(DiffContext ctx) {
+   public void findEndDiff(DiffContext ctx, Object parSemVal, ParentParseNode parParseNode, int childIx) {
       if (value instanceof IParseNode) {
-         ((IParseNode) value).findEndDiff(ctx);
+         ((IParseNode) value).findEndDiff(ctx, null, null, -1);
       }
       else if (value instanceof CharSequence) {
          CharSequence parsedText = (CharSequence) value;

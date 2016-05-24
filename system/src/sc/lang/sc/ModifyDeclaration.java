@@ -287,8 +287,10 @@ public class ModifyDeclaration extends TypeDeclaration {
                   dynamicType = true;
                   dynamicNew = false;
                }
-               if (extTD instanceof TypeDeclaration)
-                  thisModel.layeredSystem.addSubType((TypeDeclaration) extTD, this);
+               if (extTD instanceof TypeDeclaration) {
+                  if (thisModel.layeredSystem != null)
+                     thisModel.layeredSystem.addSubType((TypeDeclaration) extTD, this);
+               }
             }
          }
       }

@@ -58,12 +58,13 @@ public class ErrorParseNode extends AbstractParseNode {
    }
 
    @Override
-   public void findStartDiff(DiffContext ctx, boolean atEnd) {
+   public void findStartDiff(DiffContext ctx, boolean atEnd, Object parSemVal, ParentParseNode parSemNode, int childIx) {
       if (errorText == null)
          return;
       String text = ctx.text;
       int textLen = text.length();
-      for (int i = 0; i < errorText.length(); i++) {
+      int errorLen = errorText.length();
+      for (int i = 0; i < errorLen; i++) {
          if (ctx.startChangeOffset >= textLen) {
             return;
          }
@@ -79,7 +80,7 @@ public class ErrorParseNode extends AbstractParseNode {
             ctx.startChangeOffset++;
          }
       }
-      if (atEnd && text.length() > ctx.startChangeOffset) {
+      if (atEnd && textLen > ctx.startChangeOffset) {
          IParseNode last = ctx.lastVisitedNode;
          ctx.firstDiffNode = last.getParselet().getBeforeFirstNode(last);
          ctx.beforeFirstNode = ctx.firstDiffNode;
@@ -87,7 +88,7 @@ public class ErrorParseNode extends AbstractParseNode {
    }
 
    @Override
-   public void findEndDiff(DiffContext ctx) {
+   public void findEndDiff(DiffContext ctx, Object parSemVal, ParentParseNode parParseNode, int childIx) {
       if (errorText == null)
          return;
       String text = ctx.text;

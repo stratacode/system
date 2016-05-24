@@ -509,9 +509,8 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    OrderedChoice forInit = new OrderedChoice(OPTIONAL, new Sequence("([])", localVariableDeclaration), expressionList);
    Sequence forVarControl = new Sequence("ForVarStatement(variableModifiers,type,identifier,,expression)",
                                          variableModifiers, type, identifier, colon, expression);
-   OrderedChoice forControl = new OrderedChoice(forVarControl,
-                        new Sequence("ForControlStatement(forInit,,condition,,repeat)", 
-                                     forInit, semicolon, optExpression, semicolon, optExpressionList));
+   Sequence forControlStatement = new Sequence("ForControlStatement(forInit,,condition,,repeat)", forInit, semicolon, optExpression, semicolon, optExpressionList);
+   OrderedChoice forControl = new OrderedChoice(forVarControl,forControlStatement);
    Sequence forStatement =
        new Sequence("(,,.,,statement)", new KeywordSpace("for"), openParen, forControl, closeParenSkipOnError, statement);
 

@@ -337,8 +337,15 @@ public class Sequence extends NestedParselet  {
          Object oldChildParseNode = getReparseChildNode(oldParseNode, newChildCount, forceReparse);
 
          if (oldChildParseNode == SKIP_CHILD) {
-            value.addForReparse(null, childParselet, newChildCount, newChildCount++, i, false, parser, null, dctx, false, false);
-            continue;
+            // Last time we took the reparse but this time we might not
+            if (!childParselet.anyReparseChanges(parser, null, dctx, false)) {
+               value.addForReparse(null, childParselet, newChildCount, newChildCount++, i, false, parser, null, dctx, false, false);
+               continue;
+            }
+            else {
+               oldChildParseNode = null;
+               forceReparse = true;
+            }
          }
 
          nextChildReparse = !oldChildMatches(oldChildParseNode, childParselet, dctx);
