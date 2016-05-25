@@ -537,9 +537,10 @@ public class OrderedChoice extends NestedParselet  {
                forceReparse = false;
             }
 
+            // If the bestError is longer than the success result, we are going to choose the best error.  We might parse "String" as an identifier expression when the best error
+            // is "String foo =" for example
             Object nestedValue = parser.reparseNext(matchedParselet, nextChildParseNode, dctx, forceReparse || nextChildReparse, null);
             if (!(nestedValue instanceof ParseError) && bestError != null && bestError.partialValue != null && ParseUtil.toLength(bestError.partialValue) > ParseUtil.toLength(nestedValue)) {
-               System.out.println("***");
                continue;
             }
             emptyMatch = nestedValue == null;
