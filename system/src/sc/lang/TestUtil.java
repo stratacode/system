@@ -535,11 +535,13 @@ public class TestUtil {
                      ParseError err = ((ParseError) result);
                      result = err.getBestPartialValue();
                   }
+                  /*
                   if (reparseFile.contains("40")) {
                      System.out.println("***");
                      SCLanguage.getSCLanguage().tryStatement.trace = true;
                      //SemanticNode.debugDiffTrace = true;
                   }
+                  */
                   if (result == null)
                      out("*** FAILURE: No previous result for reparse");
 

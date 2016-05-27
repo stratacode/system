@@ -600,9 +600,11 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
                      return true;
                }
             }
-            // A null old parser right on the boundary needs to be extended
-            else if (startChange <= parser.currentIndex && parser.currentIndex < dctx.endChangeNewOffset)
-               return true;
+            else {
+               // Null old parse nodes cannot really be validated so we need to just reparse them
+               if (startChange <= parser.currentIndex)
+                  return true;
+            }
          }
       }
       return anyChanges;
