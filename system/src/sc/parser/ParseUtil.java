@@ -961,7 +961,7 @@ public class ParseUtil  {
          // parse more characters, even when we should be "sameAgain"
          ctx.endParseChangeNewOffset = ctx.endChangeNewOffset;
 
-         if (ctx.lastDiffNode == ctx.firstDiffNode && ctx.afterLastNode == ctx.lastDiffNode) {
+         if (ctx.lastDiffNode == ctx.firstDiffNode && ctx.afterLastNode == ctx.lastDiffNode && ctx.firstDiffNode != null) {
             int endNodeIx = ctx.firstDiffNode.getStartIndex() + ctx.firstDiffNode.length();
             if (endNodeIx > ctx.endParseChangeNewOffset)
                ctx.endParseChangeNewOffset = endNodeIx;
