@@ -3023,7 +3023,7 @@ public class ModelUtil {
       int len = str.length();
       for (int i = 0; i < len; i++) {
          char charVal = str.charAt(i);
-         if (charVal == '\\') {
+         if (charVal == '\\' && i < len - 1) {
             i++;
             switch (str.charAt(i)) {
                case 'b':
