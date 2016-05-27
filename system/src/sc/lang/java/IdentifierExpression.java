@@ -4162,15 +4162,13 @@ public class IdentifierExpression extends ArgumentsExpression {
          else {
             ParentParseNode nextChildren = (ParentParseNode) identsNode.children.get(1);
             int childIx = (i - 1) * 2;
-            if (nextChildren.children.size() > childIx) {
+            if (nextChildren != null && nextChildren.children.size() > childIx) {
                // First do the '.'
                ParseUtil.toStyledString(adapter, nextChildren.children.get(childIx));
                // Then the next identifier
                child = (IParseNode) nextChildren.children.get(childIx+1);
             }
             else {
-               System.out.println("*** error styling identifier expression");
-               child = null;
                continue;
             }
          }
