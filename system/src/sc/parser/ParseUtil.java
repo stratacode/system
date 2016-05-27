@@ -947,6 +947,7 @@ public class ParseUtil  {
          ctx.endChangeOldOffset = origOldLen;
          pnode.findEndDiff(ctx, null, null, -1);
 
+
          // If we are still on the last character we checked - there's no overlap in these files so advance the count beyond the last char
          if (ctx.endChangeNewOffset == origNewLen)
             ctx.endChangeNewOffset = newLen;
@@ -959,6 +960,12 @@ public class ParseUtil  {
          // Start out with these two the same.  endParseChangeNewOffset can be adjusted during the reparse to force us to
          // parse more characters, even when we should be "sameAgain"
          ctx.endParseChangeNewOffset = ctx.endChangeNewOffset;
+
+         if (ctx.lastDiffNode == ctx.firstDiffNode && ctx.afterLastNode == ctx.lastDiffNode) {
+            int endNodeIx = ctx.firstDiffNode.getStartIndex() + ctx.firstDiffNode.length();
+            if (endNodeIx > ctx.endParseChangeNewOffset)
+               ctx.endParseChangeNewOffset = endNodeIx;
+         }
 
          // Now we walk the parselet tree in a way similar to how we parsed it in the first place, but accepting
          // the pnode.  We'll update this existing pnode with changes so it looks the same as if we'd reparsed

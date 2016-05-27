@@ -127,7 +127,10 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    public Sequence optExpression = new Sequence("(.)", OPTIONAL, expression);
 
-   Parselet skipBodyError = createSkipOnErrorParselet("}", Symbol.EOF);
+   Parselet skipBodyError = createSkipOnErrorParselet("<skipBodyError>", "}", Symbol.EOF);
+
+   // When parsing for errors with type declarations, we need to consume even the close } because we are looking for EOF as an exit parselet
+   Parselet skipTypeDeclError = createSkipOnErrorParselet("<skipTypeDeclError>", Symbol.EOF);
 
    public Sequence classBody = new Sequence("<classBody>(,[],)");
    public OrderedChoice classDeclarationWithoutModifiers = new OrderedChoice();
@@ -622,6 +625,17 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
          };
    Sequence typedMemberDeclaration =
          new Sequence("(type,.)", type, new OrderedChoice(methodDeclaration, fieldDeclaration));
+   {
+      // We don't want just 'type' to match in an error handling scenario - we should match at least something in the method or field declaration or else
+      typedMemberDeclaration.minContentSlot = 1;
+   }
+
+   // The constructor - essentially a method without a return type.
+   Sequence constructorDeclaration = new Sequence("(name, .)", identifier, constructorDeclaratorRest);
+   {
+      // Don't match just the identifier when parsing errors
+      constructorDeclaration.minContentSlot = 1;
+   }
 
    public IndexedChoice memberDeclaration = new IndexedChoice("<memberDeclaration>");
    {
@@ -629,9 +643,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       memberDeclaration.put("interface",  interfaceDeclarationWithoutModifiers);
       memberDeclaration.put("@",  interfaceDeclarationWithoutModifiers);
       memberDeclaration.put("enum", classDeclarationWithoutModifiers);
-      memberDeclaration.addDefault(genericMethodOrConstructorDecl, typedMemberDeclaration,
-                                   // The constructor - essentially a method without a return type.
-                                   new Sequence("(name, .)", identifier, constructorDeclaratorRest));
+      memberDeclaration.addDefault(genericMethodOrConstructorDecl, typedMemberDeclaration, constructorDeclaration);
    }
 
    public Sequence memberDeclarationWithModifiers = new Sequence("(modifiers,.)", modifiers, memberDeclaration);
@@ -739,16 +751,25 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    }
 
    /**
-    * The semicolon here is part of the language spec - a concession to C programmers who put semis at the end of class declarations.
+    * The semicolon in a typeDeclaration is part of the language spec - a concession to C programmers who put semis at the end of class declarations.
     * Do not use semicolonEOL here because it has skip-on-error and we'd rather match a partial error in class or interface declaration
     */
    public OrderedChoice typeDeclaration = new OrderedChoice("(.,.,)", classDeclaration, interfaceDeclaration, semicolon);
 
-   Sequence typeDeclarations = new Sequence("<typeDeclarations>([])", OPTIONAL | REPEAT, typeDeclaration);
+   // We could wrap typeDeclaration but it's more efficient to avoid the extra sequence here and we need to set skipBodyError.  Keeping typeDeclaration so we can style a TypeDeclaration without
+   // wrapping it in an array
+   OrderedChoice typeDeclarations = new OrderedChoice("<typeDeclarations>([],[],)", OPTIONAL | REPEAT, classDeclaration, interfaceDeclaration, semicolon);
+   {
+      typeDeclarations.skipOnErrorParselet = skipTypeDeclError;
+   }
 
    Sequence packageDeclaration = new Sequence("Package(annotations,,name,)", OPTIONAL);
 
    public Sequence languageModel = new Sequence("JavaModel(,packageDef, imports, types)", spacing, packageDeclaration, imports, typeDeclarations);
+   {
+      // Should we set this?  We really need the language model to parse as best as it can
+      //languageModel.skipOnErrorSlot = 1;
+   }
 
    // TODO: refactor this to use languageModel and pass it through as the result type of compilationUnit
    public Sequence compilationUnit = new Sequence("JavaModel(,packageDef,imports,types,)");

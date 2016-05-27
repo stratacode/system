@@ -199,7 +199,9 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       // Need to skip the getInheritedAnnotation call made indirectly here for the case where this is just a sync'd model (i.e. a dynamic
       // merged model).
       JavaModel model = getJavaModel();
-      if (model.mergeDeclaration && !isLayerType) {
+      if (model == null)
+         System.out.println("***");
+      if (model != null && model.mergeDeclaration && !isLayerType) {
 
          // Can't access inherited annotations in start
          Object setting;

@@ -535,13 +535,11 @@ public class TestUtil {
                      ParseError err = ((ParseError) result);
                      result = err.getBestPartialValue();
                   }
-                  /*
-                  if (reparseFile.contains("82")) {
+                  if (reparseFile.contains("40")) {
                      System.out.println("***");
-                     SCLanguage.getSCLanguage().blockStatements.trace = true;
+                     SCLanguage.getSCLanguage().tryStatement.trace = true;
                      //SemanticNode.debugDiffTrace = true;
                   }
-                  */
                   if (result == null)
                      out("*** FAILURE: No previous result for reparse");
 
@@ -596,7 +594,7 @@ public class TestUtil {
                            // If we have an error in both parse and reparse and everything else matches and we have at least a partial parse of the
                            // value it's ok
                            if (reparsedString.startsWith(newResStr) && reparsedString.startsWith(parseStr)) {
-                              if (reparseSameAsParse)
+                              if (reparseSameAsParse || reparseSameAsOrig)
                                   parseSameAsOrig = reparseSameAsOrig = true;
                               else {
                                  error("*** FAILURE: Reparsed partial match does not match parsed partial match ");
@@ -610,7 +608,7 @@ public class TestUtil {
                            else {
                               if (!reparseSameAsOrig)
                                  error("*** REPARSE FAILURE - reparsed text does not match");
-                              else
+                              else if (!newResStr.startsWith(parseStr) || newResStr.length() - 1 != parseStr.length())
                                  error("*** REPARSE FAILURE - reparsed text does not match - parsed"); // is this possible?
                            }
                         }
@@ -803,7 +801,7 @@ public class TestUtil {
 
             Console c = System.console();
             if (opts.interactive && c != null) {
-               String ans = c.readLine("Accept new output? [yn]?");
+               String ans = c.readLine("Accept new output? [yn]? ");
                if (ans.equalsIgnoreCase("y") || ans.equalsIgnoreCase("yes")) {
                   FileUtil.renameFile(newVerifyFileName, testVerifyFileName);
                   FileUtil.renameFile(newOutputFileName, testOutputFileName);
@@ -830,7 +828,7 @@ public class TestUtil {
             }
          }
       }
-      else {
+      else if (testVerifyStr.length() > 0) {
          System.out.println("First run - saving verify out: " + testVerifyFileName + ", test output: " + testOutputFileName + " for: " + testId);
          FileUtil.saveStringAsFile(testVerifyFile, testVerifyStr, false);
          FileUtil.saveStringAsFile(testOutputFile, testOutputStr, false);

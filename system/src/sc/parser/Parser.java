@@ -236,10 +236,6 @@ public class Parser implements IString {
       // Always return the error which occurred furthers into the stream.  Probably should return the whole
       // list of these errors if there is more than one.
       if ((result == null || result instanceof ParseError) && currentErrors != null) {
-         if (language.debug) {
-            for (int i = 0; i < currentErrors.size(); i++)
-               System.out.println("Errors: " + i + ": " + currentErrors.get(i));
-         }
          if (enablePartialValues && result != null) {
             ParseError err = (ParseError) result;
             if (err.partialValue != null && err.endIndex != length()) {
@@ -247,6 +243,15 @@ public class Parser implements IString {
                   System.out.println("Partial value did not consume all of file - wrapping error node to parent element!");
 
             }
+            // Sometimes the produced partial value is say 0-1273 and the currentErrors all are 1274-1274.  We always choose
+            // an error that makes it further but in this case, the error with the information is the one returned in the partial value so
+            // we are adding it back in.
+            if (!currentErrors.contains(err))
+               currentErrors.add(err);
+         }
+         if (language.debug) {
+            for (int i = 0; i < currentErrors.size(); i++)
+               System.out.println("Errors: " + i + ": " + currentErrors.get(i));
          }
          result = wrapErrors();
       }

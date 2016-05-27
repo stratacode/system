@@ -701,6 +701,9 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       int startIndex = p.currentIndex;
       Object value = p.parseNext(this);
       p.resetCurrentIndex(startIndex);
+      // If the parselet is matching EOF, it returns null as a valid match.  Everything else should return a ParseError at EOF.
+      if (value == null && p.atEOF())
+         return true;
       return value != null && !(value instanceof ParseError);
    }
 

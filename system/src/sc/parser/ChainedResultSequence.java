@@ -320,6 +320,11 @@ public class ChainedResultSequence extends Sequence {
          if (pp.getParselet() == this)
             return super.getReparseChildNode(oldParseNode, ix, forceReparse);
       }
+      if (ix != 0 && forceReparse) {
+         if (oldParseNode != null) {
+            return null;
+         }
+      }
       // This parse noded matched the "chained result" the first slot but not the second.  Skip the second one altogether.
       // propagate the value to the first slot
       return ix == 0 || forceReparse ? oldParseNode : SKIP_CHILD;

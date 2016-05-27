@@ -1059,7 +1059,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       //   transformModifyInherited(ILanguageModel.RuntimeType.JAVA, false);
       JavaModel model = getJavaModel();
       // Don't do this for model streams
-      if (compoundName && model.mergeDeclaration) {
+      if (compoundName && model != null && model.mergeDeclaration) {
          replaceHiddenType(null);
       }
    }
@@ -2394,7 +2394,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       else {
          JavaModel model = getJavaModel();
          // For a modify type in a sync definition, the compiledClassName is the modifyTypeDecl's name
-         if (!model.mergeDeclaration) {
+         if (model == null || !model.mergeDeclaration) {
             if (modifyClass != null)
                return ModelUtil.getTypeName(modifyClass);
             else if (modifyTypeDecl != null)
@@ -2534,7 +2534,7 @@ public class ModifyDeclaration extends TypeDeclaration {
    public Object getCompiledImplements() {
       Object cimpl;
       JavaModel model = getJavaModel();
-      if (model.mergeDeclaration && modifyTypeDecl instanceof TypeDeclaration) {
+      if (model != null && model.mergeDeclaration && modifyTypeDecl instanceof TypeDeclaration) {
          cimpl = ((TypeDeclaration) modifyTypeDecl).getCompiledImplements();
          if (cimpl != null)
             return cimpl;
@@ -2545,7 +2545,7 @@ public class ModifyDeclaration extends TypeDeclaration {
    public List<Statement> getInitStatements(InitStatementsMode mode, boolean isTransformed) {
       List<Statement> res = null;
       JavaModel model = getJavaModel();
-      if (model.mergeDeclaration && modifyTypeDecl != null && !modifyInherited) {
+      if (model != null && model.mergeDeclaration && modifyTypeDecl != null && !modifyInherited) {
          BodyTypeDeclaration modTD = modifyTypeDecl;
          if (isTransformed) {
             BodyTypeDeclaration xformType = modTD.getTransformedResult();

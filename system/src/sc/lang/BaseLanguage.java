@@ -254,8 +254,8 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
 
    /** Use this to create a parselet for your repeating parselets skipOnError parselet.  It's used to consume the next error token while trying to skip out
     * of the body of something which is incomplete.  It must consume all text except for the text which would ordinarily complete the parent. */
-   public Parselet createSkipOnErrorParselet(String... exitSymbols) {
-      return new OrderedChoice("<skipBodyError>(.,.)", alphaNumString, new Sequence(new SymbolChoice(NOT, exitSymbols), spacing));
+   public Parselet createSkipOnErrorParselet(String name, String... exitSymbols) {
+      return new OrderedChoice(name + "(.,.)", alphaNumString, new Sequence(new SymbolChoice(NOT, exitSymbols), spacing));
    }
 
    Sequence identifierSp = (Sequence) identifier.copy();

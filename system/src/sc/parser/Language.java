@@ -276,6 +276,10 @@ public abstract class Language extends LayerFileComponent {
          else if (parseTree instanceof ParseError)
             wrapPartialValues((ParseError) parseTree, parser);
       }
+      else if (pnode instanceof PartialValueParseNode) {
+         // At some point this node was a partial result but has now reset itself so clear this out
+         ((PartialValueParseNode) pnode).unparsedLen = 0;
+      }
 
       if (debugReparse) {
          /*

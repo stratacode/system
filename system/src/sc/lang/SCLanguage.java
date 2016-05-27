@@ -51,8 +51,12 @@ public class SCLanguage extends JavaLanguage {
    KeywordSpace scopeKeyword = new KeywordSpace("scope");
    public Sequence scopeModifier = new Sequence("ScopeModifier(,,scopeName,)", scopeKeyword, lessThan, identifier, greaterThan);
 
-   Sequence modifyDeclarationWithoutModifiers = new Sequence("ModifyDeclaration(typeName,typeParameters, extendsTypes,implementsTypes,,body,)",
+   Sequence modifyDeclarationWithoutModifiers = new Sequence("ModifyDeclaration(typeName,typeParameters,extendsTypes,implementsTypes,,body,)",
             qualifiedIdentifier, optTypeParameters, extendsTypes, implementsTypes, openBraceEOL, classBodyDeclarations, closeBraceEOL);
+   {
+      // This prevents just "typeName" from parsing - we should need at least an open-brace after that.
+      modifyDeclarationWithoutModifiers.minContentSlot = 4;
+   }
 
    Sequence modifyDeclaration = new Sequence("(modifiers,.)", modifiers, modifyDeclarationWithoutModifiers);
 
@@ -92,6 +96,7 @@ public class SCLanguage extends JavaLanguage {
    {
       // Redefine Java's type declaration parameter mapping and children to add the "modifyDeclaration".  Just like Java use semicolon not semicolonEOL so we do not get skipOnError
       typeDeclaration.set("(.,.,.,)", classDeclaration, interfaceDeclaration, modifyDeclaration, semicolon);
+      typeDeclarations.set("([],[],[],)", classDeclaration, interfaceDeclaration, modifyDeclaration, semicolon);
 
       // The operator is now a valid object.  We are overriding the class declaration for now even though objects don't
       // support implements

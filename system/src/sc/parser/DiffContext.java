@@ -98,8 +98,14 @@ public class DiffContext {
 
    public void setChangedRegion(Parser parser, boolean newVal) {
       if (newVal) {
-         if (changeStartOffset == -1 || changeStartOffset > parser.currentIndex)
+         if (changeStartOffset == -1 || changeStartOffset > parser.currentIndex) {
             changeStartOffset = parser.currentIndex;
+            // The changeStartOffset gets set when the beforeFirstNode is encountered in parsing.  If for some reason
+            // this happens after the changes start, we should still mark the changes as starting where they do.
+            if (changeStartOffset > startChangeOffset) {
+               changeStartOffset = startChangeOffset;
+            }
+         }
       }
       else {
          if (changeEndOffset == -1 || changeEndOffset < parser.currentIndex) {
