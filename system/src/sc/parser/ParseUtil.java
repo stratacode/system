@@ -701,6 +701,10 @@ public class ParseUtil  {
       return parseNodeObj;
    }
 
+   public static void reformatParseNode(IParseNode node) {
+      node.formatString(null, null, -1, true);
+   }
+
    /** Re-applies default spacing/new line rules to the parse node given.  The spacing and newline objects have their parse nodes replaced by the generateParseNode */
    public static void resetSpacing(ISemanticNode node) {
       IParseNode opn = node.getParseNode();

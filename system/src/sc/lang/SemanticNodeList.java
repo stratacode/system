@@ -290,8 +290,12 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
    }
 
    public E remove(int index) {
+      return remove(index, true);
+   }
+
+   public E remove(int index, boolean updateParseNodes) {
       E element = super.get(index);
-      if (started && parseNode != null) {
+      if (started && parseNode != null && updateParseNodes) {
          Parselet parselet = parseNode.getParselet();
 
          //if (!parselet.language.trackChanges) {
@@ -340,11 +344,18 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
    }
 
    public boolean addAll(Collection<? extends E> c) {
-      return addAll(size(), c);
+      return addAll(c, true, true);
    }
 
-   public boolean addAll(int index, Collection<? extends E> c)
-   {
+   public boolean addAll(Collection<? extends E> c, boolean setParent, boolean updateParseNodes) {
+      return addAll(size(), c, setParent, updateParseNodes);
+   }
+
+   public boolean addAll(int index, Collection<? extends E> c) {
+      return addAll(index, c, true, true);
+   }
+
+   public boolean addAll(int index, Collection<? extends E> c, boolean setParent, boolean updateParseNodes) {
       if (c == this) {
          System.out.println("*** Error - attempt to add a collection to itself");
          return false;
@@ -352,18 +363,18 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       ensureCapacity(size() + c.size());
       int i = 0;
       for (E e:c)
-         super.add(index + i++, e);
+         add(index + i++, e, setParent, updateParseNodes);
 
       // It's best to first init and then start all components after all have been added.  Otherwise, for example, the start method
       // after each statement will revalidate the caches.  We need init to run first so the propertyName of all methodDefinitions is set
       // when the start method of the first entry is run.
       i = 0;
       for (E e:c)
-         updateElement(index + i++, e, true, NestedParselet.ChangeType.ADD, true, true);
+         updateElement(index + i++, e, setParent, NestedParselet.ChangeType.ADD, true, updateParseNodes);
 
       i = 0;
       for (E e:c)
-         updateElement(index + i++, e, true, NestedParselet.ChangeType.ADD, false, false);
+         updateElement(index + i++, e, setParent, NestedParselet.ChangeType.ADD, false, false);
 
       return i != 0;
    }
@@ -449,8 +460,12 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
    }
 
    public void clear() {
+      clear(false);
+   }
+
+   public void clear(boolean updateParseNodes) {
       while (size() > 0)
-         remove(size()-1);
+         remove(size()-1, updateParseNodes);
    }
 
    public ISemanticNode deepCopy(int options, IdentityHashMap<Object, Object> oldNewMap) {

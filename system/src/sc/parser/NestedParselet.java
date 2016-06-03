@@ -1415,7 +1415,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                SemanticNodeList parentList = (SemanticNodeList) parent.value;
                if (childIndex == -1 || parentList.size() <= childIndex) {
                   Object newElement = createInstance(parser, resultClass);
-                  parentList.add(newElement);
+                  parentList.add(newElement, true, false);
                }
                // TODO: else - do we need to check if the element parentList.get(childIndex) is an instanceof resultClass?
             }
@@ -1500,14 +1500,14 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                         }
                         else {
                            if (childIndex == -1)
-                              ((List) parent.value).addAll((List) sv);
+                              ((SemanticNodeList) parent.value).addAll((List) sv, true, false);
                            else if (sv != parent.value) {
                               // Two different cases here - if we have a pattern like ([], []) we are combining two arrays and
                               // so need to replace the old one starting at childIndex with the new one.  This case probably requires
                               // more work in more complex situations of reparsing
                               // The other case is (,[],) where we have childIndex == 1 but it is all one array.
                               if (childIndex > 0 && appendArray) {
-                                 List parentList = (List) parent.value;
+                                 SemanticNodeList parentList = (SemanticNodeList) parent.value;
                                  List newList = (List) sv;
                                  int newSize = newList.size();
                                  int oldSize = parentList.size();
@@ -1518,9 +1518,9 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                                  }
                                  for (int newIx = 0; newIx < newSize; newIx++) {
                                     if (newIx + childIndex < parentList.size())
-                                       parentList.set(newIx + childIndex, newList.get(newIx));
+                                       parentList.set(newIx + childIndex, newList.get(newIx), true, false);
                                     else
-                                       parentList.add(newList.get(newIx));
+                                       parentList.add(newList.get(newIx), true, false);
                                  }
                               }
                               else {
@@ -1569,7 +1569,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                         // Maybe we should set this to null here?
                         if (propagatesArray() && !allowNullElements) {
                            if (values.size() > 0)
-                              values.clear();
+                              values.clear(false);
                         }
                         else {
                            // This is false for typical identifier expression "a." but for partial values we need
@@ -1589,12 +1589,12 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                            else if (allowEmptyPartialElements && parser.enablePartialValues)
                               values.set(childIndex, PString.EMPTY_STRING, true, false);
                            else
-                              values.remove(childIndex);
+                              values.remove(childIndex, false);
                         }
                         else {
                            // TODO: for the cases when we are combining two arrays, how can we map from slot index to array range
                            // to update this correctly?
-                           values.clear();
+                           values.clear(false);
                         }
                      }
                   }
@@ -1646,9 +1646,9 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                   SemanticNodeList values = (SemanticNodeList) parent.getSemanticValue();
                   if (values != null) {
                      if (propagatesArray())
-                        values.clear();
+                        values.clear(false);
                      else if (childIndex != -1 && values.size() > childIndex)
-                        values.remove(childIndex);
+                        values.remove(childIndex, false);
                   }
                   break;
                 /*
@@ -1823,7 +1823,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                      if (parent.value != null) {
                         Object sv = ((IParseNode) node).getSemanticValue();
                         if (parent.value instanceof List) {
-                           List parentList = (List) parent.value;
+                           SemanticNodeList parentList = (SemanticNodeList) parent.value;
 
                            if (sv instanceof List) {
                               List svList = (List) sv;
@@ -1831,7 +1831,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                                  Object svElem = svList.get(svix);
                                  int oldIx = parentList.indexOf(svElem);
                                  if (oldIx != -1)
-                                    parentList.remove(oldIx);
+                                    parentList.remove(oldIx, false);
                                  else
                                     System.err.println("*** Could not find old element in semenatic value - not removing");
                               }
@@ -1840,7 +1840,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                               int plix;
                               for (plix = 0; plix < parentList.size(); plix++) {
                                  if (parentList.get(plix) == sv) {
-                                    parentList.remove(plix);
+                                    parentList.remove(plix, false);
                                     break;
                                  }
                               }

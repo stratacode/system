@@ -43,6 +43,9 @@ public class SpacingParseNode extends FormattingParseNode {
    }
 
    public void format(FormatContext ctx) {
+      if (ctx.replaceFormatting) {
+         ctx.setReplaceNode(this);
+      }
       if (ctx.semanticValueOnly)
          return;
       int prevInt = ctx.prevChar();

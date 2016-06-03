@@ -360,7 +360,7 @@ public class ParentParseNode extends AbstractParseNode {
       return len;
    }
    public String toString() {
-      return formatString(null, null, -1);
+      return formatString(null, null, -1, false);
    }
 
    private FormatContext createFormatContext(Object parSemVal, ParentParseNode curParseNode, int curChildIndex) {
@@ -380,7 +380,7 @@ public class ParentParseNode extends AbstractParseNode {
     * If null is specified, it's no problem as long as this parse-node's semantic value has a parent.  Some primitive parse nodes have a string
     * semantic value with no ref to their parent.  For the spacing to be computed properly we need this context (for FormatContext.getNextSemanticValue())
     */
-   public String formatString(Object parSemVal, ParentParseNode curParseNode, int curChildIndex) {
+   public String formatString(Object parSemVal, ParentParseNode curParseNode, int curChildIndex, boolean replaceFormatting) {
       // If the parse node is generated, we need to use the formatting process to add in
       // the spacing.  If the parse node was parsed, we toString it just as it
       // was parsed so we get back the identical input strings.
@@ -389,6 +389,7 @@ public class ParentParseNode extends AbstractParseNode {
       // If there's overhead here, we could still optimize the case where there are no invalidated children nodes
       if (isGeneratedTree()) {
          FormatContext ctx = createFormatContext(parSemVal, curParseNode, curChildIndex);
+         ctx.replaceFormatting = true;
          //ctx.append(FormatContext.INDENT_STR);
          PerfMon.start("format", false);
          format(ctx);
@@ -487,14 +488,19 @@ public class ParentParseNode extends AbstractParseNode {
 
       FormatContext.Entry ent = visitForFormat(ctx);
       try {
-         for (Object p:children) {
+         int len = children.size();
+         for (int i = 0; i < len; i++) {
+            Object p = children.get(i);
             if (p instanceof IParseNode) {
                IParseNode node = (IParseNode) p;
                Parselet parselet = node.getParselet();
                if (parselet == null)
                   node.format(ctx);
-               else
+               else {
                   parselet.format(ctx, node);
+                  if (ctx.replaceNode == node)
+                     children.set(i, ctx.createReplaceNode());
+               }
             }
             else if (p != null) {
                ctx.append((CharSequence) p);

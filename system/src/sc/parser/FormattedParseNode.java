@@ -22,8 +22,13 @@ public class FormattedParseNode extends ParseNode {
    public void format(FormatContext ctx) {
       super.format(ctx);
       if (formattingParseNodes != null) {
-         for (IParseNode pn:formattingParseNodes) {
+         int len = formattingParseNodes.length;
+         for (int i = 0; i < len; i++) {
+            IParseNode pn = formattingParseNodes[i];
             pn.format(ctx);
+            if (ctx.replaceNode == pn) {
+               formattingParseNodes[i] = ctx.createReplaceNode();
+            }
          }
       }
    }
@@ -53,10 +58,10 @@ public class FormattedParseNode extends ParseNode {
    }
 
    public String toString() {
-      return formatString(null, null, -1);
+      return formatString(null, null, -1, false);
    }
 
-   public String formatString(Object parSemVal, ParentParseNode parParseNode, int curChildIndex) {
+   public String formatString(Object parSemVal, ParentParseNode parParseNode, int curChildIndex, boolean removeFormatting) {
       if (generated) {
          int initIndent;
 
@@ -67,6 +72,7 @@ public class FormattedParseNode extends ParseNode {
          else
             initIndent = 0;
          FormatContext ctx = new FormatContext(parParseNode, curChildIndex, initIndent, getNextSemanticValue(parSemVal), parSemVal);
+         ctx.replaceFormatting = true;
          //ctx.append(FormatContext.INDENT_STR);
          format(ctx);
          return ctx.getResult().toString();

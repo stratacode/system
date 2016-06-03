@@ -68,8 +68,11 @@ public class ParseNode extends AbstractParseNode {
    }
 
    public void format(FormatContext ctx) {
-      if (value instanceof IParseNode)
-         ((IParseNode)value).format(ctx);
+      if (value instanceof IParseNode) {
+         ((IParseNode) value).format(ctx);
+         if (ctx.replaceNode == this)
+            value = ctx.createReplaceNode();
+      }
       else
          ctx.append(value.toString());
    }

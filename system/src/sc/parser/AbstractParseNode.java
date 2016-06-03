@@ -154,7 +154,7 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
       return false;
    }
 
-   public String formatString(Object parentSemVal, ParentParseNode parParseNode, int curChildIndex) {
+   public String formatString(Object parentSemVal, ParentParseNode parParseNode, int curChildIndex, boolean removeFormattingNodes) {
       return toString();
    }
 

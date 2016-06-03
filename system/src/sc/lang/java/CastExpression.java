@@ -43,6 +43,8 @@ public class CastExpression extends ChainedExpression {
    }
 
    public Object getTypeDeclaration() {
+      if (type == null)
+         return null;
       return type.getTypeDeclaration();
    }
 

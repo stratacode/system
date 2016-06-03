@@ -63,7 +63,7 @@ public abstract class FormattingParseNode extends AbstractParseNode {
    // where we are in the parse tree.  Or we could just reparse the entire file on the first change
    // and only do the incremental stuff on the second change.
    public void findStartDiff(DiffContext ctx, boolean atEnd, Object parSemVal, ParentParseNode parParseNode, int childIx) {
-      String nodeText = formatString(parSemVal, parParseNode, childIx);
+      String nodeText = formatString(parSemVal, parParseNode, childIx, false);
       String text = ctx.text;
       int textLen = text.length();
       int nodeTextLen = nodeText.length();
@@ -91,7 +91,7 @@ public abstract class FormattingParseNode extends AbstractParseNode {
    }
 
    public void findEndDiff(DiffContext ctx, Object parSemVal, ParentParseNode parParseNode, int childIx) {
-      String nodeText = formatString(parSemVal, parParseNode, childIx);
+      String nodeText = formatString(parSemVal, parParseNode, childIx, false);
       if (nodeText == null)
          return;
       String text = ctx.text;
