@@ -14,9 +14,7 @@ import sc.util.FileUtil;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.StringReader;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 /**
  * This class defines the grammar modifications to Java for the V language.  Essentially:
@@ -38,6 +36,11 @@ public class SCLanguage extends JavaLanguage {
       SC_VARNAME_KEYWORD_SET.add(PString.toPString("object"));
       SC_VARNAME_KEYWORD_SET.add(PString.toPString("override"));
       SC_VARNAME_KEYWORD_SET.add(PString.toPString("scope"));
+   }
+
+   protected static final List<String> SC_CLASS_LEVEL_KEYWORDS = new ArrayList<String>(Arrays.asList("object", "override", "scope"));
+   static {
+      SC_CLASS_LEVEL_KEYWORDS.addAll(JavaLanguage.CLASS_LEVEL_KEYWORDS);
    }
 
    public Set getKeywords() {
@@ -235,5 +238,9 @@ public class SCLanguage extends JavaLanguage {
             System.out.println("*** processed: " + fileName);
          }
       }
+   }
+
+   public List<String> getClassLevelKeywords() {
+      return SC_CLASS_LEVEL_KEYWORDS;
    }
 }

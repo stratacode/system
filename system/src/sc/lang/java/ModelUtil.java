@@ -5779,7 +5779,7 @@ public class ModelUtil {
    }
 
    public static void suggestMembers(JavaModel model, Object type, String prefix, Set<String> candidates, boolean includeGlobals,
-                                     boolean includeProps, boolean includeMethods) {
+                                     boolean includeProps, boolean includeMethods, boolean includeClassBodyKeywords) {
       if (type != null) {
          if (includeProps) {
             Object[] props = getProperties(type, null);
@@ -5818,9 +5818,17 @@ public class ModelUtil {
          Object encType = getEnclosingType(type);
 
          if (encType != null) // Include members that are visible in the namespace
-            suggestMembers(model, encType, prefix, candidates, includeGlobals, includeProps, includeMethods);
+            suggestMembers(model, encType, prefix, candidates, true, includeProps, includeMethods, false);
          else // only for the root - search the global ones
             model.findMatchingGlobalNames(prefix, candidates);
+      }
+      if (includeClassBodyKeywords && model.getLanguage() instanceof JavaLanguage) {
+         List<String> keywords = ((JavaLanguage) model.getLanguage()).getClassLevelKeywords();
+         for (int i = 0; i < keywords.size(); i++) {
+            String keyword = keywords.get(i);
+            if (keyword.startsWith(prefix))
+               addCompletionCandidate(candidates, keyword);
+         }
       }
    }
 

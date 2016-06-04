@@ -456,7 +456,7 @@ public abstract class JavaSemanticNode extends SemanticNode {
       return -1;
    }
 
-   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, int offset, String dummyIdentifier, Set<String> candidates) {
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
       return null;
    }
 

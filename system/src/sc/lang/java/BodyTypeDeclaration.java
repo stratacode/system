@@ -451,7 +451,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if (st instanceof ITypeDeclaration) {
             ITypeDeclaration it = (ITypeDeclaration) st;
 
-            st.addMemberByName(membersByName, it.getTypeName());
+            String typeName = it.getTypeName();
+            if (typeName != null)
+               st.addMemberByName(membersByName, typeName);
          }
          else
             st.addMembersByName(membersByName);
@@ -8834,5 +8836,27 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public void ensureExtendsAreSource() {
+   }
+
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
+      ModelUtil.suggestMembers(origModel, this, matchPrefix, candidates, true, true, true, true);
+      return matchPrefix;
+   }
+
+   public void stop() {
+      memberCache = null;
+      membersByName = null;
+      methodsByName = null;
+      propertyCache = null;
+      instFields = null;
+      allMethods = null;
+      staticValues = null;
+      staticFieldMap = null;
+      oldInstFields = null;
+      oldStaticFields = null;
+      dynTransientFields = null;
+      innerObjs = null;
+      defaultConstructor = null;
+      super.stop();
    }
 }

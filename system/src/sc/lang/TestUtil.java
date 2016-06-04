@@ -536,10 +536,10 @@ public class TestUtil {
                      result = err.getBestPartialValue();
                   }
                   /*
-                  if (reparseFile.contains("3")) {
+                  if (reparseFile.contains("69")) {
                      System.out.println("***");
-                     SCLanguage.getSCLanguage().primaryExpression.trace = true;
-                     //SemanticNode.debugDiffTrace = true;
+                     //SCLanguage.getSCLanguage().classTypeChainedTypes.trace = true;
+                     SemanticNode.debugDiffTrace = true;
                   }
                   */
                   if (result == null)

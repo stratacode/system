@@ -1027,7 +1027,9 @@ public class Sequence extends NestedParselet  {
                      Object nv = matchedValues.get(i);
                      oldChildParseNode = oldParent == null || i >= oldParent.children.size() ? null : oldParent.children.get(i);
                      //if (nv != null) // need an option to preserve nulls?
-                     if (value.addForReparse(nv, parselets.get(i), svCount, newChildCount++, i, false, parser, oldChildParseNode, dctx, true, true))
+                     // Only remove the extra nodes on the last value - that uses parser.currentIndex which has advanced up to after the last matched value
+                     boolean removeExtraNodes = i == numMatchedValues - 1;
+                     if (value.addForReparse(nv, parselets.get(i), svCount, newChildCount++, i, false, parser, oldChildParseNode, dctx, removeExtraNodes, true))
                         svCount++;
                   }
                }

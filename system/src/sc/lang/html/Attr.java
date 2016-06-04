@@ -253,7 +253,7 @@ public class Attr extends Node implements ISrcStatement {
          // The tag object will not have been defined in most cases so just use the extends type from the tag to suggest members
          Object baseClass = enclTag.getExtendsTypeDeclaration();
          if (baseClass != null) {
-            ModelUtil.suggestMembers(getJavaModel(), baseClass, attName, candidates, false, true, false);
+            ModelUtil.suggestMembers(getJavaModel(), baseClass, attName, candidates, false, true, false, false);
          }
          return 0;
       }

@@ -911,7 +911,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
 
       JavaModel model = getJavaModel();
       if (obj != null)
-         ModelUtil.suggestMembers(model, obj, lastIdent, candidates, false, true, true);
+         ModelUtil.suggestMembers(model, obj, lastIdent, candidates, false, true, true, false);
 
       return pos;
    }

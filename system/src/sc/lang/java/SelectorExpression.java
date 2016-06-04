@@ -734,7 +734,7 @@ public class SelectorExpression extends ChainedExpression {
          if (!(obj instanceof Class) && !(obj instanceof ITypeDeclaration)) {
             obj = obj.getClass();
          }
-         ModelUtil.suggestMembers(getJavaModel(), obj, lastIdent, candidates, false, true, true);
+         ModelUtil.suggestMembers(getJavaModel(), obj, lastIdent, candidates, false, true, true, false);
          return pos;
       }
       else {

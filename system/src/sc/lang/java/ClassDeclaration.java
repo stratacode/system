@@ -1341,7 +1341,7 @@ public class ClassDeclaration extends TypeDeclaration {
          if (parseNode != null && parseNode.toString().endsWith(extName)) {
             JavaModel model = getJavaModel();
             if (currentType != null)
-               ModelUtil.suggestMembers(model, currentType, extName, candidates, true, false, false);
+               ModelUtil.suggestMembers(model, currentType, extName, candidates, true, false, false, false);
             ModelUtil.suggestTypes(model, extName, "", candidates, true);
             ModelUtil.suggestTypes(model, prefix, extName, candidates, true);
             if (extName.equals(""))

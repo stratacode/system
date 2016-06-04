@@ -3910,7 +3910,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       }
    }
 
-   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, int offset, String dummyIdentifier, Set<String> candidates) {
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
       List<IString> idents = getAllIdentifiers();
       if (idents == null)
          return null;
@@ -3934,7 +3934,7 @@ public class IdentifierExpression extends ArgumentsExpression {
 
             boolean includeGlobals = idents.size() == 1;
             if (curType != null)
-               ModelUtil.suggestMembers(origModel, curType, matchPrefix, candidates, includeGlobals, true, true);
+               ModelUtil.suggestMembers(origModel, curType, matchPrefix, candidates, includeGlobals, true, true, false);
             else if (origModel != null) {
                ModelUtil.suggestTypes(origModel, origModel.getPackagePrefix(), matchPrefix, candidates, includeGlobals);
             }
@@ -4025,7 +4025,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          return pos;
       boolean includeGlobals = idSize == 1 && !emptyDotName;
       if (obj != null)
-         ModelUtil.suggestMembers(model, obj, lastIdent, candidates, includeGlobals, true, true);
+         ModelUtil.suggestMembers(model, obj, lastIdent, candidates, includeGlobals, true, true, false);
       else {
          ModelUtil.suggestTypes(model, prefix, lastIdent, candidates, includeGlobals);
       }

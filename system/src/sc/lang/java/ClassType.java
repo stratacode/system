@@ -959,7 +959,7 @@ public class ClassType extends JavaType {
 
       ModelUtil.suggestTypes(model, prefix, typeName, candidates, true);
       if (currentType != null)
-         ModelUtil.suggestMembers(model, currentType, typeName, candidates, true, includeProps, includeProps);
+         ModelUtil.suggestMembers(model, currentType, typeName, candidates, true, includeProps, includeProps, true);
 
       IBlockStatement enclBlock = getEnclosingBlockStatement();
       if (enclBlock != null)
@@ -969,6 +969,26 @@ public class ClassType extends JavaType {
          return pos;
 
       return -1;
+   }
+
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
+      String packagePrefix;
+      boolean isQualifiedType = false;
+      if (matchPrefix.contains(".")) {
+         packagePrefix = CTypeUtil.getPackageName(matchPrefix);
+         matchPrefix = CTypeUtil.getClassName(matchPrefix);
+         isQualifiedType = true;
+      }
+      else {
+         packagePrefix = origModel.getPackagePrefix();
+      }
+      ModelUtil.suggestTypes(origModel, packagePrefix, matchPrefix, candidates, true);
+      if (origModel != null && !isQualifiedType) {
+         Object currentType = origNode == null ? origModel.getModelTypeDeclaration() : origNode.getEnclosingType();
+         if (currentType != null)
+            ModelUtil.suggestMembers(origModel, currentType, typeName, candidates, true, true, true, true);
+      }
+      return matchPrefix;
    }
 
    public boolean applyPartialValue(Object value) {

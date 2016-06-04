@@ -2633,8 +2633,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                if (!peerMode && peerSystems != null) {
                   for (int i = 0; i < peerSystems.size(); i++) {
                      LayeredSystem peerSys = peerSystems.get(i);
-                     Layer peerRefLayer = peerSys.getPeerLayerFromRemote(refLayer);
-                     if (peerRefLayer != null)
+                     Layer peerRefLayer = refLayer == null ? null : peerSys.getPeerLayerFromRemote(refLayer);
+                     if (peerRefLayer != null || refLayer == null)
                         peerSys.findMatchingGlobalNames(null, peerRefLayer, prefix, prefixPkg, prefixBaseName, candidates, retFullTypeName, srcOnly);
                   }
                }

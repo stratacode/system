@@ -13,6 +13,7 @@ import sc.parser.*;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /** This is the main implementation class for the Java parser and grammar.  Like all languages 
@@ -32,6 +33,8 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
            "final",     "interface",   "static",     "void",      "class",
            "finally",   "long",        "strictfp",   "volatile",  "const",
            "float",     "native",      "super",      "while",     "enum"};
+
+   protected static final List<String> CLASS_LEVEL_KEYWORDS = Arrays.asList("class", "enum", "const", "final", "abstract", "native", "volatile", "public", "private", "interface", "transient", "synchronized");
 
    protected static Set<IString> JAVA_KEYWORD_SET = new HashSet<IString>(Arrays.asList(PString.toPString(JAVA_KEYWORDS)));
 
@@ -93,9 +96,10 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    }
    public Sequence optTypeArguments = new Sequence("(.)", OPTIONAL, typeArguments);
 
+   Sequence classTypeChainedTypes = new Sequence("ClassType(, typeName, typeArguments)", OPTIONAL | REPEAT, periodSpace, identifier, optTypeArguments);
+
    public Sequence classOrInterfaceType =
-           new Sequence("ClassType(typeName, typeArguments, chainedTypes)", identifier, optTypeArguments,
-                    new Sequence("ClassType(, typeName, typeArguments)", OPTIONAL | REPEAT, periodSpace, identifier, optTypeArguments));
+           new Sequence("ClassType(typeName, typeArguments, chainedTypes)", identifier, optTypeArguments, classTypeChainedTypes);
    {
       type.set(new OrderedChoice(classOrInterfaceType, primitiveType), openCloseSqBrackets);
    }
@@ -872,6 +876,10 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    public boolean getSupportsLongTypeSuffix() {
       return true;
+   }
+
+   public List<String> getClassLevelKeywords() {
+      return CLASS_LEVEL_KEYWORDS;
    }
 
 }
