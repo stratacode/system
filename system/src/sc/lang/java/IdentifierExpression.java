@@ -3910,6 +3910,46 @@ public class IdentifierExpression extends ArgumentsExpression {
       }
    }
 
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, int offset, String dummyIdentifier, Set<String> candidates) {
+      List<IString> idents = getAllIdentifiers();
+      if (idents == null)
+         return null;
+
+      IdentifierExpression origIdent = origNode instanceof IdentifierExpression ? (IdentifierExpression) origNode : null;
+
+      int i = 0;
+      for (IString ident:idents) {
+         String identStr = ident.toString();
+         int dummyIx = identStr.indexOf(dummyIdentifier);
+         if (dummyIx != -1) {
+            String matchPrefix = identStr.substring(0, dummyIx);
+
+            Object curType = origNode == null ? origModel.getModelTypeDeclaration() : origNode.getEnclosingType();
+
+            if (origIdent != null && i > 0 && origIdent.boundTypes != null && origIdent.boundTypes.length >= i) {
+               curType = origIdent.getTypeForIdentifier(i-1);
+               if (curType == null) // If we can't resolve the type for the previous we should restrict it to a type - not show global names
+                  curType = Object.class;
+            }
+
+            boolean includeGlobals = idents.size() == 1;
+            if (curType != null)
+               ModelUtil.suggestMembers(origModel, curType, matchPrefix, candidates, includeGlobals, true, true);
+            else if (origModel != null) {
+               ModelUtil.suggestTypes(origModel, origModel.getPackagePrefix(), matchPrefix, candidates, includeGlobals);
+            }
+
+            IBlockStatement enclBlock = getEnclosingBlockStatement();
+            if (enclBlock != null)
+               ModelUtil.suggestVariables(enclBlock, matchPrefix, candidates);
+
+            return matchPrefix;
+         }
+         i++;
+      }
+      return null;
+   }
+
    public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
       List<IString> idents = getAllIdentifiers();
       if (idents == null)

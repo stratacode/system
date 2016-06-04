@@ -56,6 +56,16 @@ public class ChainedResultSequence extends Sequence {
          return super.addResultToParent(node, parent, index, parser);
    }
 
+   public boolean addReparseResultToParent(Object node, ParentParseNode parent, int svIndex, int childIndex, int slotIndex, Parser parser, Object oldChildParseNode, DiffContext dctx, boolean removeExtraNodes, boolean parseArray) {
+      ParentParseNode pnode = (ParentParseNode) node;
+      if (pnode.children.get(1) == null) {
+         parent.addForReparse(pnode.children.get(0), this, svIndex, childIndex, slotIndex, false, parser, oldChildParseNode, dctx, removeExtraNodes, parseArray);
+         return false;
+      }
+      else
+         return super.addReparseResultToParent(node, parent, svIndex, childIndex, slotIndex, parser, oldChildParseNode, dctx, removeExtraNodes, parseArray);
+   }
+
    public boolean setResultOnParent(Object node, ParentParseNode parent, int index, Parser parser) {
       ParentParseNode pnode = (ParentParseNode) node;
       if (pnode.children.get(1) == null) {

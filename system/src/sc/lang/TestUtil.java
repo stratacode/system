@@ -536,9 +536,9 @@ public class TestUtil {
                      result = err.getBestPartialValue();
                   }
                   /*
-                  if (reparseFile.contains("40")) {
+                  if (reparseFile.contains("3")) {
                      System.out.println("***");
-                     SCLanguage.getSCLanguage().tryStatement.trace = true;
+                     SCLanguage.getSCLanguage().primaryExpression.trace = true;
                      //SemanticNode.debugDiffTrace = true;
                   }
                   */

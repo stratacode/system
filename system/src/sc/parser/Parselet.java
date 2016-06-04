@@ -260,6 +260,22 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       return true;
    }
 
+   public boolean addReparseResultToParent(Object node, ParentParseNode parent, int svIndex, int childIndex, int slotIndex, Parser parser, Object oldChildParseNode, DiffContext dctx, boolean removeExtraNodes, boolean parseArray) {
+      // Exclude this entirely from the result
+      if (getDiscard() || getLookahead())
+         return false;
+
+      if (getSkip()) {
+         AbstractParseNode pn = (AbstractParseNode) node;
+         if (pn.canSkip()) {
+            parent.addForReparse(pn.getSkippedValue(), this, svIndex, childIndex, slotIndex, true, parser, oldChildParseNode, dctx, removeExtraNodes, parseArray);
+            return false;
+         }
+      }
+
+      return true;
+   }
+
    /**
     * This method replicates the functionality of addResultToParent for the special case where we are parsing errors
     * and we've reparsed the value of a node and need to replace it in it's parent before returning.  It only handles

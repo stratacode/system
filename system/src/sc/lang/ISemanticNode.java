@@ -11,6 +11,7 @@ import sc.parser.Language;
 import sc.parser.Parselet;
 
 import java.util.IdentityHashMap;
+import java.util.List;
 
 /**
  * The semantic node interfaface is implemented by primarily SemanticNode and SemanticNodeList.  Instances of this interface
@@ -102,6 +103,8 @@ public interface ISemanticNode {
 
    public boolean getTransformed();
 
+   public boolean isStarted();
+
    public boolean isValidated();
 
    /** Regenerates the parsed description for this node */
@@ -153,4 +156,5 @@ public interface ISemanticNode {
 
    /** Most statements if started before the newline that signals a breakpoint should be considered the 'source statement' for that line.  Block statement is used to signal the end of the statement and is an exception.  */
    public boolean isTrailingSrcStatement();
+
 }

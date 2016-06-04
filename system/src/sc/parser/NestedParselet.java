@@ -1513,7 +1513,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                                  int oldSize = parentList.size();
                                  // The new list is smaller than the old one so trim the old one down first
                                  while (oldSize > newSize + childIndex) {
-                                    parentList.remove(oldSize - 1);
+                                    parentList.remove(oldSize - 1, false);
                                     oldSize--;
                                  }
                                  for (int newIx = 0; newIx < newSize; newIx++) {
@@ -1832,8 +1832,8 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                                  int oldIx = parentList.indexOf(svElem);
                                  if (oldIx != -1)
                                     parentList.remove(oldIx, false);
-                                 else
-                                    System.err.println("*** Could not find old element in semenatic value - not removing");
+                                 //else
+                                 //   System.err.println("*** Could not find old element in semenatic value - not removing");
                               }
                            }
                            else {
@@ -1935,10 +1935,15 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       if (mapping instanceof BeanMapper && (beanMapper = (BeanMapper) mapping).isScalarToList() && value instanceof ISemanticNode) {
          ISemanticNode childNode = (ISemanticNode) value;
          SemanticNodeList snl = new SemanticNodeList(1);
+         ISemanticNode sn = (ISemanticNode) semNode;
+         // During reparse, the semantic node here is already started, as may be the array element.  If the list is not started as we won't stop it and
+         // clear out syntax errors in the list element.   We could also replace the element in the existing list to fix this problem.
+         if (sn.isStarted())
+            ParseUtil.initAndStartComponent(snl);
          snl.setParentNode(childNode.getParentNode());
          snl.add(value, true, false);
-         TypeUtil.setProperty(semNode, beanMapper.getSetSelector(), snl);
-         snl.setParentNode((ISemanticNode) semNode);
+         TypeUtil.setProperty(sn, beanMapper.getSetSelector(), snl);
+         snl.setParentNode(sn);
       }
       else {
          // First set the value
@@ -2024,6 +2029,36 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
             }
          }
          */
+      }
+
+      return true;
+   }
+
+   public boolean addReparseResultToParent(Object node, ParentParseNode parent, int svIndex, int childIndex, int slotIndex, Parser parser, Object oldChildParseNode, DiffContext dctx, boolean removeExtraNodes, boolean parseArray) {
+      // Exclude this entirely from the result
+      if (getDiscard() || getLookahead())
+         return false;
+
+      NestedParselet parentParselet = parent.parselet;
+
+      if (getSkip() && node instanceof ParentParseNode) {
+         ParentParseNode ppnode = (ParentParseNode) node;
+
+         // We have no information to preserve in this level of the hierarchy so we merge
+         // it into the parentNode.
+         if (parentParselet.parameterMapping == null) {
+            ArrayList<Object> children = ppnode.children;
+            int childSz = children.size();
+            for (int i = 0; i < childSz; i++) {
+               Object c = children.get(i);
+
+               // We are adding a nested child which is marked as being skipped.  At this
+               // point we add its children directly to the parentNode node - we'll throw away
+               // this temporary parentNode node.  At this point, the value is the semantic value
+               parent.addForReparse(c, this, svIndex, childIndex, slotIndex, false, parser, oldChildParseNode, dctx, removeExtraNodes, parseArray);
+            }
+            return false; // Do not add to the parentNode node
+         }
       }
 
       return true;

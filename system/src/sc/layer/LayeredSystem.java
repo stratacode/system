@@ -2628,18 +2628,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
 
             if (refLayer == null || !refLayer.activated || refLayer == Layer.ANY_INACTIVE_LAYER) {
-               typeIndex.addMatchingGlobalNames(prefix, candidates, retFullTypeName);
+               typeIndex.addMatchingGlobalNames(prefix, candidates, retFullTypeName, refLayer);
 
                if (!peerMode && peerSystems != null) {
                   for (int i = 0; i < peerSystems.size(); i++) {
                      LayeredSystem peerSys = peerSystems.get(i);
-                     peerSys.findMatchingGlobalNames(null, null, prefix, prefixPkg, prefixBaseName, candidates, retFullTypeName, srcOnly);
+                     Layer peerRefLayer = peerSys.getPeerLayerFromRemote(refLayer);
+                     if (peerRefLayer != null)
+                        peerSys.findMatchingGlobalNames(null, peerRefLayer, prefix, prefixPkg, prefixBaseName, candidates, retFullTypeName, srcOnly);
                   }
                }
                if (typeIndexProcessMap != null) {
                   for (Map.Entry<String,SysTypeIndex> typeIndexEntry:typeIndexProcessMap.entrySet()) {
                      SysTypeIndex idx = typeIndexEntry.getValue();
-                     idx.addMatchingGlobalNames(prefix, candidates, retFullTypeName);
+                     idx.addMatchingGlobalNames(prefix, candidates, retFullTypeName, refLayer);
                   }
                }
             }
@@ -13213,9 +13215,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    /**
-    * Retrieves a Layer instance given the layer name - i.e. group.name.  If checkPeers = true, you may receive a layer in a runtime (that is lazily created the first time it's needed).
-    * Pass in true unless you explicitly do not want to enable the layer.  Enabling the layer adds it to to the classpath so types in the layer can be starte so types in the layer can be started
-    * Pass in true unless you want to get the excluded layer from this runtime which
+    * Retrieves a Layer instance given the layer name - i.e. group.name (it also accepts the path group/name).
+    * If checkPeers = true, you may receive a layer in a runtime (that is lazily created the first time it's needed).
+    * For enabled: Pass in true unless you explicitly do not want to enable the layer.  Enabling the layer adds it to to the classpath so types in the layer can be starte so types in the layer can be started
+    * For skipExcluded: pass in true unless you want to get the excluded layer from this runtime which
     * we create temporarily to bootstrap layers in other runtimes.   We first create the Layer in the original runtime to see if it's excluded or not.  If so, we remove from the list.
     */
    public Layer getInactiveLayer(String layerPath, boolean openLayer, boolean checkPeers, boolean enabled, boolean skipExcluded) {

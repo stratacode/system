@@ -111,7 +111,7 @@ public class SysTypeIndex {
    }
 
 
-   public void addMatchingGlobalNames(String prefix, Set<String> candidates, boolean retFullTypeName) {
+   public void addMatchingGlobalNames(String prefix, Set<String> candidates, boolean retFullTypeName, Layer refLayer) {
       if (inactiveTypeIndex.sys.writeLocked == 0) {
          System.err.println("*** Modifying type index without write lock");
          new Throwable().printStackTrace();
@@ -120,6 +120,19 @@ public class SysTypeIndex {
       for (Map.Entry<String,LayerTypeIndex> typeIndexEnt:inactiveTypeIndex.typeIndex.entrySet()) {
          //String layerName = typeIndexEnt.getKey();
          LayerTypeIndex layerTypeIndex = typeIndexEnt.getValue();
+         String layerName = typeIndexEnt.getKey();
+
+         if (inactiveTypeIndex.sys == null) {
+            continue;
+         }
+
+         if (refLayer != null && inactiveTypeIndex.sys != null && layerName != null) {
+            // Using lookup here so we only look through layers that have been loaded.  Otherwise there's a concurrent modification exception as we modify this index
+            Layer indexLayer = inactiveTypeIndex.sys.lookupInactiveLayer(layerName, true, true);
+            // Only search layers which this layer can depend upon
+            if (indexLayer == null || (!refLayer.getLayerName().equals(indexLayer.getLayerName()) && !refLayer.extendsLayer(indexLayer)))
+               continue;
+         }
          HashMap<String,TypeIndexEntry> layerTypeMap = layerTypeIndex.layerTypeIndex;
          for (Map.Entry<String,TypeIndexEntry> typeEnt:layerTypeMap.entrySet()) {
             String typeName = typeEnt.getKey();

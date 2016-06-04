@@ -63,6 +63,15 @@ public class ParentParseNode extends AbstractParseNode {
          return add(node, p, svIndex, slotIndex, skipSemanticValue, parser);
       else {
          boolean insert = false;
+
+         if (node instanceof IParseNode) {
+            IParseNode pnode = (IParseNode) node;
+            Parselet childParselet = pnode.getParselet();
+
+            if (!childParselet.addReparseResultToParent(pnode, this, svIndex, childIndex, slotIndex, parser, oldChildParseNode, dctx, removeExtraNodes, parseArray))
+               return false;
+         }
+
          if (node != oldChildParseNode) {
             Object oldNode = children.get(childIndex);
             if (parseArray && oldNode instanceof IParseNode) {
@@ -389,7 +398,7 @@ public class ParentParseNode extends AbstractParseNode {
       // If there's overhead here, we could still optimize the case where there are no invalidated children nodes
       if (isGeneratedTree()) {
          FormatContext ctx = createFormatContext(parSemVal, curParseNode, curChildIndex);
-         ctx.replaceFormatting = true;
+         ctx.replaceFormatting = replaceFormatting;
          //ctx.append(FormatContext.INDENT_STR);
          PerfMon.start("format", false);
          format(ctx);

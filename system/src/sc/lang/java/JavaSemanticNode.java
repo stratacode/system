@@ -441,8 +441,23 @@ public abstract class JavaSemanticNode extends SemanticNode {
       return false;
    }
 
+   /**
+    * Used to create a list of suggestions to complete this node.  Returns the character offset into the parse-tree (or command string if there's no parse tree) where the completion
+    * should start.
+    * Parameters:
+    * prefix is the starting sequence of chars in the identifier to complete.  All candidates returned will start with the prefix if it's provided.
+    * currentType provides a context for the current type if the node is not embedded in a model - i.e. an identifier expression on its own but known to live in a specific type
+    * If ctx is not null, it's an executation context we can use to evaluate the "root value" - i.e. in a.b the value of the variable 'a' is evaluated and the returned instance
+    * can be used to suggest candidates.  This is useful in live-programming situations.
+    * The command String parameter is used to determine the offset returned for where the completion starts for the case where the parseNode tree is not available.
+    */
+
    public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
       return -1;
+   }
+
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, int offset, String dummyIdentifier, Set<String> candidates) {
+      return null;
    }
 
    /**

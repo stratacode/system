@@ -1065,7 +1065,9 @@ public class ClassType extends JavaType {
             JavaType newType = typeArg.resolveTypeParameters(t, resolveUnbound);
             if (newType != typeArg) {
                if (cloneArgs == null) {
-                  cloneArgs = (List<JavaType>) ((ArrayList) typeArgs).clone();
+                  //cloneArgs = (List<JavaType>) ((ArrayList) typeArgs).clone();
+                  // Don't create a SemanticNodeList here since we don't need to generate stuff
+                  cloneArgs = new ArrayList<JavaType>(typeArgs);
                }
                cloneArgs.set(ix, newType);
             }
