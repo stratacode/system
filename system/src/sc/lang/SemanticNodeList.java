@@ -363,7 +363,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       ensureCapacity(size() + c.size());
       int i = 0;
       for (E e:c)
-         add(index + i++, e, setParent, updateParseNodes);
+         super.add(index + i++, e);
 
       // It's best to first init and then start all components after all have been added.  Otherwise, for example, the start method
       // after each statement will revalidate the caches.  We need init to run first so the propertyName of all methodDefinitions is set
