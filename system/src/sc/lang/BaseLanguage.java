@@ -239,11 +239,16 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
          if (value instanceof IParseNode)
             value = ((IParseNode) value).getSemanticValue();
 
+         // This is a sentinel type you can use to push even 'this' through as non-keyword.  Used to avoid needing to convert
+         // to a selector expression during code-generation
+         if (value instanceof NonKeywordString)
+            return null;
+
          if (value != null && !(value instanceof StringToken))
             value = PString.toIString(value);
          if (getLanguage() == null)
             throw new IllegalArgumentException("*** No language defined for parselet: " + this);
-         if (!(value instanceof NonKeywordString) && !((BaseLanguage) getLanguage()).getKeywords().contains(value))
+         if (!((BaseLanguage) getLanguage()).getKeywords().contains(value))
             return null;
          return "Identifiers cannot be keywords";
       }

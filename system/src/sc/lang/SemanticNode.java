@@ -586,6 +586,8 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
          if (parseNodeInvalid) {
             validateParseNode(false);
          }
+         if (parseNode == null)
+            return "<invalid-semantic-node>";
          return parseNode.toString();
       }
 
