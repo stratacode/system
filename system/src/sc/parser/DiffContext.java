@@ -25,6 +25,8 @@ import java.util.HashSet;
  * differently.
  */
 public class DiffContext {
+   public static boolean debugDiffContext = false;
+
    // The new text string involved in the reparse
    String text;
    int newLen;

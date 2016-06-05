@@ -326,6 +326,8 @@ public class ParseNode extends AbstractParseNode {
          int textLen = text.length();
          for (int i = 0; i < plen; i++) {
             if (startChange >= textLen || parsedText.charAt(i) != text.charAt(startChange)) {
+               if (DiffContext.debugDiffContext)
+                  ctx = ctx;
                ctx.firstDiffNode = this;
                ctx.beforeFirstNode = ctx.lastVisitedNode.getParselet().getBeforeFirstNode(ctx.lastVisitedNode);
                ctx.startChangeOffset = startChange;

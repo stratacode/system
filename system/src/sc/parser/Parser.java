@@ -586,6 +586,10 @@ public class Parser implements IString {
          return PARSE_NEGATED_ERROR;
       //if (parselet.reportError && (currentErrorEndIndex == -1 || (end > currentErrorEndIndex || (end == currentErrorEndIndex && start <= currentErrorStartIndex)))) {
 
+      // TODO: verify that this is not a performance problem (since it marks all recursive parse-nodes as error nodes)
+      if (partialValue instanceof IParseNode)
+         ((IParseNode) partialValue).setErrorNode(true);
+
       // Keep track of only the errors which made the most progress during the parse.  If the end is greater, that is
       // a better error than the one we have no matter what.  But if they end at the same spot, this error is only better
       // if it consumed more text than the previous one.

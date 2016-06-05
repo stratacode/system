@@ -1259,9 +1259,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             for (Statement s:theBody) {
                if (s instanceof TypeDeclaration) {
                   TypeDeclaration st = (TypeDeclaration) s;
-                  if (st.typeName == null)
-                     System.out.println("*** Error - missing type name");
-                  else if (st.typeName.equals(name)) {
+                  if (st.typeName != null && st.typeName.equals(name)) {
                      return s;
                   }
                }

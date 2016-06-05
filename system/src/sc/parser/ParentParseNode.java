@@ -1035,6 +1035,8 @@ public class ParentParseNode extends AbstractParseNode {
    }
 
    public void findStartDiff(DiffContext ctx, boolean atEnd, Object parSemVal, ParentParseNode parParseNode, int childIx) {
+      if (parselet != null && parselet.trace)
+         ctx = ctx;
       if (children == null) {
          return;
       }
@@ -1067,6 +1069,8 @@ public class ParentParseNode extends AbstractParseNode {
                int textLen = text.length();
                for (int c = 0; c < len; c++) {
                   if (startChange >= textLen || childSeq.charAt(c) != text.charAt(startChange)) {
+                     if (DiffContext.debugDiffContext)
+                        ctx = ctx;
                      ctx.firstDiffNode = this;
                      // Is there any content inside of this node?  If so, the change starts inside the node.  Otherwise,
                      // we need to choose the previous node so we "bracket" the changed region.
