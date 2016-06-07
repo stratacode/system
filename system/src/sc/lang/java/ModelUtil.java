@@ -1359,6 +1359,12 @@ public class ModelUtil {
       if (ModelUtil.isTypeVariable(newType))
          return origType;
 
+      if (newType == null)
+         return origType;
+
+      if (origType == null)
+         return newType;
+
       if (!ModelUtil.isAssignableFrom(origType, newType))
          return origType;
 

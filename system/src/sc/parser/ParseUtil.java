@@ -747,13 +747,18 @@ public class ParseUtil  {
       if (space == null)
          return null;
 
+      int skipIx = 0;
       for (int i = 0; i < space.length(); i++) {
          char ch = space.charAt(i);
-         if (ch == '\n') {
-            return space.substring(0, i);
+         if (ch == '\n' || ch == ' ' || ch == '\t' || ch == '\r')  {
+            skipIx++;
          }
+         else
+            break;
       }
-      return space;
+      if (skipIx == 0)
+         return space;
+      return space.substring(skipIx);
    }
 
    public static String getSpacingForNode(Object parseNode) {

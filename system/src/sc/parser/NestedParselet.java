@@ -744,6 +744,14 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
     */
    public boolean arrayElementChanged(Object parseNode, List semanticValue, int startIndex, int index, Object element, ChangeType changeType) {
       if (!(parseNode instanceof ParentParseNode)) {
+         if (parseNode instanceof ParseNode && parameterType == ParameterType.PROPAGATE) {
+            ParseNode pn = (ParseNode) parseNode;
+            Parselet childParselet = pn.getParselet();
+            if (pn.value instanceof IParseNode) {
+               return ((NestedParselet) childParselet).arrayElementChanged(pn.value, semanticValue, index, element, changeType);
+            }
+         }
+
          System.err.println("Error: array element changed on non parent parse node!");
          return false;
       }
@@ -901,8 +909,9 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                               if (currentValueIndex == index) {
                                  Object elemValue = semanticValue.get(currentValueIndex);
                                  if (childParselet.dataTypeMatches(elemValue)) {
+                                    int changedIx = currentValueIndex - startIndex;
                                     if (language.trackChanges || !(elemValue instanceof ISemanticNode)) {
-                                       lastErr = regenerateElement(parentParseNode, childParselet, elemValue, currentValueIndex - startIndex, changeType);
+                                       lastErr = regenerateElement(parentParseNode, childParselet, elemValue, changedIx, changeType);
                                        if (lastErr == null)
                                           elementProcessed = true;
                                     }
@@ -1017,60 +1026,78 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       }
    }
 
-   public boolean regenerate(ParentParseNode pnode, boolean finalGen) {
-      Object sv = pnode.getSemanticValue();
+   public boolean regenerate(IParseNode resNode, boolean finalGen) {
+      Object sv = resNode.getSemanticValue();
       Object genRes;
       GenerateContext ctx = getLanguage().newGenerateContext(this, sv);
       ctx.finalGeneration = finalGen;
       int ix;
       PerfMon.start("regenerate");
       try {
-         IParseNode resNode = pnode;
+         if (resNode instanceof ParseNode) {
+            ParseNode pn = (ParseNode) resNode;
+            Object val = pn.value;
+            if (val instanceof IParseNode) {
+               IParseNode valNode = (IParseNode) val;
+               NestedParselet childParselet = (NestedParselet) ((IParseNode) val).getParselet();
 
-         if (getSemanticValueIsArray() && !(sv instanceof List)) {
-            genRes = generateElement(ctx, sv, false);
-            Object origParseNode = sv instanceof ISemanticNode ? ((ISemanticNode) sv).getParseNode() : sv;
-            ix = pnode.children == null ? -1 : pnode.children.indexOf(origParseNode);
-            if (genRes instanceof GenerateError || genRes instanceof PartialArrayResult)
-               return false;
-            ParentParseNode newParseNode = (ParentParseNode) genRes;
-            // With a repeat Sequence like ImportDeclaration, the sequence will be stored both with the list and the elements.  We need to differentiate which one kind of brute force.
-            if (pnode.children == null)
-               pnode.children = new ArrayList<Object>(newParseNode.children.size());
-
-            if (ix == -1)
-               pnode.children.add(genRes);
-            else
-               pnode.children.set(ix, genRes);
-         }
-         else {
-            genRes = generate(ctx, sv);
-            if (genRes instanceof GenerateError || genRes instanceof PartialArrayResult)
-               return false;
-
-            // TODO: pnode.children here may have non-semantic parse-nodes like spacing, comments which should be merged
-            // back into the genRes children.  So instead of just clearing the children, we could walk down the old and new
-            // tree's and take from the old anything which did not have semantic content.
-
-            if (pnode.children != null)
-               pnode.children.clear();
-
-            // The parselet optimized it's generation so it returns a String.  We need to reuse this parse node to hold
-            // the string because it may be wired into all of the parent parse nodes.
-            if (genRes instanceof String) {
-               if (pnode.children == null)
-                  pnode.children = new ArrayList<Object>(1);
-               pnode.children.add(genRes);
+               return childParselet.regenerate(valNode, finalGen);
             }
             else {
+               System.err.println("*** Unhandled case in regenerate");
+               return false;
+            }
+         }
+         else if (resNode instanceof ParentParseNode) {
+            ParentParseNode pnode = (ParentParseNode) resNode;
+            if (getSemanticValueIsArray() && !(sv instanceof List)) {
+               genRes = generateElement(ctx, sv, false);
+               Object origParseNode = sv instanceof ISemanticNode ? ((ISemanticNode) sv).getParseNode() : sv;
+               ix = pnode.children == null ? -1 : pnode.children.indexOf(origParseNode);
+               if (genRes instanceof GenerateError || genRes instanceof PartialArrayResult)
+                  return false;
                ParentParseNode newParseNode = (ParentParseNode) genRes;
-               if (newParseNode != null && newParseNode.children != null) {
-                  // With a repeat Sequence like ImportDeclaration, the sequence will be stored both with the list and the elements.  We need to differentiate which one kind of brute force.
+               // With a repeat Sequence like ImportDeclaration, the sequence will be stored both with the list and the elements.  We need to differentiate which one kind of brute force.
+               if (pnode.children == null)
+                  pnode.children = new ArrayList<Object>(newParseNode.children.size());
+
+               if (ix == -1)
+                  pnode.children.add(genRes);
+               else
+                  pnode.children.set(ix, genRes);
+            }
+            else {
+               genRes = generate(ctx, sv);
+               if (genRes instanceof GenerateError || genRes instanceof PartialArrayResult)
+                  return false;
+
+               // TODO: pnode.children here may have non-semantic parse-nodes like spacing, comments which should be merged
+               // back into the genRes children.  So instead of just clearing the children, we could walk down the old and new
+               // tree's and take from the old anything which did not have semantic content.
+
+               if (pnode.children != null)
+                  pnode.children.clear();
+
+               // The parselet optimized it's generation so it returns a String.  We need to reuse this parse node to hold
+               // the string because it may be wired into all of the parent parse nodes.
+               if (genRes instanceof String) {
                   if (pnode.children == null)
-                     pnode.children = new ArrayList<Object>(newParseNode.children.size());
-                  pnode.children.addAll(newParseNode.children);
+                     pnode.children = new ArrayList<Object>(1);
+                  pnode.children.add(genRes);
+               }
+               else {
+                  ParentParseNode newParseNode = (ParentParseNode) genRes;
+                  if (newParseNode != null && newParseNode.children != null) {
+                     // With a repeat Sequence like ImportDeclaration, the sequence will be stored both with the list and the elements.  We need to differentiate which one kind of brute force.
+                     if (pnode.children == null)
+                        pnode.children = new ArrayList<Object>(newParseNode.children.size());
+                     pnode.children.addAll(newParseNode.children);
+                  }
                }
             }
+         }
+         else {
+            System.err.println("*** Unrecognized parse node type in regenerate");
          }
 
          // Make sure semantic value points to the original parse node
@@ -1906,7 +1933,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
             }
 
             Object value;
-            if (startIx + i < srcNode.children.size()) {
+            if (srcNode != null && srcNode.children != null && startIx + i < srcNode.children.size()) {
                Object oldResult = srcNode.children.get(startIx + i);
                value = ParseUtil.nodeToSemanticValue(oldResult);
                setSemanticProperty(dstNode, slotMapping[i], value);
@@ -1919,7 +1946,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          defined by a second level parent, we will get a null at that point.  So when the parent processes
          its slot, we then have to go down multiple levels.
        */
-      if (recurse && parameterType == ParameterType.INHERIT && inheritSlots != null) {
+      if (srcNode != null && recurse && parameterType == ParameterType.INHERIT && inheritSlots != null) {
          for (int inheritSlot : inheritSlots)
             if (srcNode.parselet.slotMapping != null)
                ((NestedParselet) parselets.get(inheritSlot)).processSlotMappings(0,

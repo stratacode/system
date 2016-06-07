@@ -669,15 +669,25 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       return null;
    }
 
+   protected int getStartIndex() {
+      if (parseNode != null)
+         return parseNode.getStartIndex();
+      IParseNode pp = getAnyChildParseNode();
+      if (pp != null)
+         return pp.getStartIndex();
+      return -1;
+   }
+
    private void appendAtString(StringBuilder sb, int indent, boolean addFile, boolean addAt, boolean addNear, Parselet parselet) {
       IParseNode pp = parseNode;
       if (pp == null)
          pp = getAnyChildParseNode();
 
-      if (pp != null) {
+      int startIx = getStartIndex();
+
+      if (startIx != -1) {
          ISemanticNode rootNode = getRootNode();
-         int startIx = pp.getStartIndex();
-         if (startIx != -1 && rootNode != null && rootNode instanceof ILanguageModel) {
+         if (rootNode != null && rootNode instanceof ILanguageModel) {
             List<SrcEntry> srcEnts = ((ILanguageModel) rootNode).getSrcFiles();
             if (srcEnts != null && srcEnts.size() > 0) {
                String fileName = srcEnts.get(0).absFileName;
@@ -722,8 +732,12 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       if (pp == null) {
          pp = getAnyChildParseNode();
       }
-      if (pp == null)
+      if (pp == null) {
+         // This node does not have a parse-node but we do have a file - just don't print anything (for imports right now)
+         if (getStartIndex() != -1)
+            return "";
          return ": <no source available>";
+      }
 
       StringBuilder sb = new StringBuilder();
       sb.append("\n");

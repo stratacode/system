@@ -684,7 +684,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
                if (ModelUtil.isTypeVariable(origType))
                   types.set(i, ModelUtil.wrapPrimitiveType(type));
                // Here the 'type' may be more specific for the core type but may not include type parameters which exist in the current type.
-               else {
+               else if (type != null) {
                   types.set(i, ModelUtil.refineType(definedInType, origType, type));
                }
                return;

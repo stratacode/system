@@ -436,7 +436,12 @@ public class Sequence extends NestedParselet  {
                   if (childParselet.skipOnError || (skipOnErrorSlot != -1 && i >= skipOnErrorSlot)) {
                      parser.addSkippedError(err);
                      // Record the error but move on
-                     nestedValue = new ErrorParseNode(err, "");
+                     if (err.partialValue != null) {
+                        nestedValue = err.partialValue;
+                        dctx.changeCurrentIndex(parser, err.endIndex);
+                     }
+                     else
+                        nestedValue = new ErrorParseNode(err, "");
                      errorNode = true;
                      err = null;
                   }

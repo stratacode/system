@@ -7,6 +7,7 @@ package sc.lang;
 import sc.lang.java.NonKeywordString;
 import sc.layer.Layer;
 import sc.parser.*;
+import sc.util.FileUtil;
 
 import java.util.Collections;
 import java.util.Set;
@@ -130,6 +131,15 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
    public SymbolSpace semicolonEOL = new SymbolSpace(";", SKIP_ON_ERROR);
    {
       semicolonEOL.generateParseNode = new NewlineParseNode(";");
+   }
+   // A semicolon followed by 2 newlines for package, imports
+   public SymbolSpace semicolonNewline = new SymbolSpace(";", SKIP_ON_ERROR);
+   {
+      semicolonNewline.generateParseNode = new NewlineParseNode(";") {
+         public String getNewlineSeparator() {
+            return FileUtil.LINE_SEPARATOR + FileUtil.LINE_SEPARATOR;
+         }
+      };
    }
    public SymbolSpace semicolon = new SymbolSpace(";");
    public SymbolSpace colon = new SymbolSpace(":");

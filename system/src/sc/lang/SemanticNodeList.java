@@ -551,7 +551,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       }
       else {
          NestedParselet parselet = (NestedParselet) parseNode.getParselet();
-         if (parselet.regenerate((ParentParseNode) parseNode, finalGen))
+         if (parselet.regenerate(parseNode, finalGen))
             parseNodeInvalid = false;
          else {
             System.err.println("*** regenerate of list failed: " + this.getClass());

@@ -72,6 +72,8 @@ public class ErrorParseNode extends AbstractParseNode {
             if (DiffContext.debugDiffContext)
                ctx = ctx;
             IParseNode last = ctx.lastVisitedNode;
+            if (last == null)
+               last = this;
             // For error nodes, we want the last visited node to start the diff since it's possible extensions to the content of an error node
             // will change the previously incomplete parsed result.
             ctx.firstDiffNode = last.getParselet().getBeforeFirstNode(last);

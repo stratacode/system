@@ -535,13 +535,15 @@ public class TestUtil {
                      ParseError err = ((ParseError) result);
                      result = err.getBestPartialValue();
                   }
-                  if (reparseFile.contains("139")) {
+                  /*
+                  if (reparseFile.contains("4")) {
                      System.out.println("***");
-                     //SCLanguage.getSCLanguage().genericMethodOrConstructorDecl.trace = true;
-                     SemanticNode.debugDiffTrace = true;
+                     SCLanguage.getSCLanguage().compilationUnit.trace = true;
+                     //SemanticNode.debugDiffTrace = true;
 
-                     //DiffContext.debugDiffContext = true;
+                     DiffContext.debugDiffContext = true;
                   }
+                  */
                   if (result == null)
                      out("*** FAILURE: No previous result for reparse");
 
@@ -567,6 +569,7 @@ public class TestUtil {
                      }
 
                      Object reparsedModelObj = getTestResult(newRes);
+
                      Object parseComplete = lang.parseString(reparsedString, opts.enablePartialValues);
                      boolean parseError = false;
                      if (parseComplete instanceof ParseError) {

@@ -4,7 +4,10 @@
 
 package sc.lang.java;
 
-public class ImportDeclaration extends JavaSemanticNode {
+import sc.lang.ISemanticNode;
+import sc.parser.IParseNode;
+
+public class ImportDeclaration extends AbstractErrorNode {
    public final static String WILDCARD = ".*";
 
    public boolean staticImport;
@@ -33,6 +36,16 @@ public class ImportDeclaration extends JavaSemanticNode {
    }
 
    public String toString() {
-      return staticImport ? "static " : "" + "import " + identifier;
+      return toSafeLanguageString();
+   }
+
+   public String toSafeLanguageString() {
+      StringBuilder sb = new StringBuilder();
+      if (staticImport)
+         sb.append("static ");
+      sb.append("import ");
+      sb.append(identifier);
+      return sb.toString();
    }
 }
+

@@ -61,11 +61,13 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    Sequence openCloseSqBrackets = new Sequence("('','')", OPTIONAL | REPEAT, openSqBracket, closeSqBracket);
    Sequence dotStarTail = new Sequence("('','')", OPTIONAL, periodSpace, asterix);
 
-   Sequence imports = new Sequence("ImportDeclaration(,staticImport,identifier,)", REPEAT | OPTIONAL,
+   Sequence importDeclaration = new Sequence("ImportDeclaration(,staticImport,identifier,)",
                             new KeywordSpace("import"),
                             new KeywordSpace("static", OPTIONAL),
                             new Sequence("('','')", qualifiedIdentifier, dotStarTail),
                             semicolonEOL);
+
+   Sequence imports = new Sequence("([])", REPEAT | OPTIONAL, importDeclaration);
 
    KeywordChoice primitiveTypeName = new KeywordChoice("boolean", "byte", "short", "char", "int", "float", "long", "double", "void");
 
@@ -435,9 +437,12 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
                 new Sequence("(,[])", OPTIONAL | REPEAT, comma, annotationElementValuePair));
 
    // Simplify? Seems like we really just need Sequence("{", Sequence(OPTIONAL | REPEAT, annotationElementValue, comma), "}"
+   //public OrderedChoice annotationValue = new OrderedChoice("<annotationValue>", OPTIONAL,
+   //   new Sequence("(,.,)", openParen, new Sequence("(.)", OPTIONAL, annotationElementValuePairs), closeParenEOL),
+   //   new Sequence("(,.,)", openParen, elementValue, closeParenEOL));
+
    public OrderedChoice annotationValue = new OrderedChoice("<annotationValue>", OPTIONAL,
-      new Sequence("(,.,)", openParen, new Sequence("(.)", OPTIONAL, annotationElementValuePairs), closeParenEOL),
-      new Sequence("(,.,)", openParen, elementValue, closeParenEOL));
+                  new Sequence("(,.,)", openParen, new OrderedChoice("(.,.)", OPTIONAL, annotationElementValuePairs, elementValue), closeParenEOL));
 
    {
       annotation.set(new SymbolSpace("@"), typeName, annotationValue);
@@ -779,7 +784,8 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    {
       compilationUnit.add(spacing, packageDeclaration, imports, typeDeclarations, new Symbol(EOF));
-      packageDeclaration.add(annotations, new KeywordSpace("package"), qualifiedIdentifier, semicolonEOL);
+      compilationUnit.skipOnErrorSlot = 1;
+      packageDeclaration.add(annotations, new KeywordSpace("package"), qualifiedIdentifier, semicolonNewline);
    }
 
    Sequence modelList = new Sequence("([])", OPTIONAL | REPEAT, languageModel);

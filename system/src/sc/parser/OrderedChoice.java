@@ -369,6 +369,9 @@ public class OrderedChoice extends NestedParselet  {
       ParseError bestError = null;
       int bestErrorSlotIx = -1;
 
+      if (trace)
+         trace = trace;
+
       boolean emptyMatch = false;
 
       do {

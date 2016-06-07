@@ -27,8 +27,8 @@ public class NewlineParseNode extends FormattingParseNode {
    }
 
    public String toString() {
-      if (terminator == null) return "\n";
-      return terminator + "\n";
+      if (terminator == null) return getNewlineSeparator();
+      return terminator + getNewlineSeparator();
    }
 
    /** This node is inserted into the tree in places where we might need to insert a newline.  It chooses the indent
@@ -94,7 +94,7 @@ public class NewlineParseNode extends FormattingParseNode {
          indent = ctx.popIndent();
 
       if (!suppressNewline)
-         ctx.appendWithStyle(FileUtil.LINE_SEPARATOR);
+         ctx.appendWithStyle(getNewlineSeparator());
 
       if (indent == -1) {
          val = ctx.nextSemanticNode();
@@ -127,5 +127,9 @@ public class NewlineParseNode extends FormattingParseNode {
          ctx.indentWithStyle(indent + indentIncr);
       else
          ctx.appendWithStyle(" ");
+   }
+
+   public String getNewlineSeparator() {
+      return FileUtil.LINE_SEPARATOR;
    }
 }

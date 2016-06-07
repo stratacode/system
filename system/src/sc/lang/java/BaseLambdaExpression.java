@@ -303,7 +303,7 @@ public abstract class BaseLambdaExpression extends Expression {
    }
 
    private void updateInferredType(Object inferredType) {
-      if (inferredTypeParamName != null && inferredType instanceof ParamTypeDeclaration) {
+      if (inferredTypeParamName != null && inferredType instanceof ParamTypeDeclaration && inferredTypeParamType != null) {
          ParamTypeDeclaration paramType = (ParamTypeDeclaration) inferredType;
 
          paramType.setTypeParameter(inferredTypeParamName, inferredTypeParamType);

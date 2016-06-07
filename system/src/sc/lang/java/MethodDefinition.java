@@ -797,7 +797,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       }
       Object retType = getTypeDeclaration();
       // Make sure the inferredType is more specific than the actual return type
-      if (retType == null || ModelUtil.isAssignableFrom(retType, infRetType))
+      if (retType == null || (infRetType != null && ModelUtil.isAssignableFrom(retType, infRetType)))
          return infRetType;
       return retType;
    }

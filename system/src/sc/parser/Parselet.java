@@ -611,6 +611,11 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
             if (oldParseNode != null) {
                CharSequence seq = (CharSequence) oldParseNode;
                int oldLen = seq.length();
+               int oldEnd = parser.currentIndex + oldLen;
+               // We don't have the old parse-nodes start index but if we assume it starts here and is long enough to hit the end of the boundary
+               // we might be an identifier that is being extended so mark it changed.
+               if (oldEnd >= startChange && parser.currentIndex < startChange)
+                  return true;
                for (int i = 0; i < oldLen; i++) {
                   if (seq.charAt(i) != parser.peekInputChar(i))
                      return true;

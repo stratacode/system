@@ -89,7 +89,7 @@ public class SysTypeIndex {
                   else
                      typeLayerInSystem = sys.getActiveOrInactiveLayerByPath(type.getLayer().getLayerName(), null, false, true, true);
                   if (typeLayerInSystem != null) {
-                     Layer peerLayer = typeLayerInSystem.layeredSystem == sys ? typeLayerInSystem : modLayer.layeredSystem.getPeerLayerFromRemote(typeLayerInSystem);
+                     Layer peerLayer = typeLayerInSystem.layeredSystem == modLayer.layeredSystem ? typeLayerInSystem : modLayer.layeredSystem.getPeerLayerFromRemote(typeLayerInSystem);
                      if (peerLayer == null)
                         System.err.println("*** Unable to find layer in layer in runtime: " + sys.getProcessIdent() + " for: " + typeLayerInSystem);
                      else {

@@ -48,8 +48,6 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
 
    public transient ISrcStatement fromStatement;
 
-   public transient Object[] errorArgs;
-
    private static boolean wasBound = false;
 
    public void init() {
@@ -759,39 +757,5 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          res.add(fromSt);
    }
 
-   /** Override to provide per-node error support */
-   public String getNodeErrorText() {
-      if (errorArgs != null) {
-         StringBuilder sb = new StringBuilder();
-         for (Object arg:errorArgs)
-            sb.append(arg.toString());
-         sb.append(this.toString());
-         return sb.toString();
-      }
-      return null;
-   }
-
-   public void stop() {
-      super.stop();
-
-      errorArgs = null;
-   }
-
-   public boolean displayTypeError(String...args) {
-      if (errorArgs == null) {
-         if (super.displayTypeError(args)) {
-            errorArgs = args;
-            return true;
-         }
-      }
-      return false;
-   }
-
-   public void displayError(String...args) {
-      if (errorArgs == null) {
-         super.displayError(args);
-         errorArgs = args;
-      }
-   }
 }
 

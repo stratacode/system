@@ -182,7 +182,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             ITypeDeclaration thisType = enclType;
 
             if (thisType == null) {
-               displayTypeError("Invalid super expression - no enclosing type for: ");
+               displayRangeError(0, 0, "Invalid super expression - no enclosing type for: ");
             }
             else {
                Object superType = thisType.getDerivedTypeDeclaration();
@@ -278,7 +278,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                }
                if (boundTypes[0] == null && model != null && !model.disableTypeErrors) {
                   String otherMethods = enclType == null ? "" : getOtherMethodsMessage(enclType, firstIdentifier);
-                  displayTypeError("No method named: ", firstIdentifier, ModelUtil.argumentsToString(arguments), otherMethods, " for: ");
+                  displayRangeError(0, 0, "No method named: ", firstIdentifier, ModelUtil.argumentsToString(arguments), otherMethods, " for: ");
                   foundMeth = findMethod(firstIdentifier, arguments, this, enclType, isStatic(), inferredType);
                }
                if (idTypes[0] == null) {
@@ -377,7 +377,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   }
                }
                if (idTypes[0] == IdentifierType.UnboundName) {
-                  displayTypeError("No identifier: ", firstIdentifier, " in ");
+                  displayRangeError(0, 0, "No identifier: ", firstIdentifier, " in ");
 
                   // TODO remove or keep commented out, this is for diagnostics, when this fails and we want to debug the code path
                   EnumSet<MemberType> mTypes = isAssignment ? MemberType.PropertySetSet : MemberType.PropertyGetSet;
@@ -487,7 +487,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                      }
                      else {
                         if (ident != null && ident.indexOf(".") == -1) {
-                           displayTypeError("No type: " + ident + " in ");
+                           displayRangeError(0, 0, "No type: " + ident + " in ");
                            break;
                         }
                         else {
@@ -1340,7 +1340,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   idTypes[i] = IdentifierType.UnboundMethodName;
                   if (model != null && !model.disableTypeErrors) {
                      String otherMessage = getOtherMethodsMessage(currentType, nextName);
-                     expr.displayTypeError("No method: ", nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentTypeDecl),otherMessage == null ? "" : otherMessage.toString(),  " for ");
+                     expr.displayRangeError(i, i, "No method: ", nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentTypeDecl),otherMessage == null ? "" : otherMessage.toString(),  " for ");
                      methVar = currentTypeDecl.definesMethod(nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs);
                   }
                }
@@ -1387,7 +1387,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                      }
                      else {
                         idTypes[i] = IdentifierType.UnboundName;
-                        expr.displayTypeError("No nested property: ", nextName, " in type: ", ModelUtil.getTypeName(currentTypeDecl), " for ");
+                        expr.displayRangeError(i, i, "No nested property: ", nextName, " in type: ", ModelUtil.getTypeName(currentTypeDecl), " for ");
                      }
                   }
                }
@@ -1409,7 +1409,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   idTypes[i] = IdentifierType.UnboundMethodName;
                   if (model != null && !model.disableTypeErrors) {
                      String otherMethods = getOtherMethodsMessage(currentClass, nextName);
-                     expr.displayTypeError("No method: ", nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentClass), otherMethods, " for ");
+                     expr.displayRangeError(i, i, "No method: ", nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentClass), otherMethods, " for ");
                      methObj = (Method) ModelUtil.definesMethod(currentClass, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs); // TODO: remove - for debugging only
                   }
                }
@@ -1459,7 +1459,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                      idTypes[i] = IdentifierType.EnumName;
                   else {
                      idTypes[i] = IdentifierType.UnboundName;
-                     expr.displayTypeError("No property: ", nextName, " in type: ", ModelUtil.getTypeName(currentClass), " for ");
+                     expr.displayRangeError(i, i, "No property: ", nextName, " in type: ", ModelUtil.getTypeName(currentClass), " for ");
                   }
                }
             }
@@ -1468,7 +1468,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       else if (currentType != null)
          System.err.println("*** Unrecognized type in bindNextIdentifier: " + currentType);
       if (isStatic && boundTypes[i] != null && idTypes[i] != IdentifierType.BoundTypeName && idTypes[i] != IdentifierType.EnumName && !ModelUtil.hasModifier(getMemberForIdentifier(expr, i, idTypes, boundTypes, model), "static")) {
-         expr.displayTypeError("Non static ", idTypes[i] == IdentifierType.MethodInvocation ? "method " : "property ", nextName, " accessed from a static context in : ", nextName, " for ");
+         expr.displayRangeError(i, i, "Non static ", idTypes[i] == IdentifierType.MethodInvocation ? "method " : "property ", nextName, " accessed from a static context in : ", nextName, " for ");
          ModelUtil.hasModifier(getMemberForIdentifier(expr, i, idTypes, boundTypes, model), "static");
       }
    }
@@ -2284,7 +2284,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                VariableDefinition varDef = (VariableDefinition) boundTypes[i];
                if (!varDef.convertGetSet) {
                   // Happens during transform if we hit a setX of a non-bindable property.
-                  displayTypeError("Reference to field ", varDef.toDefinitionString(), " as a get/set without a get/set conversion from: ");
+                  displayRangeError(i, i, "Reference to field ", varDef.toDefinitionString(), " as a get/set without a get/set conversion from: ");
                }
                break;
 
