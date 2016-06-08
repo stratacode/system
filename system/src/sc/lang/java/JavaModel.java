@@ -335,7 +335,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
       // Doing this after the types have been started as doing it when imports are defined is too early to resolve stuff
       // we depend upon
-      if (imports != null) {
+      if (imports != null && !isLayerModel) {
          // used to test on this condition - && layer != null && layer.isInitialized()
          for (ImportDeclaration imp:imports) {
             if (imp.staticImport)
