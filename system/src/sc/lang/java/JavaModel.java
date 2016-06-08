@@ -278,7 +278,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    private void addNonStaticImportInternal(ImportDeclaration imp, boolean checkErrors) {
       String impStr = imp.identifier;
-      if (!imp.staticImport) {
+      if (!imp.staticImport && impStr != null) {
          String className = CTypeUtil.getClassName(impStr);
          if (className.equals("*")) {
             String pkgName = CTypeUtil.getPackageName(impStr);
@@ -296,9 +296,12 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                globalTypes.add(CTypeUtil.getPackageName(impStr));
             }
          }
+         /*
+          * This happens too early to validate the imports so we do it later on
          else if (checkErrors && findTypeDeclaration(impStr, true) == null) {
             imp.displayTypeError("No type: " + className + " for: ");
          }
+         */
          importsByName.put(className, impStr);
       }
    }
@@ -325,6 +328,30 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       PerfMon.end("startJavaModel");
 
       //startReplacingTypes();
+   }
+
+   public void validate() {
+      if (validated) return;
+
+      // Doing this after the types have been started as doing it when imports are defined is too early to resolve stuff
+      // we depend upon
+      if (imports != null) {
+         // used to test on this condition - && layer != null && layer.isInitialized()
+         for (ImportDeclaration imp:imports) {
+            if (imp.staticImport)
+               continue;
+            String impStr = imp.identifier;
+            if (impStr == null)
+               continue;
+            String className = CTypeUtil.getClassName(impStr);
+            if (className.equals("*"))
+               continue;
+            if (findTypeDeclaration(imp.identifier, true) == null) {
+               imp.displayTypeError("No type: " + imp.identifier + " for: ");
+            }
+         }
+      }
+      super.validate();
    }
 
    /**

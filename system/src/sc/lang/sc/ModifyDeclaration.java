@@ -170,7 +170,7 @@ public class ModifyDeclaration extends TypeDeclaration {
                }
 
                if (modifyTypeDecl.replacedByType == null && !modifyInherited) {
-                  modifyTypeDecl.replacedByType = this;
+                  modifyTypeDecl.updateReplacedByType(this);
                }
             }
          }

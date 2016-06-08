@@ -8857,4 +8857,15 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       defaultConstructor = null;
       super.stop();
    }
+
+   public void updateReplacedByType(BodyTypeDeclaration repl) {
+      this.replacedByType = repl;
+      if (anonIdsAllocated > 0) {
+         if (repl.anonIdsAllocated > 0) {
+            System.err.println("*** Anon-ids database collision between: " + this + " and: " + repl);
+         }
+         else
+            repl.anonIdsAllocated = anonIdsAllocated;
+      }
+   }
 }

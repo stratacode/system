@@ -78,7 +78,7 @@ public class ClassDeclaration extends TypeDeclaration {
                }
                TypeDeclaration prevDecl = thisModel.getPreviousDeclaration(fullTypeName);
                if (prevDecl != null && prevDecl != this && prevDecl.getFullTypeName().equals(fullTypeName))
-                  prevDecl.replacedByType = this;
+                  prevDecl.updateReplacedByType(this);
             }
          }
       }
