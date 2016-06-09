@@ -221,11 +221,6 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          resultComponentClass = null;
 
       if (skipOnErrorParselet != null) {
-         if (!repeat) {
-            System.err.println("*** Error in parselet configuration for: " + this + " skipOnErrorParselet only valid when REPEAT flag is used.");
-            skipOnErrorParselet = null;
-         }
-
          skipOnErrorParselet.setLanguage(getLanguage());
          skipOnErrorParselet.init();
       }
@@ -1450,7 +1445,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
          if (parameterMapping != null) {
             if (slotIndex >= parameterMapping.length)
-               System.out.println("*** Invalid slot index in parameter mapping!");
+              System.out.println("*** Invalid slot index in parameter mapping!");
             switch (parameterMapping[slotIndex]) {
                case SKIP:
                   hasValue = false;
@@ -1802,7 +1797,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       return arraySlotFound;
    }
 
-   public boolean removeFromSemanticValue(ParentParseNode parent, Object node, int slotIndex, boolean skipSemanticValue, Parser parser, boolean replaceValue, boolean reparse) {
+   public boolean removeFromSemanticValue(ParentParseNode parent, Object node, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, boolean replaceValue, boolean reparse) {
       if (trace && parser.enablePartialValues)
          System.out.println("*** removing from semantic value of traced element");
 
@@ -1810,9 +1805,16 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
       if (!skipSemanticValue && !parser.matchOnly) {
          if (resultClass != null && !getSkip()) {
-            if (slotIndex == 0 && getSemanticValueIsArray()) {
-               // TODO: do we need to null out there array here?
-               System.err.println("*** Not updating now empty array");
+            if (getSemanticValueIsArray()) {
+               // TODO: maybe we should clear the value when slotIndex = parselets.size() - 1 and remove it when slotIndex == 0
+               // When we remove the first value for this array element, we also remove the element in the semantic value
+               int svIndex = childIndex / parselets.size();
+               Object sv = parent.getSemanticValue();
+               if (sv instanceof List) {
+                  SemanticNodeList parentList = (SemanticNodeList) sv;
+                  if (parentList.size() > svIndex)
+                     parentList.remove(svIndex, false);
+               }
             }
          }
 

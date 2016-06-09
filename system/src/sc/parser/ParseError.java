@@ -136,4 +136,9 @@ public class ParseError implements Cloneable, IParseResult {
       }
       return null;
    }
+
+   public ParseError propagatePartialValue(Object pv) {
+      partialValue = pv;
+      return this;
+   }
 }

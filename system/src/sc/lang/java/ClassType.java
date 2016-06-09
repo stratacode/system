@@ -331,7 +331,9 @@ public class ClassType extends JavaType {
       if (chainedTypes != null) {
          if (!chainedTypes.isStarted())
             chainedTypes.start();
-         return chainedTypes.get(chainedTypes.size()-1).typeArguments;
+         int chainedSz = chainedTypes.size();
+         if (chainedSz > 0)
+            return chainedTypes.get(chainedSz-1).typeArguments;
       }
       if (typeArguments != null && !typeArguments.isStarted())
          typeArguments.start();
@@ -453,7 +455,9 @@ public class ClassType extends JavaType {
       }
 
       if (typeArguments != null && chainedTypes != null) {
-         chainedTypes.get(chainedTypes.size()-1).typeArguments = typeArguments;
+         int chainedSz;
+         if ((chainedSz = chainedTypes.size()) != 0)
+            chainedTypes.get(chainedSz-1).typeArguments = typeArguments;
       }
 
       // Looking up type parameters by name is not good here
@@ -715,8 +719,9 @@ public class ClassType extends JavaType {
       try {
          String typeName = getFullTypeName();
          List<JavaType> typeArgs = null;
-         if (chainedTypes != null)
-            typeArgs = chainedTypes.get(chainedTypes.size() - 1).typeArguments;
+         int chainedSz;
+         if (chainedTypes != null && (chainedSz = chainedTypes.size()) > 0)
+            typeArgs = chainedTypes.get(chainedSz - 1).typeArguments;
          else
             typeArgs = typeArguments;
 
@@ -926,7 +931,8 @@ public class ClassType extends JavaType {
 
       // When the identifier expression ends with "." so we match everything defined for the prefix only
       //boolean endsWithDot = continuation != null && continuation instanceof Boolean;
-      boolean endsWithDot = chainedTypes != null && chainedTypes.get(chainedTypes.size()-1).typeName == null;
+      int chainedSz;
+      boolean endsWithDot = chainedTypes != null && (chainedSz = chainedTypes.size()) > 0 && chainedTypes.get(chainedSz-1).typeName == null;
 
       if (endsWithDot)
          pos = pos + leafName.length() + 1;

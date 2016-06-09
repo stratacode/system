@@ -337,7 +337,7 @@ public class OrderedChoice extends NestedParselet  {
                if (bestError == null || Parser.isBetterError(bestError.startIndex, bestError.endIndex, error.startIndex, error.endIndex, false)) {
                   bestError = error;
                   if (bestError.partialValue != null && bestError.partialValue != oldParseNode) {
-                     bestError.partialValue = subParselet.propagateResult(bestError.partialValue);
+                     bestError = bestError.propagatePartialValue(subParselet.propagateResult(bestError.partialValue));
                   }
                }
             }

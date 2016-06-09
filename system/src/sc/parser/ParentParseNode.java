@@ -20,7 +20,8 @@ public class ParentParseNode extends AbstractParseNode {
    // The semantic value (if any) 
    public Object value;
 
-   public ParentParseNode() {}
+   public ParentParseNode() {
+   }
 
    public ParentParseNode(Parselet p) {
       this.parselet = (NestedParselet) p;
@@ -46,7 +47,7 @@ public class ParentParseNode extends AbstractParseNode {
          ParseUtil.clearSemanticValue(value, this);
 
          if (children != null) {
-            for (Object p:children) {
+            for (Object p : children) {
                ParseUtil.clearSemanticValue(p, this);
             }
          }
@@ -57,7 +58,7 @@ public class ParentParseNode extends AbstractParseNode {
    }
 
    public boolean addForReparse(Object node, Parselet p, int svIndex, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, Object oldChildParseNode, DiffContext dctx,
-                                 boolean removeExtraNodes, boolean parseArray) {
+                                boolean removeExtraNodes, boolean parseArray) {
       // If there's no old value or we are inserting off the end, we must be inserting a new value
       if (children == null || childIndex >= children.size())
          return add(node, p, svIndex, slotIndex, skipSemanticValue, parser);
@@ -121,7 +122,7 @@ public class ParentParseNode extends AbstractParseNode {
                break;
 
             int oldStartOld = oldPN.getOrigStartIndex();
-            int oldStartNew = oldStartOld + dctx.getNewOffsetForOldPos(oldStartOld+oldChildLen);
+            int oldStartNew = oldStartOld + dctx.getNewOffsetForOldPos(oldStartOld + oldChildLen);
             if (oldStartNew >= parser.currentIndex) {
                parselet.removeForReparse(parser, this, c);
                int newSz = children.size();
@@ -150,7 +151,7 @@ public class ParentParseNode extends AbstractParseNode {
                break;
 
             int oldStartOld = oldPN.getOrigStartIndex();
-            int oldStartNew = oldStartOld + dctx.getNewOffsetForOldPos(oldStartOld+oldChildLen);
+            int oldStartNew = oldStartOld + dctx.getNewOffsetForOldPos(oldStartOld + oldChildLen);
             // If the entire old next parse-node exists before the currently parsed contents we cull these nodes.
             // For zero length nodes that are on the boundary, we also remove to keep them from hanging around.
 
@@ -187,7 +188,7 @@ public class ParentParseNode extends AbstractParseNode {
       }
       else {
          Object node = children.remove(childIndex);
-         return parselet.removeFromSemanticValue(this, node, slotIndex, skipSemanticValue, parser, false, true);
+         return parselet.removeFromSemanticValue(this, node, childIndex, slotIndex, skipSemanticValue, parser, false, true);
       }
    }
 
@@ -219,7 +220,7 @@ public class ParentParseNode extends AbstractParseNode {
                if (child instanceof StringToken) {
                   // For null nodes, be careful not to add an empty slot here cause then the next string won't get appended
                   if (node != null)
-                     children.set(0, StringToken.concatTokens((StringToken)child, (StringToken)node));
+                     children.set(0, StringToken.concatTokens((StringToken) child, (StringToken) node));
                   addChild = false;
                }
             }
@@ -229,7 +230,7 @@ public class ParentParseNode extends AbstractParseNode {
          if (p.discard || p.lookahead)
             return false;
          if (p.skip && !(parselet.needsChildren())) {
-            if (children.size() == 1)  {
+            if (children.size() == 1) {
                Object child = children.get(0);
                if (child instanceof String) { // TODO: should this be PString.isString?  See issue#24 where we are not collapsing string tokens into a single parse node
                   // this is n*n - the need to avoid the Strings...
@@ -253,6 +254,14 @@ public class ParentParseNode extends AbstractParseNode {
       // Only nested parselets should be using the ParentParseNode
       return parselet.setSemanticValue(this, node, svIndex, index, skipSemanticValue, parser, false, false);
    }
+
+   public void addOrSet(Object node, Parselet p, int svIndex, int index, boolean skipSemanticValue, Parser parser) {
+      if (children.size() > index)
+         set(node, p, index, skipSemanticValue, parser);
+      else
+         add(node, p, svIndex, index, skipSemanticValue, parser);
+   }
+
 
    public void set(Object node, Parselet p, int index, boolean skipSemanticValue, Parser parser) {
       boolean setChild = true;

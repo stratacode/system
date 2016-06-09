@@ -16,7 +16,10 @@ public class Sequence extends NestedParselet  {
     * return null as the value for the sequence, the default. */
    boolean acceptNoContent = false;
 
+   /** If set, after parsing this slot return a partial-value result when partialValues is enabled */
    public int skipOnErrorSlot = -1;
+   /** If set with skipOnErrorParselet, stop skip on error parsing at this slot */
+   public int skipOnErrorEndSlot = -1;
 
    /** The minimum number of slots that should be filled before completing a partial value with this sequence. */
    public int minContentSlot = 0;
@@ -75,6 +78,9 @@ public class Sequence extends NestedParselet  {
 
       boolean anyContent = false, errorNode = false;
 
+      ErrorParseNode pendingError = null;
+      int pendingErrorIx = -1;
+
       int numParselets = parselets.size();
       for (int i = 0; i < numParselets; i++) {
          Parselet childParselet = parselets.get(i);
@@ -114,7 +120,7 @@ public class Sequence extends NestedParselet  {
 
                // If we failed to complete this sequence, and we are in "error handling" mode, try to re-parse the previous sequence by extending it.
                // Some sequences collapse all values into a single child (e.g. blockComment).  For those, we can't support this optimization.
-               if (i > 0 && value != null && value.children != null && value.children.size() >= i) {
+               if (i > 0 && value != null && value.children != null && value.children.size() >= i && pendingErrorIx == -1) {
                   int prevIx = i - 1;
                   Parselet prevParselet = parselets.get(prevIx);
                   Object oldValue = value.children.get(prevIx);
@@ -156,11 +162,62 @@ public class Sequence extends NestedParselet  {
                if (err != null) {
                   // Skip on error can either be set on the child or as a slot index on the parent
                   if (childParselet.skipOnError || (skipOnErrorSlot != -1 && i >= skipOnErrorSlot)) {
-                     parser.addSkippedError(err);
-                     // Record the error but move on
-                     nestedValue = new ErrorParseNode(err, "");
-                     errorNode = true;
-                     err = null;
+                     if (skipOnErrorParselet != null && (skipOnErrorEndSlot == -1 || i < skipOnErrorEndSlot)) {
+                        int errorStart = parser.currentIndex;
+
+                        Object errorRes = parser.parseNext(skipOnErrorParselet);
+
+                        if (!(errorRes instanceof ParseError) && errorRes != null && ((CharSequence) errorRes).length() > 0) {
+                           // We were able to consume at least some characters so now we decide which sequence to retry.
+                           // We definitely retry this slot but if there are null optional slots in front of us, we can try to
+                           // reparse them as well.
+                           int resumeIx = i;
+                           Object resumeSlotVal = value == null || value.children == null || value.children.size() <= i ? null : value.children.get(resumeIx);
+                           while (resumeIx >= skipOnErrorSlot - 1) {
+                              int nextIx = resumeIx - 1;
+
+                              Parselet backChild = parselets.get(nextIx);
+                              // Walking backwards
+                              if (!backChild.optional || backChild.getLookahead())
+                                 break;
+
+                              if (value.children != null) {
+                                 Object nextSlotVal = value.children.get(nextIx);
+                                 // Can't retry this slot as we already parsed it
+                                 if (nextSlotVal != null && !(nextSlotVal instanceof ErrorParseNode))
+                                    break;
+                                 resumeSlotVal = nextSlotVal;
+                              }
+                              else
+                                 resumeSlotVal = null;
+                              resumeIx = nextIx;
+                           }
+
+                           if (resumeSlotVal == null) {
+                              pendingError = new ErrorParseNode(new ParseError(skipOnErrorParselet, "Expected {0}", new Object[]{this}, errorStart, parser.currentIndex), errorRes.toString());
+                              pendingErrorIx = resumeIx;
+                              value.addOrSet(pendingError, parselets.get(resumeIx), -1, resumeIx, true, parser);
+                           }
+                           else {
+                              ErrorParseNode resumeNode = (ErrorParseNode) resumeSlotVal;
+                              resumeNode.errorText += errorRes.toString();
+                              pendingErrorIx = resumeIx;
+                           }
+                           errorNode = true;
+
+                           // Restart the loop again at slot resumeIx
+                           i = resumeIx - 1;
+                           continue;
+                        }
+                     }
+                     // No parselet - so just skip parsing this sequence and resume parsing from here
+                     else {
+                        parser.addSkippedError(err);
+                        // Record the error but move on
+                        nestedValue = new ErrorParseNode(err, "");
+                        errorNode = true;
+                        err = null;
+                     }
                   }
                   else {
                      if (err.optionalContinuation) {
@@ -184,7 +241,7 @@ public class Sequence extends NestedParselet  {
                         }
                         else
                            errVal = value;
-                        err.partialValue = errVal;
+                        err = err.propagatePartialValue(errVal);
                         //err.continuationValue = true;
                         err.optionalContinuation = false;
                         nestedValue = null; // Switch this to optional
@@ -231,7 +288,6 @@ public class Sequence extends NestedParselet  {
                   parser.changeCurrentIndex(startIndex);
                return nestedValue;
             }
-
          }
 
          if (value == null)
@@ -246,7 +302,29 @@ public class Sequence extends NestedParselet  {
                if (!nestedParseNode.isEmpty())
                   errorNode = nestedParseNode.isErrorNode();
             }
-            value.add(nestedValue, childParselet, -1, i, false, parser);
+            if (pendingErrorIx != -1) {
+               if (nestedValue != null) {
+                  if (pendingErrorIx != i) {
+                     value.addOrSet(nestedValue, childParselet, -1, i, false, parser);
+                  }
+                  else {
+                     if (nestedValue instanceof IParseNode) {
+                        if (nestedValue instanceof ErrorParseNode)
+                           pendingError.errorText += nestedValue.toString();
+                        else if (!(nestedValue instanceof ParseError)) {
+                           // Need to somehow insert the errorText as an ErrorParseNode into the ParentParseNode or ParseNode?  Or add a "post-value" onto error node?
+                           PreErrorParseNode pepn = new PreErrorParseNode(pendingError.error, pendingError.errorText, (IParseNode) nestedValue);
+                           nestedValue = pepn;
+                           value.addOrSet(nestedValue, childParselet, -1, i, false, parser);
+                        }
+                     }
+                     else
+                        pendingError.errorText += nestedValue.toString();
+                  }
+               }
+            }
+            else
+               value.add(nestedValue, childParselet, -1, i, false, parser);
          }
          else if (slotMapping != null) // Need to preserve the specific index in the results if we have a mapping
             value.add(null, childParselet, -1, i, true, parser);
@@ -327,8 +405,8 @@ public class Sequence extends NestedParselet  {
 
       boolean anyContent = false, errorNode = false;
 
-      int numParselets = parselets.size();
-      int newChildCount = 0;
+      int numParselets = parselets.size(), newChildCount = 0, pendingErrorIx = -1;
+      ErrorParseNode pendingError = null;
 
       for (int i = 0; i < numParselets; i++) {
          Parselet childParselet = parselets.get(i);
@@ -346,6 +424,12 @@ public class Sequence extends NestedParselet  {
                oldChildParseNode = null;
                forceReparse = true;
             }
+         }
+
+         // If there's unparsed junk before this node don't use it when trying to reparse the slot
+         if (oldChildParseNode instanceof PreErrorParseNode) {
+            PreErrorParseNode oldChildPreError = (PreErrorParseNode) oldChildParseNode;
+            oldChildParseNode = oldChildPreError.value;
          }
 
          nextChildReparse = !oldChildMatches(oldChildParseNode, childParselet, dctx);
@@ -434,21 +518,95 @@ public class Sequence extends NestedParselet  {
                if (err != null) {
                   // Skip on error can either be set on the child or as a slot index on the parent
                   if (childParselet.skipOnError || (skipOnErrorSlot != -1 && i >= skipOnErrorSlot)) {
-                     parser.addSkippedError(err);
-                     // Record the error but move on
-                     if (err.partialValue != null) {
-                        nestedValue = err.partialValue;
-                        dctx.changeCurrentIndex(parser, err.endIndex);
+                     if (skipOnErrorParselet != null && (skipOnErrorEndSlot == -1 || i < skipOnErrorEndSlot)) {
+                        int errorStart = parser.currentIndex;
+
+                        if (trace)
+                           trace = trace;
+
+                        Object errorChildParseNode = oldChildParseNode;
+                        boolean errorReparse = forceReparse || nextChildReparse;
+                        if (errorChildParseNode instanceof IParseNode) {
+                           if (!skipOnErrorParselet.producesParselet(((IParseNode) errorChildParseNode).getParselet()))
+                              errorReparse = true;
+                        }
+
+                        Object errorRes = parser.reparseNext(skipOnErrorParselet, errorChildParseNode, dctx, errorReparse, getExitParselet(i));
+
+                        if (!(errorRes instanceof ParseError) && errorRes != null && ((CharSequence) errorRes).length() > 0) {
+                           // We were able to consume at least some characters so now we decide which sequence to retry.
+                           // We definitely retry this slot but if there are null optional slots in front of us, we can try to
+                           // reparse them as well.
+                           int resumeIx = i;
+                           Object resumeSlotVal = value == null || value.children == null || value.children.size() <= i ? null : value.children.get(resumeIx);
+                           while (resumeIx >= skipOnErrorSlot - 1) {
+                              int nextIx = resumeIx - 1;
+
+                              Parselet backChild = parselets.get(nextIx);
+                              // Walking backwards
+                              if (!backChild.optional || backChild.getLookahead())
+                                 break;
+
+                              if (value.children != null) {
+                                 Object nextSlotVal = value.children.get(nextIx);
+                                 // Can't retry this slot as we already parsed it
+                                 if (nextSlotVal != null && !(nextSlotVal instanceof ErrorParseNode))
+                                    break;
+                                 resumeSlotVal = nextSlotVal;
+                              }
+                              else
+                                 resumeSlotVal = null;
+                              resumeIx = nextIx;
+                           }
+
+                           if (resumeSlotVal == null) {
+                              pendingError = new ErrorParseNode(new ParseError(skipOnErrorParselet, "Expected {0}", new Object[]{childParselet}, errorStart, parser.currentIndex), errorRes.toString());
+                              pendingErrorIx = resumeIx;
+                              value.addForReparse(pendingError, parselets.get(resumeIx), -1, resumeIx, resumeIx, true, parser, errorChildParseNode, dctx, false, false);
+                           }
+                           else {
+                              if (resumeSlotVal instanceof ErrorParseNode) {
+                                 ErrorParseNode resumeNode = (ErrorParseNode) resumeSlotVal;
+                                 if (pendingErrorIx == -1)
+                                    resumeNode.errorText = errorRes.toString();
+                                 else
+                                    resumeNode.errorText += errorRes.toString();
+                                 pendingError = resumeNode;
+                              }
+                              else if (resumeSlotVal instanceof IParseNode) {
+                                 PreErrorParseNode newEPN = new PreErrorParseNode(new ParseError(skipOnErrorParselet, "Expected {0}", new Object[]{childParselet},errorStart, parser.currentIndex), errorRes.toString(),
+                                         (IParseNode) resumeSlotVal);
+                                 pendingError = newEPN;
+                                 value.addForReparse(newEPN, parselets.get(resumeIx), -1, resumeIx, resumeIx, true, parser, errorChildParseNode, dctx, false, false);
+                              }
+                              pendingErrorIx = resumeIx;
+                           }
+                           errorNode = true;
+
+                           // Restart the loop again at slot resumeIx
+                           i = resumeIx - 1;
+                           newChildCount = resumeIx;
+                           continue;
+                        }
                      }
-                     else
-                        nestedValue = new ErrorParseNode(err, "");
-                     errorNode = true;
-                     err = null;
+                     else {
+                        parser.addSkippedError(err);
+                        // Record the error but move on
+                        if (err.partialValue != null) {
+                           nestedValue = err.partialValue;
+                           dctx.changeCurrentIndex(parser, err.endIndex);
+                        }
+                        else
+                           nestedValue = new ErrorParseNode(err, "");
+                        errorNode = true;
+                        err = null;
+                     }
                   }
                   else {
                      int origChildCount = newChildCount;
                      if (err.optionalContinuation) {
                         ParentParseNode errVal;
+                        boolean continuationFailed = false;
                         if (pv != null) {
                            if (value == null) {
                               errVal = resetOldParseNode(forceReparse || nextChildReparse ? null : oldParseNode, startIndex, true, false);
@@ -459,8 +617,14 @@ public class Sequence extends NestedParselet  {
                               // and replace the error slot here with a null
                               Object semValue = value.getSemanticValue();
                               if (semValue != null && semValue instanceof ISemanticNode) {
-                                 ISemanticNode newNode = ((ISemanticNode) semValue).deepCopy(ISemanticNode.CopyAll, null);
-                                 errVal = (ParentParseNode) newNode.getParseNode();
+                                 ISemanticNode semValNode = ((ISemanticNode) semValue);
+                                 if (semValNode.getParseNode().getParselet() == this) {
+                                    ISemanticNode newNode = semValNode.deepCopy(ISemanticNode.CopyAll, null);
+                                    errVal = (ParentParseNode) newNode.getParseNode();
+                                 }
+                                 else {
+                                    errVal = value.deepCopy();
+                                 }
                               }
                               else
                                  errVal = value.deepCopy();
@@ -469,7 +633,7 @@ public class Sequence extends NestedParselet  {
                         }
                         else
                            errVal = value;
-                        err.partialValue = errVal;
+                        err = err.propagatePartialValue(errVal);
                         //err.continuationValue = true;
                         err.optionalContinuation = false;
                         nestedValue = null; // Switch this to optional
@@ -548,7 +712,30 @@ public class Sequence extends NestedParselet  {
                if (!nestedParseNode.isEmpty())
                   errorNode = nestedParseNode.isErrorNode();
             }
-            value.addForReparse(nestedValue, childParselet, newChildCount, newChildCount++, i, false, parser, oldChildParseNode, dctx, false, false);
+            if (pendingErrorIx != -1) {
+               if (nestedValue != null) {
+                  if (pendingErrorIx != i) {
+                     value.addForReparse(nestedValue, childParselet, -1, newChildCount, newChildCount, false, parser, oldChildParseNode, dctx, false, false);
+                  }
+                  else {
+                     if (nestedValue instanceof IParseNode) {
+                        if (nestedValue instanceof ErrorParseNode)
+                           pendingError.errorText += nestedValue.toString();
+                        else if (!(nestedValue instanceof ParseError)) {
+                           // Need to somehow insert the errorText as an ErrorParseNode into the ParentParseNode or ParseNode?  Or add a "post-value" onto error node?
+                           PreErrorParseNode pepn = new PreErrorParseNode(pendingError.error, pendingError.errorText, (IParseNode) nestedValue);
+                           nestedValue = pepn;
+                           value.addForReparse(nestedValue, childParselet, -1, newChildCount, newChildCount, false, parser, oldChildParseNode, dctx, false, false);
+                        }
+                     }
+                     else
+                        pendingError.errorText += nestedValue.toString();
+                  }
+               }
+               newChildCount++;
+            }
+            else
+               value.addForReparse(nestedValue, childParselet, newChildCount, newChildCount++, i, false, parser, oldChildParseNode, dctx, false, false);
          }
          else if (slotMapping != null) // Need to preserve the specific index in the results if we have a mapping
             value.addForReparse(null, childParselet, newChildCount, newChildCount++, i, true, parser, oldChildParseNode, dctx, false, false);
@@ -900,10 +1087,10 @@ public class Sequence extends NestedParselet  {
             if (pv == null) {
                if (errorValues != null) {
                   ParentParseNode errVal = cloneParseNode(((ParentParseNode) value)) ;
-                  lastError.partialValue = newRepeatSequenceResult(errorValues, errVal, lastMatchIndex, parser);
+                  lastError = lastError.propagatePartialValue(newRepeatSequenceResult(errorValues, errVal, lastMatchIndex, parser));
                }
                else
-                   lastError.partialValue = value;
+                   lastError = lastError.propagatePartialValue(value);
                // Instead of producing a value for this fragment and messing up the parse node for what might be a valid match
                // we mark this error as a "continuation".  This flag can then be used in the suggestCompletions
                // method to take into account the fact that there's an extra '.' at the end (or whatever)
@@ -1129,10 +1316,10 @@ public class Sequence extends NestedParselet  {
             if (pv == null) {
                if (errorValues != null) {
                   ParentParseNode errVal = cloneParseNode(((ParentParseNode) value)) ;
-                  lastError.partialValue = newRepeatSequenceResultReparse(errorValues, errVal, svCount, newChildCount, lastMatchIndex, parser, oldParent, dctx);
+                  lastError = lastError.propagatePartialValue(newRepeatSequenceResultReparse(errorValues, errVal, svCount, newChildCount, lastMatchIndex, parser, oldParent, dctx));
                }
                else
-                  lastError.partialValue = value;
+                  lastError = lastError.propagatePartialValue(value);
                // Instead of producing a value for this fragment and messing up the parse node for what might be a valid match
                // we mark this error as a "continuation".  This flag can then be used in the suggestCompletions
                // method to take into account the fact that there's an extra '.' at the end (or whatever)

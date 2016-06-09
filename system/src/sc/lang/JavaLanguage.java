@@ -707,6 +707,11 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    Sequence normalClassDeclaration =
        new Sequence("ClassDeclaration(operator,,typeName,typeParameters,extendsType,implementsTypes,body)",
                     classOperators, spacing, identifierSp, optTypeParameters, extendsType, implementsTypes, classBody);
+   {
+      // When parsing for errors, once we've seen the 'class' skip on error until we see the { so we can resume a misformed class definition
+      normalClassDeclaration.skipOnErrorSlot = 1;
+      normalClassDeclaration.skipOnErrorParselet = new Sequence("('')", OPTIONAL | REPEAT, new SymbolChoice(NOT, "extends", "implements", "{", "}", "\n", EOF));
+   }
 
    Sequence enumConstant = new Sequence("EnumConstant(modifiers,typeName,arguments,body)", annotations, identifier,
                                         optArguments,

@@ -127,7 +127,6 @@ public class TestUtil {
    public static int numErrors = 0;
 
    public static void main(String[] args) {
-
       TestOptions opts = new TestOptions();
 
       List<String> buildList = null;
@@ -288,7 +287,7 @@ public class TestUtil {
          }
          else {
             if (buildList == null)
-               buildList = new ArrayList<String>(args.length-1);
+               buildList = new ArrayList<String>(args.length - 1);
             buildList.add(args[i]);
          }
       }
@@ -312,7 +311,7 @@ public class TestUtil {
       else {
          if (opts.srcPath == null && buildList != null) {
             LinkedHashSet<String> srcDirs = new LinkedHashSet<String>();
-            for (String buildFile:buildList) {
+            for (String buildFile : buildList) {
                String parentDir = FileUtil.getParentPath(buildFile);
                if (parentDir == null)
                   srcDirs.add(".");
@@ -536,12 +535,13 @@ public class TestUtil {
                      result = err.getBestPartialValue();
                   }
                   /*
-                  if (reparseFile.contains("4")) {
+                  if (reparseFile.contains("3")) {
                      System.out.println("***");
-                     SCLanguage.getSCLanguage().compilationUnit.trace = true;
-                     //SemanticNode.debugDiffTrace = true;
+                     //SCLanguage.getSCLanguage().classBodyDeclarations.trace = true;
+                     JavaLanguage.getJavaLanguage().classBodyDeclarations.trace = true;
+                     SemanticNode.debugDiffTrace = true;
 
-                     DiffContext.debugDiffContext = true;
+                     //DiffContext.debugDiffContext = true;
                   }
                   */
                   if (result == null)

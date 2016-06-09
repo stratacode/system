@@ -655,8 +655,8 @@ public class Parser implements IString {
       return node;
    }
 
-   static final ParseError PARSE_ERROR_OVERRIDDEN = new ParseError("Error less specific than previous error", null, -1, -1);
-   static final ParseError PARSE_NEGATED_ERROR = new ParseError("Match failed while negated", null, -1, -1);
+   static final ParseError PARSE_ERROR_OVERRIDDEN = new StaticParseError("Error less specific than previous error");
+   static final ParseError PARSE_NEGATED_ERROR = new StaticParseError("Match failed while negated");
 
    public void getChars(int srcBegin, int srcEnd, char dst[], int dstBegin) {
       int dstOffset = dstBegin - srcBegin;
