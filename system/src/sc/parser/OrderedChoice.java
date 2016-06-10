@@ -469,8 +469,6 @@ public class OrderedChoice extends NestedParselet  {
       int newChildCount = 0;
       int svCount = 0;
 
-      int oldLen = oldParseNode == null ? -1 : ((CharSequence) oldParseNode).length();
-
       do {
          matched = false;
          lastMatchStart = parser.currentIndex;
@@ -531,8 +529,6 @@ public class OrderedChoice extends NestedParselet  {
                   }
                }
             }
-
-            int oldChildLen = oldChildParseNode != null ? ((CharSequence) oldChildParseNode).length() : -1;
 
             // This is here to override the case where the "beforeFirstNode" is a parent of some large sequence which eventually is the same.
             // TODO - should we check that the nextChildParseNode starts at the right spot here as well?

@@ -12,7 +12,7 @@ import java.util.IdentityHashMap;
  * some error text.
  */
 public class PreErrorParseNode extends ErrorParseNode {
-   IParseNode value;
+   public IParseNode value;
    public PreErrorParseNode(ParseError err, String errText, IParseNode valueNode) {
       super(err, errText);
 

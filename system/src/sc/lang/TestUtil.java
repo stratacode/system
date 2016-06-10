@@ -535,10 +535,10 @@ public class TestUtil {
                      result = err.getBestPartialValue();
                   }
                   /*
-                  if (reparseFile.contains("3")) {
+                  if (reparseFile.contains("1")) {
                      System.out.println("***");
-                     //SCLanguage.getSCLanguage().classBodyDeclarations.trace = true;
-                     JavaLanguage.getJavaLanguage().classBodyDeclarations.trace = true;
+                     SCLanguage.getSCLanguage().classBodyDeclarations.trace = true;
+                     //JavaLanguage.getJavaLanguage().classBodyDeclarations.trace = true;
                      SemanticNode.debugDiffTrace = true;
 
                      //DiffContext.debugDiffContext = true;

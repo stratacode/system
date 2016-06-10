@@ -157,7 +157,7 @@ public class ParentParseNode extends AbstractParseNode {
 
             // For re24 - UnitConverter4 must detect that we remove the misparsed block statement so we can reuse the rest.
             //if (oldStartNew + oldChildLen < parser.currentIndex || (oldChildLen == 0 && oldStartNew == parser.currentIndex))
-            if (oldStartNew + oldChildLen <= parser.currentIndex) {
+            if (oldStartNew + oldChildLen <= parser.currentIndex || (parser.atEOF() && oldStartNew >= parser.currentIndex)) {
                // Used to have this test to avoid removing old parse nodes in the same again region which we haven't reached yet but
                /* caused us to we fail to remove parse-nodes we need to remove to do efficient incremental reparses.
                if (!dctx.sameAgain && oldStart > dctx.endChangeOldOffset) {
