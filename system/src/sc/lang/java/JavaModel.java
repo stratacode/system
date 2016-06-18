@@ -433,6 +433,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                        ModelUtil.definesMember(importedType, memberName, MemberType.FieldEnumSet, null, null);
                if (property == null && enableExtensions())
                   property = ModelUtil.definesMember(importedType, memberName, MemberType.PropertySetSet, null, null);
+               // You can also import static classes apparently
+               if (property == null) {
+                  property = ModelUtil.getInnerType(importedType, memberName, null);
+               }
                if (property != null && ModelUtil.hasModifier(property, "static")) {
                   if (staticImportProperties == null)
                      staticImportProperties = new HashMap<String,Object>();

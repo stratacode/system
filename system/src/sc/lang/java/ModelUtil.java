@@ -1200,6 +1200,8 @@ public class ModelUtil {
    public static boolean sameTypeParameters(Object tp1, Object tp2) {
       String tpName1 = ModelUtil.getTypeParameterName(tp1);
       String tpName2 = ModelUtil.getTypeParameterName(tp2);
+      if (tpName1 == null || tpName2 == null)
+         return false;
       if (!tpName1.equals(tpName2))
          return false;
       Object decl1 = ModelUtil.getTypeParameterDeclaration(tp1);
@@ -1354,9 +1356,9 @@ public class ModelUtil {
    }
 
    public static Object refineType(ITypeDeclaration definedInType, Object origType, Object newType) {
-      if (ModelUtil.isTypeVariable(origType))
+      if (ModelUtil.isTypeVariable(origType) || ModelUtil.isWildcardType(origType))
          return newType;
-      if (ModelUtil.isTypeVariable(newType))
+      if (ModelUtil.isTypeVariable(newType) || ModelUtil.isWildcardType(newType))
          return origType;
 
       if (newType == null)
@@ -3992,6 +3994,9 @@ public class ModelUtil {
       else if (typeParam instanceof Class) {
          return null;
       }
+      // We could check if the bounds are a type parameter but don't think that's right since this is not a type variable
+      else if (ModelUtil.isWildcardType(typeParam))
+         return null;
       else
          throw new UnsupportedOperationException();
    }
