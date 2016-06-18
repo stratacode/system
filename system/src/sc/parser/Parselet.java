@@ -91,6 +91,9 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
     */
    public IParseNode generateParseNode;
 
+   /** Set to true for parselets such as spacing that tend to glue together other parse nodes.  Those need to be reparsed always. */
+   public boolean alwaysReparse = false;
+
    /**
     * Assign a default style for semantic values produced by this parse node.  Often, but not always the style for a text node
     * is associated with it's grammar node.  If you need to customize the style for a given node, override the styleNode method.
@@ -249,7 +252,23 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       if (getSkip()) {
          AbstractParseNode pn = (AbstractParseNode) node;
          if (pn.canSkip()) {
-            parent.add(pn.getSkippedValue(), this, index, true, parser);
+            parent.add(pn.getSkippedValue(), this, -1, index, true, parser);
+            return false;
+         }
+      }
+
+      return true;
+   }
+
+   public boolean addReparseResultToParent(Object node, ParentParseNode parent, int svIndex, int childIndex, int slotIndex, Parser parser, Object oldChildParseNode, DiffContext dctx, boolean removeExtraNodes, boolean parseArray) {
+      // Exclude this entirely from the result
+      if (getDiscard() || getLookahead())
+         return false;
+
+      if (getSkip()) {
+         AbstractParseNode pn = (AbstractParseNode) node;
+         if (pn.canSkip()) {
+            parent.addForReparse(pn.getSkippedValue(), this, svIndex, childIndex, slotIndex, true, parser, oldChildParseNode, dctx, removeExtraNodes, parseArray);
             return false;
          }
       }
@@ -387,13 +406,27 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       language = l;
    }
 
+   public ParseError reparseError(Parser parser, Parselet childParselet, DiffContext dctx, String errorCode, Object... args) {
+      ParseError res = parseError(parser, childParselet, errorCode, args);
+      dctx.updateForNewIndex(parser.currentIndex);
+      return res;
+   }
+
    public ParseError parseError(Parser parser, Parselet childParselet, String errorCode, Object... args) {
       return parseError(parser, null, null, childParselet, errorCode, args);
    }
 
    public ParseError parseError(Parser parser, Object partialValue, ParseError chain, Parselet childParselet, String errorCode, Object... args) {
+      int partialValueLen = partialValue == null ? 0 : ((CharSequence) partialValue).length();
       int endIx = chain == null ? parser.currentIndex : Math.max(chain.endIndex, parser.currentIndex);
       int startIx = parser.getLastStartIndex();
+
+      // It's possible that we've parsed more data in this parselet than we included in the partial value.  In that case, we have to throw away
+      // that extra info (Or possibly include it in the partial value) - simple case - entering "public s" into a body declaration without the ;
+      if (endIx - startIx != partialValueLen) {
+         endIx = startIx;
+      }
+
       parser.resetCurrentIndex(startIx);
       return parser.parseError(this, partialValue, childParselet, errorCode, startIx, endIx, args);
    }
@@ -402,6 +435,18 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       ParseError error = parseError(parser, partialValue, chain, childParselet, errorCode, args);
       error.eof = true;
       return error;
+   }
+
+   public ParseError reparsePartialError(Parser parser, DiffContext dctx, Object partialValue, ParseError chain, Parselet childParselet, String errorCode, Object... args) {
+      ParseError res = parsePartialError(parser, partialValue, chain, childParselet, errorCode, args);
+
+      dctx.updateForNewIndex(parser.currentIndex);
+
+      return res;
+   }
+
+   public ParseError reparseError(Parser parser, DiffContext dctx, String errorCode, Object... args) {
+      return reparseError(parser, null, dctx, errorCode, args);
    }
 
    public ParseError parseError(Parser parser, String errorCode, Object... args) {
@@ -441,7 +486,8 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
    }
 
 
-   public IParseNode newParseNode() { return newParseNode(-1);
+   public IParseNode newParseNode() {
+      return newParseNode(-1);
    }
 
    public IParseNode newGeneratedParseNode(Object value) {
@@ -499,7 +545,165 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       node.formatStyled(ctx, adapter);
    }
 
-   abstract public Object parse(Parser p);
+   public abstract Object parse(Parser p);
+
+   protected boolean anyReparseChanges(Parser parser, Object oldParseNode, DiffContext dctx, boolean forceReparse) {
+      //dctx.updateStateForPosition(parser.currentIndex);
+
+      // We are about to parse the parselet for
+      if (/*dctx.changedRegion && */ !dctx.sameAgain && dctx.isAfterLastNode(oldParseNode, true)) {
+         checkForSameAgainRegion(parser, oldParseNode, dctx, true, forceReparse);
+      }
+      // Still need to possibly clear the changed region before we reparse the next round
+      else
+         clearChangedRegion(parser, oldParseNode, dctx, true, forceReparse);
+
+      if (!dctx.changedRegion && !dctx.sameAgain) {
+         if (oldParseNode == dctx.firstDiffNode || oldParseNode == dctx.beforeFirstNode) {
+            dctx.setChangedRegion(parser, true);
+         }
+         /* Breaks re22, 415
+         if (!dctx.changedRegion && parser.currentIndex >= dctx.startChangeOffset) {
+            dctx.setChangedRegion(parser, true);
+         }
+         */
+      }
+      /* This is some logic we had to validate that the start index in the old parse node matches and force a reparse when it does not.
+       * instead we should be setting the endNewOffset when we see we are not parsing the same thing at the same location so changedRegion is
+       * never set back to false.
+      if (dctx.sameAgain && !dctx.changedRegion && !forceReparse) {
+         if (oldParseNode instanceof IParseNode) {
+            int oldStartIx = ((IParseNode) oldParseNode).getStartIndex() + dctx.getNewOffset();
+            if (oldStartIx != parser.currentIndex) {
+               //forceReparse = true;
+            }
+         }
+      }
+      */
+      boolean anyChanges = dctx.changedRegion || forceReparse;
+      if (!anyChanges && parser.currentIndex >= dctx.newLen)
+         return true;
+      int startChange = dctx.startChangeOffset;
+      if (dctx.changeEndOffset == -1 && !anyChanges) {
+         if (dctx.changeStartOffset != -1)
+            startChange = dctx.changeStartOffset;
+         else if (dctx.beforeFirstNode != null && dctx.beforeFirstNode.getStartIndex() < startChange)
+            startChange = dctx.beforeFirstNode.getStartIndex();
+         if (parser.currentIndex >= startChange)
+            return true;
+      }
+
+      // Finally we've determined we are in a state where we can cache the old parse-node.  It's in an unchanged
+      // region of the text.  But it's possible we hit this oldParseNode at the wrong position in the text
+      if (!anyChanges) {
+         if (oldParseNode instanceof IParseNode) {
+            int curIndex = parser.currentIndex;
+            IParseNode oldPN = (IParseNode) oldParseNode;
+            int oldStart = oldPN.getOrigStartIndex();
+            if (oldStart + dctx.getNewOffsetForNewPos(curIndex) != curIndex)
+               return true;
+            // If the old parse node ends right at the start of the changes we should reparse it in case there's more to the old parse node
+            int oldEnd = oldStart + oldPN.length();
+            if (oldEnd >= startChange && oldStart < startChange)
+               return true;
+         }
+         else {
+            if (oldParseNode != null) {
+               CharSequence seq = (CharSequence) oldParseNode;
+               int oldLen = seq.length();
+               int oldEnd = parser.currentIndex + oldLen;
+               // We don't have the old parse-nodes start index but if we assume it starts here and is long enough to hit the end of the boundary
+               // we might be an identifier that is being extended so mark it changed.
+               if (oldEnd >= startChange && parser.currentIndex < startChange)
+                  return true;
+               for (int i = 0; i < oldLen; i++) {
+                  if (seq.charAt(i) != parser.peekInputChar(i))
+                     return true;
+               }
+            }
+            else {
+               // Null old parse nodes cannot really be validated so we need to just reparse them
+               if (startChange <= parser.currentIndex)
+                  return true;
+            }
+         }
+      }
+      return anyChanges;
+   }
+
+   protected void checkForSameAgainRegion(Parser parser, Object oldParseNode, DiffContext dctx, boolean beforeMatch, boolean forceReparse) {
+      // When do we restore the reparse mode so it's looking at the oldParseNode again to find cached values?
+      // If we find the "afterLastNode" or in some cases we have cleared out oldParseNode - so in those situations, when we've parsed
+      // beyond the "changeNewOffset" we set this to true.
+      if (/*dctx.changedRegion && */ !dctx.sameAgain && dctx.isAfterLastNode(oldParseNode, false)) {
+         if (parser.currentIndex > dctx.endParseChangeNewOffset && (!beforeMatch ||
+             oldParseNode instanceof IParseNode && ((IParseNode) oldParseNode).getOrigStartIndex() + dctx.getDiffOffset() == parser.currentIndex)) {
+            dctx.setSameAgain(parser, true);
+         }
+      }
+
+      clearChangedRegion(parser, oldParseNode, dctx, beforeMatch, forceReparse);
+   }
+
+   protected void clearChangedRegion(Parser parser, Object oldParseNode, DiffContext dctx, boolean beforeMatch, boolean forceReparse) {
+      // If we've already passed the last node in the set of nodes that have changed, but have not yet passed
+      // the end of the changed region, we might parse things differently so do not mark changedRegion false until
+      // the first
+      if (dctx.sameAgain && dctx.changedRegion && parser.currentIndex > dctx.endParseChangeNewOffset) {
+         boolean clearChangedFlag = !forceReparse;
+         // If we are about to reparse a parse-node
+         if (!clearChangedFlag && beforeMatch) {
+            if ((oldParseNode instanceof IParseNode)) {
+               IParseNode oldPN = (IParseNode) oldParseNode;
+               if (oldPN.getOrigStartIndex() + dctx.getNewOffset() == parser.currentIndex && oldPN.getParselet() == this)
+                  clearChangedFlag = true;
+            }
+         }
+         if (clearChangedFlag && parser.currentIndex == dctx.endParseChangeNewOffset) {
+            // In re14/UnitConverter6.sc we hit the case where endParseChangeNewOffset represents the first "sameAgain" character which was part of the part we wanted to reuse
+            System.out.println("*** Warning - some tests need this test to work!");
+            //clearChangedFlag = false;
+         }
+         if (clearChangedFlag)
+            dctx.setChangedRegion(parser, false);
+      }
+   }
+
+   protected void advancePointer(Parser parser, Object oldParseNode, DiffContext dctx) {
+      // If nothing has changed, just advance the currentIndex beyond this token since this is a match
+      if (oldParseNode != null) {
+         if (oldParseNode instanceof IParseNode) {
+            IParseNode oldp = (IParseNode) oldParseNode;
+            // ? assert oldp.getStartIndex() == parser.currentIndex
+            int newStartIx = oldp.getOrigStartIndex() + dctx.getNewOffset();
+            if (newStartIx != parser.currentIndex)
+               System.out.println("*** Error - reusing old parse node that is not in the right place!");
+            boolean sameAgain = dctx.sameAgain;
+            dctx.changeCurrentIndex(parser, newStartIx + oldp.length());
+
+            if (sameAgain)
+               oldp.resetStartIndex(newStartIx, false, true);
+         }
+         else {
+            dctx.changeCurrentIndex(parser, parser.currentIndex + ((CharSequence) oldParseNode).length());
+         }
+      }
+   }
+
+   public Object reparse(Parser parser, Object oldParseNode, DiffContext dctx, boolean forceReparse, Parselet exitParselet) {
+      Object res;
+      if (anyReparseChanges(parser, oldParseNode, dctx, forceReparse)) {
+         parser.reparseCt++;
+         res = parse(parser);
+      }
+      else {
+         res = oldParseNode;
+         parser.reparseSkippedCt++;
+         advancePointer(parser, oldParseNode, dctx);
+      }
+
+      return res;
+   }
 
    /** An optional method for parsing a repeating parselet.  Used in the context when we know there are errors in the file and
     * we know the parent parselet failed to parse the exit parselet in the current context.  The parselet previous to exit parselet is called
@@ -512,10 +716,17 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       return null;
    }
 
+   public Object reparseExtendedErrors(Parser p, Parselet exitParselet, Object oldChildNode, DiffContext dctx, boolean forceReparse) {
+      return null;
+   }
+
    public boolean peek(Parser p) {
       int startIndex = p.currentIndex;
       Object value = p.parseNext(this);
       p.resetCurrentIndex(startIndex);
+      // If the parselet is matching EOF, it returns null as a valid match.  Everything else should return a ParseError at EOF.
+      if (value == null && p.atEOF())
+         return true;
       return value != null && !(value instanceof ParseError);
    }
 
@@ -631,5 +842,31 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
    /** From the IDE's perspective,  */
    public boolean isComplexStringType() {
       return false;
+   }
+
+   public IParseNode getBeforeFirstNode(IParseNode beforeFirstNode) {
+      // To handle the case where we have a large parse-node like the classBodyDeclarations.  if this node happens to be in front of
+      // the changed region by a character, choose the last child and make that the "beforeFirstNode" so we can avoid reparsing a large repeat parselet
+      if (beforeFirstNode instanceof ParentParseNode) {
+         ParentParseNode parent = (ParentParseNode) beforeFirstNode;
+         if (parent.children != null) {
+            int sz = parent.children.size();
+            for (int i = sz - 1; i >= 0; i--) {
+               Object child = parent.children.get(i);
+               if (child != null) {
+                  if (child instanceof IParseNode && !(child instanceof ErrorParseNode)) {
+                     IParseNode childPN = (IParseNode) child;
+                     Parselet childParselet = childPN.getParselet();
+                     if (!childParselet.alwaysReparse) {
+                        // Might have to do this for multiple levels to avoid the really big nested block statements
+                        return childPN.getParselet().getBeforeFirstNode(childPN);
+                     }
+                  }
+                  break;
+               }
+            }
+         }
+      }
+      return beforeFirstNode;
    }
 }

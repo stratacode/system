@@ -57,8 +57,12 @@ public class SymbolChoice extends Parselet {
       addExpectedValues(values);
    }
 
-   public void removeExpectedValue(String v) {
-      expectedValues.remove(PString.toIString(v));
+   public void removeExpectedValue(CharSequence v) {
+      if (!expectedValues.remove(v)) {
+         // The hashcode on PString is different than String to we need to convert to be sure to really remove it
+         if (!expectedValues.remove(PString.toIString(v)))
+            System.err.println("*** Failed to remove expected value!");
+      }
    }
 
    public void addExpectedValues(String [] values) {

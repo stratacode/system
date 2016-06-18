@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import sc.classfile.CFClass;
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNode;
 import sc.lang.SemanticNodeList;
@@ -14,7 +15,9 @@ import sc.util.StringUtil;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.WildcardType;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 
@@ -42,17 +45,17 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
 
    // Returns the TypeDeclaration or Class for this type
    public Object getTypeDeclaration() {
-      return getTypeDeclaration(null, false);
+      return getTypeDeclaration(null, null, false, false, true);
    }
 
-   public abstract Object getTypeDeclaration(ITypeParamContext ctx, boolean resolve);
+   public abstract Object getTypeDeclaration(ITypeParamContext ctx, ITypeDeclaration definedInType, boolean resolve, boolean refreshParams, boolean bindUnbound);
 
    public int getNdims() {
       return arrayDimensions == null || arrayDimensions.length() == 0 ? -1 : arrayDimensions.length() >> 1;
    }
 
    public String getAbsoluteBaseTypeName() {
-      Object type = getTypeDeclaration(null, true);
+      Object type = getTypeDeclaration(null, null, true, false, true);
       if (type != null)
          return ModelUtil.getTypeName(type, false);
       else
@@ -84,6 +87,8 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
    public Object getTypeArgumentDeclaration(int ix) {
       return null;
    }
+
+   public abstract void convertToSrcReference();
 
    abstract public void initType(LayeredSystem sys, ITypeDeclaration definedInType, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer, Object typeParam);
 
@@ -131,10 +136,14 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
       return t;
    }
 
+   static int typeParamRecurseCheck = 0;
+
    public static JavaType createFromParamType(Object type, ITypeParamContext ctx, ITypeDeclaration definedInType) {
       JavaType[] typeParamsArr = null;
       JavaType newType = null;
       ITypeDeclaration typeCtx = ctx instanceof ITypeDeclaration ? (ITypeDeclaration) ctx : ctx != null ? ctx.getDefinedInType() : definedInType;
+
+      LayeredSystem sys = ctx != null ? ctx.getLayeredSystem() : definedInType == null ? null : definedInType.getLayeredSystem();
       if (ModelUtil.hasTypeParameters(type)) {
          SemanticNodeList<JavaType> typeParams = new SemanticNodeList<JavaType>();
          int numParams = ModelUtil.getNumTypeParameters(type);
@@ -142,8 +151,8 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
             Object typeParam = ModelUtil.getTypeParameter(type, i);
             if (typeParam instanceof WildcardType) {
                newType = ExtendsType.create((WildcardType) typeParam);
-               if (!newType.isBound() && ctx != null)
-                  newType.initType(ctx.getLayeredSystem(), typeCtx, null, ctx, true, false, typeParam);
+               if (!newType.isBound() && sys != null)
+                  newType.initType(sys, typeCtx, null, ctx, true, false, typeParam);
                typeParam = newType;
             }
             else if (typeParam instanceof ExtendsType.LowerBoundsTypeDeclaration) {
@@ -156,7 +165,9 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
                      typeParam = new ExtendsType.LowerBoundsTypeDeclaration(newTypeParam);
                }
                else {
-                  newType = ExtendsType.createSuper(td, ctx);
+                  newType = ExtendsType.createSuper(td, ctx, definedInType);
+                  if (sys != null)
+                     newType.initType(sys, typeCtx, null, ctx, true, false, typeParam);
                   typeParam = newType;
                }
             }
@@ -182,8 +193,19 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
                if (typeParam == type)
                   System.out.println("*** Error!");
                else {
-                  JavaType typeParamJavaType = createFromParamType(typeParam, ctx, definedInType);
-                  typeParams.add(typeParamJavaType);
+                  if (typeParamRecurseCheck == 100) {
+                     System.err.println("*** Loop in type-parameters!");
+                     return null;
+                  }
+                  else {
+                     if (typeParamRecurseCheck == 97) {
+                        System.out.println("*** Error infinite loop in type-parameter resolution!");
+                     }
+                     typeParamRecurseCheck++;
+                     JavaType typeParamJavaType = createFromParamType(typeParam, ctx, definedInType);
+                     typeParamRecurseCheck--;
+                     typeParams.add(typeParamJavaType);
+                  }
                }
             }
             else if (typeParam instanceof WildcardType) {
@@ -195,8 +217,8 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
             else {
                String typeName = ModelUtil.getTypeName(typeParam);
                newType = ClassType.create(typeName);
-               if (ctx != null)
-                  newType.initType(ctx.getLayeredSystem(), typeCtx, null, ctx, true, false, typeParam);
+               if (sys != null)
+                  newType.initType(sys, typeCtx, null, ctx, true, false, typeParam);
                typeParams.add(newType);
             }
          }
@@ -204,8 +226,8 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
       }
       else if (type instanceof WildcardType) {
          newType = ExtendsType.create((WildcardType) type);
-         if (!newType.isBound() && ctx != null)
-            newType.initType(ctx.getLayeredSystem(), typeCtx, null, ctx, true, false, null);
+         if (!newType.isBound() && sys != null)
+            newType.initType(sys, typeCtx, null, ctx, true, false, null);
          return newType;
       }
       else if (type instanceof GenericArrayType || type instanceof ArrayTypeDeclaration) {
@@ -214,28 +236,29 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
          do {
             compType = ModelUtil.getGenericComponentType(type);
             arrDims.append(ModelUtil.getArrayDimsStr(type));
-         } while (compType instanceof GenericArrayType);
+            type = compType;
+         } while (ModelUtil.isArray(compType));
 
          if (ModelUtil.isWildcardType(compType)) {
-            newType = ExtendsType.createFromType(compType, ctx);
+            newType = ExtendsType.createFromType(compType, ctx, definedInType);
          }
          else {
             newType = ClassType.create(ModelUtil.getTypeName(compType));
          }
          newType.arrayDimensions = arrDims.toString();
-         if (ctx != null)
-            newType.initType(ctx.getLayeredSystem(), typeCtx, null, ctx, true, false, compType);
+         if (sys != null)
+            newType.initType(sys, typeCtx, null, ctx, true, false, compType);
          return newType;
       }
       else if (type instanceof ExtendsType.LowerBoundsTypeDeclaration) {
-         newType = ExtendsType.createSuper((ExtendsType.LowerBoundsTypeDeclaration) type, ctx);
-         if (ctx != null)
-            newType.initType(ctx.getLayeredSystem(), typeCtx, null, ctx, true, false, type);
+         newType = ExtendsType.createSuper((ExtendsType.LowerBoundsTypeDeclaration) type, ctx, definedInType);
+         if (sys != null)
+            newType.initType(sys, typeCtx, null, ctx, true, false, type);
          return newType;
       }
       newType = createTypeFromTypeParams(type, typeParamsArr);
-      if (ctx != null) {
-         newType.initType(ctx.getLayeredSystem(), typeCtx, null, ctx, true, false, type);
+      if (sys != null) {
+         newType.initType(sys, typeCtx, null, ctx, true, false, type);
       }
       return newType;
    }
@@ -300,7 +323,7 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
       String dimsStr = getSignatureDims();
       String baseSig = getBaseSignature();
       if (baseSig.startsWith("T") && expandTypeParams) {
-         Object type = getTypeDeclaration(null, true);
+         Object type = getTypeDeclaration(null, null, true, false, true);
          if (ModelUtil.isArray(type))
             type = ModelUtil.getArrayComponentType(type);
          if (ModelUtil.isTypeVariable(type))

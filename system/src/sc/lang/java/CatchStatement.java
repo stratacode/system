@@ -16,8 +16,8 @@ public class CatchStatement extends NonIndentedStatement {
       if (initialized) return;
       super.init();
 
-      if (parameters.getNumParameters() != 1)
-         System.err.println("*** Incorrect number of parameters to catch statement: " + toDefinitionString());
+      if (parameters == null || parameters.getNumParameters() != 1)
+         displayError("Incorrect number of parameters to catch statement: ");
    }
 
    public Object getCaughtTypeDeclaration() {
@@ -75,5 +75,16 @@ public class CatchStatement extends NonIndentedStatement {
       if (statements != null)
          statements.transformToJS();
       return this;
+   }
+
+   public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append("catch (");
+      if (parameters != null)
+         sb.append(parameters);
+      sb.append(") ");
+      if (statements != null)
+         sb.append(statements);
+      return sb.toString();
    }
 }

@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import sc.classfile.CFClass;
 import sc.layer.Layer;
 import sc.type.*;
 import sc.layer.LayeredSystem;
@@ -200,9 +201,9 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return ModelUtil.isDynamicStub(baseType, includeExtends);
    }
 
-   public Object definesMethod(String name, List<? extends Object> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType) {
+   public Object definesMethod(String name, List<? extends Object> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
       // assert ctx == null; ??? this fails unfortunately...
-      Object method = ModelUtil.definesMethod(baseType, name, parametersOrExpressions, this, refType, isTransformed, staticOnly, inferredType);
+      Object method = ModelUtil.definesMethod(baseType, name, parametersOrExpressions, this, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
       if (ctx == null)
          ctx = this;
       // If we already got back some parameter types for this method, we need to merge the definitions of this type into the one we retrieved.
@@ -212,7 +213,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
          methPT.updateParamTypes(this);
       }
       else if (method != null && ModelUtil.isParameterizedMethod(method))
-         return new ParamTypedMethod(method, this, definedInType, parametersOrExpressions, inferredType);
+         return new ParamTypedMethod(method, this, definedInType, parametersOrExpressions, inferredType, methodTypeArgs);
       return method;
    }
 
@@ -442,7 +443,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       for (int i = 0; i < baseMethods.length; i++) {
          Object meth = baseMethods[i];
          if (ModelUtil.isParameterizedMethod(meth))
-            result.add(new ParamTypedMethod(meth, this, definedInType, null, null));
+            result.add(new ParamTypedMethod(meth, this, definedInType, null, null, null));
          else
             result.add(meth);
       }
@@ -634,6 +635,31 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       }
    }
 
+   public Object mapTypeParameters(Map<TypeParamKey, Object> paramMap) {
+      if (types == null) {
+         return this;
+      }
+      ParamTypeDeclaration res = null;
+      int ix = 0;
+      for (Object paramType:types) {
+         if (ModelUtil.isTypeVariable(paramType)) {
+            Object defaultParamType = ModelUtil.getTypeParameterDefault(paramType);
+            Object newParamType = paramMap.get(new TypeParamKey(paramType));
+            if (newParamType == defaultParamType)
+               continue;
+            if (newParamType != null && newParamType != paramType) {
+               if (res == null)
+                  res = copy();
+               res.types.set(ix, newParamType);
+            }
+         }
+         ix++;
+      }
+      if (res != null)
+         return res;
+      return this;
+   }
+
    static class TypeParamMap {
       Object fromVar;
       Object toVar;
@@ -658,7 +684,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
                if (ModelUtil.isTypeVariable(origType))
                   types.set(i, ModelUtil.wrapPrimitiveType(type));
                // Here the 'type' may be more specific for the core type but may not include type parameters which exist in the current type.
-               else {
+               else if (type != null) {
                   types.set(i, ModelUtil.refineType(definedInType, origType, type));
                }
                return;
@@ -692,7 +718,10 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
    }
 
    public ParamTypeDeclaration cloneForNewTypes() {
-      return new ParamTypeDeclaration(system, typeParams, new ArrayList<Object>(types), baseType);
+      if (definedInType == null)
+         return new ParamTypeDeclaration(system, typeParams, new ArrayList<Object>(types), baseType);
+      else
+         return new ParamTypeDeclaration(definedInType, typeParams, new ArrayList<Object>(types), baseType);
    }
 
 }

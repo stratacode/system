@@ -42,6 +42,8 @@ public class BinaryExpression extends Expression {
    }
 
    static OperatorType getOperatorType(String operator) {
+      if (operator == null)
+         return null;
       if (operator.equals("instanceof"))
          return OperatorType.InstanceOf;
 
@@ -88,7 +90,8 @@ public class BinaryExpression extends Expression {
          addOperands(operands);
       }
       else {
-         assert operands.size() >= 1;
+         if (operands == null || operands.size() < 1)
+            return;
 
          BaseOperand op = operands.get(0);
          operator = op.operator;
@@ -482,6 +485,8 @@ public class BinaryExpression extends Expression {
          return Boolean.TYPE;
       else if (opType == OperatorType.InstanceOf)
          return Boolean.TYPE;
+      else if (opType == null)
+         return null; // Could be a partial value
       throw new UnsupportedOperationException();
    }
 
@@ -889,20 +894,28 @@ public class BinaryExpression extends Expression {
                   }
                }
             }
-            res.lhs.init();
-            res.rhs.init();
+            if (res.lhs != null)
+               res.lhs.init();
+            if (res.rhs != null)
+               res.rhs.init();
          }
          if (isStarted()) {
-            res.lhs.start();
-            res.rhs.start();
+            if (res.lhs != null)
+               res.lhs.start();
+            if (res.rhs != null)
+               res.rhs.start();
          }
          if (isValidated()) {
-            res.lhs.validate();
-            res.rhs.validate();
+            if (res.lhs != null)
+               res.lhs.validate();
+            if (res.rhs != null)
+               res.rhs.validate();
          }
          if (isProcessed()) {
-            res.lhs.process();
-            res.rhs.process();
+            if (res.lhs != null)
+               res.lhs.process();
+            if (res.rhs != null)
+               res.rhs.process();
          }
       }
       return res;

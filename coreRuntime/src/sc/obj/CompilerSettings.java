@@ -28,7 +28,7 @@ public @interface CompilerSettings {
    String objectTemplate() default "";      
    /** Specifies the type name for a template file to use for class components */
    String newTemplate() default "";         
-  /** A template merged into any subclass of this class, useful for collecting children */
+   /** A template merged into any subclass of this class, useful for collecting children */
    String mixinTemplate() default "";       
    /** A template merged into any subclass of this class that includes static code.  This code gets put into a static section of the outer-most class because inner classes cannot have static code sections. */
    String staticMixinTemplate() default ""; 
@@ -43,8 +43,11 @@ public @interface CompilerSettings {
    /** For components that are created externally (e.g. android's activity), specifies the name of a method that will be called which is used for component initialization.
        The template should define a method called _init where all sc' init code goes.  A call to _init is inserted into the onInitMethod. */
    String onInitMethod() default "";        
-   /** Setting this flag tells sc to propagate a constructor with the given set of parameter types in any classes unless a constructor is defined explicitly */
-   String propagateConstructor() default ""; 
+   /** Setting this flag tells sc to propagate a constructor with the given set of parameter types in any sub-classes of the given type unless that sub-class has a constructor defined explicitly */
+   String propagateConstructor() default "";
+   /** Specify a list of strings where each string contains the comma separated list of parameter types for constructor signatures that should be propagated */
+   // TODO: should we add support for propagating more than one constructor?
+   //String[] propagateConstructors() default {};
    /** If your class has a final start method but calls some other method, it can still be a component.  Set this property to the name of a method called by start and that method is overridden instead of start. */
    String overrideStartName() default "";    
    /** Name of a jar file relative to the build directory */

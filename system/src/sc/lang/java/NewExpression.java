@@ -179,12 +179,12 @@ public class NewExpression extends IdentifierExpression {
 
    public Object findMethod(String name, List<? extends Object> params, Object fromChild, Object refType, boolean staticOnly, Object inferredType) {
       if (classBody != null && classBody.indexOf(fromChild) != -1) {
-         Object v = BodyTypeDeclaration.findMethodInBody(classBody, name, params, null, refType, staticOnly, inferredType);
+         Object v = BodyTypeDeclaration.findMethodInBody(classBody, name, params, null, refType, staticOnly, inferredType, null);
          if (v != null)
             return v;
 
          if (boundType != null) {
-            v = ModelUtil.definesMethod(boundType, name, params, null, refType, ModelUtil.isTransformedType(boundType), staticOnly, inferredType);
+            v = ModelUtil.definesMethod(boundType, name, params, null, refType, ModelUtil.isTransformedType(boundType), staticOnly, inferredType, null);
             if (v != null)
                return v;
          }
@@ -404,7 +404,7 @@ public class NewExpression extends IdentifierExpression {
                if (accessClass != null) {
                   String name = cl.getName().replace('$', '.');
                   String methodName = "new" + CTypeUtil.capitalizePropertyName(CTypeUtil.getClassName(name));
-                  Object method = ModelUtil.definesMethod(accessClass, methodName, arguments, null, null, true, false, null);
+                  Object method = ModelUtil.definesMethod(accessClass, methodName, arguments, null, null, true, false, null, null);
                   if (method != null) {
                      Object[] params = ModelUtil.expressionListToValues(arguments, ctx);
                      Object thisObj = ctx.findThisType(accessClass);

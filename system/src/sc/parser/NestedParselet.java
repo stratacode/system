@@ -30,7 +30,9 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
    public boolean allowNullElements = false;
    public boolean allowEmptyPartialElements = false;
 
-   /** From the IDE's perspective, by default a tree element  */
+   /**
+    * From the IDE's perspective, by default a tree element
+    */
    public boolean complexStringType = false;
 
    enum ParameterMapping {
@@ -45,24 +47,32 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
    }
 
 
-   /** Args in incremental update methods */
+   /**
+    * Args in incremental update methods
+    */
    public enum ChangeType {
       ADD,
       REPLACE,
       REMOVE
    }
 
-   /** Specifies how we handle each parsed child of this parselet when building the semantic value */
+   /**
+    * Specifies how we handle each parsed child of this parselet when building the semantic value
+    */
    ParameterMapping[] parameterMapping = null;
 
-   /** When building the semantic value, this contains the property selectors for each child of the parselet */
-   Object [] slotMapping = null;
+   /**
+    * When building the semantic value, this contains the property selectors for each child of the parselet
+    */
+   Object[] slotMapping = null;
 
-   String [] genMapping = null;
+   String[] genMapping = null;
 
    int propagatedValueIndex = -1;
 
-   /** For results which are arrays, this stores the type of elements in the array */
+   /**
+    * For results which are arrays, this stores the type of elements in the array
+    */
    Class resultComponentClass;
 
    /**
@@ -71,23 +81,28 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
     */
    Object[] chainedPropertyMappings = null;
 
-   enum ParameterType { DEFAULT, ARRAY, STRING, PROPAGATE /* slot has a '.' */, INHERIT /* slot has a '*' */ };
+   enum ParameterType {DEFAULT, ARRAY, STRING, PROPAGATE /* slot has a '.' */, INHERIT /* slot has a '*' */}
+
+   ;
 
    ParameterType parameterType = ParameterType.DEFAULT;
 
-   /** The indexes used for any "*" (aka INHERIT) slots */
+   /**
+    * The indexes used for any "*" (aka INHERIT) slots
+    */
    List<Integer> inheritSlots = null;
 
-   /** Set this to a parselet to use when we want to try and reparse an element after skipping over error text.  This
-    * parselet is applied whenever we encounter an error.  As long as it matches */
+   /**
+    * Set this to a parselet to use when we want to try and reparse an element after skipping over error text.  This
+    * parselet is applied whenever we encounter an error.  As long as it matches
+    */
    public Parselet skipOnErrorParselet = null;
 
    public NestedParselet() {
       super();
    }
 
-   public NestedParselet(String name, int options)
-   {
+   public NestedParselet(String name, int options) {
       super(name, options);
    }
 
@@ -110,7 +125,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       add(toAdd);
    }
 
-   public NestedParselet(int options, Parselet... toAdd)  {
+   public NestedParselet(int options, Parselet... toAdd) {
       this(null, options);
       add(toAdd);
    }
@@ -158,14 +173,12 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
    }
 
    public void add(Parselet... toAdd) {
-      if (initialized)
-      {
+      if (initialized) {
          initialized = false;
          started = false;
          System.out.println("*** warning: adding parselets after initialization");
       }
-      for (Parselet p: toAdd)
-      {
+      for (Parselet p : toAdd) {
          if (p == null)
             throw new IllegalArgumentException("Null value encountered during initialized");
          parselets.add(p);
@@ -175,7 +188,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
    public void init() {
       if (initialized)
          return;
-      
+
       super.init();
 
       if (trace)
@@ -183,11 +196,11 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
       // Make sure we know these are not defined until we're finished intializing
       if (resultComponentClass == null)
-          resultComponentClass = UNDEFINED_CLASS;
+         resultComponentClass = UNDEFINED_CLASS;
       if (resultClass == null)
          resultClass = UNDEFINED_CLASS;
 
-      for (Parselet p: parselets) {
+      for (Parselet p : parselets) {
          Language l = getLanguage();
          if (l != null)
             p.setLanguage(l); // Propagate the language property down to the child
@@ -198,7 +211,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       if (genMapping != null && genMapping.length != parselets.size())
          throw new IllegalArgumentException("Number of parselet parameters for the generation info (after the colon) does not match number of child parselets: " + this + " " + name);
 
-      for (Parselet p: parselets)
+      for (Parselet p : parselets)
          p.init();
 
       // These can no longer be set so if no type is defined, that is ok.
@@ -208,11 +221,6 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          resultComponentClass = null;
 
       if (skipOnErrorParselet != null) {
-         if (!repeat) {
-            System.err.println("*** Error in parselet configuration for: " + this + " skipOnErrorParselet only valid when REPEAT flag is used.");
-            skipOnErrorParselet = null;
-         }
-
          skipOnErrorParselet.setLanguage(getLanguage());
          skipOnErrorParselet.init();
       }
@@ -239,7 +247,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
    public void setResultClass(Class c) {
       super.setResultClass(c);
       if (inheritSlots != null) {
-         for (int i:inheritSlots)
+         for (int i : inheritSlots)
             parselets.get(i).setSemanticValueClass(c);
       }
    }
@@ -262,7 +270,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
       // If this guy is inheriting property settings from children, their class needs to be set as well.
       if (inheritSlots != null) {
-         for (int i:inheritSlots)
+         for (int i : inheritSlots)
             parselets.get(i).setSemanticValueClass(c);
       }
    }
@@ -276,13 +284,13 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       int colonIx = name.indexOf(":");
       if (colonIx != -1) {
          genDescriptor = name.substring(colonIx);
-         paramDescriptor = name.substring(0,colonIx);
+         paramDescriptor = name.substring(0, colonIx);
 
          int gopenIx = genDescriptor.indexOf("(");
          int gcloseIx = genDescriptor.lastIndexOf(")");
          if (gopenIx == -1 || gcloseIx == -1)
             throw new IllegalArgumentException("Malformed generate descriptor: " + name);
-         genDescriptor = genDescriptor.substring(gopenIx+1,gcloseIx);
+         genDescriptor = genDescriptor.substring(gopenIx + 1, gcloseIx);
 
          boolean sub = false;
          if (genDescriptor.endsWith(",")) {
@@ -293,7 +301,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          // trim off char we added to get split to work right
          if (sub) {
             int last = genMapping.length - 1;
-            genMapping[last] = genMapping[last].substring(0,genMapping[last].length()-1);
+            genMapping[last] = genMapping[last].substring(0, genMapping[last].length() - 1);
          }
       }
       else
@@ -303,12 +311,12 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       int closeIx = paramDescriptor.lastIndexOf(")");
       if (openIx != -1) {
          if (closeIx != -1) {
-            String paramStr = paramDescriptor.substring(openIx+1, closeIx);
-            String nameStr = paramDescriptor.substring(0,openIx);
+            String paramStr = paramDescriptor.substring(openIx + 1, closeIx);
+            String nameStr = paramDescriptor.substring(0, openIx);
             if ((openIx = nameStr.indexOf("[")) != -1) {
                closeIx = nameStr.indexOf("]");
                if (closeIx != -1) {
-                  String [] mps = nameStr.substring(openIx+1,closeIx).split(",");
+                  String[] mps = nameStr.substring(openIx + 1, closeIx).split(",");
                   chainedPropertyMappings = new Object[2];
                   chainedPropertyMappings[0] = mps[0];
                   chainedPropertyMappings[1] = mps[1];
@@ -320,11 +328,11 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
             if (paramStr.endsWith(","))
                paramStr = paramStr + " ";
 
-            String [] params = paramStr.split(",");
+            String[] params = paramStr.split(",");
             parameterMapping = new ParameterMapping[params.length];
 
             if (parameterMapping.length != parselets.size())
-               throw new IllegalArgumentException("Number of parselet parameters does not match number of child parselets: " + this + " " + name);
+               throw new IllegalArgumentException("Number of parselet parameters does not match number of child parselets: " + this + " " + name + " has: " + parameterMapping.length + " declared but only " + parselets.size() + " defined parselets");
 
             for (int i = 0; i < params.length; i++) {
                String p = params[i].trim();
@@ -396,10 +404,8 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       if (resultComponentClass == null)
          resultComponentClass = getSemanticValueComponentClass();
 
-      if (slotMapping != null)
-      {
-         if (parameterType != ParameterType.INHERIT)
-         {
+      if (slotMapping != null) {
+         if (parameterType != ParameterType.INHERIT) {
             if (resultClass == null)
                System.out.println("*** No result type defined for: " + this);
 
@@ -409,33 +415,27 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
          Class slotClass = getSlotClass();
 
-         if (slotClass != null)
-         {
-            for (int i = 0; i < slotMapping.length; i++)
-            {
+         if (slotClass != null) {
+            for (int i = 0; i < slotMapping.length; i++) {
                assignSlotMapping(i, slotClass);
             }
          }
       }
-      if (chainedPropertyMappings != null)
-      {
+      if (chainedPropertyMappings != null) {
          if (!repeat)
             throw new IllegalArgumentException("Use of Name[chainedProperty](..) syntax on non-repeating sequence: " + this);
          Class rc = getSemanticValueClass();
          String chainedPropertyName = null;
          // TODO: need to type check this guy
-         try
-         {
-            for (int i = 0; i < 2; i++)
-            {
+         try {
+            for (int i = 0; i < 2; i++) {
                chainedPropertyName = (String) chainedPropertyMappings[i];
                chainedPropertyMappings[i] = TypeUtil.getPropertyMapping(rc, chainedPropertyName, null, null);
                if (chainedPropertyMappings[i] == null)
                   System.err.println("*** Error: Cannot find set method or public field for slot " + chainedPropertyName + " on class: " + rc + " for definition: " + this);
             }
          }
-         catch (IllegalArgumentException iae)
-         {
+         catch (IllegalArgumentException iae) {
             System.err.println("*** Error: " + iae + " for slot " + chainedPropertyName + " on class: " + rc + " for definition: " + this);
          }
       }
@@ -477,11 +477,11 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       }
 
 
-      Class res =  o1 != null && o2 != null && o1.isAssignableFrom(o2) ? o2 : o1;
+      Class res = o1 != null && o2 != null && o1.isAssignableFrom(o2) ? o2 : o1;
 
       if (trace && o1 != res)
          System.out.println("Trace: changing parselet type to: " + res + " from: " + o1 +
-               (childIx == -1 ? " set by parent to: " : " child[" + childIx + "] = " + o2));
+                 (childIx == -1 ? " set by parent to: " : " child[" + childIx + "] = " + o2));
 
 
       // Grammars can use "Object" such as when we have a String or a strongly typed class
@@ -504,7 +504,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
       super.start();
 
-      for (Parselet p: parselets)
+      for (Parselet p : parselets)
          p.start();
 
       resolveParameterMapping();
@@ -518,14 +518,14 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          return;
       started = false;
       initialized = false;
-      for (Parselet p: parselets)
+      for (Parselet p : parselets)
          p.stop();
    }
 
 
    private void assignSlotMapping(int i, Class slotClass) {
       if (slotMapping[i] == null || !(slotMapping[i] instanceof String))
-          return;
+         return;
 
       String slotName = (String) slotMapping[i];
       Class valueClass, componentClass;
@@ -540,15 +540,14 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       }
 
       if (componentClass == ARRAY_LIST_CLASS)
-           System.err.println("*** Error: invalid component class of type list");
+         System.err.println("*** Error: invalid component class of type list");
       try {
          slotMapping[i] = TypeUtil.getPropertyMapping(slotClass, slotName, valueClass, componentClass);
          if (slotMapping[i] == null)
             System.err.println("*** Error: Cannot find set method or public field for property '" + slotName + "' on class: " + slotClass + " for definition: " + this);
       }
-      catch (IllegalArgumentException iae)
-      {
-         System.err.println("*** Error: " + iae.getMessage() + " for property '" + slotName + "' on class: " + slotClass + " for definition: " + this + " Child parselet[" + i + "]:"  + childParselet);
+      catch (IllegalArgumentException iae) {
+         System.err.println("*** Error: " + iae.getMessage() + " for property '" + slotName + "' on class: " + slotClass + " for definition: " + this + " Child parselet[" + i + "]:" + childParselet);
       }
    }
 
@@ -614,7 +613,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                // At least one case where this happens is for IdentifierExpression(identifiers,.) when we
                // add "arguments" to the expression. 
                if (childParseNode == null)
-                   return regenerateIfTracking(ppnode, false);
+                  return regenerateIfTracking(ppnode, false);
 
                // Some parselets do not generate a parse node - rather they just propagate up the nested parselets
                // value.  We'll skip passed these parselets during the generation.
@@ -630,7 +629,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                throw new IllegalArgumentException("Unable to update semantic property value");
          }
          // If we have an "*" operators, see if we can propagate the change to a child.
-         else if (inheritSlots != null)  {
+         else if (inheritSlots != null) {
             ParentParseNode ppnode = (ParentParseNode) parentParseNode;
             for (int i = 0; i < inheritSlots.size(); i++) {
                int slot = inheritSlots.get(i);
@@ -740,6 +739,14 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
     */
    public boolean arrayElementChanged(Object parseNode, List semanticValue, int startIndex, int index, Object element, ChangeType changeType) {
       if (!(parseNode instanceof ParentParseNode)) {
+         if (parseNode instanceof ParseNode && parameterType == ParameterType.PROPAGATE) {
+            ParseNode pn = (ParseNode) parseNode;
+            Parselet childParselet = pn.getParselet();
+            if (pn.value instanceof IParseNode) {
+               return ((NestedParselet) childParselet).arrayElementChanged(pn.value, semanticValue, index, element, changeType);
+            }
+         }
+
          System.err.println("Error: array element changed on non parent parse node!");
          return false;
       }
@@ -747,7 +754,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       if (parameterType == ParameterType.PROPAGATE && propagatedValueIndex != -1) {
          Parselet childParselet = parselets.get(propagatedValueIndex);
          if (parentParseNode == null)
-             return false;
+            return false;
          // Already invalidated
          if (parentParseNode.children == null)
             return !language.trackChanges;
@@ -809,7 +816,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                         }
                         // Assume the remainder of the list is for this guy
                         else {
-                           List l = currentValueIndex == 0 ? semanticValue : semanticValue.subList(currentValueIndex,semanticValue.size());
+                           List l = currentValueIndex == 0 ? semanticValue : semanticValue.subList(currentValueIndex, semanticValue.size());
 
                            Object childParseNode = parentParseNode.children == null ? null : parentParseNode.children.get(i);
                            if (childParseNode == null) {
@@ -830,7 +837,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                               }
                            }
                            if (((NestedParselet) childParselet).arrayElementChanged(
-                                 childParseNode, l, index-currentValueIndex, element, changeType))
+                                   childParseNode, l, index - currentValueIndex, element, changeType))
                               return true;
 
                            processedAllElements = true;
@@ -897,13 +904,14 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                               if (currentValueIndex == index) {
                                  Object elemValue = semanticValue.get(currentValueIndex);
                                  if (childParselet.dataTypeMatches(elemValue)) {
+                                    int changedIx = currentValueIndex - startIndex;
                                     if (language.trackChanges || !(elemValue instanceof ISemanticNode)) {
-                                       lastErr = regenerateElement(parentParseNode, childParselet, elemValue, currentValueIndex-startIndex, changeType);
+                                       lastErr = regenerateElement(parentParseNode, childParselet, elemValue, changedIx, changeType);
                                        if (lastErr == null)
                                           elementProcessed = true;
                                     }
                                     else {
-                                       invalidateChildElement(parentParseNode, childParselet, semanticValue, elemValue, currentValueIndex-startIndex, changeType);
+                                       invalidateChildElement(parentParseNode, childParselet, semanticValue, elemValue, currentValueIndex - startIndex, changeType);
                                        elementProcessed = true;
                                     }
                                  }
@@ -943,7 +951,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                // If this happens, it is because the other elements in the array were not generated properly... maybe just
                // re-generate the entire array if this case?
                if (parentParseNode.children.size() < nodeIndex)
-                   throw new IllegalArgumentException("Old parse nodes missing required elements to do incremental array regeneration");
+                  throw new IllegalArgumentException("Old parse nodes missing required elements to do incremental array regeneration");
 
                Object genResult = generateElement(getLanguage().newGenerateContext(this, element), element, true);
 
@@ -1013,60 +1021,78 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       }
    }
 
-   public boolean regenerate(ParentParseNode pnode, boolean finalGen) {
-      Object sv = pnode.getSemanticValue();
+   public boolean regenerate(IParseNode resNode, boolean finalGen) {
+      Object sv = resNode.getSemanticValue();
       Object genRes;
       GenerateContext ctx = getLanguage().newGenerateContext(this, sv);
       ctx.finalGeneration = finalGen;
       int ix;
       PerfMon.start("regenerate");
       try {
-         IParseNode resNode = pnode;
+         if (resNode instanceof ParseNode) {
+            ParseNode pn = (ParseNode) resNode;
+            Object val = pn.value;
+            if (val instanceof IParseNode) {
+               IParseNode valNode = (IParseNode) val;
+               NestedParselet childParselet = (NestedParselet) ((IParseNode) val).getParselet();
 
-         if (getSemanticValueIsArray() && !(sv instanceof List)) {
-            genRes = generateElement(ctx, sv, false);
-            Object origParseNode = sv instanceof ISemanticNode ? ((ISemanticNode) sv).getParseNode() : sv;
-            ix = pnode.children == null ? -1 : pnode.children.indexOf(origParseNode);
-            if (genRes instanceof GenerateError || genRes instanceof PartialArrayResult)
-               return false;
-            ParentParseNode newParseNode = (ParentParseNode) genRes;
-            // With a repeat Sequence like ImportDeclaration, the sequence will be stored both with the list and the elements.  We need to differentiate which one kind of brute force.
-            if (pnode.children == null)
-               pnode.children = new ArrayList<Object>(newParseNode.children.size());
-
-            if (ix == -1)
-               pnode.children.add(genRes);
-            else
-               pnode.children.set(ix, genRes);
-         }
-         else {
-            genRes = generate(ctx, sv);
-            if (genRes instanceof GenerateError || genRes instanceof PartialArrayResult)
-                return false;
-
-            // TODO: pnode.children here may have non-semantic parse-nodes like spacing, comments which should be merged
-            // back into the genRes children.  So instead of just clearing the children, we could walk down the old and new
-            // tree's and take from the old anything which did not have semantic content.
-
-            if (pnode.children != null)
-               pnode.children.clear();
-
-            // The parselet optimized it's generation so it returns a String.  We need to reuse this parse node to hold
-            // the string because it may be wired into all of the parent parse nodes.
-            if (genRes instanceof String) {
-               if (pnode.children == null)
-                  pnode.children = new ArrayList<Object>(1);
-               pnode.children.add(genRes);
+               return childParselet.regenerate(valNode, finalGen);
             }
             else {
+               System.err.println("*** Unhandled case in regenerate");
+               return false;
+            }
+         }
+         else if (resNode instanceof ParentParseNode) {
+            ParentParseNode pnode = (ParentParseNode) resNode;
+            if (getSemanticValueIsArray() && !(sv instanceof List)) {
+               genRes = generateElement(ctx, sv, false);
+               Object origParseNode = sv instanceof ISemanticNode ? ((ISemanticNode) sv).getParseNode() : sv;
+               ix = pnode.children == null ? -1 : pnode.children.indexOf(origParseNode);
+               if (genRes instanceof GenerateError || genRes instanceof PartialArrayResult)
+                  return false;
                ParentParseNode newParseNode = (ParentParseNode) genRes;
-               if (newParseNode != null && newParseNode.children != null) {
-                  // With a repeat Sequence like ImportDeclaration, the sequence will be stored both with the list and the elements.  We need to differentiate which one kind of brute force.
+               // With a repeat Sequence like ImportDeclaration, the sequence will be stored both with the list and the elements.  We need to differentiate which one kind of brute force.
+               if (pnode.children == null)
+                  pnode.children = new ArrayList<Object>(newParseNode.children.size());
+
+               if (ix == -1)
+                  pnode.children.add(genRes);
+               else
+                  pnode.children.set(ix, genRes);
+            }
+            else {
+               genRes = generate(ctx, sv);
+               if (genRes instanceof GenerateError || genRes instanceof PartialArrayResult)
+                  return false;
+
+               // TODO: pnode.children here may have non-semantic parse-nodes like spacing, comments which should be merged
+               // back into the genRes children.  So instead of just clearing the children, we could walk down the old and new
+               // tree's and take from the old anything which did not have semantic content.
+
+               if (pnode.children != null)
+                  pnode.children.clear();
+
+               // The parselet optimized it's generation so it returns a String.  We need to reuse this parse node to hold
+               // the string because it may be wired into all of the parent parse nodes.
+               if (genRes instanceof String) {
                   if (pnode.children == null)
-                     pnode.children = new ArrayList<Object>(newParseNode.children.size());
-                  pnode.children.addAll(newParseNode.children);
+                     pnode.children = new ArrayList<Object>(1);
+                  pnode.children.add(genRes);
+               }
+               else {
+                  ParentParseNode newParseNode = (ParentParseNode) genRes;
+                  if (newParseNode != null && newParseNode.children != null) {
+                     // With a repeat Sequence like ImportDeclaration, the sequence will be stored both with the list and the elements.  We need to differentiate which one kind of brute force.
+                     if (pnode.children == null)
+                        pnode.children = new ArrayList<Object>(newParseNode.children.size());
+                     pnode.children.addAll(newParseNode.children);
+                  }
                }
             }
+         }
+         else {
+            System.err.println("*** Unrecognized parse node type in regenerate");
          }
 
          // Make sure semantic value points to the original parse node
@@ -1118,7 +1144,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       if (childParseNode == null) {
          childParseNode = childParselet.newGeneratedParseNode(node);
       }
-      updateElement(parentParseNode, childParseNode,  element, childParseNodeIx, changeType);
+      updateElement(parentParseNode, childParseNode, element, childParseNodeIx, changeType);
    }
 
    protected void updateElement(ParentParseNode pnode, Object childParseNode, Object element, int childParseNodeIx, ChangeType changeType) {
@@ -1135,7 +1161,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       else if (changeType == ChangeType.ADD) {
          if (pnode.children == null)
             pnode.children = new ArrayList<Object>();
-         pnode.children.add(Math.min(childParseNodeIx,pnode.children.size()), childParseNode);
+         pnode.children.add(Math.min(childParseNodeIx, pnode.children.size()), childParseNode);
       }
       else if (changeType == ChangeType.REMOVE) {
          if (pnode.children == null) { // Parsenode is already invalid
@@ -1179,7 +1205,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                                            ChangeType changeType) {
 
       Object childResult = changeType == ChangeType.REMOVE ? null :
-                           childParselet.generate(getLanguage().newGenerateContext(this, element), element);
+              childParselet.generate(getLanguage().newGenerateContext(this, element), element);
       if (!(childResult instanceof GenerateError)) {
          if (changeType == ChangeType.REPLACE) {
             if (childParseNodeIx >= pnode.children.size())
@@ -1190,7 +1216,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          else if (changeType == ChangeType.ADD) {
             if (pnode.children == null)
                pnode.children = new ArrayList<Object>();
-            pnode.children.add(Math.min(childParseNodeIx,pnode.children.size()), childResult);
+            pnode.children.add(Math.min(childParseNodeIx, pnode.children.size()), childResult);
          }
          else if (changeType == ChangeType.REMOVE) {
             /*
@@ -1204,9 +1230,9 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                   Object currValue = pnode.children.get(childParseNodeIx);
                   Object sv = null;
                   if (!(currValue instanceof IParseNode) ||
-                      (sv = ((IParseNode) currValue).getSemanticValue()) == element ||
-                       // Covers the List<String> case where we do this conversion automatically (I think) any others?
-                      ((sv instanceof PString) && DynUtil.equalObjects(sv, element))) {
+                          (sv = ((IParseNode) currValue).getSemanticValue()) == element ||
+                          // Covers the List<String> case where we do this conversion automatically (I think) any others?
+                          ((sv instanceof PString) && DynUtil.equalObjects(sv, element))) {
                      found = true;
                      break;
                   }
@@ -1264,7 +1290,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          // mess up the regeneration.
          if (childParseNode instanceof IParseNode) {
             if (!childParselet.producesParselet(((IParseNode) childParseNode).getParselet()))
-            //if (((IParseNode) childParseNode).getParselet() != childParselet)
+               //if (((IParseNode) childParseNode).getParselet() != childParselet)
                childParseNode = null;
          }
       }
@@ -1272,12 +1298,12 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          childParseNode = childParselet.newGeneratedParseNode(sv);
          sv.invalidateParseNode();
       }
-      updateElement(pnode, childParseNode,  element, parseNodeIx, changeType);
+      updateElement(pnode, childParseNode, element, parseNodeIx, changeType);
    }
 
    public abstract String getSeparatorSymbol();
 
-   public String toHeaderString(Map<Parselet,Integer> visited) {
+   public String toHeaderString(Map<Parselet, Integer> visited) {
       if (isNamed())
          return super.toHeaderString(visited);
 
@@ -1295,14 +1321,14 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
    public String toString() {
       if (isNamed())
          return getDebugName();
-      
-      String body = toStringInternal(new IdentityHashMap<Parselet,Integer>());
-         //return name + " = " + body;
+
+      String body = toStringInternal(new IdentityHashMap<Parselet, Integer>());
+      //return name + " = " + body;
       return body;
    }
 
-   protected String toStringInternal(Map<Parselet,Integer> visited) {
-      Integer id = visited.get(this); 
+   protected String toStringInternal(Map<Parselet, Integer> visited) {
+      Integer id = visited.get(this);
       if (id != null) {
          if (name != null)
             return getDebugName();
@@ -1317,7 +1343,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          sb.append(getDebugName());
          sb.append("=");
       }
-      
+
       sb.append(getPrefixSymbol());
       /*
        * Displays the parameters to the parselet in a header format which can sometimes be useful.  But since
@@ -1325,7 +1351,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
        */
       sb.append("(");
       boolean first = true;
-      for (Parselet p: parselets) {
+      for (Parselet p : parselets) {
          if (!first)
             sb.append(getSeparatorSymbol());
          first = false;
@@ -1342,7 +1368,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       if (!GenerateContext.debugError) {
          int ix = name.indexOf("(");
          if (ix != -1)
-            return name.substring(0,ix);
+            return name.substring(0, ix);
       }
       return name;
    }
@@ -1363,9 +1389,38 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       return RTypeUtil.createInstance(theClass);
    }
 
-   public void setSemanticValue(ParentParseNode parent, Object node, int index, boolean skipSemanticValue, Parser parser, boolean replaceValue) {
+   ParentParseNode resetOldParseNode(Object parent, int startIndex, boolean resetString, boolean clone) {
+      if (parent == null || !(parent instanceof ParentParseNode))
+         return (ParentParseNode) newParseNode(startIndex);
+
+      ParentParseNode pn = (ParentParseNode) parent;
+
+      if (clone)
+         pn = pn.shallowCopy();
+
+      pn.newStartIndex = startIndex;
+
+      // Clearing this because we may reuse this same parse-node in a new non-error context.
+      pn.errorNode = false;
+
+      if (pn.parselet != this) {
+         return (ParentParseNode) newParseNode(startIndex);
+      }
+
+      // Need to reset the initial value when reparsing a string node
+      if (resetString && parameterType == ParameterType.STRING) {
+         pn.value = PString.EMPTY_STRING;
+      }
+      return pn;
+   }
+
+   public boolean setSemanticValue(ParentParseNode parent, Object node, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, boolean replaceValue, boolean reparse) {
       if (trace && parser.enablePartialValues)
          System.out.println("*** setting semantic value of traced element");
+
+      boolean hasValue = !skipSemanticValue;
+
+      int sequenceSize = parselets.size();
 
       if (!skipSemanticValue && !parser.matchOnly) {
          if (resultClass != null && !getSkip()) {
@@ -1373,19 +1428,34 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                // If we are propagating a value and have a result class specified, we wait to create this until
                // we see if the propagated value is null or not.  It only gets created if it is null.
                if (propagatedValueIndex == -1)
-                  parent.setSemanticValue(createInstance(parser, getSemanticValueSlotClass()));
+                  parent.setSemanticValue(createInstance(parser, getSemanticValueSlotClass()), !reparse);
             }
 
-            if (index == 0 && getSemanticValueIsArray()) {
-               Object newElement = createInstance(parser, resultClass);
-               ((SemanticNodeList) parent.value).add(newElement);
+            // If this is a repeating sequence which produces an object for each element, we create that first element here when setting the first slot (e.g. maybe the '.' in a ClassType)
+            // Later in processSlotMappings, we'll grab this element and update it's properties.  For the reparse case, it's possible we already have an element we can just update.
+            if (slotIndex == 0 && getSemanticValueIsArray()) {
+               SemanticNodeList parentList = (SemanticNodeList) parent.value;
+               if (childIndex == -1 || parentList.size() <= childIndex) {
+                  Object newElement = createInstance(parser, resultClass);
+                  parentList.add(newElement, true, false);
+               }
+               // TODO: else - do we need to check if the element parentList.get(childIndex) is an instanceof resultClass?
             }
          }
 
          if (parameterMapping != null) {
-            switch (parameterMapping[index]) {
+            if (slotIndex >= parameterMapping.length)
+              System.out.println("*** Invalid slot index in parameter mapping!");
+            switch (parameterMapping[slotIndex]) {
                case SKIP:
-                   break;
+                  hasValue = false;
+                  break;
+
+               case NAMED_SLOT:
+                  // For named slots with arrays we only count a value when we match the last node (i.e. we process the slot mappings
+                  if (getSemanticValueIsArray())
+                     hasValue = slotIndex == sequenceSize - 1;
+                  break;
 
                case PROPAGATE:
                   Object sval = ParseUtil.nodeToSemanticValue(node);
@@ -1394,13 +1464,16 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                   // If the child value is null, we create an instance of the class specified by the parent.
                   if (sval == null && resultClassName != null)
                      sval = createInstance(parser, getSemanticValueClass());
-                  
-                  parent.setSemanticValue(sval);
+
+                  // If we are reparsing, do not clear the semantic value - That ends up clearing all properties and
+                  // for example when we are propagating slot mappings, we'll clear out properties we need to reset them
+                  // on the new value.
+                  parent.setSemanticValue(sval, !reparse);
 
                   // We are propagating the node's value - override the node we store for 
                   // this semantic node's parse node.
                   if (parent.value instanceof ISemanticNode && node instanceof ISemanticNode) {
-                     ((ISemanticNode) node).setParentNode((ISemanticNode)parent.value);
+                     ((ISemanticNode) node).setParentNode((ISemanticNode) parent.value);
                   }
                   break;
 
@@ -1415,107 +1488,222 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                            parent.value = sv;
                         else if (parent.value instanceof StringToken && sv instanceof StringToken)
                            parent.value = StringToken.concatTokens((StringToken) parent.value, (StringToken) sv);
-                        else
+                        else {
                            parent.value = parent.value.toString() + sv.toString();
+                        }
                      }
                   }
-                  else if (parent.value == null)
+                  else if (parent.value == null) {
                      parent.value = node;
+                  }
                   else if (node instanceof StringToken) {
                      if (parent.value instanceof StringToken) {
                         parent.value = StringToken.concatTokens((StringToken) parent.value, (StringToken) node);
                         //((StringToken)parentNode.value).len += ((StringToken) node).len;
                      }
                      else {
-                        parent.value = parent.value.toString() + node;
+                        parent.value = PString.toIString(parent.value.toString() + node.toString());
                      }
                   }
-                  else if (node instanceof String) {
-                     parent.value = parent.value.toString() + node;
+                  else if (node instanceof CharSequence) {
+                     parent.value = PString.toIString(parent.value.toString() + node.toString());
                   }
                   break;
 
-                case ARRAY:
-                   if (node instanceof IParseNode) {
-                      Object sv = ((IParseNode) node).getSemanticValue();
-                      if (sv instanceof List) {
-                         if (parent.value == null)
-                             parent.setSemanticValue(sv);
-                         else if (replaceValue)
-                            parent.value = sv;
-                         else
-                            ((List)parent.value).addAll((List) sv);
-                      }
-                      else if (sv != null) {
-                         SemanticNodeList snl;
-                         if (parent.value == null)
-                            parent.setSemanticValue(snl = new SemanticNodeList());
-                         else
-                            snl = (SemanticNodeList) parent.value;
-                         snl.add(sv);
-                      }
-                   }
-                   else if (node != null) {
-                      SemanticNodeList snl;
-                      if (parent.value == null)
-                         parent.setSemanticValue(snl = new SemanticNodeList());
-                      else
-                         snl = (SemanticNodeList) parent.value;
-                      snl.add(node);
-                   }
-                   // TODO: should this be optional?  We need some empty list to hold the semantic value to differentiate
-                   // between foo() and foo.
-                   else {
-                      List values = (List) parent.getSemanticValue();
-                      if (values == null) {
-                         values = new SemanticNodeList(0);
-                         parent.setSemanticValue(values);
-                      }
-                      // This is false for typical identifier expression "a." but for partial values we need
-                      // to preserve that null
-                      if (allowNullElements)
-                         values.add(null);
-                      else if (allowEmptyPartialElements && parser.enablePartialValues)
-                         values.add(PString.toIString(""));
-                   }
+               case ARRAY:
+                  boolean appendArray = slotIndex > 0 && hasPreviousArray(slotIndex);
+                  if (node instanceof IParseNode) {
+                     Object sv = ((IParseNode) node).getSemanticValue();
+                     if (sv instanceof List) {
+                        if (parent.value == null)
+                           parent.setSemanticValue(sv, !reparse);
+                        else if (replaceValue) {
+                           parent.value = sv;
+                        }
+                        else {
+                           if (childIndex == -1)
+                              ((SemanticNodeList) parent.value).addAll((List) sv, true, false);
+                           else if (sv != parent.value) {
+                              // Two different cases here - if we have a pattern like ([], []) we are combining two arrays and
+                              // so need to replace the old one starting at childIndex with the new one.  This case probably requires
+                              // more work in more complex situations of reparsing
+                              // The other case is (,[],) where we have childIndex == 1 but it is all one array.
+                              if (childIndex > 0 && appendArray) {
+                                 SemanticNodeList parentList = (SemanticNodeList) parent.value;
+                                 List newList = (List) sv;
+                                 int newSize = newList.size();
+                                 int oldSize = parentList.size();
+                                 // The new list is smaller than the old one so trim the old one down first
+                                 while (oldSize > newSize + childIndex) {
+                                    parentList.remove(oldSize - 1, false);
+                                    oldSize--;
+                                 }
+                                 for (int newIx = 0; newIx < newSize; newIx++) {
+                                    if (newIx + childIndex < parentList.size())
+                                       parentList.set(newIx + childIndex, newList.get(newIx), true, false);
+                                    else
+                                       parentList.add(newList.get(newIx), true, false);
+                                 }
+                              }
+                              else {
+                                 // TODO: Are there any cases where this is not the right thing?
+                                 parent.value = sv;
+                              }
+                           }
+                        }
+                     }
+                     else if (sv != null) {
+                        SemanticNodeList snl;
+                        if (parent.value == null)
+                           parent.setSemanticValue(snl = new SemanticNodeList(), !reparse);
+                        else
+                           snl = (SemanticNodeList) parent.value;
+                        if (childIndex == -1 || snl.size() <= childIndex)
+                           snl.add(sv, true, false);
+                        else
+                           snl.set(childIndex, sv, true, false);
+                     }
+                     // sv == null has no value so don't increment the svcount
+                     else
+                        hasValue = false;
+                  }
+                  else if (node != null) {
+                     SemanticNodeList snl;
+                     if (parent.value == null)
+                        parent.setSemanticValue(snl = new SemanticNodeList(), !reparse);
+                     else
+                        snl = (SemanticNodeList) parent.value;
+                     if (childIndex == -1 || snl.size() <= childIndex)
+                        snl.add(node, true, false);
+                     else
+                        snl.set(childIndex, node, true, false);
+                  }
+                  // TODO: should this be optional?  We need some empty list to hold the semantic value to differentiate
+                  // between foo() and foo.
+                  else {
+                     SemanticNodeList values = (SemanticNodeList) parent.getSemanticValue();
+                     if (values == null) {
+                        values = new SemanticNodeList(0);
+                        parent.setSemanticValue(values, !reparse);
+                     }
+                     if (childIndex == -1 || values.size() <= childIndex) {
+                        // If we are just propagating the array value of one of our children and that value has a null we clear the value we are propagating.
+                        // Maybe we should set this to null here?
+                        if (propagatesArray() && !allowNullElements) {
+                           if (values.size() > 0)
+                              values.clear(false);
+                        }
+                        else {
+                           // This is false for typical identifier expression "a." but for partial values we need
+                           // to preserve that null
+                           if (allowNullElements)
+                              values.add(null, true, false);
+                           else if (allowEmptyPartialElements && parser.enablePartialValues)
+                              values.add(PString.EMPTY_STRING, true, false);
+                        }
+                     }
+                     else {
+                        // If this parselet is adding to a regular array deal with the specific index.  If it's propagating an array value, the null
+                        // needs to clear out the old value
+                        if (!propagatesArray()) {
+                           if (allowNullElements)
+                              values.set(childIndex, null, true, false);
+                           else if (allowEmptyPartialElements && parser.enablePartialValues)
+                              values.set(childIndex, PString.EMPTY_STRING, true, false);
+                           else
+                              values.remove(childIndex, false);
+                        }
+                        else {
+                           // TODO: for the cases when we are combining two arrays, how can we map from slot index to array range
+                           // to update this correctly?
+                           values.clear(false);
+                        }
+                     }
+                  }
 
-                   break;
+                  break;
                 /*
                  * This is the case where we want to set properties on the parentNode node from the child node
                  * as we walk up the tree.  The parentNode node specifies "*" in the slot for the child node.
                  * The child node just lists the properties it wants to set on the parentNode.
                  */
-                case INHERIT:
-                   if (node instanceof ParentParseNode) {
-                      ParentParseNode pnode = (ParentParseNode) node;
-                      // TODO: need to make sure these get processed
-                      if (pnode.parselet.slotMapping != null) {
-                         if (getSemanticValueIsArray() && !pnode.parselet.getSemanticValueIsArray()) {
-                            List semValList = (List) parent.getSemanticValue();
-                            if (semValList.size() == 0)
-                               System.err.println("**** Warning: not processing slot mappings for value: " + pnode);
-                            else
-                               pnode.parselet.processSlotMappings(0, pnode, semValList.get(semValList.size()-1), true);
-                         }
-                         else
-                            pnode.parselet.processSlotMappings(0, pnode, parent.getSemanticValue(), true);
-                      }
-                   }
-                   else if (node != null)
-                      System.err.println("*** The '*' operator was used on a slot which produced an invalid result: " + node);
-                   break;
+               case INHERIT:
+                  if (node instanceof ParentParseNode) {
+                     ParentParseNode pnode = (ParentParseNode) node;
+                     // TODO: need to make sure these get processed
+                     if (pnode.parselet.slotMapping != null) {
+                        if (getSemanticValueIsArray() && !pnode.parselet.getSemanticValueIsArray()) {
+                           List semValList = (List) parent.getSemanticValue();
+                           if (semValList.size() == 0)
+                              System.err.println("**** Warning: not processing slot mappings for value: " + pnode);
+                           else
+                              pnode.parselet.processSlotMappings(0, pnode, semValList.get(semValList.size() - 1), true, childIndex);
+                        }
+                        else
+                           pnode.parselet.processSlotMappings(0, pnode, parent.getSemanticValue(), true, childIndex);
+                     }
+                  }
+                  else if (node != null)
+                     System.err.println("*** The '*' operator was used on a slot which produced an invalid result: " + node);
+                  break;
             }
          }
       }
 
-      int sequenceSize = parselets.size();
+      // This is the case where we have an error in the slot - when we are reparsing, we can't always skip the update as we
+      // may need to update it to remove whatever was in this slot.
+      if (skipSemanticValue && reparse) {
+         if (parameterMapping != null && slotIndex != -1) {
+            switch (parameterMapping[slotIndex]) {
+               case SKIP:
+                  break;
 
-      if (index == sequenceSize - 1) {
+               case PROPAGATE:
+                  break;
+
+               case STRING:
+                  break;
+
+               case ARRAY:
+                  SemanticNodeList values = (SemanticNodeList) parent.getSemanticValue();
+                  if (values != null) {
+                     if (propagatesArray())
+                        values.clear(false);
+                     else if (childIndex != -1 && values.size() > childIndex)
+                        values.remove(childIndex, false);
+                  }
+                  break;
+                /*
+                 * This is the case where we want to set properties on the parentNode node from the child node
+                 * as we walk up the tree.  The parentNode node specifies "*" in the slot for the child node.
+                 * The child node just lists the properties it wants to set on the parentNode.
+                 */
+               case INHERIT:
+                  break;
+            }
+         }
+      }
+
+      if (slotIndex == sequenceSize - 1) {
          int childrenSize = parent.children.size();
 
          int startIx = childrenSize - sequenceSize;
          if (startIx < 0)
             startIx = 0;
+
+         // For non string/array parslets, we should always expect an even number of children for a parse.  But when reparsing or parsing partial values
+         // we might have a null where we expect a value and so end up with the wrong parse index using the above algorithm.  This is a quick fix for those types
+         // of problems.  It's at least a good way to catch those problems but for now is a workaround.
+         if (startIx != 0 && childrenSize % sequenceSize != sequenceSize - 1 && parameterType != ParameterType.STRING && parameterType != ParameterType.ARRAY) {
+            int newStartIx = (((childrenSize + 1) / sequenceSize) - 1) * sequenceSize;
+
+            startIx = newStartIx;
+         }
+
+         // We're given the starting index during the reparse case.  For reparse, we are not always using the childrenSize to figure out how many elements to process.
+         if (reparse && childIndex != -1 && repeat && getSemanticValueIsArray()) {
+            startIx = childIndex * sequenceSize;
+         }
 
          Object toProcess = null;
 
@@ -1532,7 +1720,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
                /* Create the new parse node which will hold this result */
                Object newValue = createInstance(parser, getSemanticValueClass());
-               newParent.setSemanticValue(newValue);
+               newParent.setSemanticValue(newValue, !reparse);
 
                Object lastParent = parent.getSemanticValue();
                Object lastNode = TypeUtil.getPropertyValue(lastParent, chainedPropertyMappings[1]);
@@ -1578,27 +1766,159 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
             // Two reasons to wait: 1) for chained sequences and 2) for propagated values
             // so that we don't try to set the value before the propagated slot has been
             // processed.
-            processSlotMappings(startIx, parent, toProcess, false);
+            processSlotMappings(startIx, parent, toProcess, false, childIndex);
 
             if (trace && parser.enablePartialValues)
                System.out.println("*** Semantic value of: " + this + FileUtil.LINE_SEPARATOR +
                        "    " + parent + " => " + parent.getSemanticValue());
          }
       }
+      return hasValue;
    }
 
-   public void processSlotMappings(int startIx, ParentParseNode srcNode, Object dstNode, boolean recurse) {
+   boolean propagatesArray() {
+      int pix = 0;
+      if (parameterType != ParameterType.ARRAY)
+         return false;
+      boolean arraySlotFound = false;
+      for (ParameterMapping childMap:parameterMapping) {
+         if (childMap != ParameterMapping.SKIP && childMap != ParameterMapping.ARRAY && childMap != ParameterMapping.PROPAGATE)
+            return false;
+
+         if (childMap == ParameterMapping.ARRAY || childMap == ParameterMapping.PROPAGATE) {
+            if (childMap == ParameterMapping.ARRAY || parselets.get(pix).getSemanticValueIsArray()) {
+               if (arraySlotFound)
+                  return false;
+               arraySlotFound = true;
+            }
+         }
+         pix++;
+      }
+      return arraySlotFound;
+   }
+
+   public boolean removeFromSemanticValue(ParentParseNode parent, Object node, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, boolean replaceValue, boolean reparse) {
+      if (trace && parser.enablePartialValues)
+         System.out.println("*** removing from semantic value of traced element");
+
+      boolean hasValue = true;
+
+      if (!skipSemanticValue && !parser.matchOnly) {
+         if (resultClass != null && !getSkip()) {
+            if (getSemanticValueIsArray()) {
+               // TODO: maybe we should clear the value when slotIndex = parselets.size() - 1 and remove it when slotIndex == 0
+               // When we remove the first value for this array element, we also remove the element in the semantic value
+               int svIndex = childIndex / parselets.size();
+               Object sv = parent.getSemanticValue();
+               if (sv instanceof List) {
+                  SemanticNodeList parentList = (SemanticNodeList) sv;
+                  if (parentList.size() > svIndex)
+                     parentList.remove(svIndex, false);
+               }
+            }
+         }
+
+         if (parameterMapping != null) {
+            switch (parameterMapping[slotIndex]) {
+               case SKIP:
+                  hasValue = false;
+                  break;
+
+               case PROPAGATE:
+                  break;
+
+               case STRING:
+                  /* Concatenate the node to the current string - if we have StringTokens, try to keep
+                     the string tokens and just increment the length to avoid string copying.
+                   */
+                  if (node instanceof IParseNode) {
+                     Object sv = ((IParseNode) node).getSemanticValue();
+                     if (sv != null) {
+                        if (!sv.toString().equals(node.toString()))
+                           System.err.println("*** Not removing from string value");
+                     }
+                  }
+                  else if (node instanceof StringToken) {
+                     System.err.println("*** Not removing from string token value");
+                  }
+                  else if (node instanceof String) {
+                     System.err.println("*** Not removing from string value");
+                  }
+                  break;
+
+               case ARRAY:
+                  boolean appendArray = slotIndex > 0 && hasPreviousArray(slotIndex);
+                  if (node instanceof IParseNode) {
+                     if (parent.value != null) {
+                        Object sv = ((IParseNode) node).getSemanticValue();
+                        if (parent.value instanceof List) {
+                           SemanticNodeList parentList = (SemanticNodeList) parent.value;
+
+                           if (sv instanceof List) {
+                              List svList = (List) sv;
+                              for (int svix = 0; svix < svList.size(); svix++) {
+                                 Object svElem = svList.get(svix);
+                                 int oldIx = parentList.indexOf(svElem);
+                                 if (oldIx != -1)
+                                    parentList.remove(oldIx, false);
+                                 //else
+                                 //   System.err.println("*** Could not find old element in semenatic value - not removing");
+                              }
+                           }
+                           else {
+                              int plix;
+                              for (plix = 0; plix < parentList.size(); plix++) {
+                                 if (parentList.get(plix) == sv) {
+                                    parentList.remove(plix, false);
+                                    break;
+                                 }
+                              }
+                              //if (plix == parentList.size())
+                              //   System.err.println("*** Could not find old scalar element in semenatic value - not removing");
+                           }
+                        }
+                     }
+                  }
+                  else if (node != null) {
+                     if (parent.value != null) {
+                        System.err.println("*** Not removing from non-parse node child");
+                     }
+                  }
+                  break;
+
+               case INHERIT:
+                  System.err.println("*** Unhandled case in remove:");
+                  break;
+            }
+         }
+      }
+      return hasValue;
+   }
+
+   /**
+    * Is this a parselet which is building up the semantic value of an array with a previous slot?
+    */
+   private boolean hasPreviousArray(int slotIndex) {
+      for (int i = 0; i < slotIndex; i++)
+         if (parameterMapping[i] == ParameterMapping.ARRAY)
+            return true;
+      return false;
+   }
+
+   public void processSlotMappings(int startIx, ParentParseNode srcNode, Object dstNode, boolean recurse, int childIndex) {
       if (dstNode == null)
          return;
 
       if (getSemanticValueIsArray()) {
          List dstList = (List) dstNode;
+         if (childIndex == -1)
+            childIndex = dstList.size() - 1;
          // We are populating the last node in the list
-         dstNode = dstList.get(dstList.size()-1);
+         dstNode = dstList.get(childIndex);
       }
 
       if (slotMapping == null)
-          return;
+         return;
 
       for (int i = 0; i < slotMapping.length; i++) {
          if (slotMapping[i] != null) {
@@ -1615,12 +1935,12 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
             }
 
             Object value;
-            if (startIx+i >= srcNode.children.size())
-                System.out.println("*** ack");
-
-            Object oldResult = srcNode.children.get(startIx + i);
-            value = ParseUtil.nodeToSemanticValue(oldResult);
-            setSemanticProperty(dstNode, slotMapping[i], value);
+            if (srcNode != null && srcNode.children != null && startIx + i < srcNode.children.size()) {
+               Object oldResult = srcNode.children.get(startIx + i);
+               value = ParseUtil.nodeToSemanticValue(oldResult);
+               setSemanticProperty(dstNode, slotMapping[i], value);
+            }
+            // else - when dealing with partial results, we might not have parsed this slot so don't bother with the semantic value
          }
       }
 
@@ -1628,11 +1948,11 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          defined by a second level parent, we will get a null at that point.  So when the parent processes
          its slot, we then have to go down multiple levels.
        */
-      if (recurse && parameterType == ParameterType.INHERIT && inheritSlots != null) {
-         for (int inheritSlot:inheritSlots)
+      if (srcNode != null && recurse && parameterType == ParameterType.INHERIT && inheritSlots != null) {
+         for (int inheritSlot : inheritSlots)
             if (srcNode.parselet.slotMapping != null)
-               ((NestedParselet)parselets.get(inheritSlot)).processSlotMappings(0,
-                              (ParentParseNode)srcNode.children.get(inheritSlot), dstNode, true);
+               ((NestedParselet) parselets.get(inheritSlot)).processSlotMappings(0,
+                       (ParentParseNode) srcNode.children.get(inheritSlot), dstNode, true, childIndex);
       }
 
       if (language.debug)
@@ -1644,10 +1964,15 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       if (mapping instanceof BeanMapper && (beanMapper = (BeanMapper) mapping).isScalarToList() && value instanceof ISemanticNode) {
          ISemanticNode childNode = (ISemanticNode) value;
          SemanticNodeList snl = new SemanticNodeList(1);
+         ISemanticNode sn = (ISemanticNode) semNode;
+         // During reparse, the semantic node here is already started, as may be the array element.  If the list is not started as we won't stop it and
+         // clear out syntax errors in the list element.   We could also replace the element in the existing list to fix this problem.
+         if (sn.isStarted())
+            ParseUtil.initAndStartComponent(snl);
          snl.setParentNode(childNode.getParentNode());
-         snl.add(value);
-         TypeUtil.setProperty(semNode, beanMapper.getSetSelector(), snl);
-         snl.setParentNode((ISemanticNode) semNode);
+         snl.add(value, true, false);
+         TypeUtil.setProperty(sn, beanMapper.getSetSelector(), snl);
+         snl.setParentNode(sn);
       }
       else {
          // First set the value
@@ -1661,7 +1986,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
    public boolean skipSemanticValue(int index) {
       if (parameterMapping != null) {
          if (index >= parameterMapping.length)
-             return false;
+            return false;
          return parameterMapping[index] == ParameterMapping.SKIP;
       }
       return false;
@@ -1680,10 +2005,10 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
     * included in the semantic value produced by the parent node.
     * </p>
     *
-    * @param node the result value for this parselet - usually a ParseNode or a ParentParseNode
-    * or some subclass of those.
+    * @param node   the result value for this parselet - usually a ParseNode or a ParentParseNode
+    *               or some subclass of those.
     * @param parent the parent parse node we are added this result into.
-    * @param index the position of this parselet in the parent's sequence
+    * @param index  the position of this parselet in the parent's sequence
     * @return true if we are to add "node" directly to the parent and false if this method took
     * care already of propgating node to the parent.
     */
@@ -1709,7 +2034,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                // We are adding a nested child which is marked as being skipped.  At this
                // point we add its children directly to the parentNode node - we'll throw away
                // this temporary parentNode node.  At this point, the value is the semantic value
-               parent.add(c, this, index, false, parser);
+               parent.add(c, this, -1, index, false, parser);
             }
             return false; // Do not add to the parentNode node
          }
@@ -1733,6 +2058,36 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
             }
          }
          */
+      }
+
+      return true;
+   }
+
+   public boolean addReparseResultToParent(Object node, ParentParseNode parent, int svIndex, int childIndex, int slotIndex, Parser parser, Object oldChildParseNode, DiffContext dctx, boolean removeExtraNodes, boolean parseArray) {
+      // Exclude this entirely from the result
+      if (getDiscard() || getLookahead())
+         return false;
+
+      NestedParselet parentParselet = parent.parselet;
+
+      if (getSkip() && node instanceof ParentParseNode) {
+         ParentParseNode ppnode = (ParentParseNode) node;
+
+         // We have no information to preserve in this level of the hierarchy so we merge
+         // it into the parentNode.
+         if (parentParselet.parameterMapping == null) {
+            ArrayList<Object> children = ppnode.children;
+            int childSz = children.size();
+            for (int i = 0; i < childSz; i++) {
+               Object c = children.get(i);
+
+               // We are adding a nested child which is marked as being skipped.  At this
+               // point we add its children directly to the parentNode node - we'll throw away
+               // this temporary parentNode node.  At this point, the value is the semantic value
+               parent.addForReparse(c, this, svIndex, childIndex, slotIndex, false, parser, oldChildParseNode, dctx, removeExtraNodes, parseArray);
+            }
+            return false; // Do not add to the parentNode node
+         }
       }
 
       return true;
@@ -1779,7 +2134,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
       // Sentinel... computation is in process so must be dealing with a recursive type
       if (resultClass == UNDEFINED_CLASS)
-          return null;
+         return null;
 
       if (resultClass != null) {
          return resultClass;
@@ -1798,20 +2153,17 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       if (getSemanticValueIsArray()) {
          if (resultClass == UNDEFINED_CLASS)
             return null;
-         if (resultClass != null)
-         {
+         if (resultClass != null) {
             if (resultClass == ARRAY_LIST_CLASS)
                return resultComponentClass;
             return resultClass;
          }
 
-         if (propagatedValueIndex != -1)
-         {
+         if (propagatedValueIndex != -1) {
             return parselets.get(propagatedValueIndex).getSemanticValueClass();
          }
       }
-      else
-      {
+      else {
          if (resultComponentClass == UNDEFINED_CLASS)
             return null;
 
@@ -1820,27 +2172,22 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
          resultComponentClass = UNDEFINED_CLASS;
 
-         try
-         {
+         try {
             if (propagatedValueIndex != -1)
                return parselets.get(propagatedValueIndex).getSemanticValueComponentClass();
 
-            if (parameterType == ParameterType.ARRAY)
-            {
+            if (parameterType == ParameterType.ARRAY) {
                Class componentClass = null;
                boolean unresolved = false;
                int numParselets = parselets.size();
-               for (int i = 0; i < numParselets; i++)
-               {
+               for (int i = 0; i < numParselets; i++) {
                   Parselet parselet = parselets.get(i);
-                  if (parameterMapping[i] == ParameterMapping.ARRAY)
-                  {
+                  if (parameterMapping[i] == ParameterMapping.ARRAY) {
                      Class newClass = parselet.getSemanticValueClass();
 
                      if (newClass == ARRAY_LIST_CLASS)
                         newClass = parselet.getSemanticValueComponentClass();
-                     else if (newClass != null)
-                     {
+                     else if (newClass != null) {
                         if (componentClass == null)
                            componentClass = newClass;
                         else
@@ -1854,8 +2201,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                   resultComponentClass = componentClass;
             }
          }
-         finally
-         {
+         finally {
             if (resultComponentClass == UNDEFINED_CLASS)
                resultComponentClass = null;
          }
@@ -1864,19 +2210,17 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
    }
 
 
-   public Class getParseNodeClass()
-   {
+   public Class getParseNodeClass() {
       return ParentParseNode.class;
    }
 
-   public boolean needsChildren()
-   {
+   public boolean needsChildren() {
       return parameterMapping != null;
    }
 
    static final Class UNDEFINED_CLASS = UNDEFINED.class;
-   private static class UNDEFINED
-   {
+
+   private static class UNDEFINED {
    }
 
    /**
@@ -1906,7 +2250,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       IParseNode pnode = newParseNode();
 
       // associate the new parse node in both directions with the semantic value.
-      pnode.setSemanticValue(value);
+      pnode.setSemanticValue(value, true);
       //if (value instanceof ISemanticNode)
       //   ((ISemanticNode) value).setParseNode(pnode);
 
@@ -1920,7 +2264,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
     * determined by the parselet.  If the value is null, it is empty.  If the parselet
     * sets properties on its parent object during the parse phase, we view that parent
     * as empty if all of the slots are null.
-    *
+    * <p>
     * This method lets us determine when an optional slot has failed... if it is empty
     * a failure is not reported.
     *
@@ -1963,7 +2307,9 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
    public abstract Object generateElement(GenerateContext ctx, Object value, boolean isArray);
 
-   /** Return the remaining items in the list */
+   /**
+    * Return the remaining items in the list
+    */
    SemanticNodeList getRemainingValue(SemanticNodeList l, int arrayIndex) {
       if (arrayIndex == 0)
          return l;
@@ -1976,7 +2322,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       // Add nodes to a semantic list here but do not change the parent node
       // those values need to stay part of their original graph
       for (int i = arrayIndex; i < l.size(); i++)
-         sub.add(l.get(i), false);
+         sub.add(l.get(i), false, true);
       return sub;
    }
 
@@ -2149,7 +2495,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                               childParseRes = parent.children.get(i);
                               if (!(childParseRes instanceof IParseNode)) {
                                  // We're consuming a NULL here which may correspond to a skipped parselet.  In that case, need to skip that parselet here.  In other cases, it might be an optional array parselet and for some reason skipping the parselet breaks IdentifierExpressions.
-                                 if (pix < parselets.size() - 1 && parameterMapping[pix+1] == ParameterMapping.SKIP)
+                                 if (pix < parselets.size() - 1 && parameterMapping[pix + 1] == ParameterMapping.SKIP)
                                     pix++;
                                  break;   // TODO: NEED TO ADVANCE the parselet if
                               }
@@ -2258,7 +2604,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
       // By doing this after we update the children, we ensure that the highest node for the same semantic value
       // gets mapped.
-      return super.updateParseNodes(semanticValue,  parentNode);
+      return super.updateParseNodes(semanticValue, parentNode);
    }
 
    public boolean producesParselet(Parselet other) {
@@ -2267,11 +2613,11 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
       if (parselets == null)
          return false;
+      if (parameterMapping == null)
+         return false;
       int sz = parselets.size();
       for (int i = 0; i < sz; i++) {
          Parselet child = parselets.get(i);
-         if (parameterMapping == null)
-            continue;
          switch (parameterMapping[i]) {
             case PROPAGATE:
                return child.producesParselet(other);
@@ -2328,7 +2674,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       if (parameterMapping == null)
          return false;
       boolean result = false;
-      for (ParameterMapping type:parameterMapping) {
+      for (ParameterMapping type : parameterMapping) {
          if (type == ParameterMapping.STRING)
             result = true;
          else if (type != ParameterMapping.SKIP)
@@ -2340,4 +2686,75 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
    public boolean isComplexStringType() {
       return complexStringType;
    }
+
+   protected boolean anyReparseChanges(Parser parser, Object oldParseNode, DiffContext dctx, boolean forceReparse) {
+      if (super.anyReparseChanges(parser, oldParseNode, dctx, forceReparse)) {
+         return true;
+      }
+
+      boolean parentChanged = oldParseNode != null && dctx.changedParents.contains(oldParseNode);
+      boolean anyChanges = parentChanged || dctx.changedRegion;
+
+      return anyChanges;
+   }
+
+   /**
+    * In the reparse case, we might need to determine which child parselet produced a given parsenode.
+    * We can only do this when we have a parse-node child unfortunately
+    */
+   public int getParseletSlotIx(Parselet parseNodeChild) {
+      if (parselets != null) {
+         int sz = parselets.size();
+         for (int i = 0; i < sz; i++) {
+            Parselet child = parselets.get(i);
+            if (child.producesParselet(parseNodeChild))
+               return i;
+         }
+      }
+      return -1;
+   }
+
+   void removeChildrenForReparse(Parser parser, ParentParseNode value, int newChildCount) {
+      if (value == null || value.children == null)
+         return;
+      while (value.children.size() > newChildCount) {
+         int childIx = value.children.size() - 1;
+         removeForReparse(parser, value, childIx);
+      }
+   }
+
+   void removeForReparse(Parser parser, ParentParseNode value, int childIx) {
+      // TODO: in the current test case these are ErrorParseNodes but if they are not errors, do we need to update the semantic value?
+      Object remValue = value.children.get(childIx);
+      if (!(remValue instanceof ErrorParseNode)) {
+         if (remValue instanceof IParseNode) {
+            Parselet remParselet = ((IParseNode) remValue).getParselet();
+            int slotIx = getParseletSlotIx(remParselet);
+            if (slotIx != -1)
+               value.removeForReparse(childIx, slotIx, false, parser);
+            else {
+               value.children.remove(childIx);
+            }
+         }
+         else {
+            value.children.remove(childIx);
+         }
+      }
+      else
+         value.children.remove(childIx);
+   }
+
+   /*
+   public IParseNode getBeforeFirstNode(IParseNode beforeFirstNode) {
+      if (parameterType == ParameterType.PROPAGATE && beforeFirstNode instanceof ParentParseNode) {
+         ParentParseNode beforeParent = (ParentParseNode) beforeFirstNode;
+         Object propNode;
+         if (beforeParent.children != null && (propNode = beforeParent.children.get(propagatedValueIndex)) instanceof IParseNode) {
+            IParseNode propPN = (IParseNode) propNode;
+            return propPN.getParselet().getBeforeFirstNode(propPN);
+         }
+      }
+      return super.getBeforeFirstNode(beforeFirstNode);
+   }
+   */
 }

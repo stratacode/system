@@ -4,6 +4,7 @@
 
 package sc.repos;
 
+import sc.util.IClassResolver;
 import sc.util.IMessageHandler;
 import sc.repos.mvn.MvnRepositoryManager;
 import sc.util.MessageHandler;
@@ -27,12 +28,17 @@ public class RepositorySystem {
 
    public HashSet<String> classPath = new HashSet<String>();
 
+   IClassResolver resolver;
+
    public IMessageHandler msg;
 
-   public RepositorySystem(RepositoryStore store, IMessageHandler handler, boolean info, boolean reinstall, boolean update, boolean installExisting) {
+   public String pkgIndexRoot;
+
+   public RepositorySystem(RepositoryStore store, IMessageHandler handler, IClassResolver resolver, boolean info, boolean reinstall, boolean update, boolean installExisting) {
       this.store = store;
 
       msg = handler;
+      this.resolver = resolver;
       reinstallSystem = reinstall;
       updateSystem = update;
       this.installExisting = installExisting;
@@ -63,9 +69,9 @@ public class RepositorySystem {
       }
    }
 
-   public RepositoryPackage addPackage(String url, boolean install) {
+   public IRepositoryManager getManagerFromURL(String url) {
       int ix = url.indexOf(":");
-      if (ix == 0) {
+      if (ix <= 0) {
          MessageHandler.error(msg, "addRepoitoryPackage - invalid URL - missing type://values");
          return null;
       }
@@ -75,6 +81,11 @@ public class RepositorySystem {
          MessageHandler.error(msg, "No repository with name: " + repositoryTypeName + " for add package");
          return null;
       }
+      return mgr;
+   }
+
+   public RepositoryPackage addPackage(String url, boolean install) {
+      IRepositoryManager mgr = getManagerFromURL(url);
 
       // TODO: use getOrCreatePackage here?
       RepositoryPackage pkg = mgr.createPackage(url);
@@ -135,6 +146,7 @@ public class RepositorySystem {
 
    public RepositoryPackage addPackageSource(IRepositoryManager mgr, String pkgName, String fileName, RepositorySource repoSrc, boolean install, RepositoryPackage parentPkg) {
       RepositoryPackage pkg;
+
       pkg = store.packages.get(pkgName);
       if (pkg == null) {
          pkg = mgr.createPackage(mgr, pkgName, fileName, repoSrc, parentPkg);
@@ -183,6 +195,9 @@ public class RepositorySystem {
             RepositorySource newSrc = newPkg.currentSource == null ? newPkg.sources[0] : newPkg.currentSource;
             pkg.updateCurrentSource(newSrc, true);
          }
+         // We are adding a new package instance but the canonical package of that name has been added already.
+         // We point this package at the canonical one so that we always refer to the right one.
+         newPkg.replacedByPkg = pkg;
       }
 
       if (install) {
@@ -196,7 +211,7 @@ public class RepositorySystem {
          // We do the install and update immediately after they are added so that the layer definition file has
          // access to the installed state, to for example, list the contents of the lib directory to get the jar files
          // to add to the classpath.
-         String err = pkg.preInstall(ctx, depCol);
+         String err = pkg.preInstall(ctx, depCol, true);
          if (err != null) {
             MessageHandler.error(msg, "Failed to install repository package: " + pkg.packageName + " error: " + err);
          }
@@ -211,7 +226,7 @@ public class RepositorySystem {
          DependencyCollection nextDeps = new DependencyCollection();
          for (PackageDependency pkgDep : instDeps.neededDeps) {
             if (!pkgDep.pkg.installed)
-               pkgDep.pkg.preInstall(pkgDep.ctx, nextDeps);
+               pkgDep.pkg.preInstall(pkgDep.ctx, nextDeps, true);
             else
                pkgDep.pkg.register();
             allDeps.add(pkgDep.pkg);
@@ -243,5 +258,9 @@ public class RepositorySystem {
          pkg.update();
       }
       pkg.register();
+   }
+
+   public IClassResolver getClassResolver() {
+      return resolver;
    }
 }

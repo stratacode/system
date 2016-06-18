@@ -10,6 +10,10 @@ import java.util.List;
 
 public abstract class AbstractParseNode implements IParseNode, Cloneable {
    int startIndex = -1;
+   /** Set during the reparse process as a node is moved from the old to the new tree.  TODO: we could eliminate this perhaps by copying the parse-node tree? */
+   int newStartIndex = -1;
+   /** Set to true for any parse-nodes which are generated as part of an error state */
+   boolean errorNode = false;
 
    public void setParselet(Parselet p) {}
 
@@ -22,7 +26,17 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
    }
 
    public int getStartIndex() {
+      if (newStartIndex != -1)
+         return newStartIndex;
       return startIndex;
+   }
+
+   public int getOrigStartIndex() {
+      return startIndex;
+   }
+
+   public int getNewStartIndex() {
+      return newStartIndex;
    }
 
    public void setStartIndex(int ix) {
@@ -140,7 +154,7 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
       return false;
    }
 
-   public String formatString(Object parentSemVal, ParentParseNode parParseNode, int curChildIndex) {
+   public String formatString(Object parentSemVal, ParentParseNode parParseNode, int curChildIndex, boolean removeFormattingNodes) {
       return toString();
    }
 
@@ -167,12 +181,27 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
       return true;
    }
 
-   public int resetStartIndex(int ix) {
-      startIndex = ix;
+   public int resetStartIndex(int ix, boolean validate, boolean newIndex) {
+      if (validate && ix != getStartIndex())
+         System.err.println("Invalid start index found");
+      if (!newIndex) {
+         startIndex = ix;
+         newStartIndex = -1;
+      }
+      else
+         newStartIndex = ix;
       return ix + length();
    }
 
    public int getSemanticLength() {
       return length();
+   }
+
+   public boolean isErrorNode() {
+      return errorNode;
+   }
+
+   public void setErrorNode(boolean val) {
+      errorNode = val;
    }
 }

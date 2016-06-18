@@ -21,10 +21,7 @@ import sc.bind.IBinding;
 import sc.util.StringUtil;
 
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public abstract class Expression extends Statement implements IValueNode, ITypedObject {
    transient public BindingDirection bindingDirection;
@@ -949,7 +946,8 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       return null;
    }
 
-   public void setInferredType(Object type) {
+   public boolean setInferredType(Object type) {
+      return false;
    }
 
    public boolean propagatesInferredType(Expression child) {
@@ -977,4 +975,32 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       }
       return false;
    }
+
+   public List<JavaType> getMethodTypeArguments() {
+      return null;
+   }
+
+   void displayRangeError(int fromIx, int toIx, String...args) {
+      displayTypeError(args);
+      if (errorArgs != null) {
+         ArrayList<Object> eargs = new ArrayList<Object>(Arrays.asList(errorArgs));
+         eargs.add(new ErrorRangeInfo(fromIx, toIx));
+         errorArgs = eargs.toArray();
+      }
+   }
+
+   public static class ErrorRangeInfo {
+      public int fromIx;
+      public int toIx;
+
+      public ErrorRangeInfo(int fromIx, int toIx) {
+         this.fromIx = fromIx;
+         this.toIx = toIx;
+      }
+
+      public String toString() {
+         return fromIx + ":" + toIx;
+      }
+   }
+
 }

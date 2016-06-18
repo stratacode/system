@@ -22,6 +22,9 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
 
    public boolean active = true;
 
+   /** Is this by default a src repository to build or one for runtime files like classes */
+   public boolean srcRepository = false;
+
    public final static String REPLACED_DIR_NAME = ".replacedPackages";
 
    public boolean isActive() {
@@ -40,8 +43,8 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       return system;
    }
 
-   public RepositorySource createRepositorySource(String url, boolean unzip) {
-      return new RepositorySource(this, url, unzip);
+   public RepositorySource createRepositorySource(String url, boolean unzip, RepositoryPackage parent) {
+      return new RepositorySource(this, url, unzip, parent);
    }
 
    public AbstractRepositoryManager(RepositorySystem sys, String mn, String reposRoot, IMessageHandler handler, boolean info) {
@@ -69,7 +72,13 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
    // Putting this into the version-specific installed root so it more reliably gets removed if the folder itself is removed
    // and so that for versioned packaged, we can store more than one version in the repository at the same time.
    private File getTagFile(RepositoryPackage pkg) {
-      File tagFile = new File(pkg.getVersionRoot(), "scPkgCachedInfo.ser");
+      String rootPath = getRepositorySystem().pkgIndexRoot;
+      // When we are initializing the layers, before we've set up a build layer, we may encounter some packages in
+      // the layer's start method.  For now, storing them in the shared package directory.
+      if (rootPath == null) {
+         return new File(pkg.getVersionRoot(), pkg.getIndexFileName());
+      }
+      File tagFile = new File(rootPath, pkg.getIndexFileName());
       return tagFile;
    }
 
@@ -105,8 +114,19 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       if (rootParent != null)
          new File(rootParent).mkdirs();
       long installedTime = -1;
-      if (rootDirExists && tagFile.canRead()) {
+      if (rootDirExists && tagFile != null && tagFile.canRead()) {
+         if (pkg.definedInLayer != null)
+            pkg.definedInLayer.layeredSystem.layerResolveContext = true;
          RepositoryPackage oldPkg = RepositoryPackage.readFromFile(tagFile, this);
+         if (pkg.definedInLayer != null)
+            pkg.definedInLayer.layeredSystem.layerResolveContext = false;
+
+         /* TODO: is it possible to restore a package which was not installed and then think it is installed?
+         if (oldPkg != null && !oldPkg.installed) {
+            // If we were not installed when we were saved don't make us installed now
+            preInstalled = false;
+         }
+         */
 
          if (oldPkg == null)
             pkg.rebuildReason = "failed to read scPkgCachedInfo.ser file";
@@ -121,7 +141,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
          }
       }
       else
-         pkg.rebuildReason = "first install";
+         pkg.rebuildReason = "No cached package info for: " + system.pkgIndexRoot;
       long packageTime = getLastModifiedTime(src);
 
       // No last modified time for this source... assume it's up to date unless it's not installed
@@ -152,7 +172,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
          pkg.rebuildReason += ": files out of date";
 
       // If we are installing on top of an existing directory, rename the old directory in the backup folder.  Checking tagFile because it could be version specific and don't want to back up one version to install another one
-      if (!pkg.preInstalled && rootDirExists && !isEmptyDir(rootFile) && !system.installExisting && pkg.parentPkg == null && !mismatchedCase(rootFile) && !pkg.getReusePackageDirectory()) {
+      if (!pkg.preInstalled && rootDirExists && !isEmptyDir(rootFile) && system.reinstallSystem && pkg.parentPkg == null && !mismatchedCase(rootFile) && !pkg.getReusePackageDirectory()) {
          Date curTime = new Date();
          String backupDir = FileUtil.concat(packageRoot, REPLACED_DIR_NAME, pkg.packageName + "." + curTime.getHours() + "." + curTime.getMinutes());
          new File(backupDir).mkdirs();
@@ -210,7 +230,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       }
 
       if (info)
-         info(StringUtil.indent(DependencyContext.val(ctx)) + "Installing package: " + pkg.packageName + (pkg.rebuildReason == null ? "" : ": " + pkg.rebuildReason) + " src url: " + src.url + getDepsInfo(ctx));
+         info(StringUtil.indent(DependencyContext.val(ctx)) + "Installing package: " + pkg.packageName + (pkg.rebuildReason == null ? "" : ": " + pkg.rebuildReason) + " src url: " + src.toString() + getDepsInfo(ctx));
       pkg.installError = doInstall(src, ctx, deps);
       if (pkg.installError != null)
          return pkg.installError;
@@ -225,15 +245,17 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
    public void completeInstall(RepositoryPackage pkg) {
       File tagFile = getTagFile(pkg);
       if (pkg.installError != null) {
-         tagFile.delete();
+         if (tagFile != null)
+            tagFile.delete();
          System.err.println("Installing package: " + pkg.packageName + " failed: " + pkg.installError);
       }
       else {
          pkg.installedTime = System.currentTimeMillis();
-         // Make the version specific directory if necessary
-         new File(tagFile.getParent()).mkdirs();
-         pkg.saveToFile(tagFile);
-         //FileUtil.saveStringAsFile(tagFile, String.valueOf(System.currentTimeMillis()), true);
+         if (tagFile != null) {
+            // Make the version specific directory if necessary
+            new File(tagFile.getParent()).mkdirs();
+            pkg.saveToFile(tagFile);
+         }
       }
       ArrayList<RepositoryPackage> subPackages = pkg.subPackages;
       if (subPackages != null) {
@@ -314,5 +336,13 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
 
    public String toString() {
       return managerName;
+   }
+
+   public boolean isSrcRepository() {
+      return srcRepository;
+   }
+
+   public IClassResolver getClassResolver() {
+      return system.getClassResolver();
    }
 }

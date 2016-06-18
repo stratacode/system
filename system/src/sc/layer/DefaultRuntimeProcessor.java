@@ -48,6 +48,9 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor, Serializable 
    public void saveRuntime() {
    }
 
+   public void initAfterRestore() {
+   }
+
    public void start(BodyTypeDeclaration def) {
    }
 
@@ -144,9 +147,10 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor, Serializable 
       return system;
    }
 
-   public void runMainMethod(Object type, String runClass, String[] runClassArgs) {
+   public String runMainMethod(Object type, String runClass, String[] runClassArgs) {
       if (system.options.verbose)
-         System.out.println("Warning: JSRuntime - not running main method for: " + runClass + " - this will run in the browser");
+         System.out.println("Warning: - not running main method for: " + runClass + " in runtime: " + getRuntimeName());
+      return null;
    }
 
    protected ArrayList<IRuntimeProcessor> syncRuntimes = new ArrayList<IRuntimeProcessor>();
@@ -193,6 +197,7 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor, Serializable 
          Object res = ois.readObject();
          if (res instanceof IRuntimeProcessor) {
             IRuntimeProcessor runtime = (IRuntimeProcessor) res;
+            runtime.initAfterRestore();
             return runtime;
          }
          else {

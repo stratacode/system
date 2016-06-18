@@ -208,7 +208,12 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       Definition def = getDefinition();
       if (def instanceof TypeDeclaration)
          return def;
-      Object type = ((TypedDefinition) def).type.getTypeDeclaration();
+
+      TypedDefinition tdef = (TypedDefinition) def;
+      JavaType varType = tdef.type;
+      if (varType == null)
+         return null;
+      Object type = varType.getTypeDeclaration();
 
       // Handles old school array dimensions after the variable name
       if (arrayDimensions == null)
@@ -251,8 +256,16 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       Definition def = getDefinition();
       if (def instanceof TypeDeclaration)
          return ((TypeDeclaration) def).typeName;
-      String typeName = frozenTypeDecl != null ? ModelUtil.getTypeName(frozenTypeDecl) :
-              ((TypedDefinition) def).type.getFullTypeName();
+      String typeName;
+      if (frozenTypeDecl != null)
+         typeName = ModelUtil.getTypeName(frozenTypeDecl);
+      else {
+         TypedDefinition tdef = (TypedDefinition) def;
+         if (tdef.type != null)
+            typeName = tdef.type.getFullTypeName();
+         else
+            typeName = "<no type>";
+      }
 
       // Handles old school array dimensions after the variable name
       if (arrayDimensions == null)
@@ -686,7 +699,9 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
             Object newField = ((BodyTypeDeclaration) res).declaresMember(variableName, MemberType.FieldSet, null, null);
             if (newField instanceof VariableDefinition)
                return (VariableDefinition) newField;
-            displayError("Field removed ", variableName);
+            displayError("Field removed ", variableName, " for: ");
+            // TODO: debug only
+            newField = ((BodyTypeDeclaration) res).declaresMember(variableName, MemberType.FieldSet, null, null);
          }
       }
       if (def instanceof VariableStatement) {
@@ -741,5 +756,6 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       if (fromSt != null)
          res.add(fromSt);
    }
+
 }
 

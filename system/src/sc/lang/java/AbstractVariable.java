@@ -8,7 +8,7 @@ import sc.lang.INamedNode;
 import sc.lang.IUserDataNode;
 import sc.lang.js.JSUtil;
 
-public class AbstractVariable extends JavaSemanticNode implements INamedNode, IUserDataNode {
+public class AbstractVariable extends AbstractErrorNode implements INamedNode, IUserDataNode {
    public String variableName;
    public String arrayDimensions;
 

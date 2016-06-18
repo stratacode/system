@@ -25,7 +25,7 @@ public class ErrorParseNode extends AbstractParseNode {
       return error == null || !(error.partialValue instanceof IParseNode) ? null : ((IParseNode) error.partialValue).getSemanticValue();
    }
 
-   public void setSemanticValue(Object value) {
+   public void setSemanticValue(Object value, boolean clearOld) {
       if (value != null)
          throw new UnsupportedOperationException();
    }
@@ -57,6 +57,60 @@ public class ErrorParseNode extends AbstractParseNode {
       }
    }
 
+   @Override
+   public void findStartDiff(DiffContext ctx, boolean atEnd, Object parSemVal, ParentParseNode parSemNode, int childIx) {
+      if (errorText == null)
+         return;
+      String text = ctx.text;
+      int textLen = text.length();
+      int errorLen = errorText.length();
+      for (int i = 0; i < errorLen; i++) {
+         if (ctx.startChangeOffset >= textLen) {
+            return;
+         }
+         if (errorText.charAt(i) != text.charAt(ctx.startChangeOffset)) {
+            if (DiffContext.debugDiffContext)
+               ctx = ctx;
+            IParseNode last = ctx.lastVisitedNode;
+            if (last == null)
+               last = this;
+            // For error nodes, we want the last visited node to start the diff since it's possible extensions to the content of an error node
+            // will change the previously incomplete parsed result.
+            ctx.firstDiffNode = last.getParselet().getBeforeFirstNode(last);
+            ctx.beforeFirstNode = ctx.firstDiffNode;
+            return;
+         }
+         else {
+            ctx.startChangeOffset++;
+         }
+      }
+      if (atEnd && textLen > ctx.startChangeOffset) {
+         IParseNode last = ctx.lastVisitedNode;
+         ctx.firstDiffNode = last.getParselet().getBeforeFirstNode(last);
+         ctx.beforeFirstNode = ctx.firstDiffNode;
+      }
+   }
+
+   @Override
+   public void findEndDiff(DiffContext ctx, Object parSemVal, ParentParseNode parParseNode, int childIx) {
+      if (errorText == null)
+         return;
+      String text = ctx.text;
+      int len = errorText.length();
+      for (int i = len - 1; i >= 0; i--) {
+         if (errorText.charAt(i) != text.charAt(ctx.endChangeNewOffset)) {
+            ctx.lastDiffNode = this;
+            ctx.afterLastNode = ctx.lastVisitedNode;
+            ctx.addSameAgainChildren(ctx.lastVisitedNode);
+            return;
+         }
+         else {
+            ctx.endChangeOldOffset--;
+            ctx.endChangeNewOffset--;
+         }
+      }
+   }
+
    public String toString() {
       return errorText == null ? "" : errorText;
    }
@@ -79,5 +133,9 @@ public class ErrorParseNode extends AbstractParseNode {
 
    public boolean canSkip() {
       return false;
+   }
+
+   public boolean isErrorNode() {
+      return true;
    }
 }

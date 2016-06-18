@@ -34,10 +34,11 @@ public class VariableStatement extends TypedDefinition {
    }
 
    public Object definesMember(String name, EnumSet<MemberType> mtype, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {
-      if (mtype.contains(MemberType.Variable))
-         for (VariableDefinition v:definitions)
+      if (definitions != null && mtype.contains(MemberType.Variable)) {
+         for (VariableDefinition v : definitions)
             if (v.variableName.equals(name))
                return v;
+      }
       return super.definesMember(name, mtype, refType, ctx, skipIfaces, isTransformed);
    }
 

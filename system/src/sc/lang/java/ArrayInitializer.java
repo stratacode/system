@@ -25,7 +25,7 @@ public class ArrayInitializer extends Expression {
       super.start();
    }
 
-   public void setInferredType(Object type) {
+   public boolean setInferredType(Object type) {
       super.setInferredType(type);
 
       inferredType = type;
@@ -49,6 +49,7 @@ public class ArrayInitializer extends Expression {
             }
          }
       }
+      return false;
    }
 
    public boolean propagatesInferredType(Expression child) {

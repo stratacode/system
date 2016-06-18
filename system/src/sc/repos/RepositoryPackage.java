@@ -4,9 +4,10 @@
 
 package sc.repos;
 
+import sc.dyn.DynUtil;
 import sc.layer.Layer;
 import sc.layer.LayerComponent;
-import sc.repos.mvn.MvnRepositorySource;
+import sc.util.ClassResolverObjectInputStream;
 import sc.util.FileUtil;
 import sc.util.MessageHandler;
 import sc.util.StringUtil;
@@ -15,7 +16,12 @@ import java.io.*;
 import java.util.*;
 
 /**
- * Represents a third party package that's managed by a RepositoryManager
+ * Represents a package or software component obtained from some source location - e.g. a git repository, maven, file system, etc.
+ * Each package may come from one or more sources, where the source contains the specific version.  Ultimately a single currentSource
+ * is selected and that's used to install or update the package.
+ * Once installed, the package produces access to the assets such as the class path, src path, web path and config path entries added
+ * by this package.
+ * Packages can be installed in either source or binary form with different sources for the two types.
  */
 public class RepositoryPackage extends LayerComponent implements Serializable {
    private static final long serialVersionUID = 7334042890983906329L;
@@ -41,6 +47,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    private boolean includeTests = false;
    private boolean includeRuntime = false;
 
+   /** List of possible sources for this package */
    public RepositorySource[] sources;
    public RepositorySource currentSource;
 
@@ -83,6 +90,9 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    /** Lets you define a separate alias for this package */
    public String packageAlias;
 
+   public RepositoryPackage() {
+   }
+
    public RepositoryPackage(Layer layer) {
       super(layer);
    }
@@ -122,35 +132,54 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    }
 
    public void init() {
+      if (_initState > 1)
+         return;
       super.init();
-      if (definedInLayer != null) {
-         RepositorySystem sys = definedInLayer.layeredSystem.repositorySystem;
-         RepositoryPackage pkg = this;
-         if (type != null) {
-            mgr = sys.getRepositoryManager(type);
 
-            if (url != null) {
-               RepositorySource src = mgr.createRepositorySource(url, unzip);
-               if (packageName == null)
-                  packageName = src.getDefaultPackageName();
-               String defaultFile = src.getDefaultFileName();
-               if (fileNames.size() == 0 && defaultFile != null)
-                  addFileName(defaultFile);
-               // TODO: a null fileName also means to install in the packageRoot.  Do we need to support this case?
-               // maybe that should be a separate flag
-               if (fileNames.size() == 0)
-                  addFileName(packageName);
-               src.pkg = this;
-               // Since we just set the file name above, do not reset them... for root level projects we do not install
-               // a file.
-               updateCurrentSource(src, false);
-               updateInstallRoot(mgr);
-               // Note: if a package with this name has already been added, we use that instance
-               pkg = sys.addRepositoryPackage(this);
-               if (pkg != this) {
-                  replacedByPkg = pkg;
-               }
+      // Supports being inside of a layer and inside of another package.  There's no constructor for the package case
+      // so just using the dyn api to find the outer object in the dyn context.  We could add an interface in common between
+      // layer and LayerComponent and use the same constructor or add propagateConstructors to add a new one for this case.
+      if (definedInLayer == null) {
+         Object obj = DynUtil.getOuterObject(this);
+         if (obj instanceof RepositoryPackage)
+            parentPkg = (RepositoryPackage) obj;
+      }
+
+      RepositorySystem sys = getRepositorySystem();
+      if (sys != null) {
+         if (type != null)
+            mgr = sys.getRepositoryManager(type);
+         else {
+            MessageHandler.error(sys.msg, "Package ", packageName, " missing type property - should be 'git', 'mvn', 'url', 'scp' etc.");
+         }
+         RepositoryPackage pkg = this;
+
+         if (url != null) {
+            RepositorySource src = mgr.createRepositorySource(url, unzip, parentPkg);
+            if (packageName == null)
+               packageName = src.getDefaultPackageName();
+            String defaultFile = src.getDefaultFileName();
+            if (fileNames.size() == 0 && defaultFile != null)
+               addFileName(defaultFile);
+            // TODO: a null fileName also means to install in the packageRoot.  Do we need to support this case?
+            // maybe that should be a separate flag
+            if (fileNames.size() == 0)
+               addFileName(packageName);
+            src.pkg = this;
+            // Since we just set the file name above, do not reset them... for root level projects we do not install
+            // a file.
+            updateCurrentSource(src, false);
+            updateInstallRoot(mgr);
+            // Note: if a package with this name has already been added, we use that instance
+            pkg = sys.addRepositoryPackage(this);
+            if (pkg != this) {
+               replacedByPkg = pkg;
             }
+         }
+         if (parentPkg != null) {
+            parentPkg.addSubPackage(pkg);
+         }
+         if (definedInLayer != null) {
             if (definedInLayer.repositoryPackages == null)
                definedInLayer.repositoryPackages = new ArrayList<RepositoryPackage>();
             // We need to add 'this' not the canonical pkg here so the definedInLayer is set for this layer.  We'll dereference replacedByPkg
@@ -158,15 +187,33 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
             definedInLayer.repositoryPackages.add(this);
             // TODO: are there any properties in this pkg which we need to copy over to the existing instance if pkg != this
          }
-         else {
-            MessageHandler.error(sys.msg, "Package ", packageName, " missing type property - should be 'git', 'mvn', 'ur', 'scp' etc.");
-         }
       }
       else {
-         if (url != null || type != null) {
-            System.err.println("*** Warning - url and type properties set on RepositoryPackage which is not part of a layer");
-         }
+         System.err.println("*** RepositoryPackage component defined outside of a RepositorySystem context");
       }
+   }
+
+   void addSubPackage(RepositoryPackage pkg) {
+      if (subPackages == null)
+         subPackages = new ArrayList<RepositoryPackage>();
+      subPackages.add(pkg);
+   }
+
+   public Layer getDefinedInLayer() {
+      if (definedInLayer != null)
+         return definedInLayer;
+      if (parentPkg != null)
+         return parentPkg.getDefinedInLayer();
+      return null;
+   }
+
+   public RepositorySystem getRepositorySystem() {
+      Layer layer = getDefinedInLayer();
+      if (layer != null)
+         return layer.layeredSystem.repositorySystem;
+      if (mgr != null)
+         return mgr.getRepositorySystem();
+      return null;
    }
 
    public String install(DependencyContext ctx) {
@@ -175,13 +222,14 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
 
       RepositorySystem sys = mgr.getRepositorySystem();
       RepositoryPackage oldPkg = sys.getRepositoryPackage(packageName);
-      if (oldPkg != this)
+      if (oldPkg != this && oldPkg != null)
          System.err.println("*** Warning - installing package not registered");
 
       ArrayList<RepositoryPackage> allDeps = new ArrayList<RepositoryPackage>();
       DependencyCollection depCol = new DependencyCollection();
-      String err = preInstall(ctx, depCol);
+      String err = preInstall(ctx, depCol, true);
       if (err == null) {
+         installSubPackages(mgr, ctx);
          err = RepositorySystem.installDeps(depCol, allDeps);
       }
       mgr.completeInstall(this);
@@ -190,23 +238,30 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    }
 
    public void register() {
-      if (definedInLayer != null && !definedInLayer.disabled && !definedInLayer.excluded) {
-         String root = getInstalledRoot();
-         if (root != null) {
-            if (srcPaths != null) {
-               for (String srcPath : srcPaths)
-                  definedInLayer.addSrcPath(FileUtil.concat(root, srcPath), null);
+      Layer defLayer = getDefinedInLayer();
+      if (defLayer != null && !defLayer.disabled && !defLayer.excluded) {
+         registerForLayer(defLayer);
+      }
+   }
 
-               addSrcPathsForSubPackages(definedInLayer, srcPaths);
+   public void registerForLayer(Layer layer) {
+      String root = getInstalledRoot();
+      if (root != null) {
+         // Propagate any srcPaths, webPaths, etc. properties down to the sub-packages
+         if (srcPaths != null) {
+            if (definesSrc) {
+               for (String srcPath : srcPaths)
+                  layer.addSrcPath(FileUtil.concat(root, srcPath), null);
             }
-            if (webPaths != null) {
-               for (String webPath:webPaths)
-                  definedInLayer.addSrcPath(FileUtil.concat(root, webPath), "web");
-            }
-            if (configPaths != null) {
-               for (String configPath:configPaths)
-                  definedInLayer.addSrcPath(FileUtil.concat(root, configPath), "config");
-            }
+         }
+         addSrcPathsForSubPackages(layer, srcPaths);
+         if (webPaths != null) {
+            for (String webPath:webPaths)
+               layer.addSrcPath(FileUtil.concat(root, webPath), "web");
+         }
+         if (configPaths != null) {
+            for (String configPath:configPaths)
+               layer.addSrcPath(FileUtil.concat(root, configPath), "config");
          }
       }
    }
@@ -214,15 +269,17 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    private void addSrcPathsForSubPackages(Layer layer, String[] srcPaths) {
       if (subPackages != null) {
          for (RepositoryPackage subPackage:subPackages) {
-            for (String srcPath : srcPaths)
-               layer.addSrcPath(FileUtil.concat(subPackage.getInstalledRoot(), srcPath), null);
+            if (srcPaths != null) {
+               for (String srcPath : srcPaths)
+                  layer.addSrcPath(FileUtil.concat(subPackage.getInstalledRoot(), srcPath), null);
+            }
 
             subPackage.addSrcPathsForSubPackages(layer, srcPaths);
          }
       }
    }
 
-   public String preInstall(DependencyContext ctx, DependencyCollection depCol) {
+   public String preInstall(DependencyContext ctx, DependencyCollection depCol, boolean preInstallDeps) {
       installed = false;
       StringBuilder errors = null;
       if ((sources == null || sources.length == 0) && currentSource != null) {
@@ -234,8 +291,11 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
          for (RepositorySource src : sources) {
             if (src.repository.isActive()) {
                // Mark as installed to prevent recursive installs
-               installed = true;
-               String err = src.repository.preInstall(src, ctx, depCol);
+               String err = null;
+               if (!installed) {
+                  installed = true;
+                  err = src.repository.preInstall(src, ctx, depCol);
+               }
                if (err == null) {
                   // This version of the currentSource may have been restored on an incremental build and have info like the classifier which is not part of the URL so only replace it if
                   // we have a new and incompatible definition of the source.
@@ -246,6 +306,28 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
                      updateCurrentSource(src, true);
                   else
                      updateCurrentFileNames(currentSource);
+
+                  // Need to get through all of the sub-packages before we start installing the dependencies
+                  if (subPackages != null) {
+                     for (RepositoryPackage subPkg:subPackages) {
+                        if (!subPkg.installed)
+                           subPkg.preInstall(ctx, depCol, false);
+                     }
+                  }
+                  if (preInstallDeps) {
+                     if (subPackages != null) {
+                        for (RepositoryPackage subPkg:subPackages) {
+                           if (!subPkg.installed)
+                              subPkg.preInstall(ctx, depCol, true);
+                        }
+                     }
+                     if (dependencies != null) {
+                        for (RepositoryPackage depPkg : dependencies) {
+                           if (!depPkg.installed)
+                              depPkg.preInstall(ctx, depCol, true);
+                        }
+                     }
+                  }
                   break;
                } else {
                   installed = false;
@@ -286,6 +368,25 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
             resName = FileUtil.concat(mgr.getPackageRoot(), FileUtil.unnormalize(packageName));
       }
       installedRoot = resName;
+   }
+
+   /**
+    * Like the logic from updateInstallRoot, we need to compute a name for the package which is consistent across the
+    * lifespan of the package.  For maven packages, they first get a package name based on their file storage (i.e.
+    * parentModule/childModule, then after we read the POM, the real package name is known - groupId/artifactId).
+    * Here we need to use the original name parent__child since that's the only name we'll have when we need to restore the
+    * package from the tag file.
+    */
+   public String getIndexFileName() {
+      String resName = packageName;
+      if (parentPkg != null && buildFromSrc) {
+         resName = FileUtil.removeExtension(parentPkg.getIndexFileName()) + "__" + getModuleBaseName();
+      }
+
+      //if (packageAlias != null)
+      //   resName = packageAlias;
+      // Nested packages are stored with their module name inside of the parent's installed root.
+      return FileUtil.addExtension(resName.replace("/", "__"), "ser");
    }
 
    public String getModuleBaseName() {
@@ -379,9 +480,10 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
                   classPath.add(entry);
                   newGlobal = true;
                }
-               if (definedInLayer != null) {
-                  if (!definedInLayer.hasClassPathEntry(entry)) {
-                     definedInLayer.addClassPathEntry(entry);
+               Layer defLayer = getDefinedInLayer();
+               if (defLayer != null) {
+                  if (!defLayer.hasClassPathEntry(entry)) {
+                     defLayer.addClassPathEntry(entry);
                      // It's rare but possible that we've defined this class path entry but at a layer higher in the stack
                      // that does not depend on this layer.  This layer will need to duplicate the classpath entry as we are not
                      // always going to search it when searching for types from this layer.
@@ -391,6 +493,12 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
                }
             } else
                System.err.println("*** No manager for addToClassPath");
+         }
+      }
+
+      if (subPackages != null) {
+         for (RepositoryPackage depPkg : subPackages) {
+            depPkg.addToClassPath(classPath);
          }
       }
 
@@ -445,7 +553,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       ObjectInputStream ios = null;
       FileInputStream fis = null;
       try {
-         ios = new ObjectInputStream(fis = new FileInputStream(f));
+         ios = new ClassResolverObjectInputStream(fis = new FileInputStream(f), mgr.getClassResolver());
          RepositoryPackage res = (RepositoryPackage) ios.readObject();
          res.init(mgr);
          return res;
@@ -472,7 +580,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    // Check for any changes in the package - if so, we'll re-install.  Otherwise, we'll
    // update this package with the saved info.
    public boolean updateFromSaved(IRepositoryManager mgr, RepositoryPackage oldPkg, boolean install, DependencyContext ctx) {
-      if (!packageName.equals(oldPkg.packageName) && (oldPkg.packageAlias == null ||  !packageName.equals(oldPkg.packageAlias)))
+      if (!samePackages(oldPkg))
          return false;
 
       // Note: We used to also compare fileNames but we can at least add to that list based on the contents of the POM
@@ -514,7 +622,19 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       RepositorySystem sys = mgr.getRepositorySystem();
 
       if (oldPkg.parentPkgURL != null) {
-         setParentPkg(mgr.getOrCreatePackage(oldPkg.parentPkgURL, null, false));
+         if (parentPkg != null) {
+            if (!parentPkg.sameParentURL(oldPkg.parentPkgURL)) {
+               System.err.println("*** parentPkgURL changed - reinstalling");
+               return false;
+            }
+         }
+         else {
+            IRepositoryManager parentMgr = sys.getManagerFromURL(oldPkg.parentPkgURL);
+            if (parentMgr == null) {
+               parentMgr = mgr;
+            }
+            setParentPkg(parentMgr.getOrCreatePackage(oldPkg.parentPkgURL, null, false));
+         }
       }
 
       initSubPackages(oldPkg, install);
@@ -535,8 +655,9 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       // update the backpointer as well.
       sources = oldPkg.sources;
       if (sources != null) {
-         for (RepositorySource nsrc:sources)
-            nsrc.pkg = this;
+         for (RepositorySource nsrc:sources) {
+            nsrc.updateAfterRestore(this);
+         }
       }
       updateCurrentSource(oldPkg.currentSource, true);
 
@@ -549,11 +670,35 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
 
    private void initSubPackages(RepositoryPackage oldPkg, boolean install) {
       if (oldPkg.subPkgURLs != null) {
-         ArrayList<RepositoryPackage> subs = new ArrayList<RepositoryPackage>(oldPkg.subPkgURLs.size());
+         ArrayList<RepositoryPackage> newSubs = new ArrayList<RepositoryPackage>(oldPkg.subPkgURLs.size());
+         RepositorySystem repoSys = getRepositorySystem();
+         if (repoSys == null) {
+            System.err.println("*** Error - repository package without system.");
+            return;
+         }
          for (String sub:oldPkg.subPkgURLs) {
-            RepositoryPackage subPkg = mgr.getOrCreatePackage(sub, this, install);
+            if (subPackages != null) {
+               boolean found = false;
+               for (RepositoryPackage curSubPkg : subPackages) {
+                  if (curSubPkg.sameURL(sub)) {
+                     found = true;
+                     break;
+                  }
+               }
+               if (found) {
+                  if (install)
+                     System.err.println("*** Not installing!"); // Not reached as we do not use this option anymore
+                  continue;
+               }
+            }
+            IRepositoryManager subMgr = repoSys.getManagerFromURL(sub);
+            if (subMgr == null) {
+               System.err.println("*** Failed to find manager for sub package URL: " + sub);
+               continue;
+            }
+            RepositoryPackage subPkg = subMgr.getOrCreatePackage(sub, this, install);
             if (subPkg != null) {
-               subs.add(subPkg);
+               newSubs.add(subPkg);
                // This happens when we try to install the sub-pkg
                //subPkg.initSubPackages(oldPkg, install);
             }
@@ -561,7 +706,11 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
                System.err.println("*** Failed to create subPackage: " + sub);
             }
          }
-         subPackages = subs;
+         if (subPackages == null)
+            subPackages = newSubs;
+         // TODO: if the subPackageURLs have changed should we just reinstall?
+         else
+            subPackages.addAll(newSubs);
       }
    }
 
@@ -579,13 +728,13 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       if (dependencies != null) {
          ArrayList<String> depPkgs = new ArrayList<String>(dependencies.size());
          for (int i = 0; i < dependencies.size(); i++) {
-            String depURL = dependencies.get(i).getPackageURL();
+            String depURL = dependencies.get(i).getPackageSrcURL();
             depPkgs.add(depURL);
          }
          depPkgURLs = depPkgs;
       }
       if (parentPkg != null)
-         parentPkgURL = parentPkg.getPackageURL();
+         parentPkgURL = parentPkg.getPackageSrcURL();
       preSaveSubPackages();
    }
 
@@ -594,8 +743,9 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
          ArrayList<String> subPkgs = new ArrayList<String>(subPackages.size());
          for (int i = 0; i < subPackages.size(); i++) {
             RepositoryPackage subPkg = subPackages.get(i);
-            subPkgs.add(subPkg.getPackageURL());
-            subPkg.preSaveSubPackages();
+            subPkgs.add(subPkg.getPackageSrcURL());
+            // Each package will have it's preSave called before saving the package file so no need to recurse
+            //subPkg.preSaveSubPackages();
          }
          subPkgURLs = subPkgs;
       }
@@ -714,11 +864,21 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       }
    }
 
+   public String getPackageSrcURL() {
+      if (replacedByPkg != null)
+         return replacedByPkg.getPackageSrcURL();
+      if (currentSource == null)
+         return packageName;
+      // Using the srcURL here
+      return currentSource.getPackageSrcURL();
+   }
+
    public String getPackageURL() {
       if (replacedByPkg != null)
          return replacedByPkg.getPackageURL();
       if (currentSource == null)
          return packageName;
+      // Using the srcURL here
       return currentSource.url;
    }
 
@@ -726,5 +886,22 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
     * that file each time and yet we never save the .ser file so we can't determine that it's pre-installed. */
    public boolean getReusePackageDirectory() {
       return false;
+   }
+
+   public boolean samePackages(RepositoryPackage other) {
+      if (other.packageName.equals(packageName) || StringUtil.equalStrings(other.packageAlias, packageName) ||
+          StringUtil.equalStrings(packageAlias, other.packageName) || StringUtil.equalStrings(packageAlias, other.packageAlias)) {
+         return true;
+      }
+      return false;
+   }
+
+   // We can match against either the original srcURL (sometimes a 'git' URL) and the canonical package url - i.e. mvn://groupId/artifactId/version
+   public boolean sameURL(String url) {
+      return getPackageURL().equals(url) || getPackageSrcURL().equals(url);
+   }
+
+   public boolean sameParentURL(String url) {
+      return sameURL(url);
    }
 }

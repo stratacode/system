@@ -18,6 +18,7 @@ import sc.layer.Layer;
 
 import java.io.*;
 import java.util.List;
+import java.util.TreeSet;
 
 /** Static utility methods used in the parsing code */
 public class ParseUtil  {
@@ -339,7 +340,7 @@ public class ParseUtil  {
           return;
       
       if (value instanceof IParseNode)
-         ((IParseNode) value).setSemanticValue(null);
+         ((IParseNode) value).setSemanticValue(null, true);
       else if (value instanceof SemanticNode) {
          SemanticNode node = (SemanticNode) value;
          // many parse nodes may point to a value but we only need to clear if we
@@ -347,7 +348,7 @@ public class ParseUtil  {
          node.setParseNode(null);
       }
       else if (value instanceof IParseNode)
-           ((IParseNode) value).setSemanticValue(null);
+           ((IParseNode) value).setSemanticValue(null, true);
       else if (value instanceof SemanticNodeList) {
          SemanticNodeList nodeList = (SemanticNodeList) value;
          nodeList.setParseNode(null);
@@ -388,6 +389,15 @@ public class ParseUtil  {
          return ((CharSequence) value).length();
       return value.toString().length();
    }
+
+   public static int toLength(Object val) {
+      if (val == null)
+         return 0;
+      if (val instanceof CharSequence)
+         return ((CharSequence) val).length();
+      throw new UnsupportedOperationException();
+   }
+
 
    public static boolean isArrayParselet(Parselet parselet) {
       Class svClass;
@@ -495,6 +505,11 @@ public class ParseUtil  {
    public static void restartComponent(Object obj) {
       ParseUtil.stopComponent(obj);
       ParseUtil.initAndStartComponent(obj);
+   }
+
+   public static void reinitComponent(Object obj) {
+      ParseUtil.stopComponent(obj);
+      ParseUtil.initComponent(obj);
    }
 
    public static void styleString(IStyleAdapter adapter, Object semanticValue, IParseNode node, String strVal, boolean escape) {
@@ -686,6 +701,10 @@ public class ParseUtil  {
       return parseNodeObj;
    }
 
+   public static void reformatParseNode(IParseNode node) {
+      node.formatString(null, null, -1, true);
+   }
+
    /** Re-applies default spacing/new line rules to the parse node given.  The spacing and newline objects have their parse nodes replaced by the generateParseNode */
    public static void resetSpacing(ISemanticNode node) {
       IParseNode opn = node.getParseNode();
@@ -697,7 +716,7 @@ public class ParseUtil  {
 
    public static void resetStartIndexes(ISemanticNode node) {
       IParseNode rootParseNode = node.getParseNode();
-      int endIx = rootParseNode.resetStartIndex(0);
+      int endIx = rootParseNode.resetStartIndex(0, false, false);
       //if (endIx != rootParseNode.length())
      //    System.out.println("*** End index does not match after resetStartIndex");
    }
@@ -728,13 +747,18 @@ public class ParseUtil  {
       if (space == null)
          return null;
 
+      int skipIx = 0;
       for (int i = 0; i < space.length(); i++) {
          char ch = space.charAt(i);
-         if (ch == '\n') {
-            return space.substring(0, i);
+         if (ch == '\n' || ch == ' ' || ch == '\t' || ch == '\r')  {
+            skipIx++;
          }
+         else
+            break;
       }
-      return space;
+      if (skipIx == 0)
+         return space;
+      return space.substring(skipIx);
    }
 
    public static String getSpacingForNode(Object parseNode) {
@@ -868,11 +892,19 @@ public class ParseUtil  {
       return null;
    }
 
+   /**
+    * Creates a LayeredSystem from a single classPath, externalClassPath, and srcPath.   You use this method
+    * when you do not have any layers but still want to leverage the low-level language processing capabilities of
+    * StrataCode.
+    * You can optionally provide an implementation of IExternalModelIndex to provide control over how models
+    * are cached and managed on the file system.  This is useful to help synchronize the LayeredSystem's copy of a
+    * particular model with the version of the model managed by an external tool like an IDE.
+    */
    public static LayeredSystem createSimpleParser(String classPath, String externalClassPath, String srcPath, IExternalModelIndex modelIndex) {
       LayeredSystem.Options options = new LayeredSystem.Options();
       options.installLayers = false;
 
-      LayeredSystem sys = new LayeredSystem(null, null, null, null, classPath, options, null, null, false, modelIndex);
+      LayeredSystem sys = new LayeredSystem(null, null, null, null, classPath, options, null, null, false, modelIndex, null, null);
 
       /** Create a single layer to manage externalClasses and source files given to us to parse */
       Layer sysLayer = sys.createLayer("sysLayer", null, null, false, false, false, false, false);
@@ -885,5 +917,99 @@ public class ParseUtil  {
       sys.startLayers(sysLayer);
 
       return sys;
+   }
+
+   public static Object reparse(IParseNode pnode, String newText) {
+      int oldLen = pnode.length();
+      int newLen = newText.length();
+
+      // First we make a pass over the parse node tree to find two mark points in the file - where the changes
+      // start and where the text becomes the same again.  We are optimizing for the "single edit" case - global
+      // edits currently will require a complete reparse (not that we could not handle this case - it will just be
+      // easier for the 90+% case).
+      DiffContext ctx = new DiffContext();
+      ctx.text = newText;
+      ctx.newLen = newLen;
+      ctx.startChangeOffset = 0;
+
+      // Find the parse node which is the first one that does not match in the text.
+      pnode.findStartDiff(ctx, true, null, null, -1);
+      Parselet plet = pnode.getParselet();
+      Language lang = plet.getLanguage();
+
+      // Clear this out so it's not set for findEndDiff
+      ctx.lastVisitedNode = null;
+      // Exact same contents - just return the originl
+      if (ctx.firstDiffNode == null && oldLen == newLen && newLen == ctx.startChangeOffset)
+         return pnode;
+      else {
+         int unparsedLen = pnode instanceof PartialValueParseNode ? ((PartialValueParseNode) pnode).unparsedLen : 0;
+         ctx.unparsedLen = unparsedLen;
+
+         ctx.diffLen = newLen - (oldLen + unparsedLen);
+
+         int origNewLen = newLen - unparsedLen - 1;
+         int origOldLen = oldLen - unparsedLen - 1;
+
+         // The offset at which changes start - the same in both old and new texts
+         ctx.endChangeNewOffset = origNewLen;
+         ctx.endChangeOldOffset = origOldLen;
+         pnode.findEndDiff(ctx, null, null, -1);
+
+
+         // If we are still on the last character we checked - there's no overlap in these files so advance the count beyond the last char
+         if (ctx.endChangeNewOffset == origNewLen)
+            ctx.endChangeNewOffset = newLen;
+         if (ctx.endChangeOldOffset == origOldLen)
+            ctx.endChangeOldOffset = oldLen;
+
+         if (ctx.afterLastNode == null)
+            ctx.afterLastNode = ctx.lastDiffNode;
+
+         // Start out with these two the same.  endParseChangeNewOffset can be adjusted during the reparse to force us to
+         // parse more characters, even when we should be "sameAgain"
+         ctx.endParseChangeNewOffset = ctx.endChangeNewOffset;
+
+         if (ctx.lastDiffNode == ctx.firstDiffNode && ctx.afterLastNode == ctx.lastDiffNode && ctx.firstDiffNode != null) {
+            int endNodeIx = ctx.firstDiffNode.getStartIndex() + ctx.firstDiffNode.length();
+            if (endNodeIx > ctx.endParseChangeNewOffset)
+               ctx.endParseChangeNewOffset = endNodeIx;
+         }
+
+         // Now we walk the parselet tree in a way similar to how we parsed it in the first place, but accepting
+         // the pnode.  We'll update this existing pnode with changes so it looks the same as if we'd reparsed
+         // the whole thing.
+         Object newRes = lang.reparse(pnode, ctx, newText, true);
+
+         // Find common parent node and reparse that node
+         /*
+         Object startObj = startNode.getSemanticValue();
+         Object endObj = endNode.getSemanticValue();
+         if (startObj instanceof ISemanticNode && endObj instanceof ISemanticNode) {
+            ISemanticNode startVal = (ISemanticNode) startObj;
+            ISemanticNode endVal = (ISemanticNode) endObj;
+            ISemanticNode reparseNode = findCommonParent(startVal, endVal);
+         }
+         else {
+            Parselet plet = pnode.getParselet();
+            return plet.getLanguage().parse(newText, plet, false);
+         }
+         */
+         return newRes;
+      }
+   }
+
+   public static ISemanticNode findCommonParent(ISemanticNode node1, ISemanticNode node2) {
+      if (node1 == node2)
+         return node1;
+      TreeSet<ISemanticNode> node1Parents = new TreeSet<ISemanticNode>();
+      for (ISemanticNode parent1 = node1.getParentNode(); parent1 != null; parent1 = parent1.getParentNode())
+         node1Parents.add(parent1);
+      for (ISemanticNode parent2 = node2.getParentNode(); parent2 != null; parent2 = parent2.getParentNode()) {
+         if (node1Parents.contains(parent2))
+            return parent2;
+      }
+      // Is this reached?  Shouldn't there always be a common parent?
+      return null;
    }
 }

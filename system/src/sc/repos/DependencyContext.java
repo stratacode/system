@@ -6,15 +6,20 @@ package sc.repos;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.List;
 
 public class DependencyContext implements Serializable {
    public int depth;
-   public RepositoryPackage fromPkg;
+   public transient RepositoryPackage fromPkg;
+   public String fromPkgURL;
    public DependencyContext parent;
+
+   private transient List<RepositoryPackage> incPkgs = null;
 
    public DependencyContext(int depth, RepositoryPackage initPkg, DependencyContext parent) {
       this.depth = depth;
       fromPkg = initPkg;
+      fromPkgURL = fromPkg.getPackageSrcURL();
       this.parent = parent;
    }
 
@@ -53,4 +58,25 @@ public class DependencyContext implements Serializable {
       }
       return sb.toString();
    }
+
+   /** Returns the list of packages that defined this dependency, starting with the root package */
+   public List<RepositoryPackage> getIncludingPackages() {
+      if (incPkgs != null)
+         return incPkgs;
+      incPkgs = new ArrayList<RepositoryPackage>();
+      if (parent != null) {
+         incPkgs.addAll(parent.getIncludingPackages());
+      }
+      if (fromPkg != null)
+         incPkgs.add(fromPkg);
+      return incPkgs;
+   }
+
+   public void updateAfterRestore(IRepositoryManager manager) {
+      if (fromPkgURL != null && fromPkg == null)
+         fromPkg = manager.getOrCreatePackage(fromPkgURL, null, false);
+      if (parent != null)
+         parent.updateAfterRestore(manager);
+   }
+
 }

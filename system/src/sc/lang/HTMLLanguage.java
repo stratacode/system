@@ -308,7 +308,7 @@ public class HTMLLanguage extends TemplateLanguage {
    {
       // Here we are skipping any incomplete attributes (e.g. id=) till we hit the end of close tag or the start of the next tag
       // It's important that we do not consume part or all of the next tag in the body of this tag if for some reason we decide to put this back in.
-      tagAttributes.skipOnErrorParselet = createSkipOnErrorParselet("/", "<", ">", Symbol.EOF);
+      tagAttributes.skipOnErrorParselet = createSkipOnErrorParselet("<tagAttributesError>", "/", "<", ">", Symbol.EOF);
       tagAttributes.cacheResults = true;
    }
    // TODO: how do we deal with appending newlines after the start tag?  Used to having tagSpacingEOL here but that ate up the space in the content.  Need features of tagSpacingEOL perhaps when processing the endTagChar?

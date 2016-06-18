@@ -13,11 +13,15 @@ import java.util.Set;
 /**
  * Language grammar for Javascript.
  *
- * TODO: complete the grammar. Right now this is only used for converting from Java to JS for 'grammar only' conversions.
- * For the rest of the conversion, look at the transformToJS and formatJS methods in each language node
+ * Extending the SCLanguage to make it easier to convert from SC to JS via the grammar.  Rather than defining a new grammar from scratch, we
+ * replace and change the Java grammar so it can parse Javascript files.   Partly this is because we can then easily map parselets from one language
+ * to the other by looking up in the class hierarchy, but we could have a more general way to do that (so for example that two sub-classes of Java, or two completely independent
+ * languages map to each other based on mapping names or some import/export mechanism).  The most important thing is that during a conversion from one language to the
+ * next, you can just change the language of a parseNode and re-generate it's code in the new language by applying the new grammar rules in reverse.  That involves finding the parselet
+ * in one language that maps to the next.
  *
- * Extending the SCLanguage to make it easier to convert from SC to JS via the grammar.
- * Probably could go back to extending Java if we have a more flexible way of mapping names - eg.g modifiers takes an extra param in SC
+ * The other way of looking at this is that some language needs to be the lingua-franca and the base language - it doesn't really matter which one.  Everything else gets derived from that one.
+ * It's not a bad model because it ensures consistency in the name-space.
  */
 public class JSLanguage extends SCLanguage implements IParserConstants {
    public final static JSLanguage INSTANCE = new JSLanguage();
@@ -32,7 +36,42 @@ public class JSLanguage extends SCLanguage implements IParserConstants {
       return JAVA_VARNAME_KEYWORD_SET;
    }
 
+   public KeywordSpace varKeyword = new KeywordSpace("var");
+
+   public Sequence identifierList = new Sequence("([],[])", OPTIONAL, identifier, remainingIdentifiers);
+
    {
+      // For JS, you can end statements with a ; either a newline or a line feed
+      //endStatement.add("\n", "\r");
+
+      localVariableDeclaration.setName("VariableStatement(type,definitions)");
+      localVariableDeclaration.set(new Sequence("ClassType(typeName)", OPTIONAL, varKeyword), variableDeclarators);
+
+      blockStatements.setName("([])");
+      blockStatements.set(statement);
+
+      statement.removeParselet(syncStatement);
+      statement.put("var", localVariableDeclarationStatement);
+      // Be careful with the name here - there's one entry that's ommitted - the for a semicolon without anything in front of it.
+      statement.setName("<statement>(.,.,.,.,.,.,.,.,.,.,.,.,,.,.,.)");
+   }
+
+   public Sequence parameterNameList = new Sequence("(,.,)", openParen, identifierList, closeParen);
+
+   public KeywordSpace functionKeyword = new KeywordSpace("function");
+   public Sequence functionDeclaration = new Sequence("JSFunctionDeclaration(,name,parameterNames,body)", functionKeyword, identifier, parameterNameList, block);
+   public Sequence functionExpression = new Sequence("JSFunctionDeclaration(,name,parameterNames,body)", functionKeyword, optIdentifier, parameterNameList, block);
+
+   public OrderedChoice sourceElement = new OrderedChoice("(.,.)", functionDeclaration, statement);
+
+   Sequence sourceElements = new Sequence("([])", OPTIONAL | REPEAT, sourceElement);
+
+   {
+      languageModel = new Sequence("JSModel(,sourceElements)", spacing, sourceElements);
+      setStartParselet(languageModel);
+
+      primary.put("function", functionExpression);
+
       binaryOperators.add("===");
       binaryOperators.add("!==");
 

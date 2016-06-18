@@ -12,11 +12,12 @@ import java.io.Reader;
 import java.util.*;
 
 /**
- * This is the basic parser class. For the most part external users won't see this - they
- * use the Language class.  This class maintains the input buffer and the location of the current parsed
- * position in the input buffer.  It also stores the current set of errors.
+ * This is the parser class which holds state for a given parse of a file or buffer.  Usually you access this
+ * class via Language.  Parser maintains the input buffer and the location of the current parsed
+ * position in the input buffer.  It also stores the current set of errors, parsing statistics, adn the current parselet.
  */
 public class Parser implements IString {
+   // Java won't include code behind these flags
    public final static boolean ENABLE_STATS = false;
 
    private final static boolean ENABLE_RESULT_TRACE = false;
@@ -76,10 +77,21 @@ public class Parser implements IString {
    int traceCt = 0; // # of nodes we are currently tracing for debug information
    int negatedCt = 0; // # of parselets in the stack with the negated flag - don't store errors while negated
 
+   int totalParseCt = 0;
+   int reparseCt = 0; // For reparse operations the # of nodes that are actually reparsed
+   int reparseSkippedCt = 0; // For reparse operations the # of nodes that are the same
+
    // When this is true, we do not produce a semantic value - just perform the match part.
    public boolean matchOnly = false;
 
    HashMap<Integer,ParseletState> resultCache = null;
+
+   public Parser(Language l, char[] inputArray) {
+      language = l;
+      inputBuffer = inputArray;
+      bufSize = inputArray.length;
+      eof = true;
+   }
 
    public Parser(Language l, Reader reader, int bufSize) {
       inputBuffer = new char[bufSize];
@@ -195,27 +207,48 @@ public class Parser implements IString {
    }
 
    public final int length() {
-      while (!eof)
-         growBuffer();
-
+      int ct = 0;
+      while (!eof) {
+         if (peekInputChar(ct++) == '\0')
+            break;
+      }
       return currentBufferPos + bufSize;
    }
 
-   public final Object parseStart(Parselet parselet) {
+   private void initParseState(Parselet parselet) {
       currentErrors.clear();
       currentErrorStartIndex = currentErrorEndIndex = -1;
       currentIndex = 0;
       currentStreamPos = 0; // The character index of the last char read from the input stream
       numAccepted = 0;
-      eof = false;
+      // If inputReader == null, inputBuffer points to the complete source array
+      if (inputReader != null)
+         eof = false;
 
       semanticContext = language.newSemanticContext(parselet, null);
+   }
+
+   public final Object parseStart(Parselet parselet) {
+      initParseState(parselet);
 
       Object result = parseNext(parselet);
 
       // Always return the error which occurred furthers into the stream.  Probably should return the whole
       // list of these errors if there is more than one.
       if ((result == null || result instanceof ParseError) && currentErrors != null) {
+         if (enablePartialValues && result != null) {
+            ParseError err = (ParseError) result;
+            if (err.partialValue != null && err.endIndex != length()) {
+               if (language.debug)
+                  System.out.println("Partial value did not consume all of file - wrapping error node to parent element!");
+
+            }
+            // Sometimes the produced partial value is say 0-1273 and the currentErrors all are 1274-1274.  We always choose
+            // an error that makes it further but in this case, the error with the information is the one returned in the partial value so
+            // we are adding it back in.
+            if (!currentErrors.contains(err))
+               currentErrors.add(err);
+         }
          if (language.debug) {
             for (int i = 0; i < currentErrors.size(); i++)
                System.out.println("Errors: " + i + ": " + currentErrors.get(i));
@@ -226,6 +259,23 @@ public class Parser implements IString {
       if (ENABLE_STATS) {
          System.out.println("*** cache stats:");
          System.out.println(getCacheStats());
+      }
+      return result;
+   }
+
+   public final Object reparseStart(Parselet parselet, Object oldParseNode, DiffContext dctx) {
+      initParseState(parselet);
+
+      Object result = reparseNext(parselet, oldParseNode, dctx, false, null);
+
+      // Always return the error which occurred furthers into the stream.  Probably should return the whole
+      // list of these errors if there is more than one.
+      if ((result == null || result instanceof ParseError) && currentErrors != null) {
+         if (language.debug) {
+            for (int i = 0; i < currentErrors.size(); i++)
+               System.out.println("Errors: " + i + ": " + currentErrors.get(i));
+         }
+         result = wrapErrors();
       }
       return result;
    }
@@ -342,6 +392,93 @@ public class Parser implements IString {
             }
          }
 
+         totalParseCt++;
+
+         if (ENABLE_STATS) {
+            parselet.attemptCount++;
+            testedNodes++;
+
+            if (!(value instanceof ParseError) && value != null) {
+               parselet.successCount++;
+               matchedNodes++;
+            }
+         }
+      }
+      finally {
+         inProgressCount--;
+         currentParselet = saveParselet;
+         lastStartIndex = saveLastStartIndex;
+
+         if (ENABLE_RESULT_TRACE && disableDebug)
+            language.debug = false;
+         if (parselet.trace)
+            traceCt--;
+         if (parselet.negated)
+            negatedCt--;
+      }
+
+      /*
+      if (language.debug || parselet.trace) {
+         if (value instanceof ParseError) {
+            if (!language.debugSuccessOnly)
+               System.out.println(indent(inProgressCount) + "Error" +
+                       (parselet.getName() != null ? "<" + parselet.getName() + ">: " : ": ") +
+                       value + " next: " + getLookahead(8));
+         }
+         else
+            System.out.println(indent(inProgressCount) + "Result" +
+                    (parselet.getName() != null ? "<" + parselet.getName() + ">:" : ":") +
+                    ParseUtil.escapeObject(value) + " next: " + getLookahead(8));
+      }
+      */
+      return value;
+   }
+
+   public final Object reparseNext(Parselet parselet, Object oldParseNode, DiffContext dctx, boolean forceReparse, Parselet exitParselet) {
+      Parselet saveParselet = null;
+      int saveLastStartIndex = -1;
+      Object value;
+      boolean doCache = false;
+
+      /*
+      if ((language.debug || parselet.trace) && !language.debugSuccessOnly)
+         System.out.println(indent(inProgressCount) + "Next: " + getLookahead(8) + " testing rule: " + parselet.toString());
+      */
+
+      boolean disableDebug = false;
+      if (parselet.negated)
+         negatedCt++;
+      try {
+         saveLastStartIndex = lastStartIndex;
+         lastStartIndex = currentIndex;
+         inProgressCount++;
+         saveParselet = currentParselet;
+         currentParselet = parselet;
+
+         value = parselet.reparse(this, oldParseNode, dctx, forceReparse, exitParselet);
+
+         if (doCache) {
+            if (resultCache == null)
+               resultCache = new HashMap<Integer,ParseletState>();
+            ParseletState newState = new ParseletState(parselet, value, currentIndex);
+            ParseletState currentState;
+            if (ENABLE_STATS) {
+               currentState = resultCache.get(lastStartIndex);
+               if (currentState != null)
+                  currentState = findMatchingState(currentState, parselet);
+            }
+            else
+               currentState = null;
+            if (currentState == null) {
+               currentState = resultCache.put(lastStartIndex, newState);
+               if (currentState != null) {
+                  newState.next = currentState;
+               }
+            }
+         }
+
+         totalParseCt++;
+
          if (ENABLE_STATS) {
             parselet.attemptCount++;
             testedNodes++;
@@ -449,6 +586,10 @@ public class Parser implements IString {
          return PARSE_NEGATED_ERROR;
       //if (parselet.reportError && (currentErrorEndIndex == -1 || (end > currentErrorEndIndex || (end == currentErrorEndIndex && start <= currentErrorStartIndex)))) {
 
+      // TODO: verify that this is not a performance problem (since it marks all recursive parse-nodes as error nodes)
+      if (partialValue instanceof IParseNode)
+         ((IParseNode) partialValue).setErrorNode(true);
+
       // Keep track of only the errors which made the most progress during the parse.  If the end is greater, that is
       // a better error than the one we have no matter what.  But if they end at the same spot, this error is only better
       // if it consumed more text than the previous one.
@@ -464,7 +605,7 @@ public class Parser implements IString {
             int lastIx = currentErrors.size();
             if (lastIx != 0) {
                ParseError lastError = currentErrors.get(lastIx-1);
-               if (lastError.parselet == childParselet)
+               if (childParselet != null && childParselet.producesParselet(lastError.parselet))
                   currentErrors.set(lastIx-1, e);
                else
                   addError(e);
@@ -510,12 +651,12 @@ public class Parser implements IString {
       node.value = value;
       node.startIndex = lastStartIndex;
       if (!skipSemanticValue)
-         node.setSemanticValue(ParseUtil.nodeToSemanticValue(value));
+         node.setSemanticValue(ParseUtil.nodeToSemanticValue(value), true);
       return node;
    }
 
-   static final ParseError PARSE_ERROR_OVERRIDDEN = new ParseError("Error less specific than previous error", null, -1, -1);
-   static final ParseError PARSE_NEGATED_ERROR = new ParseError("Match failed while negated", null, -1, -1);
+   static final ParseError PARSE_ERROR_OVERRIDDEN = new StaticParseError("Error less specific than previous error");
+   static final ParseError PARSE_NEGATED_ERROR = new StaticParseError("Match failed while negated");
 
    public void getChars(int srcBegin, int srcEnd, char dst[], int dstBegin) {
       int dstOffset = dstBegin - srcBegin;
@@ -524,7 +665,7 @@ public class Parser implements IString {
    }
 
    public String toString() {
-      return language.toString() + " parsing: " + getLookahead(8);
+      return language.toString() + " parsing: " + getLookahead(32);
    }
 
    public int peekInputStr(ArrString expectedValue, boolean negated) {

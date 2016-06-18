@@ -22,6 +22,8 @@ public abstract class ChainedExpression extends Expression {
    }
 
    public Object getTypeDeclaration() {
+      if (expression == null)
+         return null;
       return expression.getTypeDeclaration();
    }
 
@@ -81,9 +83,10 @@ public abstract class ChainedExpression extends Expression {
       }
    }
 
-   public void setInferredType(Object type) {
+   public boolean setInferredType(Object type) {
       if (expression != null)
-         expression.setInferredType(type);
+         return expression.setInferredType(type);
+      return false;
    }
 
    public boolean propagatesInferredType(Expression child) {

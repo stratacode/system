@@ -6,6 +6,8 @@ package sc.lang;
 
 import sc.lifecycle.ILifecycle;
 import sc.parser.*;
+import sc.type.CTypeUtil;
+import sc.util.FileUtil;
 
 import java.util.*;
 
@@ -188,7 +190,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
    }
 
    public void add(int index, E element) {
-      add(index, element, true);
+      add(index, element, true, true);
    }
 
    private void updateElement(int index, E element, boolean changeParent, NestedParselet.ChangeType changeType, boolean initOnly, boolean updateParseNodes) {
@@ -246,14 +248,14 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       }
    }
 
-   public void add(int index, E element, boolean changeParent) {
+   public void add(int index, E element, boolean changeParent, boolean updateParseNodes) {
       super.add(index, element);
 
       // For semantic nodes, we'll populate the parentNode pointer.
       if (changeParent && element instanceof ISemanticNode)
          ((ISemanticNode) element).setParentNode(this);
 
-      updateElement(index, element, changeParent, NestedParselet.ChangeType.ADD, false, true);
+      updateElement(index, element, changeParent, NestedParselet.ChangeType.ADD, false, updateParseNodes);
 
       /*
        * Use this to debug cases where an uninitailzied model is hooked up to an initialized model.  we don't automatically initialize cause there are some cases where this happens too early (if I recall correctly)
@@ -267,11 +269,14 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       */
    }
 
-   public E set(int index, E element)
-   {
+   public E set(int index, E element) {
+      return set(index, element, true, true);
+   }
+
+   public E set(int index, E element, boolean changeParent, boolean updateParseNodes) {
       E ret = super.set(index, element);
 
-      updateElement(index, element, true, NestedParselet.ChangeType.REPLACE, false, true);
+      updateElement(index, element, changeParent, NestedParselet.ChangeType.REPLACE, false, updateParseNodes);
 
       return ret;
    }
@@ -285,8 +290,12 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
    }
 
    public E remove(int index) {
+      return remove(index, true);
+   }
+
+   public E remove(int index, boolean updateParseNodes) {
       E element = super.get(index);
-      if (started && parseNode != null) {
+      if (started && parseNode != null && updateParseNodes) {
          Parselet parselet = parseNode.getParselet();
 
          //if (!parselet.language.trackChanges) {
@@ -325,21 +334,28 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
    }
 
    public boolean add(E element) {
-      add(size(), element, true);
+      add(size(), element, true, true);
       return true;
    }
 
-   public boolean add(E element, boolean setParent) {
-      add(size(), element, setParent);
+   public boolean add(E element, boolean setParent, boolean updateParseNodes) {
+      add(size(), element, setParent, updateParseNodes);
       return true;
    }
 
    public boolean addAll(Collection<? extends E> c) {
-      return addAll(size(), c);
+      return addAll(c, true, true);
    }
 
-   public boolean addAll(int index, Collection<? extends E> c)
-   {
+   public boolean addAll(Collection<? extends E> c, boolean setParent, boolean updateParseNodes) {
+      return addAll(size(), c, setParent, updateParseNodes);
+   }
+
+   public boolean addAll(int index, Collection<? extends E> c) {
+      return addAll(index, c, true, true);
+   }
+
+   public boolean addAll(int index, Collection<? extends E> c, boolean setParent, boolean updateParseNodes) {
       if (c == this) {
          System.out.println("*** Error - attempt to add a collection to itself");
          return false;
@@ -354,11 +370,11 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       // when the start method of the first entry is run.
       i = 0;
       for (E e:c)
-         updateElement(index + i++, e, true, NestedParselet.ChangeType.ADD, true, true);
+         updateElement(index + i++, e, setParent, NestedParselet.ChangeType.ADD, true, updateParseNodes);
 
       i = 0;
       for (E e:c)
-         updateElement(index + i++, e, true, NestedParselet.ChangeType.ADD, false, false);
+         updateElement(index + i++, e, setParent, NestedParselet.ChangeType.ADD, false, false);
 
       return i != 0;
    }
@@ -444,8 +460,12 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
    }
 
    public void clear() {
+      clear(false);
+   }
+
+   public void clear(boolean updateParseNodes) {
       while (size() > 0)
-         remove(size()-1);
+         remove(size()-1, updateParseNodes);
    }
 
    public ISemanticNode deepCopy(int options, IdentityHashMap<Object, Object> oldNewMap) {
@@ -481,7 +501,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
 
             if ((options & CopyParseNode) == 0) {
                newList.parseNode = newPP = new ParentParseNode(p);
-               newList.parseNode.setSemanticValue(newList);
+               newList.parseNode.setSemanticValue(newList, true);
                newPP.setStartIndex(parseNode.getStartIndex());
                newList.parseNodeInvalid = true;
             }
@@ -531,7 +551,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       }
       else {
          NestedParselet parselet = (NestedParselet) parseNode.getParselet();
-         if (parselet.regenerate((ParentParseNode) parseNode, finalGen))
+         if (parselet.regenerate(parseNode, finalGen))
             parseNodeInvalid = false;
          else {
             System.err.println("*** regenerate of list failed: " + this.getClass());
@@ -650,6 +670,77 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
             return false;
       }
       return true;
+   }
+
+   private static void diffAppend(StringBuilder diffs, Object val) {
+      if (SemanticNode.debugDiffTrace)
+         diffs = diffs;
+      diffs.append(val);
+   }
+
+   public void diffNode(Object o, StringBuilder diffs) {
+      if (o == this)
+         return;
+      if (!(o instanceof List)) {
+         diffAppend(diffs, "Other item is not a list!");
+         diffs.append(FileUtil.LINE_SEPARATOR);
+         return;
+      }
+
+      int sz = size();
+      List oList = (List) o;
+      int osz = oList.size();
+
+      int diffSz = sz;
+      if (sz != osz) {
+         diffAppend(diffs, "List size: " + sz + " != other size: " + osz);
+         diffs.append(FileUtil.LINE_SEPARATOR);
+
+         diffSz = Math.min(sz, osz);
+      }
+
+      for (int i = 0; i < diffSz; i++) {
+         Object otherProp = oList.get(i);
+         Object thisProp = get(i);
+         // If both are null it is ok.  If thisProp is not null it has to equal other prop to go on.
+         if (thisProp != otherProp) {
+            if (thisProp instanceof ISemanticNode && otherProp != null) {
+               ISemanticNode thisPropNode = (ISemanticNode) thisProp;
+               StringBuilder newDiffs = new StringBuilder();
+               thisPropNode.diffNode(otherProp, newDiffs);
+               if (newDiffs.length() != 0) {
+                  diffAppend(diffs, "[" + i + "]->");
+                  diffs.append(newDiffs);
+               }
+               else if (!thisPropNode.deepEquals(otherProp)) {
+                  diffAppend(diffs, CTypeUtil.getClassName(getClass().getName()) + " - [" + i + "] = " + thisProp + " other's = " + otherProp);
+                  diffs.append(", ");
+               }
+            }
+            else if (thisProp == null || otherProp == null || !thisProp.equals(otherProp)) {
+               diffAppend(diffs, CTypeUtil.getClassName(getClass().getName()) + " - [" + i + "] = " + thisProp + " other's = " + otherProp);
+               diffs.append(", ");
+            }
+         }
+      }
+      if (sz > diffSz) {
+         diffs.append(" - extra in this: ");
+         for (int i = diffSz; i < sz; i++) {
+            diffs.append("[");
+            diffs.append(i);
+            diffs.append("] = ");
+            diffs.append(get(i));
+         }
+      }
+      else if (osz > diffSz) {
+         diffs.append(" - extra in other: ");
+         for (int i = diffSz; i < osz; i++) {
+            diffs.append("[");
+            diffs.append(i);
+            diffs.append("] = ");
+            diffs.append(oList.get(i));
+         }
+      }
    }
 
    public String getNodeErrorText() {

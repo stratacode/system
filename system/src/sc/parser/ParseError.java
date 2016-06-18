@@ -120,4 +120,25 @@ public class ParseError implements Cloneable, IParseResult {
       }
       return val;
    }
+
+   public Object getBestPartialValue() {
+      if (partialValue != null)
+         return partialValue;
+      for (Object errArg : errorArgs) {
+         if (errArg instanceof ParseError) {
+            ParseError nestedErr = (ParseError) errArg;
+            // TODO: for now just return the first one - the errors are already known to have the same start/index and we should have filtered out
+            // errors that are parent/child of each other.
+            if (nestedErr.partialValue != null) {
+               return nestedErr.partialValue;
+            }
+         }
+      }
+      return null;
+   }
+
+   public ParseError propagatePartialValue(Object pv) {
+      partialValue = pv;
+      return this;
+   }
 }

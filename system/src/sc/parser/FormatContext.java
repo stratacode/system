@@ -32,12 +32,18 @@ public class FormatContext {
    boolean suppressNewlines = false;
    boolean tagMode = false;
 
+   boolean replaceFormatting = false;
+
    public IntStack savedIndentLevels = new IntStack(16);
    public int lastIndent;
 
    private Object nextValue;
 
    IStyleAdapter styleAdapter;
+
+   /** For SpacingParseNodes and other generated nodes when replaceFormatting is true */
+   IParseNode replaceNode = null;
+   StringBuilder replaceBuffer = null;
 
    public FormatContext(ParentParseNode curParent, int curChildIndex, int initIndent, Object lastNextValue, Object curSemVal) {
       // If the semantic value is the node above the curParent parse node, we add it first
@@ -70,6 +76,26 @@ public class FormatContext {
       }
       savedIndentLevels.push(initIndent);
       nextValue = lastNextValue;
+   }
+
+   public void setReplaceNode(IParseNode node) {
+      if (replaceNode != null)
+         System.err.println("*** Error replace node already set");
+      replaceBuffer = new StringBuilder();
+      replaceNode = node;
+   }
+
+   public IParseNode createReplaceNode() {
+      StringBuilder buf = replaceBuffer;
+      IParseNode repl = replaceNode;
+      replaceBuffer = null;
+      replaceNode = null;
+      if (buf.length() != 0) {
+         ParseNode res = new ParseNode(repl.getParselet());
+         res.value = buf.toString();
+         return res;
+      }
+      return null;
    }
 
    /**
@@ -161,15 +187,21 @@ public class FormatContext {
    }
 
    public void append(CharSequence seq) {
-      if (seq != null)
+      if (seq != null) {
          currentBuffer.append(seq);
+         if (replaceBuffer != null)
+            replaceBuffer.append(seq);
+      }
       if (styleBuffer != null)
          styleBuffer.append(seq);
    }
 
    public void appendNoStyle(CharSequence seq) {
-      if (seq != null)
+      if (seq != null) {
          currentBuffer.append(seq);
+         if (replaceBuffer != null)
+            replaceBuffer.append(seq);
+      }
    }
 
    public void appendWithStyle(CharSequence seq) {

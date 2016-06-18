@@ -39,8 +39,15 @@ public abstract class BaseLambdaExpression extends Expression {
    abstract Statement getLambdaBody(Object methObj);
    abstract String getExprType();
 
+   transient String inferredTypeParamName;
+   transient Object inferredTypeParamType;
+
    void updateInferredTypeMethod(Object methObj) {
       inferredTypeMethod = methObj;
+   }
+
+   protected boolean referenceMethodMatches(Object type, Object ifaceMeth) {
+      return true;
    }
 
    public boolean lambdaParametersMatch(Object type) {
@@ -53,6 +60,9 @@ public abstract class BaseLambdaExpression extends Expression {
       if (!parametersMatch(lambdaParams, ifaceMeth, getLayeredSystem())) {
          return false;
       }
+
+      if (!referenceMethodMatches(type, ifaceMeth))
+         return false;
       return true;
    }
 
@@ -117,26 +127,24 @@ public abstract class BaseLambdaExpression extends Expression {
          return;
       }
 
-
       if (newExpr != null)
          System.err.println("*** reinitializing new expression!");
 
       Object ifaceMeth = getInterfaceMethod(inferredType, true);
       if (ifaceMeth == null) {
-         System.err.println("*** No interface method for lambda expressoin: ");
+         displayError("No interface method for lambda expression using inferred type: " + ModelUtil.getTypeName(inferredType) + " for: ");
          return;
       }
 
       updateInferredTypeMethod(ifaceMeth);
 
       if (ModelUtil.isParameterizedMethod(ifaceMeth) && ModelUtil.hasTypeParameters(inferredType) && !(ifaceMeth instanceof ParamTypedMethod)) {
-         ifaceMeth = new ParamTypedMethod(ifaceMeth, (ITypeParamContext) inferredType, getEnclosingType(), null, null);
+         ifaceMeth = new ParamTypedMethod(ifaceMeth, (ITypeParamContext) inferredType, getEnclosingType(), null, null, null);
       }
       Object ifaceMethReturnType = ModelUtil.getReturnType(ifaceMeth, false);
       // If we can tell the return type of the lambda expression now, define any type parameters we learn from that type.
       Object newMethReturnType = getNewMethodReturnType();
       if (newMethReturnType != null) {
-         // We get this again below after it's a param-typed method
          updateReturnTypeParameters(ifaceMeth, ifaceMethReturnType, newMethReturnType);
       }
       // For method references, there's a mapping between the referenceMethod and the ifaceMeth so we can use those
@@ -160,7 +168,8 @@ public abstract class BaseLambdaExpression extends Expression {
       ITypeDeclaration enclType = getEnclosingType();
 
       newMeth.setProperty("parameters", parameters = createLambdaParams(lambdaParams, ifaceMeth, typeCtx, enclType));
-      newMeth.setProperty("type", JavaType.createFromParamType(ModelUtil.getParameterizedReturnType(ifaceMeth, null, true), typeCtx, enclType));
+      Object lambdaMethodReturnType = ModelUtil.getParameterizedReturnType(ifaceMeth, null, true);
+      newMeth.setProperty("type", JavaType.createFromParamType(lambdaMethodReturnType, typeCtx, enclType));
       lambdaMethod = newMeth;
 
       // Doing this after we have defined the parameters here so we can resolve the references
@@ -177,6 +186,9 @@ public abstract class BaseLambdaExpression extends Expression {
       Statement lambdaBody = getLambdaBody(ifaceMeth);
 
       BlockStatement methodBody;
+      ReturnStatement returnBodyExpr = null;
+      Expression bodyExpr = null;
+
       if (lambdaBody instanceof BlockStatement) {
          methodBody = (BlockStatement) lambdaBody.deepCopy(ISemanticNode.CopyNormal, null);
       }
@@ -186,9 +198,11 @@ public abstract class BaseLambdaExpression extends Expression {
             // The method is void and so does not return anything.  Just use <expr>
             methodBody.addStatementAt(0, ((Expression) lambdaBody).deepCopy(ISemanticNode.CopyNormal, null));
          }
-         else{
+         else {
+            bodyExpr = (Expression) lambdaBody.deepCopy(ISemanticNode.CopyNormal, null);
+            returnBodyExpr = ReturnStatement.create(bodyExpr);
             // Do the return <expr> ;
-            methodBody.addStatementAt(0, ReturnStatement.create(((Expression) lambdaBody).deepCopy(ISemanticNode.CopyNormal, null)));
+            methodBody.addStatementAt(0, returnBodyExpr);
          }
       }
       else {
@@ -200,6 +214,20 @@ public abstract class BaseLambdaExpression extends Expression {
       classBody.add(newMeth);
       newExpr.setProperty("classBody", classBody);
       newExpr.parentNode = parentNode;
+
+      // Weird case here - it's minBy(t -> t, naturalOrder()) in Agg.java of jool.  First param is a Function<T, R> - we know 'R' from the naturalOrder() return type
+      // but have no way to know T except that t -> t - basically could allow us to change the type of 't' to R by back-propagating the type.
+      // Should we go back and rewrite the type of the parameter 't'?   Based on IntelliJ's lack of knowledge of the type of 't' expedience of the fix, I'm inserting a cast
+      if (bodyExpr != null && bodyExpr instanceof IdentifierExpression) {
+         IdentifierExpression ibodyExpr = (IdentifierExpression) bodyExpr;
+         if (ibodyExpr.identifiers != null && ibodyExpr.identifiers.size() == 1 && ibodyExpr.arguments == null) {
+            Object bodyExprType = bodyExpr.getGenericType();
+            if (bodyExprType != null && !ModelUtil.isAssignableFrom(lambdaMethodReturnType, bodyExprType))
+               returnBodyExpr.setProperty("expression", CastExpression.create(
+                           JavaType.createFromParamType(lambdaMethodReturnType, typeCtx, null),
+                           returnBodyExpr.expression));
+         }
+      }
 
       // In the most general case, the type parameters for type of this expression are determined from the inferred return
       // type of the method.  That means searching through all return's and building up the common superclass.
@@ -234,7 +262,7 @@ public abstract class BaseLambdaExpression extends Expression {
             if (typeParam instanceof JavaType)
                typeParams.add((JavaType) ((JavaType) typeParam).deepCopy(ISemanticNode.CopyNormal, null));
             else if (typeParam instanceof WildcardType || typeParam instanceof ParameterizedType || typeParam instanceof ExtendsType.LowerBoundsTypeDeclaration) {
-               typeParams.add((JavaType.createFromParamType(typeParam, inferredType instanceof ITypeParamContext ? (ITypeParamContext) inferredType : null, null)));
+               typeParams.add((JavaType.createFromParamType(typeParam, typeCtx, null)));
             }
             else
                typeParams.add(ClassType.create(ModelUtil.getTypeName(typeParam)));
@@ -243,6 +271,7 @@ public abstract class BaseLambdaExpression extends Expression {
       }
 
       propagateInferredType(inferredType, paramReturnType);
+
    }
 
    void addTypeParameterMapping(Object ifaceMeth, Object ifaceMethType, Object newMethType) {
@@ -258,26 +287,36 @@ public abstract class BaseLambdaExpression extends Expression {
          Object methType = ModelUtil.getEnclosingType(ifaceMeth);
 
          if (!ModelUtil.sameTypes(paramType, methType)) {
-            // TODO: need to map type parameters from one type to the other...
-            //System.out.println("*** Unsupported type parameters case");
-            // We know that typeParamName is a type parameter for methType, but we need to convert to the type parameter for methType
+            // We know that typeParamName is a type parameter for methType, but we need to convert to the type parameter for paramType
             Object typeParamRes = ModelUtil.resolveTypeParameter(methType, paramType, ifaceMethType);
             typeParamName = ModelUtil.getTypeParameterName(typeParamRes);
          }
-         paramType.setTypeParameter(typeParamName, newMethType);
+
+         inferredTypeParamName = typeParamName;
+         inferredTypeParamType = newMethType;
+
+         updateInferredType(paramType);
       } else if (ifaceMethType instanceof ExtendsType) {
          System.out.println("*** Unknown extends reference");
       } else if (ModelUtil.isParameterizedType(ifaceMethType))
          System.out.println("*** Unknown parameterized type"); // TODO: do we need to do extraction and setting of type parameters here
    }
 
+   private void updateInferredType(Object inferredType) {
+      if (inferredTypeParamName != null && inferredType instanceof ParamTypeDeclaration && inferredTypeParamType != null) {
+         ParamTypeDeclaration paramType = (ParamTypeDeclaration) inferredType;
+
+         paramType.setTypeParameter(inferredTypeParamName, inferredTypeParamType);
+      }
+   }
+
    private void updateReturnTypeParameters(Object ifaceMeth, Object ifaceMethReturnType, Object newMethReturnType) {
       addTypeParameterMapping(ifaceMeth, ifaceMethReturnType, newMethReturnType);
    }
 
-   // Overridden in MethodReference
-   void updateMethodTypeParameters(Object ifaceMeth) {
-   }
+   // Overridden in MethodReference and LambdaExpression to add any type parameter mappings we get from the type
+   // information in the method's parameter types.
+   abstract void updateMethodTypeParameters(Object ifaceMeth);
 
    protected void propagateInferredType(Object type, Object methReturnType) {
       if (newExpr != null)
@@ -292,7 +331,7 @@ public abstract class BaseLambdaExpression extends Expression {
       Object[] params = ModelUtil.getGenericParameterTypes(meth, true);
       // One parameter special case for lambda's
       if (PString.isString(lambdaParams)) {
-         return params.length == 1;
+         return params != null && params.length == 1;
       }
       // Lambda sends in the list of names - the length only needs to match
       else if (lambdaParams instanceof SemanticNodeList) {
@@ -300,7 +339,9 @@ public abstract class BaseLambdaExpression extends Expression {
       }
       else if (lambdaParams instanceof Parameter) {
          Object[] paramTypes = ((Parameter) lambdaParams).getParameterTypes();
-         return ModelUtil.parametersMatch(paramTypes, params, false, sys); // TODO: should we allow unbound type parameters to match here
+         // Need to pass true here for SeqTest - Seq.unfold(0, (Integer i -> ...)   The lamda param there needs to match even though we do not have
+         // a parameter type.  Or should we be binding "U" because of the Integer i somehow?
+         return ModelUtil.parametersMatch(paramTypes, params, true, sys);
       }
       // () turns into null?
       else if (lambdaParams == null) {
@@ -331,7 +372,7 @@ public abstract class BaseLambdaExpression extends Expression {
 
    public void validate() {
       if (inferredType == null)
-         displayError("Unrecognized use of lambda expression: ");
+         displayError("No inferredType for lambda expression: ");
       if (needsStart) {
          needsStart = false;
          super.start();
@@ -368,8 +409,8 @@ public abstract class BaseLambdaExpression extends Expression {
             resMethTypes[i] = methTypes[i];
             if (resMethTypes[i] instanceof ExtendsType.LowerBoundsTypeDeclaration)
                resMethTypes[i] = ((ExtendsType.LowerBoundsTypeDeclaration) resMethTypes[i]).getBaseType();
-            if (ModelUtil.isTypeVariable(resMethTypes[i]))
-               resMethTypes[i] = ModelUtil.getTypeParameterDefault(resMethTypes[i]);
+            //if (ModelUtil.isTypeVariable(resMethTypes[i]))
+            //   resMethTypes[i] = ModelUtil.getTypeParameterDefault(resMethTypes[i]);
          }
       }
       return Parameter.create(resMethTypes, names.toArray(new String[names.size()]), ctx, definedInType);
@@ -423,10 +464,21 @@ public abstract class BaseLambdaExpression extends Expression {
       newExpr.transformBinding(runtime);
    }
 
-   public void setInferredType(Object parentType) {
+   public boolean setInferredType(Object parentType) {
       // Convert between the ParameterizedType and ParamTypeDeclaration
       if (parentType instanceof ParameterizedType)
          parentType = ModelUtil.getTypeDeclFromType(parentType, parentType, false, getLayeredSystem(), false, getEnclosingType());
+
+      if (inferredType != null) {
+         if (ModelUtil.isAssignableFrom(parentType, inferredType)) {
+            needsStart = true;
+            newExpr = null;
+         }
+         else {
+            // Need to set the type parameters we set while building the new expression if we are not going to rebuild it
+            updateInferredType(parentType);
+         }
+      }
       inferredType = parentType;
       if (needsStart) {
          needsStart = false;
@@ -434,6 +486,9 @@ public abstract class BaseLambdaExpression extends Expression {
             initNewExpression();
          super.start();
       }
+
+      // Did we modify type parameters in the inferredType?
+      return inferredTypeParamName != null;
    }
 
    public BaseLambdaExpression deepCopy(int options, IdentityHashMap<Object, Object> oldNewMap) {
@@ -519,7 +574,7 @@ public abstract class BaseLambdaExpression extends Expression {
       }
 
       @Override
-      public Object definesMethod(String name, List<?> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType) {
+      public Object definesMethod(String name, List<?> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
          return null;
       }
 

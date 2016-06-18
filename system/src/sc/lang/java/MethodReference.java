@@ -104,10 +104,68 @@ public class MethodReference extends BaseLambdaExpression {
                resTypes[i] = ModelUtil.getTypeParameterDefault(resTypes[i]);
          }
       }
-      Parameter res = Parameter.create(resTypes,ModelUtil.getParameterNames(methObj), ctx, null);
+      Parameter res = Parameter.create(resTypes,ModelUtil.getParameterNames(methObj), ctx, getEnclosingType());
       if (res != null)
          res.parentNode = this;
       return res;
+   }
+
+   boolean isValidInferredTypeMethod(Object ifmeth) {
+      Object refType = getReferencedType();
+
+      if (refType == null)
+         return false;
+
+      Object[] meths;
+      boolean isConstructor = false;
+      if (methodName.equals("new")) {
+         meths = ModelUtil.getConstructors(refType, getEnclosingType());
+         isConstructor = true;
+      }
+      else {
+         meths = ModelUtil.getMethods(refType, methodName, null);
+      }
+      if (meths == null || meths.length == 0) {
+         // TODO: do we need to check if there's a valid constructor here?
+         if (methodName.equals("new")) {
+            return true;
+         }
+         return false;
+      }
+      Object[] paramTypes = ModelUtil.getParameterTypes(ifmeth, true);
+      Object returnType = ModelUtil.getReturnType(ifmeth, true);
+      LayeredSystem sys = getLayeredSystem();
+      // Find the method in the list which matches the type parameters of the inferred type method
+      // First pass is to look for a method where all of the parameters match each other
+      for (Object meth:meths) {
+         Object methReturnType = ModelUtil.getReturnType(meth, true);
+         // Need to skip void methods here.  They will be assignable from a type parameter but here we know returnType is a real value (I think)
+         if (!isConstructor && ModelUtil.typeIsVoid(returnType) != ModelUtil.typeIsVoid(methReturnType))
+            continue;
+         if (ModelUtil.parametersMatch(ModelUtil.getParameterTypes(meth, true), paramTypes, true, sys) && (isConstructor || ModelUtil.isAssignableFrom(returnType, methReturnType, sys))) {
+            return true;
+         }
+      }
+      // Second case is used when the first parameter
+      if (paramTypes != null && paramTypes.length > 0) {
+         int newLen = paramTypes.length-1;
+         Object[] nextParamTypes = new Object[newLen];
+         System.arraycopy(paramTypes, 1, nextParamTypes, 0, newLen);
+         for (Object meth:meths) {
+            Object methReturnType = ModelUtil.getReturnType(meth, true);
+
+            //if (!ModelUtil.isAssignableFrom(paramTypes[0], methReturnType))
+            //   continue;
+
+            if (!ModelUtil.isAssignableFrom(refType, paramTypes[0], false, null, true, sys))
+               continue;
+            Object[] refParamTypes = ModelUtil.getParameterTypes(meth, true);
+            if (ModelUtil.parametersMatch(refParamTypes, nextParamTypes, true, sys)) {
+               return true;
+            }
+         }
+      }
+      return false;
    }
 
    void initReferenceMethod() {
@@ -118,8 +176,10 @@ public class MethodReference extends BaseLambdaExpression {
       }
 
       Object[] meths;
+      boolean isConstructor = false;
       if (methodName.equals("new")) {
          meths = ModelUtil.getConstructors(refType, getEnclosingType());
+         isConstructor = true;
       }
       else {
          meths = ModelUtil.getMethods(refType, methodName, null);
@@ -144,7 +204,10 @@ public class MethodReference extends BaseLambdaExpression {
          // Find the method in the list which matches the type parameters of the inferred type method
          // First pass is to look for a method where all of the parameters match each other
          for (Object meth:meths) {
-            if (ModelUtil.parametersMatch(ModelUtil.getParameterTypes(meth, true), paramTypes, true, sys) && ModelUtil.isAssignableFrom(returnType, ModelUtil.getReturnType(meth, true), sys)) {
+            Object methReturnType = ModelUtil.getReturnType(meth, true);
+            if (!isConstructor && ModelUtil.typeIsVoid(methReturnType) != ModelUtil.typeIsVoid(returnType))
+               continue;
+            if (ModelUtil.parametersMatch(ModelUtil.getParameterTypes(meth, true), paramTypes, true, sys) && (isConstructor || ModelUtil.isAssignableFrom(returnType, methReturnType, sys))) {
                if (res == null)
                   res = meth;
                else
@@ -293,5 +356,11 @@ public class MethodReference extends BaseLambdaExpression {
             }
          }
       }
+   }
+
+   public boolean referenceMethodMatches(Object type, Object ifaceMeth) {
+      if (!isValidInferredTypeMethod(ifaceMeth))
+         return false;
+      return true;
    }
 }

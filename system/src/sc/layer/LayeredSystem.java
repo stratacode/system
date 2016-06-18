@@ -143,7 +143,8 @@ import java.util.zip.ZipFile;
  * <p/>
  * -vl - show the initial layers as in verbose
  */
-public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSystem {
+public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSystem, IClassResolver {
+
    {
       setCurrent(this);
    }
@@ -174,6 +175,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public Map<String,Layer> layerFileIndex = new HashMap<String,Layer>(); // <layer-pkg> + layerName
    public Map<String,Layer> layerPathIndex = new HashMap<String,Layer>(); // layer-group name
    public String layerPath;
+   public List<File> layerPathDirs;
    public String rootClassPath; /* The classpath passed to the layered system constructor - usually the system */
    public String classPath;  /* The complete external class path, used for javac, not for looking up internal classes */
    public String userClassPath;  /* The part of the above which is user specified - i.e. to be used for scripts */
@@ -228,6 +230,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public String url; // The system URL
 
+   /** If set, specifies the -source option to the javac compiler */
+   public String javaSrcVersion;
+
    /** The list of runtimes required to execute this stack of layers (e.g. javascript and java).  If java is in the list, it will be the first one and represented by a "null" entry. */
    public static ArrayList<IRuntimeProcessor> runtimes;
 
@@ -265,7 +270,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public boolean useCanonicalPaths = false;
 
    private Set<String> changedDirectoryIndex = new HashSet<String>();
-   private List<File> layerPathDirs;
    private Map<String,Object> otherClassCache; // Only used for CFClass - when crossCompile is true
    private Map<String,Class> compiledClassCache = new HashMap<String,Class>(); // Class
    {
@@ -340,6 +344,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    boolean startingTypeIndexLayers = false;
 
    boolean batchingModelUpdates = false;
+
+   /** When restoring serialized layered components, we need to lookup a thread-local layered system and be able to know we are doing layerResolves - to swap the name space to that of the layer. */
+   public boolean layerResolveContext = false;
 
    private void clearReverseTypeIndex() {
       typeIndex.clearReverseTypeIndex();
@@ -805,7 +812,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return false;
    }
 
-
    public enum BuildCommandTypes {
       Pre, Post, Run, Test
    }
@@ -850,6 +856,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       globalLayerImports.put("BuildPhase", ImportDeclaration.create("sc.layer.BuildPhase"));
       globalLayerImports.put("CodeType", ImportDeclaration.create("sc.layer.CodeType"));
       globalLayerImports.put("CodeFunction", ImportDeclaration.create("sc.layer.CodeFunction"));
+      globalLayerImports.put("Sync", ImportDeclaration.create("sc.obj.Sync"));
+      globalLayerImports.put("SyncMode", ImportDeclaration.create("sc.obj.SyncMode"));
    }
 
    // The globally scoped objects which have been defined.
@@ -890,7 +898,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public String newLayerDir = null; // Directory for creating new layers
 
-   public String mainLayerDir = null; // Directory containing .stratacode dir be using by this stack - this is the last .stratacode dir found in the layer path.
+   /** Set to true when we have identified the real StrataCode directory structure (as opposed to the older looser collection of layers) */
+   boolean isStrataCodeDir = false;
+   public String strataCodeMainDir = null; // Directory containing .stratacode dir.  It's either the StrataCode install dir or a layer dir if you are running a layer not in the context of the install dir.
+
+   public String strataCodeInstallDir = null; // Configured to point to the install directory for StrataCode so we can find sc.jar and scrt-core-src.jar and files like that more easily
 
    /** Set to "layers" or "../layers" when we are running in the StrataCode main/bin directories.  In this case we look for and by default install the layers folder next to the bin directory  */
    public String layersFilePathPrefix = null;
@@ -1001,24 +1013,45 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public TreeSet<String> overrideFinalPackages = new TreeSet<String>();
 
+   /** The current project directory */
    public String getStrataCodeDir(String dirName) {
-      String dir = mainLayerDir;
+      String dir = strataCodeMainDir;
       if (dir == null) {
          dir = System.getProperty("user.dir");
       }
-      return FileUtil.concat(dir, SC_DIR, dirName);
+      return FileUtil.concat(dir, dirName);
    }
 
-   public LayeredSystem(String lastLayerName, List<String> initLayerNames, List<String> explicitDynLayers, String layerPathNames, String rootClassPath, Options options, IProcessDefinition useProcessDefinition, LayeredSystem parentSystem, boolean startInterpreter, IExternalModelIndex extModelIndex) {
+   /** Use this when your preference is to share the directory among projects */
+   public String getStrataCodeHomeDir(String dirName) {
+      String homeDir = System.getProperty("user.home");
+      if (homeDir != null)
+         return FileUtil.concat(homeDir, SC_DIR, dirName);
+      return getStrataCodeDir(dirName);
+   }
+
+   public String getStrataCodeConfDir(String dirName) {
+      return getStrataCodeDir(FileUtil.concat("conf", dirName));
+   }
+
+   public LayeredSystem(String lastLayerName, List<String> initLayerNames, List<String> explicitDynLayers, String layerPathNames, String rootClassPath, Options options, IProcessDefinition useProcessDefinition, LayeredSystem parentSystem, boolean startInterpreter, IExternalModelIndex extModelIndex, String mainDir, String scInstallDir) {
       this.systemPtr = new LayerUtil.LayeredSystemPtr(this);
       this.options = options;
       this.peerMode = parentSystem != null;
       this.externalModelIndex = extModelIndex;
       this.systemInstalled = !options.installLayers;
+      this.strataCodeInstallDir = scInstallDir;
 
       if (!peerMode) {
          disabledLayersIndex = new HashMap<String, Layer>();
          disabledLayers = new ArrayList<Layer>();
+
+         if (mainDir != null) {
+            strataCodeMainDir = mainDir;
+            isStrataCodeDir = true;
+            if (options.verbose)
+               verbose("StrataCode initialized with main directory: " + mainDir + " install directory: " + this.strataCodeInstallDir);
+         }
 
          disabledRuntimes = options.disabledRuntimes;
          if (disabledRuntimes == null) {
@@ -1027,8 +1060,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          else if (options.verbose)
             verbose("Disable runtimes: " + disabledRuntimes);
       }
-      else
+      else {
          disabledRuntimes = parentSystem.disabledRuntimes;
+         strataCodeMainDir = parentSystem.strataCodeMainDir;
+         isStrataCodeDir = parentSystem.isStrataCodeDir;
+      }
 
       IRuntimeProcessor useRuntimeProcessor = useProcessDefinition == null ? null : useProcessDefinition.getRuntimeProcessor();
 
@@ -1054,6 +1090,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       JSLanguage.INSTANCE.initialize();
 
       layerPath = layerPathNames;
+
       initLayerPath();
 
       // Sets the coreBuildLayer - used for storing dynamic stubs needed for the layer init process
@@ -1083,11 +1120,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          else
             newLayerDir = mapLayerDirName(".");
       }
-      if (mainLayerDir == null)
-         mainLayerDir = newLayerDir;
+      // We could not find the real StrataCode install dir but we could find a layer so use that
+      if (strataCodeMainDir == null)
+         strataCodeMainDir = newLayerDir;
 
       if (!peerMode) {
-         String scSourceConfig = getStrataCodeDir(SC_SOURCE_PATH);
+         String scSourceConfig = getStrataCodeConfDir(SC_SOURCE_PATH);
          if (new File(scSourceConfig).canRead()) {
             scSourcePath = FileUtil.getFileAsString(scSourceConfig);
             if (scSourcePath != null) {
@@ -1118,10 +1156,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (!peerMode)
-         this.repositorySystem = new RepositorySystem(new RepositoryStore(getStrataCodeDir("pkgs")), messageHandler, options.verbose, options.reinstall, options.update, options.installExisting);
+         this.repositorySystem = new RepositorySystem(new RepositoryStore(getStrataCodeHomeDir("pkgs")), messageHandler, this, options.verbose, options.reinstall, options.update, options.installExisting);
       else {
          messageHandler = parentSystem.messageHandler;
-         this.repositorySystem = new RepositorySystem(parentSystem.repositorySystem.store, messageHandler, options.verbose, options.reinstall, options.update, options.installExisting);
+         this.repositorySystem = new RepositorySystem(parentSystem.repositorySystem.store, messageHandler, this, options.verbose, options.reinstall, options.update, options.installExisting);
       }
 
       if (initLayerNames != null) {
@@ -1224,9 +1262,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // Create a new LayeredSystem for each additional runtime we need to satisfy the active set of layers.
       // Then purge any layers from this LayeredSystem which should not be here.
       if (processes != null && processes.size() > 1 && (peerSystems == null || peerSystems.size() < processes.size() - 1)) {
-         // We want all of the layered systems to use the same buildDir so pass it through options as though you had used the -d option.  Of course if you use -d, it will happen automatically.
+         // We want all of the layered systems to use the same buildDir so pass it through options as though you had used the -da option.  Of course if you use -d, it will happen automatically.
          if (options.buildDir == null) {
-            if (lastLayer != null && !lastLayer.buildSeparate)
+            if (lastLayer != null && !lastLayer.buildSeparate && options.buildLayerAbsDir == null)
                options.buildLayerAbsDir = lastLayer.getDefaultBuildDir();
          }
 
@@ -1255,7 +1293,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
                // Since we may have added layers, for each process see if those layers also need to go into the peer.
                if (processPeer != null) {
-                  updateSystemLayers(processPeer);
+                  String runtimeName = processPeer.getRuntimeName();
+                  if (!isRuntimeDisabled(runtimeName) && (!active || isRuntimeActivated(runtimeName)))
+                     updateSystemLayers(processPeer);
                   continue;
                }
             }
@@ -1344,7 +1384,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // When you run in the layer directory, the other runtime defines the root layer dir which we need as the layer path here since we specify all of the layers using absolute paths
       if (peerLayerPath == null && newLayerDir != null)
          peerLayerPath = newLayerDir;
-      LayeredSystem peerSys = new LayeredSystem(null, procLayerNames, explicitDynLayers, peerLayerPath, rootClassPath, options, proc, this, false, externalModelIndex);
+      LayeredSystem peerSys = new LayeredSystem(null, procLayerNames, explicitDynLayers, peerLayerPath, rootClassPath, options, proc, this, false, externalModelIndex, strataCodeMainDir, strataCodeInstallDir);
 
       // The LayeredSystem needs at least the main layered system in its peer list to initialize the layers.  We'll reset this later to include all of the layeredSystems.
       if (peerSys.peerSystems == null) {
@@ -1516,7 +1556,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
 
          if (input.trim().length() > 0) {
-            mainLayerDir = newLayerDir = input;
+            strataCodeMainDir = newLayerDir = input;
 
             if (isValidLayersDir(newLayerDir)) {
                systemInstalled = true;
@@ -1790,6 +1830,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          ProcessDefinition proc = procName == null ? new ProcessDefinition() : ProcessDefinition.readProcessDefinition(this, runtimeName, procName);
          if (proc != null) {
             proc.runtimeProcessor = getOrRestoreRuntime(runtimeName);
+            if (proc.runtimeProcessor == null && !runtimeName.equals(IRuntimeProcessor.DEFAULT_RUNTIME_NAME)) {
+               error("Error - unable to restore cached definition of runtime: " + runtimeName);
+               return INVALID_PROCESS_SENTINEL;
+            }
             initProcessesList(proc);
             processes.add(proc);
          }
@@ -1802,8 +1846,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       IRuntimeProcessor proc = getRuntime(name);
       if (proc == null) {
          proc = DefaultRuntimeProcessor.readRuntimeProcessor(this, name);
-         if (proc != null)
+         if (proc != null) {
+            if (runtimes == null) {
+               runtimes = new ArrayList<IRuntimeProcessor>();
+               if (javaIsAlwaysDefaultRuntime)
+                  addRuntime(null, null);
+            }
             runtimes.add(proc);
+         }
       }
       return proc;
    }
@@ -1995,6 +2045,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
             */
             buildDir = buildLayer.buildDir;
+            if (repositorySystem != null) {
+               repositorySystem.pkgIndexRoot = FileUtil.concat(buildDir, "pkgIndex");
+            }
 
             // Only set the first time
             if (commonBuildDir == null) {
@@ -2061,7 +2114,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private class RuntimeRootInfo {
       String zipFileName;
       String buildDirName;
-      boolean buildSubDir;
    }
 
    public String getStrataCodeRuntimePath(boolean core, boolean src) {
@@ -2081,6 +2133,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                return FileUtil.concat(sysRoot, core ? "coreRuntime" : "fullRuntime", !isIDEBuildLayer(info.buildDirName) ? "build" : null);
          }
       }
+
       if (scSourcePath != null) {
          String scRuntimePath = FileUtil.concat(scSourcePath, core ? "coreRuntime": "fullRuntime", "src");
          File f = new File(scRuntimePath);
@@ -2089,7 +2142,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          else
             return scRuntimePath;
       }
-      return "Error - sourcePath is not set in layers/.stratacode/scSourcePath";
+      return "Error - sourcePath is not set in: " + getStrataCodeConfDir(SC_SOURCE_PATH);
    }
 
    private static String getSystemBuildLayer(String buildDirName) {
@@ -2120,6 +2173,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return rootInfo;
       }
       boolean warned = false;
+
+      if (strataCodeInstallDir != null) {
+         String mainJarFile = FileUtil.concat(strataCodeInstallDir, STRATACODE_LIBRARIES_FILE);
+         if (!new File(mainJarFile).canRead()) {
+            error("Install directory: " + strataCodeInstallDir + " missing main jar file: " + mainJarFile);
+         }
+         rootInfo.zipFileName = mainJarFile;
+         return rootInfo;
+      }
+      /** We were not configured with an install dir so look to find sc.jar in the class index and create it from that */
       for (int i = 0; i < runtimePackages.length; i++) {
          String pkg = runtimePackages[i];
          pkg = FileUtil.unnormalize(pkg);
@@ -2205,7 +2268,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          String zipDirName = FileUtil.getParentPath(info.zipFileName);
 
          // We're only supposed to copy the runtime part.  Assume that scrt.jar is right next to sc.jar
-         if (FileUtil.getFileName(info.zipFileName).equals("sc.jar")) {
+         if (FileUtil.getFileName(info.zipFileName).equals(STRATACODE_LIBRARIES_FILE)) {
             info.zipFileName = FileUtil.concat(zipDirName, "scrt.jar");
          }
 
@@ -2389,7 +2452,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       // Used to only do this for the final build layer or build ssparate.  But if there's a final layer in there
       // we can load the classes as soon as we've finished building it
-      //if (mode.doLibs() || sysLayer.buildSeparate || sysLayer == buildLayer) {
       if (mode.doLibs() || sysLayer.isBuildLayer()) {
          if (sysLayer != null) {
 
@@ -2428,16 +2490,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             buildClassLoader = getClass().getClassLoader();
             Thread.currentThread().setContextClassLoader(buildClassLoader);
          }
-
-         /*
-         try {
-            buildClassLoader = new URLClassLoader(new URL[] { buildDirFile.toURL() }, getClass().getClassLoader());
-
-         }
-         catch (MalformedURLException exc) {
-            System.err.println("*** Unable to create build class loader" + exc);
-         }
-         */
 
          if (updateSystemClassLoader) {
             // Once we've finished compiling, we can add the buildDir to the classpath.  At this point we also
@@ -2576,18 +2628,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
 
             if (refLayer == null || !refLayer.activated || refLayer == Layer.ANY_INACTIVE_LAYER) {
-               typeIndex.addMatchingGlobalNames(prefix, candidates, retFullTypeName);
+               typeIndex.addMatchingGlobalNames(prefix, candidates, retFullTypeName, refLayer);
 
                if (!peerMode && peerSystems != null) {
                   for (int i = 0; i < peerSystems.size(); i++) {
                      LayeredSystem peerSys = peerSystems.get(i);
-                     peerSys.findMatchingGlobalNames(null, null, prefix, prefixPkg, prefixBaseName, candidates, retFullTypeName, srcOnly);
+                     Layer peerRefLayer = refLayer == null ? null : refLayer.layeredSystem == peerSys ? refLayer : peerSys.getPeerLayerFromRemote(refLayer);
+                     if (peerRefLayer != null || refLayer == null)
+                        peerSys.findMatchingGlobalNames(null, peerRefLayer, prefix, prefixPkg, prefixBaseName, candidates, retFullTypeName, srcOnly);
                   }
                }
                if (typeIndexProcessMap != null) {
                   for (Map.Entry<String,SysTypeIndex> typeIndexEntry:typeIndexProcessMap.entrySet()) {
                      SysTypeIndex idx = typeIndexEntry.getValue();
-                     idx.addMatchingGlobalNames(prefix, candidates, retFullTypeName);
+                     idx.addMatchingGlobalNames(prefix, candidates, retFullTypeName, refLayer);
                   }
                }
             }
@@ -3063,6 +3117,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       @Constant public boolean retryAfterFailedBuild = false;
 
+      /** Directly containing layerBundle directories.  Each directory in the bundleDir is added to the initial layerPath */
+      @Constant public String bundleDir = "./bundles";
+
       @Constant String testPattern = null;
 
       /** Argument to control what happens after the command is run, e.g. it can specify the URL of the page to open. */
@@ -3118,7 +3175,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       @Constant public boolean update;
    }
 
-   @MainSettings(produceJar = true, produceScript = true, produceBAT = true, execName = "bin/scc", debug = false, maxMemory = 1024, defaultArgs = "-restartArgsFile <%= getTempDir(\"restart\", \"tmp\") %>")
+   @MainSettings(produceJar = true, produceScript = true, produceBAT = true, execName = "bin/scc", jarFileName="bin/sc.jar", debug = false, maxMemory = 1280, defaultArgs = "-restartArgsFile <%= getTempDir(\"restart\", \"tmp\") %>")
    public static void main(String[] args) {
       String buildLayerName = null;
       List<String> includeLayers = null;
@@ -3134,6 +3191,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       ArrayList<String> restartArgs = new ArrayList<String>();
       int lastRestartArg = -1;
       ArrayList<String> recursiveDynLayers = null;
+      String scInstallDir = null;
 
       for (int i = 0; i < args.length; i++) {
          restartArg = true;
@@ -3207,6 +3265,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                case 'i':
                   if (opt.equals("ie"))
                      options.installExisting = true;
+                  else if (opt.equals("id")) {
+                     if (args.length < i + 1)
+                        usage("Missing arg to install directory (-id) option", args);
+                     scInstallDir = args[++i];
+                  }
                   else {
                      startInterpreter = true;
                      editLayer = false;
@@ -3499,7 +3562,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             usage("The -dyn option was provided without a list of layers.  The -dyn option should be in front of the list of layer names you want to make dynamic.", args);
          }
 
-         sys = new LayeredSystem(buildLayerName, includeLayers, recursiveDynLayers, layerPath, classPath, options, null, null, startInterpreter, null);
+         sys = new LayeredSystem(buildLayerName, includeLayers, recursiveDynLayers, layerPath, classPath, options, null, null, startInterpreter, null, null, scInstallDir);
          if (defaultLayeredSystem == null)
             defaultLayeredSystem = sys;
          currentLayeredSystem.set(sys.systemPtr);
@@ -3626,8 +3689,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                sys.cmd.readParseLoop();
          }
 
-         // Run any unit tests before starting the program
+         boolean haveReset = false;
+
          if (options.testPattern != null) {
+            if (!haveReset)
+               sys.resetClassLoader();
             // First run the unit tests which match (i.e. those installed with the @Test annotation)
             Thread.currentThread().setContextClassLoader(sys.getSysClassLoader());
             sys.buildInfo.runMatchingTests(options.testPattern);
@@ -3651,7 +3717,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // tomcat's connection pool implementation will load a jdbc driver that is in a subsequent layer's classpath.
             // TODO should we have some way for layers to turn this on or off?  Most SC frameworks do not do this injected class
             // dependency thing and work fine without the rest.  It means we hav eto reload all classes.
-            sys.resetClassLoader();
+            if (!haveReset)
+               sys.resetClassLoader();
+            haveReset = true;
             if (commandThread != null)
                commandThread.setContextClassLoader(sys.getSysClassLoader());
 
@@ -3665,7 +3733,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
 
          if (options.verbose) {
-            sys.verbose("Run completed in: " + StringUtil.formatFloat((System.currentTimeMillis() - sys.sysStartTime)/1000.0));
+            sys.verbose("Run completed in: " + StringUtil.formatFloat((System.currentTimeMillis() - sys.sysStartTime)/1000.0) + " at: " + new Date().toString());
          }
 
       }
@@ -4298,48 +4366,49 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return result.toArray(new String[result.size()]);
    }
 
-   void runMainMethod(String runClass, String[] runClassArgs, int lowestLayer) {
+   String runMainMethod(String runClass, String[] runClassArgs, int lowestLayer) {
       Object type = getRuntimeTypeDeclaration(runClass);
       if (lowestLayer != -1) {
          if (type instanceof TypeDeclaration) {
             Layer typeLayer = ((TypeDeclaration) type).getLayer();
             // Already ran this one before
             if (typeLayer.layerPosition <= lowestLayer)
-               return;
+               return null;
          }
          else
-            return;
+            return null;
       }
-      runMainMethod(type, runClass, runClassArgs);
+      return runMainMethod(type, runClass, runClassArgs);
    }
 
-   void runMainMethod(String runClass, String[] runClassArgs, List<Layer> theLayers) {
+   String runMainMethod(String runClass, String[] runClassArgs, List<Layer> theLayers) {
       Object type = getRuntimeTypeDeclaration(runClass);
       if (theLayers != null) {
          if (type instanceof TypeDeclaration) {
             Layer typeLayer = ((TypeDeclaration) type).getLayer();
             // Already ran this one before or the layer is not part of the current layers
             if (!theLayers.contains(typeLayer) || !typeLayer.activated)
-               return;
+               return null;
          }
          else
-            return;
+            return null;
       }
-      runMainMethod(type, runClass, runClassArgs);
+      return runMainMethod(type, runClass, runClassArgs);
    }
 
    static private Class MAIN_ARG = sc.type.Type.get(String.class).getArrayClass(String.class, 1);
 
-   void runMainMethod(Object type, String runClass, String[] runClassArgs) {
+   String runMainMethod(Object type, String runClass, String[] runClassArgs) {
       if (runtimeProcessor != null) {
-         runtimeProcessor.runMainMethod(type, runClass, runClassArgs);
-         return;
+         return runtimeProcessor.runMainMethod(type, runClass, runClassArgs);
       }
       Object[] args = new Object[] {processCommandArgs(runClassArgs)};
       if (type != null && ModelUtil.isDynamicType(type)) {
          Object meth = ModelUtil.getMethod(this, type, "main", null, null, null, false, MAIN_ARG);
+         if (meth == null)
+            return "No method named: 'main' on type: " + ModelUtil.getTypeName(type);
          if (!ModelUtil.hasModifier(meth, "static"))
-            System.err.println("*** Main method missing 'static' modifier: " + runClass);
+            return "Main method missing 'static' modifier: " + runClass;
          else {
             if (options.info)
                System.out.println("Running dynamic: " + runClass);
@@ -4352,20 +4421,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       else {
          Object rc = getCompiledClass(runClass);
          if (rc == null) {
-            System.err.println("*** Can't find main class to run: " + runClass);
-            return;
+            return "No main class to run: " + runClass;
          }
          Class rcClass = (Class) rc;
          Method meth = RTypeUtil.getMethod(rcClass, "main", MAIN_ARG);
          if (!PTypeUtil.hasModifier(meth, "static"))
-            System.err.println("*** Main method missing 'static' modifier: " + runClass);
+            return "Main method missing 'static' modifier: " + runClass;
          else {
             if (options.info)
-               System.out.println("Running compiled: " + runClass);
+               System.out.println("Running compiled main for class: " + runClass);
             runClassStarted = true;
             TypeUtil.invokeMethod(null, meth, args);
          }
       }
+      return null;
    }
 
    void runScript(String execName, String[] execArgs) {
@@ -5153,13 +5222,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    private Layer findLayerInPath(String layerPathName, String relDir, String relPath, boolean markDynamic, LayerParamInfo lpi) {
       // defaults to using paths relative to the current directory
-      if (layerPathDirs == null || relDir != null)
-         return findLayer(relDir == null ? "." : relDir, layerPathName, relDir, relPath, markDynamic, lpi);
+      if (layerPathDirs == null || relDir != null) {
+         Layer res = findLayer(relDir == null ? "." : relDir, layerPathName, relDir, relPath, markDynamic, lpi);
+         if (res != null)
+            return res;
+      }
 
-      for (File pathDir:layerPathDirs) {
-         Layer l = findLayer(pathDir.getPath(), layerPathName, null, relPath, markDynamic, lpi);
-         if (l != null)
-            return l;
+      if (layerPathDirs != null) {
+         for (File pathDir : layerPathDirs) {
+            Layer l = findLayer(pathDir.getPath(), layerPathName, null, relPath, markDynamic, lpi);
+            if (l != null)
+               return l;
+         }
       }
       return null;
    }
@@ -5244,9 +5318,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             layerPathPrefix = null;
          }
          else {
+            return null;
+            /*
             layerTypeName = FileUtil.getFileName(layerFileName);
             layerPathPrefix = null;
             layerGroup = "";
+            */
          }
          inLayerDir = true;
       }
@@ -5324,7 +5401,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
          // Parse the model, validate it defines an instance of a Layer
          Layer newLayer = (Layer) loadLayerObject(defSrcEnt, Layer.class, layerTypeName, layerPrefix, relDir, layerPathPrefix, inLayerDir, markDynamic, layerPathName, lpi);
-
          // No matter what, get it out since the name name have changed or maybe we did not look it up.
          pendingLayers.remove(layerTypeName);
 
@@ -5748,6 +5824,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return sb.toString();
    }
 
+   /** TODO: can we remove this and instead rely on the stricter StrataCode directory organization (in initStratCodeDir0 for identifying a layer directory? */
    public boolean isValidLayersDir(String dirName) {
       String layerPathFileName = FileUtil.concat(dirName, SC_DIR, LAYER_PATH_FILE);
       File layerPathFile = new File(layerPathFileName);
@@ -5781,11 +5858,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       else {
          String scDirName = FileUtil.concat(dirName, SC_DIR);
          // TODO: picking the last directory in the layer path because right now that's how IntelliJ orders them and it seems
-         // like a potentially 'too powerful' idea to let someone replace a layer in a subsequent layer path, for the same reasons Java makes it so hard to replace a class
+         // like a potentially 'too powerful' idea to let someone to modify a layer in an upstream path entry.
          // You can just replace the types to fix the layer if you need to in an incremental way.
          // Down the road we could reverse this decision to make it consistent.
-         if (new File(scDirName).isDirectory()) {
-            mainLayerDir = dirName;
+         if (!isStrataCodeDir && new File(scDirName).isDirectory()) {
+            strataCodeMainDir = dirName;
          }
          String layerPathFileName = FileUtil.concat(dirName, SC_DIR, LAYER_PATH_FILE);
          File layerPathFile = new File(layerPathFileName);
@@ -5827,104 +5904,147 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          systemInstalled = true;
 
          String [] dirNames = layerPath.split(FileUtil.PATH_SEPARATOR);
-         List dirNameList = Arrays.asList(dirNames);
          layerPathDirs = new ArrayList<File>(dirNames.length);
          for (String d:dirNames) {
             addLayerPathDir(d);
          }
+
+         if (!peerMode)
+            verbose("Using explicit layer path: " + layerPath);
       }
       else {
-         String layerPathFileName = FileUtil.concat(".", SC_DIR, LAYER_PATH_FILE);
-         File layerPathFile = new File(layerPathFileName);
-         if (layerPathFile.canRead()) {
-            systemInstalled = true;
-         }
+         String currentDir = System.getProperty("user.dir");
+         if (initStrataCodeDir(currentDir))
+            return;
          else {
-            layerPathFileName = FileUtil.concat("layers", SC_DIR, LAYER_PATH_FILE);
-            layerPathFile = new File(layerPathFileName);
-            // This is the case where have installed into the StrataCode dist directory
-            if (layerPathFile.canRead()) {
+            if (isValidLayersDir(".")) {
                systemInstalled = true;
-               if (layerPath == null) {
-                  String currentDir = System.getProperty("user.dir");
-                  mainLayerDir = newLayerDir = FileUtil.concat(currentDir, "layers");
-                  layerPath = newLayerDir;
-                  layerPathDirs = new ArrayList<File>();
-                  layerPathDirs.add(new File(layerPath));
-               }
             }
-            else {
-               String currentDir = System.getProperty("user.dir");
-               if (currentDir != null) {
-                  // If we are in the bin directory, check for the layers up and over one level
-                  if (FileUtil.getFileName(currentDir).equals("bin")) {
-                     layerPathFileName = FileUtil.concat("..", "layers", ".layerPath");
-                     layerPathFile = new File(layerPathFileName);
-                     if (layerPathFile.canRead()) {
-                        systemInstalled = true;
-                        if (layerPath == null) {
-                           // newLayerDir needs to be absolute
-                           String newDir = getLayersDirFromBinDir();
-                           if (newDir != null) {
-                              mainLayerDir = newLayerDir = newDir;
-                              layerPath = newLayerDir;
+            else if (currentDir != null) {
+               // If we are in the bin directory, check for the layers up and over one level
+               if (FileUtil.getFileName(currentDir).equals("bin") && initStrataCodeDir(FileUtil.getParentPath(currentDir))) {
+                  return;
+               }
+               else {
+                  // Are we running from a StrataCodeDir that does not yet have layers or bundles?
+                  File currentFile = new File(currentDir);
+                  String parentName;
+                  File binDir = new File(currentFile, "bin");
+                  if (binDir.isDirectory()) {
+                     File scJarFile = new File(binDir, STRATACODE_LIBRARIES_FILE);
+                     // When running from the StrataCode dist directory, we put the results in 'layers' mostly because
+                     // git needs an empty directory to start from.
+                     if (scJarFile.canRead()) {
+                        layersFilePathPrefix = "layers";
+                     }
+                  }
+                  else {
+                     // Perhaps running from the bin directory of a StrataCode install dir without layers
+                     String parentDir = FileUtil.getParentPath(currentDir);
+                     if (parentDir != null) {
+                        binDir = new File(parentDir, "bin");
+                        if (binDir.isDirectory()) {
+                           File scJarFile = new File(binDir, STRATACODE_LIBRARIES_FILE);
+                           if (scJarFile.canRead()) {
+                              layersFilePathPrefix = ".." + FileUtil.FILE_SEPARATOR + "layers";
+                           }
+                        }
+                     }
+                  }
+
+                  do {
+                     parentName = currentFile.getParent();
+                     if (parentName != null) {
+                        if (initStrataCodeDir(parentName))
+                           return;
+
+                        File layerPathFile = new File(FileUtil.concat(parentName, SC_DIR));
+                        // There's a .stratacode here - it's a layer bundle - either layers or inside of bundles?
+                        if (layerPathFile.isDirectory()) {
+                           String parentParent = FileUtil.getParentPath(parentName);
+                           // We are in the layers directory
+                           if (parentParent != null) {
+                              if (initStrataCodeDir(parentParent))
+                                 return;
+                              String ppp = FileUtil.getParentPath(parentParent);
+                              // In the bundles directory
+                              if (initStrataCodeDir(ppp))
+                                 return;
+                           }
+                           // Otherwise, we are in a layer bundle directory that's not in the normal structure.  Just put this path
+                           // in the layer path.
+                           if (layerPath == null) {
+                              strataCodeMainDir = newLayerDir = parentName;
+                              layerPath = parentName;
                               layerPathDirs = new ArrayList<File>();
                               layerPathDirs.add(new File(layerPath));
-                           }
-                        }
-                     }
-                  }
-                  // We may be inside of a layer directory in the layer path.  We'll figure that out later on but for now just
-                  // find the .layerPath above us so we do not install incorrectly.
-                  else {
-                     File currentFile = new File(currentDir);
-                     String parentName;
-                     File binDir = new File(currentFile, "bin");
-                     if (binDir.isDirectory()) {
-                        File scJarFile = new File(binDir, "sc.jar");
-                        // When running from the StrataCode dist directory, we put the results in 'layers' mostly because
-                        // git needs an empty directory to start from.
-                        if (scJarFile.canRead()) {
-                           layersFilePathPrefix = "layers";
-                        }
-                     }
-                     else {
-                        // Perhaps running from the bin directory
-                        String parentDir = FileUtil.getParentPath(currentDir);
-                        if (parentDir != null) {
-                           binDir = new File(parentDir, "bin");
-                           if (binDir.isDirectory()) {
-                              File scJarFile = new File(binDir, "sc.jar");
-                              if (scJarFile.canRead()) {
-                                 layersFilePathPrefix = ".." + FileUtil.FILE_SEPARATOR + "layers";
-                              }
-                           }
-                        }
-                     }
 
-                     do {
-                        parentName = currentFile.getParent();
-                        if (parentName != null) {
-                           layerPathFile = new File(FileUtil.concat(parentName, SC_DIR));
-                           if (layerPathFile.isDirectory()) {
                               systemInstalled = true;
-                              // Need to at least install it in the right place
-                              if (layerPath == null) {
-                                 mainLayerDir = newLayerDir = parentName;
-                                 layerPath = parentName;
-                                 layerPathDirs = new ArrayList<File>();
-                                 layerPathDirs.add(new File(layerPath));
-                              }
+                              return;
                            }
-                           else
-                              currentFile = new File(parentName);
                         }
-                     } while (parentName != null && !systemInstalled);
-                  }
+                        else
+                           currentFile = new File(parentName);
+                     }
+                  } while (parentName != null);
                }
             }
          }
       }
+   }
+
+   private boolean initStrataCodeDir(String dir) {
+      if (dir == null)
+         return false;
+
+      // Must either have a bin or .stratacode directory to be considered an install dir - otherwise, anything with layers or bundles in
+      // them is considered an install dir.
+      if (!new File(dir, "bin").isDirectory() && !new File(dir, SC_DIR).isDirectory() && !new File(dir, "conf").isDirectory())
+         return false;
+
+      String bundlesFileName = FileUtil.concat(dir, "bundles");
+      File bundlesFile = new File(bundlesFileName);
+      boolean inited = false;
+      StringBuilder layerPathBuf = new StringBuilder();
+      if (bundlesFile.isDirectory()) {
+         String[] bundleNames = bundlesFile.list();
+         for (String bundleName:bundleNames) {
+            String bundleDirName = FileUtil.concat(bundlesFileName, bundleName);
+            File bundleDir = new File(bundleDirName);
+            if (!bundleDir.isDirectory())
+               continue;
+            if (layerPathBuf.length() > 0)
+               layerPathBuf.append(FileUtil.PATH_SEPARATOR_CHAR);
+            layerPathBuf.append(bundleDirName);
+            if (layerPathDirs == null)
+               layerPathDirs = new ArrayList<File>();
+            layerPathDirs.add(bundleDir);
+         }
+         inited = true;
+      }
+
+      String layersFileName = FileUtil.concat(".", "layers");
+      File layersFile = new File(layersFileName);
+      if (layersFile.isDirectory()) {
+         newLayerDir = mapLayerDirName(layersFileName);
+         if (layerPathDirs == null)
+            layerPathDirs = new ArrayList<File>();
+         layerPathDirs.add(layersFile);
+         if (layerPathBuf.length() > 0)
+            layerPathBuf.append(FileUtil.PATH_SEPARATOR_CHAR);
+         layerPathBuf.append(layersFileName);
+         inited = true;
+      }
+
+      if (inited) {
+         layerPath = layerPathBuf.toString();
+         strataCodeMainDir = dir;
+         systemInstalled = true;
+         isStrataCodeDir = true;
+
+         verbose("Initialized layer path: " + layerPath + " from StrataCode main dir: " + dir);
+      }
+      return inited;
    }
 
    public String getNewLayerDir() {
@@ -5938,7 +6058,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public String getUndoDirPath() {
-      String undoDirPath = FileUtil.concat(mainLayerDir, ".undo");
+      String undoDirPath = FileUtil.concat(strataCodeMainDir, ".undo");
       File undoDir = new File(undoDirPath);
       if (!undoDir.isDirectory())
          undoDir.mkdirs();
@@ -6316,6 +6436,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return typeIndexMainDir.list();
    }
 
+   public static final ProcessDefinition INVALID_PROCESS_SENTINEL = new ProcessDefinition();
+
    private void initTypeIndexRuntimes() {
       String[] runtimeDirNames = getRuntimeDirNames(false);
 
@@ -6345,7 +6467,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
          File typeIndexDir = new File(getTypeIndexDir(typeIndexIdent));
 
+         String[] fileNames = typeIndexDir.list();
+         if (fileNames == null) {
+            System.err.println("*** Unable to access typeIndex directory: " + typeIndexDir.getPath());
+            return;
+         }
+         // We may create types_java directories for this layered system before we've used it for a specific process
+         if (fileNames.length == 0)
+            continue;
+
          IProcessDefinition proc = getProcessDefinition(newRuntimeName, newProcessName, true);
+
+         if (proc == INVALID_PROCESS_SENTINEL)
+            continue;
 
          File mainIndexFile = new File(typeIndexDir, MAIN_SYSTEM_MARKER_FILE);
          if (mainIndexFile.exists() && processDefinition == null && newRuntimeName.equals(thisRuntimeName)) {
@@ -6385,7 +6519,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       finally {
          releaseDynLock(false);
       }
-
 
       for (String runtimeDirName:runtimeDirNames) {
          if (!runtimeDirName.startsWith(TYPE_INDEX_DIR_PREFIX))
@@ -6471,8 +6604,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         }
                         if (layerTypeIndex != null)
                            curTypeIndex.inactiveTypeIndex.typeIndex.put(layerName, layerTypeIndex);
-                        else
+                        else {
+                           // The layer was removed - remove the type index entry and the file behind it to avoid this problem next itme
                            curTypeIndex.inactiveTypeIndex.typeIndex.remove(layerName);
+                           removeTypeIndexFile(typeIndexIdent, layerName);
+                        }
                         if (layerTypeIndex != null && layerTypeIndex.langExtensions != null)
                            customSuffixes.addAll(Arrays.asList(layerTypeIndex.langExtensions));
 
@@ -6853,6 +6989,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          FileUtil.safeClose(fis);
       }
       return null;
+   }
+
+   public void removeTypeIndexFile(String typeIndexIdent, String layerName) {
+      File typeIndexFile = new File(getTypeIndexFileName(typeIndexIdent, layerName));
+      typeIndexFile.delete();
    }
 
    private void initBuildDirIndex() {
@@ -8474,7 +8615,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                info("Compiling Java: " + bd.toCompile.size() + " files into " + genLayer.getBuildClassesDir());
 
             PerfMon.start("javaCompile");
-            if (LayerUtil.compileJavaFilesInternal(bd.toCompile, genLayer.getBuildClassesDir(), getClassPathForLayer(genLayer, true, genLayer.getBuildClassesDir(), true), options.debug, messageHandler) == 0) {
+            if (LayerUtil.compileJavaFilesInternal(bd.toCompile, genLayer.getBuildClassesDir(), getClassPathForLayer(genLayer, true, genLayer.getBuildClassesDir(), true), options.debug, javaSrcVersion, messageHandler) == 0) {
                if (!buildInfo.buildJars())
                   compileFailed = true;
             }
@@ -8630,6 +8771,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       Thread.currentThread().setContextClassLoader(getSysClassLoader());
       refreshBoundTypes(ModelUtil.REFRESH_CLASSES);
+
+      // Test processors and other instances need to be refreshed with the new class loader
+      if (buildInfo != null)
+         buildInfo.reload();
    }
 
    public void setSystemClassLoader(ClassLoader loader) {
@@ -9075,7 +9220,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (result instanceof ParseError) {
             if (enablePartialValues) {
                Object val = ((ParseError) result).getRootPartialValue();
-               initNewBufferModel(srcEnt, val, modTimeStart, dummy);
+               initNewBufferModel(srcEnt, val, modTimeStart, dummy, false);
             }
             return result;
          }
@@ -9085,7 +9230,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (!(modelObj instanceof IFileProcessorResult))
                return modelObj;
 
-            initNewBufferModel(srcEnt, modelObj, modTimeStart, dummy);
+            initNewBufferModel(srcEnt, modelObj, modTimeStart, dummy, false);
 
             return modelObj;
          }
@@ -9093,7 +9238,42 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       throw new IllegalArgumentException(("No language processor for file: " + srcEnt.relFileName));
    }
 
-   private void initNewBufferModel(SrcEntry srcEnt, Object modelObj, long modTimeStart, boolean dummy) {
+   /**
+    * For IDE-like operations where we need to parse a file but using the current-in memory copy for fast model validation.  This method
+    * should not alter the runtime code model
+    */
+   public Object reparseSrcBuffer(SrcEntry srcEnt, ILanguageModel oldModel, boolean enablePartialValues, String buffer, boolean dummy) {
+      IParseNode pnode = oldModel.getParseNode();
+      if (pnode == null)
+         return parseSrcBuffer(srcEnt, enablePartialValues, buffer, dummy);
+
+      long modTimeStart = srcEnt.getLastModified();
+      IFileProcessor processor = getFileProcessorForSrcEnt(srcEnt, null, false);
+      if (processor instanceof Language) {
+         Language lang = (Language) processor;
+         Object result = ParseUtil.reparse(oldModel.getParseNode(), buffer);
+         if (result instanceof ParseError) {
+            if (enablePartialValues) {
+               Object val = ((ParseError) result).getRootPartialValue();
+               initNewBufferModel(srcEnt, val, modTimeStart, dummy, true);
+            }
+            return result;
+         }
+         else {
+            Object modelObj = ParseUtil.nodeToSemanticValue(result);
+
+            if (!(modelObj instanceof IFileProcessorResult))
+               return modelObj;
+
+            initNewBufferModel(srcEnt, modelObj, modTimeStart, dummy, true);
+
+            return modelObj;
+         }
+      }
+      throw new IllegalArgumentException(("No language processor for file: " + srcEnt.relFileName));
+   }
+
+   private void initNewBufferModel(SrcEntry srcEnt, Object modelObj, long modTimeStart, boolean dummy, boolean incremental) {
       if (modelObj instanceof IFileProcessorResult) {
          IFileProcessorResult res = (IFileProcessorResult) modelObj;
          res.addSrcFile(srcEnt);
@@ -9109,9 +9289,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // overhead but also the types in the other layered systems need to be updated eventually
             ArrayList<JavaModel> clonedModels = null;
             boolean activated = srcEnt.layer != null && srcEnt.layer.activated;
-            if (options.clonedParseModel && peerSystems != null) {
+            if (!dummy && !incremental && options.clonedParseModel && peerSystems != null) {
                for (LayeredSystem peerSys:peerSystems) {
-                  Layer peerLayer = activated ? peerSys.getLayerByName(srcEnt.layer.layerUniqueName) : peerSys.lookupInactiveLayer(srcEnt.layer.getLayerName(), false, true);
+                  Layer peerLayer = activated ? peerSys.getLayerByName(srcEnt.layer.layerUniqueName) : srcEnt.layer == null ? null : peerSys.lookupInactiveLayer(srcEnt.layer.getLayerName(), false, true);
                   // does this layer exist in the peer runtime and is it started?
                   if (peerLayer != null && peerLayer.started) {
                      if (peerSys.beingLoaded.get(srcEnt.absFileName) == null) {
@@ -11994,7 +12174,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             relDir = FileUtil.concat("..", relDir);
          if (newLayerDir == null || newLayerDir.equals(mapLayerDirName("."))) {
             // Need to make this absolute before we start running the app - which involves switching the current directory sometimes.
-            mainLayerDir = newLayerDir = mapLayerDirName(relDir);
+            newLayerDir = mapLayerDirName(relDir);
+            if (strataCodeMainDir == null)
+               strataCodeMainDir = newLayerDir;
          }
          //globalObjects.remove(defFile.layer.layerUniqueName);
          defFile.layer.layerUniqueName = modelTypeName;
@@ -12589,7 +12771,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
             else {
                Layer refLayer = type.getLayer();
-               if (refLayer.layeredSystem != this)
+               if (refLayer == null)
+                  System.err.println("*** Error node without a parent layer");
+               if (refLayer != null && refLayer.layeredSystem != this)
                   refLayer = getPeerLayerFromRemote(refLayer);
                // For the cachedOnly case, we do not want to load a type which is not yet loaded - i.e. we are invalidating caches for that type
                TypeDeclaration res = cachedOnly ? getCachedTypeDeclaration(subTypeName, null, null, false, false) : (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
@@ -12624,7 +12808,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                }
                else {
                   Layer refLayer = type.getLayer();
-                  if (refLayer.layeredSystem != this)
+                  if (refLayer == null)
+                     System.err.println("*** Error node without a parent layer");
+                  if (refLayer != null && refLayer.layeredSystem != this)
                      refLayer = getPeerLayerFromRemote(refLayer);
                   TypeDeclaration res = (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
                   // Check the resulting class name.  getSrcTypeDeclaration may find the base-type of an inner type as it looks for inherited inner types under the parent type's name
@@ -13029,9 +13215,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    /**
-    * Retrieves a Layer instance given the layer name - i.e. group.name.  If checkPeers = true, you may receive a layer in a runtime (that is lazily created the first time it's needed).
-    * Pass in true unless you explicitly do not want to enable the layer.  Enabling the layer adds it to to the classpath so types in the layer can be starte so types in the layer can be started
-    * Pass in true unless you want to get the excluded layer from this runtime which
+    * Retrieves a Layer instance given the layer name - i.e. group.name (it also accepts the path group/name).
+    * If checkPeers = true, you may receive a layer in a runtime (that is lazily created the first time it's needed).
+    * For enabled: Pass in true unless you explicitly do not want to enable the layer.  Enabling the layer adds it to to the classpath so types in the layer can be starte so types in the layer can be started
+    * For skipExcluded: pass in true unless you want to get the excluded layer from this runtime which
     * we create temporarily to bootstrap layers in other runtimes.   We first create the Layer in the original runtime to see if it's excluded or not.  If so, we remove from the list.
     */
    public Layer getInactiveLayer(String layerPath, boolean openLayer, boolean checkPeers, boolean enabled, boolean skipExcluded) {
@@ -13151,10 +13338,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (newRes != null)
             return newRes;
          else {
+            /*
             LayeredSystem mainSys = getMainLayeredSystem();
+             * We used to do this but the disabledLayersIndex is on the main runtime - shared.  here the layer may only be excluded in this runtime.
             mainSys.disabledLayersIndex.put(layer.getLayerName(), layer);
             layer.layerPosition = mainSys.disabledLayers.size();
             mainSys.disabledLayers.add(layer);
+            */
          }
             /*
          else {
@@ -13690,6 +13880,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return disabledRuntimes.contains(runtimeName);
    }
 
+   public boolean isRuntimeActivated(String runtimeName) {
+      // Default runtime does not have to be activated
+      if (runtimeName == null)
+         return true;
+      // For these other runtimes, make sure the layer which defined the runtime is included.
+      for (int i = 0; i < layers.size(); i++) {
+         Layer layer = layers.get(i);
+         if (layer.definedRuntime != null && StringUtil.equalStrings(layer.definedRuntime.getRuntimeName(), runtimeName))
+            return true;
+      }
+      return false;
+   }
+
    public boolean isDisabled() {
       return isRuntimeDisabled(getRuntimeName());
    }
@@ -13794,4 +13997,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return sb;
    }
 
+   /** Returns the prefix to prepend onto files generated for the given srcPathType (e.g. 'web', 'config', etc.) */
+   public String getSrcPathBuildPrefix(String srcPathType) {
+      for (int i = layers.size() - 1; i >= 0; i--) {
+         Layer layer = layers.get(i);
+         String res = layer.getSrcPathBuildPrefix(srcPathType);
+         if (res != null)
+            return res;
+      }
+      return null;
+   }
 }
+

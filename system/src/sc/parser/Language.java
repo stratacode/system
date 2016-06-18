@@ -60,6 +60,11 @@ public abstract class Language extends LayerFileComponent {
 
    public boolean debug = false;
 
+   public boolean debugReparse = false;
+
+   public int globalParseCt = 0;
+   public int globalReparseCt = 0;
+
    public boolean initialized = false;
 
    /** The generation scheme works in two modes: when trackTranges=true, each property change automatically updates the generated result.  When it is false, we invalidate changed nodes and only revalidate them as needed.  tracking changes is better for debugging but a little slower */
@@ -197,9 +202,33 @@ public abstract class Language extends LayerFileComponent {
          p.populateInst = toPopulateInst;
          Object parseTree = p.parseStart(start);
          if (parseTree instanceof IParseNode) {
-            if (!p.atEOF())
-               parseTree = p.wrapErrors();
+            if (!p.atEOF()) {
+               parseTree = wrapPartialParseNode(parseTree, p);
+               if (enablePartialValues) {
+                  IParseNode parseNode = (IParseNode) parseTree;
+                  postProcessResult(parseTree, fileName);
+                  if (debugReparse) {
+                     System.out.println("*** EOF - parsed: " + parseNode.length() + " out of: " + p.length() + " characters");
+                     globalParseCt += p.totalParseCt;
+                  }
+                  return p.parseError(start, parseTree, null, "Invalid text at end of file", 0, p.length());
+               }
+               else {
+                  // TODO: should we always do the above?
+                  parseTree = p.wrapErrors();
+               }
+            }
          }
+         else if (parseTree instanceof ParseError) {
+            if (!p.atEOF()) {
+               wrapPartialValues((ParseError) parseTree, p);
+            }
+         }
+
+         if (debugReparse) {
+            globalParseCt += p.totalParseCt;
+         }
+
          postProcessResult(parseTree, fileName);
          return parseTree;
       }
@@ -211,6 +240,68 @@ public abstract class Language extends LayerFileComponent {
             System.err.println("*** Failed to close the reader for parsing: " + fileName + ": " + exc);
          }
       }
+   }
+
+   private void wrapPartialValues(ParseError err, Parser parser) {
+      if (err.isMultiError()) {
+         Object[] args = err.errorArgs;
+         for (Object argObj : args) {
+            ParseError subErr = (ParseError) argObj;
+            wrapPartialValues(subErr, parser);
+         }
+      }
+      else if (err.partialValue instanceof ParentParseNode) {
+         err.partialValue = wrapPartialParseNode(err.partialValue, parser);
+      }
+   }
+
+   private Object wrapPartialParseNode(Object parseTree, Parser parser) {
+      if (parseTree instanceof ParentParseNode) {
+         ParentParseNode parseNode = (ParentParseNode) parseTree;
+         parseTree = PartialValueParseNode.copyFrom(parseNode, parser.length() - parseNode.length());
+      }
+      return parseTree;
+   }
+
+   public Object reparse(IParseNode pnode, DiffContext dctx, String newText, boolean enablePartialValues) {
+      Parselet start = pnode.getParselet();
+
+      Parser parser = new Parser(this, newText.toCharArray());
+      parser.enablePartialValues = enablePartialValues;
+      Object parseTree = parser.reparseStart(start, pnode, dctx);
+
+      if (!parser.atEOF()) {
+         if (parseTree instanceof ParentParseNode)
+            parseTree = wrapPartialParseNode(parseTree, parser);
+         else if (parseTree instanceof ParseError)
+            wrapPartialValues((ParseError) parseTree, parser);
+      }
+      else if (pnode instanceof PartialValueParseNode) {
+         // At some point this node was a partial result but has now reset itself so clear this out
+         ((PartialValueParseNode) pnode).unparsedLen = 0;
+      }
+
+      if (debugReparse) {
+         /*
+         if (parseTree instanceof IParseNode) {
+            String newTextReparsed = parseTree.toString();
+            if (!newTextReparsed.equals(newText)) {
+               // This is the case where we missed some characters in the reparse - e.g. an unterminated commentBody which did not parse the last character and was the last thing we could parse or
+               // we just do not have the ability to parse the end of the file.
+               if (!newText.startsWith(newTextReparsed))
+                  System.err.println("Failure reparsing - reparsed results do not match.  Reparsed text:\n" + newTextReparsed + "\n != original:\n" +  newText + " (reparsed: " + parser.reparseCt + " nodes)");
+               else
+                  System.out.println("Partial reparse of: " + parser.reparseCt + " nodes, skipped: " + parser.reparseSkippedCt + " total: " + parser.totalParseCt + " " + newTextReparsed.length() + " out of: " + newText.length() + " chars parsed");
+            }
+            else {
+               //System.out.println("Reparsed: " + parser.reparseCt + " nodes, skipped: " + parser.reparseSkippedCt + " total: " + parser.totalParseCt);
+            }
+         }
+         */
+         globalReparseCt += parser.reparseCt;
+      }
+
+      return parseTree;
    }
 
    public void postProcessResult(Object res, String fileName) {
@@ -304,6 +395,44 @@ public abstract class Language extends LayerFileComponent {
    @sc.obj.HTMLSettings(returnsHTML=true)
    public Object styleFile(String layerName, String fileName, boolean displayError, boolean isLayer) {
       return styleFile(layerName, fileName, displayError, isLayer, true);
+   }
+
+   /**
+    * Styles a file in the build directory.  If layerName is specified, the file name is taken from the layer's build directory.  The buildPathPrefix
+    * specifies a prefix to add onto the file which is not displayed in the file's path in the UI.
+    * fileName is also added onto the path and is displayed as the file name in the display of the file.
+    */
+   @sc.obj.HTMLSettings(returnsHTML=true)
+   public Object styleBuildFile(String layerName, String buildPathPrefix, String fileName, boolean displayError, boolean isLayer, boolean layerEnabled) {
+      LayeredSystem sys = LayeredSystem.getCurrent().getMainLayeredSystem();
+      fileName = FileUtil.unnormalize(fileName);
+      String absFileName = fileName;
+      // TODO: this is a hack!  Add a new parameter or maybe disabled:layerName?
+      if (layerName != null) {
+         Layer layer = sys.getActiveOrInactiveLayerByPathSync(layerName, null, true, true, layerEnabled);
+         if (layer == null) {
+            System.err.println("No layer named: " + layerName + " for styleFile method");
+            return null;
+         }
+         absFileName = FileUtil.concat(layer.getDefaultBuildDir(), buildPathPrefix == null ? null : FileUtil.unnormalize(buildPathPrefix), fileName);
+         // Want to start the layer before we start loading types into it.  Otherwise, when it gets started we see that we have types to replace when we really don't.
+         layer.checkIfStarted();
+      }
+      // TODO should we check the system.getCachedModel to see if we have this guy already?
+      File file = new File(absFileName);
+      try {
+         Object result = parse(file);
+         if (result instanceof ParseError) {
+            System.err.println("Error parsing string to be styled - no styling for this section: " + file + ": " + ((ParseError) result).errorStringWithLineNumbers(file));
+            return "";
+         }
+         return ParseUtil.styleParseResult(layerName, layerName, fileName, displayError, isLayer, result, layerEnabled);
+      }
+      catch (IllegalArgumentException exc) {
+         System.err.println("Error reading file to be styled: " + absFileName + ": " + exc);
+         return "Missing file: " + absFileName;
+      }
+
    }
 
    @sc.obj.HTMLSettings(returnsHTML=true)
@@ -747,4 +876,5 @@ public abstract class Language extends LayerFileComponent {
          }
       }
    }
+
 }

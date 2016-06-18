@@ -386,4 +386,8 @@ public class PerfMon {
       return formatter.format(time / 1000000000.0);
    }
 
+   public static String formatNanoTimeMillis(long time) {
+      return formatter.format(time / 1000000.0);
+   }
+
 }

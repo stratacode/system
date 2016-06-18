@@ -64,7 +64,14 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
 
             int startIx = statements.size()-1;
             if (fromChild != null) {
-               int childIx = statements.indexOf(fromChild);
+               int sz = statements.size();
+               int childIx = -1;
+               for (int i = 0; i < sz; i++) {
+                  if (statements.get(i) == fromChild) {
+                     childIx = i;
+                     break;
+                  }
+               }
                if (childIx != -1)
                   startIx = childIx;
             }
@@ -352,5 +359,26 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
 
    public boolean childIsTopLevelStatement(Statement child) {
       return true;
+   }
+
+   private final static int STATEMENTS_IN_STRING = 6;
+
+   public String toString() {
+      if (statements == null) {
+         return "{}";
+      }
+      StringBuilder sb = new StringBuilder();
+      if (staticEnabled)
+         sb.append("static ");
+      sb.append("{\n");
+      for (int i = 0; i < Math.min(statements.size(), STATEMENTS_IN_STRING); i++) {
+         Statement st = statements.get(i);
+         sb.append("   ");
+         sb.append(statements.toString());
+      }
+      if (statements.size() > STATEMENTS_IN_STRING)
+         sb.append("   ...\n");
+      sb.append("}\n");
+      return sb.toString();
    }
 }

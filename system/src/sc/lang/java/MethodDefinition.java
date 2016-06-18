@@ -47,24 +47,27 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
 
    public void init() {
       if (initialized) return;
-      
-      if (name != null && type != null) {
+
+      if (name != null) {
          JavaType[] paramJavaTypes = parameters == null ? null : parameters.getParameterJavaTypes(true);
-         if ((propertyName = ModelUtil.isGetMethod(name, paramJavaTypes, type)) != null)
-            propertyMethodType = propertyName.startsWith("i") ? PropertyMethodType.Is : PropertyMethodType.Get;
-         else if ((propertyName = ModelUtil.isSetMethod(name, paramJavaTypes, type)) != null)
-            propertyMethodType = PropertyMethodType.Set;
-         else if ((propertyName = ModelUtil.isSetIndexMethod(name, paramJavaTypes, type)) != null)
-            propertyMethodType = PropertyMethodType.SetIndexed;
-         else if ((propertyName = ModelUtil.isGetIndexMethod(name, paramJavaTypes, type)) != null)
-            propertyMethodType = PropertyMethodType.GetIndexed;
-         isMain = name.equals("main") && type.isVoid() && paramJavaTypes != null && paramJavaTypes.length == 1 &&
+         if (type != null) {
+            if ((propertyName = ModelUtil.isGetMethod(name, paramJavaTypes, type)) != null)
+               propertyMethodType = propertyName.startsWith("i") ? PropertyMethodType.Is : PropertyMethodType.Get;
+            else if ((propertyName = ModelUtil.isSetMethod(name, paramJavaTypes, type)) != null)
+               propertyMethodType = PropertyMethodType.Set;
+            else if ((propertyName = ModelUtil.isSetIndexMethod(name, paramJavaTypes, type)) != null)
+               propertyMethodType = PropertyMethodType.SetIndexed;
+            else if ((propertyName = ModelUtil.isGetIndexMethod(name, paramJavaTypes, type)) != null)
+               propertyMethodType = PropertyMethodType.GetIndexed;
+         }
+         isMain = name.equals("main") && (type == null || type.isVoid()) && paramJavaTypes != null && paramJavaTypes.length == 1 &&
                  ModelUtil.typeIsStringArray(paramJavaTypes[0]) && hasModifier("static");
       }
 
       // Do this after our propertyName is set so that other initializers can use that info
       super.init();
    }
+
 
    public boolean isDynamicType() {
       return dynamicType || super.isDynamicType();
@@ -94,11 +97,8 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       Object modType = methodType.getDerivedTypeDeclaration();
       if (extendsType == null)
          extendsType = Object.class;
-      Object overridden = ModelUtil.definesMethod(extendsType, name, getParameterList(), null, null, false, false, null);
+      Object overridden = ModelUtil.definesMethod(extendsType, name, getParameterList(), null, null, false, false, null, null);
       superMethod = overridden;
-      if (overridden instanceof MethodDefinition) {
-         MethodDefinition superMeth = (MethodDefinition) overridden;
-      }
 
       /* Dynamic methods need to find any overridden method and make sure calls to that one are also made dynamic.
        * This is here in the validate because the isDynamic method on our parents is not valid until we've propagated
@@ -132,7 +132,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          if (overridden == null && methodType.implementsBoundTypes != null) {
             Object implMeth;
             for (Object impl:methodType.implementsBoundTypes) {
-               implMeth = ModelUtil.definesMethod(impl, name, getParameterList(), null, null, false, false, null);
+               implMeth = ModelUtil.definesMethod(impl, name, getParameterList(), null, null, false, false, null, null);
                if (implMeth != null && ModelUtil.isCompiledMethod(implMeth)) {
                   methodType.setNeedsDynamicStub(true);
                   overridesCompiled = true;
@@ -140,18 +140,6 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             }
          }
 
-         if (modType != extendsType) {
-            overridden = ModelUtil.definesMethod(modType, name, getParameterList(), null, null, false, false, null);
-            if (overridden instanceof MethodDefinition) {
-               MethodDefinition overMeth = (MethodDefinition) overridden;
-               if (overMeth == this)
-                  System.out.println("*** replacing a method by itself");
-               if (ModelUtil.sameTypes(methodType, overMeth.getEnclosingType())) {
-                  overMeth.replacedByMethod = this;
-                  overriddenMethod = overMeth;
-               }
-            }
-         }
       }
       else {
          boolean makeBindable = false;
@@ -171,6 +159,20 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                enclType.addPropertyToMakeBindable(propertyName, this, null);
          }
       }
+      // TODO: shouldn't this be moved to the start method?
+      if (modType != extendsType) {
+         overridden = ModelUtil.definesMethod(modType, name, getParameterList(), null, null, false, false, null, null);
+         if (overridden instanceof MethodDefinition) {
+            MethodDefinition overMeth = (MethodDefinition) overridden;
+            if (overMeth == this)
+               System.out.println("*** replacing a method by itself");
+            if (ModelUtil.sameTypes(methodType, overMeth.getEnclosingType())) {
+               overMeth.replacedByMethod = this;
+               overriddenMethod = overMeth;
+            }
+         }
+      }
+      overrides = overriddenMethod;
       super.validate();
    }
 
@@ -311,6 +313,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
    class JavaCommandInfo {
       String command, restartCommand, sharedArgs;
       Boolean produceJar;
+      String jarFileName;
       Boolean produceScript;
       Boolean produceBAT;
       String execCommandTemplateName;
@@ -335,6 +338,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          this.model = model;
          this.fullTypeName = fullTypeName;
          produceJar = (Boolean) ModelUtil.getAnnotationValue(mainSettings, "produceJar");
+         jarFileName = (String) ModelUtil.getAnnotationValue(mainSettings, "jarFileName");
          produceScript = (Boolean) ModelUtil.getAnnotationValue(mainSettings, "produceScript");
          produceBAT = (Boolean) ModelUtil.getAnnotationValue(mainSettings, "produceBAT");
          execCommandTemplateName = (String) ModelUtil.getAnnotationValue(mainSettings, "execCommandTemplate");
@@ -406,6 +410,9 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             execName = model.getModelTypeName().replace('.', '/');
             scriptSuffix = "." + shellType;
          }
+         // jarFileName lets you override the jar name used.  Defaults to execName.
+         if (jarFileName == null || jarFileName.length() == 0)
+            jarFileName = FileUtil.addExtension(execName, "jar");
          String debugStr = debug != null && debug ?
                  " -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=" + (debugPort == null ? "5005": debugPort)  :
                  "";
@@ -425,9 +432,9 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             // TODO: need to find a way to inject command line args into the jar process
             if (dynStr.length() > 0)
                System.err.println("*** Unable to produce script with jar option for dynamic layers");
-            lsys.buildInfo.addModelJar(model, model.getModelTypeName(), execName + ".jar", null, false, includeDepsInJar == null || includeDepsInJar);
+            lsys.buildInfo.addModelJar(model, model.getModelTypeName(), jarFileName, null, false, includeDepsInJar == null || includeDepsInJar);
             sharedArgs =  "java" + debugStr + memStr + vmParams +
-                    " -jar \"" + varString("DIRNAME") + sepStr + getFileNamePart(execName, "/") + ".jar\"";
+                    " -jar \"" + varString("DIRNAME") + sepStr + getFileNamePart(jarFileName, "/") + "\"";
          }
          else {
             lsys.buildInfo.addMainCommand(model, execName, defaultArgList);
@@ -462,7 +469,9 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
 
       JavaModel model;
       if (isMain && (model = getJavaModel()) != null) {
-         Object mainSettings = getAnnotation("sc.obj.MainSettings");
+         // If we've been replaced by another method on this same type, let that method do the processing since it will
+         // have the complete merged annotations
+         Object mainSettings = replacedByMethod == null ? getAnnotation("sc.obj.MainSettings") : null;
          if (mainSettings != null) {
             Boolean disabled = (Boolean) ModelUtil.getAnnotationValue(mainSettings, "disabled");
             if (disabled == null || !disabled) {
@@ -630,12 +639,12 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
 
       Object res;
       if (ext != null) {
-         res = ModelUtil.definesMethod(ext, name, getParameterList(), null, null, false, false, null);
+         res = ModelUtil.definesMethod(ext, name, getParameterList(), null, null, false, false, null, null);
          if (res != null)
             return res;
       }
       if (ext != base && base != null) {
-         res = ModelUtil.definesMethod(base, name, getParameterList(), null, null, false, false, null);
+         res = ModelUtil.definesMethod(base, name, getParameterList(), null, null, false, false, null, null);
          if (res != null)
             return res;
       }
@@ -712,6 +721,8 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          res.dynamicType = dynamicType;
          res.overridesCompiled = overridesCompiled;
          res.needsDynAccess = needsDynAccess;
+         res.overriddenMethod = overriddenMethod;
+         res.overrides = overrides;
       }
       return res;
    }
@@ -739,7 +750,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          }
 
          // In this case, we need to consider all overriding methods - including those in modified types
-         Object result = subType.declaresMethod(name, ptypes, null, enclType, false, null, false);
+         Object result = subType.declaresMethod(name, ptypes, null, enclType, false, null, null, false);
          if (result instanceof MethodDefinition) {
             res.add(result);
          }
@@ -748,7 +759,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             // If we hit this same type in the list of modified types need to stop since anything below this type is not an overriding method
             if (modType == null || ModelUtil.sameTypes(modType, enclType) && modType.layer.getLayerName().equals(subType.layer.getLayerName()))
                break;
-            result = modType.declaresMethod(name, ptypes, null, enclType, false, null, false);
+            result = modType.declaresMethod(name, ptypes, null, enclType, false, null, null, false);
             if (result instanceof MethodDefinition)
                res.add(result);
             modType = modType.getModifiedType();
@@ -763,7 +774,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
    }
 
    public Object getInferredReturnType() {
-      Object retType = null;
+      Object infRetType = null;
       if (body != null) {
          ArrayList<Statement> returns = new ArrayList<Statement>();
          body.addReturnStatements(returns);
@@ -771,17 +782,23 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             for (int i = 0; i < returns.size(); i++) {
                ReturnStatement ret = (ReturnStatement) returns.get(i);
                if (ret.expression != null) {
-                  Object newRetType = ret.expression.getTypeDeclaration();
+                  Object newRetType = ret.expression.getGenericType();
                   if (newRetType != null && newRetType != NullLiteral.NULL_TYPE) {
-                     if (retType == null)
-                        retType = newRetType;
+                     if (infRetType == null) {
+                        //infRetType = ModelUtil.findCommonSuperClass(newRetType, getTypeDeclaration());
+                        infRetType = newRetType;
+                     }
                      else
-                        retType = ModelUtil.findCommonSuperClass(newRetType, retType);
+                        infRetType = ModelUtil.findCommonSuperClass(newRetType, infRetType);
                   }
                }
             }
          }
       }
+      Object retType = getTypeDeclaration();
+      // Make sure the inferredType is more specific than the actual return type
+      if (retType == null || (infRetType != null && ModelUtil.isAssignableFrom(retType, infRetType)))
+         return infRetType;
       return retType;
    }
 
@@ -794,5 +811,22 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       if (propertyName != null) {
          addMemberByName(membersByName, propertyName);
       }
+   }
+
+   public Object getAnnotation(String annotation) {
+      Object thisAnnot = super.getAnnotation(annotation);
+      if (overriddenMethod != null) {
+         Object overriddenAnnotation = ModelUtil.getAnnotation(overriddenMethod, annotation);
+
+         if (thisAnnot == null) {
+            return overriddenAnnotation == null ? null : Annotation.toAnnotation(overriddenAnnotation);
+         }
+         if (overriddenAnnotation == null)
+            return thisAnnot;
+
+         thisAnnot = ModelUtil.mergeAnnotations(thisAnnot, overriddenAnnotation, false);
+         return thisAnnot;
+      }
+      return thisAnnot;
    }
 }

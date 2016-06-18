@@ -21,6 +21,10 @@ public class PrimitiveType extends JavaType {
    }
 
    public Class getRuntimeBaseClass() {
+      if (typeName == null) {
+         System.out.println("*** Error - invalid primitive type");
+         return null;
+      }
       char c = typeName.charAt(0);
 
       Class base;
@@ -94,11 +98,13 @@ public class PrimitiveType extends JavaType {
       return typeName;
    }
 
-   public Object getTypeDeclaration(ITypeParamContext ctx, boolean resolve) {
+   public Object getTypeDeclaration(ITypeParamContext ctx, ITypeDeclaration dit, boolean resolve, boolean refreshParams, boolean bindUnbound) {
       return getRuntimeClass();
    }
 
    public void initType(LayeredSystem sys, ITypeDeclaration itd, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer, Object typeParam) {}
+
+   public void convertToSrcReference() {}
 
    public String getBaseSignature() {
       return getSignatureCode();

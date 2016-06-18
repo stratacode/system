@@ -31,7 +31,6 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
    public transient String overriddenLayer = null;
    public transient Object[] parameterTypes;
 
-
    /** A method to be used in place of the previous method - either because it was modified (replaced=false) or a type was reloaded (replaced=true) */
    public transient AbstractMethodDefinition replacedByMethod;
    public transient AbstractMethodDefinition overriddenMethod; // TODO: rename this to "modifiedMethod"
@@ -40,6 +39,10 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
 
    transient String origName;
    private transient boolean templateBody;
+
+   public static final String METHOD_TYPE_PREFIX = "_M__";
+
+   private transient int anonMethodId = 0;
 
    public void init() {
       if (initialized) return;
@@ -85,7 +88,7 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       return super.findMember(memberName, type, this, refType, ctx, skipIfaces);
    }
 
-   public Object definesMethod(String methodName, List<?> methParams, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType) {
+   public Object definesMethod(String methodName, List<?> methParams, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
       if (name != null && methodName.equals(name)) {
          if (parametersMatch(methParams, ctx)) {
             // In Java, it's possible to have static and non-static methods with the identical signature.  If we are calling this from a static
@@ -95,13 +98,14 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
             if (refType == null || ModelUtil.checkAccess(refType, this)) {
                // TODO: I think we may have to do this if the method has any unbound type parameters in any of it declared types
                if (typeParameters != null) {
-                  ParamTypedMethod paramMethod = new ParamTypedMethod(this, ctx, getEnclosingType(), methParams, inferredType);
+                  ParamTypedMethod paramMethod = new ParamTypedMethod(this, ctx, getEnclosingType(), methParams, inferredType, methodTypeArgs);
                   if (inferredType != null) {
                      // Turn off the binding of parameter types while we do a match for this method.  We can't have the parameter types setting type parameters
                      // here - only the inferred type to be sure it does not conflict with the parameter type match.
                      paramMethod.bindParamTypes = false;
-                     if (!ModelUtil.parameterTypesMatch(paramMethod.getParameterTypes(true), ModelUtil.parametersToTypeArray(methParams, ctx), paramMethod, refType, ctx))
+                     if (!ModelUtil.parameterTypesMatch(paramMethod.getParameterTypes(true), ModelUtil.parametersToTypeArray(methParams, ctx), paramMethod, refType, ctx)) {
                         return null;
+                     }
                      paramMethod.bindParamTypes = true;
                   }
                   return paramMethod;
@@ -147,8 +151,15 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
          if (otherP instanceof ITypedObject)
              otherP = ((ITypedObject) otherP).getTypeDeclaration();
 
+         // If it's an unbound lambda expression, we still need to do some basic checks to see if this one is a match.
+         if (otherP instanceof BaseLambdaExpression.LambdaInferredType) {
+            BaseLambdaExpression.LambdaInferredType lambdaType = (BaseLambdaExpression.LambdaInferredType) otherP;
+            if (!lambdaType.rootExpr.lambdaParametersMatch(thisType))
+               return false;
+         }
+
          // Null entry means match
-         if (otherP == null || thisP == null || otherP instanceof BaseLambdaExpression.LambdaInferredType)
+         if (otherP == null || thisP == null)
             continue;
 
          // Take a conservative approach... if types are not available, just match
@@ -180,6 +191,26 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
    }
 
    public Object definesType(String name, TypeContext ctx) {
+      // No classes have been defined in this method yet so no possible matches
+      if (anonMethodId == 0)
+         return null;
+      /** We can look up a specific local method's class name using the special method type prefix */
+      if (name.startsWith(METHOD_TYPE_PREFIX)) {
+         int prefLen = METHOD_TYPE_PREFIX.length();
+         int i;
+         for (i = prefLen + 1; i < name.length() && name.charAt(i) >= '0' && name.charAt(i) <= '9'; i++) {
+         }
+         int endIdIx = i;
+         if (endIdIx == -1)
+            return null;
+         String idStr = name.substring(prefLen, endIdIx);
+         try {
+            int id = Integer.parseInt(idStr);
+            if (id == anonMethodId)
+               name = name.substring(endIdIx);
+         }
+         catch (NumberFormatException exc) {}
+      }
       if (body != null) {
          List<Statement> statements = body.statements;
          if (statements != null) {
@@ -212,36 +243,45 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
          modified = true;
       }
 
-      if (overridden != null) {
-         boolean overriddenIsAbstract = overridden.hasModifier("abstract");
-         TypeDeclaration enclType = overridden.getEnclosingType();
-         if (overriddenIsAbstract) {
-            enclType.removeStatement(overridden);
-         }
-         else {
-            boolean overriddenIsStatic = overridden.hasModifier("static");
-            boolean thisIsStatic = hasModifier("static");
-            if (!overriddenIsStatic == thisIsStatic) {
-               if (overriddenIsStatic)
-                  addModifier("static");
+      boolean isOverrideMethod = this instanceof MethodDefinition && ((MethodDefinition) this).override;
+
+      if (!isOverrideMethod) {
+         if (overridden != null) {
+            boolean overriddenIsAbstract = overridden.hasModifier("abstract");
+            TypeDeclaration enclType = overridden.getEnclosingType();
+            if (overriddenIsAbstract) {
+               enclType.removeStatement(overridden);
+            }
+            else {
+               boolean overriddenIsStatic = overridden.hasModifier("static");
+               boolean thisIsStatic = hasModifier("static");
+               if (!overriddenIsStatic == thisIsStatic) {
+                  if (overriddenIsStatic)
+                     addModifier("static");
+                  else
+                     displayError("Cannot make an instance method static in a derived layer: ");
+               }
+               // Needs to be unique per layer, per-type  TODO: is there a shorter way to make this unique?
+               overriddenMethodName = "_super_" + enclType.getLayer().getLayerUniqueName().replace('.', '_') + "_" + enclType.getInnerTypeName().replace('.', '_') + '_' + origName;
+
+               overrides = overridden;
+
+               /* Constructors need to be void so we need to change them to a method definition */
+               if (overridden instanceof ConstructorDefinition) {
+                  ((ConstructorDefinition) overridden).convertToMethod(overriddenMethodName);
+               }
                else
-                  displayError("Cannot make an instance method static in a derived layer: ");
+                  overridden.setProperty("name", overriddenMethodName);
             }
-            // Needs to be unique per layer, per-type  TODO: is there a shorter way to make this unique?
-            overriddenMethodName = "_super_" + enclType.getLayer().getLayerUniqueName().replace('.','_') + "_" + enclType.getInnerTypeName().replace('.', '_') + '_' +  origName;
+         }
 
-            overrides = overridden;
-
-            /* Constructors need to be void so we need to change them to a method definition */
-            if (overridden instanceof ConstructorDefinition) {
-               ((ConstructorDefinition) overridden).convertToMethod(overriddenMethodName);
-            }
-            else
-               overridden.setProperty("name", overriddenMethodName);
+         base.addBodyStatementIndent(this);
+      }
+      else {
+         if (overridden != null) {
+            overridden.mergeModifiers(this, false, true);
          }
       }
-
-      base.addBodyStatementIndent(this);
       return this;
    }
 
@@ -463,11 +503,11 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       if (compiledClass == null) {
          System.err.println("*** No compiled class for: " + getDeclaringType());
       }
-      Object res = ModelUtil.definesMethod(compiledClass, name, getParameterList(), null, null, false, false, null);
+      Object res = ModelUtil.definesMethod(compiledClass, name, getParameterList(), null, null, false, false, null, null);
       if (res == null) {
          System.err.println("*** No runtime method for: " + name);
          boolean x = isDynMethod();
-         Object y = ModelUtil.definesMethod(compiledClass, name, getParameterList(), null, null, false, false, null);
+         Object y = ModelUtil.definesMethod(compiledClass, name, getParameterList(), null, null, false, false, null, null);
       }
       return res;
    }
@@ -721,5 +761,12 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
    public void stop() {
       super.stop();
       parameterTypes = null;
+   }
+
+   public String getInnerTypeName() {
+      if (anonMethodId == 0)
+         anonMethodId = getEnclosingType().allocateAnonMethodId();
+      // Java names these just parentType$1InnerType
+      return METHOD_TYPE_PREFIX + anonMethodId;
    }
 }

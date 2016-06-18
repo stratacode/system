@@ -122,7 +122,9 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       initDynamicType();
 
       if (m != null) {
-         m.addTypeDeclaration(getFileRelativeTypeName(), this);
+         // Types defined inside of a method are not globally visible within the file
+         if (getEnclosingMethod() == null)
+            m.addTypeDeclaration(getFileRelativeTypeName(), this);
       }
 
       super.init();
@@ -197,7 +199,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       // Need to skip the getInheritedAnnotation call made indirectly here for the case where this is just a sync'd model (i.e. a dynamic
       // merged model).
       JavaModel model = getJavaModel();
-      if (model.mergeDeclaration && !isLayerType) {
+      if (model != null && model.mergeDeclaration && !isLayerType) {
 
          // Can't access inherited annotations in start
          Object setting;
@@ -282,6 +284,13 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       if (typeInfoInitialized)
          return;
       typeInfoInitialized = true;
+
+
+      // Need to make sure the parent type is initialized before the sub-type since we need to search the parent types extends/implementBoundTypes to possibly find the implements types here
+      TypeDeclaration enclType = getEnclosingType();
+      if (enclType != null)
+         enclType.initTypeInfo();
+
       JavaModel m = getJavaModel();
 
       if (implementsTypes != null && m != null) {
@@ -442,13 +451,13 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return !isLayerType && !isDynamicType();
    }
 
-   public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType) {
-      Object v = super.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType);
+   public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
+      Object v = super.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
       if (v != null)
          return v;
 
       if (modelType != null) {
-         v = modelType.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType);
+         v = modelType.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
          if (v != null)
             return v;
       }
@@ -457,7 +466,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
       if (implementsBoundTypes != null) {
          for (Object impl:implementsBoundTypes) {
-            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType)) != null)
+            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs)) != null)
                return v;
          }
       }
@@ -851,6 +860,12 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       if (implementsBoundTypes != null) {
          for (Object impl:implementsBoundTypes) {
             if (impl != null) {
+               // TODO: If we do this, it creates a lot more work to map type-parameters etc, but the ParamTypeDeclaration
+               // does have the mapping between the type parameters of the implementing class and the interface.  Do we
+               // need that?  I feel like ordinarily we would expect the type parameters to be in the context of the interface
+               // anyway so unwrapping it here.
+               if (impl instanceof ParamTypeDeclaration)
+                  impl = ((ParamTypeDeclaration) impl).baseType;
                Object[] implResult = ModelUtil.getMethods(impl, methodName, modifier);
                if (implResult != null && implResult.length > 0) {
                   result = ModelUtil.appendInheritedMethods(implResult, result);
@@ -1124,7 +1139,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
                if (ModelUtil.isPropertyIs(member)) {
                   String getName = "get" + CTypeUtil.capitalizePropertyName(propName);
                   Object membType = ModelUtil.getPropertyType(member);
-                  Object existingMeth = definesMethod(getName, null, null, null, true, false, null);
+                  Object existingMeth = definesMethod(getName, null, null, null, true, false, null, null);
                   if (existingMeth == null || existingMeth == res || ModelUtil.isAbstractMethod(existingMeth)) {
                      MethodDefinition meth = new MethodDefinition();
                      meth.name = getName;

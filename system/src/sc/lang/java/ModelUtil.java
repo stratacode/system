@@ -38,6 +38,18 @@ import java.lang.reflect.*;
 import java.lang.reflect.Type;
 import java.util.*;
 
+/**
+ * This interface contains a wide range of operations on Java objects defined in either java.lang.Class, or ITypeDeclaration as the
+ * primary types.  For ITypeDeclaration there are two primary implementations: CFClass - the .class file parser, or sc.lang.java.TypeDeclaration,
+ * a main type for source files parsed in Java or StrataCode.
+ * We use Object here as the core type to avoid the need to create wrapper types for java.lang.Class to implement ITypeDeclaration.
+ * From a performance perspective, lots of wrapper classes is not efficient but it means we do more casting.  If it were only classes, it would
+ * not be a good tradeoff but this same decision affects all meta-data: java.lang.reflect.Field etc. which are more numerous.  Casting and Object
+ * provides some flexibility for such a core API from an integration perspective, especially if we use it with layers down the road to add new languages
+ * to this base API.
+ *
+ * TODO: this class has gotten too big.  Are there any feature chunks we can break off to improve modularization?
+ */
 public class ModelUtil {
    public static final String CHILDREN_ANNOTATION = "Children";
    public static final String PARENT_ANNOTATION = "Parent";
@@ -117,6 +129,8 @@ public class ModelUtil {
          // This happens with undefined references
          //if (boundType == null || boundType.equals("<null>"))
          //   System.out.println("*** Null type parameter default");
+         if (boundType instanceof ExtendsType.WildcardTypeDeclaration)
+            continue;
          if (boundType != Object.class)
             paramMap.put(new TypeParamKey(tp), boundType);
       }
@@ -181,8 +195,11 @@ public class ModelUtil {
       else if (ModelUtil.isGenericArray(genParam)) {
          Object paramComponentType = ModelUtil.getGenericComponentType(genParam);
          // Sometimes we get an Object type which is a valid array type but does not add any info to the type parameter so just ignore it
-         if (ModelUtil.isTypeVariable(paramComponentType) && argType != Object.class)
-            paramMap.put(new TypeParamKey(paramComponentType), ModelUtil.getGenericComponentType(argType));
+         if (ModelUtil.isTypeVariable(paramComponentType) && argType != Object.class) {
+            Object newComponentType = ModelUtil.getGenericComponentType(argType);
+            if (!(newComponentType instanceof ExtendsType.WildcardTypeDeclaration))
+               paramMap.put(new TypeParamKey(paramComponentType), newComponentType);
+         }
       }
       else if (genParam instanceof ExtendsType.LowerBoundsTypeDeclaration) {
          // TODO: I don't think there is anything we need to do here.
@@ -203,7 +220,8 @@ public class ModelUtil {
                   // assert curParamType.isAssignableFrom(atp)
                   if (curParamType != null && ModelUtil.isAssignableFrom(curParamType, paramArgType)) {
                      argType = paramArgType;
-                     paramMap.put(new TypeParamKey(atp), argType);
+                     if (!(argType instanceof ExtendsType.WildcardTypeDeclaration))
+                         paramMap.put(new TypeParamKey(atp), argType);
                   }
                }
                else {
@@ -213,11 +231,12 @@ public class ModelUtil {
                         if (resTypeParam != null && ModelUtil.isTypeVariable(resTypeParam)) {
                            int resPos = ModelUtil.getTypeParameterPosition(argType, ModelUtil.getTypeParameterName(resTypeParam));
                            Object resTypeValue = ModelUtil.getTypeParameter(argType, resPos);
-                           if (resTypeValue != null)
+                           if (!(resTypeValue instanceof ExtendsType.WildcardTypeDeclaration) && resTypeValue != null)
                               paramMap.put(new TypeParamKey(atp), resTypeValue);
                         }
                         else if (resTypeParam != null && !ModelUtil.isTypeVariable(resTypeParam)) {
-                           paramMap.put(new TypeParamKey(atp), resTypeParam);
+                           if (!(resTypeParam instanceof ExtendsType.WildcardTypeDeclaration))
+                              paramMap.put(new TypeParamKey(atp), resTypeParam);
                         }
                      }
                      else {
@@ -251,8 +270,12 @@ public class ModelUtil {
          return ((GenericArrayType) genParam).getGenericComponentType();
       else if (genParam instanceof ArrayTypeDeclaration)
          return ((ArrayTypeDeclaration) genParam).componentType;
-      else
-         throw new UnsupportedOperationException();
+      else if (genParam instanceof Class) {
+         Class arrClass = (Class) genParam;
+         if (arrClass.isArray())
+            return arrClass.getComponentType();
+      }
+      throw new UnsupportedOperationException();
    }
 
    public static Object getMethodTypeDeclaration(Object typeContext, Object varObj, List<Expression> arguments, JavaModel model, Object inferredType, ITypeDeclaration definedInType) {
@@ -333,6 +356,10 @@ public class ModelUtil {
                         typeDefs.add(paramMappedType);
                      }
                      else {
+                        // We might have type variables defined at this level which we can substitute in this type param declaration
+                        if (typeParam instanceof ParamTypeDeclaration && paramMap.size() > 0) {
+                           typeParam = ((ParamTypeDeclaration) typeParam).mapTypeParameters(paramMap);
+                        }
                         Object res = getTypeDeclFromType(typeContext, typeParam, false, sys, false, definedInType);
                         typeDefs.add(res);
                      }
@@ -1124,6 +1151,52 @@ public class ModelUtil {
       return ModelUtil.getTypeName(typeObj1, true).equals(ModelUtil.getTypeName(typeObj2, true));
    }
 
+   public static boolean sameTypesAndParams(Object t1, Object t2) {
+      if (!ModelUtil.sameTypes(t1, t2))
+         return false;
+      boolean h1 = ModelUtil.hasTypeParameters(t1);
+      boolean h2 = ModelUtil.hasTypeParameters(t2);
+      if (h1 != h2)
+         return false;
+      if (!h1)
+         return true;
+      int n1 = ModelUtil.getNumTypeParameters(t1);
+      int n2 = ModelUtil.getNumTypeParameters(t2);
+      if (n1 != n2)
+         return false;
+      for (int i = 0; i < n1; i++) {
+         Object tp1 = ModelUtil.getTypeParameter(t1, i);
+         Object tp2 = ModelUtil.getTypeParameter(t2, i);
+         boolean v1 = ModelUtil.isTypeVariable(tp1);
+         boolean v2 = ModelUtil.isTypeVariable(tp2);
+         if (v1 != v2)
+            return false;
+         if (v1) {
+            if (!ModelUtil.sameTypeParameters(tp1, tp2))
+               return false;
+         }
+         else {
+            if (!ModelUtil.sameTypes(tp1, tp2))
+               return false;
+         }
+      }
+      if (!(t1 instanceof ParamTypeDeclaration)) {
+         if (t2 instanceof ParamTypeDeclaration)
+            return false;
+      }
+      else {
+         if (!(t2 instanceof ParamTypeDeclaration))
+            return false;
+         ParamTypeDeclaration ptd1 = (ParamTypeDeclaration) t1;
+         ParamTypeDeclaration ptd2 = (ParamTypeDeclaration) t2;
+         for (int i = 0; i < n1; i++) {
+            if (!ModelUtil.sameTypesAndParams(ptd1.getType(i), ptd2.getType(i)))
+               return false;
+         }
+      }
+      return true;
+   }
+
    public static boolean sameTypeParameters(Object tp1, Object tp2) {
       String tpName1 = ModelUtil.getTypeParameterName(tp1);
       String tpName2 = ModelUtil.getTypeParameterName(tp2);
@@ -1286,16 +1359,41 @@ public class ModelUtil {
       if (ModelUtil.isTypeVariable(newType))
          return origType;
 
+      if (newType == null)
+         return origType;
+
+      if (origType == null)
+         return newType;
+
       if (!ModelUtil.isAssignableFrom(origType, newType))
-         System.err.println("*** Incompatible types in refineType");
+         return origType;
 
       if (ModelUtil.isParameterizedType(origType)) {
          // If the old type has type parameters but the new one does not, create a new param type which has the new type
          // as the base type and the old type parameters
          if (!ModelUtil.isParameterizedType(newType)) {
             if (origType instanceof ParamTypeDeclaration) {
-               ParamTypeDeclaration mergedType = ((ParamTypeDeclaration) origType).copy();
-               mergedType.baseType = newType;
+               List<?> typeParams = ModelUtil.getTypeParameters(newType);
+               if (typeParams == null || typeParams.size() == 0)
+                  return newType;
+               ParamTypeDeclaration origParamType = (ParamTypeDeclaration) origType;
+               ArrayList<Object> newTypes = new ArrayList<Object>(typeParams.size());
+               List<Object> oldTypes = origParamType.types;
+               List<?> oldTypeParams = origParamType.typeParams;
+               for (Object newTypeParam:typeParams)
+                  newTypes.add(newTypeParam);
+
+               // Replace any type parameters we can map into the new type
+               int i = 0;
+               for (Object oldType:oldTypes) {
+                  if (!ModelUtil.isTypeVariable(oldType)) {
+                     int newPos = evalParameterPosition(origType, newType, ModelUtil.getTypeParameterName(oldTypeParams.get(i)));
+                     if (newPos != -1)
+                        newTypes.set(newPos, oldType);
+                  }
+                  i++;
+               }
+               ParamTypeDeclaration mergedType = new ParamTypeDeclaration(origParamType.system, typeParams, newTypes, newType);
                return mergedType;
             }
             else {
@@ -1482,6 +1580,8 @@ public class ModelUtil {
          return (String) type;
       else if (type instanceof ParameterizedType)
          return getTypeName(((ParameterizedType) type).getRawType(), includeDims);
+      else if (type instanceof WildcardType)
+         return type.toString();
       //else if (ModelUtil.isTypeVariable(type))
       //   return ModelUtil.getTypeParameterName(type);
       throw new UnsupportedOperationException();
@@ -1680,6 +1780,9 @@ public class ModelUtil {
          return true;
 
       if (type1 instanceof TypeParameter) {
+         // There java.lang.Void.class will match a type parameter
+         //if (typeIsVoid(type2))
+         //   return false;
          // Force primitive types to be their wrapper type so we find matches for Comparable and int
          return ((TypeParameter)type1).isAssignableFrom(wrapPrimitiveType(type2), ctx, allowUnbound);
       }
@@ -1688,7 +1791,7 @@ public class ModelUtil {
             // TODO: enforce the extends type in the TypeParameter
             return true;
          }
-         return ((TypeParameter)type2).isAssignableTo(type1, ctx);
+         return ((TypeParameter)type2).isAssignableTo(type1, ctx, true /* allowUnbound */);
       }
 
       while (type1 instanceof TypeVariable) {
@@ -1738,8 +1841,11 @@ public class ModelUtil {
 
       if (type1 instanceof Class) {
          // Accepts double and other types assuming the unboxing rules in Java
-         if (type1 == Object.class)
+         if (type1 == Object.class) {
+            if (typeIsVoid(type2))
+               return false;
             return true;
+         }
          if (type2 instanceof ITypeDeclaration) {
             // In this case, we need to invert the direction of the test.  Let's see if our TypeDeclaration
             // implements a type with the same name.
@@ -1911,6 +2017,9 @@ public class ModelUtil {
          Class typeClass = RTypeUtil.loadClass(implClass.getClassLoader(), fullTypeName, false);
 
          return typeClass != null && typeClass.isAssignableFrom(implClass);
+      }
+      else if (implType instanceof ParameterizedType) {
+         return implementsType(((ParameterizedType) implType).getRawType(), fullTypeName, assignment, allowUnbound);
       }
       else
          throw new UnsupportedOperationException();
@@ -2136,22 +2245,26 @@ public class ModelUtil {
             paramType = null;
          if (paramType instanceof JavaType)
             parameterTypes[i] = (JavaType) paramType;
-         else if (paramType != null)
-            parameterTypes[i] = JavaType.createFromParamType(paramType, ctx, null);
+         else if (paramType != null) {
+            // Used to pass in ctx here as the type param context but really the method's paramType info should not be used
+            // to resolve the type variables here in that context.
+            parameterTypes[i] = JavaType.createFromParamType(paramType, null, ctx.getDefinedInType());
+         }
          else
             parameterTypes[i] = null;
       }
       return parameterTypes;
    }
 
-   public static Object definesMethod(Object td, String name, List<? extends Object> parameters, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType) {
-      return definesMethod(td, name, parameters, ctx, refType, isTransformed, staticOnly, inferredType, null);
+
+   public static Object definesMethod(Object td, String name, List<? extends Object> parameters, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
+      return definesMethod(td, name, parameters, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, null);
    }
 
-   public static Object definesMethod(Object td, String name, List<? extends Object> parameters, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, LayeredSystem sys) {
+   public static Object definesMethod(Object td, String name, List<? extends Object> parameters, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs, LayeredSystem sys) {
       Object res;
       if (td instanceof ITypeDeclaration) {
-         if ((res = ((ITypeDeclaration)td).definesMethod(name, parameters, ctx, refType, isTransformed, staticOnly, inferredType)) != null)
+         if ((res = ((ITypeDeclaration)td).definesMethod(name, parameters, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs)) != null)
             return res;
       }
       else if (td instanceof Class) {
@@ -2916,7 +3029,7 @@ public class ModelUtil {
       int len = str.length();
       for (int i = 0; i < len; i++) {
          char charVal = str.charAt(i);
-         if (charVal == '\\') {
+         if (charVal == '\\' && i < len - 1) {
             i++;
             switch (str.charAt(i)) {
                case 'b':
@@ -3166,7 +3279,7 @@ public class ModelUtil {
 
                if (!isStatic && findMethodOnThis) {
                   Object concreteType = getObjectsType(thisObject);
-                  Object overMeth = ModelUtil.definesMethod(concreteType, rtmeth.name, rtmeth.getParameterList(), null, null, false, false, null);
+                  Object overMeth = ModelUtil.definesMethod(concreteType, rtmeth.name, rtmeth.getParameterList(), null, null, false, false, null, null);
 
                   if (overMeth != rtmeth && overMeth != null) {
                      return invokeMethodWithValues(thisObject, overMeth, arguments, expectedType, ctx, repeatArgs, false, pmeth, argValues);
@@ -5672,7 +5785,7 @@ public class ModelUtil {
    }
 
    public static void suggestMembers(JavaModel model, Object type, String prefix, Set<String> candidates, boolean includeGlobals,
-                                     boolean includeProps, boolean includeMethods) {
+                                     boolean includeProps, boolean includeMethods, boolean includeClassBodyKeywords) {
       if (type != null) {
          if (includeProps) {
             Object[] props = getProperties(type, null);
@@ -5711,9 +5824,17 @@ public class ModelUtil {
          Object encType = getEnclosingType(type);
 
          if (encType != null) // Include members that are visible in the namespace
-            suggestMembers(model, encType, prefix, candidates, includeGlobals, includeProps, includeMethods);
+            suggestMembers(model, encType, prefix, candidates, true, includeProps, includeMethods, false);
          else // only for the root - search the global ones
             model.findMatchingGlobalNames(prefix, candidates);
+      }
+      if (includeClassBodyKeywords && model.getLanguage() instanceof JavaLanguage) {
+         List<String> keywords = ((JavaLanguage) model.getLanguage()).getClassLevelKeywords();
+         for (int i = 0; i < keywords.size(); i++) {
+            String keyword = keywords.get(i);
+            if (keyword.startsWith(prefix))
+               addCompletionCandidate(candidates, keyword);
+         }
       }
    }
 
@@ -5943,7 +6064,7 @@ public class ModelUtil {
             lp = null;
          else
             lp = Arrays.asList(params);
-         res = ModelUtil.definesMethod(specEncType, ModelUtil.getMethodName(def), lp, null, null, false, false, null);
+         res = ModelUtil.definesMethod(specEncType, ModelUtil.getMethodName(def), lp, null, null, false, false, null, null);
          if (res == null) {
             System.out.println("*** no method in specEncType");
             res = def;
@@ -6985,9 +7106,9 @@ public class ModelUtil {
    }
 
    public static Object definesComponentMethod(Object type, String name, Object refType) {
-      Object res = ModelUtil.definesMethod(type, name, null, null, refType, false, false, null);
+      Object res = ModelUtil.definesMethod(type, name, null, null, refType, false, false, null, null);
       if (res == null)
-         res = ModelUtil.definesMethod(type, "_" + name, null, null, refType, false, false, null);
+         res = ModelUtil.definesMethod(type, "_" + name, null, null, refType, false, false, null, null);
       return res;
    }
 
@@ -7038,7 +7159,7 @@ public class ModelUtil {
       List<Object> params = paramTypes == null ? null : Arrays.asList(paramTypes);
       // If we're looking for the super of a constructor, use the type name
       String methName = ModelUtil.isConstructor(method) ? CTypeUtil.getClassName(ModelUtil.getTypeName(extClass)) : ModelUtil.getMethodName(method);
-      return ModelUtil.definesMethod(extClass, methName, params, null, null, false, false, null);
+      return ModelUtil.definesMethod(extClass, methName, params, null, null, false, false, null, null);
    }
 
    public static boolean needsClassInit(Object srcType) {
@@ -7396,9 +7517,14 @@ public class ModelUtil {
       if (ModelUtil.isPrimitive(newVal)) {
          if (newVal instanceof PrimitiveType) {
             primTypeName = ((PrimitiveType) newVal).typeName;
-         } else if (newVal instanceof Class) {
+         }
+         else if (newVal instanceof Class) {
             primTypeName = ((Class) newVal).getName();
-         } else
+         }
+         else if (newVal instanceof WrappedTypeDeclaration) {
+            return wrapPrimitiveType(((WrappedTypeDeclaration) newVal).getBaseType());
+         }
+         else
             throw new UnsupportedOperationException();
          String wrapperTypeName = ClassType.getPrimitiveWrapperName(primTypeName);
          return RTypeUtil.loadClass(null, "java.lang." + wrapperTypeName, true);
@@ -7473,6 +7599,9 @@ public class ModelUtil {
          return ((ArrayTypeDeclaration) type).arrayDimensions;
       }
       else if (type instanceof GenericArrayType) {
+         return "[]";
+      }
+      else if (type instanceof Class && ((Class) type).isArray()) {
          return "[]";
       }
       throw new UnsupportedOperationException();

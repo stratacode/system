@@ -17,8 +17,6 @@ import java.io.*;
 import java.lang.reflect.Field;
 import java.util.*;
 import java.util.regex.Pattern;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
 
 public class LayerUtil implements LayerConstants {
 
@@ -64,12 +62,12 @@ public class LayerUtil implements LayerConstants {
          return sys.options.buildLayerAbsDir;
       }
       String sysBuildDir = srcDir && sys.options.buildSrcDir != null ?  sys.options.buildSrcDir : sys.options.buildDir;
-      String mainLayerDir = sys.mainLayerDir;
+      String mainLayerDir = sys.strataCodeMainDir;
       if (mainLayerDir == null) {
          mainLayerDir = System.getProperty("user.dir");
       }
       // If we use the -dyn option to selectively make layers dynamic, use a different build dir so that we can quickly switch back and forth between -dyn and not without rebuilding everything.
-      String prefix = sysBuildDir == null ?  FileUtil.concat(mainLayerDir, SC_DIR, sys.options.anyDynamicLayers ? "dynbuild" : "build") : sysBuildDir;
+      String prefix = sysBuildDir == null ?  FileUtil.concat(mainLayerDir, sys.options.anyDynamicLayers ? "dynbuild" : "build") : sysBuildDir;
       prefix = FileUtil.concat(prefix, layer.getUnderscoreName());
       // TODO: remove this comment - this was a naive solution that caused headaches between JS marks all layers as compiled
       //return prefix + FileUtil.FILE_SEPARATOR + (layer.dynamic ? DYN_BUILD_DIRECTORY : BUILD_DIRECTORY);
@@ -96,11 +94,11 @@ public class LayerUtil implements LayerConstants {
       suppressedCompilerMessages.add("Note: Recompile with -Xlint:unchecked for details.");
    }
 
-   public static int compileJavaFilesInternal(Collection<SrcEntry> srcEnts, String buildDir, String classPath, boolean debug, IMessageHandler messageHandler) {
+   public static int compileJavaFilesInternal(Collection<SrcEntry> srcEnts, String buildDir, String classPath, boolean debug, String srcVersion, IMessageHandler messageHandler) {
       JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
       if (compiler == null) {
          System.err.println("*** No internal java compiler found - Do you have the JDK installed and is tools.jar in the system classpath? - trying javac");
-         return compileJavaFiles(srcEnts, buildDir, classPath, debug, messageHandler);
+         return compileJavaFiles(srcEnts, buildDir, classPath, debug, srcVersion, messageHandler);
       }
 
       DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<JavaFileObject>();
@@ -121,6 +119,10 @@ public class LayerUtil implements LayerConstants {
          options.add(buildDir);
          options.add("-cp");
          options.add(classPath);
+         if (srcVersion != null) {
+            options.add("-source");
+            options.add(srcVersion);
+         }
          if (debug)
             options.add("-g");
          //options.add("-target");
@@ -196,7 +198,7 @@ public class LayerUtil implements LayerConstants {
       }
    }
    
-   public static int compileJavaFiles(Collection<SrcEntry> srcEnts, String buildDir, String classPath, boolean debug, IMessageHandler handler) {
+   public static int compileJavaFiles(Collection<SrcEntry> srcEnts, String buildDir, String classPath, boolean debug, String srcVersion, IMessageHandler handler) {
       if (srcEnts.size() > 0) {
          List<String> args = new ArrayList<String>(srcEnts.size() + 5);
          args.add("javac");
@@ -207,6 +209,10 @@ public class LayerUtil implements LayerConstants {
          args.add(buildDir);
          args.add("-cp");
          args.add(classPath);
+         if (srcVersion != null) {
+            args.add("-source");
+            args.add(srcVersion);
+         }
          if (debug)
             args.add("-g");
          // args.add("-target");
@@ -730,12 +736,23 @@ public class LayerUtil implements LayerConstants {
       errorHandler.reportMessage(error, srcEnt == null ? null : srcEnt.getJarUrl(), line, col, type);
    }
 
+   public static String installLayerBundle(String projectDir, IMessageHandler handler, boolean verbose, String gitURL) {
+      RepositorySystem sys = new RepositorySystem(new RepositoryStore(projectDir), handler, null, verbose, false, false, false);
+      sys.pkgIndexRoot = FileUtil.concat(projectDir, "idx", "pkgIndex");
+      IRepositoryManager mgr = sys.getRepositoryManager("git");
+      String fileName = FileUtil.concat("bundles", FileUtil.removeExtension(URLUtil.getFileName(gitURL))); // Remove the '.git' suffix and take the last name as the file name.
+      // Just install this package into the packageRoot - don't add the packageName like we do for most packages
+      RepositoryPackage pkg = new RepositoryPackage(mgr, fileName, null, new RepositorySource(mgr, gitURL, false, null), null);
+      String err = pkg.install(null);
+      return err;
+   }
+
    public static String installDefaultLayers(String resultDir, IMessageHandler handler, boolean verbose, String gitURL) {
-      RepositorySystem sys = new RepositorySystem(new RepositoryStore(resultDir), handler, verbose, false, false, false);
+      RepositorySystem sys = new RepositorySystem(new RepositoryStore(resultDir), handler, null, verbose, false, false, false);
       IRepositoryManager mgr = sys.getRepositoryManager("git");
       String fileName = gitURL == null ? LayerConstants.DEFAULT_LAYERS_PATH: FileUtil.removeExtension(URLUtil.getFileName(gitURL)); // Remove the '.git' suffix and take the last name as the file name.
       // Just install this package into the packageRoot - don't add the packageName like we do for most packages
-      RepositoryPackage pkg = new RepositoryPackage(mgr, fileName, null, new RepositorySource(mgr, gitURL == null ? LayerConstants.DEFAULT_LAYERS_URL : gitURL, false), null);
+      RepositoryPackage pkg = new RepositoryPackage(mgr, fileName, null, new RepositorySource(mgr, gitURL == null ? LayerConstants.DEFAULT_LAYERS_URL : gitURL, false, null), null);
       //RepositoryPackage pkg = new RepositoryPackage("layers", new RepositorySource(mgr, "ssh://vsgit@stratacode.com/home/git/vs/layers", false));
       String err = pkg.install(null);
       return err;

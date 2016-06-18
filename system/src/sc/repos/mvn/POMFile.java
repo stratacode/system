@@ -18,7 +18,7 @@ import java.util.*;
 
 /** Handles parsing and data model of the Maven POM file (pom.xml) */
 public class POMFile extends XMLFileFormat {
-   public static final POMFile NULL_SENTINEL = new POMFile(null, null, null, null, null);
+   public static final POMFile NULL_SENTINEL = new POMFile(null, null, null, null, false, null);
 
    MvnRepositoryManager mgr;
 
@@ -28,6 +28,8 @@ public class POMFile extends XMLFileFormat {
 
    /** If this is a module in a parent package, the module name */
    String modulePath;
+
+   boolean required = true;
 
    // Represents the chain of includes for variable resolving
    POMFile includedFromPOM;
@@ -54,18 +56,19 @@ public class POMFile extends XMLFileFormat {
       return null;
    }
 
-   public POMFile(String fileName, MvnRepositoryManager mgr, DependencyContext ctx, RepositoryPackage pomPkg, POMFile includedFromPOM) {
+   public POMFile(String fileName, MvnRepositoryManager mgr, DependencyContext ctx, RepositoryPackage pomPkg, boolean required, POMFile includedFromPOM) {
       super(fileName, mgr == null ? null : mgr.msg);
       this.mgr = mgr;
       depCtx = ctx;
       this.pomPkg = pomPkg;
+      this.required = required;
       if (pomPkg instanceof MvnRepositoryPackage)
          ((MvnRepositoryPackage) pomPkg).pomFile = this;
       this.includedFromPOM = includedFromPOM;
    }
 
-   public static POMFile readPOM(String fileName, MvnRepositoryManager mgr, DependencyContext depCtx, RepositoryPackage pomPkg, POMFile parentPOM, POMFile includedFromPOM) {
-      POMFile file = new POMFile(fileName, mgr, depCtx, pomPkg, includedFromPOM);
+   public static POMFile readPOM(String fileName, MvnRepositoryManager mgr, DependencyContext depCtx, RepositoryPackage pomPkg, boolean required, POMFile parentPOM, POMFile includedFromPOM) {
+      POMFile file = new POMFile(fileName, mgr, depCtx, pomPkg, required, includedFromPOM);
       file.parentPOM = parentPOM;
       // Need to put this before we try to parse it - in case we resolve another recursive reference during the parsing
       mgr.pomCache.put(fileName, file);
@@ -104,7 +107,11 @@ public class POMFile extends XMLFileFormat {
          initParent();
       // Must be after we've initialized the parent
       initCanonicalName();
-      initModules();
+      if (getUseRepositories())
+         initRepositories();
+
+      if (required)
+         initModules();
       initDependencyManagement();
 
       return true;
@@ -120,17 +127,31 @@ public class POMFile extends XMLFileFormat {
 
    private void initCanonicalName() {
       if (projElement != null) {
+         MvnDescriptor desc = getDescriptor();
+         if (desc != null) {
+            if (desc.groupId == null) {
+               desc.groupId = getGroupId();
+            }
+         }
          artifactId = projElement.getSimpleChildValue("artifactId");
          if (artifactId != null) {
             artifactId = artifactId.trim();
-            MvnDescriptor desc = getDescriptor();
             pomPkg = mgr.registerNameForPackage(pomPkg, artifactId);
             if (desc != null) {
                desc.artifactId = artifactId;
                // And update the URL in the source so we save it pointing to the real artifactId
                if (pomPkg != null && pomPkg.currentSource != null) {
-                  pomPkg.packageName = desc.getPackageName();
+                  String descPkgName = desc.getPackageName();
+                  // If we are a sub-package we might have one name that lets us find the package in the file system
+                  // and another for finding it in the repository.  Need to preserve both names for proper initialization
+                  if (pomPkg.packageName != null && (pomPkg.packageAlias == null || pomPkg.packageAlias.equals(descPkgName)) && !pomPkg.packageName.equals(descPkgName))
+                     pomPkg.packageAlias = pomPkg.packageName;
+                  pomPkg.packageName = descPkgName;
+                  // The currentSource.srcURL will stay as the original URL
                   pomPkg.currentSource.url = desc.getURL();
+                  // We only can have a different srcURL if we have no parent - for child packages, we actually update the url to include parent + module name here.
+                  if (pomPkg.currentSource.srcURL == null || pomPkg.parentPkg != null)
+                     pomPkg.currentSource.srcURL = pomPkg.currentSource.url;
                   pomPkg.updateInstallRoot(mgr);
                }
             }
@@ -167,6 +188,42 @@ public class POMFile extends XMLFileFormat {
       // TODO: else - there is a default POM but so far, we don't need any of the contents since it's all concerned with the build
    }
 
+   private void initRepositories() {
+      if (projElement != null) {
+         Element[] repos = projElement.getChildTagsWithName("repositories");
+         if (repos != null && repos.length > 1)
+            MessageHandler.error(msg, "Multiple repositories tags - only using the first one");
+         ArrayList<MvnDescriptor> res = new ArrayList<MvnDescriptor>();
+         if (repos != null) {
+            Element[] repoTags = repos[0].getChildTagsWithName("repository");
+            if (repoTags != null) {
+               for (Element repoTag : repoTags) {
+                  String repoURL = repoTag.getSimpleChildValue("url");
+                  if (repoURL == null) {
+                     MessageHandler.error(msg, "repository in POM - missing url attribute: ");
+                  }
+                  else {
+                     boolean found = false;
+                     for (MvnRepository old:mgr.repositories) {
+                        if (old.baseURL.equals(repoURL)) {
+                           found = true;
+                           break;
+                        }
+                     }
+                     if (!found)
+                        mgr.repositories.add(new MvnRepository(repoURL));
+                  }
+                  // TODO: do we need id, name, layout, releases and snapshots information
+               }
+            }
+         }
+      }
+   }
+
+   private boolean getUseRepositories() {
+      return pomPkg instanceof MvnRepositoryPackage && ((MvnRepositoryPackage) pomPkg).useRepositories;
+   }
+
    private String getArtifactId() {
       return getProperty("project.artifactId", true, true);
    }
@@ -201,6 +258,8 @@ public class POMFile extends XMLFileFormat {
                // Do not init the dependencies here.  We won't be able to resolve deps inbetween these modules.  We have to create them all and
                // initialize the deps for the modules when we init them for the parent.
                RepositoryPackage pkg = desc.getOrCreatePackage(mgr.getChildManager(), false, depCtx, false, isSrc ? (MvnRepositoryPackage) pomPkg : null);
+               if (!isSrc && pkg.currentSource != null)
+                  pkg.currentSource.srcURL = null;
                if (pkg != null) {
                   POMFile modPOM = mgr.getPOMFile(desc, pkg, depCtx, isSrc, isSrc ? this : null, null);
                   if (modPOM != null)
@@ -292,7 +351,7 @@ public class POMFile extends XMLFileFormat {
 
    public static final String DEFAULT_SCOPE = "compile";
 
-   public List<MvnDescriptor> getDependencies(String[] scopes, boolean addChildren, boolean addParent, boolean parentDefinesSrc) {
+   public List<MvnDescriptor> getDependencies(String[] scopes, boolean addChildren, boolean addParent, boolean parentDefinesSrc, DependencyContext ctx) {
       Element[] deps = projElement.getChildTagsWithName("dependencies");
       if (deps != null && deps.length > 1)
          MessageHandler.error(msg, "Multiple tags with dependencies - should be only one");
@@ -306,34 +365,51 @@ public class POMFile extends XMLFileFormat {
                   depScope = DEFAULT_SCOPE;
                if (includesScope(scopes, depScope)) {
                   MvnDescriptor desc = MvnDescriptor.getFromTag(this, depTag, true, true, true);
+                  if (ctx != null) {
+                     List<RepositoryPackage> incPkgs = ctx.getIncludingPackages();
+                     if (incPkgs != null) {
+                        for (RepositoryPackage incPkg:incPkgs) {
+                           // Maven packages which are in the dependency chain from this package should override the version number for any
+                           // dependencies in the dependencyManagement section.  This list starts at the root and goes to the last one so
+                           // as soon as we see an override we stop.
+                           if (incPkg instanceof MvnRepositoryPackage) {
+                              if (((MvnRepositoryPackage) incPkg).overrideVersion(desc))
+                                 break;
+                           }
+                        }
+                     }
+                  }
                   if (!desc.optional || (pomPkg instanceof MvnRepositoryPackage && ((MvnRepositoryPackage) pomPkg).includeOptional))
                      res.add(desc);
+
                }
             }
          }
       }
       if (parentPOM != null && addParent) {
-         addPOMRefDependencies(parentPOM, res, scopes, false, true, false);
+         addPOMRefDependencies(parentPOM, res, scopes, false, true, false, ctx);
       }
       // We either want to include modules that directly defineSrc or if the parent is a src module, we need to include the child dependencies
       // We don't want to include dependencies from the parent-pom's modules.
       if (pomPkg instanceof MvnRepositoryPackage && (((MvnRepositoryPackage) pomPkg).definesSrc || parentDefinesSrc) && addChildren) {
+         if (modulePOMs == null)
+            initModules();
          if (modulePOMs != null) {
             for (POMFile modulePOM:modulePOMs) {
-               addPOMRefDependencies(modulePOM, res, scopes, true, false, true);
+               addPOMRefDependencies(modulePOM, res, scopes, true, false, true, ctx);
             }
          }
       }
       return res;
    }
 
-   private void addPOMRefDependencies(POMFile refPOM, ArrayList<MvnDescriptor> res, String[] scopes, boolean checkChildren, boolean checkParent, boolean parentDefinesSrc) {
-      List<MvnDescriptor> parentDeps = refPOM.getDependencies(scopes, checkChildren, checkParent, parentDefinesSrc);
+   private void addPOMRefDependencies(POMFile refPOM, ArrayList<MvnDescriptor> res, String[] scopes, boolean checkChildren, boolean checkParent, boolean parentDefinesSrc, DependencyContext ctx) {
+      List<MvnDescriptor> parentDeps = refPOM.getDependencies(scopes, checkChildren, checkParent, parentDefinesSrc, ctx);
       if (parentDeps != null) {
          for (MvnDescriptor parentDesc:parentDeps) {
             boolean found = false;
             for (MvnDescriptor childDesc:res) {
-               if (childDesc.matches(parentDesc)) {
+               if (childDesc.matches(parentDesc, false)) {
                   found = true;
                   childDesc.mergeFrom(parentDesc);
                   break;
@@ -465,10 +541,10 @@ public class POMFile extends XMLFileFormat {
       if (visited.contains(this))
          return;
       visited.add(this);
-      if (desc.version == null || desc.type == null || desc.classifier == null) {
+      if (desc.version == null || desc.classifier == null) {
          initDependencyManagement();
          for (MvnDescriptor dep : dependencyManagement) {
-            if (desc.matches(dep)) {
+            if (desc.matches(dep, false)) {
                if (desc.version == null && dep.version != null) {
                   desc.version = dep.version;
                   if (desc.version.contains("${")) {
@@ -482,8 +558,9 @@ public class POMFile extends XMLFileFormat {
                // It does not appear that we should be inheriting the type
                //if (desc.type == null && dep.type != null)
                //   desc.type = dep.type;
-               if (desc.classifier == null && dep.classifier != null)
+               if (desc.classifier == null && dep.classifier != null) {
                   desc.classifier = dep.classifier;
+               }
             }
          }
          if (parentPOM != null)
@@ -494,6 +571,8 @@ public class POMFile extends XMLFileFormat {
             }
          }
       }
+      if (modulePOMs == null)
+         initModules();
       if (modulePOMs != null) {
          for (POMFile modPOM:modulePOMs) {
             modPOM.appendInheritedAtts(desc, visited);
@@ -515,7 +594,20 @@ public class POMFile extends XMLFileFormat {
       return null;
    }
 
-   public boolean isSubModule() {
-      return pomPkg.buildFromSrc && (pomPkg instanceof MvnRepositoryPackage) && ((MvnRepositoryPackage) pomPkg).subModule;
+   /** TODO: performance - build up a hash-table of these dependencies by group-id/artifactId so we can filter them quickly */
+   public boolean overrideVersion(MvnDescriptor desc) {
+      initDependencyManagement();
+      if (dependencyManagement != null) {
+         for (MvnDescriptor depDesc:dependencyManagement) {
+            if (depDesc.version != null && depDesc.matches(desc, false)) {
+               if (desc.version == null || !desc.version.equals(depDesc.version))
+                  desc.version = depDesc.version;
+               return true;
+            }
+         }
+      }
+      if (parentPOM != null)
+         parentPOM.overrideVersion(desc);
+      return false;
    }
 }

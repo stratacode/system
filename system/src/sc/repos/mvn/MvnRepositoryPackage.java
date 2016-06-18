@@ -15,6 +15,12 @@ import sc.util.URLUtil;
 import java.io.File;
 import java.util.ArrayList;
 
+/**
+ * The main class for defining a maven repository.  These can be created from Java, defined as components in a layer, or
+ * created programmatically from constructs found in the POM file.   Like RepositoryPackages, the first package instance with a given package name
+ * is stored - any other configured packages will modify the original instance and set their 'replacedByPackage" value to
+ * point to the canonical package for that name.
+ */
 public class MvnRepositoryPackage extends RepositoryPackage {
    private static final long serialVersionUID = 8392015479919408864L;
    {
@@ -22,17 +28,22 @@ public class MvnRepositoryPackage extends RepositoryPackage {
    }
    transient POMFile pomFile;
 
+   /** Should the optional dependencies of this package be included */
    public boolean includeOptional = false;
+   /** Should we include dependencies marked as "provided" scope in maven - ordinarily provided by the environment this component runs in */
    public boolean includeProvided = false;
+   /** Should we use the repository tags found to define additional maven repositories to search from.  Setting to true can slow down searches */
+   public boolean useRepositories = false;
    // The list of types of files we are to install for this package - null = (the default POM packaging)
    // other values of the type field for a depenency reference - e.g. test-jar
    public ArrayList<String> installFileTypes = new ArrayList<String>();
 
-   /** Is this a sub-module of a parent module */
-   public boolean subModule = false;
-
    public MvnRepositoryPackage(Layer layer) {
       super(layer);
+   }
+
+   public MvnRepositoryPackage() {
+      super();
    }
 
    public MvnRepositoryPackage(IRepositoryManager mgr, String pkgName, String fileName, RepositorySource src, RepositoryPackage parentPkg) {
@@ -150,7 +161,7 @@ public class MvnRepositoryPackage extends RepositoryPackage {
          for (RepositoryPackage subPkg : subPkgs) {
             if (subPkg instanceof MvnRepositoryPackage) {
                MvnRepositoryPackage msub = (MvnRepositoryPackage) subPkg;
-               if (msub.getDescriptor().matches(depDesc))
+               if (msub.getDescriptor().matches(depDesc, false))
                   return true;
                if (msub.hasSubPackage(depDesc))
                   return true;
@@ -177,5 +188,33 @@ public class MvnRepositoryPackage extends RepositoryPackage {
          return desc.parentPath;
       }
       return null;
+   }
+
+   public boolean sameURL(String otherURL) {
+      MvnDescriptor desc = getDescriptor();
+      if (this.url != null && this.url.equals(otherURL))
+         return true;
+      MvnDescriptor otherDesc = MvnDescriptor.fromURL(otherURL);
+      if (desc == null) {
+         return false;
+      }
+      return desc.matches(otherDesc, true);
+   }
+
+   /**
+    * This exists because parent packages can have two URLs - one from git, the other a mvn URL.  During init, before
+    * we've read the POM, we may not know the maven URL so we need to match purely based on the package name.
+    */
+   public boolean sameParentURL(String otherURL) {
+      if (this.url != null && this.url.equals(otherURL))
+         return true;
+      MvnDescriptor otherDesc = MvnDescriptor.fromURL(otherURL);
+      return otherDesc != null && (packageName.equals(otherDesc.getPackageName()) || packageName.equals(otherDesc.artifactId));
+   }
+
+   public boolean overrideVersion(MvnDescriptor desc) {
+      if (pomFile != null)
+         return pomFile.overrideVersion(desc);
+      return false;
    }
 }

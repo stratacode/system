@@ -170,7 +170,7 @@ public class ModifyDeclaration extends TypeDeclaration {
                }
 
                if (modifyTypeDecl.replacedByType == null && !modifyInherited) {
-                  modifyTypeDecl.replacedByType = this;
+                  modifyTypeDecl.updateReplacedByType(this);
                }
             }
          }
@@ -287,8 +287,10 @@ public class ModifyDeclaration extends TypeDeclaration {
                   dynamicType = true;
                   dynamicNew = false;
                }
-               if (extTD instanceof TypeDeclaration)
-                  thisModel.layeredSystem.addSubType((TypeDeclaration) extTD, this);
+               if (extTD instanceof TypeDeclaration) {
+                  if (thisModel.layeredSystem != null)
+                     thisModel.layeredSystem.addSubType((TypeDeclaration) extTD, this);
+               }
             }
          }
       }
@@ -682,20 +684,20 @@ public class ModifyDeclaration extends TypeDeclaration {
       return null;
    }
 
-   public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType) {
-      Object v = super.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType);
+   public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
+      Object v = super.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
       if (v != null)
          return v;
 
       if (extendsBoundTypes != null) {
          for (Object impl:extendsBoundTypes) {
-            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType)) != null)
+            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs)) != null)
                return v;
          }
       }
       if (impliedRoots != null) {
          for (Object impl:impliedRoots) {
-            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType)) != null)
+            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs)) != null)
                return v;
          }
       }
@@ -723,13 +725,13 @@ public class ModifyDeclaration extends TypeDeclaration {
       return null;
    }
 
-   public Object declaresMethod(String name, List<? extends Object> types, ITypeParamContext ctx, Object refType, boolean staticOnly, Object inferredType, boolean includeModified) {
-      Object res = super.declaresMethod(name, types, ctx, refType, staticOnly, inferredType, includeModified);
+   public Object declaresMethod(String name, List<? extends Object> types, ITypeParamContext ctx, Object refType, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs, boolean includeModified) {
+      Object res = super.declaresMethod(name, types, ctx, refType, staticOnly, inferredType, methodTypeArgs, includeModified);
       if (res != null)
          return res;
       // if we have a modifyClass is there ever a case where we need to include those methods?  We typically use definesMethod for resolution - this is just for the IDE - overriding methods.
       if (includeModified && modifyTypeDecl != null) {
-         return modifyTypeDecl.declaresMethod(name, types, ctx, refType, staticOnly, inferredType, includeModified);
+         return modifyTypeDecl.declaresMethod(name, types, ctx, refType, staticOnly, inferredType, methodTypeArgs, includeModified);
       }
       return null;
    }
@@ -1057,7 +1059,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       //   transformModifyInherited(ILanguageModel.RuntimeType.JAVA, false);
       JavaModel model = getJavaModel();
       // Don't do this for model streams
-      if (compoundName && model.mergeDeclaration) {
+      if (compoundName && model != null && model.mergeDeclaration) {
          replaceHiddenType(null);
       }
    }
@@ -2392,7 +2394,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       else {
          JavaModel model = getJavaModel();
          // For a modify type in a sync definition, the compiledClassName is the modifyTypeDecl's name
-         if (!model.mergeDeclaration) {
+         if (model == null || !model.mergeDeclaration) {
             if (modifyClass != null)
                return ModelUtil.getTypeName(modifyClass);
             else if (modifyTypeDecl != null)
@@ -2532,7 +2534,7 @@ public class ModifyDeclaration extends TypeDeclaration {
    public Object getCompiledImplements() {
       Object cimpl;
       JavaModel model = getJavaModel();
-      if (model.mergeDeclaration && modifyTypeDecl instanceof TypeDeclaration) {
+      if (model != null && model.mergeDeclaration && modifyTypeDecl instanceof TypeDeclaration) {
          cimpl = ((TypeDeclaration) modifyTypeDecl).getCompiledImplements();
          if (cimpl != null)
             return cimpl;
@@ -2543,7 +2545,7 @@ public class ModifyDeclaration extends TypeDeclaration {
    public List<Statement> getInitStatements(InitStatementsMode mode, boolean isTransformed) {
       List<Statement> res = null;
       JavaModel model = getJavaModel();
-      if (model.mergeDeclaration && modifyTypeDecl != null && !modifyInherited) {
+      if (model != null && model.mergeDeclaration && modifyTypeDecl != null && !modifyInherited) {
          BodyTypeDeclaration modTD = modifyTypeDecl;
          if (isTransformed) {
             BodyTypeDeclaration xformType = modTD.getTransformedResult();
@@ -2660,5 +2662,9 @@ public class ModifyDeclaration extends TypeDeclaration {
             baseLayerNames.add(extType.getFullTypeName());
       }
       return baseLayerNames;
+   }
+
+   public String getOperatorString() {
+      return "<modify>";
    }
 }

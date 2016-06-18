@@ -25,7 +25,7 @@ public interface IParseNode extends CharSequence, IParseResult {
 
    Object getSemanticValue();
 
-   void setSemanticValue(Object value);
+   void setSemanticValue(Object value, boolean clearOld);
 
    String toDebugString();
 
@@ -46,6 +46,12 @@ public interface IParseNode extends CharSequence, IParseResult {
    /** Returns the offset in characters from the beginning of the file */
    int getStartIndex();
 
+   /** If we have a parse-node which has been copied from an old definition, the original start index */
+   int getOrigStartIndex();
+
+   /** If this parse-node has been reparsed already, this returns the new start index.  Otherwise -1 */
+   int getNewStartIndex();
+
    void setStartIndex(int s);
 
    /** Returns the index of the string relative to the start of this parse node */
@@ -62,7 +68,7 @@ public interface IParseNode extends CharSequence, IParseResult {
    boolean isEmpty();
 
    /** Like toString but provides a parent object to handle spacing with re-generated primitive string valued nodes which do not know their parent. */
-   CharSequence formatString(Object parSemVal, ParentParseNode parParseNode, int curChildIndex);
+   CharSequence formatString(Object parSemVal, ParentParseNode parParseNode, int curChildIndex, boolean removeFormattingNodes);
 
    /** Just like formatString, we need to take an optional parent semantic value, parseNode, and childIndex so we know where this element falls in the context so we can do spacing properly */
    void styleNode(IStyleAdapter adapter, Object parSemVal, ParentParseNode parParseNode, int curChildIndex);
@@ -89,10 +95,20 @@ public interface IParseNode extends CharSequence, IParseResult {
     * After updating some parse nodes, you may need to reset the start indexes.  This sets the start index to the one given and returns the start index to
     * continue after this parse node.
     */
-   int resetStartIndex(int ix);
+   int resetStartIndex(int ix, boolean validate, boolean newIndex);
 
    /** Returns the length of the parse node eliminating any trailing whitespace */
    int getSemanticLength();
+
+   /** Finds the first parse node whose text does not match the DiffContext */
+   void findStartDiff(DiffContext ctx, boolean atEnd, Object parSemVal, ParentParseNode parParseNode, int childIx);
+
+   void findEndDiff(DiffContext ctx, Object parSemVal, ParentParseNode parParseNode, int childIx);
+
+   /** Returns true for ErrorParseNode or parse nodes which are part of an error */
+   boolean isErrorNode();
+
+   void setErrorNode(boolean val);
 }
 
 

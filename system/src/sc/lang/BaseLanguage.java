@@ -7,6 +7,7 @@ package sc.lang;
 import sc.lang.java.NonKeywordString;
 import sc.layer.Layer;
 import sc.parser.*;
+import sc.util.FileUtil;
 
 import java.util.Collections;
 import java.util.Set;
@@ -78,7 +79,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
 
    public IndexedChoice whiteSpace = new IndexedChoice("<whitespace>", NOERROR | OPTIONAL);
    {
-      whiteSpace.put(" ", new Symbol(" "));
+      whiteSpace.put(" ", new Symbol(REPEAT, " "));
       whiteSpace.put("\t", new Symbol("\t"));
       whiteSpace.put("\f", new Symbol("\f"));
       whiteSpace.put("\r", lineTerminator);
@@ -116,6 +117,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
       spacing.put("/*", blockComment);
 
       spacing.generateParseNode = new SpacingParseNode(spacing, false);
+      spacing.alwaysReparse = true;
    }
 
    public IndexedChoice spacingEOL = (IndexedChoice) spacing.clone();
@@ -129,6 +131,15 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
    public SymbolSpace semicolonEOL = new SymbolSpace(";", SKIP_ON_ERROR);
    {
       semicolonEOL.generateParseNode = new NewlineParseNode(";");
+   }
+   // A semicolon followed by 2 newlines for package, imports
+   public SymbolSpace semicolonNewline = new SymbolSpace(";", SKIP_ON_ERROR);
+   {
+      semicolonNewline.generateParseNode = new NewlineParseNode(";") {
+         public String getNewlineSeparator() {
+            return FileUtil.LINE_SEPARATOR + FileUtil.LINE_SEPARATOR;
+         }
+      };
    }
    public SymbolSpace semicolon = new SymbolSpace(";");
    public SymbolSpace colon = new SymbolSpace(":");
@@ -238,11 +249,16 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
          if (value instanceof IParseNode)
             value = ((IParseNode) value).getSemanticValue();
 
+         // This is a sentinel type you can use to push even 'this' through as non-keyword.  Used to avoid needing to convert
+         // to a selector expression during code-generation
+         if (value instanceof NonKeywordString)
+            return null;
+
          if (value != null && !(value instanceof StringToken))
-            value = value.toString();
+            value = PString.toIString(value);
          if (getLanguage() == null)
             throw new IllegalArgumentException("*** No language defined for parselet: " + this);
-         if (!(value instanceof NonKeywordString) && !((BaseLanguage) getLanguage()).getKeywords().contains(value))
+         if (!((BaseLanguage) getLanguage()).getKeywords().contains(value))
             return null;
          return "Identifiers cannot be keywords";
       }
@@ -253,8 +269,8 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
 
    /** Use this to create a parselet for your repeating parselets skipOnError parselet.  It's used to consume the next error token while trying to skip out
     * of the body of something which is incomplete.  It must consume all text except for the text which would ordinarily complete the parent. */
-   public Parselet createSkipOnErrorParselet(String... exitSymbols) {
-      return new OrderedChoice("<skipBodyError>(.,.)", alphaNumString, new Sequence(new SymbolChoice(NOT, exitSymbols), spacing));
+   public Parselet createSkipOnErrorParselet(String name, String... exitSymbols) {
+      return new OrderedChoice(name + "(.,.)", alphaNumString, new Sequence(new SymbolChoice(NOT, exitSymbols), spacing));
    }
 
    Sequence identifierSp = (Sequence) identifier.copy();
@@ -262,7 +278,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
       identifierSp.setName("('','',)");
    }
 
-   Sequence optIdentifier = new Sequence("(.)", OPTIONAL, identifier);
+   public Sequence optIdentifier = new Sequence("(.)", OPTIONAL, identifier);
 
    public Sequence qualifiedIdentifier = new Sequence("('','')", identifier,
            new Sequence("('','')", OPTIONAL | REPEAT, new SymbolSpace("."), identifier));
@@ -275,21 +291,21 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
     * negate that case.
     */
    public class KeywordSpace extends Sequence {
-      KeywordSpace(String name, int options, String symbol) {
+      public KeywordSpace(String name, int options, String symbol) {
          super(name, options | NOERROR);
          add(new Symbol(symbol), new Sequence(NOT | LOOKAHEAD | NOERROR, identifierChar), spacing);
          styleName = "keyword";
       }
-      KeywordSpace(String symbol, int options) {
+      public KeywordSpace(String symbol, int options) {
          this("<keyword_" + symbol + ">" + "('',,)", options, symbol);
       }
-      KeywordSpace(String symbol) {
+      public KeywordSpace(String symbol) {
          this(symbol, 0);
       }
    }
 
    public class KeywordNewline extends KeywordSpace {
-      KeywordNewline(String symbol) {
+      public KeywordNewline(String symbol) {
          super(symbol);
          set(2, spacingEOL);
       }

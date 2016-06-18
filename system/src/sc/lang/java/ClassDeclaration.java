@@ -38,7 +38,7 @@ public class ClassDeclaration extends TypeDeclaration {
       if (initialized) return;
 
       if (operator == null) {
-         displayError("Invalid class - no operator");
+         displayError("Invalid class - no operator - ");
       }
       else {
          char c = operator.charAt(0);
@@ -71,9 +71,14 @@ public class ClassDeclaration extends TypeDeclaration {
          if (layer != null && !layer.activated) {
             if (!thisModel.isLayerModel) {
                String fullTypeName = getFullTypeName();
+               if (fullTypeName == null) {
+                  super.start();
+                  // Perhaps a model fragment or something we can't really start
+                  return;
+               }
                TypeDeclaration prevDecl = thisModel.getPreviousDeclaration(fullTypeName);
                if (prevDecl != null && prevDecl != this && prevDecl.getFullTypeName().equals(fullTypeName))
-                  prevDecl.replacedByType = this;
+                  prevDecl.updateReplacedByType(this);
             }
          }
       }
@@ -172,8 +177,11 @@ public class ClassDeclaration extends TypeDeclaration {
 
    public void unregister() {
       Object ext = getExtendsTypeDeclaration();
-      if (ext != null && ext instanceof TypeDeclaration)
-         getJavaModel().layeredSystem.removeSubType((TypeDeclaration) ext, this);
+      if (ext != null && ext instanceof TypeDeclaration) {
+         JavaModel model = getJavaModel();
+         if (model != null && model.layeredSystem != null)
+            model.layeredSystem.removeSubType((TypeDeclaration) ext, this);
+      }
    }
 
    public Object getDerivedTransformedTypeDeclaration() {
@@ -920,7 +928,7 @@ public class ClassDeclaration extends TypeDeclaration {
       else {
          for (int i = 0; i < meths.length; i++) {
             Object meth = meths[i];
-            Object declMethObj = declaresMethod(onInitMethodName, Arrays.asList(ModelUtil.getParameterTypes(meth)), null, null, false, null, false);
+            Object declMethObj = declaresMethod(onInitMethodName, Arrays.asList(ModelUtil.getParameterTypes(meth)), null, null, false, null, null, false);
             MethodDefinition declMeth;
             if (declMethObj == null) {
                declMeth = (MethodDefinition) TransformUtil.defineRedirectMethod(this, onInitMethodName, meth, false, !ModelUtil.isAbstractMethod(meth));
@@ -1092,7 +1100,7 @@ public class ClassDeclaration extends TypeDeclaration {
       Object extendsMethod;
 
       // super.method() - either, there is a preInit method or we will generate one anyway cause it is a component too
-      if (extendsIsComponent || (extendsMethod = extendsDefinesMethod(name, null, null, null, false, false, null)) != null &&
+      if (extendsIsComponent || (extendsMethod = extendsDefinesMethod(name, null, null, null, false, false, null, null)) != null &&
           (ModelUtil.hasModifier(extendsMethod, "public") || ModelUtil.hasModifier(extendsMethod, "protected"))) {
          IdentifierExpression ie = IdentifierExpression.create("super", superName);
          ie.setProperty("arguments", new SemanticNodeList(0));
@@ -1333,7 +1341,7 @@ public class ClassDeclaration extends TypeDeclaration {
          if (parseNode != null && parseNode.toString().endsWith(extName)) {
             JavaModel model = getJavaModel();
             if (currentType != null)
-               ModelUtil.suggestMembers(model, currentType, extName, candidates, true, false, false);
+               ModelUtil.suggestMembers(model, currentType, extName, candidates, true, false, false, false);
             ModelUtil.suggestTypes(model, extName, "", candidates, true);
             ModelUtil.suggestTypes(model, prefix, extName, candidates, true);
             if (extName.equals(""))
@@ -1400,5 +1408,9 @@ public class ClassDeclaration extends TypeDeclaration {
          }
       }
       return false;
+   }
+
+   public String getOperatorString() {
+      return operator;
    }
 }

@@ -1665,7 +1665,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    private String getJSPathPrefix(Layer buildLayer) {
-      return templatePrefix != null ? templatePrefix : buildLayer.getSrcPathBuildPrefix(srcPathType);
+      // We used to use the buildlayer here for the SrcPathPrefix but the build layer may not depend directly on the
+      // necessary layers which define the JS path - e.g. if I run scc js/allInOne test/java7Misc - the build layer
+      // is java7Misc and it does not define the 'web' srcPathPrefix so the generated JS files don't go in the right place.
+      return templatePrefix != null ? templatePrefix : system.getSrcPathBuildPrefix(srcPathType);
    }
 
    public void postProcess(LayeredSystem sys, Layer genLayer) {
@@ -1831,8 +1834,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    public void resetBuildLayerState() {
-      processedTypes.clear();
-      typesInFileMap.clear();
+      if (processedTypes != null)
+         processedTypes.clear();
+      if (typesInFileMap != null)
+         typesInFileMap.clear();
    }
 
    public void resetBuild() {
@@ -2088,7 +2093,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          return true;
       if (type == depType)
          return true;
-      if (depType instanceof EnumConstant)
+      if (depType instanceof EnumConstant || depType instanceof ExtendsType.WildcardTypeDeclaration)
          return true;
       return false;
    }
@@ -2476,9 +2481,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return system;
    }
 
-   public void runMainMethod(Object type, String runClass, String[] runClassArgs) {
+   public String runMainMethod(Object type, String runClass, String[] runClassArgs) {
       if (system.options.verbose)
          System.out.println("Warning: JSRuntime - not running main method for: " + runClass + " - this will run in the browser");
+      return null;
    }
 
 
@@ -2599,6 +2605,13 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          }
          catch (IOException exc) {}
       }
+   }
+
+   public void initAfterRestore() {
+      processedTypes = new HashSet<String>();
+      typesInFileMap = new HashMap<String,LinkedHashMap<JSFileEntry,Boolean>>();
+      jsFileBodyStore = new HashMap<String, StringBuilder>();
+      changedJSFiles = new LinkedHashSet<String>();
    }
 
    /** Called after we clear all of the layers to reset the JSBuildInfo state */

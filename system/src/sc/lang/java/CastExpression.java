@@ -43,6 +43,8 @@ public class CastExpression extends ChainedExpression {
    }
 
    public Object getTypeDeclaration() {
+      if (type == null)
+         return null;
       return type.getTypeDeclaration();
    }
 
@@ -114,5 +116,11 @@ public class CastExpression extends ChainedExpression {
       if (type != null)
          return type.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
       return -1;
+   }
+
+   public boolean setInferredType(Object infType) {
+      if (expression != null)
+         return expression.setInferredType(type.getTypeDeclaration());
+      return false;
    }
 }

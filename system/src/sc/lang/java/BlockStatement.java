@@ -6,6 +6,7 @@ package sc.lang.java;
 
 import sc.lang.IUserDataNode;
 import sc.lang.js.JSFormatMode;
+import sc.util.StringUtil;
 
 import java.util.IdentityHashMap;
 
@@ -18,9 +19,12 @@ public class BlockStatement extends AbstractBlockStatement {
       StringBuilder res = new StringBuilder();
       res.append("{\n");
       if (statements != null) {
-         for (Statement st:statements)
+         for (Statement st:statements) {
+            res.append(StringUtil.indent(getNestingDepth()+1));
             res.append(st.formatToJS(mode));
+         }
       }
+      res.append(StringUtil.indent(getNestingDepth()));
       res.append("}\n");
       return res;
    }

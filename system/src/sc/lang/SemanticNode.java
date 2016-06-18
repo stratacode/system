@@ -58,6 +58,8 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       return processed;
    }
 
+   public static boolean debugDiffTrace = false;
+
    public void init() {
       if (initialized)
           return;
@@ -491,10 +493,64 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
          // If both are null it is ok.  If thisProp is not null it has to equal other prop to go on.
          if (thisProp != otherProp &&
                 (thisProp == null || otherProp == null ||
-                   !(thisProp instanceof ISemanticNode ? ((ISemanticNode) thisProp).deepEquals(otherProp) : thisProp.equals(otherProp))))
+                   !(thisProp instanceof ISemanticNode ? ((ISemanticNode) thisProp).deepEquals(otherProp) : thisProp.equals(otherProp)))) {
             return false;
+         }
       }
       return true;
+   }
+
+   static void diffAppend(StringBuilder diffs, Object val) {
+      if (debugDiffTrace)
+         diffs = diffs;
+      diffs.append(val);
+   }
+
+   /**
+    * The semantic node classes are treated like value classes - they are equal if all of their properties
+    * are equal.
+    */
+   public void diffNode(Object other, StringBuilder diffs) {
+      if (other == this)
+         return;
+
+      if (other == null) {
+         diffAppend(diffs, "No other model for comparison against this: " + toString());
+         return;
+      }
+
+      if (getClass() != other.getClass()) {
+         diffAppend(diffs, "class mismatch - this: " + CTypeUtil.getClassName(getClass().getName()) + " = " + toString() + " other: " + CTypeUtil.getClassName(other.getClass().getName()) + " = " + other.toString());
+         return;
+      }
+
+      DynType type = TypeUtil.getPropertyCache(getClass());
+      IBeanMapper[] props = type.getSemanticPropertyList();
+      for (int i = 0; i < props.length; i++) {
+         Field field = (Field) props[i].getField();
+         Object thisProp = PTypeUtil.getProperty(this, field);
+         Object otherProp = PTypeUtil.getProperty(other, field);
+         // If both are null it is ok.  If thisProp is not null it has to equal other prop to go on.
+         if (thisProp != otherProp) {
+            if (thisProp instanceof ISemanticNode && otherProp != null) {
+               ISemanticNode thisPropNode = (ISemanticNode) thisProp;
+               StringBuilder newDiffs = new StringBuilder();
+               thisPropNode.diffNode(otherProp, newDiffs);
+               if (newDiffs.length() != 0) {
+                  diffAppend(diffs, field.getName());
+                  diffAppend(diffs, "->");
+                  diffAppend(diffs, newDiffs);
+               }
+               else if (!thisPropNode.deepEquals(otherProp)) {
+                  diffAppend(diffs, CTypeUtil.getClassName(getClass().getName()) + "." + field.getName() + " = " + thisProp + " other's = " + otherProp);
+                  diffAppend(diffs, FileUtil.LINE_SEPARATOR);
+               }
+            }
+            else if (thisProp == null || otherProp == null || !thisProp.equals(otherProp)) {
+               diffAppend(diffs, CTypeUtil.getClassName(getClass().getName()) + "." + field.getName() + " = " + thisProp + " other's = " + otherProp);
+            }
+         }
+      }
    }
 
    public boolean equals(Object other) {
@@ -530,6 +586,8 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
          if (parseNodeInvalid) {
             validateParseNode(false);
          }
+         if (parseNode == null)
+            return "<invalid-semantic-node>";
          return parseNode.toString();
       }
 
@@ -611,15 +669,25 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       return null;
    }
 
+   protected int getStartIndex() {
+      if (parseNode != null)
+         return parseNode.getStartIndex();
+      IParseNode pp = getAnyChildParseNode();
+      if (pp != null)
+         return pp.getStartIndex();
+      return -1;
+   }
+
    private void appendAtString(StringBuilder sb, int indent, boolean addFile, boolean addAt, boolean addNear, Parselet parselet) {
       IParseNode pp = parseNode;
       if (pp == null)
          pp = getAnyChildParseNode();
 
-      if (pp != null) {
+      int startIx = getStartIndex();
+
+      if (startIx != -1) {
          ISemanticNode rootNode = getRootNode();
-         int startIx = pp.getStartIndex();
-         if (startIx != -1 && rootNode != null && rootNode instanceof ILanguageModel) {
+         if (rootNode != null && rootNode instanceof ILanguageModel) {
             List<SrcEntry> srcEnts = ((ILanguageModel) rootNode).getSrcFiles();
             if (srcEnts != null && srcEnts.size() > 0) {
                String fileName = srcEnts.get(0).absFileName;
@@ -664,8 +732,12 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       if (pp == null) {
          pp = getAnyChildParseNode();
       }
-      if (pp == null)
+      if (pp == null) {
+         // This node does not have a parse-node but we do have a file - just don't print anything (for imports right now)
+         if (getStartIndex() != -1)
+            return "";
          return ": <no source available>";
+      }
 
       StringBuilder sb = new StringBuilder();
       sb.append("\n");
@@ -734,7 +806,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
                // Create a dummy parse node to preserve the parselet mapping for this clone.  We can use this to regenerate
                // the node more easily after the copy.  Otherwise we need to start at a node with a known parselet.
                copy.parseNode = newPP = new ParentParseNode(p);
-               copy.parseNode.setSemanticValue(copy);
+               copy.parseNode.setSemanticValue(copy, true);
                newPP.setStartIndex(oldP.getStartIndex());
                copy.parseNodeInvalid = true;
             }
@@ -773,7 +845,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
    public void setParselet(Parselet p) {
       if (parseNode == null) {
          parseNode = new ParentParseNode(p);
-         parseNode.setSemanticValue(this);
+         parseNode.setSemanticValue(this, true);
          parseNodeInvalid = true;
       }
    }

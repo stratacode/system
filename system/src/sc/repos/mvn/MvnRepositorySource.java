@@ -6,6 +6,7 @@ package sc.repos.mvn;
 
 import sc.repos.DependencyContext;
 import sc.repos.IRepositoryManager;
+import sc.repos.RepositoryPackage;
 import sc.repos.RepositorySource;
 
 import java.util.ArrayList;
@@ -16,8 +17,8 @@ public class MvnRepositorySource extends RepositorySource {
    // Do we need to serialize the exclusions?
    public MvnDescriptor desc;
 
-   public MvnRepositorySource(IRepositoryManager mgr, String url, boolean unzip, MvnDescriptor desc, DependencyContext ctx) {
-      super(mgr, url, unzip);
+   public MvnRepositorySource(IRepositoryManager mgr, String url, boolean unzip, RepositoryPackage parentPkg, MvnDescriptor desc, DependencyContext ctx) {
+      super(mgr, url, unzip, parentPkg);
       this.desc = desc;
       this.ctx = ctx;
    }
@@ -56,28 +57,42 @@ public class MvnRepositorySource extends RepositorySource {
       if (!(other instanceof MvnRepositorySource))
          return false;
 
-      if (desc.exclusions == null)
+      if (!desc.reference && desc.exclusions == null)
          return false;
 
       MvnRepositorySource otherSrc = (MvnRepositorySource) other;
-      if (otherSrc.desc.exclusions == null) {
-         desc.exclusions = null;
-         return true;
-      }
+      MvnDescriptor otherDesc = otherSrc.desc;
       boolean changed = false;
-      for (int i = 0; i < desc.exclusions.size(); i++) {
-         MvnDescriptor excl = desc.exclusions.get(i);
-         boolean found = false;
-         for (MvnDescriptor otherExcl:otherSrc.desc.exclusions) {
-            if (otherExcl.matches(excl)) {
-               found = true;
-               break;
+      // If this descriptor was just a reference, just pick up the exclusions from the other
+      // descriptor.  We did not define the exclusions and dependencies won't have changed so
+      // no need to invalidate them
+      if (!desc.reference) {
+         if (otherDesc.reference)
+            return false;
+         if (otherDesc.exclusions == null) {
+            desc.exclusions = null;
+            return true;
+         }
+         for (int i = 0; i < desc.exclusions.size(); i++) {
+            MvnDescriptor excl = desc.exclusions.get(i);
+            boolean found = false;
+            for (MvnDescriptor otherExcl : otherSrc.desc.exclusions) {
+               if (otherExcl.matches(excl, false)) {
+                  found = true;
+                  break;
+               }
+            }
+            if (!found) {
+               changed = true;
+               desc.exclusions.remove(i);
+               i--;
             }
          }
-         if (!found) {
-            changed = true;
-            desc.exclusions.remove(i);
-            i--;
+      }
+      else {
+         if (!otherDesc.reference) {
+            desc.exclusions = otherDesc.exclusions;
+            desc.reference = false;
          }
       }
       return changed;

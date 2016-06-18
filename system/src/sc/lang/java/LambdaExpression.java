@@ -85,4 +85,21 @@ public class LambdaExpression extends BaseLambdaExpression {
          ((Expression) lambdaBody).setInferredType(methReturnType);
       }
    }
+
+   void updateMethodTypeParameters(Object ifaceMeth) {
+      if (lambdaParams instanceof Parameter) {
+         Object[] ifaceParamTypes = ModelUtil.getParameterTypes(ifaceMeth, false);
+         Object[] refParamTypes = ((Parameter) lambdaParams).getParameterTypes();
+         if (ifaceParamTypes != null && refParamTypes != null) {
+            int j = 0;
+            for (int i = 0; i < ifaceParamTypes.length; i++) {
+               Object ifaceParamType = ifaceParamTypes[i];
+               Object refParamType = refParamTypes[j];
+               if (ModelUtil.isTypeVariable(ifaceParamType)) {
+                  addTypeParameterMapping(ifaceMeth, ifaceParamType, refParamType);
+               }
+            }
+         }
+      }
+   }
 }

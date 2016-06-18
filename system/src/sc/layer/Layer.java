@@ -2457,7 +2457,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    public String getLayerName() {
       String base = layerDirName;
       if (base == null || base.equals(".")) {
-         if (packagePrefix != null && packagePrefix.length() > 1 && packagePrefix.length() > layerUniqueName.length())
+         if (packagePrefix != null && packagePrefix.length() > 1 && packagePrefix.length() < layerUniqueName.length())
             base = layerUniqueName.substring(packagePrefix.length()+1);
          else
             base = layerUniqueName;
@@ -3113,6 +3113,11 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (lastRefreshTime == -1 || (newTime = f.lastModified()) > lastRefreshTime) {
          // First update the src cache to pick up any new files, refresh any models we find in there when ctx is not null
          addSrcFilesToCache(f, prefix, null);
+      }
+
+      if (!f.isDirectory()) {
+         System.err.println("*** Invalid layer source directory: " + f);
+         return;
       }
 
       File[] files = f.listFiles();
@@ -3801,7 +3806,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          if (repositoryPackages == null)
             repositoryPackages = new ArrayList<RepositoryPackage>();
 
-         RepositorySource repoSrc = mgr.createRepositorySource(url, unzip);
+         RepositorySource repoSrc = mgr.createRepositorySource(url, unzip, null);
          // Add this as a new source.  This will create the package if this is the first definition or add it
          // as a new source if it already exists.
          RepositoryPackage pkg = repoSys.addPackageSource(mgr, pkgName, fileName, repoSrc, started && !disabled, null);
@@ -4013,7 +4018,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    /**
-    *  Adds a new src path with the optional srcPathType.  The srcPathType specifies the nature of the files under this
+    *  Adds a new src path with srcPathType.  The srcPathType specifies the nature of the files under this
     * directory - e.g. for web/** the srcPathType is 'web'.   The default type for normal source files is null.
     */
    public void addSrcPath(String srcPath, String srcPathType, String buildPrefix) {

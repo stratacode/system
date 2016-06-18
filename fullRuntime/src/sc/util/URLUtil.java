@@ -66,7 +66,7 @@ public class URLUtil {
    public static String saveURLToFile(String urlPath, String fileName, boolean unzip, IMessageHandler msg) {
       URL url;
       FileOutputStream fos = null;
-      ReadableByteChannel rbc;
+      ReadableByteChannel rbc = null;
       try {
          url = new URL(urlPath);
          if (unzip )
@@ -77,6 +77,20 @@ public class URLUtil {
             HttpURLConnection hconn = (HttpURLConnection) conn;
             ((HttpURLConnection) conn).setInstanceFollowRedirects(true);
             ((HttpURLConnection) conn).setFollowRedirects(true);
+            // For some reason follow redirects did not work
+            if (hconn.getResponseCode() == 302) {
+               String newURL = hconn.getHeaderField("Location");
+               if (newURL != null) {
+                  if (newURL.equals(urlPath)) {
+                     msg.reportMessage("redirect loop: " + urlPath, null, -1, -1, MessageType.Error);
+                     return "Redirect loop: " + urlPath;
+                  }
+                  else {
+                     return saveURLToFile(newURL, fileName, unzip, msg);
+                  }
+               }
+
+            }
             MessageHandler.info(msg, "Response: " + hconn.getResponseCode());
             //System.out.println("*** " + hconn.getHeaderField("Location"));
          }
@@ -107,6 +121,7 @@ public class URLUtil {
       }
       finally {
          FileUtil.safeClose(fos);
+         FileUtil.safeClose(rbc);
       }
 
       MessageHandler.info(msg, "Completed download of url: " + urlPath + " into: ", fileName);

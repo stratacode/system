@@ -11,6 +11,7 @@ import sc.parser.Language;
 import sc.parser.Parselet;
 
 import java.util.IdentityHashMap;
+import java.util.List;
 
 /**
  * The semantic node interfaface is implemented by primarily SemanticNode and SemanticNodeList.  Instances of this interface
@@ -102,6 +103,8 @@ public interface ISemanticNode {
 
    public boolean getTransformed();
 
+   public boolean isStarted();
+
    public boolean isValidated();
 
    /** Regenerates the parsed description for this node */
@@ -145,9 +148,13 @@ public interface ISemanticNode {
    /** Returns true if this object equals the other object by comparing all other properties with deepEquals */
    public boolean deepEquals(Object other);
 
+   /** For debugging - produce a string representation of the diffs between two models */
+   public void diffNode(Object other, StringBuilder diffs);
+
    /** For nodes that are able to re-resolve themselves to the latest version, return the latest version.  otherwise returns this. */
    public ISemanticNode refreshNode();
 
    /** Most statements if started before the newline that signals a breakpoint should be considered the 'source statement' for that line.  Block statement is used to signal the end of the statement and is an exception.  */
    public boolean isTrailingSrcStatement();
+
 }

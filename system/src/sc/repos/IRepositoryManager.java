@@ -4,6 +4,7 @@
 
 package sc.repos;
 
+import sc.util.IClassResolver;
 import sc.util.IMessageHandler;
 
 /**
@@ -35,6 +36,11 @@ public interface IRepositoryManager {
 
    public RepositorySystem getRepositorySystem();
 
-   RepositorySource createRepositorySource(String url, boolean unzip);
+   RepositorySource createRepositorySource(String url, boolean unzip, RepositoryPackage parent);
+
+   /** Is this a repository which defines src (e.g. git) or binaries (e.g. mvn) */
+   public boolean isSrcRepository();
+
+   public IClassResolver getClassResolver();
 
 }

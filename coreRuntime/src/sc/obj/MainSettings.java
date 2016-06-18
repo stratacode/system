@@ -20,7 +20,9 @@ import java.lang.annotation.Target;
 public @interface MainSettings {
    String execName() default "";
    /** When true, a jar is created that contains the runtime files needed to run the application.  The name of the jar is based on the base name of the execName file (so for the command bin/sc it would be sc.jar) */
-   boolean produceJar() default false;   
+   boolean produceJar() default false;
+   /** Specifies the name of the jar file to use when produceJar is true.  If not specified, the default is to produce a file called 'execName'.jar */
+   public String jarFileName() default "";
    /** When true sc will produce a shell script to run the command using the execName. */
    boolean produceScript() default false;
    /** When produceScript is true use execCommandTemplate to specify the type name of a template file to use for generating the exec script.  If this is not set a default template is used.  The template is passed an instance of ExecCommandParameters to retrieve the command to run and type name */

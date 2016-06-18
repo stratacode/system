@@ -33,9 +33,8 @@ public class ParseNode extends AbstractParseNode {
       return semanticValue;
    }
 
-   public void setSemanticValue(Object val) {
-      if (semanticValue != null)
-      {
+   public void setSemanticValue(Object val, boolean clearOld) {
+      if (clearOld && semanticValue != null) {
          ParseUtil.clearSemanticValue(semanticValue, this);
          ParseUtil.clearSemanticValue(value, this);
       }
@@ -69,8 +68,11 @@ public class ParseNode extends AbstractParseNode {
    }
 
    public void format(FormatContext ctx) {
-      if (value instanceof IParseNode)
-         ((IParseNode)value).format(ctx);
+      if (value instanceof IParseNode) {
+         ((IParseNode) value).format(ctx);
+         if (ctx.replaceNode == this)
+            value = ctx.createReplaceNode();
+      }
       else
          ctx.append(value.toString());
    }
@@ -152,9 +154,18 @@ public class ParseNode extends AbstractParseNode {
          Object childSV = childParseNode.getSemanticValue();
          if ((childSV instanceof ISemanticNode)) {
             ISemanticNode childSVNode = (ISemanticNode) childSV;
-            if (childSVNode.getParseNode() == childParseNode) {
+            Object childSVParseNode = childSVNode.getParseNode();
+            if (childSVParseNode == childParseNode) {
                ParseUtil.styleString(adapter, childSV, childParseNode.getParselet().styleName, null, false);
                return;
+            }
+            // TODO: This only handles 1-level of parseNode wrapped in parseNode.  We might need more than one for some grammars?
+            else if (childParseNode instanceof ParseNode) {
+               Object childValue = ((ParseNode) childParseNode).value;
+               if (childSVParseNode == childValue && childValue instanceof IParseNode) {
+                  ParseUtil.styleString(adapter, childSV, ((IParseNode) childValue).getParselet().styleName, null, false);
+                  return;
+               }
             }
          }
          res = childParseNode.toString();
@@ -268,17 +279,25 @@ public class ParseNode extends AbstractParseNode {
       return value;
    }
 
-   public int resetStartIndex(int ix) {
-      startIndex = ix;
+   public int resetStartIndex(int ix, boolean validate, boolean updateNewIndex) {
+      if (validate && getStartIndex() != ix)
+         System.err.println("*** Invalid start index found");
+      if (!updateNewIndex) {
+         startIndex = ix;
+         newStartIndex = -1;
+      }
+      else {
+         newStartIndex = ix;
+      }
       if (value != null) {
          if (value instanceof IParseNode) {
-            return ((IParseNode) value).resetStartIndex(ix);
+            return ((IParseNode) value).resetStartIndex(ix, validate, updateNewIndex);
          }
          else if (value instanceof CharSequence) {
-            return startIndex + ((CharSequence) value).length();
+            return getStartIndex() + ((CharSequence) value).length();
          }
       }
-      return startIndex;
+      return getStartIndex();
    }
 
    public int getSemanticLength() {
@@ -290,6 +309,67 @@ public class ParseNode extends AbstractParseNode {
             return pnode.getSemanticLength();
       }
       return length();
+   }
+
+   @Override
+   public void findStartDiff(DiffContext ctx, boolean atEnd, Object parSemVal, ParentParseNode parParseNode, int childIx) {
+      if (value instanceof IParseNode) {
+         ((IParseNode) value).findStartDiff(ctx, atEnd, null, null, -1);
+         if (ctx.firstDiffNode != null)
+            ctx.addChangedParent(this);
+      }
+      else if (value instanceof CharSequence) {
+         CharSequence parsedText = (CharSequence) value;
+         int plen = parsedText.length();
+         String text = ctx.text;
+         int startChange = ctx.startChangeOffset;
+         int textLen = text.length();
+         for (int i = 0; i < plen; i++) {
+            if (startChange >= textLen || parsedText.charAt(i) != text.charAt(startChange)) {
+               if (DiffContext.debugDiffContext)
+                  ctx = ctx;
+               ctx.firstDiffNode = this;
+               ctx.beforeFirstNode = ctx.lastVisitedNode.getParselet().getBeforeFirstNode(ctx.lastVisitedNode);
+               ctx.startChangeOffset = startChange;
+               return;
+            }
+            else
+               startChange++;
+         }
+         ctx.startChangeOffset = startChange;
+         if (atEnd && textLen > startChange) {
+            ctx.firstDiffNode = this;
+            ctx.beforeFirstNode = ctx.firstDiffNode;
+         }
+      }
+   }
+
+   @Override
+   public void findEndDiff(DiffContext ctx, Object parSemVal, ParentParseNode parParseNode, int childIx) {
+      if (value instanceof IParseNode) {
+         ((IParseNode) value).findEndDiff(ctx, null, null, -1);
+      }
+      else if (value instanceof CharSequence) {
+         CharSequence parsedText = (CharSequence) value;
+         int plen = parsedText.length();
+         String text = ctx.text;
+         for (int i = plen - 1; i >= 0; i--) {
+            if (parsedText.charAt(i) != text.charAt(ctx.endChangeNewOffset)) {
+               ctx.lastDiffNode = this;
+               ctx.afterLastNode = ctx.lastVisitedNode;
+               ctx.addSameAgainChildren(ctx.lastVisitedNode);
+               return;
+            }
+            else {
+               ctx.endChangeOldOffset--;
+               ctx.endChangeNewOffset--;
+            }
+         }
+      }
+   }
+
+   public boolean isErrorNode() {
+      return errorNode || (value instanceof IParseNode && ((IParseNode) value).isErrorNode());
    }
 }
 

@@ -8,7 +8,6 @@ import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
 import sc.layer.LayeredSystem;
 
-import java.lang.reflect.WildcardType;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -65,12 +64,16 @@ public class BoundType extends JavaType {
       return baseType;
    }
 
-   public Object getTypeDeclaration(ITypeParamContext ctx, boolean resolve) {
-      return getFirstType().getTypeDeclaration(ctx, resolve);
+   public Object getTypeDeclaration(ITypeParamContext ctx, ITypeDeclaration itd, boolean resolve, boolean refreshParams, boolean bindUnbound) {
+      return getFirstType().getTypeDeclaration(ctx, itd, resolve, refreshParams, bindUnbound);
    }
 
    public void initType(LayeredSystem sys, ITypeDeclaration itd, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer, Object typeParam) {
       getFirstType().initType(sys, itd, node, ctx, displayError, isLayer, typeParam);
+   }
+
+   public void convertToSrcReference() {
+      getFirstType().convertToSrcReference();
    }
 
    public String getBaseSignature() {

@@ -5,7 +5,6 @@
 package sc.parser;
 
 import sc.lang.ISemanticNode;
-import sc.lang.java.IfStatement;
 import sc.util.PerfMon;
 
 import java.util.ArrayList;
@@ -21,7 +20,8 @@ public class ParentParseNode extends AbstractParseNode {
    // The semantic value (if any) 
    public Object value;
 
-   public ParentParseNode() {}
+   public ParentParseNode() {
+   }
 
    public ParentParseNode(Parselet p) {
       this.parselet = (NestedParselet) p;
@@ -39,13 +39,15 @@ public class ParentParseNode extends AbstractParseNode {
       return value;
    }
 
-   public void setSemanticValue(Object val) {
+   public void setSemanticValue(Object val, boolean clearOld) {
+      if (val == value)
+         return;
       // First clear out the old value
-      if (value != null) {
+      if (clearOld && value != null) {
          ParseUtil.clearSemanticValue(value, this);
 
          if (children != null) {
-            for (Object p:children) {
+            for (Object p : children) {
                ParseUtil.clearSemanticValue(p, this);
             }
          }
@@ -55,7 +57,148 @@ public class ParentParseNode extends AbstractParseNode {
          ((ISemanticNode) value).setParseNode(this);
    }
 
-   public void add(Object node, Parselet p, int index, boolean skipSemanticValue, Parser parser) {
+   public boolean addForReparse(Object node, Parselet p, int svIndex, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, Object oldChildParseNode, DiffContext dctx,
+                                boolean removeExtraNodes, boolean parseArray) {
+      // If there's no old value or we are inserting off the end, we must be inserting a new value
+      if (children == null || childIndex >= children.size())
+         return add(node, p, svIndex, slotIndex, skipSemanticValue, parser);
+      else {
+         boolean insert = false;
+
+         if (node instanceof IParseNode) {
+            IParseNode pnode = (IParseNode) node;
+            Parselet childParselet = pnode.getParselet();
+
+            if (!childParselet.addReparseResultToParent(pnode, this, svIndex, childIndex, slotIndex, parser, oldChildParseNode, dctx, removeExtraNodes, parseArray))
+               return false;
+         }
+
+         if (node != oldChildParseNode) {
+            Object oldNode = children.get(childIndex);
+            if (parseArray && oldNode instanceof IParseNode) {
+               IParseNode oldPN = (IParseNode) oldNode;
+               // If this parse-node has not been reparsed yet (otherwise, we will duplicate it
+               if (oldPN.getNewStartIndex() == -1) {
+                  int startIx = oldPN.getOrigStartIndex();
+                  // If the old parse-node in the matching slot fits in nicely after this one, just insert it rather than replacing it.  SameAgain may not be true here even after we've passed
+                  // the
+                  if (startIx + dctx.getNewOffsetForOldPos(startIx) >= parser.currentIndex) {
+                     // If this node occupies no space we can't insert because we move a valid node
+                     if (node != null)
+                        insert = true;
+                  }
+               }
+            }
+            if (!insert) {
+               if (node != children.get(childIndex)) {
+                  Object replaced = children.set(childIndex, node);
+               }
+            }
+            else {
+               children.add(childIndex, node);
+            }
+         }
+
+         if (removeExtraNodes) {
+            clearParsedOldNodes(parser, childIndex + 1, dctx);
+         }
+
+         // Need to call this even if the parse node did not change.  A child of the parse-node might have changed.  This will
+         // cause some properties to be changed to the same value but it may be good to signal the model that something underneath
+         // has changed.
+         return parselet.setSemanticValue(this, node, svIndex, slotIndex, skipSemanticValue, parser, false, true);
+      }
+   }
+
+   public void cullUnparsedNodes(Parser parser, int startChild, DiffContext dctx) {
+      int sz = children.size();
+      for (int c = startChild; c < sz; c++) {
+         Object oldChild = children.get(c);
+         if (oldChild instanceof IParseNode) {
+            IParseNode oldPN = (IParseNode) oldChild;
+            int oldChildLen = oldPN.length();
+            // We've already reparsed this old parse node so it must be in the right place.
+            if (oldPN.getNewStartIndex() != -1)
+               break;
+
+            int oldStartOld = oldPN.getOrigStartIndex();
+            int oldStartNew = oldStartOld + dctx.getNewOffsetForOldPos(oldStartOld + oldChildLen);
+            if (oldStartNew >= parser.currentIndex) {
+               parselet.removeForReparse(parser, this, c);
+               int newSz = children.size();
+               // If we removed one readjust...
+               if (newSz != sz) {
+                  sz = newSz;
+                  c--;
+               }
+            }
+            else
+               break;
+         }
+         // else - should we handle StringTokens here?  We could compute the startIndex relative to the parent and do the same thing?
+      }
+   }
+
+   public void clearParsedOldNodes(Parser parser, int startIx, DiffContext dctx) {
+      int sz = children.size();
+      for (int c = startIx; c < sz; c++) {
+         Object oldChild = children.get(c);
+         if (oldChild instanceof IParseNode) {
+            IParseNode oldPN = (IParseNode) oldChild;
+            int oldChildLen = oldPN.length();
+            // We've already reparsed this old parse node so it must be in the right place.
+            if (oldPN.getNewStartIndex() != -1)
+               break;
+
+            int oldStartOld = oldPN.getOrigStartIndex();
+            int oldStartNew = oldStartOld + dctx.getNewOffsetForOldPos(oldStartOld + oldChildLen);
+            // If the entire old next parse-node exists before the currently parsed contents we cull these nodes.
+            // For zero length nodes that are on the boundary, we also remove to keep them from hanging around.
+
+            // For re24 - UnitConverter4 must detect that we remove the misparsed block statement so we can reuse the rest.
+            //if (oldStartNew + oldChildLen < parser.currentIndex || (oldChildLen == 0 && oldStartNew == parser.currentIndex))
+            if (oldStartNew + oldChildLen <= parser.currentIndex || (parser.atEOF() && oldStartNew >= parser.currentIndex)) {
+               // Used to have this test to avoid removing old parse nodes in the same again region which we haven't reached yet but
+               /* caused us to we fail to remove parse-nodes we need to remove to do efficient incremental reparses.
+               if (!dctx.sameAgain && oldStart > dctx.endChangeOldOffset) {
+                  System.out.println("***");
+                  //break;
+               }
+               */
+               parselet.removeForReparse(parser, this, c);
+               int newSz = children.size();
+               // If we removed one readjust...
+               if (newSz != sz) {
+                  sz = newSz;
+                  c--;
+               }
+            }
+            else
+               break;
+         }
+         // else - should we handle StringTokens here?  We could compute the startIndex relative to the parent and do the same thing?
+      }
+   }
+
+   public boolean removeForReparse(int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser) {
+      // If there's no old value or we are inserting off the end, we must be inserting a new value
+      if (children == null || childIndex >= children.size()) {
+         System.err.println("*** Unable to remove parse node - no children");
+         return false;
+      }
+      else {
+         Object node = children.remove(childIndex);
+         return parselet.removeFromSemanticValue(this, node, childIndex, slotIndex, skipSemanticValue, parser, false, true);
+      }
+   }
+
+   /**
+    * Adds a child parse node to this parent node for the given child parselet.  The svIndex can be used for multi-valued
+    * parselets to add the semantic-value to a specific array index for reparsing.  Usually it's -1 for appending the element.
+    * The index specifies the slot index of the parselet 'p' in the parent.  If skipSemanticValue is true, the parse node is
+    * added without updating the semantic value.
+    */
+   public boolean add(Object node, Parselet p, int svIndex, int index, boolean skipSemanticValue, Parser parser) {
       if (children == null)
          children = new ArrayList<Object>(parselet.parselets.size());
 
@@ -65,14 +208,19 @@ public class ParentParseNode extends AbstractParseNode {
       // we'll just accumulate one string as our value.  When this guy gets 
       // added to its parentNode, it will get removed and the string goes on to represent
       // all of this element's children.
-      if (node instanceof StringToken) {
-         if (p.getDiscard() || p.getLookahead())
-            return;
+      if (node instanceof StringToken || node == null) {
+         if (p.getDiscard() || p.getLookahead()) {
+            if (node != null)
+               return false;
+            // TODO: else - is this the right code path here?
+         }
          if (p.skip && !(parselet.needsChildren())) {
             if (children.size() == 1) {
                Object child = children.get(0);
                if (child instanceof StringToken) {
-                  children.set(0, StringToken.concatTokens((StringToken)child, (StringToken)node));
+                  // For null nodes, be careful not to add an empty slot here cause then the next string won't get appended
+                  if (node != null)
+                     children.set(0, StringToken.concatTokens((StringToken) child, (StringToken) node));
                   addChild = false;
                }
             }
@@ -80,9 +228,9 @@ public class ParentParseNode extends AbstractParseNode {
       }
       else if (node instanceof String) {
          if (p.discard || p.lookahead)
-            return;
+            return false;
          if (p.skip && !(parselet.needsChildren())) {
-            if (children.size() == 1)  {
+            if (children.size() == 1) {
                Object child = children.get(0);
                if (child instanceof String) { // TODO: should this be PString.isString?  See issue#24 where we are not collapsing string tokens into a single parse node
                   // this is n*n - the need to avoid the Strings...
@@ -97,15 +245,23 @@ public class ParentParseNode extends AbstractParseNode {
          Parselet childParselet = pnode.getParselet();
 
          if (!childParselet.addResultToParent(pnode, this, index, parser))
-            return;
+            return false;
       }
 
       if (addChild)
          children.add(node);
 
       // Only nested parselets should be using the ParentParseNode
-      parselet.setSemanticValue(this, node, index, skipSemanticValue, parser, false);
+      return parselet.setSemanticValue(this, node, svIndex, index, skipSemanticValue, parser, false, false);
    }
+
+   public void addOrSet(Object node, Parselet p, int svIndex, int index, boolean skipSemanticValue, Parser parser) {
+      if (children.size() > index)
+         set(node, p, index, skipSemanticValue, parser);
+      else
+         add(node, p, svIndex, index, skipSemanticValue, parser);
+   }
+
 
    public void set(Object node, Parselet p, int index, boolean skipSemanticValue, Parser parser) {
       boolean setChild = true;
@@ -153,7 +309,7 @@ public class ParentParseNode extends AbstractParseNode {
          children.set(index, node);
 
       // Only nested parselets should be using the ParentParseNode
-      parselet.setSemanticValue(this, node, index, skipSemanticValue, parser, true);
+      parselet.setSemanticValue(this, node, -1, index, skipSemanticValue, parser, true, false);
    }
 
    public void addGeneratedNode(Object node) {
@@ -222,7 +378,7 @@ public class ParentParseNode extends AbstractParseNode {
       return len;
    }
    public String toString() {
-      return formatString(null, null, -1);
+      return formatString(null, null, -1, false);
    }
 
    private FormatContext createFormatContext(Object parSemVal, ParentParseNode curParseNode, int curChildIndex) {
@@ -242,7 +398,7 @@ public class ParentParseNode extends AbstractParseNode {
     * If null is specified, it's no problem as long as this parse-node's semantic value has a parent.  Some primitive parse nodes have a string
     * semantic value with no ref to their parent.  For the spacing to be computed properly we need this context (for FormatContext.getNextSemanticValue())
     */
-   public String formatString(Object parSemVal, ParentParseNode curParseNode, int curChildIndex) {
+   public String formatString(Object parSemVal, ParentParseNode curParseNode, int curChildIndex, boolean replaceFormatting) {
       // If the parse node is generated, we need to use the formatting process to add in
       // the spacing.  If the parse node was parsed, we toString it just as it
       // was parsed so we get back the identical input strings.
@@ -251,6 +407,7 @@ public class ParentParseNode extends AbstractParseNode {
       // If there's overhead here, we could still optimize the case where there are no invalidated children nodes
       if (isGeneratedTree()) {
          FormatContext ctx = createFormatContext(parSemVal, curParseNode, curChildIndex);
+         ctx.replaceFormatting = replaceFormatting;
          //ctx.append(FormatContext.INDENT_STR);
          PerfMon.start("format", false);
          format(ctx);
@@ -349,14 +506,19 @@ public class ParentParseNode extends AbstractParseNode {
 
       FormatContext.Entry ent = visitForFormat(ctx);
       try {
-         for (Object p:children) {
+         int len = children.size();
+         for (int i = 0; i < len; i++) {
+            Object p = children.get(i);
             if (p instanceof IParseNode) {
                IParseNode node = (IParseNode) p;
                Parselet parselet = node.getParselet();
                if (parselet == null)
                   node.format(ctx);
-               else
+               else {
                   parselet.format(ctx, node);
+                  if (ctx.replaceNode == node)
+                     children.set(i, ctx.createReplaceNode());
+               }
             }
             else if (p != null) {
                ctx.append((CharSequence) p);
@@ -676,6 +838,21 @@ public class ParentParseNode extends AbstractParseNode {
       return res;
    }
 
+   public ParentParseNode shallowCopy() {
+      ParentParseNode res = (ParentParseNode) super.clone();
+      ArrayList<Object> newChildren;
+      if (children != null) {
+         res.children = newChildren = new ArrayList<Object>(children.size());
+         for (Object child:children) {
+            if (child instanceof IParseNode)
+               newChildren.add(child);
+            else
+               newChildren.add(child);
+         }
+      }
+      return res;
+   }
+
    public void updateSemanticValue(IdentityHashMap<Object, Object> oldNewMap) {
       if (value != null && value instanceof ISemanticNode) {
          ISemanticNode oldVal = (ISemanticNode) value;
@@ -825,8 +1002,16 @@ public class ParentParseNode extends AbstractParseNode {
       return false;
    }
 
-   public int resetStartIndex(int ix) {
-      startIndex = ix;
+   public int resetStartIndex(int ix, boolean validate, boolean updateNewIndex) {
+      if (validate && ix != getStartIndex())
+         System.out.println("*** Invalid start index found");
+      if (!updateNewIndex) {
+         startIndex = ix;
+         newStartIndex = -1;
+      }
+      else {
+         newStartIndex = ix;
+      }
 
       if (children != null) {
          int sz = children.size();
@@ -834,7 +1019,7 @@ public class ParentParseNode extends AbstractParseNode {
             Object child = children.get(i);
             if (child != null) {
                if (child instanceof IParseNode) {
-                  ix = ((IParseNode) child).resetStartIndex(ix);
+                  ix = ((IParseNode) child).resetStartIndex(ix, validate, updateNewIndex);
                }
                else if (child instanceof CharSequence) {
                   ix += ((CharSequence) child).length();
@@ -845,7 +1030,152 @@ public class ParentParseNode extends AbstractParseNode {
       return ix;
    }
 
-}
+   public boolean isLastChild(int ix) {
+      if (children == null)
+         return true;
 
+      int sz = children.size();
+      int lastIx = sz - 1;
+      if (lastIx == ix)
+         return true;
+      while (lastIx > ix && children.get(lastIx) == null)
+         lastIx--;
+      return lastIx == ix;
+   }
+
+   public void findStartDiff(DiffContext ctx, boolean atEnd, Object parSemVal, ParentParseNode parParseNode, int childIx) {
+      if (parselet != null && parselet.trace)
+         ctx = ctx;
+      if (children == null) {
+         return;
+      }
+      int sz = children.size();
+      for (int i = 0; i < sz; i++) {
+         Object child = children.get(i);
+         if (child != null) {
+            boolean lastChild = isLastChild(i);
+            boolean last = atEnd && lastChild;
+            if (child instanceof IParseNode) {
+               IParseNode childNode = (IParseNode) child;
+               childNode.findStartDiff(ctx, last, getSemanticValue(), this, i);
+               if (ctx.firstDiffNode != null) {
+                  ctx.addChangedParent(this);
+                  return;
+               }
+               // ARG - this doesn't work because we don't have a way to tease apart the boundary at the edge.  In some cases we want to include
+               // an entire parent parse-node with it's children
+               //if (!last || !endsWithError)
+               //if (i == 0 || !(childNode instanceof ErrorParseNode))
+               if (!childNode.isErrorNode())
+                  ctx.lastVisitedNode = childNode;
+               // else - this node ends with an error so don't mark it as visited
+            }
+            else if (child instanceof CharSequence) {
+               CharSequence childSeq = (CharSequence) child;
+               int len = childSeq.length();
+               int startChange = ctx.startChangeOffset;
+               String text = ctx.text;
+               int textLen = text.length();
+               for (int c = 0; c < len; c++) {
+                  if (startChange >= textLen || childSeq.charAt(c) != text.charAt(startChange)) {
+                     if (DiffContext.debugDiffContext)
+                        ctx = ctx;
+                     ctx.firstDiffNode = this;
+                     // Is there any content inside of this node?  If so, the change starts inside the node.  Otherwise,
+                     // we need to choose the previous node so we "bracket" the changed region.
+                     // TODO: In test re22/GenerateUCs32.sc - we detect the change inside of the first space so c == 1 here
+                     // clear '2' is not right here - maybe we always use the lastVisitedNode?   Should we always do this for
+                     // spacing parselets by adding a new 'glueContent' or something attribute to the parselet?
+                     if (c < 2) {
+                        IParseNode lastVisited = ctx.lastVisitedNode;
+                        if (lastVisited != null)
+                           ctx.beforeFirstNode = lastVisited.getParselet().getBeforeFirstNode(lastVisited);
+                        else
+                           ctx.beforeFirstNode = this;
+                     }
+                     else
+                        ctx.beforeFirstNode = this;
+                     ctx.startChangeOffset = startChange;
+                     return;
+                  }
+                  else {
+                     startChange++;
+                  }
+               }
+               ctx.startChangeOffset = startChange;
+               if (last && text.length() > startChange) {
+                  ctx.firstDiffNode = this;
+                  // Not using lastVisitedNode since in this case the containing parent node tree is all we need to find
+                  // the right place to start changes.
+                  ctx.beforeFirstNode = ctx.firstDiffNode;
+                  return;
+               }
+            }
+         }
+      }
+   }
+
+   public void findEndDiff(DiffContext ctx, Object parSemVal, ParentParseNode parParseNode, int childIx) {
+      if (children == null) {
+         return;
+      }
+      int sz = children.size();
+      IParseNode lastChildNode = null;
+      for (int i = sz - 1; i >= 0; i--) {
+         Object child = children.get(i);
+         if (child != null) {
+            if (child instanceof IParseNode) {
+               IParseNode childNode = (IParseNode) child;
+               childNode.findEndDiff(ctx, getSemanticValue(), this, i);
+               if (ctx.lastDiffNode != null) {
+                  // If the lastDiff is a child of the firstDiffNode, we won't find it as we prune the first diff node
+                  // Instead, treat the entire node as changed.
+                  if (ctx.firstDiffNode == this) {
+                     ctx.lastDiffNode = this;
+                  }
+                  // Also reset the afterLastNode if it happens to be the last child we've processed.  Once we are processing
+                  // a change,
+                  /*  this ends up marking way too much as changed in some cases */
+                  /*
+                  if (ctx.afterLastNode == lastChildNode) {
+                     //ctx.afterLastNode = this;
+                  }
+                  */
+                  return;
+               }
+               lastChildNode = childNode;
+            }
+            else if (child instanceof CharSequence) {
+               CharSequence childSeq = (CharSequence) child;
+               int len = childSeq.length();
+               String text = ctx.text;
+               for (int c = len - 1; c >= 0 && ctx.endChangeNewOffset >= 0 && ctx.endChangeOldOffset >= 0; c--) {
+                  if (childSeq.charAt(c) != text.charAt(ctx.endChangeNewOffset)) {
+                     ctx.lastDiffNode = this;
+                     // TODO: if c != 0 or c != len - 1 can we optimize this and choose this node instead of the "afterLast' node
+                     ctx.afterLastNode = ctx.lastVisitedNode;
+                     ctx.addSameAgainChildren(ctx.afterLastNode);
+                     break;
+                  }
+                  else {
+                     ctx.endChangeOldOffset--;
+                     ctx.endChangeNewOffset--;
+                  }
+               }
+            }
+         }
+      }
+      ctx.lastVisitedNode = this;
+   }
+
+   public void setErrorNode(boolean val) {
+      super.setErrorNode(val);
+      if (children != null) {
+         for (Object child:children)
+            if (child instanceof IParseNode)
+               ((IParseNode) child).setErrorNode(val);
+      }
+   }
+}
 
 

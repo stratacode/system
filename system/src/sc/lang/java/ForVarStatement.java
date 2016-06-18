@@ -231,4 +231,11 @@ public class ForVarStatement extends ForStatement implements IVariable {
       }
    }
 
+   public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append("for (" + type + " " + identifier + ":" + expression + ")");
+      if (statement != null)
+         sb.append(statement.toString());
+      return sb.toString();
+   }
 }

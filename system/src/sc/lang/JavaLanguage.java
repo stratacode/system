@@ -13,6 +13,7 @@ import sc.parser.*;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /** This is the main implementation class for the Java parser and grammar.  Like all languages 
@@ -32,6 +33,8 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
            "final",     "interface",   "static",     "void",      "class",
            "finally",   "long",        "strictfp",   "volatile",  "const",
            "float",     "native",      "super",      "while",     "enum"};
+
+   protected static final List<String> CLASS_LEVEL_KEYWORDS = Arrays.asList("class", "enum", "const", "final", "abstract", "native", "volatile", "public", "private", "interface", "transient", "synchronized");
 
    protected static Set<IString> JAVA_KEYWORD_SET = new HashSet<IString>(Arrays.asList(PString.toPString(JAVA_KEYWORDS)));
 
@@ -58,11 +61,13 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    Sequence openCloseSqBrackets = new Sequence("('','')", OPTIONAL | REPEAT, openSqBracket, closeSqBracket);
    Sequence dotStarTail = new Sequence("('','')", OPTIONAL, periodSpace, asterix);
 
-   Sequence imports = new Sequence("ImportDeclaration(,staticImport,identifier,)", REPEAT | OPTIONAL,
+   Sequence importDeclaration = new Sequence("ImportDeclaration(,staticImport,identifier,)",
                             new KeywordSpace("import"),
                             new KeywordSpace("static", OPTIONAL),
                             new Sequence("('','')", qualifiedIdentifier, dotStarTail),
                             semicolonEOL);
+
+   Sequence imports = new Sequence("([])", REPEAT | OPTIONAL, importDeclaration);
 
    KeywordChoice primitiveTypeName = new KeywordChoice("boolean", "byte", "short", "char", "int", "float", "long", "double", "void");
 
@@ -93,9 +98,10 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    }
    public Sequence optTypeArguments = new Sequence("(.)", OPTIONAL, typeArguments);
 
+   Sequence classTypeChainedTypes = new Sequence("ClassType(, typeName, typeArguments)", OPTIONAL | REPEAT, periodSpace, identifier, optTypeArguments);
+
    public Sequence classOrInterfaceType =
-           new Sequence("ClassType(typeName, typeArguments, chainedTypes)", identifier, optTypeArguments,
-                    new Sequence("ClassType(, typeName, typeArguments)", OPTIONAL | REPEAT, periodSpace, identifier, optTypeArguments));
+           new Sequence("ClassType(typeName, typeArguments, chainedTypes)", identifier, optTypeArguments, classTypeChainedTypes);
    {
       type.set(new OrderedChoice(classOrInterfaceType, primitiveType), openCloseSqBrackets);
    }
@@ -127,12 +133,15 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    public Sequence optExpression = new Sequence("(.)", OPTIONAL, expression);
 
-   Parselet skipBodyError = createSkipOnErrorParselet("}", Symbol.EOF);
+   Parselet skipBodyError = createSkipOnErrorParselet("<skipBodyError>", "}", Symbol.EOF);
+
+   // When parsing for errors with type declarations, we need to consume even the close } because we are looking for EOF as an exit parselet
+   Parselet skipTypeDeclError = createSkipOnErrorParselet("<skipTypeDeclError>", Symbol.EOF);
 
    public Sequence classBody = new Sequence("<classBody>(,[],)");
    public OrderedChoice classDeclarationWithoutModifiers = new OrderedChoice();
    public Sequence classDeclaration = new Sequence("<classDeclaration>(modifiers,.)");
-   Sequence block = new Sequence("BlockStatement(,statements,)");
+   public Sequence block = new Sequence("BlockStatement(,statements,)");
    public OrderedChoice blockStatements = new OrderedChoice("([],[],[])", REPEAT | OPTIONAL);
    {
       blockStatements.disableTagMode = true;
@@ -159,8 +168,10 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    Sequence innerCreator =
            new Sequence("NewExpression(typeArguments, typeIdentifier, *)", simpleTypeArguments, identifier, classCreatorRest);
 
+   public Sequence arrayElementExpression = new Sequence("ArrayElementExpression(arrayDimensions)", new Sequence("(,[],)", REPEAT, openSqBracket, expression, closeSqBracket));
+
    OrderedChoice identifierSuffix = new OrderedChoice(OPTIONAL,
-         new Sequence("ArrayElementExpression(arrayDimensions)", new Sequence("(,[],)", REPEAT, openSqBracket, expression, closeSqBracket)),
+         arrayElementExpression,
          new Sequence("IdentifierExpression(arguments)", arguments),
          new Sequence("TypedMethodExpression(,typeArguments,typedIdentifier,arguments)", periodSpace, simpleTypeArguments, identifier, arguments),
          new Sequence("(,,.)", periodSpace, newKeyword, innerCreator));
@@ -279,7 +290,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    // Note on this definition - we define a result class here and also propagate one.  If identifierSuffix returns
    // null we'll use the result class on this parent node and create a default IdentifierExpression.   If not, we
    // just set the identifiers property on the identifierSuffix object.
-   Sequence remainingIdentifiers = new Sequence("(,[])", REPEAT | OPTIONAL, periodSpace, identifier);
+   public Sequence remainingIdentifiers = new Sequence("(,[])", REPEAT | OPTIONAL, periodSpace, identifier);
    {
       // When matching "a." with enablePartialValues we need an empty string in there to tell the difference between "a" and "a."
       remainingIdentifiers.allowEmptyPartialElements = true;
@@ -304,6 +315,8 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       // Matching typeIdentifier - which can be either a type or an identifier expression first.  That type picks the right one at runtime.  After that we match type,
       // then primary since a type name can match more than a primary expression in some cases.
       methodReference.set(new OrderedChoice(new Sequence("TypeExpression(typeIdentifier,)", typeIdentifier, new Symbol(LOOKAHEAD, "::")), type, primary), new SymbolSpace("::"), optTypeArguments, new OrderedChoice(identifier, newKeyword));
+      // Since the first slot is an identifier, type, or expression make sure we at least fill in the :: before we consider this a method reference.
+      methodReference.minContentSlot = 1;
    }
 
    // Forward
@@ -330,6 +343,14 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    Sequence selectorExpression = new Sequence("SelectorExpression(selectors)", OPTIONAL, new Sequence("([])", REPEAT | OPTIONAL, selector));
    Sequence postfixUnaryExpression = new Sequence("PostfixUnaryExpression(operator)", OPTIONAL, new SemanticTokenChoice("++", "--"));
 
+   // This is a hook for other languages (like JS) to add to the endStatement symbol
+   /*
+   public SymbolChoiceSpace endStatement = new SymbolChoiceSpace(SKIP_ON_ERROR, ";");
+   {
+      endStatement.generateParseNode = new NewlineParseNode(";");
+   }
+   */
+   public SymbolSpace endStatement = semicolonEOL;
    ChainedResultSequence primaryExpression =
                                 // If the optional second part matches, we get either a SelectorExpress or PostFixUnary.  Set that's chainedExpression
                                 // property to the primary part of the expression.
@@ -393,6 +414,8 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    {
       lambdaParameters.ignoreEmptyList = false;
       lambdaExpression.set(lambdaParameters, new SymbolSpace("->"), lambdaBody);
+      // Don't parse () as a partial lambda expression - we need it to match at least the -> in slot 1 before we consider that a partial value
+      lambdaExpression.minContentSlot = 1;
    }
 
    Sequence assignment = new Sequence("AssignmentExpression(operator, rhs)", OPTIONAL, assignmentOperator, expression);
@@ -414,9 +437,12 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
                 new Sequence("(,[])", OPTIONAL | REPEAT, comma, annotationElementValuePair));
 
    // Simplify? Seems like we really just need Sequence("{", Sequence(OPTIONAL | REPEAT, annotationElementValue, comma), "}"
+   //public OrderedChoice annotationValue = new OrderedChoice("<annotationValue>", OPTIONAL,
+   //   new Sequence("(,.,)", openParen, new Sequence("(.)", OPTIONAL, annotationElementValuePairs), closeParenEOL),
+   //   new Sequence("(,.,)", openParen, elementValue, closeParenEOL));
+
    public OrderedChoice annotationValue = new OrderedChoice("<annotationValue>", OPTIONAL,
-      new Sequence("(,.,)", openParen, new Sequence("(.)", OPTIONAL, annotationElementValuePairs), closeParenEOL),
-      new Sequence("(,.,)", openParen, elementValue, closeParenEOL));
+                  new Sequence("(,.,)", openParen, new OrderedChoice("(.,.)", OPTIONAL, annotationElementValuePairs, elementValue), closeParenEOL));
 
    {
       annotation.set(new SymbolSpace("@"), typeName, annotationValue);
@@ -466,8 +492,8 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    // Forward declarations
    public OrderedChoice variableInitializer = new OrderedChoice("<variableInitializer>");
-   Sequence localVariableDeclaration = new Sequence("VariableStatement(variableModifiers, type, definitions):(.,.,.)");
-   Sequence localVariableDeclarationStatement = new Sequence("<localVariableDeclaration>(.,)", localVariableDeclaration, semicolonEOL);
+   public Sequence localVariableDeclaration = new Sequence("VariableStatement(variableModifiers, type, definitions):(.,.,.)");
+   public Sequence localVariableDeclarationStatement = new Sequence("<localVariableDeclaration>(.,)", localVariableDeclaration, endStatement);
    {
       arrayInitializer.set(
            openBrace,
@@ -478,10 +504,9 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       variableInitializer.set(arrayInitializer, expression);
    }
 
-   public Sequence variableDeclarator =
-       new Sequence("VariableDefinition(*,*)", 
-                    variableDeclaratorId, new Sequence("(operator,initializer)", OPTIONAL, variableInitializerOperators, variableInitializer));
-   Sequence variableDeclarators =
+   public Sequence variableDefinition = new Sequence("(operator,initializer)", OPTIONAL, variableInitializerOperators, variableInitializer);
+   public Sequence variableDeclarator = new Sequence("VariableDefinition(*,*)", variableDeclaratorId, variableDefinition);
+   public Sequence variableDeclarators =
        new Sequence("([],[])", variableDeclarator,
                     new Sequence("(,[])", OPTIONAL | REPEAT, comma, variableDeclarator));
 
@@ -496,9 +521,8 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    OrderedChoice forInit = new OrderedChoice(OPTIONAL, new Sequence("([])", localVariableDeclaration), expressionList);
    Sequence forVarControl = new Sequence("ForVarStatement(variableModifiers,type,identifier,,expression)",
                                          variableModifiers, type, identifier, colon, expression);
-   OrderedChoice forControl = new OrderedChoice(forVarControl,
-                        new Sequence("ForControlStatement(forInit,,condition,,repeat)", 
-                                     forInit, semicolon, optExpression, semicolon, optExpressionList));
+   Sequence forControlStatement = new Sequence("ForControlStatement(forInit,,condition,,repeat)", forInit, semicolon, optExpression, semicolon, optExpressionList);
+   OrderedChoice forControl = new OrderedChoice(forVarControl,forControlStatement);
    Sequence forStatement =
        new Sequence("(,,.,,statement)", new KeywordSpace("for"), openParen, forControl, closeParenSkipOnError, statement);
 
@@ -513,11 +537,27 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    private KeywordSpace whileKeyword = new KeywordSpace("while");
 
-   Sequence tryResources = new Sequence("(,[],[],,)", OPTIONAL, openParen, localVariableDeclaration, new Sequence("(,[])", REPEAT, semicolonEOL, localVariableDeclaration), optSemicolon, closeParenSkipOnError);
+   Sequence tryResources = new Sequence("(,[],[],,)", OPTIONAL, openParen, localVariableDeclaration, new Sequence("(,[])", OPTIONAL | REPEAT, semicolonEOL, localVariableDeclaration), optSemicolon, closeParenSkipOnError);
+
+   public Sequence syncStatement = new Sequence("SynchronizedStatement(,expression,statement)", new KeywordSpace("synchronized"), parenExpression, block);
 
    Sequence doStatement =
       new Sequence("WhileStatement(operator,statement,,expression,)", new KeywordSpace("do"), statement,
       whileKeyword, parenExpression, semicolonEOL);
+
+   Sequence whileStatement = new Sequence("WhileStatement(operator, expression, statement)", whileKeyword, parenExpression, statement);
+   Sequence catchStatement = new Sequence("CatchStatement(,parameters,statements)",  new KeywordSpace("catch"), catchParameter, block);
+   Sequence finallyStatement = new Sequence("FinallyStatement(,statements)", OPTIONAL, new KeywordSpace("finally"), block);
+   Sequence tryStatement = new Sequence("TryStatement(, resources, statements,*)", new KeywordSpace("try"), tryResources, block,
+                                        new Sequence("(catchStatements,finallyStatement)", new Sequence("([])", OPTIONAL | REPEAT, catchStatement), finallyStatement));
+   Sequence switchStatement = new Sequence("SwitchStatement(,expression,,statements,)", new KeywordSpace("switch"), parenExpression, openBraceEOL, switchBlockStatementGroups, closeBraceEOL);
+   Sequence returnStatement = new Sequence("ReturnStatement(operator,expression,)", new KeywordSpace("return"), optExpression, endStatement);
+   Sequence throwStatement = new Sequence("ThrowStatement(operator,expression,)", new KeywordSpace("throw"), expression, endStatement);
+   Sequence breakStatement = new Sequence("BreakContinueStatement(operator,labelName,)", new KeywordSpace("break"), optIdentifier, endStatement);
+   Sequence continueStatement = new Sequence("BreakContinueStatement(operator,labelName,)", new KeywordSpace("continue"), optIdentifier, endStatement);
+   Sequence assertStatement = new Sequence("AssertStatement(,expression,otherExpression,)", new KeywordSpace("assert"), expression, new Sequence("(,.)", OPTIONAL, colon, expression), endStatement);
+   Sequence exprStatement = new Sequence("<exprStatement>(.,)", expression, endStatement);
+   Sequence labelStatement = new Sequence("LabelStatement(labelName,,statement)", identifier, colonEOL, statement);
 
    {
       doStatement.suppressNewlines = true;
@@ -527,31 +567,21 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       statement.put("{", block);
       statement.put("if", ifStatement);
       statement.put("for", forStatement);
-      statement.put("while", new Sequence("WhileStatement(operator, expression, statement)", whileKeyword, parenExpression, statement));
+      statement.put("while", whileStatement);
       statement.put("do", doStatement);
       // Note: this does not enforce the try must have one catch or finally rule.
-      statement.put("try",
-         new Sequence("TryStatement(, resources, statements,*)", new KeywordSpace("try"), tryResources, block,
-                      new Sequence("(catchStatements,finallyStatement)",
-                         new Sequence("([])", OPTIONAL | REPEAT,
-                               new Sequence("CatchStatement(,parameters,statements)",  new KeywordSpace("catch"),
-                                            catchParameter, block)),
-                         new Sequence("FinallyStatement(,statements)", OPTIONAL, new KeywordSpace("finally"), block))));
-      statement.put("switch", new Sequence("SwitchStatement(,expression,,statements,)", 
-                    new KeywordSpace("switch"), parenExpression, openBraceEOL, switchBlockStatementGroups, closeBraceEOL));
-      statement.put("synchronized", new Sequence("SynchronizedStatement(,expression,statement)",
-                    new KeywordSpace("synchronized"), parenExpression, block));
-      statement.put("return", new Sequence("ReturnStatement(operator,expression,)", new KeywordSpace("return"), optExpression, semicolonEOL));
-      statement.put("throw", new Sequence("ThrowStatement(operator,expression,)", new KeywordSpace("throw"), expression, semicolonEOL));
-      statement.put("break", new Sequence("BreakContinueStatement(operator,labelName,)", new KeywordSpace("break"), optIdentifier, semicolonEOL));
-      statement.put("continue", new Sequence("BreakContinueStatement(operator,labelName,)", new KeywordSpace("continue"), optIdentifier, semicolonEOL));
-      statement.put("assert", new Sequence("AssertStatement(,expression,otherExpression,)", new KeywordSpace("assert"), expression,
-                                           new Sequence("(,.)", OPTIONAL, colon, expression), semicolonEOL));
+      statement.put("try",tryStatement);
+      statement.put("switch", switchStatement);
+      statement.put("synchronized", syncStatement);
+      statement.put("return", returnStatement);
+      statement.put("throw", throwStatement);
+      statement.put("break", breakStatement);
+      statement.put("continue", continueStatement);
+      statement.put("assert", assertStatement);
       statement.put(";", semicolonEOL);
 
       // Default rules in case the indexed ones do not match
-      statement.addDefault(new Sequence("<exprStatement>(.,)", expression, semicolonEOL),
-                           new Sequence("LabelStatement(labelName,,statement)", identifier, colonEOL, statement));
+      statement.addDefault(exprStatement, labelStatement);
 
       localVariableDeclaration.set(variableModifiers, type, variableDeclarators);
 
@@ -603,6 +633,17 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
          };
    Sequence typedMemberDeclaration =
          new Sequence("(type,.)", type, new OrderedChoice(methodDeclaration, fieldDeclaration));
+   {
+      // We don't want just 'type' to match in an error handling scenario - we should match at least something in the method or field declaration or else
+      typedMemberDeclaration.minContentSlot = 1;
+   }
+
+   // The constructor - essentially a method without a return type.
+   Sequence constructorDeclaration = new Sequence("(name, .)", identifier, constructorDeclaratorRest);
+   {
+      // Don't match just the identifier when parsing errors
+      constructorDeclaration.minContentSlot = 1;
+   }
 
    public IndexedChoice memberDeclaration = new IndexedChoice("<memberDeclaration>");
    {
@@ -610,9 +651,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       memberDeclaration.put("interface",  interfaceDeclarationWithoutModifiers);
       memberDeclaration.put("@",  interfaceDeclarationWithoutModifiers);
       memberDeclaration.put("enum", classDeclarationWithoutModifiers);
-      memberDeclaration.addDefault(genericMethodOrConstructorDecl, typedMemberDeclaration,
-                                   // The constructor - essentially a method without a return type.
-                                   new Sequence("(name, .)", identifier, constructorDeclaratorRest));
+      memberDeclaration.addDefault(genericMethodOrConstructorDecl, typedMemberDeclaration, constructorDeclaration);
    }
 
    public Sequence memberDeclarationWithModifiers = new Sequence("(modifiers,.)", modifiers, memberDeclaration);
@@ -648,6 +687,10 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    KeywordChoice classModifierKeywords = new KeywordChoice(true, "public", "protected", "private", "abstract", "static", "final", "strictfp");
    public OrderedChoice classModifiers = new OrderedChoice("([],[])", OPTIONAL | REPEAT, annotation, classModifierKeywords);
 
+   /**
+    * The list of operators for defining a new type - this is a choice because SCLanguage needs to add to this list and it's easier to add to it then to
+    * replace all references to a new one.
+    */
    public KeywordChoice classOperators = new KeywordChoice("class");
 
    Sequence extendsType = new Sequence("<extends>(,.)", OPTIONAL, extendsKeyword, type);
@@ -664,6 +707,11 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    Sequence normalClassDeclaration =
        new Sequence("ClassDeclaration(operator,,typeName,typeParameters,extendsType,implementsTypes,body)",
                     classOperators, spacing, identifierSp, optTypeParameters, extendsType, implementsTypes, classBody);
+   {
+      // When parsing for errors, once we've seen the 'class' skip on error until we see the { so we can resume a misformed class definition
+      normalClassDeclaration.skipOnErrorSlot = 1;
+      normalClassDeclaration.skipOnErrorParselet = new Sequence("('')", OPTIONAL | REPEAT, new SymbolChoice(NOT, "extends", "implements", "{", "}", "\n", EOF));
+   }
 
    Sequence enumConstant = new Sequence("EnumConstant(modifiers,typeName,arguments,body)", annotations, identifier,
                                         optArguments,
@@ -715,20 +763,34 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       interfaceDeclaration.set(classModifiers, interfaceDeclarationWithoutModifiers);
    }
 
-   public OrderedChoice typeDeclaration = new OrderedChoice("(.,.,)", classDeclaration, interfaceDeclaration, semicolonEOL);
+   /**
+    * The semicolon in a typeDeclaration is part of the language spec - a concession to C programmers who put semis at the end of class declarations.
+    * Do not use semicolonEOL here because it has skip-on-error and we'd rather match a partial error in class or interface declaration
+    */
+   public OrderedChoice typeDeclaration = new OrderedChoice("(.,.,)", classDeclaration, interfaceDeclaration, semicolon);
 
-   Sequence typeDeclarations = new Sequence("<types>([])", OPTIONAL | REPEAT, typeDeclaration);
+   // We could wrap typeDeclaration but it's more efficient to avoid the extra sequence here and we need to set skipBodyError.  Keeping typeDeclaration so we can style a TypeDeclaration without
+   // wrapping it in an array
+   OrderedChoice typeDeclarations = new OrderedChoice("<typeDeclarations>([],[],)", OPTIONAL | REPEAT, classDeclaration, interfaceDeclaration, semicolon);
+   {
+      typeDeclarations.skipOnErrorParselet = skipTypeDeclError;
+   }
 
    Sequence packageDeclaration = new Sequence("Package(annotations,,name,)", OPTIONAL);
 
    public Sequence languageModel = new Sequence("JavaModel(,packageDef, imports, types)", spacing, packageDeclaration, imports, typeDeclarations);
+   {
+      // Should we set this?  We really need the language model to parse as best as it can
+      //languageModel.skipOnErrorSlot = 1;
+   }
 
    // TODO: refactor this to use languageModel and pass it through as the result type of compilationUnit
    public Sequence compilationUnit = new Sequence("JavaModel(,packageDef,imports,types,)");
 
    {
       compilationUnit.add(spacing, packageDeclaration, imports, typeDeclarations, new Symbol(EOF));
-      packageDeclaration.add(annotations, new KeywordSpace("package"), qualifiedIdentifier, semicolonEOL);
+      compilationUnit.skipOnErrorSlot = 1;
+      packageDeclaration.add(annotations, new KeywordSpace("package"), qualifiedIdentifier, semicolonNewline);
    }
 
    Sequence modelList = new Sequence("([])", OPTIONAL | REPEAT, languageModel);
@@ -825,6 +887,10 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    public boolean getSupportsLongTypeSuffix() {
       return true;
+   }
+
+   public List<String> getClassLevelKeywords() {
+      return CLASS_LEVEL_KEYWORDS;
    }
 
 }

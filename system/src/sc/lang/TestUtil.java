@@ -14,9 +14,11 @@ import sc.util.ExtensionFilenameFilter;
 import sc.util.FileUtil;
 import sc.util.StringUtil;
 
+import java.io.Console;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.StringReader;
+import java.text.DecimalFormat;
 import java.util.*;
 
 public class TestUtil {
@@ -122,8 +124,9 @@ public class TestUtil {
            */
    };
 
-   public static void main(String[] args) {
+   public static int numErrors = 0;
 
+   public static void main(String[] args) {
       TestOptions opts = new TestOptions();
 
       List<String> buildList = null;
@@ -209,6 +212,9 @@ public class TestUtil {
                      usage(args);
                   opts.finalGenerate = false;
                   break;
+               case 'q':
+                  quietOutput = true;
+                  break;
                case 'p':
                   if (opt.length() > 1)
                      usage(args);
@@ -220,18 +226,57 @@ public class TestUtil {
                   opts.layerMode = true;
                   break;
                case 'r':
-                  if (opt.length() > 1)
-                     usage(args);
-                  try {
-                     if (args.length < i + 1)
-                        System.err.println("*** No count argument to -r option for repeating the parse <n> times. ");
-                     else {
+                  if (opt.length() > 1) {
+                     if (opt.equals("rp")) {
                         i++;
-                        opts.repeatCount = Integer.parseInt(args[i]);
+                        if (args.length < i + 1)
+                           System.err.println("*** No file argument to -rp option for reparsing files.");
+                        else {
+                           String rpArg = args[i];
+                           opts.reparseFiles = rpArg.split(",");
+                        }
                      }
+                     else if (opt.equals("ri")) {
+                        i++;
+                        if (args.length < i + 1)
+                           System.err.println("*** No file argument to -ri option for reparsing files.");
+                        else {
+                           String indexArg = args[i];
+                           opts.testArgsId = indexArg;
+                           String[] repeatArgs = indexArg.split(",");
+                           ArrayList<String> reparseIndexes = opts.reparseIndexes = new ArrayList<String>(Arrays.asList(repeatArgs));
+                           for (int curIx = 0; curIx < reparseIndexes.size(); curIx++) {
+                              String ra = reparseIndexes.get(curIx);
+                              int dashIx = ra.indexOf('-');
+                              if (dashIx != -1) {
+                                 reparseIndexes.remove(curIx);
+                                 String[] minMaxStr = ra.split("-");
+                                 int min = Integer.parseInt(minMaxStr[0]);
+                                 int max = Integer.parseInt(minMaxStr[1]);
+
+                                 for (int reparseIx = min; reparseIx <= max; reparseIx++) {
+                                    reparseIndexes.add(curIx, String.valueOf(reparseIx));
+                                    curIx++;
+                                 }
+                              }
+                           }
+                        }
+                     }
+                     else
+                        usage(args);
                   }
-                  catch (NumberFormatException exc) {
-                     System.err.println("*** bad value to repeat count");
+                  else {
+                     try {
+                        if (args.length < i + 1)
+                           System.err.println("*** No count argument to -r option for repeating the parse <n> times. ");
+                        else {
+                           i++;
+                           opts.repeatCount = Integer.parseInt(args[i]);
+                        }
+                     }
+                     catch (NumberFormatException exc) {
+                        System.err.println("*** bad value to repeat count");
+                     }
                   }
                   break;
                default:
@@ -242,7 +287,7 @@ public class TestUtil {
          }
          else {
             if (buildList == null)
-               buildList = new ArrayList<String>(args.length-1);
+               buildList = new ArrayList<String>(args.length - 1);
             buildList.add(args[i]);
          }
       }
@@ -266,7 +311,7 @@ public class TestUtil {
       else {
          if (opts.srcPath == null && buildList != null) {
             LinkedHashSet<String> srcDirs = new LinkedHashSet<String>();
-            for (String buildFile:buildList) {
+            for (String buildFile : buildList) {
                String parentDir = FileUtil.getParentPath(buildFile);
                if (parentDir == null)
                   srcDirs.add(".");
@@ -288,15 +333,32 @@ public class TestUtil {
                System.err.println("*** Find class name: " + opts.findClassName + " not found");
             }
             else {
-               System.out.println("Success - found " + opts.findClassName + ": " + res);
+               out("Success - found " + opts.findClassName + ": " + res);
             }
          }
       }
 
       if (dumpStats) {
-         System.out.println("*** Stats:");
-         System.out.println(Parser.getStatInfo(JavaLanguage.INSTANCE.compilationUnit));
+         out("*** Stats:");
+         out(Parser.getStatInfo(JavaLanguage.INSTANCE.compilationUnit));
       }
+
+      if (numErrors != 0) {
+         System.err.println("*** FAILED with " + numErrors + " errors");
+         System.exit(numErrors);
+      }
+   }
+
+   static void out(String message) {
+      if (!quietOutput)
+         System.out.println(message);
+      testOutput.append(message);
+      testOutput.append(FileUtil.LINE_SEPARATOR);
+   }
+
+   static void error(String message) {
+      numErrors++;
+      System.err.println(message);
    }
 
    static void usage(String[] args) {
@@ -308,6 +370,7 @@ public class TestUtil {
 
    static boolean verifyResults = true;
    static boolean dumpStats = false;
+   static boolean quietOutput = false;
 
    public static class TestOptions {
       boolean enableModelToString = false;
@@ -315,6 +378,7 @@ public class TestUtil {
       boolean finalGenerate = true;
       boolean enablePartialValues = false;
       boolean crossCompile = false;
+      boolean interactive = true;
       int repeatCount = 1;
       boolean layerMode = false;
       // If layerMode = true, the LayeredSystem used
@@ -323,18 +387,53 @@ public class TestUtil {
       String externalClassPath;
       String srcPath;
       String findClassName;
+      String[] reparseFiles;
+      ArrayList<String> reparseIndexes;
+
+      String testBaseName;
+      String testArgsId = "";
+
+      public String toString() {
+         StringBuilder sb = new StringBuilder();
+         sb.append("(");
+         boolean first = true;
+         if (enablePartialValues) {
+            sb.append("enablePartialValues");
+            first = false;
+         }
+         if (reparseIndexes != null) {
+            if (!first)
+               sb.append(" ,");
+            sb.append("reparse: ");
+            sb.append(reparseIndexes);
+            first = false;
+         }
+         return sb.toString();
+      }
    }
+
+   static StringBuilder testOutput = new StringBuilder();
 
    public static void parseTestFiles(Object[] inputFiles, TestOptions opts) {
       JavaLanguage.register();
       SCLanguage.register();
-      
+
+      out("Running language test: " + StringUtil.arrayToString(inputFiles) + ": options: " + opts.toString() + " in dir: " + System.getProperty("user.dir"));
+
+      ArrayList<String> reparseStats = new ArrayList<String>();
+
+      StringBuilder testVerifyOutput = new StringBuilder();
+      ArrayList<String> newModelErrors = new ArrayList<String>();
+
       for (Object fileObj : inputFiles) {
          String fileName;
          File file;
          if (fileObj instanceof File) {
             file = (File) fileObj;
             fileName = file.toString();
+
+            if (opts.testBaseName == null)
+               opts.testBaseName = FileUtil.removeExtension(fileName);
          }
          else {
             fileName = (String) fileObj;
@@ -343,6 +442,9 @@ public class TestUtil {
             else if (fileName.equals("-")) // stop processing files when we hit a -
                return;
             file = new File(fileName);
+
+            if (opts.testBaseName == null)
+               opts.testBaseName = FileUtil.removeExtension(fileName);
          }
          if (file.isDirectory()) {
             Object[] files;
@@ -374,6 +476,7 @@ public class TestUtil {
                lang = Language.getLanguageByExtension(ext);
                if (lang == null)
                   throw new IllegalArgumentException("No language for: " + file.getPath());
+               lang.debugReparse = true;
                result = lang.parse(fileName, new StringReader(input), lang.getStartParselet(), opts.enablePartialValues);
             }
             else {
@@ -408,21 +511,190 @@ public class TestUtil {
 
          long parseResultTime = System.currentTimeMillis();
 
-         System.out.println("*** parsed: " + fileName + " " + opts.repeatCount + (opts.repeatCount == 1 ? " time" : " times") + " in: " + rangeToSecs(startTime, parseResultTime));
+         out("Parsed: " + fileName + " " + opts.repeatCount + (opts.repeatCount == 1 ? " time" : " times") + " in: " + rangeToSecs(startTime, parseResultTime));
 
-         if (verifyResults) {
+         if (opts.reparseIndexes != null) {
+            opts.reparseFiles = new String[opts.reparseIndexes.size()];
+            int rix = 0;
+            String fileNoExt = FileUtil.removeExtension(fileName);
+            for (String reparseIndex:opts.reparseIndexes) {
+               opts.reparseFiles[rix] = FileUtil.addExtension(fileNoExt + reparseIndex, ext);
+               rix++;
+            }
+         }
+
+         if (opts.reparseFiles != null) {
+            for (String reparseFile:opts.reparseFiles) {
+               String reparsedString = ParseUtil.readFileString(new File(reparseFile));
+               if (reparsedString == null) {
+                  System.err.println("*** Unable to open -rp - reparse file: " + reparseFile);
+               }
+               else {
+                  if (result instanceof ParseError) {
+                     ParseError err = ((ParseError) result);
+                     result = err.getBestPartialValue();
+                  }
+                  /*
+                  if (reparseFile.contains("1")) {
+                     System.out.println("***");
+                     SCLanguage.getSCLanguage().classBodyDeclarations.trace = true;
+                     //JavaLanguage.getJavaLanguage().classBodyDeclarations.trace = true;
+                     SemanticNode.debugDiffTrace = true;
+
+                     //DiffContext.debugDiffContext = true;
+                  }
+                  */
+                  if (result == null)
+                     out("*** FAILURE: No previous result for reparse");
+
+                  // Reset the stats for each file
+                  lang.globalReparseCt = lang.globalParseCt = 0;
+
+                  Object newRes = ParseUtil.reparse((IParseNode) result, reparsedString);
+                  String reparseErrorMessage = null;
+                  if (newRes instanceof ParseError) {
+                     ParseError newErr = (ParseError) newRes;
+                     reparseErrorMessage = newErr.toString();
+                     Object newPV = newErr.getBestPartialValue();
+                     if (newPV == null)
+                        error("*** FAILURE: no reparse result!");
+                     else
+                        newRes = newPV;
+                  }
+
+                  if (verifyResults) {
+                     if (newRes instanceof IParseNode) {
+                        // We should have already updated the startIndex in all of the parse nodes but we are validating that they are set correctly here
+                        ((IParseNode) newRes).resetStartIndex(0, true, false);
+                     }
+
+                     Object reparsedModelObj = getTestResult(newRes);
+
+                     Object parseComplete = lang.parseString(reparsedString, opts.enablePartialValues);
+                     boolean parseError = false;
+                     if (parseComplete instanceof ParseError) {
+                        parseError = true;
+                        ParseError parseCompleteErr = (ParseError) parseComplete;
+                        String parseCompleteErrorMessage = parseCompleteErr.toString();
+                        if (reparseErrorMessage != null && !parseCompleteErrorMessage.equals(reparseErrorMessage))
+                           error("*** Error - reparse returned different error - reparse: " + reparseErrorMessage + " complete: " + parseCompleteErrorMessage);
+                        parseComplete = parseCompleteErr.getBestPartialValue();
+                        if (parseComplete == null)
+                           error("No partial value for file with syntax errors: " + reparseFile);
+                     }
+
+                     boolean exactMatch = false;
+                     boolean modelErrorsOk = false;
+                     if (parseComplete instanceof IParseNode) {
+                        Object reparseOrigObj = getTestResult(parseComplete);
+
+                        String newResStr = newRes.toString();
+                        String parseStr = parseComplete.toString();
+
+                        boolean reparseSameAsOrig = newResStr.equals(reparsedString);
+                        boolean parseSameAsOrig = parseStr.equals(reparsedString);
+                        boolean reparseSameAsParse = newResStr.equals(parseStr);
+
+                        if (parseError) { // NOTE: sometimes reparseError will be false - if we reparse a document that was originally an error and then is not changed on the reparse - we just return the original
+                           // If we have an error in both parse and reparse and everything else matches and we have at least a partial parse of the
+                           // value it's ok
+                           if (reparsedString.startsWith(newResStr) && reparsedString.startsWith(parseStr)) {
+                              if (reparseSameAsParse || reparseSameAsOrig)
+                                  parseSameAsOrig = reparseSameAsOrig = true;
+                              else {
+                                 error("*** FAILURE: Reparsed partial match does not match parsed partial match ");
+                              }
+                           }
+                        }
+
+                        if (!reparseSameAsOrig || !parseSameAsOrig || !reparseSameAsParse) {
+                           if (!parseSameAsOrig)
+                              error("*** PARSE FAILURE - parsed text does not match original - reparse matches parse: " + reparseSameAsParse);
+                           else {
+                              if (!reparseSameAsOrig)
+                                 error("*** REPARSE FAILURE - reparsed text does not match");
+                              else if (!newResStr.startsWith(parseStr) || newResStr.length() - 1 != parseStr.length())
+                                 error("*** REPARSE FAILURE - reparsed text does not match - parsed"); // is this possible?
+                           }
+                        }
+
+
+                        if (reparsedModelObj instanceof ISemanticNode) {
+                           // These must be inited so some properties get set which are compared - it would be nice to have a way to compare just the parsed models but we need two categories of these
+                           // semantic properties - cloned, parsed?
+                           ParseUtil.initComponent(reparseOrigObj);
+                           // Need to reinit so we catch the reparsed models - TODO: ideally we'd clear the inited flag of any parents who have children which are modified in the reparse so we only
+                           // have to reinit those.
+                           ParseUtil.reinitComponent(reparsedModelObj);
+                           StringBuilder diffs = new StringBuilder();
+                           ISemanticNode reparsedNode = (ISemanticNode) reparsedModelObj;
+                           reparsedNode.diffNode(reparseOrigObj, diffs);
+
+                           String modelNewErrorsFile = FileUtil.addExtension(FileUtil.removeExtension(reparseFile), "mismatch");
+                           String modelOkErrorsFile = FileUtil.addExtension(FileUtil.removeExtension(reparseFile), "mismatchOK");
+                           if (diffs.length() > 0) {
+                              String diffStr = diffs.toString();
+                              boolean saveNew = false;
+                              if (new File(modelOkErrorsFile).canRead()) {
+                                 String acceptErrors = FileUtil.getFileAsString(modelOkErrorsFile);
+                                 if (!acceptErrors.equals(diffStr)) {
+                                    error("*** Changed model errors for: " + reparseFile + " Old ok'd errors:\n" + acceptErrors);
+                                    System.err.println("New model errors:\n" + diffStr);
+                                    saveNew = true;
+                                 }
+                                 else {
+                                    modelErrorsOk = true;
+                                 }
+                              }
+                              else {
+                                 error("*** New model errors for: " + reparseFile + " old:\n" + diffStr);
+                                 saveNew = true;
+                              }
+                              if (saveNew) {
+                                 FileUtil.saveStringAsFile(modelNewErrorsFile, diffStr, false);
+                                 newModelErrors.add(modelNewErrorsFile);
+                              }
+                           }
+                           else {
+                              exactMatch = true;
+                              File modelErrorFile = new File(modelNewErrorsFile);
+                              if (modelErrorFile.canRead()) {
+                                 System.out.println("*** Warning - removing old model errors for: " + reparseFile);
+                                 modelErrorFile.delete();
+                              }
+                              File modelOkFile = new File(modelOkErrorsFile);
+                              if (modelOkFile.canRead()) {
+                                 System.out.println("*** Warning - removing ok'd old model errors for: " + reparseFile);
+                                 modelOkFile.delete();
+                              }
+                           }
+                        }
+                     }
+                     else if (parseComplete != null)
+                        error("*** Unrecognized return from reparse: " + parseComplete);
+
+                     double reparsePer = 100.0 * lang.globalReparseCt / (double) lang.globalParseCt;
+                     String per = new DecimalFormat("#").format(reparsePer);
+                     reparseStats.add(per);
+                     out("Reparsed: " + reparseFile + ": "  + per + "% nodes (" + lang.globalReparseCt + "/" + lang.globalParseCt + ")" +
+                         (exactMatch ? "" : (modelErrorsOk ? " ok'd modelMismatch" : " modelMismatch")));
+                  }
+               }
+            }
+         }
+         else if (verifyResults) {
             if (result == null || !input.equals(result.toString())) {
                if (result instanceof ParseError)
-                  System.out.println("File: " + fileName + ": " + ((ParseError) result).errorStringWithLineNumbers(file));
+                  out("File: " + fileName + ": " + ((ParseError) result).errorStringWithLineNumbers(file));
                else
                {
-                  System.err.println("*** FAILURE: Parsed results do not match for file: " + fileName);
-                  System.out.println(input + " => " + result);
+                  error("*** FAILURE: Parsed results do not match for file: " + fileName);
+                  out(input + " => " + result);
                }
             }
             else {
                IParseNode node = (IParseNode) result;
-               System.out.println("parse results match for: " + fileName);
+               out("parse results match for: " + fileName);
 
                //if (result instanceof IParseNode)
                //   System.out.println(((IParseNode)result).toDebugString());
@@ -434,11 +706,11 @@ public class TestUtil {
                StringBuilder sb = new StringBuilder();
 
                if (opts.enableModelToString)
-                  System.out.println("Parsed model: " + (modelObj instanceof ISemanticNode ? ((ISemanticNode)modelObj).toModelString() : modelObj.toString()));
+                  out("Parsed model: " + (modelObj instanceof ISemanticNode ? ((ISemanticNode)modelObj).toModelString() : modelObj.toString()));
 
                //((JavaLanguage) lang).identifierExpression.trace = true;
                if (opts.enableStyle)
-                  System.out.println("Styled output: " + ParseUtil.styleSemanticValue(modelObj, result));
+                  out("Styled output: " + ParseUtil.styleSemanticValue(modelObj, result));
 
                if (modelObj instanceof JavaModel) {
                   JavaModel m = (JavaModel) modelObj;
@@ -451,7 +723,7 @@ public class TestUtil {
                //System.out.println("Bindable result: " + result);
 
                // Clear out the old parse-tree
-               node.setSemanticValue(null);
+               node.setSemanticValue(null, true);
 
                // For debugging the generation rpocess only
                lang.debug = false;
@@ -463,7 +735,7 @@ public class TestUtil {
 
                Object generateResult = lang.generate(modelObj, opts.finalGenerate);
                if (generateResult instanceof GenerateError)
-                  System.err.println("**** FAILURE during generation: " + generateResult);
+                  error("**** FAILURE during generation: " + generateResult);
                else {
                   String genResult = generateResult.toString();
 
@@ -474,30 +746,97 @@ public class TestUtil {
                   sb.append(genResult);
                   FileUtil.saveStringAsFile(genFileName, sb.toString(), true);
 
-                  System.out.println("*** processed: " + fileName + " bytes: " + sb.length() +
+                  out("*** processed: " + fileName + " bytes: " + sb.length() +
                           " generate: " + rangeToSecs(generateStartTime, generateResultTime));
 
                   Object reparsedResult = lang.parse(new StringReader(genResult));
                   if (reparsedResult instanceof ParseError)
-                     System.err.println("FAILURE: Unable to parse result: " + genFileName + " e: " + reparsedResult);
+                     error("FAILURE: Unable to parse result: " + genFileName + " e: " + reparsedResult);
                   else {
                      if (!reparsedResult.toString().equals(genResult))
-                        System.err.println("**** FAILURE - reparsed result does not match generated result: " + fileName);
+                        error("**** FAILURE - reparsed result does not match generated result: " + fileName);
 
                      Object mnew = getTestResult(reparsedResult);
                      // TODO: this breaks for schtml files - Element.equals uses == cause the deep version of that implementation is too expensive for large pages
                      // TODO: Semantic node list - add deepEquals and use that here
                      if (!((ISemanticNode) mnew).deepEquals(modelObj)) {
-                        System.err.println("**** FAILURE - reparsed model does not match for: " + fileName);
+                        error("**** FAILURE - reparsed model does not match for: " + fileName);
                         mnew.equals(modelObj);
                      }
                      else
-                        System.out.println("***** SUCCESS: models match for: " + fileName);
+                        out("***** SUCCESS: models match for: " + fileName);
                   }
                }
-               System.out.println();
+               out("ln");
             }
          }
+
+         if (reparseStats.size() != 0) {
+            testVerifyOutput.append("Reparse percentages: " + reparseStats.toString());
+            out("Summary of reparse percentages: " + reparseStats);
+         }
+      }
+
+      String testName = opts.testBaseName + opts.testArgsId;
+      String testId = System.getProperty("user.dir") + "/" + testName;
+      String testOutputFileName = FileUtil.addExtension(testName, "goodOut");
+      String testVerifyFileName = FileUtil.addExtension(testName, "goodVerify");
+      String newOutputFileName = FileUtil.replaceExtension(testOutputFileName , "newOut");
+      String newVerifyFileName = FileUtil.replaceExtension(testOutputFileName , "newVerify");
+      File testOutputFile = new File(testOutputFileName);
+      File testVerifyFile = new File(testVerifyFileName);
+      String testVerifyStr = testVerifyOutput.toString();
+      String testOutputStr = testOutput.toString();
+      boolean needsSave = false;
+
+      FileUtil.saveStringAsFile(newVerifyFileName, testVerifyStr, false);
+      FileUtil.saveStringAsFile(newOutputFileName, testOutputStr, false);
+
+      if (testVerifyFile.canRead()) {
+         String oldVerify = FileUtil.getFileAsString(testVerifyFileName);
+         if (oldVerify == null) {
+            testVerifyFile.delete();
+         }
+         else if (!oldVerify.equals(testVerifyStr)) {
+            error("Test output different - new output:\n" + testVerifyStr + "\ngood output:\n" + oldVerify);
+
+            //System.out.println("Run: diff " + testVerifyFile.getAbsolutePath() + " " + new File(newVerifyFileName).getAbsolutePath());
+            System.out.println("*** Run diff command for details:");
+            System.out.println("diff " + testOutputFile.getAbsolutePath() + " " + new File(newOutputFileName).getAbsolutePath());
+
+            Console c = System.console();
+            if (opts.interactive && c != null) {
+               String ans = c.readLine("Accept new output? [yn]? ");
+               if (ans.equalsIgnoreCase("y") || ans.equalsIgnoreCase("yes")) {
+                  FileUtil.renameFile(newVerifyFileName, testVerifyFileName);
+                  FileUtil.renameFile(newOutputFileName, testOutputFileName);
+                  numErrors = 0; // So we exit with a valid code to continue the script
+               }
+            }
+         }
+         else {
+            if (numErrors == 0) {
+               System.out.println("Success: test passes: " + testId);
+            }
+            else {
+               System.out.println("Failed: " + numErrors + " errors (but verify output matches): " + testId);
+               Console c = System.console();
+               if (opts.interactive && c != null && newModelErrors.size() > 0) {
+                  String ans = c.readLine("Accept new model errors? [yn]?");
+                  if (ans.equalsIgnoreCase("y") || ans.equalsIgnoreCase("yes")) {
+                     numErrors = 0; // So we exit with a valid code to continue the script
+                     for (String newModelError:newModelErrors) {
+                        FileUtil.renameFile(newModelError, FileUtil.replaceExtension(newModelError, "mismatchOK"));
+                     }
+                  }
+               }
+            }
+         }
+      }
+      else if (testVerifyStr.length() > 0) {
+         System.out.println("First run - saving verify out: " + testVerifyFileName + ", test output: " + testOutputFileName + " for: " + testId);
+         FileUtil.saveStringAsFile(testVerifyFile, testVerifyStr, false);
+         FileUtil.saveStringAsFile(testOutputFile, testOutputStr, false);
       }
    }
    private static Object getTestResult(Object node) {

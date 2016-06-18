@@ -1,9 +1,18 @@
 #!/bin/sh
 
-../../../makeSC.sh /jjv/vbuild/
+cd ../../../
+./makeSC.sh /jjv/vbuild/
 
 cd /jjv/vbuild
 rm -rf bin
 rm -rf StrataCode
 unzip StrataCode.zip
 mv StrataCode/bin bin
+
+# The intelliJ plugin needs to add a reference to the sc.jar file for run configurations it manages.
+# for now, it's finding it in the only place it knows it will be there - the plugin directory
+# perhaps, when we create the intellij project, we should make a copy of the sc.jar file?  Or point it
+# at the version of sc.jar that gets built from src in that intelliJ instance?
+cp /jjv/vbuild/bin/sc.jar ~/Library/Application\ Support/IntelliJIdea13/sc4idea/lib/sc.jar
+cp /jjv/vbuild/bin/sc.jar ~/Library/Application\ Support/IntelliJIdea14/sc4idea/lib/sc.jar
+cp /jjv/vbuild/bin/sc.jar ~/Library/Caches/IntelliJIdea13/plugins-sandbox/plugins/sc4idea/lib/sc.jar

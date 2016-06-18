@@ -33,6 +33,8 @@ public class ClassType extends JavaType {
    //private transient String compiledTypeName;
    transient Object[] errorArgs;
 
+   transient boolean srcOnly = false;
+
    public final static Object FAILED_TO_INIT_SENTINEL = "Invalid type sentinel";
 
    /** Sentinel used to refer to a parameter type whose accurate type is not known until the inferred type has been propagated.  */
@@ -120,6 +122,15 @@ public class ClassType extends JavaType {
       if (itype != null && type == null)
          initType(itype.getLayeredSystem(), itype, this, null, true, false, null);
       super.start();
+   }
+
+   public void stop() {
+      super.stop();
+      // Stopping and starting should re-start if not valid (and possibly even if valid?)
+      if (type == FAILED_TO_INIT_SENTINEL) {
+         type = null;
+         errorArgs = null;
+      }
    }
 
    /** Returns the complete type name including the import */
@@ -234,13 +245,18 @@ public class ClassType extends JavaType {
       return false;
    }
 
-   public Object getTypeDeclaration(ITypeParamContext ctx, boolean resolve) {
+   public Object getTypeDeclaration(ITypeParamContext ctx, ITypeDeclaration itd, boolean resolve, boolean refreshParams, boolean bindUnbound) {
       // We should only be accessing the top level ClassType's type declaration
       // since the chained types are just part of this definition.
       assert !chained;
+
+      //The "definedInType" is not a reliable way to lookup type-parameters in particular.  The type param might be associated
+      // with the base-type.
+      itd = null;
       
       if (type == null) {
-         ITypeDeclaration itd = getEnclosingIType();
+         if (itd == null)
+             itd = getEnclosingIType();
          if (itd != null) {
             initType(itd.getLayeredSystem(), itd, this, ctx, true, false, null);
          }
@@ -278,6 +294,20 @@ public class ClassType extends JavaType {
       }
       if (resolve && ModelUtil.isTypeVariable(res))
          return ModelUtil.getTypeParameterDefault(res);
+
+      if (refreshParams && res instanceof ParamTypeDeclaration) {
+         ParamTypeDeclaration ptd = (ParamTypeDeclaration) res;
+         List<JavaType> typeArgs = getResolvedTypeArguments();
+         if (typeArgs != null) {
+            for (int i = 0; i < typeArgs.size(); i++) {
+               JavaType typeArg = typeArgs.get(i);
+               if (typeArg != null) {
+                  Object ptdt = typeArg.getTypeDeclaration(ctx, itd, false, true, true);
+                  ptd.setTypeParamIndex(i, ptdt);
+               }
+            }
+         }
+      }
       return res;
    }
 
@@ -301,7 +331,9 @@ public class ClassType extends JavaType {
       if (chainedTypes != null) {
          if (!chainedTypes.isStarted())
             chainedTypes.start();
-         return chainedTypes.get(chainedTypes.size()-1).typeArguments;
+         int chainedSz = chainedTypes.size();
+         if (chainedSz > 0)
+            return chainedTypes.get(chainedSz-1).typeArguments;
       }
       if (typeArguments != null && !typeArguments.isStarted())
          typeArguments.start();
@@ -310,24 +342,25 @@ public class ClassType extends JavaType {
    }
 
    public List<Object> getTypeArgumentDeclarations() {
-      return getTypeArgumentDeclarations(null, null, null, null);
+      return getTypeArgumentDeclarations(null, null, null, null, null);
    }
 
-   public List<Object> getTypeArgumentDeclarations(LayeredSystem sys, ITypeDeclaration it, JavaSemanticNode node, ITypeParamContext ctx) {
+   public List<Object> getTypeArgumentDeclarations(LayeredSystem sys, ITypeDeclaration it, JavaSemanticNode node, ITypeParamContext ctx, List<Object> typeParamTypes) {
       List<JavaType> typeArgs = getResolvedTypeArguments();
       if (typeArgs == null)
          return null;
       List<Object> typeDefs = new ArrayList<Object>(typeArgs.size());
       for (int i = 0; i < typeArgs.size(); i++) {
          JavaType typeArg = typeArgs.get(i);
-         Object argType = typeArg.getTypeDeclaration(ctx, false);
+         Object argType = typeArg.getTypeDeclaration(ctx, it, false, false, false);
+         Object typeParamType = typeParamTypes == null ? null : typeParamTypes.get(i);
          if (argType == null) {
-            typeArg.initType(sys, it, node, ctx, true, false, null);
-            argType = typeArg.getTypeDeclaration(ctx, false);
+            typeArg.initType(sys, it, node, ctx, true, false, typeParamType);
+            argType = typeArg.getTypeDeclaration(ctx, it, false, false, true);
          }
          if (argType == null) {
             typeDefs.add(null); // An unresolved type?  Do not put ClassTypes here but are there any cases we need a TypeVariable?
-            argType = typeArg.getTypeDeclaration(ctx, false); // TODO: DEBUG - remove me
+            argType = typeArg.getTypeDeclaration(ctx, it, false, false, true); // TODO: DEBUG - remove me
          }
          else
             typeDefs.add(argType);
@@ -372,6 +405,12 @@ public class ClassType extends JavaType {
    /**
     * Initializes this type from the model and node specified.  The ClassDeclaration needs to resolve the type
     * name using itself, so that it will not recursively check the type that is being initialized.
+    * This can optionally be called with a 'typeParam' parameter.  This is used when rebuilding the ClassType from
+    * an existing TypeDeclaration.  The typeParam is the existing type declaration.  It would be fastest to just
+    * set type = typeParam here but there are cases where we resolve type-parameters to more specific types than
+    * are found in the typeParam.   There are other cases though where the type or type argument for this ClassType cannot
+    * be resolved - in these cases we need to use typeParam or the type parameter values in typeParam to make the ClassType
+    * properly initialized.
     */
    public void initType(LayeredSystem sys, ITypeDeclaration it, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer, Object typeParam) {
       if (chained)
@@ -416,10 +455,15 @@ public class ClassType extends JavaType {
       }
 
       if (typeArguments != null && chainedTypes != null) {
-         chainedTypes.get(chainedTypes.size()-1).typeArguments = typeArguments;
+         int chainedSz;
+         if ((chainedSz = chainedTypes.size()) != 0)
+            chainedTypes.get(chainedSz-1).typeArguments = typeArguments;
       }
 
-      if (node != null)
+      // Looking up type parameters by name is not good here
+      if (typeParam != null && ModelUtil.isTypeVariable(typeParam))
+         type = typeParam;
+      else if (node != null)
          type = node.findType(fullTypeName);
       // In the parametrized type info we create ClassTypes which are defined as part of a compiled method - so no relative type info is available.
       // fortunately imports and local references are always made absolute at this level
@@ -427,10 +471,11 @@ public class ClassType extends JavaType {
          type = it.findTypeDeclaration(fullTypeName, true);
       }
       else if (sys != null) {
-         type = sys.getTypeDeclaration(fullTypeName, false, ctx == null ? null : ctx.getRefLayer(), false);
+         type = sys.getTypeDeclaration(fullTypeName, srcOnly, ctx == null ? null : ctx.getRefLayer(), false);
       }
 
       boolean userType = false;
+      List<Object> typeParamTypes = null;
       // When looking up type parameters, typically the it is the ParamTypeDeclaration but if it's a param method, it won't be so we need to
       // look up the type parameter for the method explicitly here.
       if (type == null && it == null && ctx != null) {
@@ -460,6 +505,12 @@ public class ClassType extends JavaType {
             }
          }
       }
+      // We do not just use typeParam here, but instead at least try to resolve type by name, then resolve the
+      // type arguments because sometimes those type arguments resolve to more specific values in this context.
+      // But in some cases we do not have the info to resolve the type and type arguments - in those cases we
+      // will just use typeParam as it is.  In any case, we are careful to use the type arguments from type
+      // param and pass those into initType as the typeParam argument so we follow this pattern for the type-arguments
+      // (and possibly their type-arguments).
 
       // Since there is a class reference to this type, we cannot optimize away that class for inner objects
       if (type instanceof BodyTypeDeclaration) {
@@ -476,7 +527,7 @@ public class ClassType extends JavaType {
       // Before we return the type, check and see if this definition adds any bound type parameters -
       // i.e. concrete types instead of parameter names.  If so, we need to wrap the returned type with
       // an object which knows how to resolve type parameters to do the proper type matching when generics are used.
-      List<Object> typeDefs = getTypeArgumentDeclarations(sys, it, node, ctx);
+      List<Object> typeDefs = getTypeArgumentDeclarations(sys, it, node, ctx, typeParamTypes);
       if (typeDefs != null && type != FAILED_TO_INIT_SENTINEL && anyBoundParameters(typeDefs)) {
          List<?> typeParams = ModelUtil.getTypeParameters(type);
          if (typeParams == null || typeParams.size() != typeDefs.size())
@@ -666,7 +717,27 @@ public class ClassType extends JavaType {
 
    public String toString() {
       try {
-         return getFullTypeName();
+         String typeName = getFullTypeName();
+         List<JavaType> typeArgs = null;
+         int chainedSz;
+         if (chainedTypes != null && (chainedSz = chainedTypes.size()) > 0)
+            typeArgs = chainedTypes.get(chainedSz - 1).typeArguments;
+         else
+            typeArgs = typeArguments;
+
+         if (typeArgs != null){
+            StringBuilder sb = new StringBuilder();
+            sb.append(typeName);
+            sb.append('<');
+            for (int i = 0; i < typeArgs.size(); i++) {
+               if (i != 0)
+                  sb.append(", ");
+               sb.append(typeArgs.get(i).toString());
+            }
+            sb.append(">");
+            return sb.toString();
+         }
+         return typeName;
       }
       catch (RuntimeException exc) {
          return "<uninitialized ClassType>";
@@ -860,7 +931,8 @@ public class ClassType extends JavaType {
 
       // When the identifier expression ends with "." so we match everything defined for the prefix only
       //boolean endsWithDot = continuation != null && continuation instanceof Boolean;
-      boolean endsWithDot = chainedTypes != null && chainedTypes.get(chainedTypes.size()-1).typeName == null;
+      int chainedSz;
+      boolean endsWithDot = chainedTypes != null && (chainedSz = chainedTypes.size()) > 0 && chainedTypes.get(chainedSz-1).typeName == null;
 
       if (endsWithDot)
          pos = pos + leafName.length() + 1;
@@ -893,7 +965,7 @@ public class ClassType extends JavaType {
 
       ModelUtil.suggestTypes(model, prefix, typeName, candidates, true);
       if (currentType != null)
-         ModelUtil.suggestMembers(model, currentType, typeName, candidates, true, includeProps, includeProps);
+         ModelUtil.suggestMembers(model, currentType, typeName, candidates, true, includeProps, includeProps, true);
 
       IBlockStatement enclBlock = getEnclosingBlockStatement();
       if (enclBlock != null)
@@ -903,6 +975,26 @@ public class ClassType extends JavaType {
          return pos;
 
       return -1;
+   }
+
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
+      String packagePrefix;
+      boolean isQualifiedType = false;
+      if (matchPrefix.contains(".")) {
+         packagePrefix = CTypeUtil.getPackageName(matchPrefix);
+         matchPrefix = CTypeUtil.getClassName(matchPrefix);
+         isQualifiedType = true;
+      }
+      else {
+         packagePrefix = origModel.getPackagePrefix();
+      }
+      ModelUtil.suggestTypes(origModel, packagePrefix, matchPrefix, candidates, true);
+      if (origModel != null && !isQualifiedType) {
+         Object currentType = origNode == null ? origModel.getModelTypeDeclaration() : origNode.getEnclosingType();
+         if (currentType != null)
+            ModelUtil.suggestMembers(origModel, currentType, typeName, candidates, true, true, true, true);
+      }
+      return matchPrefix;
    }
 
    public boolean applyPartialValue(Object value) {
@@ -958,13 +1050,13 @@ public class ClassType extends JavaType {
 
          if (ModelUtil.isTypeVariable(baseType)) {
             Object newType = t.getTypeForVariable(baseType, resolveUnbound); // was false
-            if (newType == null)
+            if (newType == null && resolveUnbound)
                newType = ModelUtil.getTypeParameterDefault(baseType);
             if (newType != null && newType != baseType && !(newType instanceof ExtendsType.LowerBoundsTypeDeclaration)) {
                superWildcard = new ExtendsType.LowerBoundsTypeDeclaration(newType);
             }
          }
-         return ExtendsType.createSuper(superWildcard, t);
+         return ExtendsType.createSuper(superWildcard, t, getEnclosingType());
       }
       else if (ModelUtil.isGenericArray(type)) {
          Object compType = ModelUtil.getGenericComponentType(type);
@@ -981,7 +1073,7 @@ public class ClassType extends JavaType {
          }
       }
       if (isTypeParameter()) {
-         Object typeParam = t.getTypeForVariable(type, resolveUnbound);
+         Object typeParam = t == null ? null : t.getTypeForVariable(type, resolveUnbound);
          if (typeParam == null)
             typeParam = type;
          JavaType res = JavaType.createJavaType(typeParam);
@@ -999,14 +1091,16 @@ public class ClassType extends JavaType {
             JavaType newType = typeArg.resolveTypeParameters(t, resolveUnbound);
             if (newType != typeArg) {
                if (cloneArgs == null) {
-                  cloneArgs = (List<JavaType>) ((ArrayList) typeArgs).clone();
+                  //cloneArgs = (List<JavaType>) ((ArrayList) typeArgs).clone();
+                  // Don't create a SemanticNodeList here since we don't need to generate stuff
+                  cloneArgs = new ArrayList<JavaType>(typeArgs);
                }
                cloneArgs.set(ix, newType);
             }
          }
          ix++;
       }
-      if (cloneArgs != null && type != null) {
+      if (cloneArgs != null && type != null && type != FAILED_TO_INIT_SENTINEL) {
          JavaType res = createTypeFromTypeParams(type, cloneArgs.toArray(new JavaType[cloneArgs.size()]));
          res.parentNode = parentNode;
          return res;
@@ -1044,4 +1138,20 @@ public class ClassType extends JavaType {
          newType.type = ArrayTypeDeclaration.create(type, 1, definedInType == null ? getEnclosingIType() : definedInType);
       return newType;
    }
+
+   public void convertToSrcReference() {
+      if (!srcOnly) {
+         srcOnly = true;
+         if (type != null) {
+            // TODO: not handling ParamTypeDeclaration - or ParameterizedType
+            if (type instanceof Class) {
+               Object newType = ModelUtil.resolveSrcTypeDeclaration(getLayeredSystem(), type);
+               if (newType != null && newType instanceof BodyTypeDeclaration)
+                  type = newType;
+            }
+         }
+      }
+   }
+
+
 }

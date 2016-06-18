@@ -14,9 +14,7 @@ import sc.util.FileUtil;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.StringReader;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 /**
  * This class defines the grammar modifications to Java for the V language.  Essentially:
@@ -40,6 +38,11 @@ public class SCLanguage extends JavaLanguage {
       SC_VARNAME_KEYWORD_SET.add(PString.toPString("scope"));
    }
 
+   protected static final List<String> SC_CLASS_LEVEL_KEYWORDS = new ArrayList<String>(Arrays.asList("object", "override", "scope"));
+   static {
+      SC_CLASS_LEVEL_KEYWORDS.addAll(JavaLanguage.CLASS_LEVEL_KEYWORDS);
+   }
+
    public Set getKeywords() {
       return SC_KEYWORD_SET;
    }
@@ -51,8 +54,12 @@ public class SCLanguage extends JavaLanguage {
    KeywordSpace scopeKeyword = new KeywordSpace("scope");
    public Sequence scopeModifier = new Sequence("ScopeModifier(,,scopeName,)", scopeKeyword, lessThan, identifier, greaterThan);
 
-   Sequence modifyDeclarationWithoutModifiers = new Sequence("ModifyDeclaration(typeName,typeParameters, extendsTypes,implementsTypes,,body,)",
+   Sequence modifyDeclarationWithoutModifiers = new Sequence("ModifyDeclaration(typeName,typeParameters,extendsTypes,implementsTypes,,body,)",
             qualifiedIdentifier, optTypeParameters, extendsTypes, implementsTypes, openBraceEOL, classBodyDeclarations, closeBraceEOL);
+   {
+      // This prevents just "typeName" from parsing - we should need at least an open-brace after that.
+      modifyDeclarationWithoutModifiers.minContentSlot = 4;
+   }
 
    Sequence modifyDeclaration = new Sequence("(modifiers,.)", modifiers, modifyDeclarationWithoutModifiers);
 
@@ -90,8 +97,9 @@ public class SCLanguage extends JavaLanguage {
    public OrderedChoice arrayVariableInitializer = new OrderedChoice("<arrayVariableInitializer>", variableInitializer, mapEntry);
 
    {
-      // Redefine Java's type declaration parameter mapping and children to add the "modifyDeclaration"
-      typeDeclaration.set("(.,.,.,)", classDeclaration, interfaceDeclaration, modifyDeclaration, semicolonEOL);
+      // Redefine Java's type declaration parameter mapping and children to add the "modifyDeclaration".  Just like Java use semicolon not semicolonEOL so we do not get skipOnError
+      typeDeclaration.set("(.,.,.,)", classDeclaration, interfaceDeclaration, modifyDeclaration, semicolon);
+      typeDeclarations.set("([],[],[],)", classDeclaration, interfaceDeclaration, modifyDeclaration, semicolon);
 
       // The operator is now a valid object.  We are overriding the class declaration for now even though objects don't
       // support implements
@@ -216,7 +224,7 @@ public class SCLanguage extends JavaLanguage {
             //System.out.println("Bindable result: " + result);
 
             // Clear out the old parse-tree
-            node.setSemanticValue(null);
+            node.setSemanticValue(null, true);
             System.out.println();
 
             // For debugging the generation rpocess only
@@ -230,5 +238,9 @@ public class SCLanguage extends JavaLanguage {
             System.out.println("*** processed: " + fileName);
          }
       }
+   }
+
+   public List<String> getClassLevelKeywords() {
+      return SC_CLASS_LEVEL_KEYWORDS;
    }
 }
