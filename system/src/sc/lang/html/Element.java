@@ -3526,9 +3526,12 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
 
    public Element refreshNode() {
       if (tagObject != null) {
-         Element newElem = ((TypeDeclaration) tagObject.refreshNode()).element;
-         if (newElem != null)
-            return newElem;
+         TypeDeclaration refreshedNode = (TypeDeclaration) tagObject.refreshNode();
+         if (refreshedNode != null) {
+            Element newElem = refreshedNode.element;
+            if (newElem != null)
+               return newElem;
+         }
       }
       return this;
    }

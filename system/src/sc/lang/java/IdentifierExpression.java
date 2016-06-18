@@ -3940,7 +3940,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             }
 
             IBlockStatement enclBlock = getEnclosingBlockStatement();
-            if (enclBlock != null)
+            if (enclBlock != null && i == 0)
                ModelUtil.suggestVariables(enclBlock, matchPrefix, candidates);
 
             return matchPrefix;

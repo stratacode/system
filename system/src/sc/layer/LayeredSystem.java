@@ -11436,8 +11436,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public Object getImportedStaticType(String name, Layer fromLayer, Layer refLayer) {
       if (fromLayer != null && fromLayer.disabled)
          return null;
+      // TODO: I believe we should only be including layers explicitly extended by refLayer in this search
       List<Layer> layerList = fromLayer == null ? refLayer == null ? layers : refLayer.getLayersList() : fromLayer.getLayersList();
       int startIx = fromLayer == null ? layerList.size() - 1 : fromLayer.getLayerPosition();
+      if (startIx >= layerList.size())
+         startIx = layerList.size() - 1;
       for (int i = startIx; i >= 0; i--) {
          Object m = layerList.get(i).getStaticImportedType(name);
          if (m != null)

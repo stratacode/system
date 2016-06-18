@@ -14,6 +14,7 @@ import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.layer.SrcEntry;
 import sc.parser.*;
+import sc.type.TypeUtil;
 import sc.util.FileUtil;
 import sc.util.StringUtil;
 

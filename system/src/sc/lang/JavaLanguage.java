@@ -304,17 +304,23 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    // Java8 Only
    Sequence methodReference = new Sequence("MethodReference(reference,,typeArguments, methodName)");
 
+
    public IndexedChoice primary = new IndexedChoice("<primary>");
+
    {
       primary.put("(", parenExpression);
       primary.put("new", newExpression);
       primary.addDefault(literal, classValueExpression, identifierExpression);
       // Caching because MethodReference may well match a primary then reject it - removing this one slows down nested expressions exponentially
       primary.cacheResults = true;
+   }
 
+   // Here for Boolean.class::cast we need to match classValueExpression first
+   OrderedChoice methodRefPrefix = new OrderedChoice(classValueExpression, new Sequence("TypeExpression(typeIdentifier,)", typeIdentifier, new Symbol(LOOKAHEAD, "::")), type, primary);
+   {
       // Matching typeIdentifier - which can be either a type or an identifier expression first.  That type picks the right one at runtime.  After that we match type,
       // then primary since a type name can match more than a primary expression in some cases.
-      methodReference.set(new OrderedChoice(new Sequence("TypeExpression(typeIdentifier,)", typeIdentifier, new Symbol(LOOKAHEAD, "::")), type, primary), new SymbolSpace("::"), optTypeArguments, new OrderedChoice(identifier, newKeyword));
+      methodReference.set(methodRefPrefix, new SymbolSpace("::"), optTypeArguments, new OrderedChoice(identifier, newKeyword));
       // Since the first slot is an identifier, type, or expression make sure we at least fill in the :: before we consider this a method reference.
       methodReference.minContentSlot = 1;
    }
@@ -380,10 +386,11 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    public SemanticTokenChoice variableInitializerOperators = new SemanticTokenChoice("=");
 
+   Sequence binaryOperand = new Sequence("BinaryOperand(operator,rhs)", binaryOperators, unaryExpression);
+
    Sequence binaryExpression = new ChainedResultSequence("BinaryExpression(firstExpr, operands)", unaryExpression,
            new OrderedChoice("([],[])", OPTIONAL | REPEAT,
-              new Sequence("BinaryOperand(operator,rhs)", binaryOperators, unaryExpression),
-              new Sequence("InstanceOfOperand(operator,rhs)", new KeywordSpace("instanceof"), type)));
+              binaryOperand, new Sequence("InstanceOfOperand(operator,rhs)", new KeywordSpace("instanceof"), type)));
 
    Sequence questionMarkExpression = new Sequence("QuestionMarkExpression(,trueChoice,,falseChoice)", OPTIONAL, questionMark, expression, colon, expression);
 
@@ -549,7 +556,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    Sequence catchStatement = new Sequence("CatchStatement(,parameters,statements)",  new KeywordSpace("catch"), catchParameter, block);
    Sequence finallyStatement = new Sequence("FinallyStatement(,statements)", OPTIONAL, new KeywordSpace("finally"), block);
    Sequence tryStatement = new Sequence("TryStatement(, resources, statements,*)", new KeywordSpace("try"), tryResources, block,
-                                        new Sequence("(catchStatements,finallyStatement)", new Sequence("([])", OPTIONAL | REPEAT, catchStatement), finallyStatement));
+                                        new Sequence("(catchStatements,finallyStatement)", OPTIONAL, new Sequence("([])", OPTIONAL | REPEAT, catchStatement), finallyStatement));
    Sequence switchStatement = new Sequence("SwitchStatement(,expression,,statements,)", new KeywordSpace("switch"), parenExpression, openBraceEOL, switchBlockStatementGroups, closeBraceEOL);
    Sequence returnStatement = new Sequence("ReturnStatement(operator,expression,)", new KeywordSpace("return"), optExpression, endStatement);
    Sequence throwStatement = new Sequence("ThrowStatement(operator,expression,)", new KeywordSpace("throw"), expression, endStatement);

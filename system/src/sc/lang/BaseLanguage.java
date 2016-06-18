@@ -263,6 +263,9 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
          return "Identifiers cannot be keywords";
       }
    };
+   {
+      identifier.cacheResults = true;
+   }
 
    Sequence alphaNumString = new Sequence("<anyName>('','',)", alphaNumChar,
            new Sequence("('')", REPEAT | OPTIONAL, alphaNumChar), spacing);

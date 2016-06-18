@@ -295,6 +295,7 @@ public class TestUtil {
       // In layer mode, we pick up the LayeredSystem's languages
       if (!opts.layerMode) {
          Language.registerLanguage(JavaLanguage.INSTANCE, "java");
+         Language.registerLanguage(JavaLanguage.INSTANCE, "scj");
          Language.registerLanguage(SCLanguage.INSTANCE, "sc");
          // This one is just for templates we process from Java code, i.e. as part of framework definitions.
          Language.registerLanguage(TemplateLanguage.INSTANCE, "sctd");

@@ -102,6 +102,9 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
             if (!ModelUtil.isTypeVariable(otherTypeParam))
                continue;
             if (types != null && otherParamType.types != null) {
+               // the case where this happens is if you have a type declarated with the wildcard: <> and are in an isAssignableFrom clause.  Assume it's ok rather than rejecting
+               if (i >= types.size())
+                  return true;
                Object type = types.get(i);
                int otherPos = ModelUtil.getTypeParameterPosition(otherBaseType, ModelUtil.getTypeParameterName(otherTypeParam));
                if (otherPos >= otherParamType.types.size())
