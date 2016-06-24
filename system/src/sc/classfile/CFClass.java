@@ -211,12 +211,12 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
             Object implType = implementsTypes.get(k);
             if (implType != null) {
                implCache = ModelUtil.getMethodCache(implType);
-               mergeSuperTypeMethods(implCache);
+               mergeSuperTypeMethods(implCache, implType);
             }
          }
       }
       if (superMethods != null) {
-         mergeSuperTypeMethods(superMethods);
+         mergeSuperTypeMethods(superMethods, extendsType);
       }
 
       for (CFMethod meth:methods) {
@@ -340,16 +340,18 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
                }
             }
          }
-         if (extendsType instanceof ParamTypeDeclaration)
-            extendsType = ((ParamTypeDeclaration) extendsType).getBaseType();
+         //if (extendsType instanceof ParamTypeDeclaration)
+         //   extendsType = ((ParamTypeDeclaration) extendsType).getBaseType();
          implJavaTypes = sig.implementsTypes;
          if (implJavaTypes != null) {
             implementsTypes = new ArrayList<Object>(implJavaTypes.size());
             for (int i = 0; i < implJavaTypes.size(); i++) {
-               String implTypeName = ((ClassType)implJavaTypes.get(i)).getFullTypeName();
-               Object implType = system.getClassWithPathName(implTypeName, null, false, true, false);
+               JavaType implJavaType = implJavaTypes.get(i);
+               //String implTypeName = ((ClassType)implJavaTypes.get(i)).getFullTypeName();
+               //Object implType = system.getClassWithPathName(implTypeName, null, false, true, false);
+               Object implType = implJavaType.getTypeDeclaration();
                if (implType == null)
-                  error("Can't find interface: " + implTypeName);
+                  error("Can't find interface: " + implJavaType.getFullTypeName());
                else
                   implementsTypes.add(implType);
             }
@@ -363,6 +365,11 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
             // a request that we support the initMethodCache method on the ITypeDeclaration interface which is not yet done.   Note also
             // this change must be made above.
             extendsType = system.getClassWithPathName(extendsTypeName, null, false, true, false);
+            if (extendsType == null) {
+               if (extendsTypeName.contains(".."))
+                  extendsTypeName = extendsTypeName.replace("..", ".$");
+               extendsType = system.getClassWithPathName(extendsTypeName, null, false, true, false);
+            }
             if (extendsType == null)
                error("No extends type: " + extendsTypeName);
          }
@@ -382,7 +389,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       initMethodAndFieldIndex();
    }
 
-   private void mergeSuperTypeMethods(CoalescedHashMap<String,Object[]> superCache) {
+   private void mergeSuperTypeMethods(CoalescedHashMap<String,Object[]> superCache, Object superType) {
       Object[] keys = superCache.keyTable;
       Object[] values = superCache.valueTable;
       for (int i = 0; i < keys.length; i++) {
@@ -393,6 +400,8 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
             if (thisMethods == null) {
                thisMethods = new Object[superMethods.length];
                System.arraycopy(superMethods, 0, thisMethods, 0, superMethods.length);
+               if (superType instanceof ParamTypeDeclaration)
+                  thisMethods = ((ParamTypeDeclaration) superType).parameterizeMethodList(thisMethods).toArray();
                methodsByName.put(key, thisMethods);
             }
             else {
@@ -409,6 +418,8 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
                      Object[] newThis = new Object[newIx+1];
                      System.arraycopy(thisMethods, 0, newThis, 0, newIx);
                      thisMethods = newThis;
+                     if (superType instanceof ParamTypeDeclaration)
+                        sMeth = ((ParamTypeDeclaration) superType).parameterizeMethod(sMeth);
                      newThis[newIx] = sMeth;
                   }
                }
@@ -501,6 +512,19 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       if (fullTypeName == null)
          fullTypeName = classFile.getTypeName();
       return fullTypeName;
+   }
+
+   private String stripInnerSeparators(String input) {
+      Object type = this, nextType;
+      while ((nextType = ModelUtil.getEnclosingType(type)) != null) {
+         int lastSepIx = input.lastIndexOf('$');
+         if (lastSepIx == -1 || lastSepIx == input.length() - 1) {
+            // This should not happen!  If it's an inner class, the name should have a trailing $
+            return input;
+         }
+         input = input.substring(0, lastSepIx) + "." + input.substring(lastSepIx+1);
+      }
+      return input;
    }
 
    public String getFullTypeName(boolean includeDims, boolean includeTypeParams) {
@@ -641,8 +665,8 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
    public Object getInnerType(String name, TypeContext ctx) {
       if (classFile.hasInnerClass(name)) {
          if (layer == null)
-            return system.getInnerCFClass(getFullTypeName(), name);
-         return layer.getInnerCFClass(getFullTypeName(), name);
+            return system.getInnerCFClass(getFullTypeName(), classFile.getCFClassName(), name);
+         return layer.getInnerCFClass(getFullTypeName(), classFile.getCFClassName(), name);
       }
       if (extendsType != null) {
          Object res = ModelUtil.getInnerType(extendsType, name, ctx);
@@ -1044,6 +1068,15 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
    }
 
    public boolean hasModifier(String modifierName) {
+      if (modifierName.equals("static")) {
+         if (classFile.theInnerClasses == null)
+            return false;
+         int accessFlags = classFile.theInnerClasses.getAccessFlags(getTypeName());
+         if (accessFlags == -1)
+            System.err.println("*** Can't find my inner type access flags!");
+         else
+            return (accessFlags & ClassFile.modifierNameToAccessFlag("static")) != 0;
+      }
       return (classFile.accessFlags & ClassFile.modifierNameToAccessFlag(modifierName)) != 0;
    }
 
