@@ -11,6 +11,7 @@ import sc.layer.LayeredSystem;
 import sc.parser.ParseUtil;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.IdentityHashMap;
 import java.util.List;
 
@@ -325,5 +326,25 @@ public class EnumDeclaration extends TypeDeclaration {
 
    public String getOperatorString() {
       return "enum";
+   }
+
+   public List<Object> getMethods(String methodName, String modifier, boolean includeExtends) {
+      List declProps = super.getMethods(methodName, modifier, includeExtends);
+      List modProps;
+      Object extendsObj = includeExtends ? getDerivedTypeDeclaration() : null;
+      if (extendsObj == null)
+         return declProps;
+      else {
+         Object[] props = ModelUtil.getMethods(extendsObj, methodName, modifier);
+         if (props != null)
+            modProps = Arrays.asList(props);
+         else
+            modProps = null;
+      }
+      return ModelUtil.mergeMethods(modProps, declProps);
+   }
+
+   public Object getDerivedTypeDeclaration() {
+      return Object.class; // TODO: should this be java.lang.Enum.class?
    }
 }
