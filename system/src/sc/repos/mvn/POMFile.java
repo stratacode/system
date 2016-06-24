@@ -182,7 +182,9 @@ public class POMFile extends XMLFileFormat {
          RepositoryPackage parentPackage = parentDesc.getOrCreatePackage(mgr.getChildManager(), false, DependencyContext.child(depCtx, pomPkg), false, null);
          // TODO: check for recursive references here!
          if (parentPackage != null) {
-            parentPOM = mgr.getPOMFile(parentDesc, parentPackage, DependencyContext.child(depCtx, pomPkg), true, null, this);
+            // Wait to init the modules until after the parentPOM is set
+            parentPOM = mgr.getPOMFile(parentDesc, parentPackage, DependencyContext.child(depCtx, pomPkg), false, null, this);
+            parentPOM.initModules();
          }
       }
       // TODO: else - there is a default POM but so far, we don't need any of the contents since it's all concerned with the build
@@ -280,9 +282,7 @@ public class POMFile extends XMLFileFormat {
    private final static String[] variableTagNames = {"project", "pom", "version", "artifactId", "baseDir"};
 
    public String getProperty(String name, boolean up, boolean down) {
-      String val = properties.get(name);
-      if (val != null)
-         return val;
+      String val;
 
       boolean isTagVariable = false;
       for (String varTagName:variableTagNames) {
@@ -331,13 +331,27 @@ public class POMFile extends XMLFileFormat {
          }
       }
 
+      // For user-defined variables, it looks like the precedance order is different than when
+      // evaluating project.version (and other tag varables).   For user-defined variables
+      // the closest project file wins but for tag attributes we'll search these those that are
+      // next to each other in the POM.xml hierarchy.
+      if (!isTagVariable &&  includedFromPOM != null && down) {
+         val = includedFromPOM.getProperty(name, false, true);
+         if (val != null)
+            return val;
+      }
+
+      val = properties.get(name);
+      if (val != null)
+         return val;
+
       if (parentPOM != null && up) {
          val = parentPOM.getProperty(name, true, false);
          if (val != null)
             return val;
       }
 
-      if (includedFromPOM != null && down) {
+      if (isTagVariable && includedFromPOM != null && down) {
          val = includedFromPOM.getProperty(name, false, true);
          if (val != null)
             return val;
