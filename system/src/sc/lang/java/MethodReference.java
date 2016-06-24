@@ -208,7 +208,7 @@ public class MethodReference extends BaseLambdaExpression {
          // Find the method in the list which matches the type parameters of the inferred type method
          // First pass is to look for a method where all of the parameters match each other
          for (Object meth:meths) {
-            Object methReturnType = ModelUtil.getParameterizedReturnType(meth, null, true);
+            Object methReturnType = isConstructor ? null : ModelUtil.getParameterizedReturnType(meth, null, true);
             boolean methReturnTypeVoid, returnTypeVoid = ModelUtil.typeIsVoid(returnType);
             if (!isConstructor && (methReturnTypeVoid = ModelUtil.typeIsVoid(methReturnType)) != returnTypeVoid) {
                if (!returnTypeVoid)
