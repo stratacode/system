@@ -10,6 +10,7 @@ import sc.type.CTypeUtil;
 import sc.type.Type;
 import sc.util.StringUtil;
 
+import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
@@ -20,6 +21,8 @@ public class ClassValueExpression extends Expression {
    public String arrayBrackets;
 
    private transient Object boundType;
+
+   private transient Object paramType;
 
    public void start() {
       if (started) return;
@@ -45,7 +48,11 @@ public class ClassValueExpression extends Expression {
       if (boundType == null && (boundType = model.findTypeDeclaration(typeIdentifier, true)) == null) {
          displayTypeError("No class: " + typeIdentifier + " for ");
       }
-
+      else {
+         ArrayList<Object> types = new ArrayList<Object>(1);
+         types.add(boundType);
+         paramType = new ParamTypeDeclaration(getEnclosingType(), ModelUtil.getTypeParameters(Class.class), types, Class.class);
+      }
    }
 
    public void validate() {
@@ -122,7 +129,10 @@ public class ClassValueExpression extends Expression {
       bindArgs.add(resolveRuntimeType());
    }
 
+   // Foobar.class should return Class<Foobar> so we provide the proper type information
    public Object getTypeDeclaration() {
+      if (paramType != null)
+         return paramType;
       return Class.class;
    }
 
