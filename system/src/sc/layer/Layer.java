@@ -2863,8 +2863,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       return null;
    }
 
-   public Object getInnerCFClass(String fullTypeName, String name) {
-      String classFileName = fullTypeName.replace('.','/') + "$" + name + ".class";
+   public Object getInnerCFClass(String fullTypeName, String cfTypeName, String name) {
+      String classFileName = cfTypeName + "$" + name + ".class";
       return getCFClass(classFileName);
    }
 
