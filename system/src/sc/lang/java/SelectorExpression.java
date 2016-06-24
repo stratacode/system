@@ -90,7 +90,7 @@ public class SelectorExpression extends ChainedExpression {
                   }
                   else {
                      IdentifierExpression.bindNextIdentifier(this, currentType, nextName, i, idTypes, boundTypes,
-                             vsel.isAssignment, vsel.arguments != null, vsel.arguments, bindingDirection, false, isLast ? useInferredType : null);
+                             vsel.isAssignment, vsel.arguments != null, vsel.arguments, vsel.getMethodTypeArguments(), bindingDirection, false, isLast ? useInferredType : null);
                      currentType = IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, vsel.arguments, i, getJavaModel(), currentType, useInferredType, getEnclosingType());
                   }
                   // If we already have the inferred type or this is the root expression and so has no inferred type - we re-resolve the type after propagating the infeerred type.  This may fill in type parameters and other information

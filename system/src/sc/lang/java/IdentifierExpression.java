@@ -129,7 +129,6 @@ public class IdentifierExpression extends ArgumentsExpression {
       List<IString> idents = getAllIdentifiers();
 
       if (idents != null && (sz = idents.size()) > 0) { // NewExpression may not be chained off of an identifier
-
          int nextIx = 1;
 
          // Preserve the arrays here - if we were cloned, we still try to start but if we can't resolve our type use the
@@ -174,9 +173,32 @@ public class IdentifierExpression extends ArgumentsExpression {
 
          if (firstIdentifier.equals("this")) {
             idTypes[0] = IdentifierType.ThisExpression;
-            boundTypes[0] = enclType;
-            if (boundTypes[0] == null)
-               displayTypeError("A 'this' expression does not refer to a type: ");
+
+            if (sz == 1 && arguments != null && enclType != null) {
+               AbstractMethodDefinition enclMeth = getEnclosingMethod();
+               if (enclMeth == null) {
+                  displayTypeError("Invalid this method call - must be in a method: ");
+               }
+               else if (!(enclMeth instanceof ConstructorDefinition)) {
+                  displayTypeError("this() must be inside of a constructor: ");
+               }
+               else {
+                  Object constr = ModelUtil.declaresConstructor(enclType, arguments, null);
+                  if (constr == null) {
+                     if (model != null && !model.disableTypeErrors) {
+                        String othersMessage = getOtherConstructorsMessage(enclType);
+                        displayTypeError("No constructor matching: ", ModelUtil.argumentsToString(arguments), othersMessage, " for: ");
+                     }
+                  }
+                  else if (constr == enclMeth) {
+                     displayTypeError("Illegal recursive this", ModelUtil.argumentsToString(arguments), " method call for: ");
+                  }
+                  else
+                     boundTypes[0] = constr;
+               }
+            }
+            else
+               boundTypes[0] = enclType;
          }
          else if (firstIdentifier.equals("super")) {
             ITypeDeclaration thisType = enclType;
@@ -521,7 +543,8 @@ public class IdentifierExpression extends ArgumentsExpression {
                   isMethod = arguments != null;
                }
 
-               bindNextIdentifier(this, currentType, nextName, i, idTypes, boundTypes, setLast, isMethod, arguments,
+               List<JavaType> methodTypeArgs = getMethodTypeArguments();
+               bindNextIdentifier(this, currentType, nextName, i, idTypes, boundTypes, setLast, isMethod, arguments, methodTypeArgs,
                        bindingDirection, i == 1 && isStaticContext(i-1), inferredType);
 
                // If we resolved the last entry as an object but its a static member, treat that as a class, not an object
@@ -552,7 +575,7 @@ public class IdentifierExpression extends ArgumentsExpression {
 
    static Object parameterizeMethod(Expression rootExpr, Object foundMeth, Object currentType, Object inferredType, List<Expression> arguments, List<JavaType> methodTypeArgs) {
       if (foundMeth != null) {
-         if (!(foundMeth instanceof ParamTypedMethod) && ModelUtil.isMethod(foundMeth) && (ModelUtil.hasMethodTypeParameters(foundMeth) || currentType instanceof ITypeParamContext)) {
+         if (!(foundMeth instanceof ParamTypedMethod) && ModelUtil.isMethod(foundMeth) && (ModelUtil.hasMethodUnboundTypeParameters(foundMeth) || currentType instanceof ITypeParamContext) || methodTypeArgs != null) {
             TypeDeclaration definedInType = rootExpr.getEnclosingType();
             if (definedInType == null) {
                // This happens for the tag expressions inside of Element objects.  We really just need a layered system and a layer
@@ -593,8 +616,10 @@ public class IdentifierExpression extends ArgumentsExpression {
          // Need to do this once again after we've propagated all of the argument type
          if (meth instanceof ParamTypedMethod) {
             ParamTypedMethod pmeth = (ParamTypedMethod) meth;
-            int i = 0;
             doPropagateInferredArgs(rootExpr, meth, arguments, paramTypes);
+
+            // And need to rebind the boundJavaTypes in here
+            pmeth.rebindArguments(arguments);
          }
       }
    }
@@ -642,7 +667,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       int len = idents.size();
 
       Object boundType = boundTypes[len-1];
-      if (boundType != null && ModelUtil.isMethod(boundType)) {
+      if (boundType != null && arguments != null) {
          propagateInferredArgs(this, boundType, arguments);
       }
    }
@@ -1281,7 +1306,7 @@ public class IdentifierExpression extends ArgumentsExpression {
    }
 
    static void bindNextIdentifier(Expression expr, Object currentType, String nextName, int i, IdentifierType[] idTypes, Object[] boundTypes,
-                                  boolean setLast, boolean isMethod, SemanticNodeList<Expression> arguments,
+                                  boolean setLast, boolean isMethod, SemanticNodeList<Expression> arguments, List<JavaType> methodTypeArgs,
                                   BindingDirection bindingDirection, boolean isStatic, Object inferredType) {
 
       JavaModel model = expr.getJavaModel();
@@ -1298,7 +1323,6 @@ public class IdentifierExpression extends ArgumentsExpression {
          currentType = ModelUtil.getParamTypeBaseType(currentType);
 
       ITypeDeclaration enclosingType = expr.getEnclosingIType();
-      List<JavaType> methodTypeArgs = expr.getMethodTypeArguments();
 
       if (currentType instanceof ITypeDeclaration) {
          ITypeDeclaration currentTypeDecl = (ITypeDeclaration) currentType;

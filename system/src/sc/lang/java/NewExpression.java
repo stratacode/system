@@ -122,7 +122,7 @@ public class NewExpression extends IdentifierExpression {
       super.start();
 
       if (boundType != null && arguments != null) {
-         constructor = ModelUtil.declaresConstructor(boundType, arguments, null);
+         constructor = parameterizeMethod(this, ModelUtil.declaresConstructor(boundType, arguments, null), null, inferredType, arguments, getMethodTypeArguments());
          propagateInferredTypes();
       }
 
@@ -133,6 +133,10 @@ public class NewExpression extends IdentifierExpression {
 
    private void propagateInferredTypes() {
       // TODO: do we need to stage this if we are in a nested expression and inferredtype has not been set yet (see IdentifierExpression or just inherit from that)
+      //if (arguments != null && constructor == null && arguments.size() > 0) {
+      //   System.out.println("***");
+      //   ModelUtil.declaresConstructor(boundType, arguments, null);
+      //}
       if (constructor != null && arguments != null) {
          propagateInferredArgs(this, constructor, arguments);
       }
