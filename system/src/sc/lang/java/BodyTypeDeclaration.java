@@ -804,19 +804,16 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       int ct = 0;
 
       if (body != null) {
+         ArrayList<Object> res = null;
          for (Statement s:body) {
-            if (s instanceof ConstructorDefinition)
-               ct++;
-         }
-         if (ct != 0) {
-            Object[] cstrs = new Object[ct];
-            ct = 0;
-            for (Statement s:body) {
-               if (s instanceof ConstructorDefinition && (refType == null || ModelUtil.checkAccess(refType, s)))
-                  cstrs[ct++] = s;
+            if (s instanceof ConstructorDefinition && (refType == null || ModelUtil.checkAccess(refType, s))) {
+               if (res == null)
+                  res = new ArrayList<Object>();
+               res.add(s);
             }
-            return cstrs;
          }
+         if (res != null)
+            return res.toArray();
       }
       return null;
    }
