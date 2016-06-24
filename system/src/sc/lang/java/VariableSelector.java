@@ -142,4 +142,8 @@ public class VariableSelector extends Selector {
          }
       }
    }
+
+   public List<JavaType> getMethodTypeArguments() {
+      return null;
+   }
 }
