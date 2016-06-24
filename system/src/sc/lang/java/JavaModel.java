@@ -380,8 +380,6 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (imp.staticImport) {
          String className = CTypeUtil.getPackageName(impStr);
          String memberName = CTypeUtil.getClassName(impStr);
-         if (className.contains("Assert"))
-            System.out.println("***");
          Object importedType = findTypeDeclaration(className, false);
          if (importedType == null) {
             imp.displayTypeError("No static import class: " + className + " for: ");
