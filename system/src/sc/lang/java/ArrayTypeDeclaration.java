@@ -63,6 +63,11 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
    }
 
    public static ArrayTypeDeclaration create(Object compType, int ndim, ITypeDeclaration dit) {
+      while (compType instanceof ArrayTypeDeclaration) {
+         ArrayTypeDeclaration arrCompType = (ArrayTypeDeclaration) compType;
+         ndim += arrCompType.getNdim();
+         compType = arrCompType.getComponentType();
+      }
       return new ArrayTypeDeclaration(dit, compType, JavaType.getDimsStr(ndim));
    }
 
