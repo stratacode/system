@@ -393,8 +393,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return true;
       if (viewedErrors == null)
          return false;
-      if (viewedErrors.size() >= 50) {
-         System.err.println(".... too many errors - disabling further console errors");
+      if (options.maxErrors != -1 && viewedErrors.size() >= options.maxErrors) {
+         System.err.println(".... more than: " + options.maxErrors + " errors - disabling further console errors");
          options.disableCommandLineErrors = true;
          return true;
       }
@@ -2820,8 +2820,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   public Object getInnerCFClass(String fullTypeName, String name) {
-      String parentClassPathName = fullTypeName.replace('.',FileUtil.FILE_SEPARATOR_CHAR);
+   public Object getInnerCFClass(String fullTypeName, String cfTypeName, String name) {
+      //String parentClassPathName = fullTypeName.replace('.',FileUtil.FILE_SEPARATOR_CHAR);
+      String parentClassPathName = cfTypeName;
       PackageEntry ent = getPackageEntry(parentClassPathName);
       if (ent == null) {
          System.err.println("*** can't find package entry for parent of inner type");
@@ -3173,6 +3174,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       /** Should we update all packages */
       @Constant public boolean update;
+
+      /** Maximum number of errors to display */
+      @Constant public int maxErrors = 100;
    }
 
    @MainSettings(produceJar = true, produceScript = true, produceBAT = true, execName = "bin/scc", jarFileName="bin/sc.jar", debug = false, maxMemory = 1280, defaultArgs = "-restartArgsFile <%= getTempDir(\"restart\", \"tmp\") %>")
@@ -3277,6 +3281,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   break;
                case 'h':
                   usage("", args);
+                  break;
+               case 'm':
+                  if (opt.equals("me")) {
+                     if (args.length < i + 1)
+                        usage("Missing arg to me (maxErrors) option: ", args);
+                     else {
+                        try {
+                           options.maxErrors = Integer.parseInt(args[++i]);
+                        }
+                        catch (NumberFormatException exc) {
+                           usage("Invalid integer arg to me (maxErrors) option: " + exc.toString(), args);
+                        }
+                     }
+                  }
                   break;
                case 'n':
                   if (opt.equals("nc")) {
