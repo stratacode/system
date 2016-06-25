@@ -514,7 +514,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       removeAllActivePackageIndexEntries();
 
-      if (!peerMode)
+      if (!peerMode && ! options.disableCG)
          System.gc();
 
    }
@@ -1659,7 +1659,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
 
-      System.gc();
+      if (!options.disableCG)
+         System.gc();
+
    }
 
    /**
@@ -3173,6 +3175,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       /** Should we update all packages */
       @Constant public boolean update;
+
+      /** Should System.cg() be invoked on cleanup */
+      @Constant public boolean disableCG;
    }
 
    @MainSettings(produceJar = true, produceScript = true, produceBAT = true, execName = "bin/scc", jarFileName="bin/sc.jar", debug = false, maxMemory = 1280, defaultArgs = "-restartArgsFile <%= getTempDir(\"restart\", \"tmp\") %>")
