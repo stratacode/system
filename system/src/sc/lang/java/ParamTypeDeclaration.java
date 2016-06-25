@@ -538,6 +538,10 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return ModelUtil.getTypeName(baseType).equals(ModelUtil.getTypeName(obj));
    }
 
+   public void setBaseType(Object nbt) {
+      baseType = nbt;
+   }
+
    public Object getBaseType() {
       return baseType;
    }

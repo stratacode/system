@@ -82,6 +82,13 @@ public class SymbolChoice extends Parselet {
       expectedValues.addAll(l);
    }
 
+   public void addExcludedValues(String... values) {
+      if (excludedValues == null)
+         excludedValues = new HashSet<IString>();
+      for (String val:values)
+         excludedValues.add(PString.toIString(val));
+   }
+
    public Class getSemanticValueClass() {
       return IString.class;
    }
@@ -173,12 +180,16 @@ public class SymbolChoice extends Parselet {
       if (excludedValues != null) {
          excludedPeekString = new HashMap<IString,ArrString>();
          for (IString excludeValue:excludedValues) {
+            boolean matched = false;
             for (IString expectedValue:expectedValues) {
                if (excludeValue.startsWith(expectedValue)) {
+                  matched = true;
                   IString peekStr = excludeValue.substring(expectedValue.length());
                   excludedPeekString.put(expectedValue, ArrString.toArrString(peekStr.toString()));
                }
             }
+            if (!matched)
+               System.err.println("*** Warning: ignoring excluded value: " + excludeValue + " does not match any expected value: " + expectedValues);
          }
       }
    }
@@ -388,7 +399,8 @@ public class SymbolChoice extends Parselet {
          // Some input symbols may be excluded e.g. %> will override %
          ArrString excludedTokensToPeek = excludedPeekString.get(matchedValue);
          if (excludedTokensToPeek != null) {
-            if (parser.peekInputStr(excludedTokensToPeek, false) == 1)
+            // If we match the excluded peek string for this symbol, it's not a match
+            if (parser.peekInputStr(excludedTokensToPeek, false) == 0)
                return "excluded token";
          }
       }

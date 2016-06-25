@@ -668,7 +668,10 @@ public class IdentifierExpression extends ArgumentsExpression {
 
       Object boundType = boundTypes[len-1];
       if (boundType != null && arguments != null) {
-         propagateInferredArgs(this, boundType, arguments);
+         // This saves some time and is important for the case where boundType is a VariableDefinition - during transform we may
+         // return the VariableDefinition until we've created the getX method - but it looks like a method call.
+         if (arguments.size() > 0)
+            propagateInferredArgs(this, boundType, arguments);
       }
    }
 
@@ -3040,6 +3043,10 @@ public class IdentifierExpression extends ArgumentsExpression {
                   return resolveType(ModelUtil.getEnclosingType(boundTypes[0]), ix, idTypes);
                }
                break;
+            case ThisExpression:
+               if (ModelUtil.isConstructor(boundTypes[ix]))
+                  return resolveType(ModelUtil.getEnclosingType(boundTypes[ix]), ix, idTypes);
+               break;
          }
       }
       Object type = resolveType(boundTypes[ix], ix, idTypes);
@@ -4332,7 +4339,8 @@ public class IdentifierExpression extends ArgumentsExpression {
          for (int i = 0; i < boundTypes.length; i++) {
             Object varType = getTypeForIdentifier(i);
             if (varType != null) {
-               types.add(varType);
+               if (!(varType instanceof AbstractMethodDefinition))
+                  types.add(varType);
             }
             Object boundType = boundTypes[i];
             if (idTypes != null && boundType != null) {
@@ -4891,6 +4899,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          if (boundTypes != null) {
             newIdent.boundTypes = boundTypes.clone();
          }
+         newIdent.inferredType = inferredType;
       }
       if ((options & CopyInitLevels) != 0) {
          newIdent.isAssignment = isAssignment;

@@ -449,6 +449,10 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
       public void set(String...choices) {
          choice.set(choices);
       }
+
+      public void addExcludedValues(String... excluded) {
+         choice.addExcludedValues(excluded);
+      }
    }
 
    public class SemanticTokenChoice extends SymbolChoiceSpace {

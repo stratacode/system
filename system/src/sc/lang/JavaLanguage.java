@@ -315,16 +315,6 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       primary.cacheResults = true;
    }
 
-   // Here for Boolean.class::cast we need to match classValueExpression first
-   OrderedChoice methodRefPrefix = new OrderedChoice(classValueExpression, new Sequence("TypeExpression(typeIdentifier,)", typeIdentifier, new Symbol(LOOKAHEAD, "::")), type, primary);
-   {
-      // Matching typeIdentifier - which can be either a type or an identifier expression first.  That type picks the right one at runtime.  After that we match type,
-      // then primary since a type name can match more than a primary expression in some cases.
-      methodReference.set(methodRefPrefix, new SymbolSpace("::"), optTypeArguments, new OrderedChoice(identifier, newKeyword));
-      // Since the first slot is an identifier, type, or expression make sure we at least fill in the :: before we consider this a method reference.
-      methodReference.minContentSlot = 1;
-   }
-
    // Forward
    IndexedChoice unaryExpressionNotPlusMinus = new IndexedChoice();
    //{ unaryExpressionNotPlusMinus.recordTime = true; }
@@ -339,6 +329,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    {
       selector.put(".", new Sequence("VariableSelector(,identifier,arguments)", periodSpace, varIdentifier, optArguments));
       selector.put(".", new Sequence("NewSelector(,,innerCreator)", periodSpace, newKeyword, innerCreator));
+      selector.put(".", new Sequence("TypedMethodSelector(,typeArguments,identifier,arguments)", periodSpace, simpleTypeArguments, identifier, arguments));
       selector.put("[", new Sequence("ArraySelector(,expression,)", openSqBracket, expression, closeSqBracket));
    }
 
@@ -377,6 +368,22 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       unaryExpression.put("+", prefixUnaryExpression);
       unaryExpression.put("-", prefixUnaryExpression);
       unaryExpression.addDefault(unaryExpressionNotPlusMinus);
+   }
+
+   Symbol methRefSepLookahead = new Symbol(LOOKAHEAD, "::");
+
+   //OrderedChoice methodRefPrefix = new OrderedChoice(classValueExpression, new Sequence("TypeExpression(typeIdentifier,)", typeIdentifier, new Symbol(LOOKAHEAD, "::")), type, primaryExpression);
+   // Here for Boolean.class::cast we need to match classValueExpression first
+   // Using the methRefSepLookahead to avoid false partial parses... it's easy to match a type which is really part of a primary or vice versa.
+   OrderedChoice methodRefPrefix = new OrderedChoice(new Sequence("TypeExpression(typeIdentifier,)", typeIdentifier, methRefSepLookahead),
+                                                     new Sequence("(.,)", type, methRefSepLookahead),
+                                                     new Sequence("(.,)", primaryExpression, methRefSepLookahead));
+   {
+      // Matching typeIdentifier - which can be either a type or an identifier expression first.  That type picks the right one at runtime.  After that we match type,
+      // then primary since a type name can match more than a primary expression in some cases.
+      methodReference.set(methodRefPrefix, new SymbolSpace("::"), optTypeArguments, new OrderedChoice(identifier, newKeyword));
+      // Since the first slot is an identifier, type, or expression make sure we at least fill in the :: before we consider this a method reference.
+      methodReference.minContentSlot = 1;
    }
 
    public SemanticTokenChoice binaryOperators = new SemanticTokenChoice(TypeUtil.binaryOperators);

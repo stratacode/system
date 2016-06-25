@@ -472,6 +472,8 @@ public class TestUtil {
          long startTime = System.currentTimeMillis();
          int ct = opts.repeatCount;
          do {
+            TemplateLanguage.getTemplateLanguage().blockStatements.trace = true;
+
             // Parsing using the language directly - no layered system involved so we can only validate the grammar
             if (!opts.layerMode) {
                lang = Language.getLanguageByExtension(ext);

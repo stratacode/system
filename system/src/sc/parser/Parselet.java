@@ -869,4 +869,20 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       }
       return beforeFirstNode;
    }
+
+   /**
+    * This is called when we are parsing using the result cache.  This node found a match in the cache, but the semantic value's parse-node
+    * from the cached value might not be right - e.g. we parsed an expression as part of a methodPrefix, then did not find the :: and so stashed
+    * the result, but where the semantic value has been updated to point to the methodPrefix.2 - we need to reset it back to the parse-node which
+    * we are returning - probably lower down on the chain.
+    */
+   public void updateCachedResult(Object res) {
+      if (res instanceof IParseNode) {
+         IParseNode resNode = (IParseNode) res;
+         Object resVal = resNode.getSemanticValue();
+         if (resVal instanceof ISemanticNode) {
+            ((ISemanticNode) resVal).setParseNode(resNode);
+         }
+      }
+   }
 }

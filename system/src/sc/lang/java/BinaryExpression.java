@@ -165,12 +165,15 @@ public class BinaryExpression extends Expression {
       if (lhs == null || rhs == null)
          return; // Partial values might not be initialized during fragment parsing
 
-      Class inferredType = getInferredType();
-      if (inferredType != null) {
-         lhs.setInferredType(inferredType);
-         Expression rhsExpr = getRhsExpr();
-         if (rhsExpr != null)
-            rhsExpr.setInferredType(inferredType);
+      // If we do this in the deepCopy it ends up breaking because we have not set the parentNode.
+      if (!lhs.isStarted()) {
+         Class inferredType = getInferredType();
+         if (inferredType != null) {
+            lhs.setInferredType(inferredType);
+            Expression rhsExpr = getRhsExpr();
+            if (rhsExpr != null)
+               rhsExpr.setInferredType(inferredType);
+         }
       }
 
       lhs.start();

@@ -347,9 +347,26 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
             implementsTypes = new ArrayList<Object>(implJavaTypes.size());
             for (int i = 0; i < implJavaTypes.size(); i++) {
                JavaType implJavaType = implJavaTypes.get(i);
-               //String implTypeName = ((ClassType)implJavaTypes.get(i)).getFullTypeName();
-               //Object implType = system.getClassWithPathName(implTypeName, null, false, true, false);
-               Object implType = implJavaType.getTypeDeclaration();
+               String implTypeName = ((ClassType)implJavaTypes.get(i)).getFullTypeName();
+               Object implType = system.getClassWithPathName(implTypeName, null, false, true, false);
+               Object implParamType = implJavaType.getTypeDeclaration();
+               // In some situations we might find a source file version of some class... the CFClass can only
+               // point to the compiled class
+               if (implParamType instanceof ParamTypeDeclaration) {
+                  if (implType != null)
+                     ((ParamTypeDeclaration) implParamType).setBaseType(implType);
+                  else
+                     error("Unable to resolve compiled interface for: " + implTypeName);
+
+                  implType = implParamType;
+               }
+               if (implParamType instanceof ArrayTypeDeclaration) {
+                  if (implType != null)
+                     ((ArrayTypeDeclaration) implParamType).componentType = implType;
+                  else
+                     error("Unable to resolve compiled interface for: " + implTypeName);
+                  implType = implParamType;
+               }
                if (implType == null)
                   error("Can't find interface: " + implJavaType.getFullTypeName());
                else

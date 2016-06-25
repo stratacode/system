@@ -339,6 +339,7 @@ public class Parser implements IString {
                   if (parselet.cacheResults) {
                      if (parselet.accept(semanticContext, res.value, currentIndex, res.endIx) == null) {
                         currentIndex = res.endIx;
+                        parselet.updateCachedResult(res.value);
                         return res.value;
                      }
                   }

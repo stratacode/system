@@ -96,6 +96,11 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
    public OrderedChoice simpleTemplateDeclarations = new OrderedChoice("([],[])", OPTIONAL | REPEAT, templateExpression, templateString);
    Sequence glueExpression = new Sequence("GlueExpression(,expressions,)", endDelimiter, simpleTemplateDeclarations, startCodeDelimiter);
    Sequence glueStatement = new Sequence("GlueStatement(,declarations,)", endDelimiter, simpleTemplateDeclarations, startCodeDelimiter);
+   {
+      // We don't want to match %>content in the partialValues case for glue expressions.  They need to have the <% as well
+      glueExpression.minContentSlot = 2;
+      glueStatement.minContentSlot = 2;
+   }
    // In terms of order here - need templateDeclaration <%! ahead of templateStatement <% - otherwise risk matching <% !foo := bar %> before we match <%! foo := bar %>
    public IndexedChoice templateBodyDeclarations = new IndexedChoice("([],[],[],[],[])", OPTIONAL | REPEAT);
    {
@@ -117,6 +122,8 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
       classBodyDeclarations.add(glueDeclaration);
 
       primary.put(END_DELIMITER, glueExpression);
+
+      binaryOperators.addExcludedValues("%>");
 
       // During transform of a compiled template, we'll transform the JavaModel back through compilationUnit.  In this case, the types have to match exactly so we need to redefine the grammar by just replacing the type name: JavaModel -> Template
       compilationUnit.setResultClassName("Template");
