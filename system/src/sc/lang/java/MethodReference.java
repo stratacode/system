@@ -214,6 +214,7 @@ public class MethodReference extends BaseLambdaExpression {
                if (!returnTypeVoid)
                   continue;
             }
+            // TODO: if we have an instance method here and there's no instance in context (i.e. it's not an expression type of reference) should that exclude the method from a match?
             if (ModelUtil.parametersMatch(ModelUtil.getParameterTypes(meth, true), paramTypes, true, sys) && (isConstructor || returnTypeVoid || ModelUtil.isAssignableFrom(returnType, methReturnType, sys))) {
                if (res == null)
                   res = meth;
@@ -260,6 +261,10 @@ public class MethodReference extends BaseLambdaExpression {
                      boolean oldIsAssignable = oldMethParamTypes != null && ModelUtil.isAssignableFrom(oldMethParamTypes[0], paramTypes[0], false, null, false, sys);
                      boolean newIsAssignable = ModelUtil.isAssignableFrom(refType, paramTypes[0]);
                      if (newIsAssignable && !oldIsAssignable) {
+                        paramInstance = true;
+                        referenceMethod = res;
+                     }
+                     else if (newIsAssignable && oldIsAssignable) {
                         paramInstance = true;
                         referenceMethod = res;
                      }

@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import com.sun.xml.internal.rngom.digested.DDataPattern;
 import sc.bind.BindingDirection;
 import sc.lang.SemanticNodeList;
 import sc.type.Type;
@@ -119,8 +120,14 @@ public class CastExpression extends ChainedExpression {
    }
 
    public boolean setInferredType(Object infType) {
-      if (expression != null)
-         return expression.setInferredType(type.getTypeDeclaration());
+      if (expression != null) {
+         Object typeDecl = type.getTypeDeclaration();
+         // TODO: we might update the type parameters here but since they are not shared I think it's ok not to make a copy
+         if (typeDecl instanceof ParamTypeDeclaration) {
+            ((ParamTypeDeclaration) typeDecl).writable = true;
+         }
+         return expression.setInferredType(typeDecl);
+      }
       return false;
    }
 }

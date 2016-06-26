@@ -495,8 +495,15 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
          }
          // We need to make a copy here because we might change these parameters for this particular instantiation of this method:
          //   - i.e. we set an inferredType on one of our arguments - a LambdaExpression and it further refines the type represented by this parameter
-         if (bound && res[i] instanceof ParamTypeDeclaration) {
-            res[i] = ((ParamTypeDeclaration) res[i]).cloneForNewTypes();
+         if (bound) {
+            Object nextRes = res[i];
+            // TODO: use an interface here?
+            if (nextRes instanceof ParamTypeDeclaration) {
+               res[i] = ((ParamTypeDeclaration) nextRes).cloneForNewTypes();
+            }
+            else if (nextRes instanceof ArrayTypeDeclaration) {
+               res[i] = ((ArrayTypeDeclaration) nextRes).cloneForNewTypes();
+            }
          }
          // Happens for unresolved type references
          //if (res[i] == null)
