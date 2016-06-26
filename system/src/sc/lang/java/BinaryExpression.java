@@ -159,6 +159,7 @@ public class BinaryExpression extends Expression {
       //if (isNestedExpr) {
       //   return;
       //}
+      boolean alreadyStarted = lhs != null && lhs.isStarted();
 
       super.start();
 
@@ -166,7 +167,7 @@ public class BinaryExpression extends Expression {
          return; // Partial values might not be initialized during fragment parsing
 
       // If we do this in the deepCopy it ends up breaking because we have not set the parentNode.
-      if (!lhs.isStarted()) {
+      if (!alreadyStarted) {
          Class inferredType = getInferredType();
          if (inferredType != null) {
             lhs.setInferredType(inferredType);

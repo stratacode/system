@@ -246,12 +246,29 @@ public class MethodReference extends BaseLambdaExpression {
                }
             }
             if (res != null && (referenceMethod == null || referenceMethod != res)) {
-               paramInstance = true;
 
-               // TOOD: any other rules to decide which to choose?
-               //if (referenceMethod != null && referenceMethod != res)
-               //   System.out.println("***");
-               referenceMethod = res;
+               if (referenceMethod != null) {
+                  // Should we check referenceMethod parameter types[0] and see which is a more specific match?
+                  Object[] oldMethParamTypes = ModelUtil.getParameterTypes(referenceMethod, true);
+                  boolean oldIsSame = oldMethParamTypes != null && ModelUtil.sameTypes(oldMethParamTypes[0], paramTypes[0]);
+                  boolean newIsSame = ModelUtil.sameTypes(refType, paramTypes[0]);
+                  if (newIsSame && !oldIsSame) {
+                     paramInstance = true;
+                     referenceMethod = res;
+                  }
+                  else {
+                     boolean oldIsAssignable = oldMethParamTypes != null && ModelUtil.isAssignableFrom(oldMethParamTypes[0], paramTypes[0], false, null, false, sys);
+                     boolean newIsAssignable = ModelUtil.isAssignableFrom(refType, paramTypes[0]);
+                     if (newIsAssignable && !oldIsAssignable) {
+                        paramInstance = true;
+                        referenceMethod = res;
+                     }
+                  }
+               }
+               else {
+                  paramInstance = true;
+                  referenceMethod = res;
+               }
             }
          }
          // TODO: better error message here - we can display the two different signatures that should match.

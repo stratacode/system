@@ -107,7 +107,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
             for (Object type:paramType.types) {
                if (ModelUtil.hasTypeVariables(type)) {
                   Object newVal = resolveTypeParameter(type, resolve);
-                  if (newVal != type) {
+                  if (newVal != type && newVal != null) {
                      if (newType == null) {
                         newType = paramType.cloneForNewTypes();
                      }
@@ -409,8 +409,8 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
                         return nestedRes;
                   }
                }
-               if (nextType != null) {
-                  Object boundParam = ModelUtil.getTypeParameter(nextType, i);
+               if (nextType != null && srcIx != -1) {
+                  Object boundParam = ModelUtil.getTypeParameter(nextType, srcIx);
                   // Do not try to extract the ? as it does not add any information and makes this parameter seem bound when it's not
                   if (boundParam instanceof ExtendsType.WildcardTypeDeclaration) {
                      continue;

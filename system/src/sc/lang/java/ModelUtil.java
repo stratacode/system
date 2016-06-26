@@ -431,10 +431,15 @@ public class ModelUtil {
             }
             List<?> typeParams = getTypeParameters(getTypeDeclFromType(typeContext, type, true, sys, bindUnboundParams, definedInType));
             Object baseType = ModelUtil.getParamTypeBaseType(type);
-            if (definedInType != null)
-               return new ParamTypeDeclaration(definedInType,typeParams, Arrays.asList(types), baseType);
-            else
-               return new ParamTypeDeclaration(sys,typeParams, Arrays.asList(types), baseType);
+            ParamTypeDeclaration res;
+            if (definedInType != null) {
+               res = new ParamTypeDeclaration(definedInType, typeParams, Arrays.asList(types), baseType);
+            }
+            else {
+               res = new ParamTypeDeclaration(sys, typeParams, Arrays.asList(types), baseType);
+            }
+            res.writable = true;
+            return res;
          }
       }
       else if (type instanceof GenericArrayType) {
