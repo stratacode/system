@@ -4,7 +4,6 @@
 
 package sc.lang.java;
 
-import com.sun.xml.internal.rngom.digested.DDataPattern;
 import sc.bind.BindingDirection;
 import sc.lang.SemanticNodeList;
 import sc.type.Type;
