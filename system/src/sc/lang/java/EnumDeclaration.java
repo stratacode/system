@@ -347,4 +347,11 @@ public class EnumDeclaration extends TypeDeclaration {
    public Object getDerivedTypeDeclaration() {
       return Object.class; // TODO: should this be java.lang.Enum.class?
    }
+
+   protected void updateBoundExtendsType(Object newType, Object oldType) {
+      // Where new type is an annotation layer for Object.class  I don't think we need to keep track of that change
+      if (oldType == Object.class)
+         return;
+      throw new UnsupportedOperationException();
+   }
 }

@@ -782,6 +782,9 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
     * Do not use semicolonEOL here because it has skip-on-error and we'd rather match a partial error in class or interface declaration
     */
    public OrderedChoice typeDeclaration = new OrderedChoice("(.,.,)", classDeclaration, interfaceDeclaration, semicolon);
+   {
+      typeDeclaration.setLanguage(this);
+   }
 
    // We could wrap typeDeclaration but it's more efficient to avoid the extra sequence here and we need to set skipBodyError.  Keeping typeDeclaration so we can style a TypeDeclaration without
    // wrapping it in an array

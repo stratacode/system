@@ -604,7 +604,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (plen != argLen) {
          // If the last guy is not a repeating parameter, it can't match
          if (last < 0 || !ModelUtil.isVarArgs(meth) || /* !ModelUtil.isArray(paramTypes[last]) || */ argLen < last) {
-            rootExpr.displayError("Mismatching parameter types to method invocation.");
+            rootExpr.displayTypeError("Mismatching parameter types to method invocation.");
             return;
          }
       }
