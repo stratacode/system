@@ -257,6 +257,9 @@ public class MethodReference extends BaseLambdaExpression {
                      paramInstance = true;
                      referenceMethod = res;
                   }
+                  else if (!newIsSame && oldIsSame) {
+                     // Keep the paramInstance and referenceMethod the same
+                  }
                   else {
                      boolean oldIsAssignable = oldMethParamTypes != null && ModelUtil.isAssignableFrom(oldMethParamTypes[0], paramTypes[0], false, null, false, sys);
                      boolean newIsAssignable = ModelUtil.isAssignableFrom(refType, paramTypes[0]);
