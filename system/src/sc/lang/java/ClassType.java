@@ -303,6 +303,7 @@ public class ClassType extends JavaType {
                JavaType typeArg = typeArgs.get(i);
                if (typeArg != null) {
                   Object ptdt = typeArg.getTypeDeclaration(ctx, itd, false, true, true);
+                  ptd.writable = true;
                   ptd.setTypeParamIndex(i, ptdt);
                }
             }
@@ -502,6 +503,11 @@ public class ClassType extends JavaType {
             type = FAILED_TO_INIT_SENTINEL;
             if (displayError) {
                displayTypeError("No type: ", getFullTypeName(), " for ");
+               if (it != null) {
+                  Object dummy = it.findTypeDeclaration(fullTypeName, true);
+                  if (node != null)
+                     dummy = node.findType(fullTypeName);
+               }
             }
          }
       }

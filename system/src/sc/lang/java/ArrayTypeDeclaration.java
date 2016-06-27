@@ -63,6 +63,11 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
    }
 
    public static ArrayTypeDeclaration create(Object compType, int ndim, ITypeDeclaration dit) {
+      while (compType instanceof ArrayTypeDeclaration) {
+         ArrayTypeDeclaration arrCompType = (ArrayTypeDeclaration) compType;
+         ndim += arrCompType.getNdim();
+         compType = arrCompType.getComponentType();
+      }
       return new ArrayTypeDeclaration(dit, compType, JavaType.getDimsStr(ndim));
    }
 
@@ -433,5 +438,14 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
 
    public String toString() {
       return componentType == null ? "<null>" : componentType.toString() + (arrayDimensions == null ? "<no dims>" : arrayDimensions);
+   }
+
+   public ArrayTypeDeclaration cloneForNewTypes() {
+      if (componentType instanceof ParamTypeDeclaration) {
+         Object newCompType = ((ParamTypeDeclaration) componentType).cloneForNewTypes();
+         return new ArrayTypeDeclaration(definedInType, newCompType, arrayDimensions);
+      }
+      // No mutable state so no need to clone
+      return this;
    }
 }

@@ -98,6 +98,8 @@ public class ModelUtil {
          return varObj;
       else if (ModelUtil.isTypeVariable(varObj))
          return ModelUtil.getTypeParameterDefault(varObj);
+      else if (varObj instanceof ParameterizedType)
+         return varObj;
       throw new UnsupportedOperationException();
    }
 
@@ -389,12 +391,13 @@ public class ModelUtil {
                   return retType;
             }
          }
-         if (varObj instanceof Method)
-            return getTypeDeclFromType(typeContext, genRetType, false, model.getLayeredSystem(), false, definedInType);
+         if (varObj instanceof Method) {
+            return getTypeDeclFromType(typeContext, genRetType, false, model == null ? null : model.getLayeredSystem(), false, definedInType);
+         }
          // Note: we are passing the arguments in here but I think they are only used for the case handled above.  There's code to handle type parameters
          // in there, but not parameters defined at the method level.
          else {
-            return getTypeDeclFromType(typeContext, ((IMethodDefinition) varObj).getTypeDeclaration(arguments, false), false, model.getLayeredSystem(), false, definedInType);
+            return getTypeDeclFromType(typeContext, ((IMethodDefinition) varObj).getTypeDeclaration(arguments, false), false, model == null ? null : model.getLayeredSystem(), false, definedInType);
          }
       }
       // MethodDefinition implements ITypedObject - don't reorder
@@ -428,10 +431,15 @@ public class ModelUtil {
             }
             List<?> typeParams = getTypeParameters(getTypeDeclFromType(typeContext, type, true, sys, bindUnboundParams, definedInType));
             Object baseType = ModelUtil.getParamTypeBaseType(type);
-            if (definedInType != null)
-               return new ParamTypeDeclaration(definedInType,typeParams, Arrays.asList(types), baseType);
-            else
-               return new ParamTypeDeclaration(sys,typeParams, Arrays.asList(types), baseType);
+            ParamTypeDeclaration res;
+            if (definedInType != null) {
+               res = new ParamTypeDeclaration(definedInType, typeParams, Arrays.asList(types), baseType);
+            }
+            else {
+               res = new ParamTypeDeclaration(sys, typeParams, Arrays.asList(types), baseType);
+            }
+            res.writable = true;
+            return res;
          }
       }
       else if (type instanceof GenericArrayType) {
@@ -983,29 +991,39 @@ public class ModelUtil {
 
          boolean paramsSorted = false;
 
+         int paramLen = types.length;
+
          // If we have one var arg and one non-var-arg and the same parameters, choose the type based on whether the
          // varArg argument is an array.  If it's an array, choose the varArgs one.  If not, choose the scalar.
-         if (c1VarArg != c2VarArg && c1Len == checkLen) {
-            Object lastType = types[types.length-1];
-            // This rule for using varArgs to match arrays applies to Integer[] but not int[]
-            boolean lastTypeArr = ModelUtil.isArray(lastType) && !ModelUtil.isPrimitive(ModelUtil.getArrayComponentType(lastType));
-            // If one matches exactly and the other matches because it's a repeat definition, choose the non-repeating one (e.g. Seq.of(T) versus Seq.of(T...) except if you have an array param.
-            // Then the match goes the other way.
-            if (c1VarArg && !c2VarArg) {
-               defaultType = lastTypeArr ? c1 : c2;
-               paramsSorted = true;
+         if (c1VarArg != c2VarArg) {
+            if (c1Len == checkLen) {
+               Object lastType = types[types.length - 1];
+               // This rule for using varArgs to match arrays applies to Integer[] but not int[]
+               boolean lastTypeArr = ModelUtil.isArray(lastType) && !ModelUtil.isPrimitive(ModelUtil.getArrayComponentType(lastType));
+               // If one matches exactly and the other matches because it's a repeat definition, choose the non-repeating one (e.g. Seq.of(T) versus Seq.of(T...) except if you have an array param.
+               // Then the match goes the other way.
+               if (c1VarArg && !c2VarArg) {
+                  defaultType = lastTypeArr ? c1 : c2;
+                  paramsSorted = true;
+               }
+               else if (c2VarArg && !c1VarArg) {
+                  defaultType = lastTypeArr ? c2 : c1;
+                  paramsSorted = true;
+               }
             }
-            else if (c2VarArg && !c1VarArg) {
-               defaultType = lastTypeArr ? c2 : c1;
-               paramsSorted = true;
+            // Another var args case - we'd rather match the method with the exact number of parameters over a var args with fewer
+            else {
+               if (c1VarArg && checkLen == paramLen)
+                  defaultType = c2;
+               else if (c2VarArg && c1Len == paramLen)
+                  defaultType = c1;
             }
          }
-
 
          // First if any of the parameters is a lambda expression, we need to ensure the
          // lambda expression parameters match the parameters of the single-interface method
          // defined for this parameter type.
-         for (int i = 0; i < types.length; i++) {
+         for (int i = 0; i < paramLen; i++) {
             Object arg = types[i];
             if (arg instanceof BaseLambdaExpression.LambdaInferredType) {
                boolean repeat1Arg = c1Types.length <= i;
@@ -1015,10 +1033,10 @@ public class ModelUtil {
 
                boolean c2Interface = ModelUtil.isInterface(c2Arg);
                BaseLambdaExpression lambda = ((BaseLambdaExpression.LambdaInferredType) arg).rootExpr;
-               if (c2Interface && !lambda.lambdaParametersMatch(c2Arg))
+               if (c2Interface && !lambda.lambdaParametersMatch(c2Arg, i >= c2Types.length - 1 && c2VarArg))
                   c2Interface = false;
                boolean c1Interface = ModelUtil.isInterface(c1Arg);
-               if (c1Interface && !lambda.lambdaParametersMatch(c1Arg))
+               if (c1Interface && !lambda.lambdaParametersMatch(c1Arg, i >= c1Types.length - 1 && c1VarArg))
                   c1Interface = false;
                if (!c1Interface) {
                   if (c2Interface)
@@ -1058,6 +1076,17 @@ public class ModelUtil {
 
                if (sameTypes(arg, c2Arg))
                   return c2;
+
+               if (isANumber(arg)) {
+                  if (ModelUtil.isInteger(arg)) {
+                     boolean c1Int = ModelUtil.isAnInteger(c1Arg);
+                     boolean c2Int = ModelUtil.isAnInteger(c2Arg);
+                     if (!c1Int && c2Int)
+                        return c2;
+                     if (!c2Int && c1Int)
+                        return c1;
+                  }
+               }
 
                // TODO: This does not look right - we should pick the more specific the args in both directions here right?
                // And only return if they are diferent.  And why do we return defaultType after the first parameter?
@@ -1200,6 +1229,8 @@ public class ModelUtil {
    public static boolean sameTypeParameters(Object tp1, Object tp2) {
       String tpName1 = ModelUtil.getTypeParameterName(tp1);
       String tpName2 = ModelUtil.getTypeParameterName(tp2);
+      if (tpName1 == null || tpName2 == null)
+         return false;
       if (!tpName1.equals(tpName2))
          return false;
       Object decl1 = ModelUtil.getTypeParameterDeclaration(tp1);
@@ -1354,9 +1385,18 @@ public class ModelUtil {
    }
 
    public static Object refineType(ITypeDeclaration definedInType, Object origType, Object newType) {
-      if (ModelUtil.isTypeVariable(origType))
+      if (origType == newType)
+         return origType;
+
+      if (origType instanceof ExtendsType.LowerBoundsTypeDeclaration)
+         origType = ((ExtendsType.LowerBoundsTypeDeclaration) origType).getBaseType();
+
+      if (newType instanceof ExtendsType.LowerBoundsTypeDeclaration)
+         newType = ((ExtendsType.LowerBoundsTypeDeclaration) newType).getBaseType();
+
+      if (ModelUtil.isTypeVariable(origType) || ModelUtil.isWildcardType(origType))
          return newType;
-      if (ModelUtil.isTypeVariable(newType))
+      if (ModelUtil.isTypeVariable(newType) || ModelUtil.isWildcardType(newType))
          return origType;
 
       if (newType == null)
@@ -1367,6 +1407,9 @@ public class ModelUtil {
 
       if (!ModelUtil.isAssignableFrom(origType, newType))
          return origType;
+
+      if (!ModelUtil.isAssignableFrom(newType, origType))
+         return newType;
 
       if (ModelUtil.isParameterizedType(origType)) {
          // If the old type has type parameters but the new one does not, create a new param type which has the new type
@@ -1405,6 +1448,7 @@ public class ModelUtil {
          else {
             List<?> typeParams = ModelUtil.getTypeParameters(origType);
             int numParams = typeParams.size();
+            List<?> newTypeParams = ModelUtil.getTypeParameters(newType);
             ArrayList<Object> typeDefs = new ArrayList<Object>(numParams);
             for (int i = 0; i < numParams; i++) {
                Object op = ModelUtil.getTypeParameter(origType, i);
@@ -1700,7 +1744,10 @@ public class ModelUtil {
       if (paramType instanceof ParamTypeDeclaration) {
          ParamTypeDeclaration ptd = (ParamTypeDeclaration) paramType;
          // If this parameter type is bound, we'll return the bound type.  Otherwise, we return the type parameter placeholder
-         Object res = ptd.types.get(ix);
+         Object res = null;
+         // Wildcard types <> no type is specified so just use the type param
+         if (ptd.types.size() != 0)
+            res = ptd.types.get(ix);
          if (res == null)
             res = ptd.typeParams.get(ix);
          return res;
@@ -1712,6 +1759,10 @@ public class ModelUtil {
       else if (paramType instanceof Class) {
          Class cl = (Class) paramType;
          return cl.getTypeParameters()[ix];
+      }
+      else if (paramType instanceof ITypeDeclaration) {
+         List typeParams = ((ITypeDeclaration) paramType).getClassTypeParameters();
+         return typeParams.get(ix);
       }
       else throw new UnsupportedOperationException();
    }
@@ -1776,8 +1827,11 @@ public class ModelUtil {
       if (type1 == type2)
          return true;
 
-      if (type2 == NullLiteral.NULL_TYPE)
+      if (type2 == NullLiteral.NULL_TYPE) {
+         if (ModelUtil.isPrimitive(type1))
+            return false;
          return true;
+      }
 
       if (type1 instanceof TypeParameter) {
          // There java.lang.Void.class will match a type parameter
@@ -3074,18 +3128,23 @@ public class ModelUtil {
                case '5':
                case '6':
                case '7':
-                  // Special case for characters: \0
-                  if (str.length() == i + 1)
-                     charVal = '\0';
-                  else {
-                     String octStr = str.substring(i,i+3);
-                     i += 3;
-                     try {
-                        charVal = (char) Integer.parseInt(octStr, 8);
-                     }
-                     catch (NumberFormatException exc) {
-                        System.err.println("**** Invalid character octal escape: " + octStr + " should be an octal number");
-                     }
+                  int olen = 1;
+                  // May be \3\u1234  or \123 or \1\2\3
+                  for (int oix = i + 1; oix < len; oix++) {
+                     char nextChar = str.charAt(i + olen);
+                     if (Character.isDigit(nextChar) && nextChar < '8')
+                        olen++;
+                     else
+                        break;
+                  }
+
+                  String octStr = str.substring(i, i + olen);
+                  i += olen - 1;
+                  try {
+                     charVal = (char) Integer.parseInt(octStr, 8);
+                  }
+                  catch (NumberFormatException exc) {
+                     System.err.println("**** Invalid character octal escape: " + octStr + " should be an octal number");
                   }
                   break;
             }
@@ -3784,6 +3843,7 @@ public class ModelUtil {
       return types;
    }
 
+   // TODO: reconcile this with hasMethodUnboundTypeParameters.
    public static boolean isParameterizedMethod(Object method) {
       return hasParameterizedReturnType(method) || hasParameterizedArguments(method);
    }
@@ -3804,7 +3864,7 @@ public class ModelUtil {
       if (method instanceof Method) {
          Type[] paramTypes = ((Method) method).getGenericParameterTypes();
          for (Type paramType:paramTypes)
-            if (paramType instanceof TypeVariable)
+            if (paramType instanceof TypeVariable || ModelUtil.hasUnboundTypeParameters(paramType))
                return true;
          return false;
       }
@@ -3992,6 +4052,9 @@ public class ModelUtil {
       else if (typeParam instanceof Class) {
          return null;
       }
+      // We could check if the bounds are a type parameter but don't think that's right since this is not a type variable
+      else if (ModelUtil.isWildcardType(typeParam))
+         return null;
       else
          throw new UnsupportedOperationException();
    }
@@ -4296,6 +4359,15 @@ public class ModelUtil {
             return lastTypeArg;
          }
       }
+      else if (lastExtType != null && ModelUtil.hasTypeArguments(lastExtType) && curParamIx < ModelUtil.getNumTypeArguments(lastExtType)) {
+         lastTypeArg = ModelUtil.getTypeArgument(lastExtType, curParamIx);
+         if (lastTypeArg instanceof JavaType)
+            lastTypeArg = ((JavaType) lastTypeArg).getTypeDeclaration();
+         // TODO: will we ever have java.lang.reflect.Type here?
+         if (!ModelUtil.isTypeVariable(lastTypeArg)) {
+            return lastTypeArg;
+         }
+      }
       // Use the default type for this type variable
       return ModelUtil.getTypeParameterDefault(lastTypeArg);
    }
@@ -4390,6 +4462,11 @@ public class ModelUtil {
       return resultType.getType(srcIx);
    }
 
+   public static int getNumTypeArguments(Object extJavaType) {
+      List<?> args = getTypeArguments(extJavaType);
+      return args == null ? 0 : args.size();
+   }
+
    public static List<?> getTypeArguments(Object extJavaType) {
       if (extJavaType instanceof JavaType) {
          return ((JavaType) extJavaType).getResolvedTypeArguments();
@@ -4404,6 +4481,10 @@ public class ModelUtil {
       }
       else
          throw new UnsupportedOperationException();
+   }
+
+   public static boolean hasTypeArguments(Object extJavaType) {
+      return extJavaType instanceof JavaType || extJavaType instanceof Type;
    }
 
    public static String getAbsoluteGenericTypeName(Object resultType, Object member, boolean includeDims) {
@@ -6008,6 +6089,8 @@ public class ModelUtil {
          return ((CFClass) type).getMethodCache();
       else if (type instanceof TypeDeclaration)
          return ((TypeDeclaration) type).getMethodCache();
+      else if (type instanceof ParamTypeDeclaration)
+         return getMethodCache(((ParamTypeDeclaration) type).baseType);
       else
          throw new UnsupportedOperationException();
    }
@@ -7510,6 +7593,23 @@ public class ModelUtil {
    public static boolean hasMethodTypeParameters(Object method) {
       Object[] typeParams = getMethodTypeParameters(method);
       return typeParams != null && typeParams.length > 0;
+   }
+
+   public static boolean hasMethodUnboundTypeParameters(Object method) {
+      Object[] typeParams = getMethodTypeParameters(method);
+      if (typeParams != null && typeParams.length > 0)
+         return true;
+      Object[] methParams = ModelUtil.getParameterTypes(method, false);
+      if (methParams != null) {
+         for (Object methParam:methParams) {
+            // Used to only consider unbound params here but we can refine even a bound type paraemter apparently so
+            // we need to use ParamTypeMethods whenever there's a type parameter in the arg list
+            if (ModelUtil.hasUnboundTypeParameters(methParam) || ModelUtil.isParameterizedType(methParam))
+               return true;
+         }
+      }
+      Object returnType = ModelUtil.getReturnType(method, false);
+      return ModelUtil.hasUnboundTypeParameters(returnType);
    }
 
    public static Object wrapPrimitiveType(Object newVal) {

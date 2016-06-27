@@ -488,11 +488,18 @@ public class Sequence extends NestedParselet  {
                   }
                   Object newPrevValue = prevParselet.reparseExtendedErrors(parser, childParselet, origOldChild, dctx, forceReparse || prevChildReparse);
                   if (newPrevValue != null && !(newPrevValue instanceof ParseError)) {
+                     Object oldPrevValue = value.children == null || prevIx >= value.children.size() ? null : value.children.get(prevIx);
+                     boolean longerVal = true;
+                     if (oldPrevValue != null && !(oldPrevValue instanceof ParseError))
+                        longerVal = ((CharSequence) newPrevValue).length() > ((CharSequence) oldPrevValue).length();
+
                      value.set(newPrevValue, childParselet, prevIx, false, parser);
 
                      // Go back and retry the current child parselet now that we've parsed the previous one again successfully... we know it should match because we just peeked it in the previous parselet.
-                     i = i - 1;
-                     continue;
+                     if (longerVal) {
+                        i = i - 1;
+                        continue;
+                     }
                   }
                   else
                      dctx.restoreCurrentIndex(parser, saveIndex, ctxState);
@@ -1240,7 +1247,7 @@ public class Sequence extends NestedParselet  {
                // Consume the next skip token if we have not hit the exit, then retry
                if (!exitParselet.peek(parser)) {
                   int errorStart = parser.currentIndex;
-                  System.err.println("*** Warning - weird case extending errors - which is oldChildParseNode right?");
+                  // TODO: is oldChildParseNode here right?
                   oldChildParseNode = oldParent == null ? null : oldParent.children.get(oldParent.children.size()-1);
                   // This will consume whatever it is that we can't parse until we get to the next statement.  We have to be careful with the
                   // design of the skipOnErrorParselet so that it leaves us in the state for the next match on this choice.  It should not breakup

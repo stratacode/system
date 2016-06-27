@@ -61,7 +61,7 @@ public class EnumConstant extends BodyTypeDeclaration {
    }
 
    public boolean isAssignableTo(ITypeDeclaration other) {
-      return other == this || ModelUtil.sameTypes(other, getEnclosingType());
+      return other == this || ModelUtil.isAssignableFrom(other, getEnclosingType());
    }
 
    public Object getRuntimeType() {

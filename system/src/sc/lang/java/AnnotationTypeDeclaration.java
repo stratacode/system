@@ -4,8 +4,7 @@
 
 package sc.lang.java;
 
-public class AnnotationTypeDeclaration extends TypeDeclaration
-{
+public class AnnotationTypeDeclaration extends TypeDeclaration {
    public DeclarationType getDeclarationType() {
       return DeclarationType.ANNOTATION;
    }
@@ -25,6 +24,11 @@ public class AnnotationTypeDeclaration extends TypeDeclaration
       if (fullTypeName.equals("java.lang.annotation.Annotation"))
          return true;
       return false;
+   }
+
+   /** All annotation classes implicitly inherit from java.lang.annotation.Annotation the way Object's by default extend Object.class */
+   public Object getDerivedTypeDeclaration() {
+      return java.lang.annotation.Annotation.class;
    }
 }
 

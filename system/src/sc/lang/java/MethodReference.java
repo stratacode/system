@@ -8,6 +8,7 @@ import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
 import sc.layer.LayeredSystem;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
@@ -133,6 +134,7 @@ public class MethodReference extends BaseLambdaExpression {
          return false;
       }
       Object[] paramTypes = ModelUtil.getParameterTypes(ifmeth, true);
+      Object[] unboundParamTypes = ModelUtil.getParameterTypes(ifmeth, false);
       Object returnType = ModelUtil.getReturnType(ifmeth, true);
       LayeredSystem sys = getLayeredSystem();
       // Find the method in the list which matches the type parameters of the inferred type method
@@ -157,7 +159,8 @@ public class MethodReference extends BaseLambdaExpression {
             //if (!ModelUtil.isAssignableFrom(paramTypes[0], methReturnType))
             //   continue;
 
-            if (!ModelUtil.isAssignableFrom(refType, paramTypes[0], false, null, true, sys))
+            if (!ModelUtil.isAssignableFrom(refType, paramTypes[0], false, null, true, sys) &&
+                    (!ModelUtil.isAssignableFrom(paramTypes[0], refType, false, null, true, sys) || !ModelUtil.isTypeVariable(unboundParamTypes[0])))
                continue;
             Object[] refParamTypes = ModelUtil.getParameterTypes(meth, true);
             if (ModelUtil.parametersMatch(refParamTypes, nextParamTypes, true, sys)) {
@@ -199,23 +202,30 @@ public class MethodReference extends BaseLambdaExpression {
       else {
          Object res = null;
          Object[] paramTypes = ModelUtil.getParameterTypes(inferredTypeMethod, true);
+         Object[] unboundParamTypes = ModelUtil.getParameterTypes(inferredTypeMethod, false);
          Object returnType = ModelUtil.getReturnType(inferredTypeMethod, true);
          LayeredSystem sys = getLayeredSystem();
          // Find the method in the list which matches the type parameters of the inferred type method
          // First pass is to look for a method where all of the parameters match each other
          for (Object meth:meths) {
-            Object methReturnType = ModelUtil.getReturnType(meth, true);
-            if (!isConstructor && ModelUtil.typeIsVoid(methReturnType) != ModelUtil.typeIsVoid(returnType))
-               continue;
-            if (ModelUtil.parametersMatch(ModelUtil.getParameterTypes(meth, true), paramTypes, true, sys) && (isConstructor || ModelUtil.isAssignableFrom(returnType, methReturnType, sys))) {
+            Object methReturnType = isConstructor ? null : ModelUtil.getParameterizedReturnType(meth, null, true);
+            boolean methReturnTypeVoid, returnTypeVoid = ModelUtil.typeIsVoid(returnType);
+            if (!isConstructor && (methReturnTypeVoid = ModelUtil.typeIsVoid(methReturnType)) != returnTypeVoid) {
+               if (!returnTypeVoid)
+                  continue;
+            }
+            // TODO: if we have an instance method here and there's no instance in context (i.e. it's not an expression type of reference) should that exclude the method from a match?
+            if (ModelUtil.parametersMatch(ModelUtil.getParameterTypes(meth, true), paramTypes, true, sys) && (isConstructor || returnTypeVoid || ModelUtil.isAssignableFrom(returnType, methReturnType, sys))) {
                if (res == null)
                   res = meth;
                else
                   res = ModelUtil.pickMoreSpecificMethod(res, meth, paramTypes);
+               if (res != null)
+                  referenceMethod = res;
             }
          }
          // Second case is used when the first parameter
-         if (res == null && paramTypes != null && paramTypes.length > 0) {
+         if (paramTypes != null && paramTypes.length > 0) {
             int newLen = paramTypes.length-1;
             Object[] nextParamTypes = new Object[newLen];
             System.arraycopy(paramTypes, 1, nextParamTypes, 0, newLen);
@@ -225,7 +235,8 @@ public class MethodReference extends BaseLambdaExpression {
                //if (!ModelUtil.isAssignableFrom(paramTypes[0], methReturnType))
                //   continue;
 
-               if (!ModelUtil.isAssignableFrom(refType, paramTypes[0], sys))
+               if (!ModelUtil.isAssignableFrom(refType, paramTypes[0], false, null, true, sys) &&
+                       (!ModelUtil.isAssignableFrom(paramTypes[0], refType, false, null, true, sys) || !ModelUtil.isTypeVariable(unboundParamTypes[0])))
                   continue;
                Object[] refParamTypes = ModelUtil.getParameterTypes(meth, true);
                if (ModelUtil.parametersMatch(refParamTypes, nextParamTypes, true, sys)) {
@@ -235,9 +246,39 @@ public class MethodReference extends BaseLambdaExpression {
                      res = ModelUtil.pickMoreSpecificMethod(res, meth, nextParamTypes);
                }
             }
-            paramInstance = res != null;
+            if (res != null && (referenceMethod == null || referenceMethod != res)) {
+
+               if (referenceMethod != null) {
+                  // Should we check referenceMethod parameter types[0] and see which is a more specific match?
+                  Object[] oldMethParamTypes = ModelUtil.getParameterTypes(referenceMethod, true);
+                  boolean oldIsSame = oldMethParamTypes != null && ModelUtil.sameTypes(oldMethParamTypes[0], paramTypes[0]);
+                  boolean newIsSame = ModelUtil.sameTypes(refType, paramTypes[0]);
+                  if (newIsSame && !oldIsSame) {
+                     paramInstance = true;
+                     referenceMethod = res;
+                  }
+                  else if (!newIsSame && oldIsSame) {
+                     // Keep the paramInstance and referenceMethod the same
+                  }
+                  else {
+                     boolean oldIsAssignable = oldMethParamTypes != null && ModelUtil.isAssignableFrom(oldMethParamTypes[0], paramTypes[0], false, null, false, sys);
+                     boolean newIsAssignable = ModelUtil.isAssignableFrom(refType, paramTypes[0]);
+                     if (newIsAssignable && !oldIsAssignable) {
+                        paramInstance = true;
+                        referenceMethod = res;
+                     }
+                     else if (newIsAssignable && oldIsAssignable) {
+                        paramInstance = true;
+                        referenceMethod = res;
+                     }
+                  }
+               }
+               else {
+                  paramInstance = true;
+                  referenceMethod = res;
+               }
+            }
          }
-         referenceMethod = res;
          // TODO: better error message here - we can display the two different signatures that should match.
          if (res == null)
             displayError("No reference method for method reference: ");
@@ -344,15 +385,32 @@ public class MethodReference extends BaseLambdaExpression {
       if (referenceMethod != null) {
          Object[] ifaceParamTypes = ModelUtil.getParameterTypes(ifaceMeth, false);
          Object[] refParamTypes = ModelUtil.getParameterTypes(referenceMethod, true);
+         if (paramInstance) {
+            Object ref = resolveReference();
+            Object refType = ref instanceof Expression ? ((Expression) ref).getTypeDeclaration() : (ref instanceof JavaType ? ((JavaType) ref).getTypeDeclaration() : null);
+            if (refType != null) {
+               if (refParamTypes == null)
+                  refParamTypes = new Object[]{refType};
+               else {
+                  Object[] newParamTypes = new Object[refParamTypes.length + 1];
+                  newParamTypes[0] = refType;
+                  System.arraycopy(refParamTypes, 0, newParamTypes, 1, refParamTypes.length);
+                  refParamTypes = newParamTypes;
+               }
+            }
+            else
+               return;
+         }
          if (ifaceParamTypes != null && refParamTypes != null) {
             int j = 0;
-            int start = paramInstance ? 1 : 0;
+            int start = 0;
             for (int i = start; i < ifaceParamTypes.length; i++) {
                Object ifaceParamType = ifaceParamTypes[i];
                Object refParamType = refParamTypes[j];
                if (ModelUtil.isTypeVariable(ifaceParamType)) {
                   addTypeParameterMapping(ifaceMeth, ifaceParamType, refParamType);
                }
+               j++;
             }
          }
       }

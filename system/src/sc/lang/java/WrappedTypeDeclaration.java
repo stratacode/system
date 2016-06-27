@@ -129,8 +129,10 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
       if (allowUnbound && isTypeVar)
          return true;
       Object typeToUse = baseType;
-      if (isTypeVar)
+      while (isTypeVar) {
          typeToUse = ModelUtil.getTypeParameterDefault(typeToUse);
+         isTypeVar = typeToUse != null && ModelUtil.isTypeVariable(typeToUse);
+      }
       if (typeToUse == null)
          typeToUse = Object.class;
       // TODO: should we verify that our parameters match if the other type has assigned params too?

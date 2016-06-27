@@ -224,16 +224,13 @@ public class RTypeUtil {
          tableSize += superMethods.size;
       }
 
-      // Need to check the interfaces for either an interface or an abstract class.  If it's concrete all of the methods need to be implemented.
-      if (resultClass.isInterface() || PTypeUtil.hasModifier(resultClass, "abstract")) {
-         Class[] superInterfaces = resultClass.getInterfaces();
-         if (superInterfaces != null) {
-            interfaceMethods = new CoalescedHashMap[superInterfaces.length];
-            for (int i = 0; i < superInterfaces.length; i++) {
-               Class superInt = superInterfaces[i];
-               interfaceMethods[i] = getMethodCache(superInt);
-               tableSize += interfaceMethods[i].size;
-            }
+      Class[] superInterfaces = resultClass.getInterfaces();
+      if (superInterfaces != null) {
+         interfaceMethods = new CoalescedHashMap[superInterfaces.length];
+         for (int i = 0; i < superInterfaces.length; i++) {
+            Class superInt = superInterfaces[i];
+            interfaceMethods[i] = getMethodCache(superInt);
+            tableSize += interfaceMethods[i].size;
          }
       }
 

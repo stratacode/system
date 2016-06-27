@@ -181,8 +181,10 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
                   typeExt = "jar";
                   optionalFile = true;
                }
-               else
+               else {
                   System.err.println("*** Warning - unrecognized packaging type: " + packaging);
+                  typeExt = "jar";
+               }
                // If we are in source mode, do not download the jar file
                if (typeExt != null && pkg.definesClasses) {
                   String jarFileName = FileUtil.concat(pkg.getVersionRoot(), desc.getJarFileName(typeExt));

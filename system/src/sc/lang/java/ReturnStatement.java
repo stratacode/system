@@ -24,6 +24,12 @@ public class ReturnStatement extends ExpressionStatement {
       if (expression != null && method != null && method.type != null &&
           (methodReturnType = method.type.getTypeDeclaration()) != null) {
 
+         // We are going to refine the method's return type rather than copy it for now.
+         if (methodReturnType instanceof ParamTypeDeclaration) {
+            //methodReturnType = ((ParamTypeDeclaration) methodReturnType).copy();
+            ((ParamTypeDeclaration) methodReturnType).writable = true;
+         }
+
          // Need to propagate our type to the lambda expressions before we can accurately get our type.
          expression.setInferredType(methodReturnType);
 

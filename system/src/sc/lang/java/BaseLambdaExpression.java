@@ -39,8 +39,7 @@ public abstract class BaseLambdaExpression extends Expression {
    abstract Statement getLambdaBody(Object methObj);
    abstract String getExprType();
 
-   transient String inferredTypeParamName;
-   transient Object inferredTypeParamType;
+   transient TreeMap<String,Object> inferredTypeParams = null;
 
    void updateInferredTypeMethod(Object methObj) {
       inferredTypeMethod = methObj;
@@ -50,10 +49,21 @@ public abstract class BaseLambdaExpression extends Expression {
       return true;
    }
 
-   public boolean lambdaParametersMatch(Object type) {
+   public boolean lambdaParametersMatch(Object type, boolean varArgs) {
+      if (varArgs && ModelUtil.isArray(type)) {
+         Object compType = ModelUtil.getArrayComponentType(type);
+         if (compType != null)
+            type = compType;
+      }
+
       Object ifaceMeth = getInterfaceMethod(type, false);
-      if (ifaceMeth == null)
+      if (ifaceMeth == null) {
+         // We may not not have an inferredType here to bind yet.  If we fail the parameter match, we'll never assign a method
+         // for the match.
+         if (ModelUtil.isTypeVariable(type))
+            return true;
          return false;
+      }
 
       Object lambdaParams = getLambdaParameters(ifaceMeth, null);
 
@@ -292,8 +302,12 @@ public abstract class BaseLambdaExpression extends Expression {
             typeParamName = ModelUtil.getTypeParameterName(typeParamRes);
          }
 
-         inferredTypeParamName = typeParamName;
-         inferredTypeParamType = newMethType;
+         if (inferredTypeParams == null)
+            inferredTypeParams = new TreeMap<String,Object>();
+         Object oldVal = inferredTypeParams.get(typeParamName);
+         if (oldVal != null)
+            newMethType = ModelUtil.refineType(getEnclosingType(), oldVal, newMethType);
+         inferredTypeParams.put(typeParamName, newMethType);
 
          updateInferredType(paramType);
       } else if (ifaceMethType instanceof ExtendsType) {
@@ -303,10 +317,12 @@ public abstract class BaseLambdaExpression extends Expression {
    }
 
    private void updateInferredType(Object inferredType) {
-      if (inferredTypeParamName != null && inferredType instanceof ParamTypeDeclaration && inferredTypeParamType != null) {
+      if (inferredTypeParams != null && inferredType instanceof ParamTypeDeclaration) {
          ParamTypeDeclaration paramType = (ParamTypeDeclaration) inferredType;
 
-         paramType.setTypeParameter(inferredTypeParamName, inferredTypeParamType);
+         for (Map.Entry<String,Object> ent:inferredTypeParams.entrySet()) {
+            paramType.setTypeParameter(ent.getKey(), ent.getValue());
+         }
       }
    }
 
@@ -488,7 +504,7 @@ public abstract class BaseLambdaExpression extends Expression {
       }
 
       // Did we modify type parameters in the inferredType?
-      return inferredTypeParamName != null;
+      return inferredTypeParams != null && inferredTypeParams.size() > 0;
    }
 
    public BaseLambdaExpression deepCopy(int options, IdentityHashMap<Object, Object> oldNewMap) {

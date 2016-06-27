@@ -95,9 +95,9 @@ public class IndexedChoice extends OrderedChoice {
          l = new OrderedChoice.MatchResult();
          l.add(parselet);
          l.addAll(defaultParselets); // Need to check the default parselets if the indexed choice fails
-         l.slotIndexes.push(slotIx);
+         l.addSlotIndex(slotIx, 0);
          for (int i = 0; i < defaultParselets.size(); i++)
-            l.slotIndexes.push(defaultParselets.slotIndexes.get(i));
+            l.addSlotIndex(defaultParselets.slotIndexes[i], 0);
          indexedParselets.put(key, l);
       }
       else {
@@ -112,8 +112,10 @@ public class IndexedChoice extends OrderedChoice {
                   break;
             l.add(i, parselet);
          }
+         l.resetSlotIndexes(this);
       }
    }
+
 
    /**
     * When inheriting a grammar from a base language, you may need to replace one parselet for another one.
@@ -155,13 +157,13 @@ public class IndexedChoice extends OrderedChoice {
       CharSequence removeKey = null;
       for (Map.Entry<CharSequence, OrderedChoice.MatchResult> ent:indexedParselets.entrySet()) {
          OrderedChoice.MatchResult mr = ent.getValue();
-         IntStack elems = mr.slotIndexes;
-         int sz = elems.size();
+         int[] elems = mr.slotIndexes;
+         int sz = elems.length;
          for (int i = 0; i < sz; i++) {
-            int old = elems.get(i);
+            int old = elems[i];
             // If we remove the i'th entry, we need to update any indexes after that guy
             if (old > oldIx)
-               elems.set(i, old - 1);
+               elems[i] = old - 1;
             // This is the guy we removed
             else if (old == oldIx) {
                // When we are removing the last non-default parselet, just remove that index entirely
@@ -169,7 +171,8 @@ public class IndexedChoice extends OrderedChoice {
                   removeKey = ent.getKey();
                }
                else {
-                  elems.remove(i);
+                  mr.removeSlotIndex(i);
+                  break;
                }
             }
          }
@@ -188,10 +191,10 @@ public class IndexedChoice extends OrderedChoice {
       
       for (Parselet p:toAdd) {
          defaultParselets.add(p);
-         defaultParselets.slotIndexes.push(slotIx);
+         defaultParselets.addSlotIndex(slotIx, -1);
          for (OrderedChoice.MatchResult l: indexedParselets.values()) {
             l.add(p);
-            l.slotIndexes.push(slotIx);
+            l.addSlotIndex(slotIx, -1);
          }
          slotIx++;
       }

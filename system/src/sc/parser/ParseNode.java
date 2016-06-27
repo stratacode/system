@@ -5,6 +5,7 @@
 package sc.parser;
 
 import sc.lang.ISemanticNode;
+import sc.lang.java.IdentifierExpression;
 
 import java.util.IdentityHashMap;
 
@@ -192,6 +193,7 @@ public class ParseNode extends AbstractParseNode {
    public void updateSemanticValue(IdentityHashMap<Object, Object> oldNewMap) {
       if (semanticValue instanceof ISemanticNode) {
          ISemanticNode oldVal = (ISemanticNode) semanticValue;
+
          ISemanticNode newVal = (ISemanticNode) oldNewMap.get(oldVal);
          if (newVal != null) {
             newVal.setParseNode(this);

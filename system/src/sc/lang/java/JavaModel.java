@@ -416,8 +416,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                      addedAny = true;
                   }
                }
+               // TODO: do we need to include inner types here?
                if (!addedAny)
-                  imp.displayTypeError("No imported static fields or methods in type: " + impStr + " for: ");
+                  imp.displayTypeError("No imported static fields, methods in type: " + impStr + " for: ");
             }
             else {
                boolean added = false;
@@ -433,14 +434,19 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                        ModelUtil.definesMember(importedType, memberName, MemberType.FieldEnumSet, null, null);
                if (property == null && enableExtensions())
                   property = ModelUtil.definesMember(importedType, memberName, MemberType.PropertySetSet, null, null);
-               if (property != null && ModelUtil.hasModifier(property, "static")) {
+               // You can also import static classes apparently
+               if (property == null) {
+                  property = ModelUtil.getInnerType(importedType, memberName, null);
+               }
+               // Not including the static check here - at least we need to allow enum's without the static prefix but maybe it's all classes?
+               if (property != null /* && ModelUtil.hasModifier(property, "static") */) {
                   if (staticImportProperties == null)
                      staticImportProperties = new HashMap<String,Object>();
                   staticImportProperties.put(memberName, property);
                   added = true;
                }
                if (!added)
-                  imp.displayTypeError("No imported static field or method: " + memberName + " for: ");
+                  imp.displayTypeError("No imported static field, method, or inner type: " + memberName + " for: ");
             }
          }
       }
@@ -888,6 +894,16 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
       if (commandInterpreter != null && typeName.equals("cmd"))
          return commandInterpreter;
+
+      if (!isLayerModel)
+         initTypeInfo();
+
+      // It may be a statically imported type
+      if (staticImportProperties != null) {
+         res = staticImportProperties.get(typeName);
+         if (res != null && (res instanceof ITypeDeclaration || res instanceof Class))
+            return res;
+      }
 
       return null;
    }

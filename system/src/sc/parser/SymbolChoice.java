@@ -8,8 +8,12 @@ import java.util.*;
 
 public class SymbolChoice extends Parselet {
    private HashSet<IString> expectedValues = new HashSet<IString>();
-   //private int[] valueLengths; 
+   // Optional set of symbols that include the expectedValues but should not cause a match - e.g. %> for TemplateLanguage to not match the % for the modulo operator
+   private HashSet<IString> excludedValues = null;
    private HashMap<IString,List<IString>> valueIndex = new HashMap<IString,List<IString>>();
+
+   // index for excludedValues - foreach excluded symbol - e.g. %> this table stores remaining string to exclude - here >
+   private HashMap<IString,ArrString> excludedPeekString = null;
 
    // Specifies the number of characters to use as an index for choosing the choice
    public int keySize = -1;
@@ -20,7 +24,8 @@ public class SymbolChoice extends Parselet {
    // Match any character in the stream (or do not match if negated is true).
    private boolean matchANY = false;
 
-   private boolean allChars = true;
+   // Optimizae the case where each pattern is only a single character
+   private boolean allSingleCharPatterns = true;
 
    private char[] expectedChars;
 
@@ -47,8 +52,8 @@ public class SymbolChoice extends Parselet {
          System.out.println("warning: adding values to an initialized SymbolChoice");
          initialized = false;
       }
-      if (allChars && (v == null || v.length() != 1))
-         allChars = false;
+      if (allSingleCharPatterns && (v == null || v.length() != 1))
+         allSingleCharPatterns = false;
       expectedValues.add(PString.toIString(v));
    }
 
@@ -67,14 +72,21 @@ public class SymbolChoice extends Parselet {
 
    public void addExpectedValues(String [] values) {
       List<IString> l =  Arrays.asList(PString.toPString(values));
-      if (allChars) {
+      if (allSingleCharPatterns) {
          for (int i = 0; i < l.size(); i++) {
             IString s = l.get(i);
             if (s != null && s.length() != 1)
-               allChars = false;
+               allSingleCharPatterns = false;
          }
       }
       expectedValues.addAll(l);
+   }
+
+   public void addExcludedValues(String... values) {
+      if (excludedValues == null)
+         excludedValues = new HashSet<IString>();
+      for (String val:values)
+         excludedValues.add(PString.toIString(val));
    }
 
    public Class getSemanticValueClass() {
@@ -88,9 +100,9 @@ public class SymbolChoice extends Parselet {
 
    public void add(String...values) {
       for (String s:values) {
-         if (allChars) {
+         if (allSingleCharPatterns) {
             if (s != null && s.length() != 1)
-               allChars = false;
+               allSingleCharPatterns = false;
          }
          expectedValues.add(PString.toIString(s));
       }
@@ -106,7 +118,7 @@ public class SymbolChoice extends Parselet {
          throw new IllegalArgumentException("SymbolChoice defined without expected values");
 
       int esz = expectedValues.size();
-      if (allChars) {
+      if (allSingleCharPatterns) {
          expectedChars = new char[esz];
          Iterator<IString> svs = expectedValues.iterator();
          for (int i = 0; i < esz; i++)
@@ -164,6 +176,22 @@ public class SymbolChoice extends Parselet {
          }
       }
       expectedValues.remove(null); // this one messes up comparisons with strings that have a null char apparently!
+
+      if (excludedValues != null) {
+         excludedPeekString = new HashMap<IString,ArrString>();
+         for (IString excludeValue:excludedValues) {
+            boolean matched = false;
+            for (IString expectedValue:expectedValues) {
+               if (excludeValue.startsWith(expectedValue)) {
+                  matched = true;
+                  IString peekStr = excludeValue.substring(expectedValue.length());
+                  excludedPeekString.put(expectedValue, ArrString.toArrString(peekStr.toString()));
+               }
+            }
+            if (!matched)
+               System.err.println("*** Warning: ignoring excluded value: " + excludeValue + " does not match any expected value: " + expectedValues);
+         }
+      }
    }
 
    private boolean stringMatches(Parser parser, StringToken inputStr) {
@@ -231,7 +259,8 @@ public class SymbolChoice extends Parselet {
       if (repeat)
         return stringMatchesRepeating(inputStr);
 
-      if (allChars) {
+      if (allSingleCharPatterns) {
+         // TODO: optimize this!
       }
 
       // Not enough input - just fail as though we did not match
@@ -354,7 +383,7 @@ public class SymbolChoice extends Parselet {
          }
       }
       else {
-         String customError = accept(parser.semanticContext, matchedValue, parser.lastStartIndex, parser.currentIndex);
+         String customError = acceptMatch(parser, matchedValue, parser.lastStartIndex, parser.currentIndex);
          if (customError == null)
             return parseResult(parser, matchedValue, false);
          else
@@ -362,8 +391,24 @@ public class SymbolChoice extends Parselet {
       }
    }
 
+   String acceptMatch(Parser parser, StringToken matchedValue, int lastStart, int current) {
+      String customError = accept(parser.semanticContext, matchedValue, lastStart, current);
+      if (customError != null)
+         return customError;
+      if (excludedValues != null) {
+         // Some input symbols may be excluded e.g. %> will override %
+         ArrString excludedTokensToPeek = excludedPeekString.get(matchedValue);
+         if (excludedTokensToPeek != null) {
+            // If we match the excluded peek string for this symbol, it's not a match
+            if (parser.peekInputStr(excludedTokensToPeek, false) == 0)
+               return "excluded token";
+         }
+      }
+      return null;
+   }
+
    public Object parse(Parser parser) {
-      if (allChars)
+      if (allSingleCharPatterns)
          return parseAllChars(parser);
 
       if (trace)
@@ -409,7 +454,7 @@ public class SymbolChoice extends Parselet {
          }
       }
       else {
-         String customError = accept(parser.semanticContext, matchedValue, parser.lastStartIndex, parser.currentIndex);
+         String customError = acceptMatch(parser, matchedValue, parser.lastStartIndex, parser.currentIndex);
          if (customError == null)
             return parseResult(parser, matchedValue, false);
          else

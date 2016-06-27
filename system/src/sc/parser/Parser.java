@@ -339,6 +339,7 @@ public class Parser implements IString {
                   if (parselet.cacheResults) {
                      if (parselet.accept(semanticContext, res.value, currentIndex, res.endIx) == null) {
                         currentIndex = res.endIx;
+                        parselet.updateCachedResult(res.value);
                         return res.value;
                      }
                   }
@@ -668,6 +669,16 @@ public class Parser implements IString {
       return language.toString() + " parsing: " + getLookahead(32);
    }
 
+   /**
+    * Warning: this method is tuned for performance so has a messy interface.  Using ArrString because we want to
+    * use char arrays directly
+    *
+    * Look ahead into the currently parsed characters and match them against expectedValue.
+    * If !negated:
+    *    return 0 for a match and 1 for a non-match, 2 for EOF
+    * If you pass in negated the match is opposite:
+    *    return 1 for a match and 0 for a non-match, 0 for EOF
+    */
    public int peekInputStr(ArrString expectedValue, boolean negated) {
       int relIx = currentIndex - currentBufferPos;
       if (relIx < 0)

@@ -24,6 +24,8 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
    // It allows us to match against this parameter even if a type variable is not assigned.
    boolean unboundInferredType = false;
 
+   boolean writable = false;
+
    public ParamTypeDeclaration(ITypeDeclaration it, List<?> typeParameters, List<Object> typeDefs, Object baseTypeDecl) {
       this(it.getLayeredSystem(), typeParameters, typeDefs, baseTypeDecl);
       definedInType = it;
@@ -102,10 +104,16 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
             if (!ModelUtil.isTypeVariable(otherTypeParam))
                continue;
             if (types != null && otherParamType.types != null) {
+               // the case where this happens is if you have a type declarated with the wildcard: <> and are in an isAssignableFrom clause.  Assume it's ok rather than rejecting
+               if (i >= types.size())
+                  return true;
                Object type = types.get(i);
                int otherPos = ModelUtil.getTypeParameterPosition(otherBaseType, ModelUtil.getTypeParameterName(otherTypeParam));
-               if (otherPos >= otherParamType.types.size())
-                  System.err.println("*** Internal error mapping type parameter");
+               if (otherPos >= otherParamType.types.size()) {
+                  if (otherParamType.types.size() != 0)
+                     System.out.println("*** Error - mismatched param type lists");
+                  // else - wildcard type - let it match
+               }
                else {
                   Object otherType = otherParamType.types.get(otherPos);
                   // A null type is a signal for a wildcard like <T> List<T> emptyList();
@@ -435,19 +443,29 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return definedInType != null ? definedInType.getLayer() : null;
    }
 
-   private List<Object> parameterizeMethodList(Object[] baseMethods) {
+   public List<Object> parameterizeMethodList(Object[] baseMethods) {
       if (baseMethods == null || baseMethods.length == 0)
          return null;
 
       List<Object> result = new ArrayList<Object>(baseMethods.length);
       for (int i = 0; i < baseMethods.length; i++) {
          Object meth = baseMethods[i];
+         if (meth instanceof ParamTypedMethod)
+            meth = ((ParamTypedMethod) meth).method;
          if (ModelUtil.isParameterizedMethod(meth))
             result.add(new ParamTypedMethod(meth, this, definedInType, null, null, null));
          else
             result.add(meth);
       }
       return result;
+   }
+
+   public Object parameterizeMethod(Object meth) {
+      if (meth instanceof ParamTypedMethod)
+         meth = ((ParamTypedMethod) meth).method;
+      if (ModelUtil.isParameterizedMethod(meth))
+         return new ParamTypedMethod(meth, this, definedInType, null, null, null);
+      return meth;
    }
 
    private List<Object> parameterizePropList(Object[] baseProps) {
@@ -518,6 +536,10 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
 
    public boolean equals(Object obj) {
       return ModelUtil.getTypeName(baseType).equals(ModelUtil.getTypeName(obj));
+   }
+
+   public void setBaseType(Object nbt) {
+      baseType = nbt;
    }
 
    public Object getBaseType() {
@@ -602,10 +624,13 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
    }
 
    public ParamTypeDeclaration copy() {
+      ParamTypeDeclaration res;
       if (definedInType != null)
-         return new ParamTypeDeclaration(definedInType, new ArrayList<Object>(typeParams), new ArrayList<Object>(types), baseType);
+          res = new ParamTypeDeclaration(definedInType, new ArrayList<Object>(typeParams), new ArrayList<Object>(types), baseType);
       else
-         return new ParamTypeDeclaration(system, new ArrayList<Object>(typeParams), new ArrayList<Object>(types), baseType);
+          res = new ParamTypeDeclaration(system, new ArrayList<Object>(typeParams), new ArrayList<Object>(types), baseType);
+      res.writable = true;
+      return res;
    }
 
    public void addMappedTypeParameters(Map<TypeParamKey,Object> paramMap) {
@@ -681,11 +706,17 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
                   typeParamMapping.add(new TypeParamMap(oldType, typeParam));
                }
                Object origType = types.get(i);
-               if (ModelUtil.isTypeVariable(origType))
+               if (ModelUtil.isTypeVariable(origType)) {
+                  if (!writable)
+                     System.err.println("*** writable type violation");
                   types.set(i, ModelUtil.wrapPrimitiveType(type));
+               }
                // Here the 'type' may be more specific for the core type but may not include type parameters which exist in the current type.
                else if (type != null) {
-                  types.set(i, ModelUtil.refineType(definedInType, origType, type));
+                  Object newType = ModelUtil.refineType(definedInType, origType, type);
+                  if (newType != origType && !writable)
+                     System.err.println("*** writable type violation");
+                  types.set(i, newType);
                }
                return;
             }
@@ -696,6 +727,8 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
    }
 
    public void setTypeParamIndex(int ix, Object type) {
+      if (!writable)
+         System.out.println("*** writable type violation");
       types.set(ix, type);
    }
 
@@ -718,10 +751,13 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
    }
 
    public ParamTypeDeclaration cloneForNewTypes() {
+      ParamTypeDeclaration res;
       if (definedInType == null)
-         return new ParamTypeDeclaration(system, typeParams, new ArrayList<Object>(types), baseType);
+         res = new ParamTypeDeclaration(system, typeParams, new ArrayList<Object>(types), baseType);
       else
-         return new ParamTypeDeclaration(definedInType, typeParams, new ArrayList<Object>(types), baseType);
+         res = new ParamTypeDeclaration(definedInType, typeParams, new ArrayList<Object>(types), baseType);
+      res.writable = true;
+      return res;
    }
 
 }

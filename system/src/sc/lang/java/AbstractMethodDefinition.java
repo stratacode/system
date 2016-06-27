@@ -154,7 +154,7 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
          // If it's an unbound lambda expression, we still need to do some basic checks to see if this one is a match.
          if (otherP instanceof BaseLambdaExpression.LambdaInferredType) {
             BaseLambdaExpression.LambdaInferredType lambdaType = (BaseLambdaExpression.LambdaInferredType) otherP;
-            if (!lambdaType.rootExpr.lambdaParametersMatch(thisType))
+            if (!lambdaType.rootExpr.lambdaParametersMatch(thisType, thisP.repeatingParameter))
                return false;
          }
 

@@ -401,7 +401,7 @@ public class OrderedChoice extends NestedParselet  {
                ParseError error = (ParseError) nestedValue;
                if (bestError == null || bestError.endIndex < error.endIndex) {
                   bestError = error;
-                  bestErrorSlotIx = matchingParselets instanceof MatchResult ? ((MatchResult) matchingParselets).slotIndexes.get(i) : i;
+                  bestErrorSlotIx = matchingParselets instanceof MatchResult ? ((MatchResult) matchingParselets).slotIndexes[i] : i;
                }
             }
          }
@@ -578,7 +578,7 @@ public class OrderedChoice extends NestedParselet  {
                ParseError error = (ParseError) nestedValue;
                if (bestError == null || bestError.endIndex < error.endIndex) {
                   bestError = error;
-                  bestErrorSlotIx = matchingParselets instanceof MatchResult ? ((MatchResult) matchingParselets).slotIndexes.get(i) : i;
+                  bestErrorSlotIx = matchingParselets instanceof MatchResult ? ((MatchResult) matchingParselets).slotIndexes[i] : i;
                }
             }
 
@@ -761,7 +761,7 @@ public class OrderedChoice extends NestedParselet  {
 
 
    private int getSlotIndex(List<Parselet> matchingParselets, int i) {
-      return matchingParselets instanceof MatchResult ? ((MatchResult) matchingParselets).slotIndexes.get(i) : i;
+      return matchingParselets instanceof MatchResult ? ((MatchResult) matchingParselets).slotIndexes[i] : i;
    }
 
    /** Code copied alert!  This is a lot like parseRepeatingChoice but skipping and stopping on exitParselet. */
@@ -810,7 +810,7 @@ public class OrderedChoice extends NestedParselet  {
                ParseError error = (ParseError) nestedValue;
                if (bestError == null || bestError.endIndex < error.endIndex) {
                   bestError = error;
-                  bestErrorSlotIx = matchingParselets instanceof MatchResult ? ((MatchResult) matchingParselets).slotIndexes.get(i) : i;
+                  bestErrorSlotIx = matchingParselets instanceof MatchResult ? ((MatchResult) matchingParselets).slotIndexes[i] : i;
                }
             }
          }
@@ -1295,7 +1295,48 @@ public class OrderedChoice extends NestedParselet  {
    }
 
    static class MatchResult extends ArrayList<Parselet> {
-     IntStack slotIndexes = new IntStack(1);
+      int[] slotIndexes;
+
+      void resetSlotIndexes(OrderedChoice parent) {
+         slotIndexes = new int[size()];
+         for (int i = 0; i < size(); i++) {
+            slotIndexes[i] = parent.parselets.indexOf(get(i));
+         }
+      }
+
+      void addSlotIndex(int ix, int insertPos) {
+         if (slotIndexes == null) {
+            slotIndexes = new int[1];
+            slotIndexes[0] = ix;
+         }
+         else {
+            int oldLen = slotIndexes.length;
+            int newLen = oldLen + 1;
+            int[] newIndexes = new int[newLen];
+            int j = 0;
+            if (insertPos == -1)
+               insertPos = oldLen;
+            for (int i = 0; i < newLen; i++) {
+               if (i != insertPos)
+                  newIndexes[i] = slotIndexes[j++];
+            }
+            newIndexes[insertPos] = ix;
+            slotIndexes = newIndexes;
+         }
+      }
+
+      void removeSlotIndex(int ix) {
+         int oldLen = slotIndexes.length;
+         int[] newIndexes = new int[oldLen-1];
+         int newIx = 0;
+         for (int oldIx = 0; oldIx < oldLen; oldIx++) {
+            if (oldIx == ix)
+               continue;
+            newIndexes[newIx] = slotIndexes[oldIx];
+            newIx++;
+         }
+         slotIndexes = newIndexes;
+      }
    }
 
    public Parselet getChildParselet(Object childParseNode, int index) {

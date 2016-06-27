@@ -8,10 +8,7 @@ import sc.lang.java.*;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.type.RTypeUtil;
-import sc.util.CoalescedHashMap;
-import sc.util.IMessageHandler;
-import sc.util.IntCoalescedHashMap;
-import sc.util.MessageHandler;
+import sc.util.*;
 
 import java.io.*;
 import java.lang.reflect.Modifier;
@@ -255,7 +252,38 @@ public class ClassFile {
    }
 
    private String getTypeNameFromIndex(int ix) {
-      return getCFName(ix).replace('/', '.').replace('$','.');
+      String cfName = getCFName(ix);
+      int lastSlashIx = cfName.lastIndexOf('/');
+      if (lastSlashIx == -1)
+         lastSlashIx = 0;
+      // We only replace the $ chars that are in the last component of the file name.  There
+      // are some Java packages which use $ in the file name/package name - presumably generated Java files.
+      cfName = replaceStartingAt(cfName, lastSlashIx, '$', '.');
+      return cfName.replace('/', '.');
+   }
+
+   private String replaceStartingAt(String in, int startIx, char from, char to) {
+      int len = in.length();
+      StringBuilder res = null;
+      int lastStartIx = -1;
+      for (int i = startIx; i < len; i++) {
+         if (in.charAt(i) == from) {
+            if (res == null) {
+               res = new StringBuilder();
+               res.append(in.substring(0, i));
+            }
+            else {
+               res.append(in.substring(lastStartIx, i));
+            }
+            res.append('.');
+            lastStartIx = i + 1;
+         }
+      }
+      if (res == null)
+         return in;
+      else
+         res.append(in.substring(lastStartIx, len));
+      return res.toString();
    }
 
    public String getTypeName() {
@@ -594,7 +622,7 @@ public class ClassFile {
    public String getInnerClassName(int ix) {
       if (theInnerClasses == null)
          return null;
-      return theInnerClasses.innerClasses.get(ix);
+      return theInnerClasses.innerClasses.get(ix).name;
    }
 
    public boolean hasInnerClass(String name) {
@@ -607,15 +635,33 @@ public class ClassFile {
 
    InnerClasses theInnerClasses;
 
+   public static class CFInnerClassInfo {
+      String name;
+      int accessFlags;
+      CFInnerClassInfo(String name, int accessFlags) {
+         this.name = name;
+         this.accessFlags = accessFlags;
+      }
+   }
+
    public static class InnerClasses implements Attribute {
 
       String outerName;
-      ArrayList<String> innerClasses;
+      ArrayList<CFInnerClassInfo> innerClasses;
 
       public void setName(String name) {}
 
       public String getName() {
          return null; // Stored in a member variable, not in the table
+      }
+
+      public int getAccessFlags(String className) {
+         if (innerClasses == null)
+            return -1;
+         for (CFInnerClassInfo innerInfo:innerClasses)
+            if (innerInfo.name.equals(className))
+               return innerInfo.accessFlags;
+         return -1;
       }
 
       public void readRest(ClassFile file, DataInputStream input) throws IOException {
@@ -639,15 +685,14 @@ public class ClassFile {
             // Name of inner class
             int innerNameIndex = input.readUnsignedShort();
             String innerName = innerNameIndex == 0 ? null : ((Utf8Constant) file.constantPool[innerNameIndex]).value;
-            // TODO: these are Modifier.PUBLIC, PRIVATE, etc. but it seems like they must also be in the CFClass we read for the inner class
-            // itself so we are ignoring them here.
+
             int innerAccessFlags = input.readUnsignedShort();
             if (innerName != null) {
                if (innerClasses == null) {
                   file.theInnerClasses = this;
-                  innerClasses = new ArrayList<String>();
+                  innerClasses = new ArrayList<CFInnerClassInfo>();
                }
-               innerClasses.add(innerName);
+               innerClasses.add(new CFInnerClassInfo(innerName, innerAccessFlags));
             }
 
          }

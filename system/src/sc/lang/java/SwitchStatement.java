@@ -110,7 +110,7 @@ public class SwitchStatement extends Statement implements IBlockStatement {
 
       // Resolving the expression should not check for exposed variables in the switch itself
       if (fromChild != expression) {
-         if (isEnum && mtype.contains(MemberType.Enum)) {
+         if (isEnum && mtype.contains(MemberType.Enum) && isFromSwitchLabel(fromChild)) {
             v = ModelUtil.definesMember(expressionType, name, MemberType.EnumOnlySet, refType, ctx, skipIfaces, false);
             if (v != null)
                return v;
@@ -129,6 +129,17 @@ public class SwitchStatement extends Statement implements IBlockStatement {
          }
       }
       return super.findMember(name, mtype, this, refType, ctx, skipIfaces);
+   }
+
+   private boolean isFromSwitchLabel(Object fromChild) {
+      SwitchLabel theLabel;
+      if (fromChild instanceof SwitchLabel)
+         theLabel = (SwitchLabel) fromChild;
+      else if (fromChild instanceof Expression && ((Expression) fromChild).parentNode instanceof SwitchLabel)
+         theLabel = (SwitchLabel) ((Expression) fromChild).parentNode;
+      else
+         return false;
+      return theLabel.parentNode != null && theLabel.parentNode.getParentNode() == this;
    }
 
    public Object findMemberOwner(String name, EnumSet<MemberType> mtype) {

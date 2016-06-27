@@ -159,11 +159,23 @@ public class BinaryExpression extends Expression {
       //if (isNestedExpr) {
       //   return;
       //}
+      boolean alreadyStarted = lhs != null && lhs.isStarted();
 
       super.start();
 
       if (lhs == null || rhs == null)
          return; // Partial values might not be initialized during fragment parsing
+
+      // If we do this in the deepCopy it ends up breaking because we have not set the parentNode.
+      if (!alreadyStarted && getJavaModel() != null) {
+         Class inferredType = getInferredType();
+         if (inferredType != null) {
+            lhs.setInferredType(inferredType);
+            Expression rhsExpr = getRhsExpr();
+            if (rhsExpr != null)
+               rhsExpr.setInferredType(inferredType);
+         }
+      }
 
       lhs.start();
       rhs.start();
@@ -936,6 +948,21 @@ public class BinaryExpression extends Expression {
          return true;
       Expression rhsExpr = getRhsExpr();
       if (rhsExpr != null && rhsExpr.needsEnclosingClass())
+         return true;
+      return false;
+   }
+
+   private Class getInferredType() {
+      switch (getOperatorType(operator)) {
+         case Conditional:
+            return Boolean.class;
+      }
+      return null;
+   }
+
+   public boolean propagatesInferredType(Expression child) {
+      Class inferredType = getInferredType();
+      if (inferredType != null)
          return true;
       return false;
    }
