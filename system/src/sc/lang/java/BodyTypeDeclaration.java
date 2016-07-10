@@ -704,7 +704,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       Object v = null;
       PerfMon.start("findMethod");
       try {
-         Object[] typesArray = null;
+         Object[] prevTypesArray = null;
+         Object[] nextTypesArray;
          if (body != null) {
             Object matchedObject = null;
             for (Statement s : body) {
@@ -721,12 +722,15 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                }
                Object newMeth;
                if ((newMeth = s.definesMethod(name, types, ctx, refType, false, staticOnly, inferredType, methodTypeArgs)) != null) {
-                  if (v == null)
+                  if (v == null) {
                      v = newMeth;
+                     prevTypesArray = ModelUtil.parametersToTypeArray(types, ctx);
+                  }
                   else {
-                     if (typesArray == null)
-                        typesArray = ModelUtil.parametersToTypeArray(types, ctx);
-                     v = ModelUtil.pickMoreSpecificMethod(v, newMeth, typesArray);
+                     nextTypesArray = ModelUtil.parametersToTypeArray(types, ctx);
+                     v = ModelUtil.pickMoreSpecificMethod(v, newMeth, prevTypesArray, nextTypesArray, types);
+                     if (v == newMeth)
+                        prevTypesArray = nextTypesArray;
                   }
                }
             }
@@ -835,24 +839,58 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public Object declaresConstructor(List<?> types, ITypeParamContext ctx) {
-      Object v;
+      Object res = null, newMeth;
       if (body != null) {
+         Object[] prevTypesArray = null;
+         Object[] nextTypesArray;
          for (Statement s:body) {
             // Prevents us walking own the type hierarchy
             if (s instanceof TypeDeclaration)
                continue;
-            if ((v = s.definesConstructor(types, ctx, false)) != null)
-               return v;
+            if ((newMeth = s.definesConstructor(types, ctx, false)) != null) {
+               if (res == null) {
+                  res = newMeth;
+                  prevTypesArray = ModelUtil.parametersToTypeArray(types, ctx);
+               }
+               else {
+                  nextTypesArray = ModelUtil.parametersToTypeArray(types, ctx);
+                  res = ModelUtil.pickMoreSpecificMethod(res, newMeth, prevTypesArray, nextTypesArray, types);
+                  if (res == newMeth)
+                     prevTypesArray = nextTypesArray;
+               }
+            }
          }
       }
-      return null;
+      return res;
    }
 
    public Object extendsDefinesMethod(String name, List<?> parameters, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
       Object td = getDerivedTypeDeclaration();
 
-      if (td != null)
+      if (td != null) {
+
+         // If we have something like class Foo<A,B> extends Bar<C,D> - need to perform the type mapping on a copy of the param type here
+         if (ctx != null && td instanceof ParamTypeDeclaration) {
+            ParamTypeDeclaration newType = null;
+            ParamTypeDeclaration origType = (ParamTypeDeclaration) td;
+            List<?> typeParams = origType.getClassTypeParameters();
+            if (typeParams != null) {
+               for (int ix = 0; ix < typeParams.size(); ix++) {
+                  Object typeParam = typeParams.get(ix);
+                  Object newVal = ctx.getTypeForVariable(typeParam, true);
+                  if (newVal != null && newVal != typeParam) {
+                     if (newType == null)
+                        newType = origType.cloneForNewTypes();
+                     newType.setTypeParamIndex(ix, newVal);
+                  }
+               }
+            }
+            if (newType != null)
+               td = newType;
+         }
+
          return ModelUtil.definesMethod(td, name, parameters, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
+      }
 
       return null;
    }
@@ -3030,7 +3068,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                char c = name.charAt(0);
                switch (c) {
                   case 's':
-                     ptypes = method.getParameterTypes(false);
+                     ptypes = method.getParameterTypes(false, true);
                      if (!name.startsWith("set"))
                         continue;
                      if (ptypes.length == 1)
@@ -3042,7 +3080,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                      propName = CTypeUtil.decapitalizePropertyName(name.substring(3));
                      break;
                   case 'g':
-                     ptypes = method.getParameterTypes(false);
+                     ptypes = method.getParameterTypes(false, true);
                      if (!name.startsWith("get"))
                         continue;
                      if (ptypes == null || ptypes.length == 0)
@@ -3055,7 +3093,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                      propName = CTypeUtil.decapitalizePropertyName(name.substring(3));
                      break;
                   case 'i':
-                     ptypes = method.getParameterTypes(false);
+                     ptypes = method.getParameterTypes(false, true);
                      if (!name.startsWith("is") || (ptypes != null && ptypes.length != 0))
                         continue;
                      propName = CTypeUtil.decapitalizePropertyName(name.substring(2));
@@ -3127,7 +3165,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                                     Object nextStatement = body.get(j);
                                     if (nextStatement instanceof MethodDefinition) {
                                        MethodDefinition theMethod = (MethodDefinition) nextStatement;
-                                       if (theMethod.name.equals(getName) && theMethod.getParameterTypes(false).length == 0) {
+                                       if (theMethod.name.equals(getName) && theMethod.getParameterTypes(false, true).length == 0) {
                                           getSelector = theMethod;
                                           break;
                                        }

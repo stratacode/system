@@ -757,7 +757,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
             Object fieldType = ModelUtil.getPropertyType(def);
             Object methType = ModelUtil.getPropertyType(currentMethod);
             // An indexed setter
-            Object[] pTypes = currentMethod.getParameterTypes(false);
+            Object[] pTypes = currentMethod.getParameterTypes(false, true);
             if (pTypes != null && pTypes.length == 2) {
                if (ModelUtil.isArray(fieldType)) {
                   Object pType = ModelUtil.getArrayComponentType(fieldType);
@@ -946,7 +946,11 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       return null;
    }
 
-   public boolean setInferredType(Object type) {
+   public boolean isInferredFinal() {
+      return true;
+   }
+
+   public boolean setInferredType(Object type, boolean finalType) {
       return false;
    }
 
@@ -1003,4 +1007,6 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       }
    }
 
+   public void clearInferredType() {
+   }
 }

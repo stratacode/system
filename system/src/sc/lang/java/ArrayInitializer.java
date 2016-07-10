@@ -25,8 +25,8 @@ public class ArrayInitializer extends Expression {
       super.start();
    }
 
-   public boolean setInferredType(Object type) {
-      super.setInferredType(type);
+   public boolean setInferredType(Object type, boolean finalType) {
+      super.setInferredType(type, finalType);
 
       inferredType = type;
 
@@ -35,7 +35,7 @@ public class ArrayInitializer extends Expression {
          Object componentType = ModelUtil.getArrayComponentType(type);
          if (initializers != null && componentType != null) {
             for (Expression init:initializers) {
-               init.setInferredType(componentType);
+               init.setInferredType(componentType, finalType);
             }
 
             for (Expression init:initializers) {
@@ -162,7 +162,7 @@ public class ArrayInitializer extends Expression {
             if (initType == null)
                initType = newType;
             else
-               initType = ModelUtil.findCommonSuperClass(initType, newType);
+               initType = ModelUtil.findCommonSuperClass(getLayeredSystem(), initType, newType);
          }
       }
       if (initType == null)

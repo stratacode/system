@@ -93,9 +93,16 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
    abstract public void initType(LayeredSystem sys, ITypeDeclaration definedInType, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer, Object typeParam);
 
    public static JavaType createJavaType(Object typeDeclaration) {
+      return createJavaType(typeDeclaration, null, null);
+   }
+
+   public static JavaType createJavaType(Object typeDeclaration, ITypeParamContext ctx, ITypeDeclaration definedInType) {
       if (typeDeclaration instanceof WildcardType) {
          ExtendsType extType = ExtendsType.create((WildcardType) typeDeclaration);
          return extType;
+      }
+      if (typeDeclaration instanceof ExtendsType.LowerBoundsTypeDeclaration) {
+         return ExtendsType.createSuper((ExtendsType.LowerBoundsTypeDeclaration) typeDeclaration, ctx, definedInType);
       }
       String modelTypeName = ModelUtil.getTypeName(typeDeclaration);
       JavaType res = createJavaTypeFromName(modelTypeName);
@@ -219,6 +226,8 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
                newType = ClassType.create(typeName);
                if (sys != null)
                   newType.initType(sys, typeCtx, null, ctx, true, false, typeParam);
+               else
+                  newType.initType(null, null, null, null, true, false, typeParam);
                typeParams.add(newType);
             }
          }
@@ -254,11 +263,16 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
          newType = ExtendsType.createSuper((ExtendsType.LowerBoundsTypeDeclaration) type, ctx, definedInType);
          if (sys != null)
             newType.initType(sys, typeCtx, null, ctx, true, false, type);
+         else
+            newType.initType(null, null, null, ctx, true, false, type);
          return newType;
       }
       newType = createTypeFromTypeParams(type, typeParamsArr);
       if (sys != null) {
          newType.initType(sys, typeCtx, null, ctx, true, false, type);
+      }
+      else {
+         newType.initType(null, null, null, null, true, false, type);
       }
       return newType;
    }

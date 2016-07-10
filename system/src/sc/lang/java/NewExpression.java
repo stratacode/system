@@ -137,9 +137,32 @@ public class NewExpression extends IdentifierExpression {
       //   System.out.println("***");
       //   ModelUtil.declaresConstructor(boundType, arguments, null);
       //}
-      if (constructor != null && arguments != null) {
+      if (constructor != null && arguments != null && (inferredType != null || !hasInferredType())) {
          propagateInferredArgs(this, constructor, arguments);
       }
+   }
+
+   public boolean setInferredType(Object inferredType, boolean finalType) {
+      if (constructor != null && arguments != null) {
+         if (constructor instanceof ParamTypedMethod) {
+            // Need to convert inferredType to an instance of boundType - which means mapping any type parameters
+            if (boundType != null && !ModelUtil.sameTypes(inferredType, boundType)) {
+               if (ModelUtil.isParameterizedType(inferredType) && ModelUtil.hasDefinedTypeParameters(boundType) && !ModelUtil.isTypeVariable(inferredType) && ModelUtil.isAssignableFrom(inferredType, boundType)) {
+                  List<?> typeParams = ModelUtil.getTypeParameters(boundType);
+                  LayeredSystem sys = getLayeredSystem();
+                  inferredType = new ParamTypeDeclaration(sys, typeParams, ModelUtil.resolveSubTypeParameters(boundType, inferredType), boundType);
+               }
+               else
+                  inferredType = boundType;
+            }
+            ((ParamTypedMethod) constructor).setInferredType(inferredType);
+            super.setInferredType(inferredType, finalType);
+         }
+         propagateInferredArgs(this, constructor, arguments);
+      }
+      else
+         super.setInferredType(inferredType, finalType);
+      return false;
    }
 
    public void validate() {
@@ -330,7 +353,7 @@ public class NewExpression extends IdentifierExpression {
       ArrayList<Object> res = new ArrayList<Object>();
       // Handle the diamond operator: <> when this is specified, we inherit the type arguments from the inferredType
       if (typeArguments.size() == 0) {
-         if (inferredType != null) {
+         if (inferredType != null && !ModelUtil.isTypeVariable(inferredType)) {
             int numTypeParams = ModelUtil.getNumTypeParameters(inferredType);
             for (int i = 0; i < numTypeParams; i++) {
                res.add(ModelUtil.getTypeParameter(inferredType, i));
@@ -536,6 +559,11 @@ public class NewExpression extends IdentifierExpression {
          if (boundType == null)
             boundType = Object.class;
          JavaType baseType = ClassType.create(ModelUtil.getTypeName(boundType));
+         if (typeArguments != null && baseType instanceof ClassType) {
+            ClassType classBaseType = (ClassType) baseType;
+            SemanticNodeList<JavaType> newArgs = (SemanticNodeList<JavaType>) typeArguments.deepCopy(CopyNormal, null);
+            classBaseType.setResolvedTypeArguments(newArgs);
+         }
          if (ModelUtil.isInterface(boundType)) {
             SemanticNodeList impl = new SemanticNodeList(2);
             impl.add(baseType);

@@ -461,6 +461,7 @@ public class ClassType extends JavaType {
             chainedTypes.get(chainedSz-1).typeArguments = typeArguments;
       }
 
+      boolean userType = false;
       // Looking up type parameters by name is not good here
       if (typeParam != null && ModelUtil.isTypeVariable(typeParam))
          type = typeParam;
@@ -474,8 +475,11 @@ public class ClassType extends JavaType {
       else if (sys != null) {
          type = sys.getTypeDeclaration(fullTypeName, srcOnly, ctx == null ? null : ctx.getRefLayer(), false);
       }
+      else if (typeParam != null) {
+         type = typeParam;
+         userType = true;
+      }
 
-      boolean userType = false;
       List<Object> typeParamTypes = null;
       // When looking up type parameters, typically the it is the ParamTypeDeclaration but if it's a param method, it won't be so we need to
       // look up the type parameter for the method explicitly here.
@@ -738,7 +742,7 @@ public class ClassType extends JavaType {
             for (int i = 0; i < typeArgs.size(); i++) {
                if (i != 0)
                   sb.append(", ");
-               sb.append(typeArgs.get(i).toString());
+               sb.append(ModelUtil.paramTypeToString(typeArgs.get(i)));
             }
             sb.append(">");
             return sb.toString();
@@ -1082,7 +1086,8 @@ public class ClassType extends JavaType {
          Object typeParam = t == null ? null : t.getTypeForVariable(type, resolveUnbound);
          if (typeParam == null)
             typeParam = type;
-         JavaType res = JavaType.createJavaType(typeParam);
+         JavaType res = JavaType.createJavaType(typeParam, null, null);
+
          res.parentNode = parentNode;
          return res;
       }

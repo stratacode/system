@@ -23,7 +23,7 @@ public class IfStatement extends NonIndentedStatement {
       super.start();
 
       if (expression != null)
-         expression.setInferredType(Boolean.class);
+         expression.setInferredType(Boolean.class, true);
    }
 
    public ExecResult exec(ExecutionContext ctx) {

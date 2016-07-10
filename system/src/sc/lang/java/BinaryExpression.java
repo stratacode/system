@@ -170,10 +170,10 @@ public class BinaryExpression extends Expression {
       if (!alreadyStarted && getJavaModel() != null) {
          Class inferredType = getInferredType();
          if (inferredType != null) {
-            lhs.setInferredType(inferredType);
+            lhs.setInferredType(inferredType, true);
             Expression rhsExpr = getRhsExpr();
             if (rhsExpr != null)
-               rhsExpr.setInferredType(inferredType);
+               rhsExpr.setInferredType(inferredType, true);
          }
       }
 

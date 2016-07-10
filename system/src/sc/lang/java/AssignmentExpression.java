@@ -105,9 +105,12 @@ public class AssignmentExpression extends TwoOperatorExpression {
       if (lhs != null && rhs != null) {
          boolean useGenericTypes = true;
          Object lhsType = useGenericTypes ? lhs.getGenericType() : lhs.getTypeDeclaration();
+         // TODO: should we clone the type here to avoid modifying the source code's type declaration's type parameters
+         if (lhsType instanceof ParamTypeDeclaration)
+            ((ParamTypeDeclaration) lhsType).writable = true;
 
          // Need to do this to initialize the lambda expression before we try to get the tyep of the rhs
-         rhs.setInferredType(lhsType);
+         rhs.setInferredType(lhsType, true);
 
          Object rhsType = useGenericTypes ? rhs.getGenericType() : rhs.getTypeDeclaration();
          if (lhsType != null && rhsType != null && !ModelUtil.isAssignableFrom(lhsType, rhsType, true, null, getLayeredSystem())) {

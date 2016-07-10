@@ -136,7 +136,10 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       // Check to be sure the initializer is compatible with the property
       if (initializer != null) {
          Object varType = getTypeDeclaration();
-         initializer.setInferredType(varType);
+         // TODO: or should we clone the type here?   the lambda expression will set type parameters to further refine the type
+         if (varType instanceof ParamTypeDeclaration)
+            ((ParamTypeDeclaration) varType).writable = true;
+         initializer.setInferredType(varType, true);
          Object initType = initializer.getGenericType();
          if (initType != null && varType != null && !ModelUtil.isAssignableFrom(varType, initType, true, null, getLayeredSystem()) && (bindingDirection == null || bindingDirection.doForward())) {
             if (!ModelUtil.hasUnboundTypeParameters(initType)) {

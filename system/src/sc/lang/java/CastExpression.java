@@ -118,14 +118,14 @@ public class CastExpression extends ChainedExpression {
       return -1;
    }
 
-   public boolean setInferredType(Object infType) {
+   public boolean setInferredType(Object infType, boolean finalType) {
       if (expression != null) {
          Object typeDecl = type.getTypeDeclaration();
          // TODO: we might update the type parameters here but since they are not shared I think it's ok not to make a copy
          if (typeDecl instanceof ParamTypeDeclaration) {
             ((ParamTypeDeclaration) typeDecl).writable = true;
          }
-         return expression.setInferredType(typeDecl);
+         return expression.setInferredType(typeDecl, finalType);
       }
       return false;
    }

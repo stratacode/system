@@ -24,12 +24,12 @@ public class QuestionMarkExpression extends Expression {
       getTypeDeclaration();
    }
 
-   public boolean setInferredType(Object type) {
+   public boolean setInferredType(Object type, boolean finalType) {
       boolean res = false;
       if (trueChoice != null)
-         res = trueChoice.setInferredType(type);
+         res = trueChoice.setInferredType(type, finalType);
       if (falseChoice != null)
-         res |= falseChoice.setInferredType(type);
+         res |= falseChoice.setInferredType(type, finalType);
       return res;
    }
 
@@ -55,7 +55,7 @@ public class QuestionMarkExpression extends Expression {
          // Not resolved
          if (trueType == null || falseType == null)
             return null;
-         return ModelUtil.coerceTypes(trueType, falseType);
+         return ModelUtil.coerceTypes(getLayeredSystem(), trueType, falseType);
       }
       catch (IllegalArgumentException exc) {
          // Don't care about the type of the question mark in the reverse only case since we are not returning anything.
@@ -63,7 +63,7 @@ public class QuestionMarkExpression extends Expression {
             return Object.class;
          displayError("Types used in question mark operator do not match: ", " " + falseType + " != " + trueType);
          try {
-            return ModelUtil.coerceTypes(trueType, falseType);
+            return ModelUtil.coerceTypes(getLayeredSystem(), trueType, falseType);
          }
          catch (IllegalArgumentException exc2) {
          }

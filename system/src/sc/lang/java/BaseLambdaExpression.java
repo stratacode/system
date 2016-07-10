@@ -27,6 +27,7 @@ public abstract class BaseLambdaExpression extends Expression {
    transient Parameter parameters; // Either a copy of lambdaParams when they are full specified or Parameter types we create to mirror the method that will be generated
    /** This is the "functional interface" (i.e. one method which is unimplemented) we are implementing with this lambda expression. */
    transient Object inferredType = null;
+   transient boolean inferredFinal = false;
    /** The new expression which we generate to implement the lambda expression */
    transient NewExpression newExpr = null;
    transient boolean needsStart = false;
@@ -37,6 +38,7 @@ public abstract class BaseLambdaExpression extends Expression {
 
    abstract Object getLambdaParameters(Object methObj, ITypeParamContext ctx);
    abstract Statement getLambdaBody(Object methObj);
+
    abstract String getExprType();
 
    transient TreeMap<String,Object> inferredTypeParams = null;
@@ -45,11 +47,11 @@ public abstract class BaseLambdaExpression extends Expression {
       inferredTypeMethod = methObj;
    }
 
-   protected boolean referenceMethodMatches(Object type, Object ifaceMeth) {
+   protected boolean referenceMethodMatches(Object type, Object ifaceMeth, LambdaMatchContext ctx) {
       return true;
    }
 
-   public boolean lambdaParametersMatch(Object type, boolean varArgs) {
+   public boolean lambdaParametersMatch(Object type, boolean varArgs, LambdaMatchContext ctx) {
       if (varArgs && ModelUtil.isArray(type)) {
          Object compType = ModelUtil.getArrayComponentType(type);
          if (compType != null)
@@ -71,8 +73,9 @@ public abstract class BaseLambdaExpression extends Expression {
          return false;
       }
 
-      if (!referenceMethodMatches(type, ifaceMeth))
+      if (!referenceMethodMatches(type, ifaceMeth, ctx))
          return false;
+
       return true;
    }
 
@@ -130,7 +133,7 @@ public abstract class BaseLambdaExpression extends Expression {
       return ifaceMeth;
    }
 
-   void initNewExpression() {
+   void initNewExpression(boolean inferredFinal) {
       if (inferredType == null) {
          // TODO: will this happen?
          displayError("No inferredType for lambda expression: ");
@@ -140,9 +143,10 @@ public abstract class BaseLambdaExpression extends Expression {
       if (newExpr != null)
          System.err.println("*** reinitializing new expression!");
 
-      Object ifaceMeth = getInterfaceMethod(inferredType, true);
+      Object ifaceMeth = getInterfaceMethod(inferredType, inferredFinal);
       if (ifaceMeth == null) {
-         displayError("No interface method for lambda expression using inferred type: " + ModelUtil.getTypeName(inferredType) + " for: ");
+         if (inferredFinal)
+            displayError("No interface method for lambda expression using inferred type: " + ModelUtil.getTypeName(inferredType) + " for: ");
          return;
       }
 
@@ -177,13 +181,22 @@ public abstract class BaseLambdaExpression extends Expression {
 
       ITypeDeclaration enclType = getEnclosingType();
 
-      newMeth.setProperty("parameters", parameters = createLambdaParams(lambdaParams, ifaceMeth, typeCtx, enclType));
-      Object lambdaMethodReturnType = ModelUtil.getParameterizedReturnType(ifaceMeth, null, true);
+      Parameter params = createLambdaParams(lambdaParams, ifaceMeth, typeCtx, enclType);
+      // The number of lambda parameters does not match
+      if (params == INVALID_LAMBDA_PARAMS) {
+         newExpr = null;
+         return;
+      }
+      newMeth.setProperty("parameters", parameters = params);
+      // resolve was true but it could lead to us binding to java.lang.Object too soon in some cases
+      Object lambdaMethodReturnType = ModelUtil.getParameterizedReturnType(ifaceMeth, null, false);
       newMeth.setProperty("type", JavaType.createFromParamType(lambdaMethodReturnType, typeCtx, enclType));
       lambdaMethod = newMeth;
 
       // Doing this after we have defined the parameters here so we can resolve the references
       if (!parametersMatch(lambdaParams, ifaceMeth, getLayeredSystem())) {
+         if (!inferredFinal)
+            return;
          displayError("Mismatch between lambda method: " + ModelUtil.getMethodName(ifaceMeth) + " and " + getExprType() + " parameters: " + getParamString(lambdaParams) + " and: " + ModelUtil.toDeclarationString(ifaceMeth));
          boolean x = parametersMatch(lambdaParams, ifaceMeth, getLayeredSystem());
       }
@@ -216,7 +229,7 @@ public abstract class BaseLambdaExpression extends Expression {
          }
       }
       else {
-         displayError("Invalid method body type: ");
+         displayTypeError("Invalid method body type: ");
          return;
       }
       newMeth.setProperty("body", methodBody);
@@ -246,7 +259,9 @@ public abstract class BaseLambdaExpression extends Expression {
       if (ModelUtil.isParameterizedType(ifaceMethReturnType) && inferredType instanceof ParamTypeDeclaration && ((ParamTypeDeclaration) inferredType).hasUnboundParameters()) {
          // Start this now so we can get it's inferred return type
          ParseUtil.initAndStartComponent(newMeth);
-         newMethReturnType = newMeth.getInferredReturnType();
+         newMethReturnType = newMeth.getInferredReturnType(false);
+         if (newMethReturnType == MethodDefinition.UNRESOLVED_INFERRED_TYPE)
+            newMethReturnType = null;
          if (newMethReturnType != null) {
             updateReturnTypeParameters(ifaceMeth, ifaceMethReturnType, newMethReturnType);
          }
@@ -271,7 +286,7 @@ public abstract class BaseLambdaExpression extends Expression {
             Object typeParam = ModelUtil.getTypeParameter(inferredType, i);
             if (typeParam instanceof JavaType)
                typeParams.add((JavaType) ((JavaType) typeParam).deepCopy(ISemanticNode.CopyNormal, null));
-            else if (typeParam instanceof WildcardType || typeParam instanceof ParameterizedType || typeParam instanceof ExtendsType.LowerBoundsTypeDeclaration) {
+            else if (typeParam instanceof WildcardType || typeParam instanceof ParameterizedType || typeParam instanceof ExtendsType.LowerBoundsTypeDeclaration || ModelUtil.isTypeVariable(typeParam) || typeParam instanceof ITypeDeclaration || typeParam instanceof Class) {
                typeParams.add((JavaType.createFromParamType(typeParam, typeCtx, null)));
             }
             else
@@ -280,8 +295,7 @@ public abstract class BaseLambdaExpression extends Expression {
          newExpr.setProperty("typeArguments", typeParams);
       }
 
-      propagateInferredType(inferredType, paramReturnType);
-
+      propagateInferredType(inferredType, paramReturnType, inferredFinal);
    }
 
    void addTypeParameterMapping(Object ifaceMeth, Object ifaceMethType, Object newMethType) {
@@ -334,9 +348,9 @@ public abstract class BaseLambdaExpression extends Expression {
    // information in the method's parameter types.
    abstract void updateMethodTypeParameters(Object ifaceMeth);
 
-   protected void propagateInferredType(Object type, Object methReturnType) {
+   protected void propagateInferredType(Object type, Object methReturnType, boolean inferredfinal) {
       if (newExpr != null)
-         newExpr.setInferredType(inferredType);
+         newExpr.setInferredType(inferredType, inferredFinal);
    }
 
    public Object getNewMethodReturnType() {
@@ -375,7 +389,7 @@ public abstract class BaseLambdaExpression extends Expression {
 
    public MethodDefinition getLambdaMethod() {
       if (lambdaMethod == null)
-         initNewExpression();
+         initNewExpression(false);
       return lambdaMethod;
    }
 
@@ -388,13 +402,18 @@ public abstract class BaseLambdaExpression extends Expression {
 
    public void validate() {
       if (inferredType == null)
-         displayError("No inferredType for lambda expression: ");
+         displayTypeError("No inferredType for lambda expression: ");
       if (needsStart) {
          needsStart = false;
-         super.start();
+         if (!isStarted())
+            super.start();
+         else
+            startLambdaBody();
       }
       super.validate();
    }
+
+   private final static Parameter INVALID_LAMBDA_PARAMS = new Parameter();
 
    private static Parameter createLambdaParams(Object params, Object meth, ITypeParamContext ctx, ITypeDeclaration definedInType) {
       ArrayList<String> names = new ArrayList<String>();
@@ -425,10 +444,14 @@ public abstract class BaseLambdaExpression extends Expression {
             resMethTypes[i] = methTypes[i];
             if (resMethTypes[i] instanceof ExtendsType.LowerBoundsTypeDeclaration)
                resMethTypes[i] = ((ExtendsType.LowerBoundsTypeDeclaration) resMethTypes[i]).getBaseType();
-            //if (ModelUtil.isTypeVariable(resMethTypes[i]))
+            //if (ModelUtil.isTypeVariable(resMethTypes[i])) {
             //   resMethTypes[i] = ModelUtil.getTypeParameterDefault(resMethTypes[i]);
+            //}
          }
       }
+      int resMethLen = resMethTypes == null ? 0 : resMethTypes.length;
+      if (resMethLen != names.size())
+         return INVALID_LAMBDA_PARAMS;
       return Parameter.create(resMethTypes, names.toArray(new String[names.size()]), ctx, definedInType);
    }
 
@@ -441,8 +464,24 @@ public abstract class BaseLambdaExpression extends Expression {
    public Object getTypeDeclaration() {
       if (inferredType == null)
          return new LambdaInferredType(this);
-      if (newExpr == null)
-         initNewExpression();
+      if (newExpr == null) {
+         JavaModel model = null;
+         boolean oldTypeErrors = false;
+         // if we are initializing this new expression as part of a "non-final inferred type", need to ignore any errors
+         // since this is just happening to validate if this lambda expression matches the method and the inferred type supplied.
+         if (!inferredFinal) {
+            model = getJavaModel();
+            oldTypeErrors = model.disableTypeErrors;
+            model.setDisableTypeErrors(true);
+         }
+         try {
+            initNewExpression(false);
+         }
+         finally {
+            if (model != null)
+               model.setDisableTypeErrors(oldTypeErrors);
+         }
+      }
       if (newExpr == null)
          return new LambdaInferredType(this);
       return inferredType;
@@ -450,7 +489,7 @@ public abstract class BaseLambdaExpression extends Expression {
 
    public Object eval(Class expectedType, ExecutionContext ctx) {
       if (newExpr == null)
-         initNewExpression();
+         initNewExpression(false);
       if (newExpr != null)
          return newExpr.eval(expectedType, ctx);
       throw new IllegalArgumentException("eval of undefined lambda expression");
@@ -459,7 +498,7 @@ public abstract class BaseLambdaExpression extends Expression {
    public boolean transform(ILanguageModel.RuntimeType runtime) {
       if (getLayeredSystem().getNeedsAnonymousConversion() || bindingStatement != null) {
          if (newExpr == null)
-             initNewExpression();
+             initNewExpression(false);
          parentNode.replaceChild(this, newExpr);
          newExpr.transform(runtime);
          return true;
@@ -480,36 +519,117 @@ public abstract class BaseLambdaExpression extends Expression {
       newExpr.transformBinding(runtime);
    }
 
-   public boolean setInferredType(Object parentType) {
+   public boolean setInferredType(Object parentType, boolean finalType) {
       // Convert between the ParameterizedType and ParamTypeDeclaration
       if (parentType instanceof ParameterizedType)
          parentType = ModelUtil.getTypeDeclFromType(parentType, parentType, false, getLayeredSystem(), false, getEnclosingType());
 
       if (inferredType != null) {
          if (ModelUtil.isAssignableFrom(parentType, inferredType)) {
-            needsStart = true;
-            newExpr = null;
+            // If these are exactly the same, no need to do anything except update the type parameters in the new parentType
+            if (ModelUtil.isAssignableFrom(inferredType, parentType)) {
+               updateInferredType(parentType);
+               // The last time we set newExpr it was during a parametersMatch - not final so reset the new expr so we propagate
+               // the final inferred type
+               if (!inferredFinal && finalType) {
+                  needsStart = true;
+                  newExpr = null;
+               }
+            }
+            else {
+               needsStart = true;
+               newExpr = null;
+            }
          }
          else {
             // Need to set the type parameters we set while building the new expression if we are not going to rebuild it
-            updateInferredType(parentType);
+            //updateInferredType(parentType);
+            needsStart = true;
+            newExpr = null;
          }
       }
       inferredType = parentType;
+      inferredFinal = finalType;
       if (needsStart) {
          needsStart = false;
-         if (newExpr == null)
-            initNewExpression();
-         super.start();
+         if (newExpr == null) {
+            JavaModel thisModel = getJavaModel();
+            boolean oldDisableTypeErrors = thisModel.disableTypeErrors;
+            try {
+               if (!inferredFinal)
+                  thisModel.setDisableTypeErrors(true);
+               initNewExpression(inferredFinal);
+            }
+            finally {
+               thisModel.setDisableTypeErrors(oldDisableTypeErrors);
+            }
+         }
+         if (inferredFinal) {
+            if (!isStarted())
+               super.start();
+            else
+               startLambdaBody();
+         }
       }
 
       // Did we modify type parameters in the inferredType?
       return inferredTypeParams != null && inferredTypeParams.size() > 0;
    }
 
+   public void clearInferredType() {
+      if (inferredFinal)
+         return;
+      inferredType = null;
+      needsStart = true;
+      newExpr = null;
+      lambdaMethod = null;
+      parameters = null;
+      inferredTypeParams = null;
+   }
+
+   class LambdaMatchContext {
+      // The return type of the method in the interface we are implementing
+      Object ifaceReturnType;
+      boolean ifaceMethIsVoid;
+      // The return type of the lambdaBody
+      Object inferredReturnType;
+      boolean lambdaBodyIsVoid;
+   }
+
+   public Object pickMoreSpecificMethod(Object meth1, Object argType1, boolean varArg1, Object meth2, Object argType2, boolean varArg2) {
+      boolean c2Interface = ModelUtil.isInterface(argType2);
+      LambdaMatchContext c2Ctx = new LambdaMatchContext();
+      if (c2Interface && !lambdaParametersMatch(argType2, varArg2, c2Ctx))
+         c2Interface = false;
+      boolean c1Interface = ModelUtil.isInterface(argType1);
+      LambdaMatchContext c1Ctx = new LambdaMatchContext();
+      if (c1Interface && !lambdaParametersMatch(argType1, varArg1, c1Ctx))
+         c1Interface = false;
+      if (!c1Interface) {
+         if (c2Interface)
+            return meth2;
+      }
+      else if (!c2Interface)
+         return meth1;
+      // The case here is binding run(Runnable) versus V run(Supplier<V>) with a method returns a value, when we are calling with () -> methReturnsBoolean()
+      // It seems like the fact that one of the run methods has a return value here pushes the choice towards V run(Supplier<V>)
+      boolean c1ReturnMismatch = c1Ctx.ifaceMethIsVoid && !c1Ctx.lambdaBodyIsVoid;
+      boolean c2ReturnMismatch = c2Ctx.ifaceMethIsVoid && !c2Ctx.lambdaBodyIsVoid;
+      if (c1ReturnMismatch && !c2ReturnMismatch)
+         return meth2;
+      if (c2ReturnMismatch && !c1ReturnMismatch)
+         return meth1;
+      return null;
+   }
+
    public BaseLambdaExpression deepCopy(int options, IdentityHashMap<Object, Object> oldNewMap) {
       // TODO: should we copy the inferred type here?
       return (BaseLambdaExpression) super.deepCopy(options, oldNewMap);
+   }
+
+   void startLambdaBody() {
+      if (newExpr != null)
+         ParseUtil.realInitAndStartComponent(newExpr);
    }
 
    public static class LambdaInferredType implements ITypeDeclaration {

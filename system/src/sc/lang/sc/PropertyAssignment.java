@@ -121,7 +121,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
          // Skip this test for reverse-only bindings
          if (initializer != null && (bindingDirection == null || bindingDirection.doForward())) {
             Object propType = isSetMethod ? ModelUtil.getSetMethodPropertyType(assignedProperty) : ModelUtil.getVariableTypeDeclaration(assignedProperty);
-            initializer.setInferredType(propType);
+            initializer.setInferredType(propType, true);
             Object initType = initializer.getGenericType();
             if (initType != null && propType != null &&
                 !ModelUtil.isAssignableFrom(propType, initType, true, null, getLayeredSystem())) {
@@ -516,7 +516,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
          return null;
       if (assignedProperty instanceof IMethodDefinition) {
          IMethodDefinition meth = (IMethodDefinition) assignedProperty;
-         return meth.isSetMethod() ?  meth.getParameterTypes(false)[0] : meth.getReturnType(false);
+         return meth.isSetMethod() ?  meth.getParameterTypes(false, true)[0] : meth.getReturnType(false);
       }
       return ModelUtil.getVariableTypeDeclaration(assignedProperty);
    }

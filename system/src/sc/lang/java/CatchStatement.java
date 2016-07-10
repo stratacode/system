@@ -87,4 +87,9 @@ public class CatchStatement extends NonIndentedStatement {
          sb.append(statements);
       return sb.toString();
    }
+
+   public void addReturnStatements(List<Statement> res) {
+      if (statements != null)
+         statements.addReturnStatements(res);
+   }
 }

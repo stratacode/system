@@ -83,9 +83,9 @@ public abstract class ChainedExpression extends Expression {
       }
    }
 
-   public boolean setInferredType(Object type) {
+   public boolean setInferredType(Object type, boolean finalType) {
       if (expression != null)
-         return expression.setInferredType(type);
+         return expression.setInferredType(type, finalType);
       return false;
    }
 

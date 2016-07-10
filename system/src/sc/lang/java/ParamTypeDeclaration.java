@@ -124,6 +124,10 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
          }
          return true;
       }
+      // For ? super X do make sure this type is a super type of the base type in the super
+      else if (other instanceof ExtendsType.LowerBoundsTypeDeclaration) {
+         return ModelUtil.isAssignableFrom(this, ((ExtendsType.LowerBoundsTypeDeclaration) other).baseType);
+      }
       else {
          return ModelUtil.isAssignableFrom(baseType, other, assignmentSemantics, null, getLayeredSystem());
       }
@@ -614,8 +618,9 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
          for (Object type:types) {
             if (i != 0)
                sb.append(", ");
-            if (type != null)
-               sb.append(ModelUtil.getTypeName(type));
+            if (type != null) {
+               sb.append(ModelUtil.paramTypeToString(type));
+            }
             i++;
          }
       }
@@ -685,6 +690,16 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return this;
    }
 
+   public int getMappedParameterPosition(String typeParamName) {
+      int i = 0;
+      for (Object type:types) {
+         if (ModelUtil.isTypeVariable(type) && ModelUtil.getTypeParameterName(type).equals(typeParamName))
+            return i;
+         i++;
+      }
+      return -1;
+   }
+
    static class TypeParamMap {
       Object fromVar;
       Object toVar;
@@ -723,7 +738,6 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
             i++;
          }
       }
-      System.err.println("*** Failed to augment parameterized type with computed type parameter: " + varName);
    }
 
    public void setTypeParamIndex(int ix, Object type) {

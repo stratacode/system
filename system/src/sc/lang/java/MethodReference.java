@@ -96,12 +96,12 @@ public class MethodReference extends BaseLambdaExpression {
 
    @Override
    Object getLambdaParameters(Object methObj, ITypeParamContext ctx) {
-      Object[] ptypes = ModelUtil.getParameterTypes(methObj, true);
+      Object[] ptypes = ModelUtil.getParameterTypes(methObj, true, true);
       Object[] resTypes = ptypes == null ? null : new Object[ptypes.length];
       if (ptypes != null) {
          for (int i = 0; i < ptypes.length; i++) {
             resTypes[i] = ptypes[i];
-            if (ModelUtil.isTypeVariable(resTypes[i]))
+            if (ModelUtil.isTypeVariable(resTypes[i]) || ModelUtil.isUnboundSuper(resTypes[i]))
                resTypes[i] = ModelUtil.getTypeParameterDefault(resTypes[i]);
          }
       }
@@ -133,8 +133,8 @@ public class MethodReference extends BaseLambdaExpression {
          }
          return false;
       }
-      Object[] paramTypes = ModelUtil.getParameterTypes(ifmeth, true);
-      Object[] unboundParamTypes = ModelUtil.getParameterTypes(ifmeth, false);
+      Object[] paramTypes = ModelUtil.getParameterTypes(ifmeth, true, true);
+      Object[] unboundParamTypes = ModelUtil.getParameterTypes(ifmeth, false, true);
       Object returnType = ModelUtil.getReturnType(ifmeth, true);
       LayeredSystem sys = getLayeredSystem();
       // Find the method in the list which matches the type parameters of the inferred type method
@@ -144,7 +144,7 @@ public class MethodReference extends BaseLambdaExpression {
          // Need to skip void methods here.  They will be assignable from a type parameter but here we know returnType is a real value (I think)
          if (!isConstructor && ModelUtil.typeIsVoid(returnType) != ModelUtil.typeIsVoid(methReturnType))
             continue;
-         if (ModelUtil.parametersMatch(ModelUtil.getParameterTypes(meth, true), paramTypes, true, sys) && (isConstructor || ModelUtil.isAssignableFrom(returnType, methReturnType, sys))) {
+         if (ModelUtil.parametersMatch(ModelUtil.getParameterTypes(meth, true, true), paramTypes, true, sys) && (isConstructor || ModelUtil.isAssignableFrom(returnType, methReturnType, sys))) {
             return true;
          }
       }
@@ -162,7 +162,7 @@ public class MethodReference extends BaseLambdaExpression {
             if (!ModelUtil.isAssignableFrom(refType, paramTypes[0], false, null, true, sys) &&
                     (!ModelUtil.isAssignableFrom(paramTypes[0], refType, false, null, true, sys) || !ModelUtil.isTypeVariable(unboundParamTypes[0])))
                continue;
-            Object[] refParamTypes = ModelUtil.getParameterTypes(meth, true);
+            Object[] refParamTypes = ModelUtil.getParameterTypes(meth, true, true);
             if (ModelUtil.parametersMatch(refParamTypes, nextParamTypes, true, sys)) {
                return true;
             }
@@ -192,7 +192,7 @@ public class MethodReference extends BaseLambdaExpression {
             referenceMethod = new ConstructorDefinition();  // ModelUtil.getDefaultConstructor?
             return;
          }
-         displayError("No method in type: " + ModelUtil.getTypeName(refType) + " for method reference: ");
+         displayTypeError("No method in type: " + ModelUtil.getTypeName(refType) + " for method reference: ");
          referenceMethod = null;
          return;
       }
@@ -201,9 +201,10 @@ public class MethodReference extends BaseLambdaExpression {
       }
       else {
          Object res = null;
-         Object[] paramTypes = ModelUtil.getParameterTypes(inferredTypeMethod, true);
-         Object[] unboundParamTypes = ModelUtil.getParameterTypes(inferredTypeMethod, false);
-         Object returnType = ModelUtil.getReturnType(inferredTypeMethod, true);
+         Object[] paramTypes = ModelUtil.getParameterTypes(inferredTypeMethod, true, true);
+         Object[] resParamTypes = null;
+         Object[] unboundParamTypes = ModelUtil.getParameterTypes(inferredTypeMethod, false, true); // TODO: should this be false, false?
+         Object returnType = ModelUtil.getReturnType(inferredTypeMethod, false);
          LayeredSystem sys = getLayeredSystem();
          // Find the method in the list which matches the type parameters of the inferred type method
          // First pass is to look for a method where all of the parameters match each other
@@ -215,11 +216,17 @@ public class MethodReference extends BaseLambdaExpression {
                   continue;
             }
             // TODO: if we have an instance method here and there's no instance in context (i.e. it's not an expression type of reference) should that exclude the method from a match?
-            if (ModelUtil.parametersMatch(ModelUtil.getParameterTypes(meth, true), paramTypes, true, sys) && (isConstructor || returnTypeVoid || ModelUtil.isAssignableFrom(returnType, methReturnType, sys))) {
-               if (res == null)
+            if (ModelUtil.parametersMatch(ModelUtil.getParameterTypes(meth, true, true), paramTypes, true, sys) && (isConstructor || returnTypeVoid || ModelUtil.isAssignableFrom(returnType, methReturnType, sys))) {
+               if (res == null) {
                   res = meth;
-               else
-                  res = ModelUtil.pickMoreSpecificMethod(res, meth, paramTypes);
+                  resParamTypes = paramTypes;
+               }
+               else {
+                  res = ModelUtil.pickMoreSpecificMethod(res, meth, paramTypes, paramTypes, null);
+                  if (res == meth) {
+                     resParamTypes = paramTypes;
+                  }
+               }
                if (res != null)
                   referenceMethod = res;
             }
@@ -238,19 +245,22 @@ public class MethodReference extends BaseLambdaExpression {
                if (!ModelUtil.isAssignableFrom(refType, paramTypes[0], false, null, true, sys) &&
                        (!ModelUtil.isAssignableFrom(paramTypes[0], refType, false, null, true, sys) || !ModelUtil.isTypeVariable(unboundParamTypes[0])))
                   continue;
-               Object[] refParamTypes = ModelUtil.getParameterTypes(meth, true);
+               Object[] refParamTypes = ModelUtil.getParameterTypes(meth, true, true);
                if (ModelUtil.parametersMatch(refParamTypes, nextParamTypes, true, sys)) {
                   if (res == null)
                      res = meth;
-                  else
-                     res = ModelUtil.pickMoreSpecificMethod(res, meth, nextParamTypes);
+                  else {
+                     res = ModelUtil.pickMoreSpecificMethod(res, meth, resParamTypes, nextParamTypes, null);
+                     if (res == meth)
+                        resParamTypes = nextParamTypes;
+                  }
                }
             }
             if (res != null && (referenceMethod == null || referenceMethod != res)) {
 
                if (referenceMethod != null) {
                   // Should we check referenceMethod parameter types[0] and see which is a more specific match?
-                  Object[] oldMethParamTypes = ModelUtil.getParameterTypes(referenceMethod, true);
+                  Object[] oldMethParamTypes = ModelUtil.getParameterTypes(referenceMethod, true, true);
                   boolean oldIsSame = oldMethParamTypes != null && ModelUtil.sameTypes(oldMethParamTypes[0], paramTypes[0]);
                   boolean newIsSame = ModelUtil.sameTypes(refType, paramTypes[0]);
                   if (newIsSame && !oldIsSame) {
@@ -281,18 +291,20 @@ public class MethodReference extends BaseLambdaExpression {
          }
          // TODO: better error message here - we can display the two different signatures that should match.
          if (res == null)
-            displayError("No reference method for method reference: ");
+            displayTypeError("No reference method for method reference: ");
       }
    }
 
    Object getReferencedType() {
       Object ref = resolveReference();
       if (ref instanceof Expression)
-         return ((Expression) ref).getGenericType();
+         ref = ((Expression) ref).getGenericType();
       else if (ref instanceof JavaType) {
-         return ((JavaType) ref).getTypeDeclaration();
+         ref = ((JavaType) ref).getTypeDeclaration();
       }
-      return null;
+      if (ModelUtil.isTypeVariable(ref))
+         return ModelUtil.getTypeParameterDefault(ref);
+      return ref;
    }
 
    @Override
@@ -322,6 +334,8 @@ public class MethodReference extends BaseLambdaExpression {
                bodyExpr = IdentifierExpression.createMethodCall(args, paramList.get(0).variableName, methodName);
             }
             else {
+               if (!inferredFinal)
+                  return null;
                // Now sure what we are supposed to do here... create a new instance or something?
                System.err.println("*** Unhandled case for MethodReference: ");
             }
@@ -383,8 +397,8 @@ public class MethodReference extends BaseLambdaExpression {
 
    void updateMethodTypeParameters(Object ifaceMeth) {
       if (referenceMethod != null) {
-         Object[] ifaceParamTypes = ModelUtil.getParameterTypes(ifaceMeth, false);
-         Object[] refParamTypes = ModelUtil.getParameterTypes(referenceMethod, true);
+         Object[] ifaceParamTypes = ModelUtil.getParameterTypes(ifaceMeth, false, true);
+         Object[] refParamTypes = ModelUtil.getParameterTypes(referenceMethod, false, true);
          if (paramInstance) {
             Object ref = resolveReference();
             Object refType = ref instanceof Expression ? ((Expression) ref).getTypeDeclaration() : (ref instanceof JavaType ? ((JavaType) ref).getTypeDeclaration() : null);
@@ -406,8 +420,14 @@ public class MethodReference extends BaseLambdaExpression {
             int start = 0;
             for (int i = start; i < ifaceParamTypes.length; i++) {
                Object ifaceParamType = ifaceParamTypes[i];
+               if (j >= refParamTypes.length) {
+                  continue;
+               }
                Object refParamType = refParamTypes[j];
-               if (ModelUtil.isTypeVariable(ifaceParamType)) {
+               // Weird case here that causes the test against Object.class.  We have a method reference for someSet::contains where contains is defined with it's first param as Object, not E so
+               // when we bind to this type, Object overrides the actual parameter type.  It does not seem valuable to bind a type parameter to Object at this
+               // point so it seems like maybe this is some kind of rule in Java.
+               if (ModelUtil.isTypeVariable(ifaceParamType) && refParamType != Object.class) {
                   addTypeParameterMapping(ifaceMeth, ifaceParamType, refParamType);
                }
                j++;
@@ -416,7 +436,7 @@ public class MethodReference extends BaseLambdaExpression {
       }
    }
 
-   public boolean referenceMethodMatches(Object type, Object ifaceMeth) {
+   public boolean referenceMethodMatches(Object type, Object ifaceMeth, LambdaMatchContext ctx) {
       if (!isValidInferredTypeMethod(ifaceMeth))
          return false;
       return true;

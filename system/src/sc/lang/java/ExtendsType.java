@@ -106,7 +106,7 @@ public class ExtendsType extends JavaType {
             Object otherObj = ((LowerBoundsTypeDeclaration) other).baseType;
             if (otherObj == null)
                return true;
-            return ModelUtil.isAssignableFrom(this, otherObj, assignmentSemantics, null, false, null);
+            return ModelUtil.isAssignableFrom(this.baseType, otherObj, assignmentSemantics, null, false, null);
          }
          // If we have ? super T  changing that to ? super Object does not work which is what happens in the reverse
          // assignment.  This should always match, or at least always match all objects.
@@ -129,13 +129,16 @@ public class ExtendsType extends JavaType {
                return true;
             return ModelUtil.isAssignableFrom(otherObj, this, false, null, false, null);
          }
-         return ModelUtil.isAssignableFrom(baseType, other);
+         return ModelUtil.isAssignableFrom(other, baseType);
       }
 
       @Override
       public boolean isAssignableFromClass(Class other) {
          if (baseType == null)
             return ModelUtil.isAssignableFrom(Object.class, other);
+         if (ModelUtil.isTypeVariable(baseType)) {
+            return true;
+         }
          return ModelUtil.isAssignableFrom(other, baseType);
       }
 
@@ -184,6 +187,10 @@ public class ExtendsType extends JavaType {
 
       @Override
       public boolean isAssignableFromClass(Class other) {
+         return true;
+      }
+
+      public boolean implementsType(String otherTypeName, boolean assignment, boolean allowUnbound) {
          return true;
       }
 
@@ -240,7 +247,18 @@ public class ExtendsType extends JavaType {
       // This LowerBounds marker will already create the extends type so just return that
       if (typeArgument instanceof ClassType && ((ClassType) typeArgument).type instanceof LowerBoundsTypeDeclaration)
          return newTypeArg;
+
       if (newTypeArg != typeArgument) {
+         if (operator != null && operator.equals("extends") && newTypeArg instanceof ExtendsType) {
+            ExtendsType newExtType = (ExtendsType) newTypeArg;
+            if (newExtType.operator != null) {
+               if (newExtType.operator.equals("extends"))
+                  return newExtType;
+               // If you have extends super Type it seems to actually translate to just Type
+               else if (newExtType.operator.equals("super"))
+                  return newExtType.typeArgument;
+            }
+         }
          ExtendsType extType = new ExtendsType();
          extType.parentNode = parentNode;
          extType.operator = operator;

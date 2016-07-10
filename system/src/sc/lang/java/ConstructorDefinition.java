@@ -91,9 +91,7 @@ public class ConstructorDefinition extends AbstractMethodDefinition {
    }
 
    public Object definesConstructor(List<?> methParams, ITypeParamContext ctx, boolean isTransformed) {
-      if (parametersMatch(methParams, ctx))
-         return this;
-      return null;
+      return parametersMatch(methParams, ctx, null, null);
    }
 
    /** When overriding constructors, we need to convert them to a method */
@@ -179,7 +177,7 @@ public class ConstructorDefinition extends AbstractMethodDefinition {
       if (getEnclosingType() instanceof ModifyDeclaration) {
          ModifyDeclaration modType = (ModifyDeclaration) getEnclosingType();
          // We are modifying the super constructor so it's not a real extends super
-         if (modType.declaresConstructor(Arrays.asList(getParameterTypes(false)), null) != null)
+         if (modType.declaresConstructor(Arrays.asList(getParameterTypes(false, true)), null) != null)
             return true;
       }
       return false;

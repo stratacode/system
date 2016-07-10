@@ -30,6 +30,7 @@ public class SelectorExpression extends ChainedExpression {
    transient boolean isAssignment;
    transient boolean referenceInitializer;
    transient Object inferredType;
+   transient boolean inferredFinal = true;
 
    public static SelectorExpression create(Expression baseExpr, Selector... selectors) {
       SelectorExpression selExpr = new SelectorExpression();
@@ -148,6 +149,19 @@ public class SelectorExpression extends ChainedExpression {
             }
          }
       }
+   }
+
+   public void stop() {
+      if (boundTypes == null || idTypes == null)
+         return;
+
+      // Force the subclass to do a stop even if we've only been resolved, not started
+      if (!started)
+         started = true;
+
+      super.stop();
+      boundTypes = null;
+      idTypes = null;
    }
 
    public Object eval(Class expectedType, ExecutionContext ctx) {
@@ -321,7 +335,9 @@ public class SelectorExpression extends ChainedExpression {
       }
 
       int last = selectors.size()-1;
-      return IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, getArguments(last), last, getJavaModel(), last == 0 ? expression.getGenericType() : getGenericTypeForSelector(last, null), inferredType, getEnclosingType());
+
+      Object rootType = last == 0 ? expression.getGenericType() : getGenericTypeForSelector(last, null);
+      return IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, getArguments(last), last, getJavaModel(), rootType, inferredType, getEnclosingType());
    }
 
    private Object getGenericTypeForSelector(int i, Object currentType) {
@@ -1004,11 +1020,16 @@ public class SelectorExpression extends ChainedExpression {
       return false;
    }
 
-   public boolean setInferredType(Object inferredType) {
+   public boolean setInferredType(Object inferredType, boolean finalType) {
       this.inferredType = inferredType;
+      this.inferredFinal = finalType;
       // Re-resolve this now that we have the inferred type
       resolveTypeDeclaration();
       return false;
+   }
+
+   public boolean isInferredFinal() {
+      return inferredFinal;
    }
 
    // We propagate to arguments in VariableSelectors but not to the root expression

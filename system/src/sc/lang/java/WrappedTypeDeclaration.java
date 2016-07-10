@@ -48,7 +48,7 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
    }
 
    public boolean isAssignableTo(ITypeDeclaration other) {
-      if (other == this || other == baseType)
+      if (other == this || other == baseType || ModelUtil.sameTypes(other, baseType) || ModelUtil.isAssignableFrom(other, baseType))
          return true;
       return false;
    }

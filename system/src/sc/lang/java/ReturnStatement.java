@@ -31,7 +31,7 @@ public class ReturnStatement extends ExpressionStatement {
          }
 
          // Need to propagate our type to the lambda expressions before we can accurately get our type.
-         expression.setInferredType(methodReturnType);
+         expression.setInferredType(methodReturnType, true);
 
          returnType = expression.getGenericType();
          // Verified at least that non-assignmentSemantics are too strict, i.e. method declared as char returning 0.

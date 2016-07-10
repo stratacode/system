@@ -71,6 +71,7 @@ public class IdentifierExpression extends ArgumentsExpression {
    transient boolean jsTransformed = false;
 
    transient Object inferredType;
+   transient boolean inferredFinal = true;
 
    public static IdentifierExpression create(IString... args) {
       IdentifierExpression ie = new IdentifierExpression();
@@ -192,6 +193,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   }
                   else if (constr == enclMeth) {
                      displayTypeError("Illegal recursive this", ModelUtil.argumentsToString(arguments), " method call for: ");
+                     constr = ModelUtil.declaresConstructor(enclType, arguments, null);
                   }
                   else
                      boundTypes[0] = constr;
@@ -641,14 +643,14 @@ public class IdentifierExpression extends ArgumentsExpression {
          }
          if (ModelUtil.isTypeVariable(useType))
             useType = ModelUtil.getTypeParameterDefault(useType);
-         boolean changed = arg.setInferredType(useType);
+         boolean changed = arg.setInferredType(useType, rootExpr.isInferredFinal());
 
          if (meth instanceof ParamTypedMethod && changed) {
             ParamTypedMethod pmeth = (ParamTypedMethod) meth;
 
             // The subsequent parameter types might need to change.
             // TODO: we should probably also go and update 0 through i-1 as well.
-            paramTypes = pmeth.resolveParameterTypes(true, pmeth.boundTypes, i+1, true);
+            paramTypes = pmeth.resolveParameterTypes(true, pmeth.boundTypes, i+1, true, false);
          }
          i++;
       }
@@ -2162,6 +2164,10 @@ public class IdentifierExpression extends ArgumentsExpression {
 
       int sz = idents.size();
       for (int i = 0; i < sz; i++) {
+         if (idTypes == null) {
+            System.out.println("*** Uninitialized expression during transform - expression was not started");
+            return false;
+         }
          switch (idTypes[i]) {
             case BoundObjectName:
             case ResolvedObjectName:
@@ -2961,7 +2967,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                return resolveType(ModelUtil.getVariableGenericTypeDeclaration(boundTypes[ix], model), ix, idTypes);
             case RemoteMethodInvocation:
             case MethodInvocation:
-               Object smt = getSpecialMethodType(ix, idTypes, boundTypes, model, definedInType);
+               Object smt = getSpecialMethodType(ix, idTypes, boundTypes, model, rootType, definedInType);
                if (smt != null)
                   return resolveType(smt, ix, idTypes);
                // If ix > 0 and ix - 1's type has type parameters (either a field like List<X> or a method List<X> get(...).
@@ -2983,22 +2989,40 @@ public class IdentifierExpression extends ArgumentsExpression {
       return type;
    }
 
-   static Method getClassMethod;
+   static Method getClassMethod, cloneMethod;
 
-   /** Implements the special rule for Class<?> getClass() - the type parameter is bound to the owner class */
-   static Object getSpecialMethodType(int ix, IdentifierType[] idTypes, Object[] boundTypes, JavaModel model, ITypeDeclaration definedInType) {
-      if (getClassMethod == null)
-         getClassMethod = (Method) ModelUtil.getMethod(null, Class.class, "getClass", null, null, null, false, (Object[]) null);
-      if (boundTypes[ix] == getClassMethod) {
-         Object classType;
+   private static Object getRootType(int ix, IdentifierType[] idTypes, Object[] boundTypes, JavaModel model, Object rootType, ITypeDeclaration definedInType) {
+      Object classType;
+      if (rootType != null)
+         classType = rootType;
+      else {
          if (ix > 0)
             classType = getGenericTypeForIdentifier(idTypes, boundTypes, null, ix - 1, model, null, null, definedInType);
          else
             classType = definedInType;
+      }
+      return classType;
+   }
+
+   /** Implements the special rule for Class<?> getClass() - the type parameter is bound to the owner class */
+   static Object getSpecialMethodType(int ix, IdentifierType[] idTypes, Object[] boundTypes, JavaModel model, Object rootType, ITypeDeclaration definedInType) {
+      if (getClassMethod == null) {
+         getClassMethod = (Method) ModelUtil.getMethod(null, Class.class, "getClass", null, null, null, false, (Object[]) null);
+         cloneMethod = (Method) ModelUtil.getMethod(null, Class.class, "clone", null, null, null, false, (Object[]) null);
+      }
+      Object bt = boundTypes[ix];
+      if (bt == getClassMethod || (bt instanceof ParamTypedMethod) && ((ParamTypedMethod) bt).method == getClassMethod) {
+         Object classType = getRootType(ix, idTypes, boundTypes, model, rootType, definedInType);
 
          ArrayList<Object> typeDefs = new ArrayList<Object>(1);
          typeDefs.add(classType);
          return new ParamTypeDeclaration(definedInType, ModelUtil.getTypeParameters(Class.class), typeDefs, Class.class);
+      }
+      else if (bt == cloneMethod || (bt instanceof ParamTypedMethod) && ((ParamTypedMethod) bt).method == cloneMethod) {
+         // Like the ArrayCloneMethod class, here we are implementing the rule that int[] src; int[] res = src.clone() macthes typewise
+         Object classType = getRootType(ix, idTypes, boundTypes, model, rootType, definedInType);
+         if (ModelUtil.isArray(classType))
+            return classType;
       }
       return null;
    }
@@ -3025,7 +3049,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                return resolveType(ModelUtil.getVariableTypeDeclaration(boundTypes[ix], model), ix, idTypes);
             case MethodInvocation:
             case RemoteMethodInvocation:
-               Object smt = getSpecialMethodType(ix, idTypes, boundTypes, model, definedInType);
+               Object smt = getSpecialMethodType(ix, idTypes, boundTypes, model, null, definedInType);
                if (smt != null)
                   return resolveType(smt, ix, idTypes);
                // If ix > 0 and ix - 1's type has type parameters (either a field like List<X> or a method List<X> get(...).
@@ -3139,7 +3163,12 @@ public class IdentifierExpression extends ArgumentsExpression {
    }
 
    public void stop() {
-      if (!started) return;
+      // If we have not been officially started but our type reference has been assigned, we need to clear it here anyway
+      if (boundTypes == null && idTypes == null) return;
+
+      // Need to complete the full stop() on this node and our base type checks 'started'
+      if (!started)
+         started = true;
       super.stop();
       
       boundTypes = null;
@@ -4766,6 +4795,8 @@ public class IdentifierExpression extends ArgumentsExpression {
          // Constructor super
          else {
             superType = getTypeForIdentifier(0);
+            if (superType == null)
+               superType = getTypeForIdentifier(0);
             enclType = getEnclosingType();
             if (ModelUtil.getEnclosingInstType(superType) != null && ModelUtil.getEnclosingInstType(enclType) != null) {
                int curCt = ModelUtil.getOuterInstCount(enclType);
@@ -5064,13 +5095,31 @@ public class IdentifierExpression extends ArgumentsExpression {
       return false;
    }
 
-   public boolean setInferredType(Object inferredType) {
+   public boolean setInferredType(Object inferredType, boolean finalType) {
       this.inferredType = inferredType;
+      this.inferredFinal = finalType;
 
       // TODO: do we need to re-resolve all type references now?
-      reresolveTypeReference();
+      // TODO: performance: if we haven't changed inferredType can we skip the re-resolve
+      JavaModel model;
+      if (!finalType && (model = getJavaModel()) != null) {
+         boolean oldTypeErrors = model.disableTypeErrors;
+         try {
+            model.setDisableTypeErrors(true);
+            reresolveTypeReference();
+         }
+         finally {
+            model.setDisableTypeErrors(oldTypeErrors);
+         }
+      }
+      else
+         reresolveTypeReference();
       //propagateInferredTypes();
       return false;
+   }
+
+   public boolean isInferredFinal() {
+      return inferredFinal;
    }
 
    public boolean propagatesInferredType(Expression child) {

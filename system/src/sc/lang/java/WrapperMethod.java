@@ -26,8 +26,8 @@ public abstract class WrapperMethod implements IMethodDefinition {
       return ModelUtil.getReturnJavaType(wrapped);
    }
 
-   public Object[] getParameterTypes(boolean bound) {
-      return ModelUtil.getParameterTypes(wrapped, bound);
+   public Object[] getParameterTypes(boolean bound, boolean bindUnbound) {
+      return ModelUtil.getParameterTypes(wrapped, bound, bindUnbound);
    }
 
    public JavaType[] getParameterJavaTypes(boolean convertRepeating) {

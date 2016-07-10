@@ -253,7 +253,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
                      if (j < methodList.length && superMethodList[j] == methodList[j]) {
                         // We start out sharing the array from our super class = make a copy on the
                         // first change only
-                        method = ModelUtil.pickMoreSpecificMethod(superMethodList[j], method, null);
+                        method = ModelUtil.pickMoreSpecificMethod(superMethodList[j], method, null, null, null);
                         // We start out with a CFMethod[] but may need to replace it with a Class if we override something
                         methodList = checkMethodList(cache, methodList, methodName, method);
                         methodList[j] = method;
@@ -279,7 +279,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
                for (int j = 0; j < methodList.length; j++) {
                   Object otherMeth = methodList[j];
                   if (otherMeth != method && ModelUtil.overridesMethod(method, otherMeth)) {
-                     Object newMethod = ModelUtil.pickMoreSpecificMethod(otherMeth, method, null);
+                     Object newMethod = ModelUtil.pickMoreSpecificMethod(otherMeth, method, null, null, null);
                      if (newMethod == method) {
                         methodList = checkMethodList(cache, methodList, methodName, method);
                         methodList[j] = method;
@@ -584,9 +584,115 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       if (!started)
          start();
 
-      Object meth = ModelUtil.getMethod(system, this, name, refType, ctx, inferredType, staticOnly, ModelUtil.varListToTypes(parametersOrExpressions));
-      if (meth != null)
-         return meth;
+      Object[] list = ModelUtil.getMethods(this, name, null);
+
+      Object meth = null;
+
+      if (list == null) {
+         // Interfaces don't inherit object methods in Java but an inteface type in this system needs to still
+         // implement methods like "toString" even if they are not on the interface.
+         if (ModelUtil.isInterface(this)) {
+            meth = ModelUtil.getMethod(system, Object.class, name, refType, null, inferredType, staticOnly, ModelUtil.varListToTypes(parametersOrExpressions));
+            if (meth != null)
+               return meth;
+         }
+      }
+      else {
+         int typesLen = parametersOrExpressions == null ? 0 : parametersOrExpressions.size();
+         Object[] prevExprTypes = null;
+         ArrayList<Expression> toClear = null;
+         for (int i = 0; i < list.length; i++) {
+            Object toCheck = list[i];
+            if (ModelUtil.getMethodName(toCheck).equals(name)) {
+               Object[] parameterTypes = ModelUtil.getParameterTypes(toCheck);
+
+               int paramLen = parameterTypes == null ? 0 : parameterTypes.length;
+               if (staticOnly && !ModelUtil.hasModifier(toCheck, "static"))
+                  continue;
+
+               int last = paramLen - 1;
+               if (paramLen != typesLen) {
+                  int j;
+                  // If the last guy is not a repeating parameter, it can't match
+                  if (last < 0 || !ModelUtil.isVarArgs(toCheck) || !ModelUtil.isArray(parameterTypes[last]) || typesLen < last)
+                     continue;
+               }
+
+               ParamTypedMethod paramMethod = null;
+               if (ModelUtil.isParameterizedMethod(toCheck)) {
+
+                  paramMethod = new ParamTypedMethod(toCheck, ctx, this, parametersOrExpressions, inferredType, methodTypeArgs);
+
+                  // Turn off the binding of parameter types while we do a match for this method.  We can't have the parameter types setting type parameters
+                  // here - only the inferred type to be sure it does not conflict with the parameter type match.
+                  //paramMethod.bindParamTypes = false;
+                  parameterTypes = paramMethod.getParameterTypes(true, true); // TODO: true, false?
+                  //paramMethod.bindParamTypes = true;
+                  toCheck = paramMethod;
+               }
+
+               if (paramLen == 0 && typesLen == 0) {
+                  if (refType == null || ModelUtil.checkAccess(refType, toCheck))
+                     meth = ModelUtil.pickMoreSpecificMethod(meth, toCheck, null, null, null);
+               }
+               else {
+                  int j;
+                  Object[] nextExprTypes = new Object[typesLen];
+                  for (j = 0; j < typesLen; j++) {
+                     Object paramType;
+                     if (j > last) {
+                        if (!ModelUtil.isArray(paramType = parameterTypes[last]))
+                           break;
+                     }
+                     else
+                        paramType = parameterTypes[j];
+
+                     Object exprObj = parametersOrExpressions.get(j);
+
+                     if (exprObj instanceof Expression) {
+                        if (paramType instanceof ParamTypeDeclaration)
+                           paramType = ((ParamTypeDeclaration) paramType).cloneForNewTypes();
+                        Expression paramExpr = (Expression) exprObj;
+                        paramExpr.setInferredType(paramType, false);
+                        if (toClear == null)
+                           toClear = new ArrayList<Expression>();
+                        toClear.add(paramExpr);
+                     }
+
+                     Object exprType = ModelUtil.getVariableTypeDeclaration(exprObj);
+                     nextExprTypes[j] = exprType;
+
+                     if (exprType != null && !ModelUtil.isAssignableFrom(paramType, exprType, false, ctx, system)) {
+                        // Repeating parameters... if the last parameter is an array match if the component type matches
+                        if (j >= last && ModelUtil.isArray(paramType) && ModelUtil.isVarArgs(toCheck)) {
+                           if (!ModelUtil.isAssignableFrom(ModelUtil.getArrayComponentType(paramType), exprType, false, ctx)) {
+                              break;
+                           }
+                        }
+                        else
+                           break;
+                     }
+                  }
+                  if (j == typesLen) {
+                     if (refType == null || ModelUtil.checkAccess(refType, toCheck)) {
+                        Object newMeth = ModelUtil.pickMoreSpecificMethod(meth, toCheck, nextExprTypes, prevExprTypes, parametersOrExpressions);
+                        if (newMeth != meth)
+                           prevExprTypes = nextExprTypes;
+                        meth = newMeth;
+                     }
+                  }
+               }
+               // Don't leave the inferredType lying around in the parameter expressions for when we start matching the next method.
+               if (toClear != null) {
+                  for (Expression clearExpr:toClear)
+                     clearExpr.clearInferredType();
+                  toClear = null;
+               }
+            }
+         }
+         if (meth != null)
+            return meth;
+      }
 
       if (extendsType != null) {
          meth = ModelUtil.definesMethod(extendsType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
@@ -680,15 +786,29 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
    }
 
    public Object getInnerType(String name, TypeContext ctx) {
+      // This will return for SortedMap.Entry which appears to exist as a type but is inherited from java/util/Map$Entry.class so need to check the extendsType if we get back null
       if (classFile.hasInnerClass(name)) {
+         Object res;
          if (layer == null)
-            return system.getInnerCFClass(getFullTypeName(), classFile.getCFClassName(), name);
-         return layer.getInnerCFClass(getFullTypeName(), classFile.getCFClassName(), name);
+             res = system.getInnerCFClass(getFullTypeName(), classFile.getCFClassName(), name);
+         else
+            res = layer.getInnerCFClass(getFullTypeName(), classFile.getCFClassName(), name);
+         if (res != null)
+            return res;
       }
       if (extendsType != null) {
          Object res = ModelUtil.getInnerType(extendsType, name, ctx);
          if (res != null)
             return res;
+      }
+      if (implementsTypes != null) {
+         int numInterfaces = implementsTypes.size();
+         for (int i = 0; i < numInterfaces; i++) {
+            Object implType = implementsTypes.get(i);
+            Object res = ModelUtil.getInnerType(implType, name, ctx);
+            if (res != null)
+               return res;
+         }
       }
       return null;
    }

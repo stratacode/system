@@ -773,7 +773,9 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       return body == null;
    }
 
-   public Object getInferredReturnType() {
+   public static final String UNRESOLVED_INFERRED_TYPE = new String("<unresolved-inferred-type>");
+
+   public Object getInferredReturnType(boolean bodyOnly) {
       Object infRetType = null;
       if (body != null) {
          ArrayList<Statement> returns = new ArrayList<Statement>();
@@ -783,21 +785,27 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                ReturnStatement ret = (ReturnStatement) returns.get(i);
                if (ret.expression != null) {
                   Object newRetType = ret.expression.getGenericType();
-                  if (newRetType != null && newRetType != NullLiteral.NULL_TYPE) {
+                  if (newRetType != null) {
                      if (infRetType == null) {
                         //infRetType = ModelUtil.findCommonSuperClass(newRetType, getTypeDeclaration());
                         infRetType = newRetType;
                      }
-                     else
-                        infRetType = ModelUtil.findCommonSuperClass(newRetType, infRetType);
+                     else if (!ModelUtil.isTypeVariable(newRetType))
+                        infRetType = ModelUtil.findCommonSuperClass(getLayeredSystem(), newRetType, infRetType);
                   }
+                  else
+                     return UNRESOLVED_INFERRED_TYPE;
                }
             }
          }
       }
+      // When matching for lambdas, we want to make sure the body's return type matches the method's so need to skip
+      // the logic to factor in the method's real return type.
+      if (bodyOnly)
+         return infRetType;
       Object retType = getTypeDeclaration();
       // Make sure the inferredType is more specific than the actual return type
-      if (retType == null || (infRetType != null && ModelUtil.isAssignableFrom(retType, infRetType)))
+      if (retType == null || (infRetType != null && infRetType != NullLiteral.NULL_TYPE && ModelUtil.isAssignableFrom(retType, infRetType)))
          return infRetType;
       return retType;
    }

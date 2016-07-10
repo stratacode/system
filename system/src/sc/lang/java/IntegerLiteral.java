@@ -96,7 +96,11 @@ public class IntegerLiteral extends AbstractLiteral {
 
          switch (valueType) {
             case HEX:
-               longValue = Long.parseLong(toParse, 16);
+               if (toParse.startsWith("-"))
+                  longValue = Long.parseLong(toParse, 16);
+               // A really long negative const like: 0x9AAABBBBCCCCDDDDL will fail to parse unless we do it as unsigned
+               else
+                  longValue = Long.parseUnsignedLong(toParse, 16);
                break;
             case OCTAL:
                longValue = Long.parseLong(toParse, 8);
@@ -112,6 +116,7 @@ public class IntegerLiteral extends AbstractLiteral {
       catch (NumberFormatException exc) {
          displayError("NumberFormatError for: " + value + ": " + exc + " in: ");
       }
+      // TODO: should enforce max constant values here
    }
 
    public Object getLiteralValue() {

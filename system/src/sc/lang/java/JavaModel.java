@@ -42,7 +42,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    transient HashMap<String,Object> importsByName = new HashMap<String,Object>();
 
    transient Map<String,Object> staticImportProperties;// Property name to beanmapper or Get/Set MethodDefinition
-   transient Map<String,Object> staticImportMethods;   // Method name, value is type object
+   transient Map<String,List<Object>> staticImportMethods;   // Method name, value is type object
 
    transient List<String> globalTypes = new ArrayList<String>();
 
@@ -392,9 +392,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                if (methods != null) {
                   for (int i = 0; i < methods.length; i++) {
                      Object methObj = methods[i];
-                     if (staticImportMethods == null)
-                        staticImportMethods = new HashMap<String,Object>();
-                     staticImportMethods.put(ModelUtil.getMethodName(methObj), importedType);
+                     addStaticImportMethodType(ModelUtil.getMethodName(methObj), importedType);
                      addedAny = true;
                   }
                }
@@ -424,9 +422,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                boolean added = false;
                methods = ModelUtil.getMethods(importedType, memberName, "static");
                if (methods != null) {
-                  if (staticImportMethods == null)
-                     staticImportMethods = new HashMap<String,Object>();
-                  staticImportMethods.put(memberName, importedType);
+                  addStaticImportMethodType(memberName, importedType);
                   added = true;
                }
                Object property = enableExtensions() ?
@@ -450,6 +446,20 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             }
          }
       }
+   }
+
+   void addStaticImportMethodType(String methodName, Object newType) {
+      if (staticImportMethods == null)
+         staticImportMethods = new HashMap<String, List<Object>>();
+      List<Object> staticImportTypes = staticImportMethods.get(methodName);
+      if (staticImportTypes == null) {
+         staticImportTypes = new ArrayList<Object>();
+         staticImportMethods.put(methodName, staticImportTypes);
+      }
+      // Performance - check for duplicates here?
+      //else {
+      //}
+      staticImportTypes.add(newType);
    }
 
    void initTypeInfo() {
@@ -2020,24 +2030,31 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
       Object v;
-      Object type = null;
+      List<Object> importedMethodTypes = null;
 
       initTypeInfo();
 
       if (staticImportMethods != null) {
-         type = staticImportMethods.get(name);
+         importedMethodTypes = staticImportMethods.get(name);
       }
-      if (type == null) {
+      if (importedMethodTypes == null) {
          // TODO: shouldn't we restrict this layer arg to the "next layer" - same for getImportDecl
+         Object type = null;
          if (layeredSystem != null && (type = layeredSystem.getImportedStaticType(name, null, getLayer())) != null) {
             layeredSystem.addAutoImport(getLayer(), getModelTypeName(), ImportDeclaration.createStatic(CTypeUtil.prefixPath(ModelUtil.getTypeName(type), name)));
          }
+         if (type != null) {
+            v = ModelUtil.definesMethod(type, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
+            if (v != null && ModelUtil.hasModifier(v, "static"))
+               return v;
+         }
       }
-
-      if (type != null) {
-         v = ModelUtil.definesMethod(type, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
-         if (v != null && ModelUtil.hasModifier(v, "static"))
-            return v;
+      else {
+         for (Object importedType:importedMethodTypes) {
+            v = ModelUtil.definesMethod(importedType, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
+            if (v != null && ModelUtil.hasModifier(v, "static"))
+               return v;
+         }
       }
       return super.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
    }

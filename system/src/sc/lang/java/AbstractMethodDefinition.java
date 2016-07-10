@@ -90,40 +90,29 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
 
    public Object definesMethod(String methodName, List<?> methParams, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
       if (name != null && methodName.equals(name)) {
-         if (parametersMatch(methParams, ctx)) {
+         Object meth = parametersMatch(methParams, ctx, inferredType, methodTypeArgs);
+         if (meth != null) {
             // In Java, it's possible to have static and non-static methods with the identical signature.  If we are calling this from a static
             // context, we need to disambiguate them by the context of the caller
             if (staticOnly && !hasModifier("static"))
                return null;
             if (refType == null || ModelUtil.checkAccess(refType, this)) {
-               // TODO: I think we may have to do this if the method has any unbound type parameters in any of it declared types
-               if (typeParameters != null) {
-                  ParamTypedMethod paramMethod = new ParamTypedMethod(this, ctx, getEnclosingType(), methParams, inferredType, methodTypeArgs);
-                  if (inferredType != null) {
-                     // Turn off the binding of parameter types while we do a match for this method.  We can't have the parameter types setting type parameters
-                     // here - only the inferred type to be sure it does not conflict with the parameter type match.
-                     paramMethod.bindParamTypes = false;
-                     if (!ModelUtil.parameterTypesMatch(paramMethod.getParameterTypes(true), ModelUtil.parametersToTypeArray(methParams, ctx), paramMethod, refType, ctx)) {
-                        return null;
-                     }
-                     paramMethod.bindParamTypes = true;
-                  }
-                  return paramMethod;
-               }
-               return this;
+               return meth;
             }
          }
       }
       return null;
    }
 
-   public boolean parametersMatch(List<? extends Object> otherParams, ITypeParamContext ctx) {
-      if (parameters == null)
-         return otherParams == null || otherParams.size() == 0;
+   public Object parametersMatch(List<? extends Object> otherParams, ITypeParamContext ctx, Object inferredType, List<JavaType> methodTypeArgs) {
+      if (parameters == null) {
+         return otherParams == null || otherParams.size() == 0 ? this : null;
+      }
+
       List<Parameter> params = parameters.getParameterList();
       int sz = params.size();
       if (otherParams == null)
-         return sz == 0;
+         return sz == 0 ? this : null;
 
       int otherSize = otherParams.size();
       int last = sz - 1;
@@ -132,7 +121,16 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
 
       if (otherSize != sz) {
          if (last < 0 || !repeatingLast || otherSize < sz-1)
-            return false;
+            return null;
+      }
+
+      Object[] boundParamTypes = null;
+      ParamTypedMethod paramMethod = null;
+
+      if (ModelUtil.isParameterizedMethod(this)) {
+         paramMethod = new ParamTypedMethod(this, ctx, getEnclosingType(), otherParams, inferredType, methodTypeArgs);
+         // TODO: do we need to disable binding of the parameter types here?  It seems we need them to blend them with the inferred type
+         boundParamTypes = paramMethod.getParameterTypes(true, true); // TODO: true, false?
       }
 
       for (int i = 0; i < otherSize; i++) {
@@ -140,13 +138,22 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
          Parameter thisP;
          Object thisType;
          // Must be a repeating parameter because of the test above
+         int thisParamIx;
          if (i >= sz) {
-            thisP = params.get(last);
+            thisParamIx = last;
          }
          else {
-            thisP = params.get(i);
+            thisParamIx = i;
          }
-         thisType = thisP.getTypeDeclaration();
+
+         thisP = params.get(thisParamIx);
+         thisType = boundParamTypes == null ? thisP.getTypeDeclaration() : boundParamTypes[thisParamIx];
+
+         if (otherP instanceof Expression) {
+            if (thisType instanceof ParamTypeDeclaration)
+               thisType = ((ParamTypeDeclaration) thisType).cloneForNewTypes();
+            ((Expression) otherP).setInferredType(thisType, false);
+         }
 
          if (otherP instanceof ITypedObject)
              otherP = ((ITypedObject) otherP).getTypeDeclaration();
@@ -154,8 +161,8 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
          // If it's an unbound lambda expression, we still need to do some basic checks to see if this one is a match.
          if (otherP instanceof BaseLambdaExpression.LambdaInferredType) {
             BaseLambdaExpression.LambdaInferredType lambdaType = (BaseLambdaExpression.LambdaInferredType) otherP;
-            if (!lambdaType.rootExpr.lambdaParametersMatch(thisType, thisP.repeatingParameter))
-               return false;
+            if (!lambdaType.rootExpr.lambdaParametersMatch(thisType, thisP.repeatingParameter, null))
+               return null;
          }
 
          // Null entry means match
@@ -167,14 +174,14 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
          if (thisType != null && thisType != otherP && !ModelUtil.isAssignableFrom(thisType, otherP, false, ctx, allowUnbound, getLayeredSystem())) {
             if (i >= last && repeatingLast) {
                if (!ModelUtil.isAssignableFrom(ModelUtil.getArrayComponentType(thisType), otherP, false, ctx, getLayeredSystem())) {
-                  return false;
+                  return null;
                }
             }
             else
-               return false;
+               return null;
          }
       }
-      return true;
+      return paramMethod == null ? this : paramMethod;
    }
 
    public Object findType(String typeName, Object refType, TypeContext ctx) {
@@ -512,7 +519,7 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       return res;
    }
 
-   public Object[] getParameterTypes(boolean bound) {
+   public Object[] getParameterTypes(boolean bound, boolean bindUnbound) {
       if (parameterTypes == null && parameters != null && parameters.getNumParameters() > 0) {
          parameterTypes = parameters.getParameterTypes();
       }

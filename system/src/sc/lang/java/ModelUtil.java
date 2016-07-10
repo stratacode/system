@@ -32,6 +32,7 @@ import sc.dyn.RDynUtil;
 import sc.parser.*;
 
 import java.io.File;
+import java.io.Serializable;
 import java.io.StringReader;
 import java.lang.annotation.ElementType;
 import java.lang.reflect.*;
@@ -603,8 +604,8 @@ public class ModelUtil {
       if (!StringUtil.equalStrings(subName, superName))
          return false;
 
-      Object[] subParamTypes = ModelUtil.getParameterTypes(subTypeMethod, true);
-      Object[] superParamTypes = ModelUtil.getParameterTypes(superTypeMethod, true);
+      Object[] subParamTypes = ModelUtil.getParameterTypes(subTypeMethod, true, true);
+      Object[] superParamTypes = ModelUtil.getParameterTypes(superTypeMethod, true, true);
 
       int numSub = subParamTypes == null ? 0 : subParamTypes.length;
       int numSuper = superParamTypes == null ? 0 : superParamTypes.length;
@@ -647,7 +648,7 @@ public class ModelUtil {
 
    public static Object getSetMethodPropertyType(Object setMethod) {
       if (setMethod instanceof IMethodDefinition) {
-         Object[] paramTypes = ((IMethodDefinition) setMethod).getParameterTypes(false);
+         Object[] paramTypes = ((IMethodDefinition) setMethod).getParameterTypes(false, true);
          if (paramTypes == null || paramTypes.length == 0)
             throw new IllegalArgumentException("Set method without any parameters: " + setMethod);
          if (paramTypes.length != 1) {
@@ -808,7 +809,7 @@ public class ModelUtil {
                continue;
             if (paramLen == 0 && typesLen == 0) {
                if (refType == null || checkAccess(refType, toCheck))
-                  res = ModelUtil.pickMoreSpecificMethod(res, toCheck, null);
+                  res = ModelUtil.pickMoreSpecificMethod(res, toCheck, null, null, null);
             }
             else {
                int j;
@@ -839,7 +840,7 @@ public class ModelUtil {
                }
                if (j == typesLen) {
                   if (refType == null || checkAccess(refType, toCheck))
-                     res = ModelUtil.pickMoreSpecificMethod(res, toCheck, types);
+                     res = ModelUtil.pickMoreSpecificMethod(res, toCheck, types, types, null); // TODO: separate types for each method inferred type
                }
             }
          }
@@ -924,6 +925,10 @@ public class ModelUtil {
       return ModelUtil.getMethodName(c1).equals(ModelUtil.getMethodName(c2));
    }
 
+   /*
+    * Checks if the parameters in the two methods match.  First call methodNamesMatch if you want to really compare
+    * that they are the same methods.
+    */
    public static boolean methodsMatch(Object m1, Object m2) {
       if (m1 == null)
          return m2 == null;
@@ -969,7 +974,7 @@ public class ModelUtil {
    }
 
    /** Chooses the method with the more specific return type - as per the searchMethods method in java.lang.Class */
-   public static Object pickMoreSpecificMethod(Object c1, Object c2, Object[] types) {
+   public static Object pickMoreSpecificMethod(Object c1, Object c2, Object[] c1ArgTypes, Object[] c2ArgTypes, List<? extends Object> exprs) {
       if (c1 == null)
          return c2;
 
@@ -978,7 +983,7 @@ public class ModelUtil {
       Object defaultType = c2;
 
       // First an exact match of parameter types overrides - e.g. Math.abs(int)
-      if (types != null) {
+      if (c1ArgTypes != null) {
          Object[] c1Types = ModelUtil.getParameterTypes(c1);
          Object[] c2Types = ModelUtil.getParameterTypes(c2);
          int c1Len = c1Types == null ? 0 : c1Types.length;
@@ -991,13 +996,14 @@ public class ModelUtil {
 
          boolean paramsSorted = false;
 
-         int paramLen = types.length;
+         int param1Len = c1ArgTypes.length;
+         int param2Len = c2ArgTypes == null ? param1Len : c2ArgTypes.length;
 
          // If we have one var arg and one non-var-arg and the same parameters, choose the type based on whether the
          // varArg argument is an array.  If it's an array, choose the varArgs one.  If not, choose the scalar.
          if (c1VarArg != c2VarArg) {
             if (c1Len == checkLen) {
-               Object lastType = types[types.length - 1];
+               Object lastType = c1ArgTypes[param1Len - 1];
                // This rule for using varArgs to match arrays applies to Integer[] but not int[]
                boolean lastTypeArr = ModelUtil.isArray(lastType) && !ModelUtil.isPrimitive(ModelUtil.getArrayComponentType(lastType));
                // If one matches exactly and the other matches because it's a repeat definition, choose the non-repeating one (e.g. Seq.of(T) versus Seq.of(T...) except if you have an array param.
@@ -1013,9 +1019,9 @@ public class ModelUtil {
             }
             // Another var args case - we'd rather match the method with the exact number of parameters over a var args with fewer
             else {
-               if (c1VarArg && checkLen == paramLen)
+               if (c1VarArg && checkLen == param1Len)
                   defaultType = c2;
-               else if (c2VarArg && c1Len == paramLen)
+               else if (c2VarArg && c1Len == param1Len)
                   defaultType = c1;
             }
          }
@@ -1023,16 +1029,23 @@ public class ModelUtil {
          // First if any of the parameters is a lambda expression, we need to ensure the
          // lambda expression parameters match the parameters of the single-interface method
          // defined for this parameter type.
-         for (int i = 0; i < paramLen; i++) {
-            Object arg = types[i];
+         for (int i = 0; i < param1Len; i++) {
+            Object arg = c1ArgTypes[i];
+            // TODO: lambda params case - choosing the method with fewer parameters?
+            if (i >= param2Len)
+               return c2;
             if (arg instanceof BaseLambdaExpression.LambdaInferredType) {
                boolean repeat1Arg = c1Types.length <= i;
                boolean repeat2Arg = c2Types.length <= i;
-               Object c1Arg = repeat1Arg ? c1Types[c1Types.length] : c1Types[i];
-               Object c2Arg = repeat2Arg ? c2Types[c2Types.length] : c2Types[i];
+               Object c1Arg = repeat1Arg ? c1Types[c1Types.length-1] : c1Types[i];
+               Object c2Arg = repeat2Arg ? c2Types[c2Types.length-1] : c2Types[i];
 
-               boolean c2Interface = ModelUtil.isInterface(c2Arg);
                BaseLambdaExpression lambda = ((BaseLambdaExpression.LambdaInferredType) arg).rootExpr;
+
+               Object lambdaRes = lambda.pickMoreSpecificMethod(c1, c1Arg, i >= c1Types.length - 1 && c1VarArg, c2, c2Arg, i >= c2Types.length - 1 && c2VarArg);
+               if (lambdaRes != null)
+                  return lambdaRes;
+               /*
                if (c2Interface && !lambda.lambdaParametersMatch(c2Arg, i >= c2Types.length - 1 && c2VarArg))
                   c2Interface = false;
                boolean c1Interface = ModelUtil.isInterface(c1Arg);
@@ -1044,12 +1057,38 @@ public class ModelUtil {
                }
                else if (!c2Interface)
                   return c1;
+               */
+            }
+         }
+
+         // There are some special rules for matching method calls with lambda expressions.
+         if (exprs != null) {
+            for (int i = 0; i < param1Len; i++) {
+               // TODO: lambda params case - choosing the method with fewer parameters?
+               if (i >= param2Len)
+                  return c2;
+               boolean repeat1Arg = c1Types.length <= i;
+               boolean repeat2Arg = c2Types.length <= i;
+               Object c1Arg = repeat1Arg ? c1Types[c1Types.length-1] : c1Types[i];
+               Object c2Arg = repeat2Arg ? c2Types[c2Types.length-1] : c2Types[i];
+               Object expr = exprs.get(i);
+
+               if (expr instanceof BaseLambdaExpression) {
+                  BaseLambdaExpression lambda = (BaseLambdaExpression) expr;
+                  Object lambdaRes = lambda.pickMoreSpecificMethod(c1, c1Arg, i >= c1Types.length - 1 && c1VarArg, c2, c2Arg, i >= c2Types.length - 1 && c2VarArg);
+                  if (lambdaRes != null)
+                     return lambdaRes;
+               }
             }
          }
 
          if (!paramsSorted) {
-            for (int i = 0; i < types.length; i++) {
-               Object arg = types[i];
+            for (int i = 0; i < param1Len; i++) {
+               // TODO: lambda params case - choosing the method with fewer parameters?
+               if (i >= param2Len)
+                  return c2;
+               Object c1ArgType = c1ArgTypes[i];
+               Object c2ArgType = c2ArgTypes[i];
                boolean repeat1Arg = c1Types.length <= i;
                boolean repeat2Arg = c2Types.length <= i;
                Object c1Arg = repeat1Arg ? c1Types[c1Types.length-1] : c1Types[i];
@@ -1071,14 +1110,14 @@ public class ModelUtil {
                }
                */
 
-               if (sameTypes(arg, c1Arg))
+               if (sameTypes(c1ArgType, c1Arg))
                   return c1;
 
-               if (sameTypes(arg, c2Arg))
+               if (sameTypes(c2ArgType, c2Arg))
                   return c2;
 
-               if (isANumber(arg)) {
-                  if (ModelUtil.isInteger(arg)) {
+               if (isANumber(c1ArgType)) {
+                  if (ModelUtil.isInteger(c1ArgType)) {
                      boolean c1Int = ModelUtil.isAnInteger(c1Arg);
                      boolean c2Int = ModelUtil.isAnInteger(c2Arg);
                      if (!c1Int && c2Int)
@@ -1094,7 +1133,7 @@ public class ModelUtil {
                   return c2;
                //else if (ModelUtil.isAssignableFrom(c2Arg, c1Arg))
 
-               boolean argIsArray = ModelUtil.isArray(arg);
+               boolean argIsArray = ModelUtil.isArray(c1ArgType);
                if (ModelUtil.isArray(c1Arg) && !ModelUtil.isArray(c2Arg)) {
                   if (argIsArray)
                      return c1;
@@ -1135,6 +1174,12 @@ public class ModelUtil {
       }
       // Picks by the method with the shortest number of parameters
       return defaultType;
+   }
+
+   public static boolean sameTypesOrVariables(Object typeObj1, Object typeObj2) {
+      if (ModelUtil.isTypeVariable(typeObj1))
+         return ModelUtil.isTypeVariable(typeObj2) && ModelUtil.sameTypeParameters(typeObj1, typeObj2);
+      return !ModelUtil.isTypeVariable(typeObj2) && ModelUtil.sameTypes(typeObj1, typeObj2);
    }
 
    /** isSameType might be a better name? */
@@ -1227,6 +1272,8 @@ public class ModelUtil {
    }
 
    public static boolean sameTypeParameters(Object tp1, Object tp2) {
+      if (tp1 == tp2)
+         return true;
       String tpName1 = ModelUtil.getTypeParameterName(tp1);
       String tpName2 = ModelUtil.getTypeParameterName(tp2);
       if (tpName1 == null || tpName2 == null)
@@ -1348,7 +1395,7 @@ public class ModelUtil {
       return type == Number.class;
    }
 
-   public static Object coerceTypes(Object lhsType, Object rhsType) {
+   public static Object coerceTypes(LayeredSystem sys, Object lhsType, Object rhsType) {
       if (lhsType == rhsType)
          return lhsType;
 
@@ -1367,12 +1414,42 @@ public class ModelUtil {
       if (isANumber(lhsType) && isANumber(rhsType))
          return coerceNumberTypes(lhsType, rhsType);
 
-      if (ModelUtil.isAssignableFrom(lhsType, rhsType))
+      // If you have one side that is ? super SuperType and we have SubType extends SuperType, oddly this seems to clamp the
+      // coerced type to SuperType
+      if (lhsType instanceof ExtendsType.LowerBoundsTypeDeclaration) {
+         ExtendsType.LowerBoundsTypeDeclaration lbt = (ExtendsType.LowerBoundsTypeDeclaration) lhsType;
+         if (ModelUtil.isAssignableFrom(rhsType, lbt.baseType))
+            return lbt.baseType;
+         return rhsType;
+      }
+      if (rhsType instanceof ExtendsType.LowerBoundsTypeDeclaration) {
+         ExtendsType.LowerBoundsTypeDeclaration rbt = (ExtendsType.LowerBoundsTypeDeclaration) rhsType;
+         if (ModelUtil.isAssignableFrom(rbt.baseType, lhsType))
+            return rbt.baseType;
          return lhsType;
-      else if (ModelUtil.isAssignableFrom(rhsType, lhsType))
+      }
+
+      boolean lhsMatch = ModelUtil.isAssignableFrom(lhsType, rhsType);
+      boolean rhsMatch = ModelUtil.isAssignableFrom(rhsType, lhsType);
+      if (lhsMatch && !rhsMatch)
+         return lhsType;
+      else if (rhsMatch && !lhsMatch)
          return rhsType;
       else {
-         Object type = ModelUtil.findCommonSuperClass(lhsType, rhsType);
+         if (ModelUtil.sameTypesAndParams(lhsType, rhsType))
+            return lhsType;
+
+         boolean lhsTypeVar = ModelUtil.isTypeVariable(lhsType);
+         boolean rhsTypeVar = ModelUtil.isTypeVariable(rhsType);
+         if (lhsTypeVar && !rhsTypeVar)
+            return rhsType;
+         if (rhsTypeVar && !lhsTypeVar)
+            return lhsType;
+
+         if (rhsTypeVar && lhsTypeVar)
+            return lhsType; // TODO: Is there something more intelligent we need to do to coalesce type variables?
+
+         Object type = ModelUtil.findCommonSuperClass(sys, lhsType, rhsType);
          if (type != null) {
             Object[] ifaces = ModelUtil.getOverlappingInterfaces(lhsType, rhsType);
             if (ifaces == null || ModelUtil.implementsInterfaces(type, ifaces))
@@ -1382,6 +1459,33 @@ public class ModelUtil {
          }
          throw new IllegalArgumentException("Cannot coerce types: " + ModelUtil.getTypeName(lhsType) + " and: " + ModelUtil.getTypeName(rhsType));
       }
+   }
+
+   /**
+    * This is used to combine the inferredType with the type extracted from the parameters in determining "the" type.
+    * Originally it also called coerceTypes but ran into some problems with that.
+    */
+   public static Object blendTypes(Object lhsType, Object rhsType) {
+      // If you have one side that is ? super SuperType and we have SubType extends SuperType, oddly this seems to clamp the
+      // coerced type to SuperType
+      if (lhsType instanceof ExtendsType.LowerBoundsTypeDeclaration) {
+         ExtendsType.LowerBoundsTypeDeclaration lbt = (ExtendsType.LowerBoundsTypeDeclaration) lhsType;
+         if (lbt.baseType == Object.class)
+            return rhsType;
+         if (ModelUtil.isAssignableFrom(rhsType, lbt.baseType))
+            return lbt.baseType;
+         return rhsType;
+      }
+      if (rhsType instanceof ExtendsType.LowerBoundsTypeDeclaration) {
+         ExtendsType.LowerBoundsTypeDeclaration rbt = (ExtendsType.LowerBoundsTypeDeclaration) rhsType;
+         if (rbt.baseType == Object.class)
+            return lhsType;
+         if (ModelUtil.isAssignableFrom(rbt.baseType, lhsType))
+            return rbt.baseType;
+         return lhsType;
+      }
+
+      return lhsType;
    }
 
    public static Object refineType(ITypeDeclaration definedInType, Object origType, Object newType) {
@@ -1510,24 +1614,116 @@ public class ModelUtil {
       return res.toArray();
    }
 
-   public static Object findCommonSuperClass(Object c1, Object c2) {
+   private static Object coerceTypeParams(LayeredSystem sys, Object o1Param, Object o2Param) {
+      Object newParam;
+      if (o1Param == null) {
+         if (o2Param == null)
+            newParam = null;
+         else
+            newParam = o2Param;
+      }
+      else if (o2Param == null) {
+         newParam = o1Param;
+      }
+      else {
+         boolean o1ParamTypeVar = ModelUtil.isTypeVariable(o1Param);
+         boolean o2ParamTypeVar = ModelUtil.isTypeVariable(o2Param);
+         if (o1ParamTypeVar) {
+            if (o2ParamTypeVar)
+               newParam = o1Param; // TODO: do we need to pick the more specific one here?
+            else
+               newParam = o2Param;
+         }
+         else if (o2ParamTypeVar) {
+            newParam = o1Param;
+         }
+         else {
+            newParam = ModelUtil.findCommonSuperClass(sys, o1Param, o2Param);
+         }
+      }
+      return newParam;
+   }
+
+   public static Object findCommonSuperClass(LayeredSystem sys, Object c1, Object c2) {
       Object o1 = c1;
       Object o2 = c2;
 
-      if (o1 == null && o2 != null)
-         return o2;
-      if (o2 == null && o1 != null)
+      if (o1 == o2)
          return o1;
 
-      while (o1 != null && !ModelUtil.isAssignableFrom(o1, o2))
+      if (o1 == null)
+         return o2;
+      if (o2 == null)
+         return o1;
+
+      if (o1 == NullLiteral.NULL_TYPE)
+         return o2;
+      if (o2 == NullLiteral.NULL_TYPE)
+         return o1;
+
+      boolean o1ParamType = ModelUtil.isParameterizedType(o1);
+      boolean o2ParamType = ModelUtil.isParameterizedType(o2);
+      if (o1ParamType && o2ParamType) {
+         Object o1Base = ModelUtil.getParamTypeBaseType(o1);
+         Object o2Base = ModelUtil.getParamTypeBaseType(o2);
+         if (ModelUtil.sameTypes(o1Base, o2Base)) {
+            int numParams = ModelUtil.getNumTypeParameters(o1);
+            ArrayList<Object> newParams = new ArrayList<Object>(numParams);
+            for (int i = 0; i < numParams; i++) {
+               Object o1Param = ModelUtil.getTypeParameter(o1, i);
+               Object o2Param = ModelUtil.getTypeParameter(o2, i);
+               Object newParam;
+
+               newParam = coerceTypeParams(sys, o1Param, o2Param);
+               newParams.add(newParam);
+            }
+            return new ParamTypeDeclaration(sys, ModelUtil.getTypeParameters(o1), newParams, o1Base);
+         }
+         else {
+            if (ModelUtil.isTypeVariable(o1)) {
+               if (ModelUtil.sameTypeParameters(o1, o2))
+                  return o1;
+               if (ModelUtil.isTypeVariable(o2))
+                  return o1;
+            }
+
+            if (o1Base == c1)
+               System.out.println("*** Error recursive coerceTypes call");
+            if (o2Base == c2)
+               System.out.println("*** Error recursive coerceTypes call");
+
+            Object newBaseType = ModelUtil.findCommonSuperClass(sys, o1Base, o2Base);
+            List<?> newBaseTypeParams = ModelUtil.getTypeParameters(newBaseType);
+            int sz = newBaseTypeParams.size();
+            ArrayList<Object> newTypeParams = new ArrayList<Object>(sz);
+
+            for (int i = 0; i < sz; i++)
+               newTypeParams.add(ModelUtil.coerceTypeParams(sys, ModelUtil.getTypeParameter(o1, i), ModelUtil.getTypeParameter(o2, i)));
+
+            return new ParamTypeDeclaration(sys, newBaseTypeParams, newTypeParams, newBaseType);
+         }
+      }
+      // Strip off the type parameters if only one type has them (or perhaps we should substitute ? for each of them
+      else if (o1ParamType)
+         o1 = ModelUtil.getParamTypeBaseType(o1);
+      else if (o2ParamType)
+         o2 = ModelUtil.getParamTypeBaseType(o2);
+
+      while (o1 != null && !ModelUtil.isAssignableFrom(o1, o2, sys))
          o1 = ModelUtil.getSuperclass(o1);
 
-      while (o2 != null && !ModelUtil.isAssignableFrom(o2, c1))
+      while (o2 != null && !ModelUtil.isAssignableFrom(o2, c1, sys))
          o2 = ModelUtil.getSuperclass(o2);
 
       // We found a class which matches so return that
-      if (o1 != null && o2 != null)
+      if (o1 != null && o2 != null && o1 != Object.class && o2 != Object.class)
          return ModelUtil.isAssignableFrom(o1, o2) ? o2 : o1;
+
+      Object i1 = findBestMatchingInterface(c1, c2, null);
+      Object i2 = findBestMatchingInterface(c2, c1, null);
+
+      if (i1 != null && i2 != null && i1 != Object.class && i2 != Object.class)
+         return ModelUtil.isAssignableFrom(i1, i2, sys) ? i2 : i1;
 
       if (o1 != null)
          return o1;
@@ -1535,17 +1731,11 @@ public class ModelUtil {
       if (o2 != null)
          return o2;
 
-      o1 = findBestMatchingInterface(c1, c2, null);
-      o2 = findBestMatchingInterface(c2, c1, null);
+      if (i1 != null)
+         return i1;
 
-      if (o1 != null && o2 != null)
-         return ModelUtil.isAssignableFrom(o1, o2) ? o2 : o1;
-
-      if (o1 != null)
-         return o1;
-
-      if (o2 != null)
-         return o2;
+      if (i2 != null)
+         return i2;
 
       return null;
    }
@@ -1704,6 +1894,10 @@ public class ModelUtil {
 
    public static boolean hasTypeParameters(Object paramType) {
       return paramType instanceof ParamTypeDeclaration || paramType instanceof ParameterizedType;
+   }
+
+   public static boolean hasDefinedTypeParameters(Object paramType) {
+      return paramType instanceof ParamTypeDeclaration || paramType instanceof ParameterizedType || ModelUtil.getTypeParameters(paramType) != null;
    }
 
    public static int getNumTypeParameters(Object paramType) {
@@ -2273,7 +2467,7 @@ public class ModelUtil {
    }
 
    public static JavaType[] parametersToJavaTypeArray(Object method, List<? extends Object> parameters, ParamTypedMethod ctx) {
-      Object[] paramTypes = ModelUtil.getParameterTypes(method, false);
+      Object[] paramTypes = ModelUtil.getParameterTypes(method, false, true);
       int size = parameters == null ? 0 : parameters.size();
       // Perf tuneup: could move logic to do comparisons into the cache so we don't allocate the temporary array here
       JavaType[] parameterTypes = new JavaType[size];
@@ -2357,7 +2551,7 @@ public class ModelUtil {
             int paramLen = (parameterTypes == null ? 0 : parameterTypes.length) - paramStart;
             if (paramLen == 0 && paramsLen == 0) {
                if (refType == null || checkAccess(refType, toCheck))
-                  res = ModelUtil.pickMoreSpecificMethod(res, toCheck, null);
+                  res = ModelUtil.pickMoreSpecificMethod(res, toCheck, null, null, parameters);
             }
             else {
                int j;
@@ -2388,7 +2582,7 @@ public class ModelUtil {
                }
                if (j == paramsLen) {
                   if (refType == null || checkAccess(refType, toCheck))
-                     res = ModelUtil.pickMoreSpecificMethod(res, toCheck, types);
+                     res = ModelUtil.pickMoreSpecificMethod(res, toCheck, types, types, parameters); // TODO: need to compute separate types for each method
                }
             }
          }
@@ -2436,7 +2630,7 @@ public class ModelUtil {
             int paramLen = parameterTypes == null ? 0 : parameterTypes.length;
             if (paramLen == 0 && paramsLen == 0) {
                if (refType == null || checkAccess(refType, toCheck))
-                  res = ModelUtil.pickMoreSpecificMethod(res, toCheck, null);
+                  res = ModelUtil.pickMoreSpecificMethod(res, toCheck, null, null, parameters);
             }
             else {
                int j;
@@ -2467,7 +2661,7 @@ public class ModelUtil {
                }
                if (j == paramsLen) {
                   if (refType == null || checkAccess(refType, toCheck))
-                     res = ModelUtil.pickMoreSpecificMethod(res, toCheck, types);
+                     res = ModelUtil.pickMoreSpecificMethod(res, toCheck, types, types, parameters); // TODO separate types for each inferred type
                }
             }
          }
@@ -3279,7 +3473,7 @@ public class ModelUtil {
       // If we have a param-typed method use that to get the parameter types as those reflect the compile-time binding of the types
       // Possibly repeating parameter
       if (ModelUtil.isVarArgs(meth)) {
-         Object[] types = pmeth == null ? ModelUtil.getParameterTypes(meth) : pmeth.getParameterTypes(true);
+         Object[] types = pmeth == null ? ModelUtil.getParameterTypes(meth) : pmeth.getParameterTypes(true, true);
          int last = types.length - 1;
          Object lastType = types[last];
          if (ModelUtil.isArray(lastType)) {
@@ -3722,7 +3916,7 @@ public class ModelUtil {
          return ((IMethodDefinition) method).isSetIndexMethod();
       else if (method instanceof Method)
          return RTypeUtil.isSetIndexMethod((Method) method);
-      else if (method instanceof VariableDefinition)
+      else if (method instanceof VariableDefinition || ModelUtil.isField(method))
          return false;
       else
          throw new UnsupportedOperationException();
@@ -3749,7 +3943,8 @@ public class ModelUtil {
    public static boolean typeIsVoid(Object type) {
       if (type instanceof JavaType)
          return ((JavaType) type).isVoid();
-      return type == Void.class || type == Void.TYPE;
+      // NOTE: do not include java.lang.Void here - i.e. Void.class.  that's a placeholder for type parameters and is assignable to object.
+      return type == Void.TYPE;
    }
 
    public static boolean typeIsInteger(Object type) {
@@ -3757,7 +3952,7 @@ public class ModelUtil {
          String typeName = ((JavaType) type).getFullTypeName();
          return typeName != null && (typeName.equals("java.lang.Integer") || typeName.equals("int"));
       }
-      return type == Void.class || type == Void.TYPE;
+      return type == Integer.class || type == Integer.TYPE;
    }
 
    public static boolean typeIsBoolean(Object type) {
@@ -3765,7 +3960,7 @@ public class ModelUtil {
          String typeName = ((JavaType) type).getFullTypeName();
          return typeName != null && (typeName.equals("java.lang.Boolean") || typeName.equals("boolean"));
       }
-      return type == Void.class || type == Void.TYPE;
+      return type == Boolean.class || type == Boolean.TYPE;
    }
 
    public static boolean typeIsString(Object type) {
@@ -3864,7 +4059,7 @@ public class ModelUtil {
       if (method instanceof Method) {
          Type[] paramTypes = ((Method) method).getGenericParameterTypes();
          for (Type paramType:paramTypes)
-            if (paramType instanceof TypeVariable || ModelUtil.hasUnboundTypeParameters(paramType))
+            if (paramType instanceof TypeVariable || ModelUtil.isParameterizedType(paramType))
                return true;
          return false;
       }
@@ -3874,11 +4069,6 @@ public class ModelUtil {
             for (JavaType paramType:paramTypes) {
                if (paramType.isParameterizedType())
                   return true;
-               // TODO: remove this test - replaced the the one above which works and this one only would work if we got the type declaration first
-               if (ModelUtil.hasUnboundTypeParameters(paramType)) {
-                  System.err.println("*** Not reached?");
-                  return true;
-               }
             }
          }
          return false;
@@ -3893,7 +4083,7 @@ public class ModelUtil {
    public static Object getParameterizedType(Object member, JavaSemanticNode.MemberType type) {
       if (type == JavaSemanticNode.MemberType.SetMethod) {
          if (member instanceof IMethodDefinition) {
-            Object[] paramTypes = ((IMethodDefinition) member).getParameterTypes(false);
+            Object[] paramTypes = ((IMethodDefinition) member).getParameterTypes(false, true);
             return paramTypes[0];
          }
          else if (member instanceof IBeanMapper)
@@ -3953,6 +4143,19 @@ public class ModelUtil {
 
    public static boolean isWildcardType(Object type) {
       return type instanceof WildcardType || type instanceof ExtendsType;
+   }
+
+   public static boolean isUnboundedWildcardType(Object type) {
+      if (type instanceof ExtendsType.WildcardTypeDeclaration) {
+         return true;
+      }
+      else if (type instanceof WildcardType) {
+         WildcardType wt = (WildcardType) type;
+         return wt.getUpperBounds().length == 0 && wt.getLowerBounds().length == 0;
+      }
+      else if (type instanceof ExtendsType)
+         return ((ExtendsType) type).typeArgument == null;
+      return false;
    }
 
    public static boolean isSuperWildcard(Object type) {
@@ -4280,7 +4483,34 @@ public class ModelUtil {
       return typeParamName;
    }
 
-   /** Given a subType and the typeParameter in the sub-type, returns the type or type parameter in the base type.  */
+   public static Object resolveBaseTypeParameters(LayeredSystem sys, Object subType, Object baseType) {
+      if (ModelUtil.sameTypes(subType, baseType)) {
+         return ModelUtil.getTypeParameters(subType);
+      }
+      List<Object> extTypes = getExtendsJavaTypePath(baseType, subType);
+      if (extTypes == null || extTypes.size() == 0) {
+         System.err.println("*** No extends path from baseType to subType");
+         return null;
+      }
+
+      int numInParams = ModelUtil.getNumTypeParameters(subType);
+      int numOutParams = ModelUtil.getNumTypeParameters(baseType);
+      ArrayList<Object> res = new ArrayList<Object>(numOutParams);
+      for (int i = 0; i < numOutParams; i++) {
+         Object typeParam = ModelUtil.getTypeParameter(baseType, i);
+         Object newParam = resolveBaseTypeParameterInternal(extTypes, subType, baseType, typeParam);
+         res.add(newParam);
+      }
+      return res;
+   }
+
+   /**
+    * TODO: this seems like the same thing as resolveTypeParameter - can we eliminate one implementation?
+    *
+    * Given a subType and baseType and the typeParameter in the base-type, returns the type or type parameter in the sub type.
+    * For example, given List<E> and MyList implements List<Integer> you provide subType = MyList, baseType = List and typeParam = E
+    * and get back Integer.
+    */
    public static Object resolveBaseTypeParameter(Object subType, Object baseType, Object typeParam) {
       if (ModelUtil.sameTypes(subType, baseType)) {
          String typeParamName = ModelUtil.getTypeParameterName(typeParam);
@@ -4294,6 +4524,87 @@ public class ModelUtil {
          return typeParam;
       }
       List<Object> extTypes = getExtendsJavaTypePath(baseType, subType);
+
+      return resolveBaseTypeParameterInternal(extTypes, subType, baseType, typeParam);
+   }
+
+   public static List<Object> resolveSubTypeParameters(Object subType, Object baseType) {
+      List<?> typeParams = ModelUtil.getTypeParameters(subType);
+      if (typeParams == null)
+         return null;
+      int numParams = typeParams.size();
+      ArrayList<Object> res = new ArrayList<Object>(numParams);
+      if (ModelUtil.sameTypes(subType, baseType)) {
+         for (int i = 0; i < numParams; i++) {
+            res.add(ModelUtil.getTypeParameter(subType, i));
+         }
+         return res;
+      }
+      else {
+         List<Object> extTypes = getExtendsJavaTypePath(baseType, subType);
+         for (int pix = 0; pix < numParams; pix++) {
+            int srcIx = pix;
+            Object nextType = subType;
+            Object paramRes = ModelUtil.getTypeParameter(subType, pix);
+            Object origRes = paramRes;
+            Object lastTypeArg = null;
+            Object nextParamType = null;
+            if (ModelUtil.isTypeVariable(paramRes)) {
+               for (int extIx = 0; extIx < extTypes.size(); extIx++) {
+                  Object ext = extTypes.get(extIx);
+                  List<?> typeArgs = ModelUtil.getTypeArguments(ext);
+                  if (typeArgs == null) {
+                     break;
+                  }
+                  srcIx = -1;
+                  Object typeArg = null;
+                  for (int tix = 0; tix < typeArgs.size(); tix++) {
+                     typeArg = typeArgs.get(tix);
+                     typeArg = resolveExtTypeDeclaration(typeArg);
+                     if (ModelUtil.isTypeVariable(typeArg) && ModelUtil.sameTypeParameters(paramRes, typeArg)) {
+                        srcIx = tix;
+                        break;
+                     }
+                  }
+                  if (srcIx == -1) {
+                     break;
+                  }
+                  nextType = resolveExtTypeDeclaration(ext);
+                  if (srcIx >= typeArgs.size()) {
+                     srcIx = -1;
+                     break;
+                  }
+                  if (typeArg instanceof JavaType)
+                     typeArg = ((JavaType) typeArg).getTypeDeclaration();
+                  if (nextType == null) {
+                     srcIx = -1;
+                     break;
+                  }
+                  paramRes = ModelUtil.getTypeArgument(nextType, srcIx);
+                  if (!ModelUtil.isTypeVariable(paramRes)) {
+                     srcIx = -1;
+                     break;
+                  }
+               }
+            }
+            else
+               srcIx = -1;
+            if (srcIx != -1)
+               paramRes = ModelUtil.getTypeParameter(baseType, srcIx);
+            if (!ModelUtil.isTypeVariable(paramRes))
+               res.add(paramRes);
+            else
+               res.add(origRes);
+         }
+      }
+      return res;
+   }
+
+   private static Object resolveExtTypeDeclaration(Object ext) {
+      return ext instanceof JavaType ? ((JavaType) ext).getTypeDeclaration() : ext;
+   }
+
+   private static Object resolveBaseTypeParameterInternal(List<Object> extTypes, Object subType, Object baseType, Object typeParam) {
       if (extTypes == null || extTypes.size() == 0) {
          System.err.println("*** No extends path from baseType to subType");
          return null;
@@ -4311,7 +4622,6 @@ public class ModelUtil {
          ct++;
       }
       if (curParamIx == -1) {
-         System.err.println("*** No typeParam in resultType");
          return null;
       }
 
@@ -4372,7 +4682,12 @@ public class ModelUtil {
       return ModelUtil.getTypeParameterDefault(lastTypeArg);
    }
 
-   /** Computes the type parameter in type 'resultType' that corresponds to the typeParam which is a type parameter for it's base class srcType */
+   /**
+    * Computes the type parameter in type 'resultType' that corresponds to "typeParam" you provide for the base type srcType.
+    * In other words, it lets you determine the value of a base type's type parameter when evaluated in the context of the sub-type.
+    * So List<E> - you provide List.class, E, and the resultType of MySubType implements List<Integer> and it will return Integer.class
+    * This "typeParam" should be one of the type variables srcType was defined with, and srcType should be a baseType of resultType.
+    */
    public static Object resolveTypeParameter(Object srcType, Object resultType, Object typeParam) {
       String typeParamName = ModelUtil.getTypeParameterName(typeParam);
       int srcIx = ModelUtil.getTypeParameterPosition(srcType, typeParamName);
@@ -4474,6 +4789,9 @@ public class ModelUtil {
       else if (extJavaType instanceof Type) {
          if (extJavaType instanceof ParameterizedType) {
             return Arrays.asList(((ParameterizedType) extJavaType).getActualTypeArguments());
+         }
+         else if (extJavaType instanceof Class) {
+            return null;
          }
          else {
             throw new UnsupportedOperationException();
@@ -5463,7 +5781,7 @@ public class ModelUtil {
       }
       else if (elem instanceof CFMethod) {
          CFMethod meth = (CFMethod) elem;
-         sb.append(getTypeName(meth.getReturnType(true)) + " " + meth.getMethodName() + " (" + StringUtil.arrayToString(meth.getParameterTypes(false)) + ")");
+         sb.append(getTypeName(meth.getReturnType(true)) + " " + meth.getMethodName() + " (" + StringUtil.arrayToString(meth.getParameterTypes(false, true)) + ")");
       }
       else if (elem instanceof Field) {
          Field f = (Field) elem;
@@ -6016,12 +6334,12 @@ public class ModelUtil {
    }
 
    public static Object[] getParameterTypes(Object method) {
-      return getParameterTypes(method, false);
+      return getParameterTypes(method, false, true);
    }
 
-   public static Object[] getParameterTypes(Object method, boolean bound) {
+   public static Object[] getParameterTypes(Object method, boolean bound, boolean bindUnbound) {
       if (method instanceof IMethodDefinition)
-         return ((IMethodDefinition) method).getParameterTypes(bound);
+         return ((IMethodDefinition) method).getParameterTypes(bound, bindUnbound);
       else if (method instanceof Method)
          return ((Method) method).getParameterTypes();
       else if (method instanceof Constructor)
@@ -6032,7 +6350,7 @@ public class ModelUtil {
 
    public static Object[] getGenericParameterTypes(Object method, boolean bound) {
       if (method instanceof IMethodDefinition)
-         return ((IMethodDefinition) method).getParameterTypes(bound);
+         return ((IMethodDefinition) method).getParameterTypes(bound, true);
       else if (method instanceof Method)
          return ((Method) method).getGenericParameterTypes();
       else if (method instanceof Constructor)
@@ -6859,7 +7177,8 @@ public class ModelUtil {
    }
 
    public static boolean isConstructor(Object method) {
-      return method instanceof Constructor || method instanceof ConstructorDefinition || (method instanceof CFMethod && ((CFMethod) method).getMethodName().equals("<init>"));
+      return method instanceof Constructor || method instanceof ConstructorDefinition || (method instanceof CFMethod && ((CFMethod) method).getMethodName().equals("<init>")) ||
+              (method instanceof ParamTypedMethod && isConstructor(((ParamTypedMethod) method).method));
    }
 
    /** Weird rule in java.  When you have a parameterized return type and no arguments, the type comes from the LHS of the assignment expression
@@ -7599,7 +7918,7 @@ public class ModelUtil {
       Object[] typeParams = getMethodTypeParameters(method);
       if (typeParams != null && typeParams.length > 0)
          return true;
-      Object[] methParams = ModelUtil.getParameterTypes(method, false);
+      Object[] methParams = ModelUtil.getParameterTypes(method, false, true);
       if (methParams != null) {
          for (Object methParam:methParams) {
             // Used to only consider unbound params here but we can refine even a bound type paraemter apparently so
@@ -7705,5 +8024,12 @@ public class ModelUtil {
          return "[]";
       }
       throw new UnsupportedOperationException();
+   }
+
+   public static String paramTypeToString(Object type) {
+      if (type instanceof TypeDeclaration)
+         return ((TypeDeclaration) type).typeName;
+      else
+         return type.toString();
    }
 }
