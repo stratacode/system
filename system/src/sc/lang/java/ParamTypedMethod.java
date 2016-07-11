@@ -55,7 +55,6 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
    public ParamTypedMethod(Object meth, ITypeParamContext paramTypeDeclaration, ITypeDeclaration definedInType, List<? extends Object> parametersOrExpressions, Object inferredType, List<JavaType> methodTypeArgs) {
       if (meth == null)
          System.out.println("*** Warning null method for method typed parameter");
-
       method = meth;
       paramTypeDecl = paramTypeDeclaration;
       this.inferredType = inferredType;
@@ -138,7 +137,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
                Object typeParam = ModelUtil.getTypeParameter(parameterizedType, i);
                if (ModelUtil.hasTypeVariables(typeParam)) {
                   Object newVal = resolveTypeParameter(typeParam, resolve);
-                  if (newVal != typeParam) {
+                  if (newVal != typeParam && newVal != null && newVal != Object.class) {
                      if (newType == null) {
                         List<?> typeParams = ModelUtil.getTypeParameters(ModelUtil.getTypeDeclFromType(this, parameterizedType, true, getLayeredSystem(), true, definedInType));
                         Object baseType = ModelUtil.getParamTypeBaseType(parameterizedType);
@@ -423,8 +422,6 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
          }
          else {
             if (boundTypeSubType) {
-               if (paramType.toString().equals("java.util.Comparator<? super T>") && boundType.toString().equals("NodeUtil.NodeComparatorBySingleAttribute (layer:broadleaf.core) (runtime: java)"))
-                  System.out.println("***");
                List<Object> extTypes = ModelUtil.getExtendsJavaTypePath(paramType, boundType);
                int srcIx = i;
                // Starting at the base type

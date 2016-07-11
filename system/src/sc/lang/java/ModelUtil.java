@@ -8029,6 +8029,8 @@ public class ModelUtil {
    public static String paramTypeToString(Object type) {
       if (type instanceof TypeDeclaration)
          return ((TypeDeclaration) type).typeName;
+      else if (type instanceof Class)
+         return CTypeUtil.getClassName(ModelUtil.getTypeName(type));
       else
          return type.toString();
    }
