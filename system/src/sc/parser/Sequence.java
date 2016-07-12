@@ -845,21 +845,22 @@ public class Sequence extends NestedParselet  {
                if (esv != null) {
                   if (node == esv || (anyContent && node.applyPartialValue(esv))) {
                      if (!value.isEmpty()) {
-                        // Reuse the same error with the new value.  This node will also call parseEOF error
+                        // Reuse the same error with the new value (unless we are caching in which case we create a new
+                        // error).  This node will also call parseEOF error
                         // but that error will be ignored caused it does not end as far back as this one.
                         // One potential benefit of doing it this way is that if more nodes end up with better
                         // final matches we'll hang onto them.  If we use the new error it would replace any other
                         // existing errors.
+                        err = err.propagatePartialValue(value);
                         err.startIndex = parser.currentIndex;
-                        err.partialValue = value;
 
                         return true;
                      }
                   }
                }
                else if (childParselet == err.parselet) {
+                  err = err.propagatePartialValue(value);
                   err.startIndex = parser.currentIndex;
-                  err.partialValue = value;
                   return true;
                }
             }
@@ -875,6 +876,7 @@ public class Sequence extends NestedParselet  {
                if (elem instanceof ISemanticNode) {
                   ISemanticNode elemNode = (ISemanticNode) elem;
                   int newIx = ((ISemanticNode) elem).getParseNode().getStartIndex();
+
                   if (newIx > startIx)
                      startIx = newIx;
 

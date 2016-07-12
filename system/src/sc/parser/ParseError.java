@@ -138,7 +138,21 @@ public class ParseError implements Cloneable, IParseResult {
    }
 
    public ParseError propagatePartialValue(Object pv) {
+      Parselet errParselet = null;
+      if (pv instanceof IParseNode) {
+         errParselet = ((IParseNode) pv).getParselet();
+         // If we are caching an error at a lower level, don't reuse the same error because then the cached
+         // results partial value will point to the wrong parselet and semantic value.
+         if (parselet.cacheResults) {
+            ParseError propError = this.clone();
+            propError.partialValue = pv;
+            propError.parselet = errParselet;
+            return propError;
+         }
+      }
       partialValue = pv;
+      if (errParselet != null)
+         parselet = errParselet;
       return this;
    }
 }
