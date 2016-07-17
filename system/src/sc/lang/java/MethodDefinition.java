@@ -838,4 +838,13 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       }
       return thisAnnot;
    }
+
+   public Object[] getExtraModifiers() {
+      TypeDeclaration enclType = getEnclosingType();
+      // Methods that are part of an interface are implicitly public in Java
+      if (enclType != null && enclType.getDeclarationType() == DeclarationType.INTERFACE) {
+         return new Object[] {"public"};
+      }
+      return null;
+   }
 }

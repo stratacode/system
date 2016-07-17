@@ -445,7 +445,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
    public List<BodyTypeDeclaration> getInnerDynStubs() {
       List<Object> myIts = objTypeDecl.getAllInnerTypes(null, false);
       if (myIts == null)
-         return null;
+         return Collections.emptyList();
 
       ArrayList<BodyTypeDeclaration> defs = new ArrayList<BodyTypeDeclaration>();
 
