@@ -345,7 +345,7 @@ public class NewExpression extends IdentifierExpression {
             type = Object.class;
 
          TypeDeclaration modelType = model == null ? null : model.getModelTypeDeclaration();
-         return new ArrayTypeDeclaration(modelType, type, StringUtil.repeat("[]", ndim));
+         return new ArrayTypeDeclaration(getLayeredSystem(), modelType, type, StringUtil.repeat("[]", ndim));
       }
    }
 
@@ -382,7 +382,7 @@ public class NewExpression extends IdentifierExpression {
          return null;
       ITypeDeclaration enclType = getEnclosingType();
       if (enclType != null)
-         return new ParamTypeDeclaration(enclType, ModelUtil.getTypeParameters(type), evalTypeArguments(type), type);
+         return new ParamTypeDeclaration(enclType.getLayeredSystem(), enclType, ModelUtil.getTypeParameters(type), evalTypeArguments(type), type);
       else
          return new ParamTypeDeclaration(getLayeredSystem(), ModelUtil.getTypeParameters(type), evalTypeArguments(type), type);
    }

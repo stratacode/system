@@ -200,7 +200,7 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
       String[] tns = att.typeNames;
       JavaType[] types = new JavaType[tns.length];
       for (int i = 0; i < tns.length; i++) {
-         types[i] = JavaType.createJavaType(tns[i]);
+         types[i] = JavaType.createJavaType(getLayeredSystem(), tns[i]);
       }
       return types;
    }

@@ -82,7 +82,7 @@ public class DynBeanIndexMapper extends DynBeanMapper implements IBeanIndexMappe
          return Type.get(elClass).getArrayClass(elClass, 1);
       }
       else
-         return ArrayTypeDeclaration.create(elementType, 1, getEnclosingType());
+         return ArrayTypeDeclaration.create(null, elementType, 1, getEnclosingType());
    }
 
    private ITypeDeclaration getEnclosingType() {

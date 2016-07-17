@@ -690,14 +690,16 @@ public class ModifyDeclaration extends TypeDeclaration {
          return v;
 
       if (extendsBoundTypes != null) {
+         LayeredSystem sys = getLayeredSystem();
          for (Object impl:extendsBoundTypes) {
-            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs)) != null)
+            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, sys)) != null)
                return v;
          }
       }
       if (impliedRoots != null) {
+         LayeredSystem sys = getLayeredSystem();
          for (Object impl:impliedRoots) {
-            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs)) != null)
+            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, sys)) != null)
                return v;
          }
       }

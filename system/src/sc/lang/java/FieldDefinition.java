@@ -32,12 +32,12 @@ public class FieldDefinition extends TypedDefinition {
    private transient boolean frozenStatic;
    //private transient Object frozenType;
 
-   public static FieldDefinition create(Object type, String fieldName, String op, Expression init) {
-      return createFromJavaType(JavaType.createJavaType(type), fieldName, op, init);
+   public static FieldDefinition create(LayeredSystem sys, Object type, String fieldName, String op, Expression init) {
+      return createFromJavaType(JavaType.createJavaType(sys, type), fieldName, op, init);
    }
 
-   public static FieldDefinition create(Object type, String fieldName) {
-      return createFromJavaType(JavaType.createJavaType(type), fieldName);
+   public static FieldDefinition create(LayeredSystem sys, Object type, String fieldName) {
+      return createFromJavaType(JavaType.createJavaType(sys, type), fieldName);
    }
 
    public static FieldDefinition createFromJavaType(JavaType type, String fieldName) {

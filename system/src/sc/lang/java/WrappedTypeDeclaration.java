@@ -18,9 +18,11 @@ import java.util.*;
  * coercing into one.
  * */
 public class WrappedTypeDeclaration implements ITypeDeclaration {
-   Object baseType; 
+   Object baseType;
+   LayeredSystem system;
 
-   public WrappedTypeDeclaration(Object it) {
+   public WrappedTypeDeclaration(LayeredSystem sys, Object it) {
+      this.system = sys;
       baseType = it;
    }
 
@@ -101,7 +103,7 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
    }
 
    public Object definesMethod(String name, List<? extends Object> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
-      return ModelUtil.definesMethod(baseType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
+      return ModelUtil.definesMethod(baseType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, getLayeredSystem());
    }
 
    public Object declaresConstructor(List<?> parametersOrExpressions, ITypeParamContext ctx) {
@@ -222,7 +224,7 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
    }
 
    public LayeredSystem getLayeredSystem() {
-      throw new UnsupportedOperationException();
+      return system;
    }
 
    public List<?> getClassTypeParameters() {

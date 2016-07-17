@@ -17,7 +17,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
    // NOTE: if there's a null value here, it means a wildcard type parameter - one that matches anything.  e.g. Collections.emptyList().
    List<Object> types;
    LayeredSystem system;
-   ITypeDeclaration definedInType;
+   Object definedInType;
    ArrayList<TypeParamMap> typeParamMapping;
 
    // Set to true when this type is derived from parameter types which are not defined until the inferredType is set
@@ -26,8 +26,8 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
 
    boolean writable = false;
 
-   public ParamTypeDeclaration(ITypeDeclaration it, List<?> typeParameters, List<Object> typeDefs, Object baseTypeDecl) {
-      this(it.getLayeredSystem(), typeParameters, typeDefs, baseTypeDecl);
+   public ParamTypeDeclaration(LayeredSystem sys, Object it, List<?> typeParameters, List<Object> typeDefs, Object baseTypeDecl) {
+      this(sys, typeParameters, typeDefs, baseTypeDecl);
       definedInType = it;
    }
 
@@ -215,7 +215,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
 
    public Object definesMethod(String name, List<? extends Object> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
       // assert ctx == null; ??? this fails unfortunately...
-      Object method = ModelUtil.definesMethod(baseType, name, parametersOrExpressions, this, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
+      Object method = ModelUtil.definesMethod(baseType, name, parametersOrExpressions, this, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, system);
       if (ctx == null)
          ctx = this;
       // If we already got back some parameter types for this method, we need to merge the definitions of this type into the one we retrieved.
@@ -225,7 +225,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
          methPT.updateParamTypes(this);
       }
       else if (method != null && ModelUtil.isParameterizedMethod(method))
-         return new ParamTypedMethod(method, this, definedInType, parametersOrExpressions, inferredType, methodTypeArgs);
+         return new ParamTypedMethod(system, method, this, definedInType, parametersOrExpressions, inferredType, methodTypeArgs);
       return method;
    }
 
@@ -405,7 +405,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
 
    public Object getClass(String className, boolean useImports) {
       if (definedInType != null)
-         return definedInType.getClass(className, useImports);
+         return ModelUtil.getClassFromType(system, definedInType, className, useImports);
       else
          return system.getClassWithPathName(className, null, false, false, false);
    }
@@ -413,7 +413,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
    public Object findTypeDeclaration(String typeName, boolean addExternalReference) {
       Object res = null;
       if (definedInType != null)
-         res = definedInType.findTypeDeclaration(typeName, addExternalReference);
+         res = ModelUtil.findTypeDeclaration(system, definedInType, typeName, null, addExternalReference);
       else
          res = system.getTypeDeclaration(typeName);
       if (res != null)
@@ -427,7 +427,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
    }
 
    public JavaModel getJavaModel() {
-      return definedInType.getJavaModel();
+      return definedInType instanceof ITypeDeclaration ? ((ITypeDeclaration) definedInType).getJavaModel() : null;
    }
 
    @Override
@@ -436,7 +436,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
    }
 
    public Layer getLayer() {
-     return definedInType != null ? definedInType.getLayer() : null;
+     return definedInType != null ? ModelUtil.getLayerForType(system, definedInType) : null;
    }
 
    public LayeredSystem getLayeredSystem() {
@@ -444,7 +444,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
    }
 
    public Layer getRefLayer() {
-      return definedInType != null ? definedInType.getLayer() : null;
+      return getLayer();
    }
 
    public List<Object> parameterizeMethodList(Object[] baseMethods) {
@@ -457,7 +457,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
          if (meth instanceof ParamTypedMethod)
             meth = ((ParamTypedMethod) meth).method;
          if (ModelUtil.isParameterizedMethod(meth))
-            result.add(new ParamTypedMethod(meth, this, definedInType, null, null, null));
+            result.add(new ParamTypedMethod(system, meth, this, definedInType, null, null, null));
          else
             result.add(meth);
       }
@@ -468,7 +468,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       if (meth instanceof ParamTypedMethod)
          meth = ((ParamTypedMethod) meth).method;
       if (ModelUtil.isParameterizedMethod(meth))
-         return new ParamTypedMethod(meth, this, definedInType, null, null, null);
+         return new ParamTypedMethod(system, meth, this, definedInType, null, null, null);
       return meth;
    }
 
@@ -631,7 +631,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
    public ParamTypeDeclaration copy() {
       ParamTypeDeclaration res;
       if (definedInType != null)
-          res = new ParamTypeDeclaration(definedInType, new ArrayList<Object>(typeParams), new ArrayList<Object>(types), baseType);
+          res = new ParamTypeDeclaration(system, definedInType, new ArrayList<Object>(typeParams), new ArrayList<Object>(types), baseType);
       else
           res = new ParamTypeDeclaration(system, new ArrayList<Object>(typeParams), new ArrayList<Object>(types), baseType);
       res.writable = true;
@@ -728,7 +728,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
                }
                // Here the 'type' may be more specific for the core type but may not include type parameters which exist in the current type.
                else if (type != null) {
-                  Object newType = ModelUtil.refineType(definedInType, origType, type);
+                  Object newType = ModelUtil.refineType(system, definedInType, origType, type);
                   if (newType != origType && !writable)
                      System.err.println("*** writable type violation");
                   types.set(i, newType);
@@ -760,7 +760,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return false;
    }
 
-   public ITypeDeclaration getDefinedInType() {
+   public Object getDefinedInType() {
       return definedInType;
    }
 
@@ -769,7 +769,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       if (definedInType == null)
          res = new ParamTypeDeclaration(system, typeParams, new ArrayList<Object>(types), baseType);
       else
-         res = new ParamTypeDeclaration(definedInType, typeParams, new ArrayList<Object>(types), baseType);
+         res = new ParamTypeDeclaration(system, definedInType, typeParams, new ArrayList<Object>(types), baseType);
       res.writable = true;
       return res;
    }

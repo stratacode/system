@@ -221,7 +221,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       // Handles old school array dimensions after the variable name
       if (arrayDimensions == null)
          return type;
-      return new ArrayTypeDeclaration(getJavaModel().getModelTypeDeclaration(), type, arrayDimensions);
+      return new ArrayTypeDeclaration(getLayeredSystem(), getEnclosingType(), type, arrayDimensions);
    }
 
    public String getVariableTypeName() {

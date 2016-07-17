@@ -105,7 +105,7 @@ public class MethodReference extends BaseLambdaExpression {
                resTypes[i] = ModelUtil.getTypeParameterDefault(resTypes[i]);
          }
       }
-      Parameter res = Parameter.create(resTypes,ModelUtil.getParameterNames(methObj), ctx, getEnclosingType());
+      Parameter res = Parameter.create(getLayeredSystem(), resTypes,ModelUtil.getParameterNames(methObj), ctx, getEnclosingType());
       if (res != null)
          res.parentNode = this;
       return res;

@@ -763,7 +763,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (isTransformedType() && isAutoComponent() && !isTransformed()) {
          // Note: this returns a compiled method even from the source type.  Use declaresMethodDef if you want to exclude
          // those compiled definitions.
-         obj = ModelUtil.definesMethod(ComponentImpl.class, name, types, ctx, refType, true, staticOnly, inferredType, methodTypeArgs);
+         obj = ModelUtil.definesMethod(ComponentImpl.class, name, types, ctx, refType, true, staticOnly, inferredType, methodTypeArgs, getLayeredSystem());
          if (obj != null)
             return obj;
       }
@@ -889,7 +889,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                td = newType;
          }
 
-         return ModelUtil.definesMethod(td, name, parameters, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
+         return ModelUtil.definesMethod(td, name, parameters, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, getLayeredSystem());
       }
 
       return null;
@@ -3411,7 +3411,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
                Object initMethod = definesMethod("init", null, null, this, false, false, null, null);
                if (initMethod == null)
-                  initMethod = ModelUtil.definesMethod(rtType, "init", null, null, this, false, false, null, null);
+                  initMethod = ModelUtil.definesMethod(rtType, "init", null, null, this, false, false, null, null, getLayeredSystem());
                if (initMethod != null) {
                   initMethod = ModelUtil.getRuntimeMethod(initMethod);
                   try {

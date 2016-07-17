@@ -128,7 +128,7 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       ParamTypedMethod paramMethod = null;
 
       if (ModelUtil.isParameterizedMethod(this)) {
-         paramMethod = new ParamTypedMethod(this, ctx, getEnclosingType(), otherParams, inferredType, methodTypeArgs);
+         paramMethod = new ParamTypedMethod(getLayeredSystem(), this, ctx, getEnclosingType(), otherParams, inferredType, methodTypeArgs);
          // TODO: do we need to disable binding of the parameter types here?  It seems we need them to blend them with the inferred type
          boundParamTypes = paramMethod.getParameterTypes(true, true); // TODO: true, false?
       }
@@ -510,11 +510,11 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       if (compiledClass == null) {
          System.err.println("*** No compiled class for: " + getDeclaringType());
       }
-      Object res = ModelUtil.definesMethod(compiledClass, name, getParameterList(), null, null, false, false, null, null);
+      Object res = ModelUtil.definesMethod(compiledClass, name, getParameterList(), null, null, false, false, null, null, getLayeredSystem());
       if (res == null) {
          System.err.println("*** No runtime method for: " + name);
          boolean x = isDynMethod();
-         Object y = ModelUtil.definesMethod(compiledClass, name, getParameterList(), null, null, false, false, null, null);
+         Object y = ModelUtil.definesMethod(compiledClass, name, getParameterList(), null, null, false, false, null, null, getLayeredSystem());
       }
       return res;
    }

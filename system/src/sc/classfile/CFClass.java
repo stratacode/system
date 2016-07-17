@@ -592,7 +592,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          // Interfaces don't inherit object methods in Java but an inteface type in this system needs to still
          // implement methods like "toString" even if they are not on the interface.
          if (ModelUtil.isInterface(this)) {
-            meth = ModelUtil.getMethod(system, Object.class, name, refType, null, inferredType, staticOnly, ModelUtil.varListToTypes(parametersOrExpressions));
+            meth = ModelUtil.getMethod(system, Object.class, name, refType, null, inferredType, staticOnly, methodTypeArgs, parametersOrExpressions, null);
             if (meth != null)
                return meth;
          }
@@ -621,7 +621,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
                ParamTypedMethod paramMethod = null;
                if (ModelUtil.isParameterizedMethod(toCheck)) {
 
-                  paramMethod = new ParamTypedMethod(toCheck, ctx, this, parametersOrExpressions, inferredType, methodTypeArgs);
+                  paramMethod = new ParamTypedMethod(system, toCheck, ctx, this, parametersOrExpressions, inferredType, methodTypeArgs);
 
                   // Turn off the binding of parameter types while we do a match for this method.  We can't have the parameter types setting type parameters
                   // here - only the inferred type to be sure it does not conflict with the parameter type match.
@@ -695,7 +695,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       }
 
       if (extendsType != null) {
-         meth = ModelUtil.definesMethod(extendsType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
+         meth = ModelUtil.definesMethod(extendsType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, getLayeredSystem());
          if (meth != null)
             return meth;
       }
@@ -704,7 +704,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          for (int i = 0; i < numInterfaces; i++) {
             Object implType = implementsTypes.get(i);
             if (implType != null) {
-               meth = ModelUtil.definesMethod(implType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
+               meth = ModelUtil.definesMethod(implType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, getLayeredSystem());
                if (meth != null)
                   return meth;
             }
@@ -900,7 +900,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
 
    public JavaType getExtendsType() {
       if (extendsJavaType == null && extendsType != null)
-         extendsJavaType = ClassType.createJavaType(extendsType);
+         extendsJavaType = ClassType.createJavaType(getLayeredSystem(), extendsType);
       return extendsJavaType;
    }
 
@@ -908,7 +908,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       if (implJavaTypes == null && implementsTypes != null) {
          implJavaTypes = new ArrayList<JavaType>(implementsTypes.size());
          for (Object implType:implementsTypes) {
-            implJavaTypes.add(ClassType.createJavaType(implType));
+            implJavaTypes.add(ClassType.createJavaType(getLayeredSystem(), implType));
          }
       }
       return implJavaTypes;

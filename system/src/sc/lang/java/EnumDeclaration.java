@@ -92,7 +92,7 @@ public class EnumDeclaration extends TypeDeclaration {
       // the values and valueOf methods.   For other methods, get the runtime type.  if it is a dynamic enum type,
       // we use DynEnumConstant.class to get the method.  For static ones, return the method on the enum class itself.
       
-      return ModelUtil.definesMethod(DynEnumConstant.class, name, types, ctx, refType, false, staticOnly, inferredType, methodTypeArgs);
+      return ModelUtil.definesMethod(DynEnumConstant.class, name, types, ctx, refType, false, staticOnly, inferredType, methodTypeArgs, getLayeredSystem());
    }
 
    public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
@@ -101,7 +101,7 @@ public class EnumDeclaration extends TypeDeclaration {
          return o;
 
       // All enum types inherit the methods from the java.lang.Enum
-      o = ModelUtil.definesMethod(java.lang.Enum.class, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
+      o = ModelUtil.definesMethod(java.lang.Enum.class, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, getLayeredSystem());
       if (o != null)
          return o;
       return null;
@@ -265,7 +265,7 @@ public class EnumDeclaration extends TypeDeclaration {
                   }
                }
 
-               constr.setProperty("parameters", Parameter.create(newTypes.toArray(new Object[newTypes.size()]), newNames.toArray(new String[newNames.size()]), null, this));
+               constr.setProperty("parameters", Parameter.create(getLayeredSystem(), newTypes.toArray(new Object[newTypes.size()]), newNames.toArray(new String[newNames.size()]), null, this));
                addEnumSuperCall(constr);
                enumCl.addBodyStatement(constr);
 
@@ -274,7 +274,7 @@ public class EnumDeclaration extends TypeDeclaration {
          }
       }
       else {
-         ConstructorDefinition constr = newEnumConstructor(typeName, this);
+         ConstructorDefinition constr = newEnumConstructor(getLayeredSystem(), typeName, this);
          enumCl.addBodyStatement(constr);
       }
 
@@ -287,10 +287,10 @@ public class EnumDeclaration extends TypeDeclaration {
       return enumCl;
    }
 
-   static ConstructorDefinition newEnumConstructor(String typeName, ITypeDeclaration definedInType) {
+   static ConstructorDefinition newEnumConstructor(LayeredSystem sys, String typeName, ITypeDeclaration definedInType) {
       ConstructorDefinition constr = new ConstructorDefinition();
       constr.name = typeName;
-      constr.setProperty("parameters", Parameter.create(defaultConstrParamTypes, defaultConstrParamNames, null, definedInType));
+      constr.setProperty("parameters", Parameter.create(sys, defaultConstrParamTypes, defaultConstrParamNames, null, definedInType));
       addEnumSuperCall(constr);
       return constr;
    }

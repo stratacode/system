@@ -1141,7 +1141,7 @@ public class TransformUtil {
       int numParams;
       if (ptypes != null && ptypes.length > 0) {
          numParams = ptypes.length;
-         redirMethod.setProperty("parameters", Parameter.create(ptypes, pnames = ModelUtil.getParameterNames(meth), null, td));
+         redirMethod.setProperty("parameters", Parameter.create(td.getLayeredSystem(), ptypes, pnames = ModelUtil.getParameterNames(meth), null, td));
       }
       else
          numParams = 0;

@@ -75,24 +75,24 @@ public class ExtendsType extends JavaType {
       return sb.toString();
    }
 
-   public Object getTypeDeclaration(ITypeParamContext ctx, ITypeDeclaration definedInType, boolean resolve, boolean refreshParams, boolean bindUnbound) {
+   public Object getTypeDeclaration(ITypeParamContext ctx, Object definedInType, boolean resolve, boolean refreshParams, boolean bindUnbound) {
       if (typeArgument == null)
-         return resolve ? Object.class : new WildcardTypeDeclaration();
+         return resolve ? Object.class : new WildcardTypeDeclaration(getLayeredSystem());
       if (operator != null && operator.equals("super")) {
          Object typeDecl = typeArgument.getTypeDeclaration(ctx, definedInType, resolve, refreshParams, bindUnbound);
          if (typeDecl == null)
             return bindUnbound ? Object.class : null;
          if (typeDecl instanceof LowerBoundsTypeDeclaration)
             return typeDecl;
-         return new LowerBoundsTypeDeclaration(typeDecl);
+         return new LowerBoundsTypeDeclaration(getLayeredSystem(), typeDecl);
       }
       return typeArgument.getTypeDeclaration(ctx, definedInType, resolve, refreshParams, bindUnbound);
    }
 
    /** Represents a ? super X type */
    public static class LowerBoundsTypeDeclaration extends WrappedTypeDeclaration {
-      LowerBoundsTypeDeclaration(Object lbType) {
-         super(lbType);
+      LowerBoundsTypeDeclaration(LayeredSystem sys, Object lbType) {
+         super(sys, lbType);
          if (lbType instanceof LowerBoundsTypeDeclaration)
             System.err.println("*** Error - nested lower bounds type");
       }
@@ -151,14 +151,9 @@ public class ExtendsType extends JavaType {
          if (baseType != null && ModelUtil.isTypeVariable(baseType)) {
             Object newBase = ctx.getTypeDeclarationForParam(ModelUtil.getTypeParameterName(baseType), baseType, resolve);
             if (!(newBase instanceof WildcardTypeDeclaration))
-               return new LowerBoundsTypeDeclaration(newBase);
+               return new LowerBoundsTypeDeclaration(system, newBase);
          }
          return this;
-      }
-
-      // Given an ExtendsType or WildcardType - create the LowerBoundsTypeDeclaration that does the appropriate type matching for a super
-      public static Object createFromType(Object type) {
-         return new LowerBoundsTypeDeclaration(ModelUtil.getWildcardLowerBounds(type));
       }
 
       public String toString() {
@@ -169,8 +164,8 @@ public class ExtendsType extends JavaType {
    }
 
    public static class WildcardTypeDeclaration extends LowerBoundsTypeDeclaration {
-      WildcardTypeDeclaration() {
-         super(Object.class);
+      WildcardTypeDeclaration(LayeredSystem sys) {
+         super(sys, Object.class);
       }
       public String getFullTypeName(boolean includeDims, boolean includeTypeParams) {
          return "?";
@@ -203,7 +198,7 @@ public class ExtendsType extends JavaType {
       }
    }
 
-   public void initType(LayeredSystem sys, ITypeDeclaration itd, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer, Object typeParam) {
+   public void initType(LayeredSystem sys, Object itd, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer, Object typeParam) {
       if (typeArgument != null)
          typeArgument.initType(sys, itd, node, ctx, displayError, isLayer, typeParam);
    }
@@ -277,11 +272,11 @@ public class ExtendsType extends JavaType {
       return true;
    }
 
-   public static ExtendsType createFromType(Object type, ITypeParamContext ctx, ITypeDeclaration definedInType) {
+   public static ExtendsType createFromType(LayeredSystem sys, Object type, ITypeParamContext ctx, Object definedInType) {
       if (type instanceof WildcardType)
          return create((WildcardType) type);
       else if (type instanceof LowerBoundsTypeDeclaration) {
-         return createSuper((LowerBoundsTypeDeclaration) type, ctx, definedInType);
+         return createSuper(sys, (LowerBoundsTypeDeclaration) type, ctx, definedInType);
       }
       else
          throw new UnsupportedOperationException();
@@ -314,13 +309,13 @@ public class ExtendsType extends JavaType {
       return res;
    }
 
-   public static ExtendsType createSuper(LowerBoundsTypeDeclaration argType, ITypeParamContext ctx, ITypeDeclaration definedInType) {
+   public static ExtendsType createSuper(LayeredSystem sys, LowerBoundsTypeDeclaration argType, ITypeParamContext ctx, Object definedInType) {
       ExtendsType res = new ExtendsType();
       res.operator = "super";
       res.questionMark = true;
 
       if (argType.baseType != null) {
-         Object baseType = JavaType.createFromParamType(argType.baseType, ctx, definedInType);
+         Object baseType = JavaType.createFromParamType(sys, argType.baseType, ctx, definedInType);
          res.setProperty("typeArgument", baseType);
       }
       return res;

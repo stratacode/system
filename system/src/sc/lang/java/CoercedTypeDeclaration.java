@@ -20,8 +20,8 @@ import java.util.*;
 public class CoercedTypeDeclaration extends WrappedTypeDeclaration {
    Object[] interfaces;
 
-   public CoercedTypeDeclaration(Object it, Object[] ifaces) {
-      super(it);
+   public CoercedTypeDeclaration(LayeredSystem sys, Object it, Object[] ifaces) {
+      super(sys, it);
       interfaces = ifaces;
    }
 

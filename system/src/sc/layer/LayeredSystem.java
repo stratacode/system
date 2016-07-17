@@ -4422,7 +4422,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       Object[] args = new Object[] {processCommandArgs(runClassArgs)};
       if (type != null && ModelUtil.isDynamicType(type)) {
-         Object meth = ModelUtil.getMethod(this, type, "main", null, null, null, false, MAIN_ARG);
+         Object meth = ModelUtil.getMethod(this, type, "main", null, null, null, false, null, null, new Object[] {MAIN_ARG});
          if (meth == null)
             return "No method named: 'main' on type: " + ModelUtil.getTypeName(type);
          if (!ModelUtil.hasModifier(meth, "static"))

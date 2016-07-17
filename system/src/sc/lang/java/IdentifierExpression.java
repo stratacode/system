@@ -577,7 +577,7 @@ public class IdentifierExpression extends ArgumentsExpression {
 
    static Object parameterizeMethod(Expression rootExpr, Object foundMeth, Object currentType, Object inferredType, List<Expression> arguments, List<JavaType> methodTypeArgs) {
       if (foundMeth != null) {
-         if (!(foundMeth instanceof ParamTypedMethod) && ModelUtil.isMethod(foundMeth) && (ModelUtil.hasMethodUnboundTypeParameters(foundMeth) || currentType instanceof ITypeParamContext) || methodTypeArgs != null) {
+         if (!(foundMeth instanceof ParamTypedMethod) && (ModelUtil.isMethod(foundMeth) || ModelUtil.isConstructor(foundMeth)) && (ModelUtil.hasMethodUnboundTypeParameters(foundMeth) || currentType instanceof ITypeParamContext) || methodTypeArgs != null) {
             TypeDeclaration definedInType = rootExpr.getEnclosingType();
             if (definedInType == null) {
                // This happens for the tag expressions inside of Element objects.  We really just need a layered system and a layer
@@ -586,7 +586,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                if (definedInType == null)
                   System.err.println("*** Unable to parameterize reference - no enclosing type");
             }
-            ParamTypedMethod ptm = new ParamTypedMethod(foundMeth, currentType instanceof ITypeParamContext ? (ITypeParamContext) currentType : null, definedInType, arguments, inferredType, methodTypeArgs);
+            ParamTypedMethod ptm = new ParamTypedMethod(rootExpr.getLayeredSystem(), foundMeth, currentType instanceof ITypeParamContext ? (ITypeParamContext) currentType : null, definedInType, arguments, inferredType, methodTypeArgs);
             foundMeth = ptm;
          }
          if (inferredType != null) {
@@ -1300,7 +1300,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             meth = ((BodyTypeDeclaration) peerType).findMethod(methodName, arguments, expr, peerType, isStatic, inferredType);
          }
          else
-            meth = ModelUtil.definesMethod(peerType, methodName, arguments, null, enclPeerType, false, isStatic, inferredType, expr.getMethodTypeArguments());
+            meth = ModelUtil.definesMethod(peerType, methodName, arguments, null, enclPeerType, false, isStatic, inferredType, expr.getMethodTypeArguments(), expr.getLayeredSystem());
          if (meth != null) {
             boundTypes[ix] = meth;
             idTypes[ix] = IdentifierType.RemoteMethodInvocation;
@@ -1353,7 +1353,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                if (i > 0 && idTypes[i-1] == IdentifierType.SuperExpression && enclosingType != null) {
                   Object newCurrentType = ModelUtil.getExtendsClass(enclosingType);
                   if (newCurrentType != null && newCurrentType != currentType) {
-                     methVar = ModelUtil.definesMethod(newCurrentType, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs);
+                     methVar = ModelUtil.definesMethod(newCurrentType, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs, enclosingType.getLayeredSystem());
                      if (methVar != null) {
                         idTypes[i] = methVar instanceof ITypeDeclaration ? IdentifierType.BoundObjectName : IdentifierType.MethodInvocation;
                         boundTypes[i] = methVar;
@@ -1426,7 +1426,8 @@ public class IdentifierExpression extends ArgumentsExpression {
       else if (currentType instanceof Class) {
          Class currentClass = (Class) currentType;
          if (isMethod) {
-            Method methObj = (Method) ModelUtil.definesMethod(currentClass, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs);
+            LayeredSystem sys = expr.getLayeredSystem();
+            Object methObj = ModelUtil.definesMethod(currentClass, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs, sys);
             if (methObj != null) {
                Object meth = parameterizeMethod(expr, methObj, currentClass, inferredType, arguments, methodTypeArgs);
                idTypes[i] = IdentifierType.MethodInvocation;
@@ -1439,7 +1440,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   if (model != null && !model.disableTypeErrors) {
                      String otherMethods = getOtherMethodsMessage(currentClass, nextName);
                      expr.displayRangeError(i, i, "No method: ", nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentClass), otherMethods, " for ");
-                     methObj = (Method) ModelUtil.definesMethod(currentClass, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs); // TODO: remove - for debugging only
+                     methObj = ModelUtil.definesMethod(currentClass, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs, sys); // TODO: remove - for debugging only
                   }
                }
             }
@@ -1879,16 +1880,17 @@ public class IdentifierExpression extends ArgumentsExpression {
             }
             // Need to use the compiled class to resolve the _super_x method
             else if (superMethod) {
-               method = ModelUtil.definesMethod(ModelUtil.getCompiledClass(DynUtil.getType(value)), methodName, arguments, null, null, false, false, null, getMethodTypeArguments());
+               LayeredSystem sys = getLayeredSystem();
+               method = ModelUtil.definesMethod(ModelUtil.getCompiledClass(DynUtil.getType(value)), methodName, arguments, null, null, false, false, null, getMethodTypeArguments(), sys);
                // Stub did not generate an _super method so just get the method itself.  Maybe the super.x() should force method x to be
                // included as a dynamic method in the stub?  Is there a case here where we will not get the real super method?
                if (method == null && methodName.startsWith("_super")) {
                   methodName = methodName.substring("_super_".length());
-                  method = ModelUtil.definesMethod(ModelUtil.getCompiledClass(DynUtil.getType(value)), methodName, arguments, null, null, false, false, null, getMethodTypeArguments());
+                  method = ModelUtil.definesMethod(ModelUtil.getCompiledClass(DynUtil.getType(value)), methodName, arguments, null, null, false, false, null, getMethodTypeArguments(), sys);
                }
             }
             else
-               method = ModelUtil.definesMethod(DynUtil.getType(value), methodName, arguments, null, null, false, false, null, getMethodTypeArguments());
+               method = ModelUtil.definesMethod(DynUtil.getType(value), methodName, arguments, null, null, false, false, null, getMethodTypeArguments(), getLayeredSystem());
 
             /*
               Java ignores anyway?
@@ -2972,7 +2974,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   return resolveType(smt, ix, idTypes);
                // If ix > 0 and ix - 1's type has type parameters (either a field like List<X> or a method List<X> get(...).
                // need to apply the method's type parameters against the ones in the previous type.
-               return resolveType(ModelUtil.getMethodTypeDeclaration(rootType != null ? rootType : getTypeContext(idTypes, boundTypes, ix), boundTypes[ix], arguments, model, inferredType, definedInType), ix, idTypes);
+               return resolveType(ModelUtil.getMethodTypeDeclaration(rootType != null ? rootType : getTypeContext(idTypes, boundTypes, ix), boundTypes[ix], arguments, model.getLayeredSystem(), model, inferredType, definedInType), ix, idTypes);
             case SetVariable:
                return resolveType(ModelUtil.getSetMethodPropertyType(boundTypes[ix], model), ix, idTypes);
             case EnumName:
@@ -2989,7 +2991,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       return type;
    }
 
-   static Method getClassMethod, cloneMethod;
+   static Object getClassMethod, cloneMethod;
 
    private static Object getRootType(int ix, IdentifierType[] idTypes, Object[] boundTypes, JavaModel model, Object rootType, ITypeDeclaration definedInType) {
       Object classType;
@@ -3007,8 +3009,12 @@ public class IdentifierExpression extends ArgumentsExpression {
    /** Implements the special rule for Class<?> getClass() - the type parameter is bound to the owner class */
    static Object getSpecialMethodType(int ix, IdentifierType[] idTypes, Object[] boundTypes, JavaModel model, Object rootType, ITypeDeclaration definedInType) {
       if (getClassMethod == null) {
-         getClassMethod = (Method) ModelUtil.getMethod(null, Class.class, "getClass", null, null, null, false, (Object[]) null);
-         cloneMethod = (Method) ModelUtil.getMethod(null, Class.class, "clone", null, null, null, false, (Object[]) null);
+         getClassMethod = ModelUtil.getMethod(model.getLayeredSystem(), Class.class, "getClass", null, null, null, false, null, null, (Object[]) null);
+         if (getClassMethod instanceof ParamTypedMethod)
+            getClassMethod = ((ParamTypedMethod) getClassMethod).method;
+         cloneMethod = ModelUtil.getMethod(model.getLayeredSystem(), Class.class, "clone", null, null, null, false, null, null, (Object[]) null);
+         if (cloneMethod instanceof ParamTypedMethod)
+            cloneMethod = ((ParamTypedMethod) cloneMethod).method;
       }
       Object bt = boundTypes[ix];
       if (bt == getClassMethod || (bt instanceof ParamTypedMethod) && ((ParamTypedMethod) bt).method == getClassMethod) {
@@ -3016,7 +3022,7 @@ public class IdentifierExpression extends ArgumentsExpression {
 
          ArrayList<Object> typeDefs = new ArrayList<Object>(1);
          typeDefs.add(classType);
-         return new ParamTypeDeclaration(definedInType, ModelUtil.getTypeParameters(Class.class), typeDefs, Class.class);
+         return new ParamTypeDeclaration(model.getLayeredSystem(), definedInType, ModelUtil.getTypeParameters(Class.class), typeDefs, Class.class);
       }
       else if (bt == cloneMethod || (bt instanceof ParamTypedMethod) && ((ParamTypedMethod) bt).method == cloneMethod) {
          // Like the ArrayCloneMethod class, here we are implementing the rule that int[] src; int[] res = src.clone() macthes typewise
@@ -3054,7 +3060,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   return resolveType(smt, ix, idTypes);
                // If ix > 0 and ix - 1's type has type parameters (either a field like List<X> or a method List<X> get(...).
                // need to apply the method's type parameters against the ones in the previous type.
-               return resolveType(ModelUtil.getMethodTypeDeclaration(getTypeContext(idTypes, boundTypes, ix), boundTypes[ix], arguments, model, inferredType, definedInType), ix, idTypes);
+               return resolveType(ModelUtil.getMethodTypeDeclaration(getTypeContext(idTypes, boundTypes, ix), boundTypes[ix], arguments, model.getLayeredSystem(), model, inferredType, definedInType), ix, idTypes);
             case SetVariable:
                return resolveType(ModelUtil.getSetMethodPropertyType(boundTypes[ix], model), ix, idTypes);
             case EnumName:

@@ -98,11 +98,11 @@ public class PrimitiveType extends JavaType {
       return typeName;
    }
 
-   public Object getTypeDeclaration(ITypeParamContext ctx, ITypeDeclaration dit, boolean resolve, boolean refreshParams, boolean bindUnbound) {
+   public Object getTypeDeclaration(ITypeParamContext ctx, Object dit, boolean resolve, boolean refreshParams, boolean bindUnbound) {
       return getRuntimeClass();
    }
 
-   public void initType(LayeredSystem sys, ITypeDeclaration itd, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer, Object typeParam) {}
+   public void initType(LayeredSystem sys, Object itd, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer, Object typeParam) {}
 
    public void convertToSrcReference() {}
 

@@ -2115,9 +2115,9 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
             if (repeatWrapperType != null)
                needsWrapperInterface = !ModelUtil.isAssignableFrom(IRepeatWrapper.class, repeatWrapperType);
          }
-         repeatWrapper = ClassDeclaration.create(isAbstract() ? "class" : "object", getRepeatObjectName(), JavaType.createJavaType(repeatWrapperType == null ? HTMLElement.class : repeatWrapperType));
+         repeatWrapper = ClassDeclaration.create(isAbstract() ? "class" : "object", getRepeatObjectName(), JavaType.createJavaType(getLayeredSystem(), repeatWrapperType == null ? HTMLElement.class : repeatWrapperType));
          if (needsWrapperInterface)
-            repeatWrapper.addImplements(JavaType.createJavaType(IRepeatWrapper.class));
+            repeatWrapper.addImplements(JavaType.createJavaType(getLayeredSystem(), IRepeatWrapper.class));
          repeatWrapper.element = this;
          repeatWrapper.layer = tagLayer;
          repeatWrapper.addModifier("public");
@@ -2437,7 +2437,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
             else {
                repeatExpr = CastExpression.create(ModelUtil.getTypeName(repeatElementType), repeatExpr);
             }
-            FieldDefinition repeatVarField = FieldDefinition.create(repeatElementType, repeatVarName, ":=:", repeatExpr);
+            FieldDefinition repeatVarField = FieldDefinition.create(getLayeredSystem(), repeatElementType, repeatVarName, ":=:", repeatExpr);
             tagType.addBodyStatementIndent(repeatVarField);
          }
       }

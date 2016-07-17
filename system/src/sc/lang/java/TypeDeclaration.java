@@ -465,8 +465,9 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       initTypeInfo();
 
       if (implementsBoundTypes != null) {
+         LayeredSystem sys = getLayeredSystem();
          for (Object impl:implementsBoundTypes) {
-            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs)) != null)
+            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, sys)) != null)
                return v;
          }
       }
@@ -1146,7 +1147,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
                      SemanticNodeList<Object> mods = new SemanticNodeList<Object>();
                      mods.add("public");
                      meth.setProperty("modifiers", mods);
-                     meth.setProperty("type", JavaType.createJavaType(membType));
+                     meth.setProperty("type", JavaType.createJavaType(getLayeredSystem(), membType));
 
                      BlockStatement methBody = new BlockStatement();
                      methBody.visible = true;

@@ -2044,14 +2044,14 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             layeredSystem.addAutoImport(getLayer(), getModelTypeName(), ImportDeclaration.createStatic(CTypeUtil.prefixPath(ModelUtil.getTypeName(type), name)));
          }
          if (type != null) {
-            v = ModelUtil.definesMethod(type, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
+            v = ModelUtil.definesMethod(type, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, layeredSystem);
             if (v != null && ModelUtil.hasModifier(v, "static"))
                return v;
          }
       }
       else {
          for (Object importedType:importedMethodTypes) {
-            v = ModelUtil.definesMethod(importedType, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
+            v = ModelUtil.definesMethod(importedType, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, layeredSystem);
             if (v != null && ModelUtil.hasModifier(v, "static"))
                return v;
          }

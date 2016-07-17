@@ -191,7 +191,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
 
    public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
       if (defaultExtendsType != null) {
-         Object methResult = ModelUtil.definesMethod(defaultExtendsType, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
+         Object methResult = ModelUtil.definesMethod(defaultExtendsType, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, getLayeredSystem());
          if (methResult != null)
             return methResult;
       }
@@ -212,7 +212,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
       }
       // When starting from inside of this guy, we need to process these things
       if (refType == this && rootType != null) {
-         o = ModelUtil.definesMethod(rootType, name, types, ctx, rootType, isTransformed, staticOnly, inferredType, methodTypeArgs);
+         o = ModelUtil.definesMethod(rootType, name, types, ctx, rootType, isTransformed, staticOnly, inferredType, methodTypeArgs, getLayeredSystem());
          if (o != null)
             return o;
       }
@@ -1115,7 +1115,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
    }
 
    public Parameter getDefaultOutputParameters() {
-      return Parameter.create(new Object[] {StringBuilder.class}, new String[] {"out"}, null, getModelTypeDeclaration());
+      return Parameter.create(getLayeredSystem(), new Object[] {StringBuilder.class}, new String[] {"out"}, null, getModelTypeDeclaration());
    }
 
    public static Statement getExprStringOutputStatement(String exprStr) {

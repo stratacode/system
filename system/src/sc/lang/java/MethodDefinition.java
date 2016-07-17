@@ -97,7 +97,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       Object modType = methodType.getDerivedTypeDeclaration();
       if (extendsType == null)
          extendsType = Object.class;
-      Object overridden = ModelUtil.definesMethod(extendsType, name, getParameterList(), null, null, false, false, null, null);
+      Object overridden = ModelUtil.definesMethod(extendsType, name, getParameterList(), null, null, false, false, null, null, getLayeredSystem());
       superMethod = overridden;
 
       /* Dynamic methods need to find any overridden method and make sure calls to that one are also made dynamic.
@@ -131,8 +131,9 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          // need that interface in the dynamic stub of the enclosing type.
          if (overridden == null && methodType.implementsBoundTypes != null) {
             Object implMeth;
+            LayeredSystem sys = getLayeredSystem();
             for (Object impl:methodType.implementsBoundTypes) {
-               implMeth = ModelUtil.definesMethod(impl, name, getParameterList(), null, null, false, false, null, null);
+               implMeth = ModelUtil.definesMethod(impl, name, getParameterList(), null, null, false, false, null, null, sys);
                if (implMeth != null && ModelUtil.isCompiledMethod(implMeth)) {
                   methodType.setNeedsDynamicStub(true);
                   overridesCompiled = true;
@@ -161,7 +162,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       }
       // TODO: shouldn't this be moved to the start method?
       if (modType != extendsType) {
-         overridden = ModelUtil.definesMethod(modType, name, getParameterList(), null, null, false, false, null, null);
+         overridden = ModelUtil.definesMethod(modType, name, getParameterList(), null, null, false, false, null, null, getLayeredSystem());
          if (overridden instanceof MethodDefinition) {
             MethodDefinition overMeth = (MethodDefinition) overridden;
             if (overMeth == this)
@@ -639,12 +640,12 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
 
       Object res;
       if (ext != null) {
-         res = ModelUtil.definesMethod(ext, name, getParameterList(), null, null, false, false, null, null);
+         res = ModelUtil.definesMethod(ext, name, getParameterList(), null, null, false, false, null, null, getLayeredSystem());
          if (res != null)
             return res;
       }
       if (ext != base && base != null) {
-         res = ModelUtil.definesMethod(base, name, getParameterList(), null, null, false, false, null, null);
+         res = ModelUtil.definesMethod(base, name, getParameterList(), null, null, false, false, null, null, getLayeredSystem());
          if (res != null)
             return res;
       }

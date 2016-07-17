@@ -6,6 +6,7 @@ package sc.lang.java;
 
 import sc.lang.ILanguageModel;
 import sc.lang.sc.PropertyAssignment;
+import sc.layer.LayeredSystem;
 
 import java.util.*;
 
@@ -100,14 +101,15 @@ public class InterfaceDeclaration extends TypeDeclaration {
 
       initTypeInfo();
 
+      LayeredSystem sys = getLayeredSystem();
       if (extendsBoundTypes != null) {
          for (Object impl:extendsBoundTypes) {
-            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs)) != null)
+            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, sys)) != null)
                return v;
          }
       }
       else
-         return ModelUtil.definesMethod(Object.class, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
+         return ModelUtil.definesMethod(Object.class, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, sys);
       return null;
    }
 
