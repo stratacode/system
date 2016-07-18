@@ -14,7 +14,7 @@ import java.util.List;
 
 /**
  * The regular IdentifierExpression is used to hold simple method invocations - when arguments != null.
- * This is used when there are type arguments to the method.
+ * This is used when there are type arguments to the method call - e.g.  Foo.<Arg1,Arg2>bar();
  */
 public class TypedMethodExpression extends IdentifierExpression {
    public String typedIdentifier; // the name of the method being called with explicit type parameters

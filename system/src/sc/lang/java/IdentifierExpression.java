@@ -577,7 +577,7 @@ public class IdentifierExpression extends ArgumentsExpression {
 
    static Object parameterizeMethod(Expression rootExpr, Object foundMeth, Object currentType, Object inferredType, List<Expression> arguments, List<JavaType> methodTypeArgs) {
       if (foundMeth != null) {
-         if (!(foundMeth instanceof ParamTypedMethod) && (ModelUtil.isMethod(foundMeth) || ModelUtil.isConstructor(foundMeth)) && (ModelUtil.hasMethodUnboundTypeParameters(foundMeth) || currentType instanceof ITypeParamContext) || methodTypeArgs != null) {
+         if (!(foundMeth instanceof ParamTypedMethod) && (ModelUtil.isMethod(foundMeth) || ModelUtil.isConstructor(foundMeth)) && (ModelUtil.hasMethodUnboundTypeParameters(foundMeth) || currentType instanceof ITypeParamContext || methodTypeArgs != null)) {
             TypeDeclaration definedInType = rootExpr.getEnclosingType();
             if (definedInType == null) {
                // This happens for the tag expressions inside of Element objects.  We really just need a layered system and a layer

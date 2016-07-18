@@ -890,6 +890,12 @@ public class ModelUtil {
                         prevExprTypes = nextExprTypes;
                }
             }
+            // Don't leave the inferredType lying around in the parameter expressions for when we start matching the next method.
+            if (toClear != null) {
+               for (Expression clearExpr:toClear)
+                  clearExpr.clearInferredType();
+               toClear = null;
+            }
          }
       }
       return res;
@@ -7534,16 +7540,13 @@ public class ModelUtil {
          return ((ClassType) javaType).getTypeArgument(ix);
       else if (javaType instanceof ParameterizedType) {
          ParameterizedType pt = (ParameterizedType) javaType;
-         TypeVariable[] arr = ((Class) pt.getRawType()).getTypeParameters();
-         if (arr != null && ix < arr.length)
-            return arr[ix];
-         return null;
-         /*
-         Object[] actual = pt.getActualTypeArguments();
-         if (actual == null || ix >= actual.length)
-            return null;
+         Type[] actual = pt.getActualTypeArguments();
+         if (actual == null || ix >= actual.length) {
+            TypeVariable[] arr = ((Class) pt.getRawType()).getTypeParameters();
+            if (arr != null && ix < arr.length)
+               return arr[ix];
+         }
          return actual[ix];
-         */
          //Object res = getTypeVariable(pt.getRawType(), ix);
          //Object res2 = ModelUtil.getTypeVariable(javaType, ix);
       }
