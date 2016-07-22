@@ -796,7 +796,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          Object td = getDerivedTypeDeclaration();
 
          if (td != null) {
-            if ((v = ModelUtil.definesConstructor(td, types, ctx)) != null)
+            if ((v = ModelUtil.definesConstructor(getLayeredSystem(), td, types, ctx)) != null)
                return v;
          }
       }
@@ -3738,7 +3738,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public Object constructInstFromArgs(SemanticNodeList<Expression> arguments, ExecutionContext ctx, boolean fromSuper) {
       Object superType = getExtendsTypeDeclaration();
-      Object superCon = ModelUtil.declaresConstructor(superType, arguments, null);
+      Object superCon = ModelUtil.declaresConstructor(getLayeredSystem(), superType, arguments, null);
       // If there is no dynamic call to super(x) we construct the pending object now.
       if (superCon == null || !ModelUtil.isDynamicType(superCon)) {
          ctx.setPendingConstructor(null); // processed this - so clear it out
@@ -6862,7 +6862,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
                // Extending a dynamic type - just use that guys class if there's a zero arg constructor.  If this type is a dynamic stub it should have a matching
                // constructor.  If it inherits the compiled class and has no super() call, it must be using a default constructor so clear out the args.
-               if (ModelUtil.declaresConstructor(extendsType, null, null) != null || ModelUtil.getConstructors(extendsType, null) == null ||
+               if (ModelUtil.declaresConstructor(getLayeredSystem(), extendsType, null, null) != null || ModelUtil.getConstructors(extendsType, null) == null ||
                        (extendsTypeDecl != null && !extendsTypeDecl.isDynamicStub(false) && extendsTypeDecl.usesDefaultConstructor())) {
 
                   return emptyObjectArray; // This assumes that we do not have a super call which is transforming the args and so using a zero arg constructor of the extends class

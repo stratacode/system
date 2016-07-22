@@ -122,7 +122,7 @@ public class NewExpression extends IdentifierExpression {
       super.start();
 
       if (boundType != null && arguments != null) {
-         constructor = parameterizeMethod(this, ModelUtil.declaresConstructor(boundType, arguments, null), null, inferredType, arguments, getMethodTypeArguments());
+         constructor = parameterizeMethod(this, ModelUtil.declaresConstructor(getLayeredSystem(), boundType, arguments, null), null, inferredType, arguments, getMethodTypeArguments());
          propagateInferredTypes();
       }
 
@@ -173,7 +173,7 @@ public class NewExpression extends IdentifierExpression {
       if (boundType != null && arguments != null) {
          if (constructor == null && arguments.size() > 0) {
             displayTypeError("Missing constructor in type: " + boundType + " for new expression: ");
-            ModelUtil.declaresConstructor(boundType, arguments, null);
+            ModelUtil.declaresConstructor(getLayeredSystem(), boundType, arguments, null);
          }
 
          if (constructor == null && arguments.size() == 0) {

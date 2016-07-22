@@ -107,11 +107,11 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
    }
 
    public Object declaresConstructor(List<?> parametersOrExpressions, ITypeParamContext ctx) {
-      return ModelUtil.declaresConstructor(baseType, parametersOrExpressions, ctx);
+      return ModelUtil.declaresConstructor(system, baseType, parametersOrExpressions, ctx);
    }
 
    public Object definesConstructor(List<?> parametersOrExpressions, ITypeParamContext ctx, boolean isTransformed) {
-      return ModelUtil.definesConstructor(baseType, parametersOrExpressions, ctx, null, isTransformed);
+      return ModelUtil.definesConstructor(system, baseType, parametersOrExpressions, ctx, null, isTransformed);
    }
 
    public Object definesMember(String name, EnumSet<JavaSemanticNode.MemberType> types, Object refType, TypeContext ctx) {

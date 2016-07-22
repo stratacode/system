@@ -117,6 +117,13 @@ public class EnumDeclaration extends TypeDeclaration {
       return super.implementsType(fullTypeName, assignment, allowUnbound);
    }
 
+
+   public boolean isAssignableTo(ITypeDeclaration other) {
+      if (ModelUtil.isAssignableFrom(other, Enum.class))
+         return true;
+      return super.isAssignableTo(other);
+   }
+
    /** For this type only we add the enum constants as properties */
    public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified) {
       List<Object> res = super.getDeclaredProperties(modifier, includeAssigns, includeModified);

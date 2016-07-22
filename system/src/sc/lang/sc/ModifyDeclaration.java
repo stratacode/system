@@ -723,7 +723,7 @@ public class ModifyDeclaration extends TypeDeclaration {
          typeObj = modifyClass;
 
       if (typeObj != null)
-         return ModelUtil.declaresConstructor(typeObj, types, ctx);
+         return ModelUtil.declaresConstructor(getLayeredSystem(), typeObj, types, ctx);
       return null;
    }
 
@@ -762,7 +762,7 @@ public class ModifyDeclaration extends TypeDeclaration {
 
       if (extendsBoundTypes != null) {
          for (Object impl:extendsBoundTypes) {
-            if (impl != null && (v = ModelUtil.definesConstructor(impl, types, ctx, null, isTransformed)) != null)
+            if (impl != null && (v = ModelUtil.definesConstructor(getLayeredSystem(), impl, types, ctx, null, isTransformed)) != null)
                return v;
          }
       }

@@ -1009,4 +1009,8 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
 
    public void clearInferredType() {
    }
+
+   public boolean isInferredSet() {
+      return true;
+   }
 }

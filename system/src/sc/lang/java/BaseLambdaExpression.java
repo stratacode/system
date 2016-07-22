@@ -21,12 +21,19 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.WildcardType;
 import java.util.*;
 
-/** Java 8 lambda expression.  To run these in JS we need to convert them to anonymous classes */
+/** Java 8 lambda expression.  To run these in JS, and in dynamic java, and to validate the code in general we convert them to anonymous classes -
+ * i.e. new InferredType<lambda-params>(...) {
+ *    inferredMethodReturn inferredMethod(inferredMethodParams) {
+ *       lambdaBody
+ *       return lambdaReturnType
+ *    }
+ * } */
 public abstract class BaseLambdaExpression extends Expression {
    /** These are the parameters to the lambda expression - they should match the inferredTypeMethod */
    transient Parameter parameters; // Either a copy of lambdaParams when they are full specified or Parameter types we create to mirror the method that will be generated
    /** This is the "functional interface" (i.e. one method which is unimplemented) we are implementing with this lambda expression. */
    transient Object inferredType = null;
+   /** Set to false when we are matching a method with a lambda expression as an argument to the method call.  It is set to true when we finally have the chosen inferredType for the expression */
    transient boolean inferredFinal = false;
    /** The new expression which we generate to implement the lambda expression */
    transient NewExpression newExpr = null;
@@ -483,8 +490,9 @@ public abstract class BaseLambdaExpression extends Expression {
                model.setDisableTypeErrors(oldTypeErrors);
          }
       }
+      // This lambda expression is just not valid
       if (newExpr == null)
-         return new LambdaInferredType(this);
+         return new LambdaInvalidType(this);
       return inferredType;
    }
 
@@ -598,11 +606,11 @@ public abstract class BaseLambdaExpression extends Expression {
    }
 
    public Object pickMoreSpecificMethod(Object meth1, Object argType1, boolean varArg1, Object meth2, Object argType2, boolean varArg2) {
-      boolean c2Interface = ModelUtil.isInterface(argType2);
+      boolean c2Interface = ModelUtil.isInterface(argType2) || (varArg2 && ModelUtil.isInterface(ModelUtil.getArrayComponentType(argType2)));
       LambdaMatchContext c2Ctx = new LambdaMatchContext();
       if (c2Interface && !lambdaParametersMatch(argType2, varArg2, c2Ctx))
          c2Interface = false;
-      boolean c1Interface = ModelUtil.isInterface(argType1);
+      boolean c1Interface = ModelUtil.isInterface(argType1) || (varArg1 && ModelUtil.isInterface(ModelUtil.getArrayComponentType(argType1)));
       LambdaMatchContext c1Ctx = new LambdaMatchContext();
       if (c1Interface && !lambdaParametersMatch(argType1, varArg1, c1Ctx))
          c1Interface = false;
@@ -936,6 +944,320 @@ public abstract class BaseLambdaExpression extends Expression {
       @Override
       public Object getArrayComponentType() {
          return null;
+      }
+   }
+
+   /**
+    * Used when we try to get the type for a lambda expression that is not valid for the inferred type.  This will happen during
+    * method matching (inferredFinal = false) when we try out an inferredType to see if the method can match.
+    * */
+   public static class LambdaInvalidType implements ITypeDeclaration {
+      BaseLambdaExpression rootExpr;
+
+      public LambdaInvalidType(BaseLambdaExpression baseLambda) {
+         rootExpr = baseLambda;
+      }
+
+      @Override
+      public boolean isAssignableFrom(ITypeDeclaration other, boolean assignmentSemantics) {
+         return false;
+      }
+
+      @Override
+      public boolean isAssignableTo(ITypeDeclaration other) {
+         return false;
+      }
+
+      @Override
+      public boolean isAssignableFromClass(Class other) {
+         return false;
+      }
+
+      @Override
+      public String getTypeName() {
+         return "Object";
+      }
+
+      @Override
+      public String getFullTypeName(boolean includeDims, boolean includeTypeParams) {
+         return "java.lang.Object";
+      }
+
+      @Override
+      public String getFullTypeName() {
+         return "java.lang.Object";
+      }
+
+      @Override
+      public String getFullBaseTypeName() {
+         return "java.lang.Object";
+      }
+
+      @Override
+      public String getInnerTypeName() {
+         return null;
+      }
+
+      @Override
+      public Class getCompiledClass() {
+         return null;
+      }
+
+      @Override
+      public String getCompiledClassName() {
+         return null;
+      }
+
+      @Override
+      public String getCompiledTypeName() {
+         return null;
+      }
+
+      @Override
+      public Object getRuntimeType() {
+         return null;
+      }
+
+      @Override
+      public boolean isDynamicType() {
+         return false;
+      }
+
+      @Override
+      public boolean isDynamicStub(boolean includeExtends) {
+         return false;
+      }
+
+      @Override
+      public Object definesMethod(String name, List<?> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
+         return null;
+      }
+
+      @Override
+      public Object declaresConstructor(List<?> parametersOrExpressions, ITypeParamContext ctx) {
+         return null;
+      }
+
+      @Override
+      public Object definesConstructor(List<?> parametersOrExpressions, ITypeParamContext ctx, boolean isTransformed) {
+         return null;
+      }
+
+      @Override
+      public Object definesMember(String name, EnumSet<MemberType> type, Object refType, TypeContext ctx) {
+         return null;
+      }
+
+      @Override
+      public Object definesMember(String name, EnumSet<MemberType> type, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {
+         return null;
+      }
+
+      @Override
+      public Object getInnerType(String name, TypeContext ctx) {
+         return null;
+      }
+
+      @Override
+      public boolean implementsType(String otherTypeName, boolean assignment, boolean allowUnbound) {
+         // At this stage, we do not know if we implement the type.  Returning true, because we need to match essentially any type during
+         // the type checking process, until the inferred type is set and we can really determine our type.  We might need to push some
+         // operations to the 'validate' stage where this inferredType will definiteily have been set if they depend on an accurate result here.
+         return true;
+      }
+
+      @Override
+      public Object getInheritedAnnotation(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
+         return null;
+      }
+
+      @Override
+      public ArrayList<Object> getAllInheritedAnnotations(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
+         return null;
+      }
+
+      @Override
+      public Object getDerivedTypeDeclaration() {
+         return null;
+      }
+
+      @Override
+      public Object getExtendsTypeDeclaration() {
+         return null;
+      }
+
+      @Override
+      public Object getExtendsType() {
+         return null;
+      }
+
+      @Override
+      public List<?> getImplementsTypes() {
+         return null;
+      }
+
+      @Override
+      public List<Object> getAllMethods(String modifier, boolean hasModifier, boolean isDyn, boolean overridesComp) {
+         return null;
+      }
+
+      @Override
+      public List<Object> getMethods(String methodName, String modifier, boolean includeExtends) {
+         return null;
+      }
+
+      @Override
+      public Object getConstructorFromSignature(String sig) {
+         return null;
+      }
+
+      @Override
+      public Object getMethodFromSignature(String methodName, String signature, boolean resolveLayer) {
+         return null;
+      }
+
+      @Override
+      public List<Object> getAllProperties(String modifier, boolean includeAssigns) {
+         return null;
+      }
+
+      @Override
+      public List<Object> getAllFields(String modifier, boolean hasModifier, boolean dynamicOnly, boolean includeObjs, boolean includeAssigns, boolean includeModified) {
+         return null;
+      }
+
+      @Override
+      public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly) {
+         return null;
+      }
+
+      @Override
+      public DeclarationType getDeclarationType() {
+         return null;
+      }
+
+      @Override
+      public Object getClass(String className, boolean useImports) {
+         return null;
+      }
+
+      @Override
+      public Object findTypeDeclaration(String typeName, boolean addExternalReference) {
+         return null;
+      }
+
+      @Override
+      public JavaModel getJavaModel() {
+         return rootExpr.getJavaModel();
+      }
+
+      @Override
+      public boolean isLayerType() {
+         return false;
+      }
+
+      @Override
+      public Layer getLayer() {
+         return rootExpr.getJavaModel().getLayer();
+      }
+
+      @Override
+      public LayeredSystem getLayeredSystem() {
+         return rootExpr.getLayeredSystem();
+      }
+
+      @Override
+      public List<?> getClassTypeParameters() {
+         return null;
+      }
+
+      @Override
+      public Object[] getConstructors(Object refType) {
+         return new Object[0];
+      }
+
+      @Override
+      public boolean isComponentType() {
+         return false;
+      }
+
+      @Override
+      public DynType getPropertyCache() {
+         return null;
+      }
+
+      @Override
+      public boolean isEnumeratedType() {
+         return false;
+      }
+
+      @Override
+      public Object getEnumConstant(String nextName) {
+         return null;
+      }
+
+      @Override
+      public boolean isCompiledProperty(String name, boolean fieldMode, boolean interfaceMode) {
+         return false;
+      }
+
+      @Override
+      public List<JavaType> getCompiledTypeArgs(List<JavaType> typeArgs) {
+         return null;
+      }
+
+      @Override
+      public boolean needsOwnClass(boolean checkComponents) {
+         return false;
+      }
+
+      @Override
+      public boolean isDynamicNew() {
+         return false;
+      }
+
+      @Override
+      public void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode) {
+
+      }
+
+      @Override
+      public void clearDynFields(Object inst, ExecutionContext ctx) {
+
+      }
+
+      @Override
+      public Object[] getImplementsTypeDeclarations() {
+         return new Object[0];
+      }
+
+      @Override
+      public Object[] getAllImplementsTypeDeclarations() {
+         return new Object[0];
+      }
+
+      @Override
+      public boolean isRealType() {
+         return false;
+      }
+
+      @Override
+      public void staticInit() {
+
+      }
+
+      @Override
+      public boolean isTransformedType() {
+         return false;
+      }
+
+      @Override
+      public Object getArrayComponentType() {
+         return null;
+      }
+
+      public String toString() {
+         return "<invalid-lambda-expression>";
       }
    }
 }

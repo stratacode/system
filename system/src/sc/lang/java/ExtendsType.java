@@ -274,7 +274,7 @@ public class ExtendsType extends JavaType {
 
    public static ExtendsType createFromType(LayeredSystem sys, Object type, ITypeParamContext ctx, Object definedInType) {
       if (type instanceof WildcardType)
-         return create((WildcardType) type);
+         return create(sys, (WildcardType) type, ctx, definedInType);
       else if (type instanceof LowerBoundsTypeDeclaration) {
          return createSuper(sys, (LowerBoundsTypeDeclaration) type, ctx, definedInType);
       }
@@ -282,28 +282,27 @@ public class ExtendsType extends JavaType {
          throw new UnsupportedOperationException();
    }
 
-   public static ExtendsType create(WildcardType type) {
+   public static ExtendsType createWildcard() {
       ExtendsType res = new ExtendsType();
-      String typeName = type.toString(); // In Java8 We can use getTypeName() which does the same thing
-      int opIx = typeName.indexOf("extends");
-      boolean isSuper = false;
-      if (opIx != -1) {
+      res.questionMark = true;
+      return res;
+   }
+
+   public static ExtendsType create(LayeredSystem sys, WildcardType type, ITypeParamContext ctx, Object definedInType) {
+      ExtendsType res = new ExtendsType();
+      Object boundsType = ModelUtil.getWildcardBounds(type);
+      boolean isSuper = ModelUtil.isSuperWildcard(type);
+      if (!isSuper && boundsType != null) {
          res.operator = "extends";
       }
       else {
-         opIx = typeName.indexOf("super");
-         if (opIx != -1) {
-            isSuper = true;
+         if (isSuper) {
             res.operator = "super";
          }
       }
-      res.questionMark = typeName.contains("?");
-      if (opIx != -1) {
-         String extName = typeName.substring(opIx + 1 + res.operator.length());
-         ClassType argType = (ClassType) ClassType.createJavaTypeFromName(extName);
-         // Need to bind this here to it's original value so we can track what type this paramter
-         // is defined with.
-         argType.type = isSuper ? type.getLowerBounds()[0] : type.getUpperBounds()[0];
+      res.questionMark = true;
+      if (boundsType != null) {
+         JavaType argType = JavaType.createFromParamType(sys, boundsType, ctx, definedInType);
          res.setProperty("typeArgument", argType);
       }
       return res;

@@ -6,7 +6,7 @@ system extends fullRuntime {
    srcPath = "src";
 
    object jlinePkg extends MvnRepositoryPackage {
-      url = "mvn://jline/jline/1.0";
+      url = "mvn://jline/jline/2.12";
    }
 
    public void start() {

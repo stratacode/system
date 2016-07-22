@@ -150,13 +150,20 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
          thisType = boundParamTypes == null ? thisP.getTypeDeclaration() : boundParamTypes[thisParamIx];
 
          if (otherP instanceof Expression) {
-            if (thisType instanceof ParamTypeDeclaration)
-               thisType = ((ParamTypeDeclaration) thisType).cloneForNewTypes();
-            ((Expression) otherP).setInferredType(thisType, false);
+            Object paramType = thisType;
+            if (repeatingLast && i >= last && ModelUtil.isArray(paramType)) {
+               paramType = ModelUtil.getArrayComponentType(paramType);
+            }
+            if (paramType instanceof ParamTypeDeclaration)
+               paramType = ((ParamTypeDeclaration) paramType).cloneForNewTypes();
+            ((Expression) otherP).setInferredType(paramType, false);
          }
 
          if (otherP instanceof ITypedObject)
              otherP = ((ITypedObject) otherP).getTypeDeclaration();
+
+         if (otherP instanceof BaseLambdaExpression.LambdaInvalidType)
+            return null;
 
          // If it's an unbound lambda expression, we still need to do some basic checks to see if this one is a match.
          if (otherP instanceof BaseLambdaExpression.LambdaInferredType) {

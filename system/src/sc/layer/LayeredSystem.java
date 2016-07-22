@@ -8616,32 +8616,37 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (options.verbose) {
             verbose("Generation completed in: " + StringUtil.formatFloat((System.currentTimeMillis() - buildStartTime)/1000.0));
          }
-         if (phase == BuildPhase.Process && !options.noCompile && !skipBuild) {
-            // Need to remove any null sentinels we might have registered
-            for (SrcEntry compiledSrcEnt:bd.toCompile) {
-               String cSrcTypeName = compiledSrcEnt.getTypeName();
-               compiledClassCache.remove(cSrcTypeName);
-               if (otherClassCache != null)
-                  otherClassCache.remove(cSrcTypeName);
-            }
-            if (options.verbose) {
-               verbose("Compiling Java into build dir: " + genLayer.getBuildClassesDir() + ": " + (options.sysDetails ? bd.toCompile + " with classpath: " + classPath : bd.toCompile.size() + " files"));
-               if (messageHandler != null)
-                  messageHandler.reportMessage("Compiling Java: " + bd.toCompile.size() + " files into " + genLayer.getBuildClassesDir(), null, -1, -1, MessageType.Info);
-            }
-            else if (options.info)
-               info("Compiling Java: " + bd.toCompile.size() + " files into " + genLayer.getBuildClassesDir());
+         if (phase == BuildPhase.Process && !skipBuild) {
+            if (!options.noCompile) {
+               // Need to remove any null sentinels we might have registered
+               for (SrcEntry compiledSrcEnt : bd.toCompile) {
+                  String cSrcTypeName = compiledSrcEnt.getTypeName();
+                  compiledClassCache.remove(cSrcTypeName);
+                  if (otherClassCache != null)
+                     otherClassCache.remove(cSrcTypeName);
+               }
+               if (options.verbose) {
+                  verbose("Compiling Java into build dir: " + genLayer.getBuildClassesDir() + ": " + (options.sysDetails ? bd.toCompile + " with classpath: " + classPath : bd.toCompile.size() + " files"));
+                  if (messageHandler != null)
+                     messageHandler.reportMessage("Compiling Java: " + bd.toCompile.size() + " files into " + genLayer.getBuildClassesDir(), null, -1, -1, MessageType.Info);
+               }
+               else if (options.info)
+                  info("Compiling Java: " + bd.toCompile.size() + " files into " + genLayer.getBuildClassesDir());
 
-            PerfMon.start("javaCompile");
-            if (LayerUtil.compileJavaFilesInternal(bd.toCompile, genLayer.getBuildClassesDir(), getClassPathForLayer(genLayer, true, genLayer.getBuildClassesDir(), true), options.debug, javaSrcVersion, messageHandler) == 0) {
-               if (!buildInfo.buildJars())
+               PerfMon.start("javaCompile");
+               if (LayerUtil.compileJavaFilesInternal(bd.toCompile, genLayer.getBuildClassesDir(), getClassPathForLayer(genLayer, true, genLayer.getBuildClassesDir(), true), options.debug, javaSrcVersion, messageHandler) == 0) {
+                  if (!buildInfo.buildJars())
+                     compileFailed = true;
+               }
+               else
                   compileFailed = true;
+               if (options.info)
+                  info("Compile " + (compileFailed ? "failed" : "completed"));
+               PerfMon.end("javaCompile");
             }
-            else
-               compileFailed = true;
-            if (options.info)
-               info("Compile " + (compileFailed ? "failed" : "completed"));
-            PerfMon.end("javaCompile");
+            else {
+               info("Compiliation disabled - not compiling: " + bd.toCompile.size() + " files");
+            }
          }
 
          List<BuildCommandHandler> cmds = null;

@@ -427,8 +427,10 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
                   int t;
                   Object sMeth = superMethods[s];
                   for (t = 0; t < thisMethods.length; t++) {
-                     if (ModelUtil.overridesMethod(thisMethods[t], sMeth))
+                     if (ModelUtil.overridesMethod(thisMethods[t], sMeth)) {
+                        thisMethods[t] = ModelUtil.pickMoreSpecificMethod(thisMethods[t], sMeth, null, null, null);
                         break;
+                     }
                   }
                   if (t == thisMethods.length) {
                      int newIx = thisMethods.length;
@@ -662,6 +664,10 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
                      Object exprType = ModelUtil.getVariableTypeDeclaration(exprObj);
                      nextExprTypes[j] = exprType;
 
+                     // Lambda inferred type is not valid so can't be a match
+                     if (exprType instanceof BaseLambdaExpression.LambdaInvalidType)
+                        break;
+
                      if (exprType != null && !ModelUtil.isAssignableFrom(paramType, exprType, false, ctx, system)) {
                         // Repeating parameters... if the last parameter is an array match if the component type matches
                         if (j >= last && ModelUtil.isArray(paramType) && ModelUtil.isVarArgs(toCheck)) {
@@ -694,10 +700,9 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
             return meth;
       }
 
+      Object superMeth = null;
       if (extendsType != null) {
-         meth = ModelUtil.definesMethod(extendsType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, getLayeredSystem());
-         if (meth != null)
-            return meth;
+         superMeth = ModelUtil.definesMethod(extendsType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, getLayeredSystem());
       }
       if (implementsTypes != null) {
          int numInterfaces = implementsTypes.size();
@@ -705,12 +710,13 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
             Object implType = implementsTypes.get(i);
             if (implType != null) {
                meth = ModelUtil.definesMethod(implType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, getLayeredSystem());
-               if (meth != null)
-                  return meth;
+               if (meth != null) {
+                  superMeth = ModelUtil.pickMoreSpecificMethod(superMeth, meth, null, null, null);
+               }
             }
          }
       }
-      return null;
+      return superMeth;
    }
 
    public Object declaresConstructor(List<?> parametersOrExpressions, ITypeParamContext ctx) {
@@ -724,7 +730,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       if (meths == null)
          return null;
 
-      return ModelUtil.definesConstructor(this, parametersOrExpressions, ctx, this, isTransformed);
+      return ModelUtil.definesConstructor(system, this, parametersOrExpressions, ctx, this, isTransformed);
    }
 
    public Object definesMember(String name, EnumSet<JavaSemanticNode.MemberType> mtype, Object refType, TypeContext ctx) {

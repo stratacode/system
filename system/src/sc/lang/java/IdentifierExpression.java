@@ -184,16 +184,16 @@ public class IdentifierExpression extends ArgumentsExpression {
                   displayTypeError("this() must be inside of a constructor: ");
                }
                else {
-                  Object constr = ModelUtil.declaresConstructor(enclType, arguments, null);
+                  Object constr = ModelUtil.declaresConstructor(getLayeredSystem(), enclType, arguments, null);
                   if (constr == null) {
-                     if (model != null && !model.disableTypeErrors) {
+                     if (model != null && !model.disableTypeErrors && isInferredFinal() && isInferredSet()) {
                         String othersMessage = getOtherConstructorsMessage(enclType);
                         displayTypeError("No constructor matching: ", ModelUtil.argumentsToString(arguments), othersMessage, " for: ");
                      }
                   }
                   else if (constr == enclMeth) {
                      displayTypeError("Illegal recursive this", ModelUtil.argumentsToString(arguments), " method call for: ");
-                     constr = ModelUtil.declaresConstructor(enclType, arguments, null);
+                     constr = ModelUtil.declaresConstructor(getLayeredSystem(), enclType, arguments, null);
                   }
                   else
                      boundTypes[0] = constr;
@@ -226,7 +226,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                         displayTypeError("super() must be inside of a constructor: ");
                      }
                      else {
-                        Object constr = ModelUtil.declaresConstructor(superType, arguments, null);
+                        Object constr = ModelUtil.declaresConstructor(getLayeredSystem(), superType, arguments, null);
                         // When transforming to JS, we need to resolve the super(name, ordinal) constructor which is part of the base type in JS only
                         if (constr == null && superType instanceof EnumDeclaration && arguments.size() == 2) {
                            constr = superType;
@@ -234,7 +234,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                         if (constr == null) {
                            Object[] constructors = ModelUtil.getConstructors(superType, null);
                            if (arguments.size() > 0 || (constructors != null && constructors.length > 0)) {
-                              if (model != null && !model.disableTypeErrors) {
+                              if (model != null && !model.disableTypeErrors && isInferredSet() && isInferredFinal()) {
                                  String othersMessage = getOtherConstructorsMessage(enclType);
                                  displayTypeError("No constructor matching: ", ModelUtil.argumentsToString(arguments), othersMessage, " for: ");
                               }
@@ -300,7 +300,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                if (boundTypes[0] == null) {
                   checkRemoteMethod(this, null, firstIdentifier, 0, idTypes, boundTypes, arguments, false, inferredType);
                }
-               if (boundTypes[0] == null && model != null && !model.disableTypeErrors) {
+               if (boundTypes[0] == null && model != null && !model.disableTypeErrors && isInferredSet() && isInferredFinal()) {
                   String otherMethods = enclType == null ? "" : getOtherMethodsMessage(enclType, firstIdentifier);
                   displayRangeError(0, 0, "No method named: ", firstIdentifier, ModelUtil.argumentsToString(arguments), otherMethods, " for: ");
                   foundMeth = findMethod(firstIdentifier, arguments, this, enclType, isStatic(), inferredType);
@@ -392,11 +392,17 @@ public class IdentifierExpression extends ArgumentsExpression {
                         idTypes[0] = IdentifierType.BoundObjectName;
                      else {
                         boolean needsGetSet = isAssignment ? ModelUtil.hasSetMethod(propObj) : ModelUtil.isPropertyGetSet(propObj);
-                        idTypes[0] = needsGetSet ?
-                                (isAssignment ? IdentifierType.SetVariable :
-                                        ModelUtil.isPropertyIs(propObj) ? IdentifierType.IsVariable : IdentifierType.GetVariable) :
-                                ModelUtil.isField(varObj) || ModelUtil.hasField(varObj) ? IdentifierType.FieldName : ModelUtil.isEnum(varObj) ?
-                                        IdentifierType.EnumName : IdentifierType.VariableName;
+                        if (!useExtensions) {
+                           idTypes[0] = ModelUtil.isField(varObj) || ModelUtil.hasField(varObj) ? IdentifierType.FieldName : ModelUtil.isEnum(varObj) ?
+                                   IdentifierType.EnumName : IdentifierType.VariableName;
+                        }
+                        else {
+                           idTypes[0] = needsGetSet ?
+                                   (isAssignment ? IdentifierType.SetVariable :
+                                           ModelUtil.isPropertyIs(propObj) ? IdentifierType.IsVariable : IdentifierType.GetVariable) :
+                                   ModelUtil.isField(varObj) || ModelUtil.hasField(varObj) ? IdentifierType.FieldName : ModelUtil.isEnum(varObj) ?
+                                           IdentifierType.EnumName : IdentifierType.VariableName;
+                        }
                      }
                   }
                }
@@ -1367,7 +1373,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                }
                if (methVar == null) {
                   idTypes[i] = IdentifierType.UnboundMethodName;
-                  if (model != null && !model.disableTypeErrors) {
+                  if (model != null && !model.disableTypeErrors && expr.isInferredSet() && expr.isInferredFinal()) {
                      String otherMessage = getOtherMethodsMessage(currentType, nextName);
                      expr.displayRangeError(i, i, "No method: ", nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentTypeDecl),otherMessage == null ? "" : otherMessage.toString(),  " for ");
                      methVar = currentTypeDecl.definesMethod(nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs);
@@ -1437,7 +1443,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                Object remoteMeth = checkRemoteMethod(expr, currentType, nextName, i, idTypes, boundTypes, arguments, isStatic, inferredType);
                if (methObj == null && remoteMeth == null) {
                   idTypes[i] = IdentifierType.UnboundMethodName;
-                  if (model != null && !model.disableTypeErrors) {
+                  if (model != null && !model.disableTypeErrors && expr.isInferredFinal() && expr.isInferredSet()) {
                      String otherMethods = getOtherMethodsMessage(currentClass, nextName);
                      expr.displayRangeError(i, i, "No method: ", nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentClass), otherMethods, " for ");
                      methObj = ModelUtil.definesMethod(currentClass, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs, sys); // TODO: remove - for debugging only
@@ -1686,7 +1692,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                      // When the super refers to the same type - i.e. it's a constructor modifying the base layer's constructor, we need to invoke the base layer's constructor here.
                      BodyTypeDeclaration enclType = getEnclosingType();
                      if (ModelUtil.sameTypes(enclType, type)) {
-                        Object baseConstr = ModelUtil.declaresConstructor(type, arguments, null);
+                        Object baseConstr = ModelUtil.declaresConstructor(getLayeredSystem(), type, arguments, null);
                         if (baseConstr != null)
                            ModelUtil.invokeMethod(ctx.getCurrentObject(), baseConstr, arguments, null, ctx, false, false, null);
                      }
@@ -5122,6 +5128,10 @@ public class IdentifierExpression extends ArgumentsExpression {
          reresolveTypeReference();
       //propagateInferredTypes();
       return false;
+   }
+
+   public boolean isInferredSet() {
+      return inferredType != null || !hasInferredType();
    }
 
    public boolean isInferredFinal() {

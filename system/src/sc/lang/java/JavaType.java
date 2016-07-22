@@ -98,7 +98,7 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
 
    public static JavaType createJavaType(LayeredSystem sys, Object typeDeclaration, ITypeParamContext ctx, Object definedInType) {
       if (typeDeclaration instanceof WildcardType) {
-         ExtendsType extType = ExtendsType.create((WildcardType) typeDeclaration);
+         ExtendsType extType = ExtendsType.create(sys, (WildcardType) typeDeclaration, ctx, definedInType);
          return extType;
       }
       if (typeDeclaration instanceof ExtendsType.LowerBoundsTypeDeclaration) {
@@ -147,7 +147,7 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
 
    public static JavaType createFromParamType(LayeredSystem sys, Object type, ITypeParamContext ctx, Object definedInType) {
       JavaType[] typeParamsArr = null;
-      JavaType newType = null;
+      JavaType newType;
       Object typeCtx = ctx instanceof ITypeDeclaration ? (ITypeDeclaration) ctx : ctx != null ? ctx.getDefinedInType() : definedInType;
 
       if (ModelUtil.hasTypeParameters(type)) {
@@ -156,9 +156,13 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
          for (int i = 0; i < numParams; i++) {
             Object typeParam = ModelUtil.getTypeParameter(type, i);
             if (typeParam instanceof WildcardType) {
-               newType = ExtendsType.create((WildcardType) typeParam);
+               newType = ExtendsType.create(sys, (WildcardType) typeParam, ctx, definedInType);
                if (!newType.isBound() && sys != null)
                   newType.initType(sys, typeCtx, null, ctx, true, false, typeParam);
+               typeParam = newType;
+            }
+            else if (typeParam instanceof ExtendsType.WildcardTypeDeclaration) {
+               newType = ExtendsType.createWildcard();
                typeParam = newType;
             }
             else if (typeParam instanceof ExtendsType.LowerBoundsTypeDeclaration) {
@@ -216,7 +220,7 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
                }
             }
             else if (typeParam instanceof WildcardType) {
-               newType = ExtendsType.create((WildcardType) typeParam);
+               newType = ExtendsType.create(sys, (WildcardType) typeParam, ctx, definedInType);
                if (!newType.isBound())
                   newType.initType(ctx.getLayeredSystem(), typeCtx, null, ctx, true, false, typeParam);
                typeParams.add(newType);
@@ -234,7 +238,7 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
          typeParamsArr = typeParams.toArray(new JavaType[typeParams.size()]);
       }
       else if (type instanceof WildcardType) {
-         newType = ExtendsType.create((WildcardType) type);
+         newType = ExtendsType.create(sys, (WildcardType) type, ctx, definedInType);
          if (!newType.isBound() && sys != null)
             newType.initType(sys, typeCtx, null, ctx, true, false, null);
          return newType;

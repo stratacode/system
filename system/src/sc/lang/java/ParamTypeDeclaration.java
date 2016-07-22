@@ -230,11 +230,11 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
    }
 
    public Object declaresConstructor(List<?> parametersOrExpressions, ITypeParamContext ctx) {
-      return ModelUtil.declaresConstructor(baseType, parametersOrExpressions, this);
+      return ModelUtil.declaresConstructor(system, baseType, parametersOrExpressions, this);
    }
 
    public Object definesConstructor(List<?> parametersOrExpressions, ITypeParamContext ctx, boolean isTransformed) {
-      return ModelUtil.definesConstructor(baseType, parametersOrExpressions, this, null, isTransformed);
+      return ModelUtil.definesConstructor(system, baseType, parametersOrExpressions, this, null, isTransformed);
    }
 
    public Object definesMember(String name, EnumSet<JavaSemanticNode.MemberType> types, Object refType, TypeContext ctx) {
@@ -755,6 +755,8 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
          if (type instanceof JavaType && ((JavaType) type).getTypeDeclaration() == null)
             return true;
          if (ModelUtil.hasTypeVariables(type))
+            return true;
+         if (ModelUtil.hasUnboundTypeParameters(type))
             return true;
       }
       return false;

@@ -1028,6 +1028,10 @@ public class SelectorExpression extends ChainedExpression {
       return false;
    }
 
+   public boolean isInferredSet() {
+      return inferredType != null || !hasInferredType();
+   }
+
    public boolean isInferredFinal() {
       return inferredFinal;
    }

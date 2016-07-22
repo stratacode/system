@@ -10,6 +10,7 @@ import sc.lang.java.JavaModel;
 import sc.parser.IParseNode;
 import sc.lang.java.TypeDeclaration;
 import sc.parser.Language;
+import sc.util.StringUtil;
 
 public class SCModel extends JavaModel {
 
@@ -19,7 +20,7 @@ public class SCModel extends JavaModel {
 
    public static SCModel create(String packageName, TypeDeclaration modType) {
       SCModel model = new SCModel();
-      if (packageName != null) {
+      if (!StringUtil.isEmpty(packageName)) {
          model.packageDef = sc.lang.java.Package.create(packageName);
       }
       SemanticNodeList<TypeDeclaration> snl = new SemanticNodeList<TypeDeclaration>();

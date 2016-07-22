@@ -1504,24 +1504,28 @@ public class EditorContext extends ClientEditorContext {
          if (!nextCommandRest.equals(pathName))
             pos += dirName.length() + 1;
       }
-      String newLayerDir = system.getNewLayerDir();
-      if (dirName == null)
-         dirName = newLayerDir;
-      else
-         dirName = FileUtil.concat(newLayerDir, dirName);
 
-      // If we are inside of a layer directory, it's an invalid path for a layer so don't complete it
-      for (String parentName = nextCommandRest.length() == 0 ? dirName : FileUtil.getParentPath(dirName); parentName != null; parentName = FileUtil.getParentPath(parentName)) {
-         if (LayerUtil.isLayerDir(parentName))
-            return pos;
-      }
 
-      File dir = new File(dirName);
-      String[] files = dir.list();
-      if (files != null) {
-         for (String file:files)
-            if (nextCommandRest.length() == 0 || file.startsWith(nextCommandRest))
-               candidates.add(file);
+      List<File> layerDirs = system.layerPathDirs;
+      for (File layerDir:layerDirs) {
+         String layerDirName;
+         if (dirName == null)
+            layerDirName = layerDir.getPath();
+         else
+            layerDirName = FileUtil.concat(layerDir.getPath(), dirName);
+
+         // If we are inside of a layer directory, it's an invalid path for a layer so don't complete it
+         for (String parentName = nextCommandRest.length() == 0 ? layerDirName : FileUtil.getParentPath(layerDirName); parentName != null; parentName = FileUtil.getParentPath(parentName)) {
+            if (LayerUtil.isLayerDir(parentName))
+               continue;
+         }
+
+         String[] files = new File(layerDirName).list();
+         if (files != null) {
+            for (String file : files)
+               if (nextCommandRest.length() == 0 || file.startsWith(nextCommandRest))
+                  candidates.add(file);
+         }
       }
       return pos;
    }

@@ -236,7 +236,6 @@ public class RTypeUtil {
 
       CoalescedHashMap<String,Method[]> cache = new CoalescedHashMap<String,Method[]>(tableSize);
 
-      // TODO: should be combining the interface and super methods as it's possible they do not override each other
       if (interfaceMethods != null) {
          for (int k = 0; k < interfaceMethods.length; k++) {
             ifMethodList = interfaceMethods[k];
@@ -245,7 +244,9 @@ public class RTypeUtil {
             for (int i = 0; i < keys.length; i++) {
                String key = (String) keys[i];
                if (key != null) {
-                  cache.put(key, (Method[]) values[i]);
+                  Method[] oldList = cache.get(key);
+                  Method[] newList = mergeMethodLists(oldList, (Method[]) values[i]);
+                  cache.put(key, newList);
                }
             }
          }
@@ -257,7 +258,9 @@ public class RTypeUtil {
          for (int i = 0; i < keys.length; i++) {
             String key = (String) keys[i];
             if (key != null) {
-               cache.put(key, (Method[]) values[i]);
+               Method[] oldList = cache.get(key);
+               Method[] newList = mergeMethodLists(oldList, (Method[]) values[i]);
+               cache.put(key, newList);
             }
          }
       }
@@ -280,8 +283,9 @@ public class RTypeUtil {
             cache.put(methodName, methodList);
          }
          else {
-            // TODO: we need to technically merge the super methods and the interface methods
-            Method[] superMethodList = superMethods != null ? superMethods.get(methodName) : interfaceMethods != null ? getInterfaceMethods(interfaceMethods, methodName) : null;
+            Method[] superMethodList = superMethods != null ? superMethods.get(methodName) : null;
+            Method[] ifaceMethodList = interfaceMethods != null ? getInterfaceMethods(interfaceMethods, methodName) : null;
+            superMethodList = mergeMethodLists(superMethodList, ifaceMethodList);
             boolean addToList = true;
             if (superMethodList != null) {
                for (int j = 0; j < superMethodList.length; j++) {
@@ -339,21 +343,42 @@ public class RTypeUtil {
       return cache;
    }
 
+   private static Method[] mergeMethodLists(Method[] subList, Method[] superList) {
+      if (superList == null)
+         return subList;
+      else if (subList == null)
+         return superList;
+
+      int superLen = superList.length;
+      int subLen = subList.length;
+      ArrayList<Method> res = new ArrayList<Method>(superLen + subLen);
+      for (int i = 0; i < subLen; i++) {
+         Method subMeth = subList[i];
+         res.add(subMeth);
+      }
+      for (int i = 0; i < superLen; i++) {
+         Method superMeth = superList[i];
+         int j;
+         for (j = 0; j < subLen; j++) {
+            if (overridesMethod(subList[j], superMeth)) {
+
+               Method newMeth = pickMoreSpecificMethod(superMeth, subList[j], null);
+               if (newMeth != res.get(j))
+                  res.set(j, newMeth);
+               break;
+            }
+         }
+         if (j == subLen)
+            res.add(superMeth);
+      }
+      return res.toArray(new Method[res.size()]);
+   }
 
    private static Method[] getInterfaceMethods(CoalescedHashMap[] interfaceMethods, String name) {
       Method[] res = null;
       for (CoalescedHashMap<String,Method[]> m:interfaceMethods) {
          Method[] nextRes = m.get(name);
-         if (nextRes != null) {
-            if (res == null)
-               res = nextRes;
-            else {
-               Method[] combined = new Method[res.length+nextRes.length];
-               System.arraycopy(res, 0, combined, 0, res.length);
-               System.arraycopy(nextRes, 0, combined, res.length, nextRes.length);
-               res = combined;
-            }
-         }
+         res = mergeMethodLists(res, nextRes);
       }
       return res;
    }

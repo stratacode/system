@@ -1168,7 +1168,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
       }
 
       Object findSuperMethod(Object type, List<Object> paramList) {
-         return ModelUtil.definesConstructor(type, paramList, null, null, false);
+         return ModelUtil.definesConstructor(sys, type, paramList, null, null, false);
       }
 
       public String getSuperExpression() {
