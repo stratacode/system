@@ -845,7 +845,12 @@ public class ModelUtil {
                parameterTypes = paramMethod.getParameterTypes(true, true); // TODO: true, false?
                //paramMethod.bindParamTypes = true;
                toCheck = paramMethod;
+
+               // Something did not match in the method type parameters - e.g. <T extends X> conflicted with another use of T.
+               if (paramMethod.invalidTypeParameter)
+                  continue;
             }
+
 
             if (paramLen == 0 && typesLen == 0) {
                if (refType == null || checkAccess(refType, toCheck))
@@ -2658,6 +2663,8 @@ public class ModelUtil {
                parameterTypes = paramMethod.getParameterTypes(true, true); // TODO: true, false?
                //paramMethod.bindParamTypes = true;
                toCheck = paramMethod;
+               if (paramMethod.invalidTypeParameter)
+                  continue;
             }
 
             if (paramLen == 0 && paramsLen == 0) {
@@ -2782,6 +2789,8 @@ public class ModelUtil {
                parameterTypes = paramMethod.getParameterTypes(true, true); // TODO: true, false?
                //paramMethod.bindParamTypes = true;
                toCheck = paramMethod;
+               if (paramMethod.invalidTypeParameter)
+                  continue;
             }
 
             if (paramLen == 0 && argsLen == 0) {

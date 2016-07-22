@@ -219,7 +219,8 @@ public class ExtendsType extends JavaType {
 
    public String toGenerateString() {
       StringBuilder sb = new StringBuilder();
-      sb.append("?");
+      if (questionMark)
+         sb.append("?");
       if (operator != null && typeArgument != null) {
          sb.append(" ");
          sb.append(operator);

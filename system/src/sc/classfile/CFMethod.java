@@ -216,9 +216,44 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
    }
 
    public String toString() {
+      StringBuilder sb = new StringBuilder();
+      if (typeParameters != null) {
+         sb.append("<");
+         boolean first = true;
+         for (TypeParameter typeParam:typeParameters) {
+            if (!first) {
+               sb.append(", ");
+            }
+            else
+               first = false;
+            if (typeParam == null)
+               sb.append("<null>");
+            else
+               sb.append(typeParam.toString());
+         }
+         sb.append(">");
+      }
       if (name != null)
-         return name + "()";
-      return super.toString();
+         sb.append(name);
+      else
+         sb.append("<uninitialized method>");
+      sb.append("(");
+      if (parameterJavaTypes != null) {
+         boolean first = true;
+         for (JavaType paramJavaType:parameterJavaTypes) {
+            if (!first)
+               sb.append(", ");
+            else
+               first = false;
+            if (paramJavaType != null) {
+               sb.append(paramJavaType);
+            }
+            else
+               sb.append("<null>");
+         }
+      }
+      sb.append(")");
+      return sb.toString();
    }
 
    public String getVariableName() {

@@ -43,6 +43,8 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
    // Set to true when this type is derived from parameter types which are not defined until the inferredType is set
    // It allows us to match against this parameter even if a type variable is not assigned.
    boolean unboundInferredType = false;
+   // Set to true when you have a <T extends X> and T also maps to a conflicting value
+   public boolean invalidTypeParameter = false;
 
    public boolean bindParamTypes = true;
 
@@ -846,6 +848,20 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
                         newRes = res;
 
                      if (newRes != null) {
+                        if (typeParam instanceof TypeParameter) {
+                           JavaType extType = ((TypeParameter) typeParam).extendsType;
+                           Object extTypeDecl = null;
+                           if (extType != null && (extTypeDecl = extType.getTypeDeclaration()) != null && !ModelUtil.isAssignableFrom(extTypeDecl, newRes)) {
+                              invalidTypeParameter = true;
+                           }
+                        }
+                        else if (typeParam instanceof TypeVariable) {
+                           Type[] bounds = ((TypeVariable) typeParam).getBounds();
+                           for (Type boundsType:bounds) {
+                              if (boundsType != Object.class && !ModelUtil.isAssignableFrom(boundsType, newRes))
+                                 invalidTypeParameter = true;
+                           }
+                        }
                         if (paramRes == null)
                            paramRes = newRes;
                         else

@@ -102,7 +102,10 @@ public class BoundType extends JavaType {
       if (boundTypes != null) {
          for (int i = 0; i < boundTypes.size(); i++) {
             JavaType t = boundTypes.get(i);
-            sb.append(" & ");
+            if (i != 0)
+               sb.append(" & ");
+            else
+               sb.append(" ");
             sb.append(t.toGenerateString());
          }
       }

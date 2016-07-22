@@ -131,6 +131,8 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
          paramMethod = new ParamTypedMethod(getLayeredSystem(), this, ctx, getEnclosingType(), otherParams, inferredType, methodTypeArgs);
          // TODO: do we need to disable binding of the parameter types here?  It seems we need them to blend them with the inferred type
          boundParamTypes = paramMethod.getParameterTypes(true, true); // TODO: true, false?
+         if (paramMethod.invalidTypeParameter)
+            return null;
       }
 
       for (int i = 0; i < otherSize; i++) {

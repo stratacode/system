@@ -631,6 +631,10 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
                   parameterTypes = paramMethod.getParameterTypes(true, true); // TODO: true, false?
                   //paramMethod.bindParamTypes = true;
                   toCheck = paramMethod;
+
+                  // There was a conflict with the type parameters matching so the parameterTypes are not valid
+                  if (paramMethod.invalidTypeParameter)
+                     continue;
                }
 
                if (paramLen == 0 && typesLen == 0) {
