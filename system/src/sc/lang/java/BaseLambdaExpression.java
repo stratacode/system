@@ -334,8 +334,8 @@ public abstract class BaseLambdaExpression extends Expression {
          updateInferredType(paramType);
       } else if (ifaceMethType instanceof ExtendsType) {
          System.out.println("*** Unknown extends reference");
-      } else if (ModelUtil.isParameterizedType(ifaceMethType))
-         System.out.println("*** Unknown parameterized type"); // TODO: do we need to do extraction and setting of type parameters here
+      } //else if (ModelUtil.isParameterizedType(ifaceMethType))
+       //  System.out.println("*** Unknown parameterized type"); // TODO: do we need to do extraction and setting of type parameters here
    }
 
    private void updateInferredType(Object inferredType) {
