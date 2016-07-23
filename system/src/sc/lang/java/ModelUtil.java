@@ -616,8 +616,8 @@ public class ModelUtil {
       if (!StringUtil.equalStrings(subName, superName))
          return false;
 
-      Object[] subParamTypes = ModelUtil.getParameterTypes(subTypeMethod, true, true);
-      Object[] superParamTypes = ModelUtil.getParameterTypes(superTypeMethod, true, true);
+      Object[] subParamTypes = ModelUtil.getParameterTypes(subTypeMethod, true);
+      Object[] superParamTypes = ModelUtil.getParameterTypes(superTypeMethod, true);
 
       int numSub = subParamTypes == null ? 0 : subParamTypes.length;
       int numSuper = superParamTypes == null ? 0 : superParamTypes.length;
@@ -660,7 +660,7 @@ public class ModelUtil {
 
    public static Object getSetMethodPropertyType(Object setMethod) {
       if (setMethod instanceof IMethodDefinition) {
-         Object[] paramTypes = ((IMethodDefinition) setMethod).getParameterTypes(false, true);
+         Object[] paramTypes = ((IMethodDefinition) setMethod).getParameterTypes(false);
          if (paramTypes == null || paramTypes.length == 0)
             throw new IllegalArgumentException("Set method without any parameters: " + setMethod);
          if (paramTypes.length != 1) {
@@ -839,11 +839,7 @@ public class ModelUtil {
                // TODO: resultClass converted to definedIntype here - we could do a wrapper for the getClass method
                paramMethod = new ParamTypedMethod(sys, toCheck, ctx, resultClass, parametersOrExpressions, inferredType, methodTypeArgs);
 
-               // Turn off the binding of parameter types while we do a match for this method.  We can't have the parameter types setting type parameters
-               // here - only the inferred type to be sure it does not conflict with the parameter type match.
-               //paramMethod.bindParamTypes = false;
-               parameterTypes = paramMethod.getParameterTypes(true, true); // TODO: true, false?
-               //paramMethod.bindParamTypes = true;
+               parameterTypes = paramMethod.getParameterTypes(true);
                toCheck = paramMethod;
 
                // Something did not match in the method type parameters - e.g. <T extends X> conflicted with another use of T.
@@ -2561,7 +2557,7 @@ public class ModelUtil {
    }
 
    public static JavaType[] parametersToJavaTypeArray(LayeredSystem sys, Object method, List<? extends Object> parameters, ParamTypedMethod ctx) {
-      Object[] paramTypes = ModelUtil.getParameterTypes(method, false, true);
+      Object[] paramTypes = ModelUtil.getParameterTypes(method, false);
       int size = parameters == null ? 0 : parameters.size();
       // Perf tuneup: could move logic to do comparisons into the cache so we don't allocate the temporary array here
       JavaType[] parameterTypes = new JavaType[size];
@@ -2657,11 +2653,7 @@ public class ModelUtil {
                // TODO: resultClass converted to definedIntype here - we could do a wrapper for the getClass method
                paramMethod = new ParamTypedMethod(sys, toCheck, ctx, td, parameters, null, null);
 
-               // Turn off the binding of parameter types while we do a match for this method.  We can't have the parameter types setting type parameters
-               // here - only the inferred type to be sure it does not conflict with the parameter type match.
-               //paramMethod.bindParamTypes = false;
-               parameterTypes = paramMethod.getParameterTypes(true, true); // TODO: true, false?
-               //paramMethod.bindParamTypes = true;
+               parameterTypes = paramMethod.getParameterTypes(true);
                toCheck = paramMethod;
                if (paramMethod.invalidTypeParameter)
                   continue;
@@ -2783,11 +2775,7 @@ public class ModelUtil {
                // TODO: resultClass converted to definedIntype here - we could do a wrapper for the getClass method
                paramMethod = new ParamTypedMethod(sys, toCheck, ctx, td, parameters, null, null);
 
-               // Turn off the binding of parameter types while we do a match for this method.  We can't have the parameter types setting type parameters
-               // here - only the inferred type to be sure it does not conflict with the parameter type match.
-               //paramMethod.bindParamTypes = false;
-               parameterTypes = paramMethod.getParameterTypes(true, true); // TODO: true, false?
-               //paramMethod.bindParamTypes = true;
+               parameterTypes = paramMethod.getParameterTypes(true);
                toCheck = paramMethod;
                if (paramMethod.invalidTypeParameter)
                   continue;
@@ -3667,7 +3655,7 @@ public class ModelUtil {
       // If we have a param-typed method use that to get the parameter types as those reflect the compile-time binding of the types
       // Possibly repeating parameter
       if (ModelUtil.isVarArgs(meth)) {
-         Object[] types = pmeth == null ? ModelUtil.getParameterTypes(meth) : pmeth.getParameterTypes(true, true);
+         Object[] types = pmeth == null ? ModelUtil.getParameterTypes(meth) : pmeth.getParameterTypes(true);
          int last = types.length - 1;
          Object lastType = types[last];
          if (ModelUtil.isArray(lastType)) {
@@ -4287,7 +4275,7 @@ public class ModelUtil {
    public static Object getParameterizedType(Object member, JavaSemanticNode.MemberType type) {
       if (type == JavaSemanticNode.MemberType.SetMethod) {
          if (member instanceof IMethodDefinition) {
-            Object[] paramTypes = ((IMethodDefinition) member).getParameterTypes(false, true);
+            Object[] paramTypes = ((IMethodDefinition) member).getParameterTypes(false);
             return paramTypes[0];
          }
          else if (member instanceof IBeanMapper)
@@ -6000,7 +5988,7 @@ public class ModelUtil {
       }
       else if (elem instanceof CFMethod) {
          CFMethod meth = (CFMethod) elem;
-         sb.append(getTypeName(meth.getReturnType(true)) + " " + meth.getMethodName() + " (" + StringUtil.arrayToString(meth.getParameterTypes(false, true)) + ")");
+         sb.append(getTypeName(meth.getReturnType(true)) + " " + meth.getMethodName() + " (" + StringUtil.arrayToString(meth.getParameterTypes(false)) + ")");
       }
       else if (elem instanceof Field) {
          Field f = (Field) elem;
@@ -6553,12 +6541,12 @@ public class ModelUtil {
    }
 
    public static Object[] getParameterTypes(Object method) {
-      return getParameterTypes(method, false, true);
+      return getParameterTypes(method, false);
    }
 
-   public static Object[] getParameterTypes(Object method, boolean bound, boolean bindUnbound) {
+   public static Object[] getParameterTypes(Object method, boolean bound) {
       if (method instanceof IMethodDefinition)
-         return ((IMethodDefinition) method).getParameterTypes(bound, bindUnbound);
+         return ((IMethodDefinition) method).getParameterTypes(bound);
       else if (method instanceof Method)
          return ((Method) method).getParameterTypes();
       else if (method instanceof Constructor)
@@ -6569,7 +6557,7 @@ public class ModelUtil {
 
    public static Object[] getGenericParameterTypes(Object method, boolean bound) {
       if (method instanceof IMethodDefinition)
-         return ((IMethodDefinition) method).getParameterTypes(bound, true);
+         return ((IMethodDefinition) method).getParameterTypes(bound);
       else if (method instanceof Method)
          return ((Method) method).getGenericParameterTypes();
       else if (method instanceof Constructor)

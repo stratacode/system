@@ -177,7 +177,7 @@ public class ConstructorDefinition extends AbstractMethodDefinition {
       if (getEnclosingType() instanceof ModifyDeclaration) {
          ModifyDeclaration modType = (ModifyDeclaration) getEnclosingType();
          // We are modifying the super constructor so it's not a real extends super
-         if (modType.declaresConstructor(Arrays.asList(getParameterTypes(false, true)), null) != null)
+         if (modType.declaresConstructor(Arrays.asList(getParameterTypes(false)), null) != null)
             return true;
       }
       return false;

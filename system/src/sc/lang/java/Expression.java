@@ -757,7 +757,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
             Object fieldType = ModelUtil.getPropertyType(def);
             Object methType = ModelUtil.getPropertyType(currentMethod);
             // An indexed setter
-            Object[] pTypes = currentMethod.getParameterTypes(false, true);
+            Object[] pTypes = currentMethod.getParameterTypes(false);
             if (pTypes != null && pTypes.length == 2) {
                if (ModelUtil.isArray(fieldType)) {
                   Object pType = ModelUtil.getArrayComponentType(fieldType);

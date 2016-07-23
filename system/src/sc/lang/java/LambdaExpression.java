@@ -97,7 +97,7 @@ public class LambdaExpression extends BaseLambdaExpression {
 
    void updateMethodTypeParameters(Object ifaceMeth) {
       if (lambdaParams instanceof Parameter) {
-         Object[] ifaceParamTypes = ModelUtil.getParameterTypes(ifaceMeth, false, true);
+         Object[] ifaceParamTypes = ModelUtil.getParameterTypes(ifaceMeth, false);
          Object[] refParamTypes = ((Parameter) lambdaParams).getParameterTypes();
          if (ifaceParamTypes != null && refParamTypes != null) {
             int j = 0;

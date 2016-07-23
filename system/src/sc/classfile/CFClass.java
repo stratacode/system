@@ -625,11 +625,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
 
                   paramMethod = new ParamTypedMethod(system, toCheck, ctx, this, parametersOrExpressions, inferredType, methodTypeArgs);
 
-                  // Turn off the binding of parameter types while we do a match for this method.  We can't have the parameter types setting type parameters
-                  // here - only the inferred type to be sure it does not conflict with the parameter type match.
-                  //paramMethod.bindParamTypes = false;
-                  parameterTypes = paramMethod.getParameterTypes(true, true); // TODO: true, false?
-                  //paramMethod.bindParamTypes = true;
+                  parameterTypes = paramMethod.getParameterTypes(true);
                   toCheck = paramMethod;
 
                   // There was a conflict with the type parameters matching so the parameterTypes are not valid

@@ -129,8 +129,7 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
 
       if (ModelUtil.isParameterizedMethod(this)) {
          paramMethod = new ParamTypedMethod(getLayeredSystem(), this, ctx, getEnclosingType(), otherParams, inferredType, methodTypeArgs);
-         // TODO: do we need to disable binding of the parameter types here?  It seems we need them to blend them with the inferred type
-         boundParamTypes = paramMethod.getParameterTypes(true, true); // TODO: true, false?
+         boundParamTypes = paramMethod.getParameterTypes(true);
          if (paramMethod.invalidTypeParameter)
             return null;
       }
@@ -528,7 +527,7 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       return res;
    }
 
-   public Object[] getParameterTypes(boolean bound, boolean bindUnbound) {
+   public Object[] getParameterTypes(boolean bound) {
       if (parameterTypes == null && parameters != null && parameters.getNumParameters() > 0) {
          parameterTypes = parameters.getParameterTypes();
       }

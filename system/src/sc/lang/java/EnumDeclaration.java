@@ -257,7 +257,7 @@ public class EnumDeclaration extends TypeDeclaration {
 
                ArrayList<Object> newTypes = new ArrayList<Object>();
                ArrayList<String> newNames = new ArrayList<String>();
-               Object[] oldTypes = constr.getParameterTypes(false, true);
+               Object[] oldTypes = constr.getParameterTypes(false);
                String[] oldNames = constr.parameters.getParameterNames();
 
                for (int i = 0; i < defaultConstrParamNames.length; i++) {

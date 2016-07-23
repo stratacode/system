@@ -104,7 +104,7 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
       return returnType;
    }
 
-   public Object[] getParameterTypes(boolean bound, boolean bindUnbound) {
+   public Object[] getParameterTypes(boolean bound) {
       if (!started)
          start();
       return bound ? boundParameterTypes : unboundParameterTypes;

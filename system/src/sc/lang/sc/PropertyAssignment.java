@@ -516,7 +516,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
          return null;
       if (assignedProperty instanceof IMethodDefinition) {
          IMethodDefinition meth = (IMethodDefinition) assignedProperty;
-         return meth.isSetMethod() ?  meth.getParameterTypes(false, true)[0] : meth.getReturnType(false);
+         return meth.isSetMethod() ?  meth.getParameterTypes(false)[0] : meth.getReturnType(false);
       }
       return ModelUtil.getVariableTypeDeclaration(assignedProperty);
    }

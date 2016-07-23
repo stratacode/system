@@ -15,8 +15,7 @@ public interface IMethodDefinition extends IMember {
 
    Object getReturnJavaType();
 
-   // TODO: remove the bindUnbound parameter - it's not used
-   Object[] getParameterTypes(boolean bindTypeVars, boolean bindUnbound);
+   Object[] getParameterTypes(boolean bindTypeVars);
 
    JavaType[] getParameterJavaTypes(boolean convertRepeating);
 

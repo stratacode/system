@@ -3073,7 +3073,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                char c = name.charAt(0);
                switch (c) {
                   case 's':
-                     ptypes = method.getParameterTypes(false, true);
+                     ptypes = method.getParameterTypes(false);
                      if (!name.startsWith("set"))
                         continue;
                      if (ptypes.length == 1)
@@ -3085,7 +3085,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                      propName = CTypeUtil.decapitalizePropertyName(name.substring(3));
                      break;
                   case 'g':
-                     ptypes = method.getParameterTypes(false, true);
+                     ptypes = method.getParameterTypes(false);
                      if (!name.startsWith("get"))
                         continue;
                      if (ptypes == null || ptypes.length == 0)
@@ -3098,7 +3098,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                      propName = CTypeUtil.decapitalizePropertyName(name.substring(3));
                      break;
                   case 'i':
-                     ptypes = method.getParameterTypes(false, true);
+                     ptypes = method.getParameterTypes(false);
                      if (!name.startsWith("is") || (ptypes != null && ptypes.length != 0))
                         continue;
                      propName = CTypeUtil.decapitalizePropertyName(name.substring(2));
@@ -3170,7 +3170,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                                     Object nextStatement = body.get(j);
                                     if (nextStatement instanceof MethodDefinition) {
                                        MethodDefinition theMethod = (MethodDefinition) nextStatement;
-                                       if (theMethod.name.equals(getName) && theMethod.getParameterTypes(false, true).length == 0) {
+                                       if (theMethod.name.equals(getName) && theMethod.getParameterTypes(false).length == 0) {
                                           getSelector = theMethod;
                                           break;
                                        }

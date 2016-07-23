@@ -560,7 +560,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
       return ModelUtil.getReturnJavaType(method);
    }
 
-   public Object[] getParameterTypes(boolean bound, boolean bindUnbound) {
+   public Object[] getParameterTypes(boolean bound) {
       if (bound) {
          if (boundTypes != null)
             return boundTypes;
@@ -569,7 +569,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
          if (paramTypes != null)
             return paramTypes;
       }
-      return resolveParameterTypes(bound, null, 0, false, bindUnbound);
+      return resolveParameterTypes(bound, null, 0, false, true);
    }
 
    public Object[] resolveParameterTypes(boolean bound, Object[] oldRes, int startIx, boolean refreshParams, boolean bindUnbound) {
