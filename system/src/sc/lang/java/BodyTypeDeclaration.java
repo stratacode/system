@@ -865,34 +865,39 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public Object extendsDefinesMethod(String name, List<?> parameters, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
-      Object td = getDerivedTypeDeclaration();
+      Object baseType = getDerivedTypeDeclaration();
 
-      if (td != null) {
+      if (baseType != null) {
+         // If necessary map the type variables in the base-types' declaration based on the type params in the context
+         baseType = convertBaseTypeContext(ctx, baseType);
 
-         // If we have something like class Foo<A,B> extends Bar<C,D> - need to perform the type mapping on a copy of the param type here
-         if (ctx != null && td instanceof ParamTypeDeclaration) {
-            ParamTypeDeclaration newType = null;
-            ParamTypeDeclaration origType = (ParamTypeDeclaration) td;
-            List<?> typeParams = origType.getClassTypeParameters();
-            if (typeParams != null) {
-               for (int ix = 0; ix < typeParams.size(); ix++) {
-                  Object typeParam = typeParams.get(ix);
-                  Object newVal = ctx.getTypeForVariable(typeParam, true);
-                  if (newVal != null && newVal != typeParam) {
-                     if (newType == null)
-                        newType = origType.cloneForNewTypes();
-                     newType.setTypeParamIndex(ix, newVal);
-                  }
-               }
-            }
-            if (newType != null)
-               td = newType;
-         }
-
-         return ModelUtil.definesMethod(td, name, parameters, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, getLayeredSystem());
+         return ModelUtil.definesMethod(baseType, name, parameters, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, getLayeredSystem());
       }
 
       return null;
+   }
+
+   // If we have something like class Foo<A,B> extends Bar<C,D> - need to perform the type mapping on a copy of the param type here
+   protected static Object convertBaseTypeContext(ITypeParamContext ctx, Object baseType) {
+      if (ctx != null && baseType instanceof ParamTypeDeclaration) {
+         ParamTypeDeclaration newType = null;
+         ParamTypeDeclaration origType = (ParamTypeDeclaration) baseType;
+         List<?> typeParams = origType.getClassTypeParameters();
+         if (typeParams != null) {
+            for (int ix = 0; ix < typeParams.size(); ix++) {
+               Object typeParam = typeParams.get(ix);
+               Object newVal = ctx.getTypeForVariable(typeParam, true);
+               if (newVal != null && newVal != typeParam) {
+                  if (newType == null)
+                     newType = origType.cloneForNewTypes();
+                  newType.setTypeParamIndex(ix, newVal);
+               }
+            }
+         }
+         if (newType != null)
+            baseType = newType;
+      }
+      return baseType;
    }
 
    public Object getInheritedAnnotation(String annotationName) {

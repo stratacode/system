@@ -104,6 +104,7 @@ public class InterfaceDeclaration extends TypeDeclaration {
       LayeredSystem sys = getLayeredSystem();
       if (extendsBoundTypes != null) {
          for (Object impl:extendsBoundTypes) {
+            impl = convertBaseTypeContext(ctx, impl);
             if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, sys)) != null)
                return v;
          }
