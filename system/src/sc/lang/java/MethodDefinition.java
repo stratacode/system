@@ -203,7 +203,11 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          else
             return ModelUtil.getReturnType(prev, true);
       }
-      return type == null ? null : type.getTypeDeclaration();
+      Object res = type == null ? null : type.getTypeDeclaration();
+      if (res != null && arrayDimensions != null) {
+         res = new ArrayTypeDeclaration(getLayeredSystem(), getEnclosingType(), type, arrayDimensions);
+      }
+      return res;
    }
 
    public String getGenericTypeName(Object resultType, boolean includeDims) {
@@ -231,79 +235,6 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       if (typeParameters == null)
          return returnType;
 
-      // TODO: Can we remove this code?  The substitution of type parameters is now done in ModelUtil so we can
-      // share that logic with src and compiled types.
-      /*
-      if (returnType instanceof TypeParameter && arguments != null) {
-         TypeParameter rtParam = (TypeParameter) returnType;
-         if (parameters != null) {
-            List<Parameter> paramList = parameters.getParameterList();
-            for (int i = 0; i < paramList.size(); i++) {
-               Object paramType = paramList.get(i).getTypeDeclaration();
-               if (paramType != null && ModelUtil.isTypeVariable(paramType)) {
-                  String paramArgName = ModelUtil.getTypeParameterName(paramType);
-                  if (paramArgName != null && paramArgName.equals(rtParam.name)) {
-                     if (i >= arguments.size()) // No value for a repeating parameter?
-                        return null;
-                     return arguments.get(i).getTypeDeclaration();
-                  }
-               }
-            }
-         }
-      }
-      */
-      // The case for a method like:
-      //   public static <E extends Enum<E>> EnumSet<E> allOf(Class<E> type)
-      //
-      // Get the type of each parameter.  For each type parameter to the method.
-      // Take the current type for that parameter and compute the bound types for those type parameters.
-      //
-      /*
-      if (returnType instanceof ParamTypeDeclaration) {
-         ParamTypeDeclaration returnTypePT = (ParamTypeDeclaration) returnType;
-         ParamTypeDeclaration result = returnTypePT.copy();
-         for (TypeParameter tp:typeParameters) {
-            if (parameters != null) {
-               List<Parameter> paramList = parameters.getParameterList();
-               for (int i = 0; i < paramList.size(); i++) {
-                  Parameter nextParam = paramList.get(i);
-                  Object paramType = nextParam.getTypeDeclaration();
-                  List<?> typeParams = ModelUtil.getTypeParameters(paramType);
-                  if (typeParams != null) {
-                     for (int j = 0; j < typeParams.size(); j++) {
-                        Object typeParam = typeParams.get(j);
-                        int paramPos = ModelUtil.getTypeParameterPosition(typeParam);
-                        if (paramPos == tp.getPosition()) {
-                           // Special case to handle foo.class -> Class<T> construct.
-                           if (ModelUtil.getParamTypeBaseType(paramType) == Class.class) {
-                              Object paramExpr = arguments.get(i);
-                              // Need the actual class itself, not the type of the expression (which in this case is class)
-                              if (paramExpr instanceof ClassValueExpression) {
-                                 ClassValueExpression pe = (ClassValueExpression) paramExpr;
-                                 Object classType = pe.resolveClassType();
-                                 result.setTypeParamIndex(j, classType);
-                              }
-                              // else - a runtime class.  We don't get additional type info from that.
-                           }
-                           // If it's a type variable itself, it's not changing the return type.
-                           else if (!ModelUtil.isTypeVariable(typeParam)) {
-                              System.err.println("*** unhandled case with param type methods");
-                           }
-                        }
-                     }
-                  }
-                  else if (paramType instanceof ArrayTypeDeclaration) {
-                     Object componentType = ((ArrayTypeDeclaration) paramType).getComponentType();
-                     if (ModelUtil.isTypeVariable(componentType)) {
-
-                     }
-                  }
-               }
-            }
-         }
-         return result;
-      }
-      */
       return returnType;
    }
 

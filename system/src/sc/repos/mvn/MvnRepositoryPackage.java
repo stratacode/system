@@ -217,4 +217,14 @@ public class MvnRepositoryPackage extends RepositoryPackage {
          return pomFile.overrideVersion(desc);
       return false;
    }
+
+   public void initChildPackage(RepositoryPackage childPkg) {
+      if (childPkg instanceof MvnRepositoryPackage) {
+         MvnRepositoryPackage childMvnPkg = (MvnRepositoryPackage) childPkg;
+         if (includeOptional)
+            childMvnPkg.includeOptional = true;
+         if (includeProvided)
+            childMvnPkg.includeProvided = true;
+      }
+   }
 }

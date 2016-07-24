@@ -259,7 +259,11 @@ public class POMFile extends XMLFileFormat {
                MvnDescriptor desc = new MvnDescriptor(getProperty("project.groupId", true, true), parentName, moduleName, null, getProperty("project.version", true, true));
                // Do not init the dependencies here.  We won't be able to resolve deps inbetween these modules.  We have to create them all and
                // initialize the deps for the modules when we init them for the parent.
-               RepositoryPackage pkg = desc.getOrCreatePackage(mgr.getChildManager(), false, depCtx, false, isSrc ? (MvnRepositoryPackage) pomPkg : null);
+               MvnRepositoryPackage parentPkg =  isSrc ? (MvnRepositoryPackage) pomPkg : null;
+               RepositoryPackage pkg = desc.getOrCreatePackage(mgr.getChildManager(), false, depCtx, false, parentPkg);
+               if (parentPkg != null) {
+                  parentPkg.initChildPackage(pkg);
+               }
                if (!isSrc && pkg.currentSource != null)
                   pkg.currentSource.srcURL = null;
                if (pkg != null) {

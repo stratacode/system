@@ -258,6 +258,8 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
 
    // Don't think this is used right now but basically keep the dimensions in tact and return the componenet's base type.
    public Object getDerivedTypeDeclaration() {
+      if (ModelUtil.isTypeVariable(componentType))
+         return null;
       Object superComponentType = ModelUtil.getSuperclass(componentType);
       if (superComponentType == null)
          return null;

@@ -336,19 +336,30 @@ public class EnumDeclaration extends TypeDeclaration {
    }
 
    public List<Object> getMethods(String methodName, String modifier, boolean includeExtends) {
-      List declProps = super.getMethods(methodName, modifier, includeExtends);
-      List modProps;
+      List declMeths = super.getMethods(methodName, modifier, includeExtends);
+      List modMeths = null;
       Object extendsObj = includeExtends ? getDerivedTypeDeclaration() : null;
       if (extendsObj == null)
-         return declProps;
+         return declMeths;
       else {
-         Object[] props = ModelUtil.getMethods(extendsObj, methodName, modifier);
-         if (props != null)
-            modProps = Arrays.asList(props);
-         else
-            modProps = null;
+         // These two methods are builtin for the Enum types
+         if (methodName.equals("values")) {
+            modMeths = new ArrayList<Object>(1);
+            initValuesMethod();
+            modMeths.add(valuesMethod);
+         }
+         else if (methodName.equals("valueOf")) {
+            modMeths = new ArrayList<Object>(1);
+            initValueOfMethod();
+            modMeths.add(valueOfMethod);
+         }
+         else {
+            Object[] meths = ModelUtil.getMethods(extendsObj, methodName, modifier);
+            if (meths != null)
+               modMeths = Arrays.asList(meths);
+         }
       }
-      return ModelUtil.mergeMethods(modProps, declProps);
+      return ModelUtil.mergeMethods(modMeths, declMeths);
    }
 
    public Object getDerivedTypeDeclaration() {

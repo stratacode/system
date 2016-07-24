@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import java.lang.reflect.Constructor;
 import java.util.List;
 
 public class ReturnStatement extends ExpressionStatement {
@@ -18,11 +19,14 @@ public class ReturnStatement extends ExpressionStatement {
       super.start();
 
       Object returnType;
-      AbstractMethodDefinition method = getEnclosingMethod();
+      AbstractMethodDefinition absMethod = getEnclosingMethod();
+      if (absMethod instanceof ConstructorDefinition && expression != null) {
+         displayError("No value return from constructor: ");
+      }
+      MethodDefinition method = absMethod instanceof MethodDefinition ? (MethodDefinition) absMethod : null;
       Object methodReturnType;
 
-      if (expression != null && method != null && method.type != null &&
-          (methodReturnType = method.type.getTypeDeclaration()) != null) {
+      if (expression != null && method != null && (methodReturnType = method.getTypeDeclaration()) != null) {
 
          // We are going to refine the method's return type rather than copy it for now.
          if (methodReturnType instanceof ParamTypeDeclaration) {
@@ -47,7 +51,7 @@ public class ReturnStatement extends ExpressionStatement {
       if (expression == null && method != null) {
          JavaType retType = method.getReturnJavaType();
          if (retType != null && !retType.isVoid())
-            displayError("Method: ", method.name, " ", " must return type: ", retType.toString());
+            displayError("Method: ", method.name, " ", " returns type: ", retType.toString());
       }
    }
 

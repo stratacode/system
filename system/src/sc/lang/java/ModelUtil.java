@@ -2150,24 +2150,28 @@ public class ModelUtil {
          }
       }
 
-      if (isANumber(type1) && isANumber(type2))
+      boolean type1Num = isANumber(type1);
+      boolean type2Num = isANumber(type2);
+      if (type1Num && type2Num)
          // Note: switching the order here to "lhs" = "rhs"
          return numberTypesAssignableFrom(type1, type2, assignmentSemantics);
 
       if (isBoolean(type1) && isBoolean(type2))
          return true;
 
-      if (isCharacter(type1) && isCharacter(type2))
+      boolean type1Char = isCharacter(type1);
+      boolean type2Char = isCharacter(type2);
+      if (type1Char && type2Char)
          return true;
 
       // Characters can be assigned to ints and vice versa during assignments only
       if (assignmentSemantics) {
-         if (isCharacter(type1) && isAnInteger(type2) || (isCharacter(type2) && isAnInteger(type1)))
+         if ((type1Char && type2Num) || (type2Char && type1Num))
             return true;
       }
       else {
          // Method parameters - an integer can be assigned with a character argument
-         if (isAnInteger(type1) && isCharacter(type2))
+         if (isAnInteger(type1) && type2Char)
             return true;
       }
 

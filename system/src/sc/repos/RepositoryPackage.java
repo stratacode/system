@@ -904,4 +904,8 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    public boolean sameParentURL(String url) {
       return sameURL(url);
    }
+
+   // When creating a child package this method can be overridden to control how the child is initialized from the parent
+   public void initChildPackage(RepositoryPackage childPkg) {
+   }
 }
