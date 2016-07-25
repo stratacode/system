@@ -233,8 +233,6 @@ public class MvnRepositoryPackage extends RepositoryPackage {
    public boolean excludesModule(String moduleName) {
       boolean res = false;
       RepositorySystem sys = getRepositorySystem();
-      if (excludeModules != null)
-         System.out.println("***");
       if (excludeModules != null && excludeModules.contains(moduleName)) {
          res = true;
          mgr.info(" Module: " + moduleName + " excluded from the parent: " + packageName + " package excludeModules setting");
