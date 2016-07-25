@@ -5,11 +5,9 @@
 package sc.repos.mvn;
 
 import sc.layer.Layer;
-import sc.repos.DependencyContext;
-import sc.repos.IRepositoryManager;
-import sc.repos.RepositoryPackage;
-import sc.repos.RepositorySource;
+import sc.repos.*;
 import sc.util.FileUtil;
+import sc.util.MessageHandler;
 import sc.util.URLUtil;
 
 import java.io.File;
@@ -37,6 +35,10 @@ public class MvnRepositoryPackage extends RepositoryPackage {
    // The list of types of files we are to install for this package - null = (the default POM packaging)
    // other values of the type field for a depenency reference - e.g. test-jar
    public ArrayList<String> installFileTypes = new ArrayList<String>();
+
+   /** Set these to control which sub-modules of this package are included */
+   public ArrayList<String> includeModules = null;
+   public ArrayList<String> excludeModules = null;
 
    public MvnRepositoryPackage(Layer layer) {
       super(layer);
@@ -226,5 +228,21 @@ public class MvnRepositoryPackage extends RepositoryPackage {
          if (includeProvided)
             childMvnPkg.includeProvided = true;
       }
+   }
+
+   public boolean excludesModule(String moduleName) {
+      boolean res = false;
+      RepositorySystem sys = getRepositorySystem();
+      if (excludeModules != null)
+         System.out.println("***");
+      if (excludeModules != null && excludeModules.contains(moduleName)) {
+         res = true;
+         mgr.info(" Module: " + moduleName + " excluded from the parent: " + packageName + " package excludeModules setting");
+      }
+      if (!res && includeModules != null) {
+         res = !includeModules.contains(moduleName);
+         mgr.info(" Module: " + moduleName + " " + (!res ? "included" : "not included") + " by the parent: " + packageName + " package includeModules setting");
+      }
+      return res;
    }
 }

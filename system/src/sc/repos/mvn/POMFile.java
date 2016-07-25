@@ -50,6 +50,8 @@ public class POMFile extends XMLFileFormat {
 
    RepositoryPackage pomPkg;
 
+   Element activeProfile;
+
    public MvnDescriptor getDescriptor() {
       if (pomPkg instanceof MvnRepositoryPackage)
          return ((MvnRepositoryPackage) pomPkg).getDescriptor();
@@ -100,6 +102,8 @@ public class POMFile extends XMLFileFormat {
          return false;
       }
 
+      initProfiles();
+
       initPackaging();
       initProperties();
       // If we are a sub-module we are created with the parent and so don't need to init it
@@ -115,6 +119,32 @@ public class POMFile extends XMLFileFormat {
       initDependencyManagement();
 
       return true;
+   }
+
+   private void initProfiles() {
+      Element[] profilesRootList = projElement.getChildTagsWithName("profiles");
+      if (profilesRootList != null) {
+         if (profilesRootList.length != 1)
+            error("Expected only a single profiles tag");
+         else {
+            Element profilesRoot = profilesRootList[0];
+            Element[] profiles = profilesRoot.getChildTagsWithName("profile");
+            if (profiles != null) {
+               for (Element profile: profiles) {
+                  //String profileId = profile.getSimpleChildValue("id");
+                  Element activation = profile.getSingleChildTag("activation");
+                  if (activation != null) {
+                     String activeByDefaultStr = activation.getSimpleChildValue("activeByDefault");
+                     if (activeByDefaultStr != null && activeByDefaultStr.equals("true"))
+                        activeProfile = profile;
+                     // TODO: implement the other activation mechanisms:
+                     //   property/value, os, jdk, file missing
+                     // This also means the default profile may need to be deactivated.
+                  }
+               }
+            }
+         }
+      }
    }
 
    private void initPackaging() {
@@ -233,6 +263,8 @@ public class POMFile extends XMLFileFormat {
    private void initModules() {
       Element modulesRoot = projElement.getSingleChildTag(("modules"));
       modulePOMs = new ArrayList<POMFile>();
+      boolean isSrc = pomPkg.buildFromSrc;
+      MvnRepositoryPackage mvnParent = pomPkg instanceof MvnRepositoryPackage ? (MvnRepositoryPackage) pomPkg : null;
       if (modulesRoot != null) {
          Element[] modules = modulesRoot.getChildTagsWithName("module");
          if (modules != null) {
@@ -249,12 +281,16 @@ public class POMFile extends XMLFileFormat {
                   if (parentName != null)
                      parentName = CTypeUtil.getPackageName(parentName);
                }
-               boolean isSrc = pomPkg.buildFromSrc;
+
+               if (mvnParent != null && mvnParent.excludesModule(moduleName))
+                  continue;
+
                if (parentName != null) {
                   if (!isSrc)
                      moduleName = CTypeUtil.prefixPath(CTypeUtil.getPackageName(parentName), moduleName);
                   // else - when we have nested source modules, they are located in the file system in directories.  Pass that name directoy in the MvnDescriptor
                }
+
                // Initially create this with a modulePath, not the artifactId.  Later when we read the POM we set the artifactId
                MvnDescriptor desc = new MvnDescriptor(getProperty("project.groupId", true, true), parentName, moduleName, null, getProperty("project.version", true, true));
                // Do not init the dependencies here.  We won't be able to resolve deps inbetween these modules.  We have to create them all and
@@ -369,11 +405,8 @@ public class POMFile extends XMLFileFormat {
 
    public static final String DEFAULT_SCOPE = "compile";
 
-   public List<MvnDescriptor> getDependencies(String[] scopes, boolean addChildren, boolean addParent, boolean parentDefinesSrc, DependencyContext ctx) {
-      Element[] deps = projElement.getChildTagsWithName("dependencies");
-      if (deps != null && deps.length > 1)
-         MessageHandler.error(msg, "Multiple tags with dependencies - should be only one");
-      ArrayList<MvnDescriptor> res = new ArrayList<MvnDescriptor>();
+   private void addDependenciesFromElement(Element depParent, String[] scopes, DependencyContext ctx, ArrayList<MvnDescriptor> res) {
+      Element[] deps = depParent.getChildTagsWithName("dependencies");
       if (deps != null) {
          Element[] depTags = deps[0].getChildTagsWithName("dependency");
          if (depTags != null) {
@@ -404,6 +437,14 @@ public class POMFile extends XMLFileFormat {
             }
          }
       }
+
+   }
+
+   public List<MvnDescriptor> getDependencies(String[] scopes, boolean addChildren, boolean addParent, boolean parentDefinesSrc, DependencyContext ctx) {
+      ArrayList<MvnDescriptor> res = new ArrayList<MvnDescriptor>();
+      addDependenciesFromElement(projElement, scopes, ctx, res);
+      if (activeProfile != null)
+         addDependenciesFromElement(activeProfile, scopes, ctx, res);
       if (parentPOM != null && addParent) {
          addPOMRefDependencies(parentPOM, res, scopes, false, true, false, ctx);
       }

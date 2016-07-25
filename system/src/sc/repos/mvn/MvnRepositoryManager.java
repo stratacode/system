@@ -126,7 +126,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
             if (!pkg.buildFromSrc) {
                // When a repository is not downloaded in src form (i.e. from 'git') these types will have classes.  The type 'pom' usually does not but we still need to
                // check for a jar file since it may be there.
-               if (pomFile.packaging.equals("jar") || pomFile.packaging.equals("bundle") || pomFile.packaging.equals("pom") | pomFile.packaging.equals("war")) {
+               if (pomFile.packaging.equals("jar") || pomFile.packaging.equals("bundle") || pomFile.packaging.equals("pom") || pomFile.packaging.equals("war") || pomFile.packaging.equals("maven-plugin")) {
                   pkg.definesClasses = true;
                   pkg.definesSrc = false;
                }

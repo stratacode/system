@@ -43,4 +43,6 @@ public interface IRepositoryManager {
 
    public IClassResolver getClassResolver();
 
+   public void info(String message);
+
 }

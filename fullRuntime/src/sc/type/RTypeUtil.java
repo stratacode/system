@@ -206,6 +206,8 @@ public class RTypeUtil {
    static CoalescedHashMap<String,Method[]> initMethodNameCache(Class resultClass) {
       Method[] methods;
       Class superClass;
+      if (resultClass.toString().equals("class sun.misc.Unsafe"))
+         System.out.println("***");
       try {
          methods = resultClass.getDeclaredMethods();
          superClass = resultClass.getSuperclass();

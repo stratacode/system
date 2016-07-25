@@ -105,8 +105,15 @@ public class ModelUtil {
    }
 
    public static Object getVariableGenericTypeDeclaration(Object varObj, JavaModel model) {
-      if (varObj instanceof Field)
-         return ((Field) varObj).getGenericType();
+      if (varObj instanceof Field) {
+         try {
+            return ((Field) varObj).getGenericType();
+         }
+         catch (Exception exc) {
+            model.displayError("Failed to resolve generic type for : " + varObj.toString() + ": " + exc.toString());
+            return null;
+         }
+      }
       else if (varObj instanceof ITypedObject)
          return ((ITypedObject) varObj).getTypeDeclaration();
       else if (varObj instanceof IBeanMapper)
@@ -4373,8 +4380,12 @@ public class ModelUtil {
    }
 
    public static Object getWildcardLowerBounds(Object type) {
-      if (type instanceof WildcardType)
-         return ((WildcardType) type).getLowerBounds()[0];
+      if (type instanceof WildcardType) {
+         Type[] bounds = ((WildcardType) type).getLowerBounds();
+         if (bounds.length == 0)
+            return null;
+         return bounds[0];
+      }
       else if (type instanceof ExtendsType) {
          return ((ExtendsType) type).typeArgument.getTypeDeclaration();
       }
