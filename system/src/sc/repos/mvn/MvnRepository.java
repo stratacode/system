@@ -24,7 +24,7 @@ public class MvnRepository {
       if (artifactId == null || artifactId.equals("null"))
          artifactId = modulePath;
       String classifierExt = classifier == null ? "" : "-" + classifier;
-      return baseURL + URLUtil.concat(groupId.replace('.', '/'), artifactId, version, FileUtil.addExtension(artifactId + "-" + version + classifierExt + suffix, extension));
+      return URLUtil.concat(baseURL, URLUtil.concat(groupId.replace('.', '/'), artifactId, version, FileUtil.addExtension(artifactId + "-" + version + classifierExt + suffix, extension)));
    }
 
    public String toString() {
