@@ -2039,7 +2039,7 @@ public class ModelUtil {
          // Wildcard types <> no type is specified so just use the type param
          if (ptd.types.size() != 0)
             res = ptd.types.get(ix);
-         if (res == null)
+         if (res == null && ix < ptd.typeParams.size())
             res = ptd.typeParams.get(ix);
          return res;
       }
