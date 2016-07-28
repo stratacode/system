@@ -331,10 +331,19 @@ public class POMFile extends XMLFileFormat {
             if (varPath.length > 1 && varPath[0].equals(varTagName)) {
                isTagVariable = true;
                if (varTagName.equals("pom")) {
-                  if (varPath.length == 2 & varPath[1].equals("groupId"))
-                     return getGroupId();
+                  if (varPath.length == 2) {
+                     String nextVarPath = varPath[1];
+                     if (nextVarPath.equals("groupId"))
+                        return getGroupId();
+                     else if (nextVarPath.equals("version")) {
+                        MvnDescriptor desc = getDescriptor();
+                        return desc == null ? null : desc.version;
+                     }
+                     else
+                        MessageHandler.error(msg, "Unrecognized 'pom' variable - " + name);
+                  }
                   else
-                     MessageHandler.error(msg, "Unrecognized 'pom' variable - " + varTagName);
+                     MessageHandler.error(msg, "Unrecognized 'pom' variable - " + name);
                   return null;
                }
 

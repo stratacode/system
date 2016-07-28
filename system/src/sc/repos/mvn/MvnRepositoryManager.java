@@ -443,7 +443,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          }
          // There was no file with the specific file name but when the version is snapshot, we need to look into the
          // maven-metadata.xml file to figure out the current version and download the file of the right name.
-         else if (desc.version.endsWith("-SNAPSHOT")) {
+         else if (desc.version != null && desc.version.endsWith("-SNAPSHOT")) {
             String mavenMetadataURL = repo.getMetadataURL(desc.groupId, desc.artifactId, desc.modulePath, desc.version);
             String resDirName = FileUtil.getParentPath(resFileName);
             String metadataResName = FileUtil.concat(resDirName, "maven-metadata.xml");
