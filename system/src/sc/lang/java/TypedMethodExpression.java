@@ -63,7 +63,9 @@ public class TypedMethodExpression extends IdentifierExpression {
       super.start();
 
       Object[] methTypeParams = getMethodTypeParams();
-      if (methTypeParams != null && methTypeParams.length != typeArguments.size()) {
+      // If there are no method type parameters (which can either be null for ParamTypeMethods or TypeVariable[0] for native methods) we need to ignore the mismatch.
+      // It's apparently OK to send in parameters even when the method does not take them.
+      if (methTypeParams != null && methTypeParams.length > 0 && methTypeParams.length != typeArguments.size()) {
          displayError("Mismatching number of method type parameters: " + Arrays.asList(methTypeParams) + " and supplied types: " + typeArguments + " for: ");
       }
    }
