@@ -4,17 +4,29 @@
 
 package sc.repos;
 
+import sc.util.StringUtil;
+
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 public class DependencyContext implements Serializable {
    public int depth;
    public transient RepositoryPackage fromPkg;
+   public String sourceInfo;
    public String fromPkgURL;
    public DependencyContext parent;
 
+   public ArrayList<DependencyContext> children;
+
    private transient List<RepositoryPackage> incPkgs = null;
+
+   public DependencyContext(RepositoryPackage initPkg, String sourceInfo) {
+      this.depth = 0;
+      this.sourceInfo = sourceInfo;
+      this.fromPkg = initPkg;
+   }
 
    public DependencyContext(int depth, RepositoryPackage initPkg, DependencyContext parent) {
       this.depth = depth;
@@ -24,7 +36,11 @@ public class DependencyContext implements Serializable {
    }
 
    public DependencyContext child(RepositoryPackage fromPkg) {
-      return new DependencyContext(depth + 1, fromPkg, this);
+      if (children == null)
+         children = new ArrayList<DependencyContext>();
+      DependencyContext child = new DependencyContext(depth + 1, fromPkg, this);
+      children.add(child);
+      return child;
    }
 
    public static DependencyContext child(DependencyContext prev, RepositoryPackage pkg) {
@@ -57,6 +73,33 @@ public class DependencyContext implements Serializable {
          sb.append(fromPkg.toString());
       }
       return sb.toString();
+   }
+
+   public StringBuilder dumpContextTree() {
+      StringBuilder sb = new StringBuilder();
+      if (sourceInfo != null) {
+         sb.append(sourceInfo);
+         sb.append(":");
+         sb.append("\n");
+      }
+      appendTree(sb, 1, new HashSet<String>());
+      return sb;
+   }
+
+   private void appendTree(StringBuilder sb, int depth, HashSet<String> visited) {
+      if (fromPkg != null) {
+         String fromPkgStr = fromPkg.getPackageURL();
+         if (visited.contains(fromPkgStr))
+            return;
+         visited.add(fromPkgStr);
+         sb.append(StringUtil.indent(depth));
+         sb.append(fromPkgStr);
+         sb.append("\n");
+      }
+      if (children != null) {
+         for (DependencyContext child:children)
+            child.appendTree(sb, depth + 1, visited);
+      }
    }
 
    /** Returns the list of packages that defined this dependency, starting with the root package */

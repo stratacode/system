@@ -311,20 +311,20 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
                   if (subPackages != null) {
                      for (RepositoryPackage subPkg:subPackages) {
                         if (!subPkg.installed)
-                           subPkg.preInstall(ctx, depCol, false);
+                           subPkg.preInstall(ctx == null ? null : ctx.child(subPkg), depCol, false);
                      }
                   }
                   if (preInstallDeps) {
                      if (subPackages != null) {
                         for (RepositoryPackage subPkg:subPackages) {
                            if (!subPkg.installed)
-                              subPkg.preInstall(ctx, depCol, true);
+                              subPkg.preInstall(ctx == null ? null : ctx.child(subPkg), depCol, true);
                         }
                      }
                      if (dependencies != null) {
                         for (RepositoryPackage depPkg : dependencies) {
                            if (!depPkg.installed)
-                              depPkg.preInstall(ctx, depCol, true);
+                              depPkg.preInstall(ctx == null ? null : ctx.child(depPkg), depCol, true);
                         }
                      }
                   }

@@ -19,10 +19,7 @@ import sc.obj.GlobalScopeDefinition;
 import sc.obj.SyncMode;
 import sc.parser.Language;
 import sc.parser.ParseUtil;
-import sc.repos.IRepositoryManager;
-import sc.repos.RepositoryPackage;
-import sc.repos.RepositorySource;
-import sc.repos.RepositorySystem;
+import sc.repos.*;
 import sc.sync.SyncManager;
 import sc.type.CTypeUtil;
 import sc.type.RTypeUtil;
@@ -1686,7 +1683,11 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
       if (repositoryPackages != null && !disabled) {
          for (RepositoryPackage pkg:repositoryPackages) {
-            layeredSystem.repositorySystem.installPackage(pkg, null);
+            DependencyContext pkgCtx = new DependencyContext(pkg, "Layer: " + toString() + " package tree");
+            layeredSystem.repositorySystem.installPackage(pkg, pkgCtx);
+            if (layeredSystem.options.verbose) {
+               verbose(pkgCtx.dumpContextTree().toString());
+            }
          }
          installPackages(repositoryPackages.toArray(new RepositoryPackage[repositoryPackages.size()]));
       }
@@ -3752,9 +3753,12 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    public RepositoryPackage addRepositoryPackage(String url) {
       RepositorySystem repoSys = layeredSystem.repositorySystem;
-      RepositoryPackage pkg = repoSys.addPackage(url, !disabled);
+      DependencyContext rootCtx = new DependencyContext(null, "Layer: " + toString() + " package tree");
+      RepositoryPackage pkg = repoSys.addPackage(url, !disabled, rootCtx);
       if (repositoryPackages == null)
          repositoryPackages = new ArrayList<RepositoryPackage>();
+      if (rootCtx.fromPkg != null && layeredSystem.options.verbose)
+         verbose(rootCtx.dumpContextTree().toString());
       repositoryPackages.add(pkg);
       pkg.definedInLayer = this;
       return pkg;
