@@ -446,6 +446,26 @@ public class Parser implements IString {
          System.out.println(indent(inProgressCount) + "Next: " + getLookahead(8) + " testing rule: " + parselet.toString());
       */
 
+      if (parselet.cacheResults || ENABLE_STATS) {
+         doCache = true;
+         if (resultCache != null) {
+            ParseletState state = resultCache.get(currentIndex);
+            if (state != null) {
+               ParseletState res = findMatchingState(state, parselet);
+               if (res != null) {
+                  if (parselet.cacheResults) {
+                     if (parselet.accept(semanticContext, res.value, currentIndex, res.endIx) == null) {
+                        currentIndex = res.endIx;
+                        parselet.updateCachedResult(res.value);
+                        return res.value;
+                     }
+                  }
+                  res.cacheHits++;
+               }
+            }
+         }
+      }
+
       boolean disableDebug = false;
       if (parselet.negated)
          negatedCt++;

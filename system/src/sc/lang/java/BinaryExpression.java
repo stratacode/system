@@ -951,6 +951,10 @@ public class BinaryExpression extends Expression {
    }
 
    private Class getInferredType() {
+      if (operator == null) {
+         System.out.println("*** Uninitialized binary expression!");
+         return null;
+      }
       switch (getOperatorType(operator)) {
          case Conditional:
             return Boolean.class;

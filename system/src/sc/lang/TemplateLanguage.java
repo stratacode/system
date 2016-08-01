@@ -123,7 +123,7 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
 
       primary.put(END_DELIMITER, glueExpression);
 
-      binaryOperators.addExcludedValues("%>");
+      binaryOperators.addExcludedValues("%>", "</");
 
       // During transform of a compiled template, we'll transform the JavaModel back through compilationUnit.  In this case, the types have to match exactly so we need to redefine the grammar by just replacing the type name: JavaModel -> Template
       compilationUnit.setResultClassName("Template");

@@ -1255,22 +1255,19 @@ public class Sequence extends NestedParselet  {
                   // design of the skipOnErrorParselet so that it leaves us in the state for the next match on this choice.  It should not breakup
                   // an identifier for example.
                   Object errorRes = parser.reparseNext(skipOnErrorParselet, oldChildParseNode, dctx, forceReparse, null);
-                  if (errorRes instanceof ParseError) {
-                     // We never found the exitParselet - i.e. > so the parent sequence will fail just like it did before.
-                     // When this method returns null, we go with the result we produced in the first call to parseRepeatingSequence method.
-                     return null;
+                  if (!(errorRes instanceof ParseError)) {
+                     if (value == null) {
+                        value = resetOldParseNode(forceReparse ? null : oldParent, lastMatchIndex, false, false);
+                     }
+                     value.addForReparse(new ErrorParseNode(new ParseError(skipOnErrorParselet, "Expected {0}", new Object[]{this}, errorStart, parser.currentIndex), errorRes.toString()), skipOnErrorParselet, newChildCount, newChildCount, -1, true, parser, oldChildParseNode, dctx, true, true);
+                     extendedErrorMatches = true;
+                     matched = true;
                   }
-
-                  if (value == null) {
-                     value = resetOldParseNode(forceReparse ? null : oldParent, lastMatchIndex, false, false);
-                  }
-                  value.addForReparse(new ErrorParseNode(new ParseError(skipOnErrorParselet, "Expected {0}", new Object[]{this}, errorStart, parser.currentIndex), errorRes.toString()), skipOnErrorParselet, newChildCount, newChildCount, -1, true, parser, oldChildParseNode, dctx, true, true);
-                  extendedErrorMatches = true;
-                  matched = true;
+                  // else - we did not find the exit parselet.  We'll just match as normal - the parent will fail but we still need to return our valid match so it is not cached incorrectly
                }
                else {   // Found the exit parselet is next in the stream so we successfully consumed some error nodes so reset the lastMatchIndex to include them
                   lastMatchIndex = parser.currentIndex;
-                  matchedAny = extendedErrorMatches;
+                  matchedAny = matchedAny || extendedErrorMatches;
                }
             }
          }

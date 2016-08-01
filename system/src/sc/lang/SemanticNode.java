@@ -153,10 +153,10 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
    }
 
    public void stop() {
+      initialized = false;
       if (!started)
          return;
       started = false;
-      initialized = false;
       validated = false;
       processed = false;
 

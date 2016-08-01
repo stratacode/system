@@ -45,6 +45,9 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
          System.out.println("*** Error null array component type");
       if (comp instanceof ArrayTypeDeclaration)
          System.out.println("*** Error - nesting array types");
+
+      if (comp instanceof String && ((String) comp).equals("Invalid type sentinel"))
+         System.out.println("*** Invalid array type!");
       componentType = comp;
       arrayDimensions = arrayDims;
       definedInType = dit;

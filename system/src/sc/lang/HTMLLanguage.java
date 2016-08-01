@@ -317,6 +317,8 @@ public class HTMLLanguage extends TemplateLanguage {
       simpleTag.enableTagMode = true;
       // If an error occurs after we parse the name we can skip it (enablePartialValues only)
       simpleTag.skipOnErrorSlot = 2;
+      // Don't match just the < for a partial value match
+      simpleTag.minContentSlot = 1;
    }
    Sequence closeTag = new Sequence("(,,'',)", beginTagChar, closeTagChar, closeTagName, endTagChar);
    {

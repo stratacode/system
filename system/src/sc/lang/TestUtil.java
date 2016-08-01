@@ -537,16 +537,15 @@ public class TestUtil {
                      ParseError err = ((ParseError) result);
                      result = err.getBestPartialValue();
                   }
-                  /*
-                  if (reparseFile.contains("1")) {
+                  if (reparseFile.contains("6")) {
                      System.out.println("***");
-                     SCLanguage.getSCLanguage().classBodyDeclarations.trace = true;
+                     //SCLanguage.getSCLanguage().classBodyDeclarations.trace = true;
                      //JavaLanguage.getJavaLanguage().classBodyDeclarations.trace = true;
-                     SemanticNode.debugDiffTrace = true;
+                     HTMLLanguage.getHTMLLanguage().enumBodyDeclaration.trace = true;
+                     //SemanticNode.debugDiffTrace = true;
 
                      //DiffContext.debugDiffContext = true;
                   }
-                  */
                   if (result == null)
                      out("*** FAILURE: No previous result for reparse");
 

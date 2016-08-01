@@ -579,7 +579,37 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
       if (templateProcessor != null)
          resultSuffix = templateProcessor.getResultSuffix();
 
+      beingInitialized = false;
       PerfMon.end("initTemplate");
+   }
+
+   public void stop() {
+      resetTemplateState();
+      super.stop();
+   }
+
+   private void resetTemplateState() {
+      hasErrors = false;
+      rootType = null;
+      // Reset the types since those are generated in the initialize method
+      types = null;
+      implicitRoot = false;
+      statefulPage = true;
+      preTagContent = null;
+      outputMethod = null;
+      outputRuntimeMethod = null;
+      singleElementType = false;
+      createInstance = false;
+      beingInitialized = false;
+
+      if (templateDeclarations != null) {
+         for (Object tempDecl:templateDeclarations) {
+            // If the page has any variables in it, we can't make it a stateful page with binding snd auto-invalidation
+            if (tempDecl instanceof Element) {
+               ((Element) tempDecl).resetTagObject();
+            }
+         }
+      }
    }
 
    public void reinitialize() {
@@ -593,26 +623,9 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
          started = false;
          validated = false;
          processed = false;
-         rootType = null;
-         // Reset the types since those are generated in the initialize method
-         types = null;
-         implicitRoot = false;
-         statefulPage = true;
-         preTagContent = null;
-         outputMethod = null;
-         outputRuntimeMethod = null;
-         singleElementType = false;
-         createInstance = false;
-         beingInitialized = false;
 
-         if (templateDeclarations != null) {
-            for (Object tempDecl:templateDeclarations) {
-               // If the page has any variables in it, we can't make it a stateful page with binding snd auto-invalidation
-               if (tempDecl instanceof Element) {
-                  ((Element) tempDecl).resetTagObject();
-               }
-            }
-         }
+         resetTemplateState();
+
          // this resets the rootType
          ParseUtil.initComponent(this);
 

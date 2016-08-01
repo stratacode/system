@@ -731,7 +731,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
                                         optArguments,
                                         new Sequence("(.)", OPTIONAL, classBody));
 
-   Sequence enumBodyDeclaration = new Sequence("([],[],,[])", OPTIONAL, new Sequence("(.)", OPTIONAL, enumConstant), new Sequence("(,[])", OPTIONAL | REPEAT, comma, enumConstant),
+   public Sequence enumBodyDeclaration = new Sequence("([],[],,[])", OPTIONAL, new Sequence("(.)", OPTIONAL, enumConstant), new Sequence("(,[])", OPTIONAL | REPEAT, comma, enumConstant),
                    new Sequence(OPTIONAL, comma),
                    new Sequence("([],[])", OPTIONAL, new Sequence("EmptyStatement()", semicolon), classBodyDeclarations));
    Sequence enumBody = new Sequence("(,[],)", openBraceEOL, enumBodyDeclaration, closeBraceEOL);

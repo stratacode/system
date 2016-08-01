@@ -923,6 +923,11 @@ public class ParseUtil  {
       int oldLen = pnode.length();
       int newLen = newText.length();
 
+      // Stop all of the nodes before we reparse to ensure we can cleanly start them up afterwards.
+      Object oldModel = pnode.getSemanticValue();
+      if (oldModel != null)
+         ParseUtil.stopComponent(oldModel);
+
       // First we make a pass over the parse node tree to find two mark points in the file - where the changes
       // start and where the text becomes the same again.  We are optimizing for the "single edit" case - global
       // edits currently will require a complete reparse (not that we could not handle this case - it will just be
