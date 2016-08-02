@@ -550,8 +550,7 @@ public class OrderedChoice extends NestedParselet  {
 
                if (nestedValue != null || parser.peekInputChar(0) != '\0') {
                   int oldSize = value.children == null ? 0 : value.children.size();
-                  if (value.addForReparse(nestedValue, matchedParselet, svCount, newChildCount++, slotIx, false, parser, nextChildParseNode, dctx, true, true))
-                     svCount++;
+                  svCount += value.addForReparse(nestedValue, matchedParselet, svCount, newChildCount++, slotIx, false, parser, nextChildParseNode, dctx, true, true);
 
                   // TODO: we should have addForReparse take a ReparseStatus object with two values - hasSemanticValue and replaced.  For now, just using the size to figure that out
                   int newSize = value.children == null ? 0 : value.children.size();
@@ -655,16 +654,14 @@ public class OrderedChoice extends NestedParselet  {
                      // Change the endIndex before we add the value because we use parser.currentIndex inside of value.addForReparse to determine how to cull old nodes.
                      dctx.changeCurrentIndex(parser, bestError.endIndex);
 
-                     if (value.addForReparse(bestError.partialValue, bestError.parselet, svCount, newChildCount++, bestErrorSlotIx, false, parser, nextChildParseNode, dctx, true, true))
-                        svCount++;
+                     svCount += value.addForReparse(bestError.partialValue, bestError.parselet, svCount, newChildCount++, bestErrorSlotIx, false, parser, nextChildParseNode, dctx, true, true);
                      errorStart = bestError.endIndex;
 
                      // It turns out the partial value error will match better than the skipOnError parselet.  We need to insert an error representing the
                      // fact that it's not a complete statement.
                      if (exitParselet.peek(parser)) {
-                        if (value.addForReparse(new ErrorParseNode(new ParseError(bestError.parselet, bestError.errorCode, bestError.errorArgs, bestError.endIndex, bestError.endIndex), ""), 
-                                                bestError.parselet, svCount, newChildCount++, bestErrorSlotIx, true, parser, nextChildParseNode, dctx, true, true))
-                           svCount++;
+                        svCount += value.addForReparse(new ErrorParseNode(new ParseError(bestError.parselet, bestError.errorCode, bestError.errorArgs, bestError.endIndex, bestError.endIndex), ""),
+                                                bestError.parselet, svCount, newChildCount++, bestErrorSlotIx, true, parser, nextChildParseNode, dctx, true, true);
                         return value;
                      }
 
@@ -677,9 +674,8 @@ public class OrderedChoice extends NestedParselet  {
                if (useError) {
                   if (value == null)
                      value = resetOldParseNode(oldParent, lastMatchStart, false, false);
-                  if (value.addForReparse(new ErrorParseNode(new ParseError(skipOnErrorParselet, "Expected {0}", new Object[]{this}, errorStart, parser.currentIndex),
-                                          errorRes.toString()), skipOnErrorParselet, svCount, newChildCount++, bestErrorSlotIx, true, parser, nextChildParseNode, dctx, true, true))
-                     svCount++;
+                  svCount += value.addForReparse(new ErrorParseNode(new ParseError(skipOnErrorParselet, "Expected {0}", new Object[]{this}, errorStart, parser.currentIndex),
+                                          errorRes.toString()), skipOnErrorParselet, svCount, newChildCount++, bestErrorSlotIx, true, parser, nextChildParseNode, dctx, true, true);
                   matched = true;
                   emptyMatch = false;
                }

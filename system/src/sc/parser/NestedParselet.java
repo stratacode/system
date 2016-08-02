@@ -1414,11 +1414,12 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       return pn;
    }
 
-   public boolean setSemanticValue(ParentParseNode parent, Object node, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, boolean replaceValue, boolean reparse) {
+   public int setSemanticValue(ParentParseNode parent, Object node, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, boolean replaceValue, boolean reparse) {
       if (trace && parser.enablePartialValues)
          System.out.println("*** setting semantic value of traced element");
 
-      boolean hasValue = !skipSemanticValue;
+      // The number to add onto childIndex for the next child node - 0 (skip this node - use the same index, 1 = for scalar semantic values, > 0 when concatenating arrays
+      int valueCount = skipSemanticValue ? 0 : 1;
 
       int sequenceSize = parselets.size();
 
@@ -1448,13 +1449,14 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
               System.out.println("*** Invalid slot index in parameter mapping!");
             switch (parameterMapping[slotIndex]) {
                case SKIP:
-                  hasValue = false;
+                  valueCount = 0;
                   break;
 
                case NAMED_SLOT:
                   // For named slots with arrays we only count a value when we match the last node (i.e. we process the slot mappings
-                  if (getSemanticValueIsArray())
-                     hasValue = slotIndex == sequenceSize - 1;
+                  if (getSemanticValueIsArray()) {
+                     valueCount = slotIndex == sequenceSize - 1 ? 1 : 0;
+                  }
                   break;
 
                case PROPAGATE:
@@ -1544,6 +1546,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                                     else
                                        parentList.add(newList.get(newIx), true, false);
                                  }
+                                 valueCount = newSize;
                               }
                               else {
                                  // TODO: Are there any cases where this is not the right thing?
@@ -1565,7 +1568,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                      }
                      // sv == null has no value so don't increment the svcount
                      else
-                        hasValue = false;
+                        valueCount = 0;
                   }
                   else if (node != null) {
                      SemanticNodeList snl;
@@ -1773,7 +1776,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                        "    " + parent + " => " + parent.getSemanticValue());
          }
       }
-      return hasValue;
+      return valueCount;
    }
 
    boolean propagatesArray() {

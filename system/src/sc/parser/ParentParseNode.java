@@ -57,7 +57,7 @@ public class ParentParseNode extends AbstractParseNode {
          ((ISemanticNode) value).setParseNode(this);
    }
 
-   public boolean addForReparse(Object node, Parselet p, int svIndex, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, Object oldChildParseNode, DiffContext dctx,
+   public int addForReparse(Object node, Parselet p, int svIndex, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, Object oldChildParseNode, DiffContext dctx,
                                 boolean removeExtraNodes, boolean parseArray) {
       // If there's no old value or we are inserting off the end, we must be inserting a new value
       if (children == null || childIndex >= children.size())
@@ -70,7 +70,7 @@ public class ParentParseNode extends AbstractParseNode {
             Parselet childParselet = pnode.getParselet();
 
             if (!childParselet.addReparseResultToParent(pnode, this, svIndex, childIndex, slotIndex, parser, oldChildParseNode, dctx, removeExtraNodes, parseArray))
-               return false;
+               return 0;
          }
 
          if (node != oldChildParseNode) {
@@ -198,7 +198,7 @@ public class ParentParseNode extends AbstractParseNode {
     * The index specifies the slot index of the parselet 'p' in the parent.  If skipSemanticValue is true, the parse node is
     * added without updating the semantic value.
     */
-   public boolean add(Object node, Parselet p, int svIndex, int index, boolean skipSemanticValue, Parser parser) {
+   public int add(Object node, Parselet p, int svIndex, int index, boolean skipSemanticValue, Parser parser) {
       if (children == null)
          children = new ArrayList<Object>(parselet.parselets.size());
 
@@ -211,7 +211,7 @@ public class ParentParseNode extends AbstractParseNode {
       if (node instanceof StringToken || node == null) {
          if (p.getDiscard() || p.getLookahead()) {
             if (node != null)
-               return false;
+               return 0;
             // TODO: else - is this the right code path here?
          }
          if (p.skip && !(parselet.needsChildren())) {
@@ -228,7 +228,7 @@ public class ParentParseNode extends AbstractParseNode {
       }
       else if (node instanceof String) {
          if (p.discard || p.lookahead)
-            return false;
+            return 0;
          if (p.skip && !(parselet.needsChildren())) {
             if (children.size() == 1) {
                Object child = children.get(0);
@@ -245,7 +245,7 @@ public class ParentParseNode extends AbstractParseNode {
          Parselet childParselet = pnode.getParselet();
 
          if (!childParselet.addResultToParent(pnode, this, index, parser))
-            return false;
+            return 0;
       }
 
       if (addChild)

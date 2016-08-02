@@ -47,6 +47,14 @@ public class ErrorParseNode extends AbstractParseNode {
       return 0;
    }
 
+   public void setStartIndex(int ix) {
+      super.setStartIndex(ix);
+      // We are updating both of these because during the reparse we may pull the error out of the parse node and
+      // create a new PreErrorParseNode with the old error - which would have a stale startIndex unless we update it here.
+      if (error != null)
+         error.startIndex = ix;
+   }
+
    public void updateSemanticValue(IdentityHashMap<Object, Object> oldNewMap) {
    }
 

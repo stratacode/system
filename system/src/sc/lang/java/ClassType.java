@@ -1145,7 +1145,9 @@ public class ClassType extends JavaType {
 
    public JavaType convertToArray(Object definedInType) {
       ClassType newType = (ClassType) super.convertToArray(definedInType);
-      if (type != null)
+      if (type == FAILED_TO_INIT_SENTINEL)
+         newType.type = FAILED_TO_INIT_SENTINEL;
+      else if (type != null)
          newType.type = ArrayTypeDeclaration.create(getLayeredSystem(), type, 1, definedInType == null ? getEnclosingIType() : definedInType);
       return newType;
    }

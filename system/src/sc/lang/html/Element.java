@@ -1009,7 +1009,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                            boolExpr.fromStatement = att;
                            strExprs.add(boolExpr);
                         }
-                        else {
+                        else if (att.value != null) {
                            str.append(" ");
                            str.append(att.name);
                            str.append("=");
