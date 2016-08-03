@@ -628,6 +628,12 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
             }
          }
       }
+      if (!anyChanges) {
+         int curIndex = parser.currentIndex;
+         Object res = accept(parser.semanticContext, oldParseNode, curIndex, oldParseNode == null ? curIndex : curIndex + ((CharSequence) oldParseNode).length());
+         if (res != null)
+            return false;
+      }
       return anyChanges;
    }
 
