@@ -216,7 +216,7 @@ public class HTMLLanguage extends TemplateLanguage {
 
    /**
     * This class extends the parser's core Sequence(list of parselets) class to add all of the logic necessary to
-    * parse the quirky HTML syntax.  It's used in the grammar definition for various types of HTML tags, configured
+    * parse the HTML syntax.  It's used in the grammar definition for various types of HTML tags, configured
     * based on the specific type.  It overrides the accept method - used to determine whether this grammar node matches
     * an input string - to accept/reject appropriately based on the type of tag.   The key variables are whether the tag
     * needs a new line and indentation during generation, whether it's like the script tag which is unescaped, and whether
@@ -373,6 +373,9 @@ public class HTMLLanguage extends TemplateLanguage {
       templateString.cacheResults = true;
       tagComment.cacheResults = true;
       anyTag.cacheResults = true;
+      // A simpleTag can turn into a treeTag due to changes outside of the simpleTag's parsed boundary so we cannot use
+      // the results of this parselet during the reparse operation.
+      anyTag.reparseable = false;
       unescapedTemplateString.cacheResults = true;
 
       templateString.add("<");

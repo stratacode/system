@@ -64,7 +64,20 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
 
    public boolean started = false;
 
+   /** 
+    * Set to true for parselets which benefit from caching - i.e. commonly are contained in parent regions of different types 
+    * e.g. children of a tree-tag or simple-tag in an HTML element which is parsed both ways when a matching close cannot be found.  
+    */
    public boolean cacheResults = false;
+
+   /** 
+     * Set to false for parselets where the new parse-result during the reparse operation may not be contained in the same region of the file - e.g. 
+     * a simpleTag which turns into a treeTag during a reparse.  The containing anyTag parselet is marked not reparseable so we try the 'treeTag' 
+     * option even during reparse where that simpleTag's contents did not change.  This catches the case where say the end tag changes or some region
+     * in the middle changes.  Unfortunately we will parse a lot more nodes when simpleTags are used... ideally we'd have some optimization to avoid
+     * the treeTag unless there is a possible close tag for that tree.
+     */
+   public boolean reparseable = true;
 
    // TODO: Ifdef "STATS_ENABLED"
    public int attemptCount, successCount;
@@ -580,7 +593,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
          }
       }
       */
-      boolean anyChanges = dctx.changedRegion || forceReparse;
+      boolean anyChanges = !reparseable || dctx.changedRegion || forceReparse;
       if (!anyChanges && parser.currentIndex >= dctx.newLen)
          return true;
       int startChange = dctx.startChangeOffset;
@@ -632,7 +645,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
          int curIndex = parser.currentIndex;
          Object res = accept(parser.semanticContext, oldParseNode, curIndex, oldParseNode == null ? curIndex : curIndex + ((CharSequence) oldParseNode).length());
          if (res != null)
-            return false;
+            return true;
       }
       return anyChanges;
    }

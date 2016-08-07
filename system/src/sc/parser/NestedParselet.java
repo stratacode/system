@@ -1842,10 +1842,10 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                      }
                   }
                   else if (node instanceof StringToken) {
-                     System.err.println("*** Not removing from string token value");
+                     //System.err.println("*** Not removing from string token value");
                   }
                   else if (node instanceof String) {
-                     System.err.println("*** Not removing from string value");
+                     //System.err.println("*** Not removing from string value");
                   }
                   break;
 
@@ -1883,7 +1883,22 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                      }
                   }
                   else if (node != null) {
-                     if (parent.value != null) {
+                     if (parent.value instanceof List) {
+                        SemanticNodeList parentList = (SemanticNodeList) parent.value;
+                        int plix;
+                        boolean found = false;
+                        for (plix = 0; plix < parentList.size(); plix++) {
+                           if (parentList.get(plix).equals(node)) {
+                              parentList.remove(plix, false);
+                              found = true;
+                              break;
+                           }
+                        }
+                        if (!found)
+                           System.err.println("*** Did not find child to remove");
+
+                     }
+                     else if (parent.value != null) {
                         System.err.println("*** Not removing from non-parse node child");
                      }
                   }
@@ -2717,6 +2732,22 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       return -1;
    }
 
+   public int getParseletSlotIxFromType(Object semValue) {
+      if (semValue == null)
+         return -1;
+      if (parselets != null) {
+         int sz = parselets.size();
+         Class semType = semValue.getClass();
+         for (int i = 0; i < sz; i++) {
+            Parselet child = parselets.get(i);
+            if (child.getSemanticValueClass().isAssignableFrom(semType))
+               return i;
+         }
+      }
+      return -1;
+
+   }
+
    void removeChildrenForReparse(Parser parser, ParentParseNode value, int newChildCount) {
       if (value == null || value.children == null)
          return;
@@ -2740,7 +2771,11 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
             }
          }
          else {
-            value.children.remove(childIx);
+            int slotIx = getParseletSlotIxFromType(remValue);
+            if (slotIx != -1)
+               value.removeForReparse(childIx, slotIx, false, parser);
+            else
+               value.children.remove(childIx);
          }
       }
       else
