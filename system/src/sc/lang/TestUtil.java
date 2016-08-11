@@ -538,11 +538,11 @@ public class TestUtil {
                      result = err.getBestPartialValue();
                   }
                   /*
-                  if (reparseFile.contains("5")) {
+                  if (reparseFile.contains("6")) {
                      System.out.println("***");
                      //SCLanguage.getSCLanguage().normalClassDeclaration.trace = true;
                      //JavaLanguage.getJavaLanguage().classBodyDeclarations.trace = true;
-                     //HTMLLanguage.getHTMLLanguage().templateBodyDeclarations.trace = true;
+                     HTMLLanguage.getHTMLLanguage().treeTag.trace = true;
 //                     SemanticNode.debugDiffTrace = true;
 
                      //DiffContext.debugDiffContext = true;

@@ -32,14 +32,22 @@ public class HTMLLanguage extends TemplateLanguage {
       public class HTMLContextEntry {
          int startIx;
          int endIx;
+         int endTagIx;
          String tagName;
+
+         public String toString() {
+            return tagName + "[" + startIx + ":" + endTagIx + "]";
+         }
       }
       ArrayList<HTMLContextEntry> tagStack = new ArrayList<HTMLContextEntry>();
+
+      ArrayList<HTMLContextEntry> removedStack = new ArrayList<HTMLContextEntry>();
 
       void addEntry(Object semanticValue, int startIx, int endIx) {
          HTMLContextEntry ent = new HTMLContextEntry();
          ent.startIx = startIx;
          ent.endIx = endIx;
+         ent.endTagIx = -1;
          ent.tagName = semanticValue.toString().toLowerCase();
          tagStack.add(ent);
       }
@@ -52,19 +60,23 @@ public class HTMLLanguage extends TemplateLanguage {
       }
 
       public Object resetToIndex(int ix) {
-         ArrayList<HTMLContextEntry> removed = null;
+         ArrayList<HTMLContextEntry> removedList = null;
+         // When we are resetting the index back - behind the current pointer, we might need to remove tag stack entries.
+         // Keep track of those we remove so we can restore them again if we set the index ahead again.
          for (int i = tagStack.size() - 1; i >= 0; i--) {
             if (tagStack.get(i).startIx >= ix) {
-               if (removed == null)
-                  removed = new ArrayList<HTMLContextEntry>();
-               removed.add(tagStack.remove(i));
-               i--;
+               if (removedList == null)
+                  removedList = new ArrayList<HTMLContextEntry>();
+               HTMLContextEntry removedEntry = tagStack.remove(i);
+               removedList.add(removedEntry);
+
+               addRemovedStackEntry(removedEntry);
             }
             else {
                break;
             }
          }
-         return removed;
+         return removedList;
       }
 
       public void restoreToIndex(int ix, Object retVal) {
@@ -73,16 +85,71 @@ public class HTMLLanguage extends TemplateLanguage {
             for (int i = 0; i < toRestore.size(); i++)
                tagStack.add(toRestore.get(i));
          }
+         else {
+            for (int i = removedStack.size() - 1; i >= 0 && i < removedStack.size(); i--) {
+               HTMLContextEntry removedEnt = removedStack.get(i);
+               if (removedEnt.startIx <= ix) {
+                  // Does this tag overlap the current position?  If so, we add it back in to the current tag stack.
+                  if (removedEnt.endTagIx != -1 && removedEnt.endTagIx >= ix) {
+                     addTagStackEntry(removedEnt);
+                  }
+                  //removedStack.remove(i);
+                  //i++;
+               }
+            }
+         }
       }
 
-      public void popTagName() {
+      public void popTagName(int endTagIx) {
          int sz = tagStack.size();
          if (sz == 0)
             System.err.println("*** invalid pop tag!");
-         else
-            tagStack.remove(sz-1);
+         else {
+            HTMLContextEntry removedEnt = tagStack.remove(sz - 1);
+            removedEnt.endTagIx = endTagIx;
+            addRemovedStackEntry(removedEnt);
+         }
       }
 
+      private void addTagStackEntry(HTMLContextEntry toAdd) {
+         int i;
+         for (i = tagStack.size() - 1; i >= 0; i--) {
+            HTMLContextEntry curEnt = tagStack.get(i);
+            if (curEnt.startIx < toAdd.startIx) {
+               break;
+            }
+            else if (curEnt.startIx == toAdd.startIx) {
+               assert(curEnt.tagName.equals(toAdd.tagName));
+               if (curEnt.endTagIx == -1)
+                  curEnt.endTagIx = toAdd.endTagIx;
+               return;
+            }
+         }
+         if (i == tagStack.size() - 1)
+            tagStack.add(toAdd);
+         else
+            tagStack.add(i + 1, toAdd);
+      }
+
+      private void addRemovedStackEntry(HTMLContextEntry removedEnt) {
+         int i;
+         for (i = removedStack.size() - 1; i >= 0; i--) {
+            HTMLContextEntry curEnt = removedStack.get(i);
+            if (curEnt.startIx < removedEnt.startIx) {
+               break;
+            }
+            else if (curEnt.startIx == removedEnt.startIx) {
+               assert(curEnt.tagName.equals(removedEnt.tagName));
+               if (curEnt.endTagIx == -1)
+                  curEnt.endTagIx = removedEnt.endTagIx;
+               return;
+            }
+         }
+         if (i == removedStack.size() - 1)
+            removedStack.add(removedEnt);
+         else
+            removedStack.add(i + 1, removedEnt);
+      }
    }
 
    /**
@@ -110,6 +177,7 @@ public class HTMLLanguage extends TemplateLanguage {
    Symbol closeTagChar = new Symbol("/");
    Symbol beginTagChar = new Symbol("<");
    Symbol endTagChar = new Symbol(SKIP_ON_ERROR, ">");
+   Symbol reqEndTagChar = new Symbol(">");
 
    public boolean validTagChar(char c) {
       return Character.isLetterOrDigit(c) || c == '-' || c == ':';
@@ -270,7 +338,7 @@ public class HTMLLanguage extends TemplateLanguage {
                   return "No open tag for close tag: " + strValue;
                if (!openTagName.equalsIgnoreCase(strValue))
                   return "Mismatching close tag name: " + value + " does not match open: " + openTagName;
-               hctx.popTagName();
+               hctx.popTagName(startIx);
                break;
          }
 
@@ -327,11 +395,14 @@ public class HTMLLanguage extends TemplateLanguage {
 
    public class TagStartSequence extends Sequence {
       public TagStartSequence(Parselet tagName, Parselet tagBody) {
-         super("Element(,tagName,attributeList,,children,closeTagName)", beginTagChar, tagName, tagAttributes, endTagChar, tagBody, closeTag);
+         // Using reqEndTagChar here so we do not accept a partial match which ends with /> - that and partial value tags should just be treated
+         // as simpleTags - not going to try and detect the tree of a partial tag.
+         super("Element(,tagName,attributeList,,children,closeTagName)", beginTagChar, tagName, tagAttributes, reqEndTagChar, tagBody, closeTag);
          enableTagMode = true;
          // Do not consider a match of just the beginTagChar as content when doing partial values extension.
          // There are other parselets that will match that character
-         minContentSlot = 1;
+         // Need to match the full <tag attributes> so that we do not match <tag attributes/> in partialValues mode.  We do not want to parse the body of a treeTag when we have a simpleTag definition.
+         minContentSlot = 3;
       }
    }
 

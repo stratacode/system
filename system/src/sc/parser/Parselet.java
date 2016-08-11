@@ -476,6 +476,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       return name;
    }
 
+
    /**
     * Lets subclasses add additional acceptance criteria to a rule.  Returns an error string or null if all is ok.
     * Passed the semanticContext, an optional object the language can use for keeping state during the parse process.
@@ -488,6 +489,15 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
    /** Lets subclasses accept or modify the semantic value.  Returns an error string or null if all is ok. */
    protected String acceptSemanticValue(Object value) {
       return null;
+   }
+
+   /**
+    * Like accept but for hierarchical nodes, performs the 'accept' operation on children in the tree.  We use this
+    * when accepting a cached or reparsed value, or generating a value.  But during the parse operation, the accept
+    * is run on each node as part of the parse so we do not have to recurse to children.
+    * */
+   protected String acceptTree(SemanticContext ctx, Object value, int startIx, int endIx) {
+      return accept(ctx, value, startIx, endIx);
    }
 
    public boolean getTrace() {
@@ -643,7 +653,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       }
       if (!anyChanges) {
          int curIndex = parser.currentIndex;
-         Object res = accept(parser.semanticContext, oldParseNode, curIndex, oldParseNode == null ? curIndex : curIndex + ((CharSequence) oldParseNode).length());
+         Object res = acceptTree(parser.semanticContext, oldParseNode, curIndex, oldParseNode == null ? curIndex : curIndex + ((CharSequence) oldParseNode).length());
          if (res != null)
             return true;
       }
@@ -742,7 +752,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
    public boolean peek(Parser p) {
       int startIndex = p.currentIndex;
       Object value = p.parseNext(this);
-      p.resetCurrentIndex(startIndex);
+      p.restoreCurrentIndex(startIndex, null);
       // If the parselet is matching EOF, it returns null as a valid match.  Everything else should return a ParseError at EOF.
       if (value == null && p.atEOF())
          return true;

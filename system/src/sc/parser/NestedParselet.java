@@ -2795,4 +2795,38 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       return super.getBeforeFirstNode(beforeFirstNode);
    }
    */
+
+   protected String acceptTree(SemanticContext ctx, Object value, int startIx, int endIx) {
+      String res = super.acceptTree(ctx, value, startIx, endIx);
+      if (res != null)
+         return res;
+
+      if (value instanceof ParentParseNode) {
+         ParentParseNode pn = (ParentParseNode) value;
+         ArrayList<Object> children = pn.children;
+         if (children != null) {
+            int ix = 0;
+            for (Object child:children) {
+               if (child instanceof IParseNode) {
+                  IParseNode childPN = (IParseNode) child;
+                  // TODO: is endIx necessary here?
+                  res = childPN.getParselet().acceptTree(ctx, child, childPN.getStartIndex(), -1);
+                  if (res != null)
+                     return res;
+               }
+               else if (child != null) {
+                  Parselet childParselet = getChildParselet(child, ix);
+                  if (childParselet != null) {
+                     // TODO: we could compute the startIx and endIx if necessary
+                     res = childParselet.acceptTree(ctx, child, -1, -1);
+                     if (res != null)
+                        return res;
+                  }
+               }
+               ix++;
+            }
+         }
+      }
+      return null;
+   }
 }

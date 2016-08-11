@@ -505,6 +505,7 @@ public class SymbolChoice extends Parselet {
       while (istr.length() > 0 && !stringMatches(istr))
          istr = istr.substring(0,istr.length()-1);
 
+      // TODO: use acceptTree here to validate the entire value?
       if (istr.length() > 0 && stringMatches(istr) && accept(ctx.semanticContext, istr, -1, -1) == null)
          return generateResult(ctx, istr); 
 

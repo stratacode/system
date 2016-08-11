@@ -1430,6 +1430,7 @@ public class Sequence extends NestedParselet  {
       if (value != null && !dataTypeMatches(value))
          return optional ? generateResult(ctx, null) : ctx.error(this, SLOT_DID_NOT_MATCH, value, 0);
 
+      // TODO: use acceptTree here since we should be validating the entire value right?
       String acceptError = accept(ctx.semanticContext, value, -1, -1);
       if (acceptError != null) {
          return ctx.error(this, ACCEPT_ERROR, value, 0);

@@ -563,6 +563,10 @@ public class Parser implements IString {
       currentIndex = ix;
    }
 
+   /**
+    * Reset is used when we encounter an error and need to revert back to a previous index. Use restoreCurrentIndex when
+    * you are peeking into the stream, or need to move the semantic context backwards to reparse for errors
+    */
    public final Object resetCurrentIndex(int ix) {
       Object res = null;
       if (semanticContext != null)
@@ -571,6 +575,10 @@ public class Parser implements IString {
       return res;
    }
 
+   /**
+    * Like reset, but will save semantic context info.  For example, if we peek ahead an HTML close tag, we remove it from
+    * the semantic context.  When we restore the current index, we put the tag back again so we can match it again in the close tag.
+    */
    public final void restoreCurrentIndex(int ix, Object res) {
       if (semanticContext != null)
          semanticContext.restoreToIndex(ix, res);

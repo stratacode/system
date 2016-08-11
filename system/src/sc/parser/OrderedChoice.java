@@ -634,7 +634,7 @@ public class OrderedChoice extends NestedParselet  {
                // an identifier for example.
                Object errorRes = parser.reparseNext(skipOnErrorParselet, nextChildParseNode, dctx, forceReparse || nextChildReparse, null);
                if (errorRes instanceof ParseError) {
-                  // We never found the exitParselet - i.e. the } so the parent sequence will fail just like it did before.
+                  // We never found the exitParselet - i.e. the close brace so the parent sequence will fail just like it did before.
                   // When this method returns null, we go with the result we produced in the normal parseRepeatingChoice method.
                   if (extendedErrorOnly) {
                      dctx.changeCurrentIndex(parser, startIndex);

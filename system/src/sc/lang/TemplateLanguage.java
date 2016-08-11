@@ -109,6 +109,7 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
       templateBodyDeclarations.put(START_DECL_DELIMITER, templateDeclaration);
       templateBodyDeclarations.put(START_CODE_DELIMITER, templateStatement);
       templateBodyDeclarations.addDefault(templateString);
+      templateBodyDeclarations.skipOnErrorParselet = skipTypeDeclError;
    }
    Sequence glueDeclaration = new Sequence("GlueDeclaration(,declarations,)", endDelimiter, templateBodyDeclarations, startCodeDelimiter);
    Sequence templateAnnotations = new Sequence("(,,imports, templateModifiers,)", OPTIONAL, new Symbol(START_IMPORT_DELIMITER), spacing, imports, modifiers, endDelimiter);
