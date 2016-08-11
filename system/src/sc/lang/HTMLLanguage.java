@@ -15,10 +15,22 @@ import java.util.Set;
 /**
  * Implements the parser for the schtml format.  This specific file defines the HTML grammar, built on top of the
  * template language.  The template declarations, the text strings, are extended to include tag objects, using the
- * sc.lang.html.Element class.  When you parse an HTML file, this language produces a Template instance which has
+ * sc.lang.html.Element class.  When you parse an schtml file, this language produces a Template instance which has
  * Element instances as additional types of it's templateDeclarations property.  During the init process, each
  * Template object converts all Element types into StrataCode language elements.  At this point the Template is processed
  * like any other template from the Template language - converted to Java, Javascript, or interpreted.
+ *
+ * In general, SCHTML provides a structured subset of HTML for manageability.  It validates all tags, attributes, etc.
+ * though is more strict in some cases than typical HTML.
+ *
+ * TODO: The parser here generates the HTML tree, matching open and close tags using a rudimentary approach to first
+ * parse a tree-tag, then when that fails to parse a valid body + close tag, just to go and parse an simple tag.  Because we
+ * enable caching on the key elements it's faster than it might seem at first glance, but it's still not nearly as fast as it
+ * could be.   A simple performance optimization would be to pre-parse a table of </tagName patterns that we find, possibly with
+ * the index where we find it.  Given that most tags are used only one way in any given file, we'd be able to skip the tree-tag
+ * parsing for <br> and <p> tags, for example.
+ *
+ * TODO: It would be nice to have a grammar that deals with pure HTML, that's not based on the template language
  */
 public class HTMLLanguage extends TemplateLanguage {
    public final static HTMLLanguage INSTANCE = new HTMLLanguage();
@@ -367,6 +379,11 @@ public class HTMLLanguage extends TemplateLanguage {
 
    public Sequence attributeValueLiteral = new Sequence("(,.,)", doubleQuote, attributeValueString, doubleQuote);
    public Sequence attributeValueSQLiteral = new Sequence("(,.,)", singleQuote, attributeValueSingleQuoteString, singleQuote);
+   {
+      // Handles the case where we have: value=":= foo."
+      attributeValueLiteral.skipOnErrorSlot = 2;
+      attributeValueSQLiteral.skipOnErrorSlot = 2;
+   }
 
    Parselet attributeValue =  new OrderedChoice(attributeValueLiteral, attributeValueSQLiteral);
 

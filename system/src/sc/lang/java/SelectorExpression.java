@@ -758,6 +758,40 @@ public class SelectorExpression extends ChainedExpression {
       }
    }
 
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
+      if (selectors == null)
+         return null;
+      SelectorExpression origSel = origNode instanceof SelectorExpression ? (SelectorExpression) origNode : null;
+      // The origIdent inside of an Element tag will not have been started, but the replacedByStatement which represents in the objects is started
+      if (origSel != null && origSel.replacedByStatement instanceof SelectorExpression)
+         origSel = (SelectorExpression) origSel.replacedByStatement;
+
+      Object[] useTypes = origSel == null ? boundTypes : origSel.boundTypes;
+
+      for (int i = 0; i < selectors.size(); i++) {
+         Selector sel = selectors.get(i);
+         if (sel instanceof VariableSelector) {
+            VariableSelector vsel = (VariableSelector) sel;
+            String ident = vsel.identifier;
+            if (ident != null) {
+               int dummyIx = ident.indexOf(dummyIdentifier);
+               if (dummyIx != -1) {
+                  String matchPrefix = ident.substring(0, dummyIx);
+
+                  Object curType = i == 0 ? (expression == null ? null :expression.getTypeDeclaration()) :
+                                            (useTypes == null ? null : useTypes[i-1]);
+
+                  if (curType != null)
+                     ModelUtil.suggestMembers(origModel, curType, matchPrefix, candidates, false, true, true, false);
+
+                  return matchPrefix;
+               }
+            }
+         }
+      }
+      return null;
+   }
+
    public void visitTypeReferences(CycleInfo info, TypeContext ctx) {
       info.visit(expression, ctx, false);
       if (boundTypes != null) {

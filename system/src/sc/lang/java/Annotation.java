@@ -335,4 +335,10 @@ public class Annotation extends JavaSemanticNode implements IAnnotation {
       }
       return null;
    }
+
+   public void stop() {
+      super.stop();
+      boundType = null;
+      errorArgs = null;
+   }
 }
