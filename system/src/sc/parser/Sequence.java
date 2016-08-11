@@ -554,7 +554,7 @@ public class Sequence extends NestedParselet  {
                               if (!backChild.optional || backChild.getLookahead())
                                  break;
 
-                              if (value.children != null) {
+                              if (value.children != null && nextIx < value.children.size()) {
                                  Object nextSlotVal = value.children.get(nextIx);
                                  // Can't retry this slot as we already parsed it
                                  if (nextSlotVal != null && !(nextSlotVal instanceof ErrorParseNode))
@@ -825,7 +825,7 @@ public class Sequence extends NestedParselet  {
       if (oldParent instanceof ErrorParseNode) {
          return null;
       }
-      if (oldParent instanceof IString)
+      if (oldParent instanceof IString || oldParent instanceof String)
          return null;
       ParentParseNode oldpn = (ParentParseNode) oldParent;
       if (ix < oldpn.children.size())
