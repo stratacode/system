@@ -1261,6 +1261,7 @@ public class Sequence extends NestedParselet  {
                         value = resetOldParseNode(forceReparse ? null : oldParent, lastMatchIndex, false, false);
                      }
                      svCount += value.addForReparse(new ErrorParseNode(new ParseError(skipOnErrorParselet, "Expected {0}", new Object[]{this}, errorStart, parser.currentIndex), errorRes.toString()), skipOnErrorParselet, svCount, newChildCount, -1, true, parser, oldChildParseNode, dctx, true, true);
+                     newChildCount++;
                      extendedErrorMatches = true;
                      matched = true;
                   }
