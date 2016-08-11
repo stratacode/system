@@ -3988,6 +3988,9 @@ public class IdentifierExpression extends ArgumentsExpression {
          return null;
 
       IdentifierExpression origIdent = origNode instanceof IdentifierExpression ? (IdentifierExpression) origNode : null;
+      // The origIdent inside of an Element tag will not have been started, but the replacedByStatement which represents in the objects is started
+      if (origIdent != null && origIdent.replacedByStatement instanceof IdentifierExpression)
+         origIdent = (IdentifierExpression) origIdent.replacedByStatement;
 
       int i = 0;
       for (IString ident:idents) {
@@ -3997,6 +4000,11 @@ public class IdentifierExpression extends ArgumentsExpression {
             String matchPrefix = identStr.substring(0, dummyIx);
 
             Object curType = origNode == null ? origModel.getModelTypeDeclaration() : origNode.getEnclosingType();
+            if (origNode != null && curType == null)
+               curType = origModel.getModelTypeDeclaration();
+
+            if (origIdent != null && !origIdent.isStarted())
+               ParseUtil.initAndStartComponent(origIdent);
 
             if (origIdent != null && i > 0 && origIdent.boundTypes != null && origIdent.boundTypes.length >= i) {
                curType = origIdent.getTypeForIdentifier(i-1);

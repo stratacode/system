@@ -305,6 +305,13 @@ public abstract class JavaSemanticNode extends SemanticNode {
             else
                return td.getEnclosingType();
          }
+         else if (pnode instanceof Element) {
+            Element elem = (Element) pnode;
+            TypeDeclaration res = elem.getElementTypeDeclaration();
+            if (res == null)
+               return elem.getEnclosingType();
+            return res;
+         }
          if (pnode instanceof NewExpression) {
             NewExpression newEx = (NewExpression) pnode;
             if (newEx.classBody != null && !newEx.lambdaExpression)

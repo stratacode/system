@@ -3564,4 +3564,8 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
    public void stop() {
       super.stop();
    }
+
+   public TypeDeclaration getElementTypeDeclaration() {
+      return tagObject;
+   }
 }
