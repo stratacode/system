@@ -8901,8 +8901,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       innerObjs = null;
       defaultConstructor = null;
       fullTypeName = null;
-      if (!replaced)
-         replacedByType = null;
+      // Can't clear this out because it's set from the other type - it won't be reset on a restart
+      //if (!replaced)
+      //   replacedByType = null;
       super.stop();
    }
 
