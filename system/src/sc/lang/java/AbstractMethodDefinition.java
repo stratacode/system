@@ -776,6 +776,10 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
    public void stop() {
       super.stop();
       parameterTypes = null;
+      overriddenMethod = null;
+      modified = false;
+      overriddenMethodName = null;
+      overriddenLayer = null;
    }
 
    public String getInnerTypeName() {

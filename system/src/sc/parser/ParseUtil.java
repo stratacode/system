@@ -701,16 +701,22 @@ public class ParseUtil  {
       return parseNodeObj;
    }
 
-   public static void reformatParseNode(IParseNode node) {
-      node.formatString(null, null, -1, true);
-   }
-
    /** Re-applies default spacing/new line rules to the parse node given.  The spacing and newline objects have their parse nodes replaced by the generateParseNode */
    public static void resetSpacing(ISemanticNode node) {
       IParseNode opn = node.getParseNode();
       IParseNode npn = opn.reformat();
       if (npn != opn)
          node.setParseNode(npn);
+   }
+
+   /** Removes the formating parse-nodes, like SpacingParseNode and replaces them with actual text based on the reformat algorithm.  When we re-generate a model, we are unable to
+    * determine the spacing and other text which is generated based on the complete context.  Instead, we insert these formatting parse-nodes as placeholders.  The format process starts then
+    * from the top of the file and can accurately generate the indentation, newlines and spaces as per the formatting rules.   This method performs that global operation but also replaces
+    * the formatting parse-nodes with the actual formatting characters - e.g. the whitepsace, newlines, etc.  so they can be more easily manipulated.   Operations like reparsing and generating
+    * the IDE representation of the parse-nodes requires that the spacing is all evaulated.
+    */
+   public static void reformatParseNode(IParseNode node) {
+      node.formatString(null, null, -1, true);
    }
 
 

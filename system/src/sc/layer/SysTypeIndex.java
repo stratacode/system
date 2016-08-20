@@ -168,6 +168,10 @@ public class SysTypeIndex {
       inactiveTypeIndex.updateTypeName(oldTypeName, newTypeName);
    }
 
+   public void fileRenamed(String oldFileName, String newFileName) {
+      inactiveTypeIndex.updateFileName(oldFileName, newFileName);
+   }
+
    public StringBuilder dumpCacheStats() {
       StringBuilder sb = new StringBuilder();
       if (activeTypeIndex != null) {

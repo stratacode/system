@@ -838,7 +838,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
          if (methodTypeParams != null) {
             for (Object typeParam : methodTypeParams) {
                if (ModelUtil.getTypeParameterName(typeParam).equals(typeVarName)) {
-                  if (ModelUtil.methodNamesMatch(def, method) && ModelUtil.methodsMatch(def, method)) {
+                  if (ModelUtil.sameMethods(def, method)) {
                      Object res = resolveMethodTypeParameter(typeVarName, typeParam);
                      Object newRes = null;
                      if (res instanceof JavaType) {

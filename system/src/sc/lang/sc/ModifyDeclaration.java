@@ -317,6 +317,21 @@ public class ModifyDeclaration extends TypeDeclaration {
       isStarting = false;
    }
 
+   public void stop() {
+      super.stop();
+      modifyTypeDecl = null;
+      modifyClass = null;
+      extendsBoundTypes = null;
+      typeInitialized = false;
+      modifyInherited = false;
+      compoundName = false;
+      enumConstant = false;
+      hiddenByType = null;
+      hiddenByRoot = null;
+      impliedRoots = null;
+      isStarting = false;
+   }
+
    private boolean needsSubType() {
       return modifyInherited && !temporaryType && modifyTypeDecl instanceof TypeDeclaration && !isHiddenType();
    }

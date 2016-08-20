@@ -2587,6 +2587,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          staticImportProperties = null;
       if (staticImportMethods != null)
          staticImportMethods = null;
+      definedTypesByName.clear();
    }
 
    @Bindable(manual=true)
@@ -2846,10 +2847,33 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       String oldFullName = CTypeUtil.prefixPath(pkgName, oldTypeName);
       String newFullName = CTypeUtil.prefixPath(pkgName, newTypeName);
       SrcEntry srcFile = getSrcFile();
-      if (srcFile != null)
+      if (srcFile != null) {
+         String oldFileName = srcFile.absFileName;
+         SrcEntry oldSrcEnt = srcFile.clone();
          srcFile.setTypeName(newTypeName, renameFile);
+         String newFileName = srcFile.absFileName;
+         if (layeredSystem != null)
+            layeredSystem.fileRenamed(oldSrcEnt, srcFile, true);
+      }
+      if (layeredSystem != null) {
+         layeredSystem.updateTypeName(oldFullName, newFullName, true);
+      }
+   }
+
+   /**
+    * Called when we detect that a source file has changed ffom outside the system.
+    * This handles updating the srcFile on this model and updating the indexes in teh layered system that
+    * depend on the file name.  NOTE: this does not change the type name of the model type which typically
+    * must correspond with the type but during the editing process, sometimes these become different so we need to
+    * handle the update independently.
+    */
+   public void fileRenamed(SrcEntry oldSrcEnt, SrcEntry newSrcEnt) {
+      if (srcFiles != null && srcFiles.size() > 0) {
+         srcFiles.remove(0);
+         srcFiles.add(0, newSrcEnt);
+      }
       if (layeredSystem != null)
-         layeredSystem.updateTypeName(oldFullName, newFullName);
+         layeredSystem.fileRenamed(oldSrcEnt, newSrcEnt, true);
    }
 
    public String getComment() {

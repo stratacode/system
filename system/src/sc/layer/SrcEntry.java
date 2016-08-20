@@ -17,7 +17,7 @@ import java.io.InputStream;
  * Represents a src file being processed by the layered system.
  * Stores the layer containing the file and the various path components. 
  */
-public class SrcEntry {
+public class SrcEntry implements Cloneable {
    public Layer layer;
    @Constant // eliminate binding warnings
    public String absFileName;  /* The absolute file name of the src entry */
@@ -135,5 +135,13 @@ public class SrcEntry {
 
    public String getJarUrl() {
       return "file://" + absFileName;
+   }
+
+   public SrcEntry clone() {
+      try {
+         return (SrcEntry) super.clone();
+      }
+      catch (CloneNotSupportedException exc) {}
+      return null;
    }
 }

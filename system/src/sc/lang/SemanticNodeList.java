@@ -149,6 +149,8 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
          return;
       started = false;
       initialized = false;
+      validated = false;
+      processed = false;
 
       int sz = size();
       for (int i = 0; i < sz; i++) {

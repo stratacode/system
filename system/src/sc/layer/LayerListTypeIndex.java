@@ -123,12 +123,20 @@ public class LayerListTypeIndex {
    }
 
    public void updateTypeName(String oldTypeName, String newTypeName) {
-      for (LayerTypeIndex ent:typeIndex.values()) {
-         ent.updateTypeName(oldTypeName, newTypeName);
+      TreeSet<String> layerNamesToSave = new TreeSet<String>();
+      for (Map.Entry<String, LayerTypeIndex> ent:typeIndex.entrySet()) {
+         LayerTypeIndex layerIndex = ent.getValue();
+         if (layerIndex.updateTypeName(oldTypeName, newTypeName)) {
+            layerNamesToSave.add(ent.getKey());
+         }
       }
       ArrayList<TypeIndexEntry> indexEntries = modifyTypeIndex.remove(oldTypeName);
-      if (indexEntries != null)
+      if (indexEntries != null) {
          modifyTypeIndex.put(newTypeName, indexEntries);
+         for (TypeIndexEntry ent:indexEntries) {
+            ent.typeName = newTypeName;
+         }
+      }
       LinkedHashMap<String,TypeIndexEntry> subTypes = subTypeIndex.remove(oldTypeName);
       if (subTypes != null)
          subTypeIndex.put(newTypeName, subTypes);
@@ -139,7 +147,27 @@ public class LayerListTypeIndex {
             subTypeMap.put(newTypeName, revEnt);
          }
       }
+      saveLayerTypeIndexes(layerNamesToSave);
+   }
 
+   public void updateFileName(String oldFileName, String newFileName) {
+      TreeSet<String> layerNamesToSave = new TreeSet<String>();
+      for (Map.Entry<String,LayerTypeIndex> ent:typeIndex.entrySet()) {
+         LayerTypeIndex layerIndex = ent.getValue();
+         if (layerIndex.updateFileName(oldFileName, newFileName)) {
+            layerNamesToSave.add(ent.getKey());
+         }
+      }
+      saveLayerTypeIndexes(layerNamesToSave);
+   }
+
+   private void saveLayerTypeIndexes(TreeSet<String> layerNamesToSave) {
+      for (String layerNameToSave:layerNamesToSave) {
+         Layer layerToSave = sys.lookupInactiveLayer(layerNameToSave, false, true);
+         if (layerToSave != null) {
+            layerToSave.saveTypeIndex();
+         }
+      }
    }
 
    public StringBuilder dumpCacheStats() {

@@ -537,6 +537,7 @@ public class TestUtil {
                      ParseError err = ((ParseError) result);
                      result = err.getBestPartialValue();
                   }
+                  /*
                   if (reparseFile.contains("3")) {
                      System.out.println("***");
                      //SCLanguage.getSCLanguage().normalClassDeclaration.trace = true;
@@ -546,6 +547,7 @@ public class TestUtil {
 
                      //DiffContext.debugDiffContext = true;
                   }
+                  */
                   if (result == null)
                      out("*** FAILURE: No previous result for reparse");
 

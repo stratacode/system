@@ -1024,6 +1024,10 @@ public class ModelUtil {
       return ModelUtil.isVarArgs(m1) == ModelUtil.isVarArgs(m2);
    }
 
+   public static boolean sameMethods(Object m1, Object m2) {
+      return ModelUtil.methodNamesMatch(m1, m2) && ModelUtil.methodsMatch(m1, m2);
+   }
+
    public static boolean parametersMatch(Object[] c1Types, Object[] c2Types, boolean allowUnbound, LayeredSystem sys) {
       int c1Len = c1Types == null ? 0 : c1Types.length;
       int checkLen = c2Types == null ? 0 : c2Types.length;

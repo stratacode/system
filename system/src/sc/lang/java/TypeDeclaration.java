@@ -242,6 +242,9 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       unregister();
 
       super.stop();
+
+      typeInfoInitialized = false;
+      implementsBoundTypes = null;
    }
 
    public boolean isAutoComponent() {

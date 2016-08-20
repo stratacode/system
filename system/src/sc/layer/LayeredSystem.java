@@ -754,10 +754,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   public void updateTypeName(String oldFullName, String newFullName) {
+   public void updateTypeName(String oldFullName, String newFullName, boolean updatePeers) {
       TypeDeclarationCacheEntry tds = typesByName.remove(oldFullName);
       if (tds != null)
          typesByName.put(newFullName, tds);
+
+      HashMap<String,Boolean> subTypes = subTypesByType.remove(oldFullName);
+      if (subTypes != null) {
+         subTypesByType.put(newFullName, subTypes);
+      }
 
       Object inner = innerTypeCache.remove(oldFullName);
       if (inner != null)
@@ -765,7 +770,33 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       typeIndex.updateTypeName(oldFullName, newFullName);
 
-      // TODO: do we do this for the other layered systems?
+      if (updatePeers && peerSystems != null) {
+         for (int i = 0; i < peerSystems.size(); i++) {
+            LayeredSystem peer = peerSystems.get(i);
+            peer.updateTypeName(oldFullName, newFullName, false);
+         }
+      }
+   }
+
+   public void fileRenamed(SrcEntry oldSrcEnt, SrcEntry newSrcEnt, boolean updatePeers) {
+      typeIndex.fileRenamed(oldSrcEnt.absFileName, newSrcEnt.absFileName);
+
+      ILanguageModel model = inactiveModelIndex.remove(oldSrcEnt.absFileName);
+      if (model != null) {
+         inactiveModelIndex.put(newSrcEnt.absFileName, model);
+         Layer modelLayer = model.getLayer();
+         if (modelLayer != null)
+            modelLayer.fileRenamed(oldSrcEnt, newSrcEnt);
+      }
+
+      // TODO: for each layer in the inactive layers list - update srcDirCache
+      // update model index?
+      if (updatePeers && peerSystems != null) {
+         for (int i = 0; i < peerSystems.size(); i++) {
+            LayeredSystem peer = peerSystems.get(i);
+            peer.fileRenamed(oldSrcEnt, newSrcEnt, false);
+         }
+      }
    }
 
    public ArrayList<PropertyAssignment> getAssignmentsToProperty(VariableDefinition varDef, boolean activeOnly, boolean openLayers, boolean checkPeers) {
@@ -3117,9 +3148,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       @Constant public boolean autoRefresh = true;
 
       @Constant public boolean retryAfterFailedBuild = false;
-
-      /** Directly containing layerBundle directories.  Each directory in the bundleDir is added to the initial layerPath */
-      @Constant public String bundleDir = "./bundles";
 
       @Constant String testPattern = null;
 
@@ -6402,7 +6430,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
                if (runtimes.size() > 0) {
                   for (IRuntimeProcessor runtime : runtimes) {
-                     if (runtime != null) {
+                     if (runtime != null && !isRuntimeDisabled(runtime.getRuntimeName())) {
                         DefaultRuntimeProcessor.saveRuntimeProcessor(this, runtime);
                      }
                   }
@@ -10841,7 +10869,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                }
             }
 
-               if (decl != null) {
+            if (decl != null) {
                JavaModel model = decl.getJavaModel();
                if (model.replacedByModel == null)
                   return decl;
@@ -12842,13 +12870,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   // Check the resulting class name.  getSrcTypeDeclaration may find the base-type of an inner type as it looks for inherited inner types under the parent type's name
                   if (res != null) {
                      if (res.getFullTypeName().equals(subTypeName)) {
-                        result.add(res);
+                        addTypeToList(result, res);
 
                         // When we have A extends B - should we return all of the layered types that make up B or just the most specific
                         if (includeModifiedTypes) {
                            BodyTypeDeclaration modType = res;
                            while ((modType = modType.getModifiedType()) != null && modType instanceof TypeDeclaration) {
-                              result.add((TypeDeclaration) modType);
+                              addTypeToList(result, (TypeDeclaration) modType);
                            }
                         }
                      }
@@ -12875,6 +12903,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       return result.iterator();
+   }
+
+   private void addTypeToList(ArrayList<TypeDeclaration> result, TypeDeclaration res) {
+      for (int i = 0; i < result.size(); i++) {
+         if (ModelUtil.sameTypes(result.get(i), res))
+            return;
+      }
+      result.add(res);
    }
 
    public ArrayList<TypeDeclaration> getModifiedTypesOfType(TypeDeclaration type, boolean before, boolean checkPeers) {
@@ -14032,6 +14068,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             return res;
       }
       return null;
+   }
+
+   public void applyModelChange(ILanguageModel model, boolean changed) {
+      if (externalModelIndex != null)
+         externalModelIndex.modelChanged(model, changed, model.getLayer());
    }
 }
 

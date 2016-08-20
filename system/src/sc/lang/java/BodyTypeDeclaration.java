@@ -544,6 +544,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    protected void bodyChanged() {
       incrVersion();
+      clearCachedMemberInfo();
+   }
+
+   public void clearCachedMemberInfo() {
       membersByName = null;
       methodsByName = null;
    }
@@ -8718,7 +8722,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          List<Object> compMethods = getDynCompiledMethods();
          if (compMethods != null) {
             for (Object compMeth:compMethods)
-               if (ModelUtil.methodNamesMatch(compMeth, meth) && ModelUtil.methodsMatch(compMeth, meth))
+               if (ModelUtil.sameMethods(compMeth, meth))
                   return true;
          }
          Object extType = getExtendsTypeDeclaration();
@@ -8766,6 +8770,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (sys != null)
          sys.removeFromRootNameIndex(this);
       setProperty("typeName", newTypeName);
+      fullTypeName = null;
       JavaModel model = getJavaModel();
       String prefix = CTypeUtil.getPackageName(getFileRelativeTypeName());
       if (model != null)
@@ -8895,6 +8900,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       dynTransientFields = null;
       innerObjs = null;
       defaultConstructor = null;
+      fullTypeName = null;
+      if (!replaced)
+         replacedByType = null;
       super.stop();
    }
 

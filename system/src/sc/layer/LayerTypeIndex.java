@@ -4,6 +4,9 @@
 
 package sc.layer;
 
+import sc.type.CTypeUtil;
+import sc.util.FileUtil;
+
 import java.io.Serializable;
 import java.util.HashMap;
 
@@ -20,12 +23,23 @@ public class LayerTypeIndex implements Serializable {
    HashMap<String,TypeIndexEntry> fileIndex = new HashMap<String,TypeIndexEntry>();
    String[] langExtensions; // Any languages registered by this layer - need to know these are source
 
-   public void updateTypeName(String oldTypeName, String newTypeName) {
+   public boolean updateTypeName(String oldTypeName, String newTypeName) {
       TypeIndexEntry ent = layerTypeIndex.remove(oldTypeName);
       if (ent != null) {
          layerTypeIndex.put(newTypeName, ent);
          ent.typeName = newTypeName;
+         return true;
       }
-      // TODO: update the file index here too if that was renamed
+      return false;
+   }
+
+   public boolean updateFileName(String oldFileName, String newFileName) {
+      TypeIndexEntry ent = fileIndex.remove(oldFileName);
+      if (ent != null) {
+         ent.fileName = newFileName;
+         fileIndex.put(newFileName, ent);
+         return true;
+      }
+      return false;
    }
 }

@@ -1597,6 +1597,20 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       String absPrefix = FileUtil.concat(packagePrefix.replace('.', FileUtil.FILE_SEPARATOR_CHAR), relDir);
       layeredSystem.addToPackageIndex(FileUtil.normalize(layerPathName), this, false, true, FileUtil.normalize(absPrefix), srcEnt.baseFileName);
       dirIndex.add(FileUtil.removeExtension(srcEnt.baseFileName));
+      // If there's an import packageName.* for this type, make sure we add the import
+      if (globalPackages != null) {
+         String typeName = srcEnt.getTypeName();
+         if (typeName != null) {
+            String packageName = CTypeUtil.getPackageName(typeName);
+            String className = CTypeUtil.getClassName(typeName);
+            for (String globalPackage : globalPackages) {
+               if (globalPackage.equals(packageName)) {
+                  importsByName.put(className, ImportDeclaration.create(typeName));
+                  break;
+               }
+            }
+         }
+      }
       if (checkPeers && layeredSystem.peerSystems != null) {
          for (LayeredSystem peerSys:layeredSystem.peerSystems) {
             Layer peerLayer = activated ? peerSys.getLayerByName(getLayerUniqueName()) : peerSys.lookupInactiveLayer(getLayerName(), false, true);
@@ -1613,7 +1627,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       srcDirCache.remove(relFileName);
       String absPrefix = FileUtil.concat(packagePrefix.replace('.', '/'), srcEnt.getRelDir());
       layeredSystem.removeFromPackageIndex(layerPathName, this, false, true, absPrefix, srcEnt.baseFileName);
-      // TODO: any reason to remove the dirIndex entry?
+      // TODO: any reason to remove the dirIndex entry?  and the globalPackages entry if there's an import packageName.* which matches this class?  We should validate each entry still exists before returning it
    }
 
    /**
@@ -4244,6 +4258,18 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             baseLayer.flushTypeCache();
          }
       }
+   }
+
+   public void fileRenamed(SrcEntry oldFile, SrcEntry newFile) {
+      File ent = srcDirCache.remove(oldFile.relFileName);
+      if (ent != null) {
+         srcDirCache.remove(FileUtil.removeExtension(oldFile.relFileName));
+         File newFileRef = new File(newFile.absFileName);
+         srcDirCache.put(newFile.relFileName, newFileRef);
+         srcDirCache.put(FileUtil.removeExtension(newFile.relFileName), newFileRef);
+      }
+
+
    }
 }
 
