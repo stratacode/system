@@ -11,6 +11,7 @@ import sc.lang.java.BodyTypeDeclaration;
 import sc.lifecycle.ILifecycle;
 import sc.type.RTypeUtil;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;

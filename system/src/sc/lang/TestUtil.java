@@ -472,8 +472,6 @@ public class TestUtil {
          long startTime = System.currentTimeMillis();
          int ct = opts.repeatCount;
          do {
-            TemplateLanguage.getTemplateLanguage().blockStatements.trace = true;
-
             // Parsing using the language directly - no layered system involved so we can only validate the grammar
             if (!opts.layerMode) {
                lang = Language.getLanguageByExtension(ext);
@@ -538,9 +536,9 @@ public class TestUtil {
                      result = err.getBestPartialValue();
                   }
                   /*
-                  if (reparseFile.contains("3")) {
+                  if (reparseFile.contains("6")) {
                      System.out.println("***");
-                     //SCLanguage.getSCLanguage().normalClassDeclaration.trace = true;
+                     SCLanguage.getSCLanguage().blockStatements.trace = true;
                      //JavaLanguage.getJavaLanguage().classBodyDeclarations.trace = true;
                      //HTMLLanguage.getHTMLLanguage().tagAttributes.trace = true;
 //                     SemanticNode.debugDiffTrace = true;

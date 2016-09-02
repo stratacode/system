@@ -666,9 +666,11 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       LayeredSystem sys = getLayeredSystem();
       List<?> parameterTypes = getParameterList();
 
+      HashSet<Object> visited = new HashSet<Object>();
+
       if (sys == null)
          return null;
-      addOverridingMethods(sys, enclType, res, parameterTypes);
+      addOverridingMethods(sys, enclType, res, parameterTypes, visited);
 
       return res;
    }
@@ -681,10 +683,13 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       return false;
    }
 
-   private void addOverridingMethods(LayeredSystem sys, TypeDeclaration enclType, ArrayList<Object> res, List<? extends Object> ptypes) {
+   private void addOverridingMethods(LayeredSystem sys, TypeDeclaration enclType, ArrayList<Object> res, List<? extends Object> ptypes, HashSet<Object> visited) {
       ArrayList<TypeDeclaration> modTypes = sys.getModifiedTypesOfType(enclType, false, false);
       if (modTypes != null) {
          for (TypeDeclaration modType:modTypes) {
+            if (visited.contains(modType))
+               continue;
+            visited.add(modType);
             Object overMeth = ModelUtil.definesMethod(modType, name, getParameterList(), null, null, false, false, null, null, getLayeredSystem());
             if (overMeth != null && !resultListContainsMethod(res, overMeth))
                res.add(overMeth);
@@ -697,6 +702,10 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             System.err.println("*** Loop in sub-type hierarchy");
             return;
          }
+
+         if (visited.contains(subType))
+            continue;
+         visited.add(subType);
 
          // In this case, we need to consider all overriding methods - including those in modified types
          Object result = subType.declaresMethod(name, ptypes, null, enclType, false, null, null, false);
@@ -714,7 +723,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             modType = modType.getModifiedType();
          } while (true);
 
-         addOverridingMethods(sys, subType, res, ptypes);
+         addOverridingMethods(sys, subType, res, ptypes, visited);
       }
    }
 

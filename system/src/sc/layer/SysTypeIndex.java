@@ -116,6 +116,7 @@ public class SysTypeIndex {
          System.err.println("*** Modifying type index without write lock");
          new Throwable().printStackTrace();
       }
+
       // For each type in the type index, add the type if it matches
       for (Map.Entry<String,LayerTypeIndex> typeIndexEnt:inactiveTypeIndex.typeIndex.entrySet()) {
          //String layerName = typeIndexEnt.getKey();
@@ -130,7 +131,7 @@ public class SysTypeIndex {
             // Using lookup here so we only look through layers that have been loaded.  Otherwise there's a concurrent modification exception as we modify this index
             Layer indexLayer = inactiveTypeIndex.sys.lookupInactiveLayer(layerName, true, true);
             // Only search layers which this layer can depend upon
-            if (indexLayer == null || (!refLayer.getLayerName().equals(indexLayer.getLayerName()) && !refLayer.extendsLayer(indexLayer)))
+            if (indexLayer == null || refLayer == Layer.ANY_INACTIVE_LAYER || refLayer == Layer.ANY_LAYER || (!refLayer.getLayerName().equals(indexLayer.getLayerName()) && !refLayer.extendsLayer(indexLayer)))
                continue;
          }
          HashMap<String,TypeIndexEntry> layerTypeMap = layerTypeIndex.layerTypeIndex;

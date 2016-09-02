@@ -1166,5 +1166,15 @@ public class ClassType extends JavaType {
       }
    }
 
+   public Object getRawTypeDeclaration() {
+      Object boundType = getTypeDeclaration();
+      while (boundType instanceof ArrayTypeDeclaration || boundType instanceof ParamTypeDeclaration) {
+         if (boundType instanceof ArrayTypeDeclaration)
+            boundType = ((ArrayTypeDeclaration) boundType).getComponentType();
+         else
+            boundType = ((ParamTypeDeclaration) boundType).getBaseType();
+      }
+      return boundType;
+   }
 
 }

@@ -112,6 +112,10 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
       templateBodyDeclarations.skipOnErrorParselet = skipTypeDeclError;
    }
    Sequence glueDeclaration = new Sequence("GlueDeclaration(,declarations,)", endDelimiter, templateBodyDeclarations, startCodeDelimiter);
+   {
+      // Do not parse %>bodyText by itself.   We need to match a the open <% as well in partial values mode or else we consume the %>bodyText as part of 'classBodyDeclarations' so it's not there for the close template
+      glueDeclaration.minContentSlot = 2;
+   }
    Sequence templateAnnotations = new Sequence("(,,imports, templateModifiers,)", OPTIONAL, new Symbol(START_IMPORT_DELIMITER), spacing, imports, modifiers, endDelimiter);
    Sequence template = new Sequence("Template(, *, templateDeclarations,)", spacing, templateAnnotations, templateBodyDeclarations, new Symbol(EOF));
    {

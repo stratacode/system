@@ -261,7 +261,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    public boolean finalLayer = false;
 
    // For build layers, while the layer is being build this stores the build state - changed files, etc.
-   LayeredSystem.BuildState buildState;
+   LayeredSystem.BuildState buildState, lastBuildState;
 
    /** Set to true when this layer has had all changed files detected.  If it's not changed, we will load it as source */
    public boolean changedModelsDetected = false;
@@ -3110,6 +3110,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    public static class ModelUpdate {
       public ILanguageModel oldModel;
       public Object changedModel;
+      public boolean removed;
 
       public ModelUpdate(ILanguageModel oldM, Object newM) {
          oldModel = oldM;
@@ -3117,7 +3118,11 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
 
       public String toString() {
-         return changedModel.toString();
+         if (removed && oldModel != null)
+            return "removed: " + oldModel.toString();
+         if (changedModel != null)
+            return changedModel.toString();
+         return "<null>";
       }
    }
 
@@ -3128,6 +3133,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (lastRefreshTime == -1 || (newTime = f.lastModified()) > lastRefreshTime) {
          // First update the src cache to pick up any new files, refresh any models we find in there when ctx is not null
          addSrcFilesToCache(f, prefix, null);
+         findRemovedFiles(changedModels);
       }
 
       if (!f.isDirectory()) {
@@ -4268,10 +4274,25 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          srcDirCache.put(newFile.relFileName, newFileRef);
          srcDirCache.put(FileUtil.removeExtension(newFile.relFileName), newFileRef);
       }
-
-
    }
+
+   void findRemovedFiles(List<ModelUpdate> changedModels) {
+      for (IdentityWrapper<ILanguageModel> layerWrapper:layerModels) {
+         ILanguageModel model = layerWrapper.wrapped;
+         SrcEntry srcFile = model.getSrcFile();
+         if (srcFile != null && !srcFile.canRead()) {
+            ModelUpdate removedModel = new ModelUpdate(model, null);
+            removedModel.removed = true;
+            changedModels.add(removedModel);
+
+            verbose("Model file removed: " + srcFile);
+         }
+      }
+   }
+
+   boolean cacheForRefLayer() {
+      return this != Layer.ANY_LAYER && this != Layer.ANY_INACTIVE_LAYER && this != Layer.ANY_OPEN_INACTIVE_LAYER && this.activated;
+   }
+
 }
-
-
 

@@ -969,8 +969,12 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
             return true;
          if (parent instanceof VariableStatement)
             return true;
-         if (parent instanceof PropertyAssignment)
+         if (parent instanceof PropertyAssignment) {
+            // We do not set the inferredType for =: bindings which are reverse only
+            if (((PropertyAssignment) parent).isReverseOnlyExpression())
+               return false;
             return true;
+         }
          if (parent instanceof IBlockStatement)
             return false;
          if (parent instanceof ITypeDeclaration)

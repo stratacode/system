@@ -2524,7 +2524,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       }
    }
 
-   public Language getLanguage() {
+   public JavaLanguage getLanguage() {
       return JavaLanguage.getJavaLanguage();
    }
 

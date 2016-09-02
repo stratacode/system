@@ -235,7 +235,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                            Object[] constructors = ModelUtil.getConstructors(superType, null);
                            if (arguments.size() > 0 || (constructors != null && constructors.length > 0)) {
                               if (model != null && !model.disableTypeErrors && isInferredSet() && isInferredFinal()) {
-                                 String othersMessage = getOtherConstructorsMessage(enclType);
+                                 String othersMessage = getOtherConstructorsMessage(superType);
                                  displayTypeError("No constructor matching: ", ModelUtil.argumentsToString(arguments), othersMessage, " for: ");
                               }
                            }
@@ -891,6 +891,21 @@ public class IdentifierExpression extends ArgumentsExpression {
 
    public Object getBoundType(int ix) {
       return boundTypes == null || boundTypes.length <= ix ? null : boundTypes[ix];
+   }
+
+   public Object getBoundTypeNoParamType(int ix) {
+      Object boundType = getBoundType(ix);
+      // First, need to unwrap any parameterization that has been wrapped onto the real type.
+      if (boundType instanceof ParamTypedMember)
+         boundType = ((ParamTypedMember) boundType).getMemberObject();
+      if (boundType instanceof ParamTypedMethod)
+         boundType = ((ParamTypedMethod) boundType).method;
+      if (boundType instanceof ParamTypeDeclaration)
+         boundType = ((ParamTypeDeclaration) boundType).getBaseType();
+      if (boundType instanceof JavaSemanticNode) {
+         boundType = ((JavaSemanticNode) boundType).refreshNode();
+      }
+      return boundType;
    }
 
    /** Returns true for a static field or method at the specific location in the indentifiers list */
@@ -2980,7 +2995,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   return resolveType(smt, ix, idTypes);
                // If ix > 0 and ix - 1's type has type parameters (either a field like List<X> or a method List<X> get(...).
                // need to apply the method's type parameters against the ones in the previous type.
-               return resolveType(ModelUtil.getMethodTypeDeclaration(rootType != null ? rootType : getTypeContext(idTypes, boundTypes, ix), boundTypes[ix], arguments, model.getLayeredSystem(), model, inferredType, definedInType), ix, idTypes);
+               return resolveType(ModelUtil.getMethodTypeDeclaration(rootType != null ? rootType : getTypeContext(idTypes, boundTypes, ix), boundTypes[ix], arguments, model == null ? null : model.getLayeredSystem(), model, inferredType, definedInType), ix, idTypes);
             case SetVariable:
                return resolveType(ModelUtil.getSetMethodPropertyType(boundTypes[ix], model), ix, idTypes);
             case EnumName:
@@ -3176,7 +3191,7 @@ public class IdentifierExpression extends ArgumentsExpression {
 
    public void stop() {
       // If we have not been officially started but our type reference has been assigned, we need to clear it here anyway
-      if (boundTypes == null && idTypes == null) return;
+      //if (boundTypes == null && idTypes == null) return;
 
       // Need to complete the full stop() on this node and our base type checks 'started'
       if (!started)

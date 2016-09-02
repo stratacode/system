@@ -783,8 +783,13 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
    }
 
    public String getInnerTypeName() {
-      if (anonMethodId == 0)
-         anonMethodId = getEnclosingType().allocateAnonMethodId();
+      if (anonMethodId == 0) {
+         TypeDeclaration enclType = getEnclosingType();
+         if (enclType != null)
+            anonMethodId = enclType.allocateAnonMethodId();
+         else
+            anonMethodId = 123; // Don't think is really used when this is a fragment not in a type
+      }
       // Java names these just parentType$1InnerType
       return METHOD_TYPE_PREFIX + anonMethodId;
    }

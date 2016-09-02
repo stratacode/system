@@ -89,8 +89,7 @@ public class OrderedChoice extends NestedParselet  {
          p.setLanguage(getLanguage());
          Class newResult = p.getSemanticValueClass();
 
-         if (firstValue)
-         {
+         if (firstValue) {
             unresolved = newResult == null;
             firstValue = false;
             oldResult = newResult;
@@ -153,8 +152,7 @@ public class OrderedChoice extends NestedParselet  {
          if (newResult == null)
             unresolved = true;
 
-         if (firstValue)
-         {
+         if (firstValue) {
             firstValue = false;
             oldResult = newResult;
          }
@@ -169,10 +167,8 @@ public class OrderedChoice extends NestedParselet  {
             if (result == null)
                result = Object.class;
          }
-
          i++;
       }
-
 
       if (!unresolved) {
          if (trace && resultComponentClass != result)
@@ -674,8 +670,17 @@ public class OrderedChoice extends NestedParselet  {
                if (useError) {
                   if (value == null)
                      value = resetOldParseNode(oldParent, lastMatchStart, false, false);
-                  svCount += value.addForReparse(new ErrorParseNode(new ParseError(skipOnErrorParselet, "Expected {0}", new Object[]{this}, errorStart, parser.currentIndex),
-                                          errorRes.toString()), skipOnErrorParselet, svCount, newChildCount++, bestErrorSlotIx, true, parser, nextChildParseNode, dctx, true, true);
+                  ErrorParseNode newErrorRes;
+                  // If we are reusing an old error parse node, just use that node because it has startIndex and newStartIndex set properly.   If we set startIndex
+                  // here but not newStartIndex, if we need to reparse this same sequence in reparseExtendedErrors, we will not use the right index to determine whether to insert
+                  // or replace this node.
+                  if (errorRes instanceof ErrorParseNode) {
+                     newErrorRes = (ErrorParseNode) errorRes;
+                  }
+                  else
+                     newErrorRes = new ErrorParseNode(new ParseError(skipOnErrorParselet, "Expected {0}", new Object[]{this}, errorStart, parser.currentIndex), errorRes.toString());
+
+                  svCount += value.addForReparse(newErrorRes, skipOnErrorParselet, svCount, newChildCount++, bestErrorSlotIx, true, parser, nextChildParseNode, dctx, true, true);
                   matched = true;
                   emptyMatch = false;
                }

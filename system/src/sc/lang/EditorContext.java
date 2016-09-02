@@ -1040,6 +1040,9 @@ public class EditorContext extends ClientEditorContext {
                }
                setErrorsChanged(errorsChanged + 1);
             }
+            else if (modelUpdate.removed) {
+
+            }
          }
       }
    }

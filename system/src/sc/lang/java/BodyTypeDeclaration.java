@@ -550,6 +550,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public void clearCachedMemberInfo() {
       membersByName = null;
       methodsByName = null;
+      memberCache = null;
+      // Propagate this up the hierarchy since we transform the modified type and need to invalidate the member cache of any modified types.
+      if (replacedByType != null)
+         replacedByType.clearCachedMemberInfo();
    }
 
    protected void incrVersion() {
@@ -3248,6 +3252,16 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    /**
+    * For a modify of an inner type which modifies an inner type of a base-type of the enclosing type (i.e. modifyInherited),
+    * this returns the modified type, which is not the same type unlike a normal modify operation.  It's possible we should
+    * return this as the extendsTypeDeclaration but for now you need to use this method to figure this out.
+    */
+   public Object getModifiedExtendsTypeDeclaration() {
+      return null;
+   }
+
+
+   /**
     * By default, the extends type is the same in the model and compiled code.  But when you modify an inherited type
     * you actually do not extend that type but the compiled model will extend it.
     */
@@ -4228,7 +4242,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             System.out.println("Compiling: " + toCompileEnts + " into build dir: " + bd + " with classpath: " + cp);
          else if (sys.options.info)
             System.out.println("Compiling: " + toCompileEnts.size() + " stub files");
-         if (doCompile && LayerUtil.compileJavaFilesInternal(toCompileEnts, bd, cp, sys.options.debug, sys.javaSrcVersion, sys.messageHandler) != 0) {
+         HashSet<String> errorFiles = new HashSet<String>();
+         if (doCompile && LayerUtil.compileJavaFilesInternal(toCompileEnts, bd, cp, sys.options.debug, sys.javaSrcVersion, sys.messageHandler, errorFiles) != 0) {
             displayError("Failed compile step for dynamic type: " + getFullTypeName() + " for ");
          }
       }
@@ -7464,10 +7479,17 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             }
          }
       }
+      Object modifyInheritedBaseType = getModifiedExtendsTypeDeclaration();
+      if (modifyInheritedBaseType != null) {
+         if (baseTypes == null)
+            baseTypes = new ArrayList<String>();
+         baseTypes.add(ModelUtil.getTypeName(modifyInheritedBaseType));
+      }
       idx.baseTypes = baseTypes;
       idx.declType = getDeclarationType();
       idx.isLayerType = isLayerType;
-      // TODO: inner types, methods? and property references
+      // Inner types store their own index entries
+      // Overridden properties use the type index and are built up when from that
       return idx;
    }
 
@@ -8526,8 +8548,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (enclType == null) {
          JavaModel model = getJavaModel();
          if (model != null && model.parseNode != null) {
-            String spaceBefore = ParseUtil.getSpaceBefore(model.parseNode, this);
-            return ParseUtil.stripComments(spaceBefore);
+            StringBuilder sb = new StringBuilder();
+            //if (modifiers != null)
+            //   sb.append(ParseUtil.getCommentsBefore(model.parseNode, modifiers, model.getLanguage().spacing));
+            sb.append(ParseUtil.getCommentsBefore(model.parseNode, this, model.getLanguage().spacing));
+            return sb.toString();
          }
       }
       else {
@@ -8801,7 +8826,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return this;
       }
 
-      if (!oldModel.removed)
+      if (oldModel == null || !oldModel.removed)
          return this; // We are still valid
       if (removed) { // For live types we have a ref to the replacement
          if (replacedByType == null)
@@ -8901,6 +8926,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       innerObjs = null;
       defaultConstructor = null;
       fullTypeName = null;
+      if (replacedByType != null)
+         replacedByType.clearCachedMemberInfo();
       // Can't clear this out because it's set from the other type - it won't be reset on a restart
       //if (!replaced)
       //   replacedByType = null;

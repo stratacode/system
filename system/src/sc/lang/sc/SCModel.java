@@ -44,7 +44,7 @@ public class SCModel extends JavaModel {
       return "sc file: ";
    }
 
-   public Language getLanguage() {
+   public SCLanguage getLanguage() {
       return SCLanguage.getSCLanguage();
    }
 }

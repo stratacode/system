@@ -60,10 +60,13 @@ public interface ITypeDeclaration {
    /** Returns all occurrences of the specified annotation on the types in the type hierarchy ordered so the first type encountered during the traversal is first. */
    ArrayList<Object> getAllInheritedAnnotations(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve);
 
+   /** Used to retrieve the type which either a class or modify type is derived from.  For a class it's the extends type.  For a modify type, it's the modified type */
    Object getDerivedTypeDeclaration();
 
+   /** The actual extends type for a class */
    Object getExtendsTypeDeclaration();
 
+   /** The declaration for the extends type for a class - includes type parameters but may not be resolved */
    Object getExtendsType();
 
    List<?> getImplementsTypes();

@@ -19,7 +19,11 @@ import sc.lang.java.*;
 
 import java.util.*;
 
-/** The semantic node class which is used for the modify operation. */
+/**
+ * The semantic node class which is used for the modify operation.  The modify type is used to modify Java code and for defining layers.
+ * You might modify another type which we have in src in which case "modifyTypeDecl" is
+ * set to point to the type, or you might modify a class for an annotation layer or a layer definition file - then modifyClass is set to refer to the modified type.
+ */
 public class ModifyDeclaration extends TypeDeclaration {
    public SemanticNodeList<JavaType> extendsTypes;
 
@@ -28,6 +32,9 @@ public class ModifyDeclaration extends TypeDeclaration {
    transient Object[] extendsBoundTypes;
    transient private boolean typeInitialized = false;
    transient public boolean temporaryType;
+   // ModifyInherited = true when you use a modify in an inner type where the modified type is actually in a base class,
+   // not the same type that the parent type is modifying.  If your outer class extends "OuterExtends", this modifyInherited case is a shortcut for:
+   //      class innerName extends OuterExtends.innerName
    transient public boolean modifyInherited = false;
    transient public boolean compoundName = false;
    transient public boolean enumConstant = false;
@@ -360,10 +367,17 @@ public class ModifyDeclaration extends TypeDeclaration {
             TypeDeclaration baseTypeDecl = (TypeDeclaration) modifyTypeDecl;
             Object modifyType = baseTypeDecl.getExtendsTypeDeclaration();
             if (modifyType != null && !ModelUtil.isAssignableFrom(modifyType, extType)) {
-               // For inactivated layers, we allow this since it's ok to have lots of layers with different implementations until you run them.
-               if (getLayer().activated) {
+               Layer thisLayer = getLayer();
+               Layer modLayer = baseTypeDecl.getLayer();
+               // For inactivated layers, we need to allow this since it's ok to have lots of layers with different implementations until you run them, but if our layer directly extends
+               // the layer in question, we can safely report the error.
+               if (getLayer().activated || (thisLayer != null && modLayer != null && thisLayer.extendsLayer(modLayer))) {
+                  JavaSemanticNode node = this;
+                  // Try to report the error on the conflicting extends type
+                  if (extendsTypes != null && extendsTypes.size() > 0)
+                     node = extendsTypes.get(0);
                   // Is this an error or a warning?  We let you replace the class and break the contract - should we let you replace the extends type?   or should this be a strict option on the layer?
-                  displayTypeError("Modify extends incompatible type - ", ModelUtil.getClassName(extType), " should extend existing extends: ", ModelUtil.getClassName(modifyType), " for: ");
+                  node.displayTypeError("Modify extends incompatible type - ", ModelUtil.getClassName(extType), " should extend existing extends: ", ModelUtil.getClassName(modifyType), " for: ");
                }
             }
          }
@@ -402,7 +416,8 @@ public class ModifyDeclaration extends TypeDeclaration {
 
       JavaModel thisModel = getJavaModel();
       if (thisModel == null) {
-         System.out.println("*** Error: initializing the type of a modify type that's not in a model!");
+         // Fragment encountered during syntax parsing - nothing to initialize
+         return;
       }
 
       boolean skipRoots = false;
@@ -1200,9 +1215,10 @@ public class ModifyDeclaration extends TypeDeclaration {
                      modifyTypeDecl = newDecl;
                }
                modType = modifyTypeDecl.transformedType;
-               if (modType == null)
+               if (modType == null) {
                   System.out.println("*** Error no transformed type for modify!");
-               modType = modifyTypeDecl;
+                  modType = modifyTypeDecl;
+               }
             }
          }
       }
@@ -2441,6 +2457,13 @@ public class ModifyDeclaration extends TypeDeclaration {
          return modifyTypeDecl;
 
       return super.getExtendsTypeDeclaration();
+   }
+
+   public Object getModifiedExtendsTypeDeclaration() {
+      if (modifyInherited) {
+         return getModifiedType();
+      }
+      return null;
    }
 
    public boolean isCompiledProperty(String propName, boolean fieldMode, boolean interfaceMode) {

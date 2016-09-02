@@ -1415,9 +1415,9 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
       }
    }
 
-   public Language getLanguage() {
+   public TemplateLanguage getLanguage() {
       if (parseNode != null)
-         return parseNode.getParselet().getLanguage();
+         return (TemplateLanguage) parseNode.getParselet().getLanguage();
       return TemplateLanguage.getTemplateLanguage();
    }
 

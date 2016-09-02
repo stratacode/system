@@ -817,26 +817,69 @@ public class ParseUtil  {
       return sb.toString();
    }
 
-   public static String getSpaceBefore(IParseNode parseNode, ISemanticNode value) {
+   public static class SpaceBeforeResult {
+      public boolean found;
+      public String spaceBefore;
+
+      SpaceBeforeResult(boolean found, String space) {
+         this.found = found;
+         this.spaceBefore = space;
+      }
+   }
+
+   /**
+    * Takes a parent child node and does a search through the parse-node tree looking for the semantic-value specified.  Returns the comments (aka whitespace) right
+    * before that node, i.e. javadoc style comments */
+   public static SpaceBeforeResult getSpaceBefore(IParseNode parseNode, ISemanticNode value, Parselet spacing) {
       StringBuilder sb = new StringBuilder();
       if (parseNode instanceof ParentParseNode) {
          ParentParseNode pp = (ParentParseNode) parseNode;
          if (pp.children != null) {
             for (Object childNode:pp.children) {
-               if (childNode instanceof ParentParseNode) {
-                  ParentParseNode childParent = (ParentParseNode) childNode;
-                  if (childParent.value == value)
-                     return sb.toString();
-
-                  Object childSB = getSpacingForNode(childParent);
-                  if (childSB != null) {
-                     sb.append(childSB);
+               if (childNode instanceof IParseNode) {
+                  IParseNode childPN = (IParseNode) childNode;
+                  Object childSemVal = childPN.getSemanticValue();
+                  // Ok, found the top-level parse-node which produced the value
+                  if (childSemVal == value) {
+                     if (childPN instanceof ParentParseNode) {
+                        // Check if there's a nested parse-node that also produced the same value.  if so, we'll include any comments here as well
+                        SpaceBeforeResult nestedResult = getSpaceBefore(childPN, value, spacing);
+                        if (nestedResult.found)
+                           sb.append(nestedResult.spaceBefore);
+                     }
+                     return new SpaceBeforeResult(true, sb.toString());
+                  }
+                  // Don't look at comments which precede another semantic value - only those directly before the node we are documenting
+                  else if (!(childSemVal instanceof CharSequence) && !(childSemVal instanceof SemanticNodeList))
+                     sb = new StringBuilder();
+                  if (childNode instanceof ParentParseNode) {
+                     ParentParseNode childParent = (ParentParseNode) childNode;
+                     SpaceBeforeResult childResult = getSpaceBefore(childParent, value, spacing);
+                     if (childResult.found) {
+                        childResult.spaceBefore = sb.toString() + childResult.spaceBefore;
+                        return childResult;
+                     }
+                     else
+                        sb.append(childResult.spaceBefore);
                   }
                }
+
+               if (pp.parselet == spacing)
+                  sb.append(childNode);
             }
          }
       }
-      return sb.toString();
+      // Did not find the child so don't return anything
+      return new SpaceBeforeResult(false, sb.toString());
+   }
+
+   public static String getCommentsBefore(IParseNode outerParseNode, ISemanticNode semNode, Parselet commentParselet) {
+      ParseUtil.SpaceBeforeResult spaceBefore = ParseUtil.getSpaceBefore(outerParseNode, semNode, commentParselet);
+      if (!spaceBefore.found) {
+         System.err.println("*** Failed to find node for getComment");
+         return "";
+      }
+      return ParseUtil.stripComments(spaceBefore.spaceBefore);
    }
 
    public static boolean isCollapsibleNode(Object currentParent) {
@@ -966,7 +1009,6 @@ public class ParseUtil  {
          ctx.endChangeNewOffset = origNewLen;
          ctx.endChangeOldOffset = origOldLen;
          pnode.findEndDiff(ctx, null, null, -1);
-
 
          // If we are still on the last character we checked - there's no overlap in these files so advance the count beyond the last char
          if (ctx.endChangeNewOffset == origNewLen)

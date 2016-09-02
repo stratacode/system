@@ -670,7 +670,9 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    public Definition modifyDefinition(BodyTypeDeclaration base, boolean doMerge, boolean inTransformed) {
       TypeDeclaration otherType = (TypeDeclaration) base.getInnerType(typeName, null, true, false, false);
       Object annotObj;
-      if (otherType != null) {
+      // We are inside of a modify but are defining a new type.  If this type is the same as the inherited type
+      // we can just replace it, but if it's a new type, it just gets added to the modified type.
+      if (otherType != null && ModelUtil.sameTypes(otherType, this)) {
          overrides = otherType;
          // Preserves the order of the children in the list.
          otherType.parentNode.replaceChild(otherType, this);

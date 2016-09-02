@@ -106,6 +106,10 @@ public class ErrorParseNode extends AbstractParseNode {
       String text = ctx.text;
       int len = errorText.length();
       for (int i = len - 1; i >= 0; i--) {
+         // We did not find any differences at the end - this is the case where there are extra chars in the old
+         // file and so going from the back, we hit the end of the new file before seeing any changes
+         if (ctx.endChangeNewOffset == -1)
+            return;
          if (errorText.charAt(i) != text.charAt(ctx.endChangeNewOffset)) {
             ctx.lastDiffNode = this;
             ctx.afterLastNode = ctx.lastVisitedNode;

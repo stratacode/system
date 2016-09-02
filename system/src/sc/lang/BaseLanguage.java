@@ -91,7 +91,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
            notLineTerminators,
            new OrderedChoice(lineTerminator, new Symbol(Symbol.EOF)));
    {
-      //EOLComment.styleName = "comment";
+      EOLComment.styleName = "comment";
    }
 
    public IndexedChoice commentBody = new IndexedChoice("<commentBody>", OPTIONAL | REPEAT | NOERROR);
@@ -103,7 +103,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
    public Sequence blockComment = new Sequence("<blockComment>", NOERROR);
    { blockComment.add(new Symbol("/*"), commentBody, new Symbol("*/")); }
    {
-      //blockComment.styleName = "comment";
+      blockComment.styleName = "comment";
    }
 
    public IndexedChoice spacing = new IndexedChoice("<spacing>", REPEAT | OPTIONAL | NOERROR);

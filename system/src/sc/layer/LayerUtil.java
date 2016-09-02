@@ -94,7 +94,7 @@ public class LayerUtil implements LayerConstants {
       suppressedCompilerMessages.add("Note: Recompile with -Xlint:unchecked for details.");
    }
 
-   public static int compileJavaFilesInternal(Collection<SrcEntry> srcEnts, String buildDir, String classPath, boolean debug, String srcVersion, IMessageHandler messageHandler) {
+   public static int compileJavaFilesInternal(Collection<SrcEntry> srcEnts, String buildDir, String classPath, boolean debug, String srcVersion, IMessageHandler messageHandler, Set<String> errorFiles) {
       JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
       if (compiler == null) {
          System.err.println("*** No internal java compiler found - Do you have the JDK installed and is tools.jar in the system classpath? - trying javac");
@@ -146,6 +146,8 @@ public class LayerUtil implements LayerConstants {
                }
                else if (source == null)
                   source = "";
+               String errorFile = source.toString();
+               errorFiles.add(errorFile);
                if (messageHandler != null) {
                   MessageType type = MessageType.Error;
                   switch (diagnostic.getKind()) {
@@ -156,7 +158,7 @@ public class LayerUtil implements LayerConstants {
                         type = MessageType.Warning;
                         break;
                   }
-                  messageHandler.reportMessage(message, source.toString(), (int) lineNumber, (int) column, type);
+                  messageHandler.reportMessage(message, "file://" + errorFile, (int) lineNumber, (int) column, type);
                }
                if (lineNumber != -1)
                   printer.println(source.toString() + ": line: " + lineNumber + " column: " + column + ": " + message);

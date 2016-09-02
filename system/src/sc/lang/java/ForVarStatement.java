@@ -64,7 +64,7 @@ public class ForVarStatement extends ForStatement implements IVariable {
                componentType = ModelUtil.getArrayOrListComponentType(model, exprType);
             Object varType = type.getTypeDeclaration();
             if (componentType != null && !ModelUtil.isAssignableFrom(varType, componentType) && varType != null) {
-               displayTypeError("The 'for' statement's variable type: " + ModelUtil.getTypeName(varType) + " does not match the collection's component type: " + ModelUtil.getTypeName(componentType) + "\n:   ");
+               type.displayTypeError("The 'for' statement's variable type: " + ModelUtil.getTypeName(varType) + " does not match the collection's component type: " + ModelUtil.getTypeName(componentType) + "\n:   ");
                // TODO: for debugging to step into the failing operation
                exprType = expression.getGenericType();
                componentType = ModelUtil.getArrayOrListComponentType(model, exprType);

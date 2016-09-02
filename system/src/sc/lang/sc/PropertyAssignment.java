@@ -119,7 +119,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
 
          // Check to be sure the initializer is compatible with the property
          // Skip this test for reverse-only bindings
-         if (initializer != null && (bindingDirection == null || bindingDirection.doForward())) {
+         if (initializer != null && !isReverseOnlyExpression()) {
             Object propType = isSetMethod ? ModelUtil.getSetMethodPropertyType(assignedProperty) : ModelUtil.getVariableTypeDeclaration(assignedProperty);
             initializer.setInferredType(propType, true);
             Object initType = initializer.getGenericType();
@@ -1018,5 +1018,9 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       if (propertyName != null) {
          addMemberByName(membersByName, propertyName);
       }
+   }
+
+   public boolean isReverseOnlyExpression() {
+      return bindingDirection != null && !bindingDirection.doForward();
    }
 }

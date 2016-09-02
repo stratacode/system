@@ -1352,6 +1352,16 @@ public class ModelUtil {
       return true;
    }
 
+   public static boolean sameTypesAndLayers(LayeredSystem sys, Object type1, Object type2) {
+      if (ModelUtil.sameTypes(type1, type2)) {
+         Layer l1 = ModelUtil.getLayerForType(sys, type1);
+         Layer l2 = ModelUtil.getLayerForType(sys, type2);
+         if (l1 == l2)
+            return true;
+      }
+      return false;
+   }
+
    public static boolean sameTypeParameters(Object tp1, Object tp2) {
       if (tp1 == tp2)
          return true;
@@ -8068,6 +8078,8 @@ public class ModelUtil {
 
    public static ISemanticNode getTopLevelStatement(ISemanticNode node) {
       Statement st = node instanceof Statement ? (Statement) node : ((JavaSemanticNode) node).getEnclosingStatement();
+      if (st == null)
+         return node;
       ISemanticNode parent = st.getParentNode();
 
       // We use the block statement that's part of the method to represent the "end of the method"

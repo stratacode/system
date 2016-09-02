@@ -394,7 +394,12 @@ public class HTMLLanguage extends TemplateLanguage {
       // Here we are skipping any incomplete attributes (e.g. id=) till we hit the end of close tag or the start of the next tag
       // It's important that we do not consume part or all of the next tag in the body of this tag if for some reason we decide to put this back in.
       tagAttributes.skipOnErrorParselet = createSkipOnErrorParselet("<tagAttributesError>", "/", "<", ">", Symbol.EOF);
-      tagAttributes.cacheResults = true;
+
+      // We used to set the cacheResults on the tagAttributes but that means we call parseExtendedErrors on it because of the skipOnErrorParselet.  That conflicts
+      // with the fact that we are caching primary which is a child of tagAttribute.  The parseExtendedErrors does not get the cached value and so reparses the entire
+      // thing, causing more work and the second reparse can get cached primaries and update the parentNode to point to a part of the model that gets discarded when
+      // the parseExtendedErrors fails to produce a better result.   By setting it on tagAttribute, we get the caching in the parseExtendedErrors and avoid the parentNode.  see re59
+      tagAttribute.cacheResults = true;
    }
    // TODO: how do we deal with appending newlines after the start tag?  Used to having tagSpacingEOL here but that ate up the space in the content.  Need features of tagSpacingEOL perhaps when processing the endTagChar?
    Sequence simpleTag = new Sequence("Element(,tagName,attributeList,selfClose,)", beginTagChar, anyTagName, tagAttributes, new Sequence("('')", OPTIONAL, closeTagChar), endTagChar);
