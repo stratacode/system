@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
 
 import java.util.EnumSet;
@@ -127,5 +128,41 @@ public class VariableStatement extends TypedDefinition {
 
    public String toString() {
       return toSafeLanguageString();
+   }
+
+   public ISrcStatement findFromStatement(ISrcStatement st) {
+      ISrcStatement fromSt = super.findFromStatement(st);
+      if (fromSt != null)
+         return fromSt;
+      return null;
+   }
+
+   public void addBreakpointNodes(List<ISrcStatement> res, ISrcStatement st) {
+      super.addBreakpointNodes(res, st);
+      if (fromStatement instanceof VariableStatement) {
+         VariableStatement fromVarSt = (VariableStatement) fromStatement;
+         if (fromVarSt.definitions != null) {
+            int ix = 0;
+            for (VariableDefinition varDef : fromVarSt.definitions) {
+               if (st.getNodeContainsPart(varDef)) {
+                  // Return the corresponding definition in the transformed model
+                  if (definitions != null && definitions.size() > ix)
+                     res.add(definitions.get(ix));
+               }
+               ix++;
+            }
+         }
+      }
+   }
+
+   public boolean getNodeContainsPart(ISrcStatement fromSt) {
+      if (super.getNodeContainsPart(fromSt))
+         return true;
+      if (definitions != null) {
+         for (VariableDefinition varDef:definitions)
+            if (varDef == fromSt || varDef.getNodeContainsPart(fromSt))
+               return true;
+      }
+      return false;
    }
 }

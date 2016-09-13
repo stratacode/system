@@ -9,6 +9,6 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="coreRuntime" exported="" />
-    <orderEntry type="library" name="jline:jline:1.0" level="project" />
+    <orderEntry type="library" exported="" name="jline-2.15-SNAPSHOT" level="project" />
   </component>
 </module>

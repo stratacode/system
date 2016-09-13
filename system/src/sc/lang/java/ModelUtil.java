@@ -6803,7 +6803,7 @@ public class ModelUtil {
       // turns out, it does the lifecycle management we need through lifecycle.  This is not the clearest way
       // to spec it but if the overrideStartName is set, it means it does not implement the interface and we
       // can't treat it as a component in the code.
-      Object compilerSettings = ModelUtil.getInheritedAnnotation(sys, typeDecl, "sc.obj.CompilerSettings", false, typeDecl instanceof ITypeDeclaration ? ((BodyTypeDeclaration) typeDecl).getLayer() : null, false);
+      Object compilerSettings = ModelUtil.getInheritedAnnotation(sys, typeDecl, "sc.obj.CompilerSettings", false, typeDecl instanceof ITypeDeclaration ? ((ITypeDeclaration) typeDecl).getLayer() : null, false);
       if (compilerSettings == null)
          return true;
       String overrideStartName;

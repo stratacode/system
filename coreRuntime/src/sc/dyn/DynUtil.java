@@ -797,6 +797,8 @@ public class DynUtil {
    }
 
    public static int getArrayLength(Object arrVal) {
+      if (arrVal == null)
+         return 0;
       if (arrVal instanceof Collection)
          return ((Collection) arrVal).size();
       return PTypeUtil.getArrayLength(arrVal);

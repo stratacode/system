@@ -782,4 +782,11 @@ public class LayerUtil implements LayerConstants {
       return dir;
    }
 
+   public static String getDefaultHomeDir() {
+      String homeDir = System.getProperty("user.home");
+      if (homeDir != null)
+         return FileUtil.concat(homeDir, SC_DIR);
+      return null;
+   }
+
 }

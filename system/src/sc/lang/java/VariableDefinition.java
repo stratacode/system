@@ -469,6 +469,9 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
    public VariableDefinition deepCopy(int options, IdentityHashMap<Object, Object> oldNewMap) {
       VariableDefinition newVarDef = (VariableDefinition) super.deepCopy(options, oldNewMap);
 
+      // TODO: Do we need this?
+      //newVarDef.fromStatement = this;
+
       if ((options & CopyState) != 0) {
          newVarDef.bindable = bindable;
          newVarDef.convertGetSet = convertGetSet;
@@ -740,6 +743,11 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       }
       if (initializer != null && initializer.findFromStatement(st) != null)
          return this;
+      if (origInitializer != null && st instanceof VariableDefinition) {
+         VariableDefinition varSt = (VariableDefinition) st;
+         if (varSt.initializer != null && origInitializer.findFromStatement(varSt.initializer) != null)
+            return this;
+      }
       return null;
    }
 

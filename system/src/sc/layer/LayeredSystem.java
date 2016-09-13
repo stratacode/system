@@ -1055,9 +1055,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    /** Use this when your preference is to share the directory among projects */
    public String getStrataCodeHomeDir(String dirName) {
-      String homeDir = System.getProperty("user.home");
+      String homeDir = LayerUtil.getDefaultHomeDir();
       if (homeDir != null)
-         return FileUtil.concat(homeDir, SC_DIR, dirName);
+         return FileUtil.concat(homeDir, dirName);
       return getStrataCodeDir(dirName);
    }
 
@@ -2036,6 +2036,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          List<Layer> resLayers = initLayers(initLayerNames, null, null, dynamicByDefault, lpi, specifiedLayers);
          if (resLayers == null || resLayers.contains(null)) {
+            anyErrors = true;
             throw new IllegalArgumentException("Can't initialize init layers: " + initLayerNames);
          }
          // In the first pass we create each layer, then once all are created we initialize them in order, then we start them in order
