@@ -9714,25 +9714,32 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public SystemRefreshInfo refreshRuntimes() {
-      SystemRefreshInfo sysInfo = refreshSystem(false);
-      ArrayList<SystemRefreshInfo> peerChangedInfos = new ArrayList<SystemRefreshInfo>();
-      if (peerSystems != null) {
-         for (LayeredSystem sys:peerSystems) {
-            setCurrent(sys);
-            // TODO: right now, we ignore the change models in other systems.  These are used by EditorContext to do
-            // updating of any errors detected in the models.  Currently EditorContext only knows about one layered system
-            // but will need to know about all of them to manage errors, switching views etc. correctly.
-            peerChangedInfos.add(sys.refreshSystem(false));
+      acquireDynLock(false);
+      SystemRefreshInfo sysInfo;
+      try {
+         sysInfo = refreshSystem(false);
+         ArrayList<SystemRefreshInfo> peerChangedInfos = new ArrayList<SystemRefreshInfo>();
+         if (peerSystems != null) {
+            for (LayeredSystem sys : peerSystems) {
+               setCurrent(sys);
+               // TODO: right now, we ignore the change models in other systems.  These are used by EditorContext to do
+               // updating of any errors detected in the models.  Currently EditorContext only knows about one layered system
+               // but will need to know about all of them to manage errors, switching views etc. correctly.
+               peerChangedInfos.add(sys.refreshSystem(false));
+            }
+            setCurrent(this);
          }
-         setCurrent(this);
+         completeRefresh(sysInfo);
+         if (peerSystems != null) {
+            int i = 0;
+            for (LayeredSystem peer : peerSystems) {
+               peer.completeRefresh(peerChangedInfos.get(i));
+               i++;
+            }
+         }
       }
-      completeRefresh(sysInfo);
-      if (peerSystems != null) {
-         int i = 0;
-         for (LayeredSystem peer:peerSystems) {
-            peer.completeRefresh(peerChangedInfos.get(i));
-            i++;
-         }
+      finally {
+         releaseDynLock(false);
       }
       return sysInfo;
    }
@@ -11920,22 +11927,30 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             return res;
          }
          else {
-            if (ent.zip) {
-               // We've already opened this zip file during the class path package scan.  My thinking is that
-               // will hold lots of classes in memory if we leave those zip files open since folks tend to have
-               // a lot of crap in their classpath they never use.  Instead, wait for us
-               // to first reference a file in that actual zip before we cache and hold it open.  This does mean
-               // that we are caching files twice.
-               ZipFile zip = getCachedZipFile(ent.fileName);
-               res = CFClass.load(zip, classFileName, this);
-               if (res != null && options.verboseClasses)
-                  verbose("Loaded CFClass: " + classFileName + " from jar: " + ent.fileName);
-            }
-            else {
-               res = CFClass.load(ent.fileName, classFileName, this);
-               if (res != null && options.verboseClasses)
-                  verbose("Loaded CFClass: " + classFileName);
-            }
+            do {
+               if (ent.zip) {
+                  // We've already opened this zip file during the class path package scan.  My thinking is that
+                  // will hold lots of classes in memory if we leave those zip files open since folks tend to have
+                  // a lot of crap in their classpath they never use.  Instead, wait for us
+                  // to first reference a file in that actual zip before we cache and hold it open.  This does mean
+                  // that we are caching files twice.
+                  ZipFile zip = getCachedZipFile(ent.fileName);
+                  res = CFClass.load(zip, classFileName, this);
+                  if (res != null && options.verboseClasses)
+                     verbose("Loaded CFClass: " + classFileName + " from jar: " + ent.fileName);
+               }
+               else {
+                  res = CFClass.load(ent.fileName, classFileName, this);
+                  if (res != null && options.verboseClasses)
+                     verbose("Loaded CFClass: " + classFileName);
+               }
+               if (res == null && ent.prev != null) {
+                  ent = ent.prev;
+               }
+               else
+                  break;
+            } while (true);
+
             if (res == null)
                res = NullClassSentinel.class;
             if (className == null)
