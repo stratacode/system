@@ -115,8 +115,18 @@ public class ExtendsType extends JavaType {
                System.out.println("*** Warning - unresolved code path for ? super T");
             return true;
          }
+         boolean superEq = ModelUtil.isAssignableFrom(other, baseType, assignmentSemantics, null, false, null);
+         boolean extEq = ModelUtil.isAssignableFrom(baseType, other, assignmentSemantics, null, false, null);
          // This switches the directions intentionally because the super construct matches the same type or base-types of that type
-         return ModelUtil.isAssignableFrom(other, baseType, assignmentSemantics, null, false, null);
+         // TODO: When you declare a specific type - e.g.  List<? super Throwable> it acts pretty much just like ? extends Throwable - i.e. extRes.
+         // But when you have method args like List<? super T> arg1, List<? extends T> arg2, we really need the opposite test once we've bound T
+         // For now we are just being overly permissive here 0
+         /*
+         if (superEq != extEq) {
+            System.out.println("***");
+         }
+         */
+         return extEq || superEq;
       }
 
       @Override
@@ -124,6 +134,84 @@ public class ExtendsType extends JavaType {
          if (baseType == null)
             return ModelUtil.isAssignableFrom(other, Object.class);
          if (other instanceof LowerBoundsTypeDeclaration) {
+            Object otherObj = ((LowerBoundsTypeDeclaration) other).baseType;
+            if (otherObj == null)
+               return true;
+            return ModelUtil.isAssignableFrom(otherObj, this, false, null, false, null);
+         }
+         return ModelUtil.isAssignableFrom(other, baseType);
+      }
+
+      @Override
+      public boolean isAssignableFromClass(Class other) {
+         if (baseType == null)
+            return ModelUtil.isAssignableFrom(Object.class, other);
+         if (ModelUtil.isTypeVariable(baseType)) {
+            return true;
+         }
+         boolean superEq = ModelUtil.isAssignableFrom(other, baseType);
+         boolean extEq = ModelUtil.isAssignableFrom(baseType, other);
+         /*
+         if (superEq != extEq) {
+            System.out.println("***");
+         }
+         */
+         return extEq || superEq;
+      }
+
+      @Override
+      public Object getRuntimeType() {
+         return this;
+      }
+
+      public Object resolveTypeVariables(ITypeParamContext ctx, boolean resolve) {
+         if (baseType != null && ModelUtil.isTypeVariable(baseType)) {
+            Object newBase = ctx.getTypeDeclarationForParam(ModelUtil.getTypeParameterName(baseType), baseType, resolve);
+            if (!(newBase instanceof WildcardTypeDeclaration))
+               return new LowerBoundsTypeDeclaration(system, newBase);
+         }
+         return this;
+      }
+
+      public String toString() {
+         if (baseType == null)
+            return "?";
+         return "? super " + String.valueOf(baseType);
+      }
+   }
+
+   /** Represents a ? extends X type.  We just resolve a wildcard extends type parameter as the type definition itself */
+   public static class UpperBoundsTypeDeclaration extends WrappedTypeDeclaration {
+      UpperBoundsTypeDeclaration(LayeredSystem sys, Object lbType) {
+         super(sys, lbType);
+         if (lbType instanceof LowerBoundsTypeDeclaration)
+            System.err.println("*** Error - nested upper bounds type");
+      }
+
+      @Override
+      public boolean isAssignableFrom(ITypeDeclaration other, boolean assignmentSemantics) {
+         if (baseType == null)
+            return ModelUtil.isAssignableFrom(Object.class, other, assignmentSemantics, null, false, null);
+         if (other instanceof WrappedTypeDeclaration) {
+            Object otherObj = ((WrappedTypeDeclaration) other).baseType;
+            if (otherObj == null)
+               return true;
+            return ModelUtil.isAssignableFrom(this.baseType, otherObj, assignmentSemantics, null, false, null);
+         }
+         if (ModelUtil.isTypeVariable(baseType)) {
+            if (!ModelUtil.isAssignableFrom(Object.class, other))
+               return false;
+            return true;
+         }
+         // This switches the directions intentionally because the super construct matches the same type or base-types of that type
+         return ModelUtil.isAssignableFrom(baseType, other, assignmentSemantics, null, false, null);
+      }
+
+      @Override
+      public boolean isAssignableTo(ITypeDeclaration other) {
+         if (baseType == null)
+            return ModelUtil.isAssignableFrom(other, Object.class);
+         if (other instanceof WrappedTypeDeclaration) {
             Object otherObj = ((LowerBoundsTypeDeclaration) other).baseType;
             if (otherObj == null)
                return true;
@@ -147,19 +235,10 @@ public class ExtendsType extends JavaType {
          return this;
       }
 
-      public Object resolveTypeVariables(ITypeParamContext ctx, boolean resolve) {
-         if (baseType != null && ModelUtil.isTypeVariable(baseType)) {
-            Object newBase = ctx.getTypeDeclarationForParam(ModelUtil.getTypeParameterName(baseType), baseType, resolve);
-            if (!(newBase instanceof WildcardTypeDeclaration))
-               return new LowerBoundsTypeDeclaration(system, newBase);
-         }
-         return this;
-      }
-
       public String toString() {
          if (baseType == null)
             return "?";
-         return "? super " + String.valueOf(baseType);
+         return "? extends " + ModelUtil.paramTypeToString(baseType);
       }
    }
 

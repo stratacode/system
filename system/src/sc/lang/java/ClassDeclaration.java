@@ -97,6 +97,15 @@ public class ClassDeclaration extends TypeDeclaration {
 
             // Need to start the extends type as we need to dig into it
             Object extendsTypeDecl = getDerivedTypeDeclaration();
+
+            if (extendsTypeDecl instanceof TypeDeclaration) {
+               TypeDeclaration extTypeDecl = (TypeDeclaration) extendsTypeDecl;
+               if (extTypeDecl.getLayer() != null && getLayer() != null && extTypeDecl.getLayer().activated != getLayer().activated) {
+                  System.out.println("*** Mismatching activated/inactived for base and extends type");
+                  // TODO: DEBUG remove
+                  extendsType.initType(getLayeredSystem(), this, resolver, null, false, isLayerType, null);
+               }
+            }
             if (extendsTypeDecl instanceof TypeDeclaration) {
                // When there's a custom resolver, we may be in a ModelStream which sets up a case where modify types in the same stream
                if (m.customResolver == null && ModelUtil.sameTypes(extendsTypeDecl, this)) {

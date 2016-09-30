@@ -995,7 +995,7 @@ public class ParentParseNode extends AbstractParseNode {
          int sz = children.size();
          for (int i = 0; i < sz; i++) {
             Object node = children.get(i);
-            if (node instanceof ParentParseNode && ((ParentParseNode) node).isGeneratedTree())
+            if (node instanceof IParseNode && ((IParseNode) node).isGeneratedTree())
                return true;
          }
       }

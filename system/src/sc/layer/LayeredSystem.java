@@ -356,7 +356,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       try {
          acquireDynLock(false);
 
-         typeIndex.buildReverseTypeIndex();
+         typeIndex.buildReverseTypeIndex(this);
 
          if (!peerMode && peerSystems != null) {
             for (LayeredSystem peerSys: peerSystems) {
@@ -366,7 +366,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // If we've already created a layered system for these type indexes, this will just return without
             // doing it over again.
             for (SysTypeIndex sti:typeIndexProcessMap.values()) {
-               sti.buildReverseTypeIndex();
+               sti.buildReverseTypeIndex(null);
             }
          }
       }
@@ -1183,7 +1183,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
          }
          if (typeIndex == null)
-            typeIndex = new SysTypeIndex(this);
+            typeIndex = new SysTypeIndex(this, getTypeIndexIdent());
       }
 
       if (!peerMode)
@@ -1432,7 +1432,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (typeIndexProcessMap != null)
          peerSys.typeIndex = typeIndexProcessMap.get(peerSys.getTypeIndexIdent());
       if (peerSys.typeIndex == null) {
-         peerSys.typeIndex = new SysTypeIndex(peerSys);
+         peerSys.typeIndex = new SysTypeIndex(peerSys, peerSys.getTypeIndexIdent());
          if (typeIndexProcessMap != null)
             typeIndexProcessMap.put(peerSys.getTypeIndexIdent(), peerSys.typeIndex);
       }
@@ -1569,6 +1569,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          renumberInactiveLayers(removeIx);
 
       checkLayerPosition();
+      if (!markOnly && typeIndex != null)
+         typeIndex.refreshLayerOrder(this);
    }
 
    public boolean installSystem() {
@@ -3105,6 +3107,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public static class Options {
       /** Re-generate all source files when true.  The default is to use dependencies to only generate changed files. */
       @Constant public boolean buildAllFiles;
+      // TODO: for this option I think we need to restart all models and possibly clear the old transformed model?  Also, possibly some code to switch to this mode based on the types of changes when we are refreshing the system
+      /** When doing an incremental build, turn this option on so that all files are regenerated.  Unlike buildAllFiles, this option only parses and restarts changed models so should be faster than buildAllFiles but less buggy than when we only transform the files we can detect need to be re-transformed. */
+      @Constant public boolean generateAllFiles = false;
       /** When true, do not inherit files from previous layers.  The buildDir will have all java files, even from layers that are already compiled */
       @Constant public boolean buildAllLayers;
       @Constant public boolean noCompile;
@@ -3201,10 +3206,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       /** Should we reinstall all packages but reusing existing downloads */
       @Constant public boolean installExisting;
 
-      /** Should we update all packages */
+      /** Should we update all external repository packages on this run of the system (instead of using previously downloaded versions) */
       @Constant public boolean update;
 
-      /** Maximum number of errors to display */
+      /** Maximum number of errors to display in one build */
       @Constant public int maxErrors = 100;
    }
 
@@ -6404,7 +6409,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             break;
       }
       if (typeIndex == null)
-         typeIndex = new SysTypeIndex(this);
+         typeIndex = new SysTypeIndex(this, getTypeIndexIdent());
 
       if (!peerMode && peerSystems != null)
          for (LayeredSystem peerSys:peerSystems)
@@ -6419,9 +6424,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          for (int i = 0; i < inactiveLayers.size(); i++) {
             Layer inactiveLayer = inactiveLayers.get(i);
             // We have not fully initialized the type index until the layer is started
-            if (inactiveLayer.started)
+            if (inactiveLayer.started && inactiveLayer.typeIndexNeedsSave)
                inactiveLayer.saveTypeIndex();
          }
+         // Save any the global information in the type index - i.e. the list of layers each time.
+         typeIndex.saveToDir(getTypeIndexDir());
+
          if (!peerMode && peerSystems != null) {
             for (int i = 0; i < peerSystems.size(); i++) {
                LayeredSystem peerSys = peerSystems.get(i);
@@ -6560,7 +6568,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (typeIndexProcessMap == null) {
             typeIndexProcessMap = new HashMap<String, SysTypeIndex>();
             if (typeIndex == null) {
-               typeIndex = new SysTypeIndex(this);
+               typeIndex = new SysTypeIndex(this, getTypeIndexIdent());
             }
          }
          else
@@ -6600,80 +6608,71 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             typeIndexProcessMap.put(typeIndexIdent, curTypeIndex);
          }
          if (curTypeIndex == null) {
-            typeIndexProcessMap.put(typeIndexIdent, curTypeIndex = new SysTypeIndex(curSys));
+            typeIndexProcessMap.put(typeIndexIdent, curTypeIndex = new SysTypeIndex(curSys, typeIndexIdent));
          }
          if (curSys != null && curSys.typeIndex == null)
             curSys.typeIndex = curTypeIndex;
 
-         ArrayList<Layer> layersToRebuild = new ArrayList<Layer>();
-         for (String indexFileName:filesToProcess.keySet()) {
-            if (!filesToProcess.get(indexFileName)) {
-               if (indexFileName.endsWith(Layer.TYPE_INDEX_SUFFIX)) {
-                  String uname = indexFileName.substring(0, indexFileName.length() - Layer.TYPE_INDEX_SUFFIX.length());
-                  String layerName = Layer.getLayerNameFromUniqueUnderscoreName(uname);
+         boolean foundIndex = curTypeIndex.loadFromDir(getTypeIndexDir(typeIndexIdent));
+         if (!foundIndex) {
+            warning("Failed to load type index order file - rebuilding the type index");
+            options.typeIndexMode = TypeIndexMode.Rebuild;
+         }
 
-                  Layer layer = curSys == null ? null : curSys.lookupLayerSync(layerName, false, true);
-                  if (layer != null) {
-                     LayeredSystem layerSys = layer.layeredSystem;
-                     layerSys.acquireDynLock(false);
-                     try {
-                        SysTypeIndex sysIdx = layerSys.typeIndex;
-                        LayerListTypeIndex idx = layer.activated ? sysIdx.activeTypeIndex : sysIdx.inactiveTypeIndex;
-                        if (writeLocked == 0) {
-                           System.err.println("*** Modifying type index without write lock");
-                           new Throwable().printStackTrace();
-                        }
-                        idx.typeIndex.put(layerName, layer.layerTypeIndex);
-                        refreshedLayers.add(layerName);
+         RefreshTypeIndexContext refreshCtx = new RefreshTypeIndexContext(typeIndexIdent, filesToProcess, curTypeIndex, refreshedLayers, typeIndexDir);
+
+         while (filesToProcess.size() > 0) {
+            String indexFileName = filesToProcess.keySet().iterator().next();
+
+            if (indexFileName.endsWith(Layer.TYPE_INDEX_SUFFIX)) {
+               String uname = indexFileName.substring(0, indexFileName.length() - Layer.TYPE_INDEX_SUFFIX.length());
+               String layerName = Layer.getLayerNameFromUniqueUnderscoreName(uname);
+
+               Layer layer = curSys == null ? null : curSys.lookupLayerSync(layerName, false, true);
+               if (layer != null) {
+                  filesToProcess.remove(indexFileName);
+
+                  // TODO: do we need to refresh this layer's type index here?   Or did it already get refreshed?
+                  LayeredSystem layerSys = layer.layeredSystem;
+                  layerSys.acquireDynLock(false);
+                  try {
+                     SysTypeIndex sysIdx = layerSys.typeIndex;
+                     LayerListTypeIndex idx = layer.activated ? sysIdx.activeTypeIndex : sysIdx.inactiveTypeIndex;
+                     if (writeLocked == 0) {
+                        System.err.println("*** Modifying type index without write lock");
+                        new Throwable().printStackTrace();
                      }
-                     finally {
-                        layerSys.releaseDynLock(false);
-                     }
+                     if (layerName.contains("android"))
+                        System.out.println("***");
+                     idx.typeIndex.put(layerName, layer.layerTypeIndex);
+                     refreshedLayers.add(layerName);
                   }
-                  else {
-                     acquireDynLock(false);
-                     try {
-                        LayerTypeIndex layerTypeIndex = readTypeIndexFile(typeIndexIdent, layerName);
-                        if (layerTypeIndex == null) {
-                           // ?? huh we just listed out the file - rebuild it from scratch.
-                           addLayerToRebuild(layerName, layersToRebuild);
-                           refreshedLayers.add(layerName);
-                        } else {
-                           switch (options.typeIndexMode) {
-                              case Refresh:
-                                 layerTypeIndex = refreshLayerTypeIndex(layerName, layerTypeIndex, new File(FileUtil.concat(typeIndexDir.getPath(), indexFileName)).lastModified());
-                                 refreshedLayers.add(layerName);
-                                 break;
-                              default:
-                                 break;
-                           }
-                        }
-                        if (writeLocked == 0) {
-                           System.err.println("*** Modifying type index without write lock");
-                           new Throwable().printStackTrace();
-                        }
-                        if (layerTypeIndex != null)
-                           curTypeIndex.inactiveTypeIndex.typeIndex.put(layerName, layerTypeIndex);
-                        else {
-                           // The layer was removed - remove the type index entry and the file behind it to avoid this problem next itme
-                           curTypeIndex.inactiveTypeIndex.typeIndex.remove(layerName);
-                           removeTypeIndexFile(typeIndexIdent, layerName);
-                        }
-                        if (layerTypeIndex != null && layerTypeIndex.langExtensions != null)
-                           customSuffixes.addAll(Arrays.asList(layerTypeIndex.langExtensions));
+                  finally {
+                     layerSys.releaseDynLock(false);
+                  }
+               }
+               else {
+                  acquireDynLock(false);
+                  try {
+                     if (curSys != null)
+                        curSys.refreshLayerTypeIndexFile(layerName, refreshCtx, false);
+                     else
+                        this.refreshLayerTypeIndexFile(layerName, refreshCtx, false);
 
-                        // The process of getting a layer may have created this runtime so use it as soon as it becomes available.
-                        if (curSys == null)
-                           curSys = findSystemFromTypeIndexIdent(typeIndexIdent);
-                     }
-                     finally {
-                        releaseDynLock(false);
-                     }
+                     // The process of getting a layer may have created this runtime so use it as soon as it becomes available.
+                     if (curSys == null)
+                        curSys = findSystemFromTypeIndexIdent(typeIndexIdent);
+                  }
+                  finally {
+                     releaseDynLock(false);
                   }
                }
             }
+            else {
+               filesToProcess.remove(indexFileName);
+            }
          }
-         rebuildLayersTypeIndex(layersToRebuild);
+         rebuildLayersTypeIndex(refreshCtx.layersToRebuild);
       }
 
       /*
@@ -6685,9 +6684,67 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       */
    }
 
+   void refreshLayerTypeIndexFile(String layerName, RefreshTypeIndexContext refreshCtx, boolean optional) {
+      // Already refreshed this one from some other super-type
+      String indexFileName = FileUtil.getFileName(getTypeIndexFileName(refreshCtx.typeIndexIdent, layerName));
+      HashMap<String,Boolean> ftp = refreshCtx.filesToProcess;
+      // If we already processed this one, it will have been removed from the list so no need to refresh it again
+      if (ftp.get(indexFileName) == null)
+         return;
+
+      LayerTypeIndex layerTypeIndex = readTypeIndexFile(refreshCtx.typeIndexIdent, layerName);
+      if (layerTypeIndex == null) {
+         // When refreshing the base layers for a layer, we might have jumped to a different layered system.  I don't think we have to enforce that dependency
+         if (optional)
+            return;
+
+         // ?? huh we just listed out the file - rebuild it from scratch.
+         verbose("Layer type index not found for layer: " + layerName + " rebuilding type index");
+
+         if (layerName.contains("android"))
+            System.out.println("***");
+
+         addLayerToRebuild(layerName, refreshCtx.layersToRebuild);
+         refreshCtx.refreshedLayers.add(layerName);
+      } else {
+         switch (options.typeIndexMode) {
+            case Refresh:
+               if (layerName.contains("android"))
+                  System.out.println("***");
+               layerTypeIndex = layerTypeIndex.refreshLayerTypeIndex(this, layerName, new File(FileUtil.concat(refreshCtx.typeIndexDir.getPath(), indexFileName)).lastModified(), refreshCtx);
+               refreshCtx.refreshedLayers.add(layerName);
+               break;
+            default:
+               break;
+         }
+      }
+      if (writeLocked == 0) {
+         System.err.println("*** Modifying type index without write lock");
+         new Throwable().printStackTrace();
+      }
+      if (layerTypeIndex != null)
+         refreshCtx.curTypeIndex.inactiveTypeIndex.typeIndex.put(layerName, layerTypeIndex);
+      else {
+         // The layer was removed - remove the type index entry and the file behind it to avoid this problem next itme
+         refreshCtx.curTypeIndex.inactiveTypeIndex.typeIndex.remove(layerName);
+         removeTypeIndexFile(refreshCtx.typeIndexIdent, layerName);
+      }
+      if (layerTypeIndex != null && layerTypeIndex.langExtensions != null)
+         customSuffixes.addAll(Arrays.asList(layerTypeIndex.langExtensions));
+
+      Boolean old = ftp.remove(indexFileName);
+      if (old == null)
+         System.err.println("*** Failed to remove the index file from files to process for: " + indexFileName);
+   }
+
    private void refreshTypeIndex(Set<String> refreshedLayers) {
+      TypeIndexMode mode = options.typeIndexMode;
+
+      if (typeIndex.inactiveTypeIndex.orderIndex == null || mode == TypeIndexMode.Rebuild)
+         typeIndex.inactiveTypeIndex.orderIndex = new LayerOrderIndex();
+
       // If we have Refresh or Rebuild modes - walk through all layers in each layer path.  If no index, build it.
-      switch (options.typeIndexMode) {
+      switch (mode) {
          case Refresh:
          case Rebuild:
             // First we batch up all layers we need to index - they are initialized via the getInactiveLayer method
@@ -6697,8 +6754,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             Map<String,LayerIndexInfo> allLayers = getAllLayerIndex();
             for (LayerIndexInfo idx : allLayers.values()) {
                String layerName = idx.layerDirName;
-               if (idx.layer != null && !idx.layer.disabled) {
-                  if (options.typeIndexMode == TypeIndexMode.Rebuild || !refreshedLayers.contains(layerName))
+               if (idx.layer != null && !idx.layer.disabled && (mode == TypeIndexMode.Rebuild || !typeIndex.excludesLayer(layerName))) {
+                  if (mode == TypeIndexMode.Rebuild || !refreshedLayers.contains(layerName))
                      addLayerToRebuild(layerName, layersToRebuild);
                }
             }
@@ -6732,6 +6789,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          else if (layer.typeIndexFileLastModified != -1)
             layer.updateFileIndexLastModified();
       }
+      // Save the list of layers here too
+      if (typeIndex != null && typeIndex.needsSave)
+         typeIndex.saveToDir(getTypeIndexDir());
    }
 
    // TODO: We need a more accurate way of determining when a model is in use before we cull it.  If there is another
@@ -6766,44 +6826,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   /**
-    * Refresh the layer type index - look for files that exist on the file system that are not in the index and
-    * files which have changed.  This is called on the main layered system since the peer system which owns this layer
-    * may not have been created yet.  If we need to create the layer, be careful to use the layer's layeredSystem so
-    * we get the one which is managing this index (since each type index is per-layered system).
-    */
-   private LayerTypeIndex refreshLayerTypeIndex(String layerName, LayerTypeIndex layerTypeIndex, long lastModified) {
-      File layerFile = getLayerFile(layerName);
-      if (layerFile == null) {
-         warning("Layer found in type index - not in the layer path: " + layerName + ": " + layerPathDirs);
-         return null;
-      }
-      String pathName = layerFile.getParentFile().getPath();
 
-      // Excluded in the project - do not refresh it
-      if (externalModelIndex != null && externalModelIndex.isExcludedFile(pathName))
-         return null;
-
-      if (!pathName.equals(layerTypeIndex.layerPathName)) {
-         return buildLayerTypeIndex(layerName);
-      }
-      for (String srcDir:layerTypeIndex.topLevelSrcDirs) {
-         if (!Layer.isBuildDirPath(srcDir)) {
-            File srcDirFile = new File(srcDir);
-
-            if (!srcDirFile.isDirectory()) {
-               System.err.println("**** Warning: srcDir removed for layer: " + layerName + ": " + srcDir + " rebuilding index");
-               return buildLayerTypeIndex(layerName);
-            }
-
-            refreshLayerTypeIndexDir(srcDirFile, "", layerName, layerTypeIndex, lastModified);
-         }
-         // else - TODO: do we need to handle this case?
-      }
-      return layerTypeIndex;
-   }
-
-   private void refreshLayerTypeIndexDir(File srcDirFile, String relDir, String layerName, LayerTypeIndex typeIndex, long lastModified) {
+   void refreshLayerTypeIndexDir(File srcDirFile, String relDir, String layerName, LayerTypeIndex typeIndex, long lastModified) {
       File[] files = srcDirFile.listFiles();
       for (File subF:files) {
          String path = subF.getPath();
@@ -6993,9 +7017,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             return;
          }
          else if (layer.disabled) {
+            typeIndex.addDisabledLayer(layerName);
             return;
          }
-         else if (!layer.excluded && layer.layeredSystem == this) {
+         else if (layer.excluded) {
+            typeIndex.addExcludedLayer(layerName);
+         }
+         else if (layer.layeredSystem == this) {
+            typeIndex.removeExcludedLayer(layerName);
             layersToRebuild.add(layer);
          }
          if (!peerMode && peerSystems != null) {
@@ -7869,6 +7898,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                            // If this name is inherited, it's not in this layer's index but previously has already been marked as in use when we built that layer
                            boolean foundInIndex = inherited || genLayer.markBuildSrcFileInUse(genFile, genRelFileName);
 
+                           if (options.generateAllFiles) {
+                              needsGenerate = true;
+                           }
+
                            if (!needsGenerate && (!foundInIndex || !genFileExists || srcLastModified > (genFileLastModified = genFile.lastModified()))) {
                               if (traceNeedsGenerate) {
                                  String reason;
@@ -8317,6 +8350,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * Various options can be provided to control how this generation is performed.  The list of includeFiles
     * specifies a subset of files to process - useful for debugging generator problems mainly.
     *
+    * We run this method over the set of BuildPhases - prepare and process.   That gives each source file a chance
+    * to be manipulated in each phase.   We might generate some additional files to process in the prepare
+    * phase which are then processed in the process phase.
+    *
     * Returns true if everything worked, and false if there were any errors.
     */
    public GenerateCodeStatus generateCode(Layer genLayer, List<String> includeFiles, BuildPhase phase, boolean separateOnly) {
@@ -8340,6 +8377,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       else
          alreadyStarted = phase == BuildPhase.Prepare ? buildState.changedModelsPrepared : buildState.changedModelsStarted;
       if (!alreadyStarted) {
+         // Now go through and find which source files have changed, reload those changes and populate the modelsToTransform
          GenerateCodeStatus startResult = startChangedModels(genLayer, includeFiles, phase, separateOnly);
          if (startResult != GenerateCodeStatus.NewCompiledFiles) {
             if (phase == BuildPhase.Process)
@@ -9989,6 +10027,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       anyErrors = false;
       viewedErrors.clear();
       systemCompiled = false;
+      changedDirectoryIndex.clear();
       if (layers != null) {
          for (int i = 0; i < layers.size(); i++) {
             Layer l = layers.get(i);
@@ -10843,11 +10882,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public Object getTypeForCompile(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden, boolean srcOnly, Layer refLayer, boolean layerResolve) {
       if (getUseCompiledForFinal() && fromLayer == null) {
          // First if we've loaded the src we need to return that.
-         TypeDeclaration decl = getCachedTypeDeclaration(typeName, null, null, true, false);
-         if (decl != null) {
-            if (decl == INVALID_TYPE_DECLARATION_SENTINEL)
-               return null;
-            return decl;
+         if (cacheForRefLayer(refLayer)) {
+            TypeDeclaration decl = getCachedTypeDeclaration(typeName, null, null, true, false);
+            if (decl != null) {
+               if (decl == INVALID_TYPE_DECLARATION_SENTINEL)
+                  return null;
+               return decl;
+            }
          }
 
          // Now since the model is not changed, we'll use the class.  If at some point we need to change the compiled version - ie. to make a property bindable, we'll load the src at that time.
@@ -10873,9 +10914,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public TypeDeclaration getTypeFromCache(String typeName, Layer fromLayer, boolean prependPackage) {
-      TypeDeclaration decl = getCachedTypeDeclaration(typeName, fromLayer, null, true, false);
-      if (decl != null)
-         return decl;
+      if (cacheForRefLayer(fromLayer)) {
+         TypeDeclaration decl = getCachedTypeDeclaration(typeName, fromLayer, null, true, false);
+         if (decl != null)
+            return decl;
+      }
 
       SrcEntry srcFile = getSrcFileFromTypeName(typeName, true, fromLayer, prependPackage, null, fromLayer, true);
 
@@ -11001,11 +11044,17 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
               nestLevel--;
             }
          }
-         //else
-         //   System.out.println(StringUtil.indent(nestLevel) + "using cached model " + typeName);
-         decl = getCachedTypeDeclaration(typeName, fromLayer, fromLayer == null ? srcFile.layer : null, false, false);
-         if (decl == INVALID_TYPE_DECLARATION_SENTINEL)
-            return null;
+
+         // The cached for types only looks for active types so don't use it if we are not looking for an activated layer
+         if (cacheForRefLayer(srcFile.layer)) {
+            //else
+            //   System.out.println(StringUtil.indent(nestLevel) + "using cached model " + typeName);
+            decl = getCachedTypeDeclaration(typeName, fromLayer, fromLayer == null ? srcFile.layer : null, false, false);
+            if (decl == INVALID_TYPE_DECLARATION_SENTINEL)
+               return null;
+         }
+         else
+            decl = null;
 
          if ((decl == null || decl == skippedDecl) && srcFile.layer != null && modelObj instanceof JavaModel) {
             JavaModel javaModel = (JavaModel) modelObj;
@@ -11400,14 +11449,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // When prependLayerPackage is false, lookup the type without the layer's package (e.g. doc/util.vdoc)
          String fullTypeName = srcFile.getTypeName();
          ILanguageModel loading = beingLoaded.get(srcFile.absFileName);
-         // If we did not specify a limit to the layer, use the current file's layer.  If we add a new layer we'll
-         // only reload if there is a file for this type in that new layer.
-         TypeDeclaration decl = getCachedTypeDeclaration(fullTypeName, fromLayer, fromLayer == null ? srcFile.layer : null, true, false);
-         if (decl != null) {
-            if (decl == INVALID_TYPE_DECLARATION_SENTINEL)
-               return null;
-            if (loading == null)
-               return decl;
+         if (cacheForRefLayer(refLayer)) {
+            // If we did not specify a limit to the layer, use the current file's layer.  If we add a new layer we'll
+            // only reload if there is a file for this type in that new layer.
+            TypeDeclaration decl = getCachedTypeDeclaration(fullTypeName, fromLayer, fromLayer == null ? srcFile.layer : null, true, false);
+            if (decl != null) {
+               if (decl == INVALID_TYPE_DECLARATION_SENTINEL)
+                  return null;
+               if (loading == null)
+                  return decl;
+            }
          }
 
          // When doing an incremental compile, we don't want to force all source to be loaded.  Only the changed files at first
@@ -12324,9 +12375,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (modelType != null && !modelType.typeName.equals(expectedName)) {
-         String errMessage = "Layer definition file: " + model.getSrcFile() + " expected to modify type name: " + expectedName + " but found: " + modelType.typeName + " instead";
-         if (lpi.activate)
+         if (layerPrefix != null)
+            return null;
+         String errMessage = "Layer definition file: " + model.getSrcFile().absFileName + " expected to modify type name: " + expectedName + " but found: " + modelType.typeName + " instead";
+         if (lpi.activate) {
+            // We stripped off some part of the name to find this file - maybe we found the wrong layer even though it's proper in the path name - e.g. if we include
+            // test.editor2.editor.swing.main - we find "editor.swing.main" with a layerPrefix = test.editor2.  We want to report back null here so that the error is
+            // that we did not find test.editor2.editor.swing.main.
             throw new IllegalArgumentException(errMessage);
+         }
          else {
             model.displayError(errMessage);
          }

@@ -772,8 +772,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          }
       }
       if (td != null) {
-         if (!skipSrc)
+         if (!skipSrc) {
             typeIndex.put(typeName, td);
+         }
          
          // The system resolved absolute references of all kinds and so might have resolved one defined here.
          if (td instanceof TypeDeclaration) {

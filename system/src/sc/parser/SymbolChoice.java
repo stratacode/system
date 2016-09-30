@@ -10,7 +10,7 @@ public class SymbolChoice extends Parselet {
    private HashSet<IString> expectedValues = new HashSet<IString>();
    // Optional set of symbols that include the expectedValues but should not cause a match - e.g. %> for TemplateLanguage to not match the % for the modulo operator
    private HashSet<IString> excludedValues = null;
-   private HashMap<IString,List<IString>> valueIndex = new HashMap<IString,List<IString>>();
+   HashMap<IString,List<IString>> valueIndex = new HashMap<IString,List<IString>>();
 
    // index for excludedValues - foreach excluded symbol - e.g. %> this table stores remaining string to exclude - here >
    private HashMap<IString,ArrString> excludedPeekString = null;

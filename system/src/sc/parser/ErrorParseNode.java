@@ -150,4 +150,8 @@ public class ErrorParseNode extends AbstractParseNode {
    public boolean isErrorNode() {
       return true;
    }
+
+   public boolean isGeneratedTree() {
+      return false;
+   }
 }

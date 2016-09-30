@@ -461,6 +461,9 @@ public class ClassType extends JavaType {
             chainedTypes.get(chainedSz-1).typeArguments = typeArguments;
       }
 
+      // The refLayer must be set so we retrieve the type from the right active/inactive layer set
+      Layer refLayer = ctx == null ? (it instanceof TypeDeclaration ? ((TypeDeclaration) it).getLayer() : null) : ctx.getRefLayer();
+
       boolean userType = false;
       // Looking up type parameters by name is not good here
       if (typeParam != null && ModelUtil.isTypeVariable(typeParam))
@@ -470,10 +473,10 @@ public class ClassType extends JavaType {
       // In the parametrized type info we create ClassTypes which are defined as part of a compiled method - so no relative type info is available.
       // fortunately imports and local references are always made absolute at this level
       else if (it != null) {
-         type = ModelUtil.findTypeDeclaration(sys, it, fullTypeName, ctx == null ? null : ctx.getRefLayer(), true);
+         type = ModelUtil.findTypeDeclaration(sys, it, fullTypeName, refLayer, true);
       }
       else if (sys != null) {
-         type = sys.getTypeDeclaration(fullTypeName, srcOnly, ctx == null ? null : ctx.getRefLayer(), false);
+         type = sys.getTypeDeclaration(fullTypeName, srcOnly, refLayer, false);
       }
       else if (typeParam != null) {
          type = typeParam;
@@ -495,7 +498,7 @@ public class ClassType extends JavaType {
 
       if (type == null) { // not a relative name
          if (it != null)
-            type = ModelUtil.findTypeDeclaration(sys, it, fullTypeName, null, true);
+            type = ModelUtil.findTypeDeclaration(sys, it, fullTypeName, refLayer, true);
       }
 
       if (type == null) {
@@ -508,7 +511,7 @@ public class ClassType extends JavaType {
             if (displayError) {
                displayTypeError("No type: ", getFullTypeName(), " for ");
                if (it != null) {
-                  Object dummy = ModelUtil.findTypeDeclaration(sys, it, fullTypeName, null, true);
+                  Object dummy = ModelUtil.findTypeDeclaration(sys, it, fullTypeName, refLayer, true);
                   if (node != null)
                      dummy = node.findType(fullTypeName);
                }

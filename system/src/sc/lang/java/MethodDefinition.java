@@ -691,7 +691,8 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                continue;
             visited.add(modType);
             Object overMeth = ModelUtil.definesMethod(modType, name, getParameterList(), null, null, false, false, null, null, getLayeredSystem());
-            if (overMeth != null && !resultListContainsMethod(res, overMeth))
+            // Instead of overMeth != this it should be sameMethodsInLayers - i.e. where we compare the method's enclosing type's type-name and layer since we know the parameters and name match
+            if (overMeth != null && !resultListContainsMethod(res, overMeth) && overMeth != this && !ModelUtil.sameMethodInLayer(sys, overMeth, this))
                res.add(overMeth);
          }
       }

@@ -2197,7 +2197,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
       SysTypeIndex sysIndex = layeredSystem.typeIndex;
       if (sysIndex == null)
-         sysIndex = layeredSystem.typeIndex = new SysTypeIndex(layeredSystem);
+         sysIndex = layeredSystem.typeIndex = new SysTypeIndex(layeredSystem, layeredSystem.getTypeIndexIdent());
       LayerListTypeIndex useTypeIndex = activated ? sysIndex.activeTypeIndex : sysIndex.inactiveTypeIndex;
       // The core build layer is created in the constructor so don't do this test for it.
       if (this != layeredSystem.coreBuildLayer && layeredSystem.writeLocked == 0) {

@@ -2156,6 +2156,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          newBoundType = model.getTypeDeclaration(typeName);
          if (newBoundType == null) {
             System.err.println("*** Can't find post compiled type for: " + getFullTypeName());
+            boundType = model.findTypeDeclaration(getFullTypeName(), false); // TODO: debug only
             return boundType;
          }
       }

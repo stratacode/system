@@ -102,7 +102,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       bindingStatement = dest;
       nestedBinding = nested;
       if (bindingStatement instanceof AssignmentExpression) {
-         Statement from = ((AssignmentExpression) bindingStatement).getFromStatement();
+         Statement from = (Statement) ((AssignmentExpression) bindingStatement).getFromStatement();
          if (from != null)
             bindingStatement = from;
       }

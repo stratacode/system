@@ -1887,8 +1887,10 @@ public class Sequence extends NestedParselet  {
                //   childNode = null;
                //}
             }
+            // NOTE: we used to set childNode = null here and not continue but clearly in both cases above we added the result already to tnode so this was inserting
+            // an extra null in IdentifierExpression.0 when we changed the first identifier (e.g. fed.size to ed.size)
             else
-               childNode = null;
+               continue;
          }
 
          tnode.addGeneratedNode(childNode, childParselet);

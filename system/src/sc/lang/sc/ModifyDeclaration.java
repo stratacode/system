@@ -75,8 +75,10 @@ public class ModifyDeclaration extends TypeDeclaration {
    protected void updateBoundExtendsType(Object extType, Object oldType) {
       if (modifyTypeDecl != oldType)
          System.out.println("*** Warning - updating modify with inconsistent type?");
-      if (extType instanceof BodyTypeDeclaration)
+      if (extType instanceof BodyTypeDeclaration) {
          modifyTypeDecl = (BodyTypeDeclaration) extType;
+         checkModify();
+      }
       else
          throw new UnsupportedOperationException();
    }
@@ -120,8 +122,10 @@ public class ModifyDeclaration extends TypeDeclaration {
             // to modify it.  But we need to get the most specific one: UnitConverter(extended).converters.
             if (modifyInherited && modifyTypeDecl.replacedByType != null) {
                BodyTypeDeclaration resolvedDecl = modifyTypeDecl.resolve(true);
-               if (resolvedDecl != this)
+               if (resolvedDecl != this) {
                   modifyTypeDecl = resolvedDecl;
+                  checkModify();
+               }
                else
                   System.err.println("*** Recursive modify in resolve");
             }
@@ -167,6 +171,7 @@ public class ModifyDeclaration extends TypeDeclaration {
                            else {
                               while (modifyTypeDecl.replacedByType != null) {
                                  modifyTypeDecl = modifyTypeDecl.replacedByType;
+                                 checkModify();
                               }
 
                               modifyTypeDecl.replacedByType = null;
@@ -352,6 +357,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       if (modifyTypeDecl != null) {
          // Get the most recent type in case this one was replaced
          modifyTypeDecl = modifyTypeDecl.resolve(false);
+         checkModify();
 
          // Start and validate the modified type
          ParseUtil.initAndStartComponent(modifyTypeDecl);
@@ -411,6 +417,14 @@ public class ModifyDeclaration extends TypeDeclaration {
       return temporaryType ? thisModel.layeredSystem.getSrcTypeDeclaration(fullTypeName, null, true) : thisModel.getPreviousDeclaration(fullTypeName);
    }
 
+   private void checkModify() {
+      if (getLayer() != null && modifyTypeDecl != null && modifyTypeDecl.getLayer() != null && getLayer().activated != modifyTypeDecl.getLayer().activated) {
+         System.out.println("*** Invalid modify type - mixing inactive and active layers");
+         // TODO: debug only
+         Object modType = getModifyType();
+      }
+   }
+
    protected void completeInitTypeInfo() {
       super.completeInitTypeInfo();
 
@@ -447,6 +461,7 @@ public class ModifyDeclaration extends TypeDeclaration {
                   modifyClass = ClassDeclaration.class;
             }
          }
+         checkModify();
          // Don't want to set the implied roots for the ModelStream case.  The intermediate objects may not be valid
          // and it is not necessary for what we are doing with them.
          skipRoots = true;
@@ -502,10 +517,12 @@ public class ModifyDeclaration extends TypeDeclaration {
          else {
             if (modifyType == this)
                System.out.println("*** ERROR recursive modify");
-            else
+            else {
                // Bind this here so that we use the pre-transformed value even after
                // this declaration has been moved.
                modifyTypeDecl = modifyType;
+               checkModify();
+            }
 
             JavaModel modifiedModel = modifyType.getJavaModel();
             if (modifiedModel.isLayerModel) {
@@ -578,7 +595,7 @@ public class ModifyDeclaration extends TypeDeclaration {
 
                   // Do errors for the layer def file when it gets started - skip this for peerMode.  The checkPeers flag here does not work because we only set them
                   // after we've initialized the layers so this is too late.
-                  if (!sys.peerMode && sys.getActiveOrInactiveLayerByPath(layerTypeName, CTypeUtil.getPackageName(layer.getLayerName()), false, true, true) == null) {
+                  if (!sys.peerMode && (layer.activated ? sys.getLayerByPath(layerTypeName, true) : sys.getInactiveLayer(layerTypeName, false, true, true, false)) == null) {
                      extendsType.displayTypeError("No layer: ");
                   }
                }
@@ -1211,8 +1228,10 @@ public class ModifyDeclaration extends TypeDeclaration {
                   BodyTypeDeclaration newDecl = modifyTypeDecl.resolve(false);
                   if (newDecl == this)
                      System.err.println("*** ERROR recursive modify");
-                  else
+                  else {
                      modifyTypeDecl = newDecl;
+                     checkModify();
+                  }
                }
                modType = modifyTypeDecl.transformedType;
                if (modType == null) {
@@ -2176,6 +2195,7 @@ public class ModifyDeclaration extends TypeDeclaration {
          boolean sameTypes = ModelUtil.sameTypes(extType, this);
          if ((sameTypes && !modifyInherited) || (!sameTypes && modifyInherited)) {
             modifyTypeDecl = extType;
+            checkModify();
             return true;
          }
       }
@@ -2277,6 +2297,7 @@ public class ModifyDeclaration extends TypeDeclaration {
                System.out.println("*** Error: unable to resolve modify type after flush cache for: " + typeName);
             else
                startExtendedType(modifyTypeDecl, "modified");
+            checkModify();
          }
          else {
             modifyTypeDecl.refreshBoundTypes(flags);
@@ -2648,6 +2669,7 @@ public class ModifyDeclaration extends TypeDeclaration {
 
       if ((options & CopyInitLevels) != 0) {
          res.modifyTypeDecl = modifyTypeDecl;
+         res.checkModify();
          res.modifyClass = modifyClass;
          res.extendsBoundTypes = extendsBoundTypes == null ? null : extendsBoundTypes.clone();
          res.typeInitialized = typeInitialized;

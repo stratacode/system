@@ -325,7 +325,9 @@ public class SelectorExpression extends ChainedExpression {
    public Object getTypeDeclaration(int ix) {
       if (boundTypes == null)
          return null;
-      return IdentifierExpression.getTypeForIdentifier(idTypes, boundTypes, getArguments(ix), ix, getJavaModel(), inferredType, getEnclosingType());
+      int last = selectors.size()-1;
+      Object rootType = last == 0 ? expression.getGenericType() : getGenericTypeForSelector(last, null);
+      return IdentifierExpression.getTypeForIdentifier(idTypes, boundTypes, getArguments(ix), ix, getJavaModel(), rootType, inferredType, getEnclosingType());
    }
 
    public Object getGenericType() {

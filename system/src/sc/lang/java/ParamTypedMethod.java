@@ -64,6 +64,12 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
       methodTypeParams = ModelUtil.getMethodTypeParameters(method);
       this.definedInType = definedInType;
 
+      /*
+      if (meth.toString().equals("protected static Key<T> config(Key<T> baseKey, String configValue)  in ShiroWebModuleWith435 layer: killbill.core") &&
+         parametersOrExpressions != null && parametersOrExpressions.toString().equals("[Key.get(type), configValue]"))
+         System.out.println("***");
+      */
+
       if (parametersOrExpressions != null) {
          boundJavaTypes = ModelUtil.parametersToJavaTypeArray(system, this, parametersOrExpressions, this);
       }

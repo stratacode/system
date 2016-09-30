@@ -15,6 +15,7 @@ import sc.parser.IStyleAdapter;
 import sc.parser.Language;
 import sc.parser.ParentParseNode;
 import sc.parser.ParseUtil;
+import sc.type.CTypeUtil;
 import sc.type.IBeanMapper;
 import sc.type.Type;
 import sc.util.StringUtil;
@@ -95,12 +96,28 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       }
 
       if (!convertGetSet) {
-         Object annotObj = ModelUtil.getAnnotation(getDefinition(), "sc.obj.GetSet");
+         Statement def = getDefinition();
+         Object annotObj = ModelUtil.getAnnotation(def, "sc.obj.GetSet");
          if (annotObj != null) {
-            Object value = ModelUtil.getAnnotationValue(annotObj, "value");
-            if (value == null || (value instanceof Boolean && ((Boolean) value)))
-               convertGetSet = true;
+            if (!(def instanceof FieldDefinition)) {
+               displayError("@GetSet annotation invalid on non-fields: ");
+            }
+            else {
+               Object value = ModelUtil.getAnnotationValue(annotObj, "value");
+               if (value == null || (value instanceof Boolean && ((Boolean) value)))
+                  convertGetSet = true;
+            }
          }
+         /*
+          * TODO: If we have a field which lives in a type with an abstract getX and setX methods, but no implementation, should we set convertGetSet to
+          * automatically fill that contract?  What are the side-effects of doing that for an abstract class where maybe a getX or setX is already implemented downstream?
+          * Need to match the public/private modifiers... since a private field should not convertGetSet on an interface.
+         if (!convertGetSet && def instanceof FieldDefinition) {
+            TypeDeclaration enclType = getEnclosingType();
+            Object getXMeth = enclType.definesMethod("get" + CTypeUtil.capitalizePropertyName(variableName), null, )
+            if (getMeth.isAbstract() && modifiers match) convertGetSet = true;
+         }
+         */
       }
       super.init();
    }

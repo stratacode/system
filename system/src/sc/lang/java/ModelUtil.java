@@ -141,6 +141,9 @@ public class ModelUtil {
          //   System.out.println("*** Null type parameter default");
          if (boundType instanceof ExtendsType.WildcardTypeDeclaration)
             continue;
+         // When we have a TypeParameter that conveys type info, pass along the TypeParameter so we don't lose any information
+         if (tp instanceof TypeParameter && ((TypeParameter) tp).extendsType != null)
+            boundType = tp;
          if (boundType != Object.class)
             paramMap.put(new TypeParamKey(tp), boundType);
       }
@@ -229,9 +232,15 @@ public class ModelUtil {
                if (ModelUtil.getTypeName(genParam).equals("java.lang.Class") && DynUtil.isType(argType)) {
                   // assert curParamType.isAssignableFrom(atp)
                   if (curParamType != null && ModelUtil.isAssignableFrom(curParamType, paramArgType)) {
-                     argType = paramArgType;
-                     if (!(argType instanceof ExtendsType.WildcardTypeDeclaration))
-                         paramMap.put(new TypeParamKey(atp), argType);
+                     // Only do this rule when the param type is a real class.  If it's a type parameter, it's not the right mapping to apply this special rule
+                     if (!ModelUtil.isTypeVariable(curParamType)) {
+                        argType = paramArgType;
+                        if (!(argType instanceof ExtendsType.WildcardTypeDeclaration))
+                           paramMap.put(new TypeParamKey(atp), argType);
+                     }
+                     else {
+                        //System.out.println("***");
+                     }
                   }
                }
                else {
@@ -1024,8 +1033,28 @@ public class ModelUtil {
       return ModelUtil.isVarArgs(m1) == ModelUtil.isVarArgs(m2);
    }
 
+   /** Returns true for two methods which match in name and parameter signature.  Beware that it will return true for the same method in different layers (use sameMethodInLayer). */
    public static boolean sameMethods(Object m1, Object m2) {
       return ModelUtil.methodNamesMatch(m1, m2) && ModelUtil.methodsMatch(m1, m2);
+   }
+
+   /**
+    * Returns true for two methods which are not only the same name, signature but also defined in the same layer.
+    * Will consider two methods in
+    * different runtimes but the same layer the same method.
+    */
+   public static boolean sameMethodInLayer(LayeredSystem sys, Object m1, MethodDefinition m2) {
+      if (ModelUtil.sameMethods(m1, m2)) {
+         Object enc1 = ModelUtil.getEnclosingType(m1);
+         Object enc2 = ModelUtil.getEnclosingType(m2);
+         if (ModelUtil.sameTypes(enc1, enc2)) {
+            Layer l1 = ModelUtil.getLayerForType(sys, enc1);
+            Layer l2 = ModelUtil.getLayerForType(sys, enc2);
+            if (l1 == l2 || l1 != null && l2 != null && l1.getLayerName().equals(l2.getLayerName()))
+               return true;
+         }
+      }
+      return false;
    }
 
    public static boolean parametersMatch(Object[] c1Types, Object[] c2Types, boolean allowUnbound, LayeredSystem sys) {
@@ -1934,6 +1963,13 @@ public class ModelUtil {
 
    // TODO: Performance Fix - me - should be looking up a precedence value in each type and just comparing them
    public static Object coerceNumberTypes(Object lhsType, Object rhsType) {
+      // If we are coercing Integer, Float, etc. and Number the base is a Number
+      if (isNumber(lhsType))
+         return lhsType;
+
+      if (isNumber(rhsType))
+         return rhsType;
+
       if (lhsType == rhsType)
            return lhsType;
 
@@ -8293,4 +8329,5 @@ public class ModelUtil {
       }
       return system.getTypeDeclaration(className);
    }
+
 }

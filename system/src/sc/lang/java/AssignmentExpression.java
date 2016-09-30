@@ -381,13 +381,13 @@ public class AssignmentExpression extends TwoOperatorExpression {
          throw new UnsupportedOperationException();
    }
 
-   public Statement getFromStatement() {
+   public ISrcStatement getFromStatement() {
       if (fromDefinition instanceof VariableDefinition)
          return ((VariableDefinition) fromDefinition).getDefinition();
       else if (fromDefinition instanceof PropertyAssignment)
          return (PropertyAssignment) fromDefinition;
       else
-         return null;
+         return super.getFromStatement();
    }
 
    public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {

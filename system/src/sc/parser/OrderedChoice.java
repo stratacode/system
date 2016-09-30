@@ -1345,8 +1345,16 @@ public class OrderedChoice extends NestedParselet  {
       Object childNode = ParseUtil.nodeToSemanticValue(childParseNode);
       for (int i = 0; i < parselets.size(); i++) {
          Parselet p = parselets.get(i);
-         if (p.dataTypeMatches(childNode))
+         if (p.dataTypeMatches(childNode)) {
+            // TODO: when childNode is a string token, or we do not have an unambiguous match here, we might
+            // return the wrong parselet.  We could do acceptTree but that's also not going to differentiate between
+            // a spacing, blockComment, or eolComment.  IndexedChoice will now do that however using the indexed keys but there
+            // might be other cases where we need to override dataTypeMatches for a string producing parselet that needs to
+            // find out which child parselet matches a given string (for styling or stuff like that).
+            //if (res != null) {
+            //}
             res = p;
+         }
       }
       return res;
    }

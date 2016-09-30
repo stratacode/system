@@ -373,5 +373,12 @@ public class ParseNode extends AbstractParseNode {
    public boolean isErrorNode() {
       return errorNode || (value instanceof IParseNode && ((IParseNode) value).isErrorNode());
    }
+
+   @Override
+   public boolean isGeneratedTree() {
+      if (value instanceof IParseNode)
+         return ((IParseNode) value).isGeneratedTree();
+      return false; // Do we need a 'generated' flag here like in ParentParseNode?  I can't find a place where a ParseNode gets created in the 'generate' process
+   }
 }
 

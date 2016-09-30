@@ -4,9 +4,7 @@
 
 package sc.layer;
 
-import sc.type.CTypeUtil;
-import sc.util.FileUtil;
-
+import java.io.File;
 import java.io.Serializable;
 import java.util.HashMap;
 
@@ -41,5 +39,50 @@ public class LayerTypeIndex implements Serializable {
          return true;
       }
       return false;
+   }
+
+   /**
+    * Refresh the layer type index - look for files that exist on the file system that are not in the index and
+    * files which have changed.  This is called on the main layered system since the peer system which owns this layer
+    * may not have been created yet.  If we need to create the layer, be careful to use the layer's layeredSystem so
+    * we get the one which is managing this index (since each type index is per-layered system).
+    */
+   LayerTypeIndex refreshLayerTypeIndex(LayeredSystem sys, String layerName, long lastModified, RefreshTypeIndexContext refreshCtx) {
+      File layerFile = sys.getLayerFile(layerName);
+      if (layerFile == null) {
+         sys.warning("Layer found in type index - not in the layer path: " + layerName + ": " + sys.layerPathDirs);
+         return null;
+      }
+      String pathName = layerFile.getParentFile().getPath();
+
+      // Excluded in the project - do not refresh it
+      if (sys.externalModelIndex != null && sys.externalModelIndex.isExcludedFile(pathName))
+         return null;
+
+      if (!pathName.equals(layerPathName)) {
+         return sys.buildLayerTypeIndex(layerName);
+      }
+
+      /* We want to refresh the layers in layer order so that we set up the modify inheritance types properly */
+      if (baseLayerNames != null) {
+         for (String baseLayer:baseLayerNames) {
+            sys.refreshLayerTypeIndexFile(baseLayer, refreshCtx, true);
+         }
+      }
+
+      for (String srcDir:topLevelSrcDirs) {
+         if (!Layer.isBuildDirPath(srcDir)) {
+            File srcDirFile = new File(srcDir);
+
+            if (!srcDirFile.isDirectory()) {
+               sys.warning("srcDir removed for layer: " + layerName + ": " + srcDir + " rebuilding index");
+               return sys.buildLayerTypeIndex(layerName);
+            }
+
+            sys.refreshLayerTypeIndexDir(srcDirFile, "", layerName, this, lastModified);
+         }
+         // else - TODO: do we need to handle this case?
+      }
+      return this;
    }
 }

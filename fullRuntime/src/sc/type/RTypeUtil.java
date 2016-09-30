@@ -966,6 +966,9 @@ public class RTypeUtil {
       catch (NoClassDefFoundError exc2) {
          clMap.put(className, NullSentinelClass.class);
       }
+      catch (IllegalAccessError exc3) {
+         clMap.put(className, NullSentinelClass.class);
+      }
       finally {
          PerfMon.end("loadClass");
       }

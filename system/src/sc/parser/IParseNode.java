@@ -109,6 +109,9 @@ public interface IParseNode extends CharSequence, IParseResult {
    boolean isErrorNode();
 
    void setErrorNode(boolean val);
+
+   /** Returns true if any nodes in this tree have been through the 'generate' process.  These nodes might have formatting parse nodes that need to be replaced for some operations */
+   boolean isGeneratedTree();
 }
 
 
