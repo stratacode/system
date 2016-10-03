@@ -7,6 +7,7 @@ package sc.classfile;
 import sc.lang.java.*;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
+import sc.type.CTypeUtil;
 import sc.type.RTypeUtil;
 import sc.util.*;
 
@@ -52,6 +53,11 @@ public class ClassFile {
 
    Attribute[] attributes;
    CoalescedHashMap<String,Attribute> attributesByName;
+
+   String outerName;
+
+   InnerClasses theInnerClasses;
+   int innerAccessFlags; // Access flags that are stored in theInnerClasses attribute for this class (e.g. 'static')
 
    public ClassFile(InputStream is) {
       input = new DataInputStream(new BufferedInputStream(is));
@@ -614,9 +620,7 @@ public class ClassFile {
    }
 
    public String getOuterClassName() {
-      if (theInnerClasses == null)
-         return null;
-      return theInnerClasses.outerName;
+      return outerName;
    }
 
    public String getInnerClassName(int ix) {
@@ -632,8 +636,6 @@ public class ClassFile {
             return true;
       return false;
    }
-
-   InnerClasses theInnerClasses;
 
    public static class CFInnerClassInfo {
       String name;
@@ -679,15 +681,17 @@ public class ClassFile {
             // Name of the outer class
             int outerClassIndex = input.readUnsignedShort();
             ClassConstant pc = outerClassIndex == 0 ? null : (ClassConstant) file.constantPool[outerClassIndex];
-            // For a simple named inner class, this is just the parent's class name.
-            //outerName = pc == null ? null : file.getTypeNameFromIndex(pc.nameIndex);
+
+            // Each inner class will have an outer class.  We may see inner classes which are not for the type we are
+            // defining.  We also get an inner class entry to indicate our outer class
+            String innerOuterName = pc == null ? null : file.getTypeNameFromIndex(pc.nameIndex);
 
             // Name of inner class
             int innerNameIndex = input.readUnsignedShort();
             String innerName = innerNameIndex == 0 ? null : ((Utf8Constant) file.constantPool[innerNameIndex]).value;
 
             int innerAccessFlags = input.readUnsignedShort();
-            if (innerName != null) {
+            if (innerName != null && innerOuterName != null && innerOuterName.equals(file.cfClass.getFullTypeName())) {
                if (innerClasses == null) {
                   file.theInnerClasses = this;
                   innerClasses = new ArrayList<CFInnerClassInfo>();
@@ -695,6 +699,10 @@ public class ClassFile {
                innerClasses.add(new CFInnerClassInfo(innerName, innerAccessFlags));
             }
 
+            if (innerName != null && innerName.equals(file.cfClass.getTypeName())) {
+               file.outerName = innerOuterName;
+               file.innerAccessFlags = innerAccessFlags;
+            }
          }
       }
    }

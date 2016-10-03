@@ -6642,8 +6642,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         System.err.println("*** Modifying type index without write lock");
                         new Throwable().printStackTrace();
                      }
-                     if (layerName.contains("android"))
-                        System.out.println("***");
                      idx.typeIndex.put(layerName, layer.layerTypeIndex);
                      refreshedLayers.add(layerName);
                   }
@@ -6701,16 +6699,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // ?? huh we just listed out the file - rebuild it from scratch.
          verbose("Layer type index not found for layer: " + layerName + " rebuilding type index");
 
-         if (layerName.contains("android"))
-            System.out.println("***");
-
          addLayerToRebuild(layerName, refreshCtx.layersToRebuild);
          refreshCtx.refreshedLayers.add(layerName);
       } else {
          switch (options.typeIndexMode) {
             case Refresh:
-               if (layerName.contains("android"))
-                  System.out.println("***");
                layerTypeIndex = layerTypeIndex.refreshLayerTypeIndex(this, layerName, new File(FileUtil.concat(refreshCtx.typeIndexDir.getPath(), indexFileName)).lastModified(), refreshCtx);
                refreshCtx.refreshedLayers.add(layerName);
                break;

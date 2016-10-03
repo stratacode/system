@@ -314,6 +314,13 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       // The layer model can't do this until the layer is started and its class path is set up.
       if (!isLayerModel)
          initTypeInfo();
+      else {
+         // When resolving a layer model in the IDE, we might start the layer modify type here and it does not resolve
+         // correctly unless it knows it's a layer type.
+         TypeDeclaration layerModelType = getLayerTypeDeclaration();
+         if (layerModelType != null)
+            layerModelType.isLayerType = true;
+      }
       super.start();
 
       // Propagate the resultSuffix to the leaf model

@@ -37,7 +37,17 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
       returnType = methodSig.returnType;
       typeParameters = methodSig.typeParameters;
       List<JavaType> ptypes = methodSig.parameterTypes;
-      parameterJavaTypes = ptypes == null ? null : ptypes.toArray(new JavaType[ptypes.size()]);
+
+      int numParams = 0;
+      // To be consistent with the Class.getParameterTypes() method, we need to strip out the constructor for an inner type
+      if (ptypes != null) {
+         numParams = ptypes.size();
+         if (isConstructor() && ownerClass.getEnclosingType() != null && numParams > 1 && !ownerClass.hasModifier("static")) {
+            ptypes = ptypes.subList(1, numParams);
+            numParams--;
+         }
+      }
+      parameterJavaTypes = ptypes == null ? null : ptypes.toArray(new JavaType[numParams]);
 
       /** Note: this needs to be done in initialize so we can do resolves without accessing the property name */
       if ((propertyName = ModelUtil.isGetMethod(name, parameterJavaTypes, returnType)) != null)
@@ -293,5 +303,9 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
 
       Method res = RTypeUtil.getMethodFromTypeSignature(cl, name, getTypeSignature());
       return res;
+   }
+
+   public boolean isConstructor() {
+      return name != null && name.equals("<init>");
    }
 }

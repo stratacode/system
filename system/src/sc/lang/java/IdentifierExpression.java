@@ -237,6 +237,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                               if (model != null && !model.disableTypeErrors && isInferredSet() && isInferredFinal()) {
                                  String othersMessage = getOtherConstructorsMessage(superType);
                                  displayTypeError("No constructor matching: ", ModelUtil.argumentsToString(arguments), othersMessage, " for: ");
+                                 constr = ModelUtil.declaresConstructor(getLayeredSystem(), superType, arguments, null);
                               }
                            }
                            else {

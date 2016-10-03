@@ -1212,9 +1212,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
 
    public boolean hasModifier(String modifierName) {
       if (modifierName.equals("static")) {
-         if (classFile.theInnerClasses == null)
-            return false;
-         int accessFlags = classFile.theInnerClasses.getAccessFlags(getTypeName());
+         int accessFlags = classFile.innerAccessFlags;
          if (accessFlags == -1)
             System.err.println("*** Can't find my inner type access flags!");
          else
