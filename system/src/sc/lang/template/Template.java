@@ -908,11 +908,9 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
       else if (decl instanceof Expression) {
          Expression origExpr = (Expression) decl;
          // Output out.append(decl.toString());
-         Expression expr = copy ? (Expression) origExpr.deepCopy(CopyNormal, null) : origExpr;
+         Expression expr = copy ? (Expression) origExpr.deepCopy(CopyNormal | CopyReplace, null) : origExpr;
          expr.parentNode = block;
          int origStartIndex = expr.parseNode == null ? -1 : expr.parseNode.getStartIndex();
-         if (copy)
-            origExpr.replacedByStatement = expr;
 
          // The replace glue call will unwrap any template definitions with Java definitions.  After that we have a nice well formed Java statement.  We generate that explicitly here because we are switching languages.
          ct = replaceStatementGlue(expr, ct, true);

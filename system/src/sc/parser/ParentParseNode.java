@@ -482,10 +482,6 @@ public class ParentParseNode extends AbstractParseNode {
       }
    }
 
-   public void addParent(ParentParseNode par, int currentChildIndex) {
-
-   }
-
    private FormatContext.Entry visitForFormat(FormatContext ctx) {
       FormatContext.Entry ent = new FormatContext.Entry();
       List<FormatContext.Entry> pp = ctx.pendingParents;

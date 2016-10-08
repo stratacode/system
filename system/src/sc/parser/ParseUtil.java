@@ -601,6 +601,22 @@ public class ParseUtil  {
       adapter.styleString(strVal, escape, styleName, null);
    }
 
+
+   public static void toStyledChild(IStyleAdapter adapter, ParentParseNode parent, Object child, int childIx) {
+      if (!(child instanceof IParseNode) && child != null) {
+         Parselet childParselet = ((NestedParselet) parent.getParselet()).getChildParselet(child, childIx);
+         if (childParselet != null) {
+            String styleName = null;
+            styleName = childParselet.styleName;
+            if (styleName != null) {
+               adapter.styleString((CharSequence) child, false, styleName, null);
+               return;
+            }
+         }
+      }
+      ParseUtil.toStyledString(adapter, child);
+   }
+
    public static void toStyledString(IStyleAdapter adapter, Object parseNode) {
       if (parseNode instanceof IParseNode)
          ((IParseNode) parseNode).styleNode(adapter, null, null, -1);

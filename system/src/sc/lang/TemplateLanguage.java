@@ -74,11 +74,14 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
    // Start must chew up space following the delimiter since it is the start of a code construct.
    SymbolSpace startCodeDelimiter = new SymbolSpace(START_CODE_DELIMITER);
    SymbolSpace startExpDelimiter = new SymbolSpace(START_EXP_DELIMITER);
-
    SymbolSpace startDeclDelimiter = new SymbolSpace(START_DECL_DELIMITER);
 
    // End does not consume space since that space should be part of the template string
    Symbol endDelimiter = new Symbol(END_DELIMITER);
+
+   {
+      startCodeDelimiter.styleName = startExpDelimiter.styleName = startDeclDelimiter.styleName = endDelimiter.styleName = "keyword";
+   }
 
    OrderedChoice htmlCommentBody = new OrderedChoice("('','','')", REPEAT | OPTIONAL,
                    new Sequence("('',)", new Symbol("--"), new Symbol(NOT | LOOKAHEAD, ">")),

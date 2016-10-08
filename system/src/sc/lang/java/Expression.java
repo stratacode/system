@@ -913,6 +913,10 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
          res.nestedBinding = nestedBinding;
          res.replacedByStatement = replacedByStatement;
       }
+      // When we make a copy with CopyReplace set, make sure the copy can find the
+      if ((options & CopyReplace) != 0l) {
+         replacedByStatement = res;
+      }
       return res;
    }
 
@@ -1016,5 +1020,17 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
 
    public boolean isInferredSet() {
       return true;
+   }
+
+   public String getNodeErrorText() {
+      String res = super.getNodeErrorText();
+      if (res != null)
+         return res;
+
+      // This handles template expressions and other cases where we don't start the element in the language... we transform it and
+      // start the element which replaces it.  So errors for those statements apply to this element in the source.
+      if (replacedByStatement != null)
+         return replacedByStatement.getNodeErrorText();
+      return null;
    }
 }

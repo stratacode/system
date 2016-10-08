@@ -80,6 +80,9 @@ public interface ISemanticNode {
 
    public static final int SkipParseNode = 16;
 
+   /** Indicates that the copy will replace the current statement in the model which is started.  E.g. a TemplateExpression sets replaceStatement to the copy, so we can trace from the original to the actual code-model which is resolved */
+   public static final int CopyReplace = 32;
+
    /**
     * Copy just some of the state in the semantic nodes.  Used to speed things up and make code more robust during
     * transform so expressiona don't get re-resolved mid-stream.  This mode does not copy the parse node but

@@ -1295,6 +1295,9 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          return tag.tagObject;
 
       Template templ = getEnclosingTemplate();
+      if (templ == null) {
+         return null;
+      }
       return (TypeDeclaration) templ.rootType;
    }
 

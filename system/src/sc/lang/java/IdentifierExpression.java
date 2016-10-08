@@ -4262,6 +4262,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       ParentParseNode pp = (ParentParseNode) parseNode;
       Parselet topParselet = pp.getParselet();
       ArrayList<Object> remaining = null;
+      int remainingIx = -1;
 
       List<IString> idents = getAllIdentifiers();
       int sz = idents.size();
@@ -4272,10 +4273,12 @@ public class IdentifierExpression extends ArgumentsExpression {
       // and we have the ; we need to handle in 'remaining'  This could be handled more generically in the grammar.
       // See comment for this method.
       if (topParselet != idExParselet) {
+         ParentParseNode nextP = null;
          for (int i = 0; i < pp.children.size(); i++) {
             Object child = pp.children.get(i);
             if (child instanceof ParentParseNode && ((ParentParseNode) child).getParselet() == idExParselet) {
                remaining = new ArrayList<Object>();
+               remainingIx = i + 1;
                while (++i < pp.children.size()) {
                   Object remainingNode = pp.children.get(i);
                   if (remainingNode != null)
@@ -4284,8 +4287,9 @@ public class IdentifierExpression extends ArgumentsExpression {
                pp = (ParentParseNode) child;
                break;
             }
-            else
-               ParseUtil.toStyledString(adapter, child);
+            else {
+               ParseUtil.toStyledChild(adapter, pp, child, i);
+            }
          }
       }
       ParentParseNode identsNode = (ParentParseNode) pp.children.get(0);
@@ -4352,10 +4356,9 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (remaining != null) {
          for (Object node:remaining) {
             if (node != argsNode)
-               ParseUtil.toStyledString(adapter, node);
+               ParseUtil.toStyledChild(adapter, parseNode, node, remainingIx++);
          }
       }
-
    }
 
 
