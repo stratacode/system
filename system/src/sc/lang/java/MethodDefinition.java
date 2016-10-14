@@ -84,7 +84,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       if (body != null) {
          Object retType = getTypeDeclaration();
          if (retType != null && !ModelUtil.typeIsVoid(retType)) {
-            Statement last = body.statements == null ? null : body.statements.get(body.statements.size() - 1);
+            Statement last = body.statements == null || body.statements.size() == 0 ? null : body.statements.get(body.statements.size() - 1);
             ArrayList<Statement> ret = null;
             if (last != null) {
                ret = new ArrayList<Statement>();
