@@ -770,7 +770,13 @@ public class ModelUtil {
          return pkg.getName();
       }
       else if (type instanceof ITypeDeclaration) {
-         return CTypeUtil.getPackageName(ModelUtil.getTypeName(getRootType(type)));
+         Object rootType = getRootType(type);
+         if (rootType != null)
+            type = rootType;
+         String typeName = ModelUtil.getTypeName(type);
+         if (typeName == null)
+            return null;
+         return CTypeUtil.getPackageName(typeName);
       }
       else
          throw new UnsupportedOperationException();
