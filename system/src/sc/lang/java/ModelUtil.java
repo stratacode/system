@@ -3885,6 +3885,11 @@ public class ModelUtil {
       }
       if (assignedProperty == null)
          return false;
+      Object enclType = ModelUtil.getEnclosingType(assignedProperty);
+      if (enclType instanceof BodyTypeDeclaration) {
+         if (((BodyTypeDeclaration) enclType).isAutomaticBindable(ModelUtil.getPropertyName(assignedProperty)))
+            return true;
+      }
       return getAnnotation(assignedProperty, "sc.bind.Bindable") != null;
    }
 
@@ -3903,6 +3908,11 @@ public class ModelUtil {
       }
       if (assignedProperty == null)
          return false;
+      Object enclType = ModelUtil.getEnclosingType(assignedProperty);
+      if (enclType instanceof BodyTypeDeclaration) {
+         if (((BodyTypeDeclaration) enclType).isAutomaticBindable(ModelUtil.getPropertyName(assignedProperty)))
+            return true;
+      }
       Object bindAnnot = getAnnotation(assignedProperty, "sc.bind.Bindable");
       return bindAnnot != null && ModelUtil.isAutomaticBindingAnnotation(bindAnnot);
    }
@@ -7965,8 +7975,13 @@ public class ModelUtil {
          else
             ((VariableDefinition) member).needsDynAccess = true;
       }
-      else
-         type.addPropertyToMakeBindable(propName, null, null, !needsBindable);
+      else {
+         member = type.definesMember(propName, JavaSemanticNode.MemberType.PropertyAnySet, null, null);
+         if (member != null) {
+            if (!ModelUtil.isBindable(member))
+               type.addPropertyToMakeBindable(propName, null, null, !needsBindable);
+         }
+      }
    }
 
    public static boolean hasUnboundTypeParameters(Object type) {
@@ -8330,4 +8345,27 @@ public class ModelUtil {
       return system.getTypeDeclaration(className);
    }
 
+   public static Object resolveCompiledType(LayeredSystem sys, Object extendsType, String fullTypeName) {
+      if (extendsType instanceof BodyTypeDeclaration) {
+         Object newExtType = ((BodyTypeDeclaration) extendsType).getCompiledClass();
+         if (newExtType != null)
+            extendsType = newExtType;
+         else
+            sys.error("Unable to resolve compiled interface for: " + fullTypeName);
+      }
+
+      Object compiledType = sys.getClassWithPathName(fullTypeName, null, false, true, false);
+      // In some situations we might find a source file version of some class... the CFClass can only
+      // point to the compiled class
+      if (extendsType instanceof ParamTypeDeclaration) {
+         ((ParamTypeDeclaration) extendsType).setBaseType(compiledType);
+      }
+      if (extendsType instanceof ArrayTypeDeclaration) {
+         if (compiledType != null)
+            ((ArrayTypeDeclaration) extendsType).componentType = compiledType;
+         else
+            sys.error("Unable to resolve compiled interface for: " + fullTypeName);
+      }
+      return extendsType;
+   }
 }

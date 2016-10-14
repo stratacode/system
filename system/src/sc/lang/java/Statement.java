@@ -101,6 +101,29 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       }
    }
 
+   public static class ErrorRangeInfo {
+      public int fromIx;
+      public int toIx;
+
+      public ErrorRangeInfo(int fromIx, int toIx) {
+         this.fromIx = fromIx;
+         this.toIx = toIx;
+      }
+
+      public String toString() {
+         return fromIx + ":" + toIx;
+      }
+   }
+
+   void displayRangeError(int fromIx, int toIx, String...args) {
+      displayTypeError(args);
+      if (errorArgs != null) {
+         ArrayList<Object> eargs = new ArrayList<Object>(Arrays.asList(errorArgs));
+         eargs.add(new ErrorRangeInfo(fromIx, toIx));
+         errorArgs = eargs.toArray();
+      }
+   }
+
    public void displayFormatatedError(String arg) {
       if (errorArgs == null) {
          super.displayFormattedError(arg);
@@ -169,7 +192,7 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
    public void addInitStatements(List<Statement> res, InitStatementsMode mode) {
    }
 
-   public void addReturnStatements(List<Statement> res) {
+   public void addReturnStatements(List<Statement> res, boolean includeThrow) {
    }
 
    public void setComment(String s) {
@@ -206,7 +229,7 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
          StringBuilder sb = new StringBuilder();
          for (Object arg:errorArgs) {
             // This is added on so we know which component of an identifier expression should display the error.  Don't display the toString of it to the user.
-            if (arg instanceof Expression.ErrorRangeInfo)
+            if (arg instanceof ErrorRangeInfo)
                continue;
             sb.append(arg.toString());
          }

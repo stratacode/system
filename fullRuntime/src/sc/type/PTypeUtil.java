@@ -15,6 +15,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.*;
 
+/** This is the version of the PTypeUtil utilities that is used in the full runtime, with Java reflection etc.  */
 @JSSettings(jsLibFiles="js/scdyn.js")
 public class PTypeUtil {
    public static ThreadLocal<Map<String,Object>> threadLocalMap = new ThreadLocal<Map<String,Object>>();
@@ -959,6 +960,8 @@ public class PTypeUtil {
       return res;
    }
 
-   // not sure why this reports an error in IntelliJ's editor but ignore it!
-
+   public static Object clone(Object o) {
+      Object meth = resolveMethod(o.getClass(), "clone", null);
+      return invokeMethod(o, meth);
+   }
 }

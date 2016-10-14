@@ -88,8 +88,8 @@ public class CatchStatement extends NonIndentedStatement {
       return sb.toString();
    }
 
-   public void addReturnStatements(List<Statement> res) {
+   public void addReturnStatements(List<Statement> res, boolean incThrow) {
       if (statements != null)
-         statements.addReturnStatements(res);
+         statements.addReturnStatements(res, incThrow);
    }
 }

@@ -286,10 +286,10 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
       }
    }
 
-   public void addReturnStatements(List<Statement> res) {
+   public void addReturnStatements(List<Statement> res, boolean incThrow) {
       if (statements != null) {
          for (Statement st:statements) {
-            st.addReturnStatements(res);
+            st.addReturnStatements(res, incThrow);
          }
       }
    }

@@ -2808,6 +2808,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public JavaModel refreshNode() {
+      if (layeredSystem == null)
+         return this;
       // Here we pick the latest annotated model
       return (JavaModel) layeredSystem.getAnnotatedModel(getSrcFile());
    }

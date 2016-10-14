@@ -330,14 +330,8 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
             else {
                extendsJavaType = sig.extendsType;
                extendsType = extendsJavaType.getTypeDeclaration();
-               // TODO: remove this when if/when support CFClasses referencing src-types
-               if (extendsType instanceof BodyTypeDeclaration) {
-                  Object newExtType = ((BodyTypeDeclaration) extendsType).getCompiledClass();
-                  if (newExtType != null)
-                     extendsType = newExtType;
-                  else
-                     error("Unable to resolve compiled type for CFClass base type: " + extendsType);
-               }
+
+               extendsType = ModelUtil.resolveCompiledType(system, extendsType, extendsJavaType.getFullTypeName());
             }
          }
          //if (extendsType instanceof ParamTypeDeclaration)
@@ -347,26 +341,8 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
             implementsTypes = new ArrayList<Object>(implJavaTypes.size());
             for (int i = 0; i < implJavaTypes.size(); i++) {
                JavaType implJavaType = implJavaTypes.get(i);
-               String implTypeName = ((ClassType)implJavaTypes.get(i)).getFullTypeName();
-               Object implType = system.getClassWithPathName(implTypeName, null, false, true, false);
                Object implParamType = implJavaType.getTypeDeclaration();
-               // In some situations we might find a source file version of some class... the CFClass can only
-               // point to the compiled class
-               if (implParamType instanceof ParamTypeDeclaration) {
-                  if (implType != null)
-                     ((ParamTypeDeclaration) implParamType).setBaseType(implType);
-                  else
-                     error("Unable to resolve compiled interface for: " + implTypeName);
-
-                  implType = implParamType;
-               }
-               if (implParamType instanceof ArrayTypeDeclaration) {
-                  if (implType != null)
-                     ((ArrayTypeDeclaration) implParamType).componentType = implType;
-                  else
-                     error("Unable to resolve compiled interface for: " + implTypeName);
-                  implType = implParamType;
-               }
+               Object implType = ModelUtil.resolveCompiledType(system, implParamType, implJavaType.getFullTypeName());
                if (implType == null)
                   error("Can't find interface: " + implJavaType.getFullTypeName());
                else
@@ -702,13 +678,18 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
 
       Object superMeth = null;
       if (extendsType != null) {
-         superMeth = ModelUtil.definesMethod(extendsType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, getLayeredSystem());
+         // If necessary map the type variables in the base-types' declaration based on the type params in the context
+         Object paramExtType = ParamTypeDeclaration.convertBaseTypeContext(ctx, extendsType);
+
+         superMeth = ModelUtil.definesMethod(paramExtType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, getLayeredSystem());
       }
       if (implementsTypes != null) {
          int numInterfaces = implementsTypes.size();
          for (int i = 0; i < numInterfaces; i++) {
             Object implType = implementsTypes.get(i);
             if (implType != null) {
+
+               implType = ParamTypeDeclaration.convertBaseTypeContext(ctx, implType);
                meth = ModelUtil.definesMethod(implType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, getLayeredSystem());
                if (meth != null) {
                   superMeth = ModelUtil.pickMoreSpecificMethod(superMeth, meth, null, null, null);
@@ -762,13 +743,13 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       Object res;
       if (mtype.contains(JavaSemanticNode.MemberType.Field)) {
          CFField field = fieldsByName.get(name);
-         if (field != null)
+         if (field != null && (refType == null || ModelUtil.checkAccess(refType, field)))
             return field;
       }
 
       if (mtype.contains(JavaSemanticNode.MemberType.Enum) && isEnum()) {
          CFField field = fieldsByName.get(name);
-         if (field != null)
+         if (field != null && (refType == null || ModelUtil.checkAccess(refType,field)))
             return field;
       }
 

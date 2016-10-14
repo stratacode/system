@@ -172,18 +172,18 @@ public class TryStatement extends Statement implements IBlockStatement {
       return true;
    }
 
-   public void addReturnStatements(List<Statement> res) {
+   public void addReturnStatements(List<Statement> res, boolean incThrow) {
       if (statements != null) {
          for (Statement statement:statements)
-            statement.addReturnStatements(res);
+            statement.addReturnStatements(res, incThrow);
       }
       if (catchStatements != null) {
          for (Statement st:catchStatements) {
-            st.addReturnStatements(res);
+            st.addReturnStatements(res, incThrow);
          }
       }
       if (finallyStatement != null)
-         finallyStatement.addReturnStatements(res);
+         finallyStatement.addReturnStatements(res, incThrow);
    }
 
    public String toString() {

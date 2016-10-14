@@ -60,7 +60,7 @@ public class ForStatement extends Statement {
       return child == statement;
    }
 
-   public void addReturnStatements(List<Statement> res) {
-      statement.addReturnStatements(res);
+   public void addReturnStatements(List<Statement> res, boolean incThrow) {
+      statement.addReturnStatements(res, incThrow);
    }
 }

@@ -264,15 +264,15 @@ public class SyncManager {
                if (val instanceof int[])
                   return ((int[]) val).clone();
                else
-                  System.err.println("*** unsupported array type in copyMutableValue");
+                  return PTypeUtil.clone(val);
             }
             else
-               System.err.println("*** Unrecognized type for synchronized property: " + val);
+               return PTypeUtil.clone(val);
          }
          finally {
             setSyncState(origState);
          }
-         return val;
+         //return val;
       }
 
       public void addPreviousValue(Object obj, String propName, Object val) {

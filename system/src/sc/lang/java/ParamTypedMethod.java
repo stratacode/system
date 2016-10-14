@@ -1012,4 +1012,6 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
          }
       }
    }
+
 }
+

@@ -54,4 +54,9 @@ public class SynchronizedStatement extends Statement {
          return bs;
       }
    }
+
+   public void addReturnStatements(List<Statement> res, boolean incThrow) {
+      if (statement != null)
+         statement.addReturnStatements(res, incThrow);
+   }
 }

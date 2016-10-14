@@ -51,7 +51,7 @@ public class ReturnStatement extends ExpressionStatement {
       if (expression == null && method != null) {
          JavaType retType = method.getReturnJavaType();
          if (retType != null && !retType.isVoid())
-            displayError("Method: ", method.name, " ", " returns type: ", retType.toString());
+            displayError("Method: ", method.name, " ", " must return type: ", retType.toString() + " for empty ");
       }
    }
 
@@ -65,17 +65,17 @@ public class ReturnStatement extends ExpressionStatement {
       return false;
    }
 
-   public void addReturnStatements(List<Statement> res) {
+   public void addReturnStatements(List<Statement> res, boolean incThrow) {
       res.add(this);
    }
 
    public String toString() {
       StringBuilder sb = new StringBuilder();
-      sb.append("return ");
-      if (expression == null)
-         sb.append("<null>");
-      else
+      sb.append("return");
+      if (expression != null) {
+         sb.append(" ");
          sb.append(expression.toString());
+      }
       return sb.toString();
    }
 }

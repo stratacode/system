@@ -104,7 +104,7 @@ public class PrimitiveType extends JavaType {
 
    public void initType(LayeredSystem sys, Object itd, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer, Object typeParam) {}
 
-   public void convertToSrcReference() {}
+   public boolean convertToSrcReference() { return false; }
 
    public String getBaseSignature() {
       return getSignatureCode();

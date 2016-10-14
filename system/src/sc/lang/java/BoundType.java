@@ -72,8 +72,8 @@ public class BoundType extends JavaType {
       getFirstType().initType(sys, itd, node, ctx, displayError, isLayer, typeParam);
    }
 
-   public void convertToSrcReference() {
-      getFirstType().convertToSrcReference();
+   public boolean convertToSrcReference() {
+      return getFirstType().convertToSrcReference();
    }
 
    public String getBaseSignature() {

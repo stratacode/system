@@ -12,6 +12,10 @@ import sc.bind.MethodBinding;
 import sc.dyn.IReverseMethodMapper;
 import sc.js.JSSettings;
 
+/** A version of the PTypeUtil class with minimum dependencies on core Java features.  Originally, this class was built for
+ * the GWT integration to separate out methods which did not exist in that runtime.  It now is primarily used to separate
+ * out a java-script only implementation of various type utilities.  This class is replaced in the JS runtime by scdyn.js.
+ */
 @JSSettings(jsLibFiles="js/scdyn.js")
 public class PTypeUtil {
    public static Map<String,Object> threadLocalMap = new HashMap<String,Object>();
@@ -454,5 +458,10 @@ public class PTypeUtil {
       if (res == null)
          return -1;
       return res;
+   }
+
+   public static Object clone(Object o) {
+      Object meth = resolveMethod(o.getClass(), "clone", null);
+      return invokeMethod(o, meth);
    }
 }

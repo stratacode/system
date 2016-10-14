@@ -147,12 +147,15 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       SystemUpdate update = new SystemUpdate();
       update.jsUpdate = jsUpdate;
       update.updateTime = System.currentTimeMillis();
+      // Because this is transient, we might have been restored and need to recreate this
+      if (systemUpdates == null)
+         systemUpdates = new ArrayList<SystemUpdate>();
       systemUpdates.add(update);
    }
 
    /** Returns the system updates that have occurred since the fromTime */
    public StringBuilder getSystemUpdates(long fromTime) {
-      if (systemUpdates.size() == 0)
+      if (systemUpdates == null || systemUpdates.size() == 0)
          return null;
       String fromTimeStr = null;
       if (traceSystemUpdates)

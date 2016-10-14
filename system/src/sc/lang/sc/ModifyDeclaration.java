@@ -1285,8 +1285,9 @@ public class ModifyDeclaration extends TypeDeclaration {
                modType.transformDefaultModifier();
             }
 
-            if (propertiesToMakeBindable != null)
+            if (propertiesToMakeBindable != null) {
                modType.addAllPropertiesToMakeBindable(propertiesToMakeBindable);
+            }
 
             if (dynInvokeMethods != null)
                modType.mergeDynInvokeMethods(dynInvokeMethods);

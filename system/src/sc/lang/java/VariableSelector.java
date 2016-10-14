@@ -7,11 +7,15 @@ package sc.lang.java;
 import sc.lang.ISemanticNode;
 import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
+import sc.lang.sc.PropertyAssignment;
+import sc.parser.IStyleAdapter;
 import sc.type.TypeUtil;
 
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
+
+import static sc.lang.java.IdentifierExpression.IdentifierType.SetVariable;
 
 public class VariableSelector extends Selector {
    public String identifier;
@@ -60,14 +64,6 @@ public class VariableSelector extends Selector {
          for (int i = 0; i < arguments.size(); i++)
             arguments.get(i).changeExpressionsThis(td, outer, newName);
       }
-   }
-
-   int getSelectorIndex() {
-      ISemanticNode parpar;
-      if (parentNode == null || !((parpar = parentNode.getParentNode()) instanceof SelectorExpression))
-         return -1;
-      SelectorExpression sex = (SelectorExpression) parpar;
-      return sex.selectors.indexOf(this);
    }
 
    public void visitTypeReferences(CycleInfo info, TypeContext ctx) {
@@ -145,5 +141,47 @@ public class VariableSelector extends Selector {
 
    public List<JavaType> getMethodTypeArguments() {
       return null;
+   }
+
+   public void styleNode(IStyleAdapter adapter) {
+      SelectorExpression selEx = getSelectorExpression();
+      int ix = getSelectorIndex();
+      boolean handled = false;
+      if (selEx != null && ix != -1 && selEx.idTypes != null && ix < selEx.idTypes.length) {
+         Object boundType = selEx.boundTypes == null ? null : selEx.boundTypes[ix];
+         switch (selEx.idTypes[ix]) {
+            case SetVariable:
+               if (!ModelUtil.isField(boundType))
+                  break;
+            case FieldName:
+            case EnumName:
+            case GetVariable:
+            case BoundObjectName:
+               if (boundType instanceof PropertyAssignment)
+                  boundType = ((PropertyAssignment) boundType).getPropertyDefinition();
+               boolean isStatic = boundType != null && ModelUtil.hasModifier(boundType, "static");
+               if (!isStatic && boundType instanceof TypeDeclaration)
+                  isStatic = ((TypeDeclaration) boundType).isStaticObject();
+               String styleName = isStatic ? "staticMember" : "member";
+               adapter.styleStart(styleName);
+               parseNode.styleNode(adapter, null, null, -1);
+               adapter.styleEnd(styleName);
+               handled = true;
+               break;
+            case ThisExpression:
+            case SuperExpression:
+               styleName = "keyword";
+               adapter.styleStart(styleName);
+               parseNode.styleNode(adapter, null, null, -1);
+               adapter.styleEnd(styleName);
+               handled = true;
+               break;
+            default:
+               break;
+         }
+      }
+      if (!handled) {
+         super.styleNode(adapter);
+      }
    }
 }

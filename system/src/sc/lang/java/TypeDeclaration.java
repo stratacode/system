@@ -316,6 +316,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       }
       if (m != null && m.getLayer() != null && m.getLayer().annotationLayer && !isAnnotationDefinition()) {
          displayError("Annotation layers may only attach annotations onto definitions: ");
+         boolean dummy = isAnnotationDefinition();
       }
    }
 
@@ -391,7 +392,14 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
             ITypeDeclaration res = getImplicitEnclosingType(impl, par);
             return res;
          }
-         if (par instanceof ITypeDeclaration) {
+         else if (par instanceof Element) {
+            Element elem = (Element) par;
+            TypeDeclaration res = elem.getElementTypeDeclaration();
+            if (res == null)
+               return elem.getEnclosingType();
+            return res;
+         }
+         else if (par instanceof ITypeDeclaration) {
             ITypeDeclaration itd = (ITypeDeclaration) par;
             if (itd.isRealType())
                return itd;
@@ -799,35 +807,6 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
          propertiesToMakeBindable.put(propertyName, referenceOnly);
          if (fromModel != null)
             getJavaModel().addBindDependency(this, propertyName, fromModel.getModelTypeDeclaration(), referenceOnly);
-      }
-   }
-
-   public void startExtendedType(BodyTypeDeclaration extendsType, String message) {
-      JavaModel extendsModel = extendsType.getJavaModel();
-      boolean doValidate = isValidated();
-      boolean incrNest = false;
-      JavaSemanticNode extendsNode = extendsModel == null ? extendsType : extendsModel;
-      if (extendsModel.layer != null && extendsModel.isLayerModel && extendsModel.layer.excluded)
-         return;
-      // Do nothing if the type or model is already at the level we need it
-      if ((!doValidate && extendsNode.isStarted()) || (doValidate && extendsNode.isValidated()))
-         return;
-      try {
-         if (extendsModel != null && (extendsModel.layeredSystem == null || extendsModel.layeredSystem.options.verbose)) {
-            System.out.println(StringUtil.indent(++LayeredSystem.nestLevel) + (!extendsType.isStarted() ? "Starting: ": "Validating: ") + message + " type " + extendsModel.getSrcFile() + " runtime: " + getLayeredSystem().getRuntimeName());
-            incrNest = true;
-         }
-         // If this type is already validated, validate the extended type
-         if (doValidate) {
-            // work at the model level as it's important the model gets started
-            ParseUtil.initAndStartComponent(extendsNode);
-         }
-         else
-            ParseUtil.startComponent(extendsNode);
-      }
-      finally {
-         if (incrNest)
-            LayeredSystem.nestLevel--;
       }
    }
 

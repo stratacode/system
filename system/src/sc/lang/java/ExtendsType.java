@@ -282,9 +282,10 @@ public class ExtendsType extends JavaType {
          typeArgument.initType(sys, itd, node, ctx, displayError, isLayer, typeParam);
    }
 
-   public void convertToSrcReference() {
+   public boolean convertToSrcReference() {
       if (typeArgument != null)
-         typeArgument.convertToSrcReference();
+         return typeArgument.convertToSrcReference();
+      return false;
    }
 
    public String getBaseSignature() {

@@ -1155,18 +1155,21 @@ public class ClassType extends JavaType {
       return newType;
    }
 
-   public void convertToSrcReference() {
+   public boolean convertToSrcReference() {
       if (!srcOnly) {
          srcOnly = true;
          if (type != null) {
             // TODO: not handling ParamTypeDeclaration - or ParameterizedType
             if (type instanceof Class) {
                Object newType = ModelUtil.resolveSrcTypeDeclaration(getLayeredSystem(), type);
-               if (newType != null && newType instanceof BodyTypeDeclaration)
+               if (newType != null && newType instanceof BodyTypeDeclaration) {
                   type = newType;
+                  return true;
+               }
             }
          }
       }
+      return false;
    }
 
    public Object getRawTypeDeclaration() {

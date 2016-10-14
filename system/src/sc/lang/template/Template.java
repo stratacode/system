@@ -724,9 +724,17 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
                   addBodyStatementsFromChildren(parentType, childStatements, parentTag, elementsOnly);
                }
             }
-            else if (staticContentOnly || inactive) {
-               if (decl instanceof Expression)
-                  ((Expression) decl).errorArgs = new Object[0]; // TODO: is this reached?  It's probably for the exec="process" which is not used anymore.
+            else {
+               if (decl instanceof Expression) {
+                  Expression declExpr = (Expression) decl;
+                  if (staticContentOnly || inactive)
+                     ((Expression) decl).errorArgs = new Object[0]; // e.g. for serverContent sections when generating the client class - we are not processing those elements in this runtime
+                  else {
+                     Object exprType = declExpr.getGenericType();
+                     if (exprType != null && ModelUtil.typeIsVoid(exprType))
+                        declExpr.displayError("Void types not allowed in a template expression: ");
+                  }
+               }
             }
          }
       }

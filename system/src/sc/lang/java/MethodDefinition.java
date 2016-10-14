@@ -7,6 +7,7 @@ package sc.lang.java;
 import sc.dyn.DynUtil;
 import sc.lang.ILanguageModel;
 import sc.lang.SemanticNodeList;
+import sc.lang.template.GlueStatement;
 import sc.lang.template.Template;
 import sc.layer.LayeredSystem;
 import sc.type.IBeanIndexMapper;
@@ -80,7 +81,37 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
    public void start() {
       if (started) return;
 
+      if (body != null) {
+         Object retType = getTypeDeclaration();
+         if (retType != null && !ModelUtil.typeIsVoid(retType)) {
+            Statement last = body.statements == null ? null : body.statements.get(body.statements.size() - 1);
+            ArrayList<Statement> ret = null;
+            if (last != null) {
+               ret = new ArrayList<Statement>();
+               // TODO: rather than gather up all return statements, we should only get the ones for 'exit paths' - i.e. nothing that's followed by another valid statement
+               last.addReturnStatements(ret, true);
+            }
+            // When you do have a glue statement as the method body, it stands in place of the return <string>
+            if (!(last instanceof GlueStatement)) {
+               if (ret == null || ret.size() == 0 || isEmptyReturn(ret.get(ret.size() - 1))) {
+                  // The start and end index here are just stored in the ErrorRangeInfo and used by the IDE to mark the end of the method, rather than the name of the method
+                  displayRangeError(1, 1, "Missing return statement: ");
+               }
+            }
+         }
+      }
       super.start();
+   }
+
+   private static boolean isEmptyReturn(Object retObj) {
+      // Not returning at all!
+      if (retObj instanceof ThrowStatement)
+         return false;
+      if (!(retObj instanceof ReturnStatement))
+         return true;
+
+      ReturnStatement ret = (ReturnStatement) retObj;
+      return ret.expression == null;
    }
 
    public void validate() {
@@ -195,7 +226,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       return propertyName;
    }
 
-   /** The methods return type */
+   /** The method's return type */
    public Object getTypeDeclaration() {
       if (override && type == null) {
          Object prev = getPreviousDefinition();
@@ -738,7 +769,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       Object infRetType = null;
       if (body != null) {
          ArrayList<Statement> returns = new ArrayList<Statement>();
-         body.addReturnStatements(returns);
+         body.addReturnStatements(returns, false);
          if (returns.size() > 0) {
             for (int i = 0; i < returns.size(); i++) {
                ReturnStatement ret = (ReturnStatement) returns.get(i);

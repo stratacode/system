@@ -892,7 +892,6 @@ public class ParseUtil  {
    public static String getCommentsBefore(IParseNode outerParseNode, ISemanticNode semNode, Parselet commentParselet) {
       ParseUtil.SpaceBeforeResult spaceBefore = ParseUtil.getSpaceBefore(outerParseNode, semNode, commentParselet);
       if (!spaceBefore.found) {
-         System.err.println("*** Failed to find node for getComment");
          return "";
       }
       return ParseUtil.stripComments(spaceBefore.spaceBefore);
@@ -943,7 +942,7 @@ public class ParseUtil  {
       }
       if (origParseNode != null) {
          int startIx = origParseNode.getStartIndex();
-         if (startIx != -1) {
+         if (startIx != -1 && newModel != null && newModel.getParseNode() != null) {
             IParseNode newNode = newModel.getParseNode().findParseNode(startIx, origParseNode.getParselet());
             if (newNode != null) {
                Object semValue = newNode.getSemanticValue();

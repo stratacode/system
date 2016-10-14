@@ -992,29 +992,6 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       return null;
    }
 
-   void displayRangeError(int fromIx, int toIx, String...args) {
-      displayTypeError(args);
-      if (errorArgs != null) {
-         ArrayList<Object> eargs = new ArrayList<Object>(Arrays.asList(errorArgs));
-         eargs.add(new ErrorRangeInfo(fromIx, toIx));
-         errorArgs = eargs.toArray();
-      }
-   }
-
-   public static class ErrorRangeInfo {
-      public int fromIx;
-      public int toIx;
-
-      public ErrorRangeInfo(int fromIx, int toIx) {
-         this.fromIx = fromIx;
-         this.toIx = toIx;
-      }
-
-      public String toString() {
-         return fromIx + ":" + toIx;
-      }
-   }
-
    public void clearInferredType() {
    }
 

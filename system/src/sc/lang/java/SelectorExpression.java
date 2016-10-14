@@ -9,7 +9,7 @@ import sc.dyn.DynUtil;
 import sc.lang.ISrcStatement;
 import sc.lang.JavaLanguage;
 import sc.lang.ILanguageModel;
-import sc.parser.ParseUtil;
+import sc.parser.*;
 import sc.type.CTypeUtil;
 import sc.type.RTypeUtil;
 import sc.bind.BindingDirection;
@@ -1076,5 +1076,13 @@ public class SelectorExpression extends ChainedExpression {
    public boolean propagatesInferredType(Expression child) {
       return child != expression;
    }
+
+   /* For Selector expressions, styling is done in the Selector sub-classes.
+    * Because identifier expressions use a list of strings, we needed to 
+    * handle them up one level, but that essentially duplicated a lot of logic
+    * in the parselets grammar to make that happen. 
+   public void styleNode(IStyleAdapter adapter) {
+   }
+   */
 
 }

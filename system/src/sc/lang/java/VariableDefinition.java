@@ -723,9 +723,10 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
             Object newField = ((BodyTypeDeclaration) res).declaresMember(variableName, MemberType.FieldSet, null, null);
             if (newField instanceof VariableDefinition)
                return (VariableDefinition) newField;
-            displayError("Field removed ", variableName, " for: ");
+            System.err.println("Failed to find field on refresh " + variableName + " for: ");
             // TODO: debug only
             newField = ((BodyTypeDeclaration) res).declaresMember(variableName, MemberType.FieldSet, null, null);
+            return this;
          }
       }
       if (def instanceof VariableStatement) {

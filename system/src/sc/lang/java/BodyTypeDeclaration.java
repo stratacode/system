@@ -877,7 +877,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       if (baseType != null) {
          // If necessary map the type variables in the base-types' declaration based on the type params in the context
-         baseType = convertBaseTypeContext(ctx, baseType);
+         baseType = ParamTypeDeclaration.convertBaseTypeContext(ctx, baseType);
 
          return ModelUtil.definesMethod(baseType, name, parameters, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, getLayeredSystem());
       }
@@ -885,28 +885,6 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return null;
    }
 
-   // If we have something like class Foo<A,B> extends Bar<C,D> - need to perform the type mapping on a copy of the param type here
-   protected static Object convertBaseTypeContext(ITypeParamContext ctx, Object baseType) {
-      if (ctx != null && baseType instanceof ParamTypeDeclaration) {
-         ParamTypeDeclaration newType = null;
-         ParamTypeDeclaration origType = (ParamTypeDeclaration) baseType;
-         List<?> typeParams = origType.getClassTypeParameters();
-         if (typeParams != null) {
-            for (int ix = 0; ix < typeParams.size(); ix++) {
-               Object typeParam = typeParams.get(ix);
-               Object newVal = ctx.getTypeForVariable(typeParam, true);
-               if (newVal != null && newVal != typeParam) {
-                  if (newType == null)
-                     newType = origType.cloneForNewTypes();
-                  newType.setTypeParamIndex(ix, newVal);
-               }
-            }
-         }
-         if (newType != null)
-            baseType = newType;
-      }
-      return baseType;
-   }
 
    public Object getInheritedAnnotation(String annotationName) {
       return getInheritedAnnotation(annotationName, false, getLayer(), isLayerType || isLayerComponent());
@@ -5539,7 +5517,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             }
             else if (newBodyDef instanceof AbstractMethodDefinition) {
                AbstractMethodDefinition newMeth = (AbstractMethodDefinition) newBodyDef;
-               AbstractMethodDefinition oldMeth = (AbstractMethodDefinition) declaresMethod(newMeth.name, newMeth.getParameterList(), null, null, false, null, null, false);
+               Object oldMethObj = declaresMethod(newMeth.name, newMeth.getParameterList(), null, null, false, null, null, false);
+               if (oldMethObj instanceof ParamTypedMethod)
+                  oldMethObj = ((ParamTypedMethod) oldMethObj).method;
+               AbstractMethodDefinition oldMeth = (AbstractMethodDefinition) oldMethObj;
                if (oldMeth != null) {
                   if (oldMeth == newMeth)
                      System.out.println("*** Replacing a method by itself!");
@@ -7016,15 +6997,63 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return null;
    }
 
+   public void startExtendedType(BodyTypeDeclaration extendsType, String message) {
+      JavaModel extendsModel = extendsType.getJavaModel();
+      boolean doValidate = isValidated();
+      boolean incrNest = false;
+      JavaSemanticNode extendsNode = extendsModel == null ? extendsType : extendsModel;
+      if (extendsModel.layer != null && extendsModel.isLayerModel && extendsModel.layer.excluded)
+         return;
+      // Do nothing if the type or model is already at the level we need it
+      if ((!doValidate && extendsNode.isStarted()) || (doValidate && extendsNode.isValidated()))
+         return;
+      try {
+         if (extendsModel != null && (extendsModel.layeredSystem == null || extendsModel.layeredSystem.options.verbose)) {
+            System.out.println(StringUtil.indent(++LayeredSystem.nestLevel) + (!extendsType.isStarted() ? "Starting: ": "Validating: ") + message + " type " + extendsModel.getSrcFile() + " runtime: " + getLayeredSystem().getRuntimeName());
+            incrNest = true;
+         }
+         // If this type is already validated, validate the extended type
+         if (doValidate) {
+            // work at the model level as it's important the model gets started
+            ParseUtil.initAndStartComponent(extendsNode);
+         }
+         else
+            ParseUtil.startComponent(extendsNode);
+      }
+      finally {
+         if (incrNest)
+            LayeredSystem.nestLevel--;
+      }
+   }
+
    public void convertToSrcReference() {
       JavaType extType = getExtendsType();
-      if (extType != null)
-         extType.convertToSrcReference();
+      if (extType != null) {
+         boolean converted = extType.convertToSrcReference();
+         if (converted) {
+            Object typeDecl = getDerivedTypeDeclaration();
+            if (typeDecl instanceof BodyTypeDeclaration)
+               startExtendedType((BodyTypeDeclaration) typeDecl, "extends");
+         }
+      }
       List<?> implTypes = getImplementsTypes();
       if (implTypes != null) {
-         for (Object implObj:implTypes)
-            if (implObj instanceof JavaType)
-               ((JavaType) implObj).convertToSrcReference();
+         int ix = 0;
+         Object[] implBoundTypes = getImplementsTypeDeclarations();
+         for (Object implObj:implTypes) {
+            if (implObj instanceof JavaType) {
+               JavaType implType = (JavaType) implObj;
+               boolean converted = implType.convertToSrcReference();
+               if (converted) {
+                  Object newImplType = implType.getTypeDeclaration();
+                  if (newImplType instanceof BodyTypeDeclaration) {
+                     startExtendedType((BodyTypeDeclaration) newImplType, "implements");
+                  }
+                  implBoundTypes[ix] = newImplType;
+               }
+            }
+            ix++;
+         }
       }
    }
 
@@ -8552,6 +8581,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             StringBuilder sb = new StringBuilder();
             //if (modifiers != null)
             //   sb.append(ParseUtil.getCommentsBefore(model.parseNode, modifiers, model.getLanguage().spacing));
+            if (model instanceof Template) {
+               return ""; // TODO: look for a template declaration at the top of the file which has a type name.  Grab the spacing before that type name
+            }
             sb.append(ParseUtil.getCommentsBefore(model.parseNode, this, model.getLanguage().spacing));
             return sb.toString();
          }
@@ -8944,5 +8976,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          else
             repl.anonIdsAllocated = anonIdsAllocated;
       }
+   }
+
+   public boolean isAutomaticBindable(String property) {
+      return propertiesToMakeBindable != null && propertiesToMakeBindable.get(property) != null;
    }
 }

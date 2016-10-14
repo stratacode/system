@@ -724,7 +724,14 @@ public class IdentifierExpression extends ArgumentsExpression {
          if (idTypes[i] == IdentifierType.RemoteMethodInvocation) {
             // When we validate the expressions inside of the tag itself, we won't have set up binding so just defer this error to the other version which is in the tag object.
             if (bindingDirection == null && getEnclosingTag() == null) {
-               displayTypeError("Method call to remote method only allowed in binding expression: ");
+               LayeredSystem sys = getLayeredSystem();
+               Layer remoteLayer = boundTypes == null ? null : ModelUtil.getLayerForMember(sys, boundTypes[i]);
+               String remoteIdent;
+               if (remoteLayer == null)
+                  remoteIdent = "<compiled class>";
+               else
+                  remoteIdent = remoteLayer.getLayeredSystem().getProcessIdent();
+               displayTypeError("Method call to remote method - from: " + sys.getProcessIdent() + " to: " + remoteIdent + " - only allowed in binding expression: ");
             }
          }
 
@@ -928,6 +935,8 @@ public class IdentifierExpression extends ArgumentsExpression {
          case GetSetMethodInvocation:
          case GetObjectMethodInvocation:
             Object type = boundTypes[ix];
+            if (type == ArrayTypeDeclaration.LENGTH_FIELD) // We use this special case object since this length method is not available via reflection
+               return false;
             if (type instanceof PropertyAssignment)
                type = ((PropertyAssignment) type).getPropertyDefinition();
             return type != null && ModelUtil.hasModifier(type, "static");
@@ -4338,6 +4347,14 @@ public class IdentifierExpression extends ArgumentsExpression {
                case GetVariable:
                case BoundObjectName:
                   String styleName = isStaticTarget(i) ? "staticMember" : "member";
+                  adapter.styleStart(styleName);
+                  child.styleNode(adapter, null, null, -1);
+                  adapter.styleEnd(styleName);
+                  handled = true;
+                  break;
+               case ThisExpression:
+               case SuperExpression:
+                  styleName = "keyword";
                   adapter.styleStart(styleName);
                   child.styleNode(adapter, null, null, -1);
                   adapter.styleEnd(styleName);

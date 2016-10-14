@@ -2158,9 +2158,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       RuntimeRootInfo info = getRuntimeRootInfo();
       if (info.zipFileName != null) {
          String dir = FileUtil.getParentPath(info.zipFileName);
-         return FileUtil.concat(dir, "scrt" + (core ? "-core" : "") + (src ? "-src" : "") + ".jar");
+         String res = FileUtil.concat(dir, "scrt" + (core ? "-core" : "") + (src ? "-src" : "") + ".jar");
+         if (new File(res).canRead())
+            return res;
       }
-      else if (info.buildDirName != null) {
+      if (info.buildDirName != null) {
          String sysRoot;
          if ((sysRoot = getSystemBuildLayer(info.buildDirName)) != null) {
             if (!src)
@@ -9896,6 +9898,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       boolean initialBuild;
       try {
+         PerfMon.start("rebuildSystem");
          List<Layer.ModelUpdate> changes = null;
          ArrayList<SystemRefreshInfo> peerChanges = null;
 
@@ -9965,6 +9968,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          setCurrent(this);
       }
       finally {
+         PerfMon.end("rebuildSystem");
          buildingSystem = false;
          releaseDynLock(false);
       }

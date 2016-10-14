@@ -93,7 +93,8 @@ public class ClassDeclaration extends TypeDeclaration {
             JavaSemanticNode resolver = getEnclosingType();
             if (resolver == null)
                resolver = m;
-            extendsType.initType(getLayeredSystem(), this, resolver, null, false, isLayerType, null);
+            if (!extendsType.isBound())
+               extendsType.initType(getLayeredSystem(), this, resolver, null, false, isLayerType, null);
 
             // Need to start the extends type as we need to dig into it
             Object extendsTypeDecl = getDerivedTypeDeclaration();
@@ -166,6 +167,8 @@ public class ClassDeclaration extends TypeDeclaration {
             System.err.println("*** recursive extends loop for type: " + typeName);
             return;
          }
+         if (!extTd.isStarted())
+            extTd.start();
          if (!extTd.isValidated())
             extTd.validate();
       }

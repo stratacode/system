@@ -4,7 +4,6 @@
 
 package sc.lang.java;
 
-import sc.classfile.CFClass;
 import sc.layer.Layer;
 import sc.type.*;
 import sc.layer.LayeredSystem;
@@ -776,4 +775,26 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return res;
    }
 
+   // If we have something like class Foo<A,B> extends Bar<C,D> - need to perform the type mapping on a copy of the param type here
+   public static Object convertBaseTypeContext(ITypeParamContext ctx, Object baseType) {
+      if (ctx != null && baseType instanceof ParamTypeDeclaration) {
+         ParamTypeDeclaration newType = null;
+         ParamTypeDeclaration origType = (ParamTypeDeclaration) baseType;
+         List<?> typeParams = origType.getClassTypeParameters();
+         if (typeParams != null) {
+            for (int ix = 0; ix < typeParams.size(); ix++) {
+               Object typeParam = typeParams.get(ix);
+               Object newVal = ctx.getTypeForVariable(typeParam, true);
+               if (newVal != null && newVal != typeParam) {
+                  if (newType == null)
+                     newType = origType.cloneForNewTypes();
+                  newType.setTypeParamIndex(ix, newVal);
+               }
+            }
+         }
+         if (newType != null)
+            baseType = newType;
+      }
+      return baseType;
+   }
 }

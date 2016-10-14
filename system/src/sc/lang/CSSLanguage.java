@@ -38,9 +38,12 @@ public class CSSLanguage extends TemplateLanguage {
             setStartParselet(template);
             addToSemanticValueClassPath("sc.lang.css");
         }
+        languageName = "SCCss";
+        defaultExtension = "scss";
     }
 
     public static CSSLanguage getCSSLanguage() {
+        INSTANCE.initialize();
         return INSTANCE;
     }
 

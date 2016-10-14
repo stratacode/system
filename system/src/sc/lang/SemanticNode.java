@@ -41,9 +41,9 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
    // TODO performance: turn these into bitfields
    transient protected boolean initialized;
    transient protected boolean started;
-   transient protected boolean transformed;
    transient protected boolean validated;
    transient protected boolean processed;
+   transient protected boolean transformed;
 
    public boolean isInitialized() {
       return initialized;
