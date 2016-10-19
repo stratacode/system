@@ -10,6 +10,7 @@ import sc.classfile.CFClass;
 import sc.dyn.DynUtil;
 import sc.dyn.IDynObject;
 import sc.lang.*;
+import sc.lang.html.Body;
 import sc.lang.js.JSRuntimeProcessor;
 import sc.lang.js.JSUtil;
 import sc.lang.sc.PropertyAssignment;
@@ -3146,13 +3147,18 @@ public class IdentifierExpression extends ArgumentsExpression {
     * super exprs.  In that case, only skip deleted types.
     */
    static Object resolveType(Object type, int ix, IdentifierType[] idTypes) {
-      if (type instanceof BodyTypeDeclaration) {
-         BodyTypeDeclaration btype = (BodyTypeDeclaration) type;
+      if (type instanceof ITypeDeclaration) {
          boolean isSuper = idTypes[ix] == IdentifierType.SuperExpression;
-         // Don't use modified replacedBy's here when we have a super expression - we mapped to a specific type
-         // in that case.  We do still have to skip replaced types of course so we pass false when isSuper=true
-         if (btype.replacedByType != null && (btype.replaced || isSuper))
-            return btype.resolve(!isSuper);
+         ITypeDeclaration itype = (ITypeDeclaration) type;
+         if (itype instanceof BodyTypeDeclaration) {
+            BodyTypeDeclaration btype = (BodyTypeDeclaration) itype;
+            // Don't use modified replacedBy's here when we have a super expression - we mapped to a specific type
+            // in that case.  We do still have to skip replaced types of course so we pass false when isSuper=true
+            if (btype.replacedByType != null && (btype.replaced || isSuper))
+               return btype.resolve(!isSuper);
+         }
+         else
+            return itype.resolve(!isSuper);
       }
       return type;
    }
@@ -4337,35 +4343,35 @@ public class IdentifierExpression extends ArgumentsExpression {
             System.err.println("*** styling identifier expression that has not been initializd?");
          }
 
+         String styleName = null;
          if (idTypes != null && idTypes[i] != null) {
             switch (idTypes[i]) {
                case SetVariable:
                   if (!ModelUtil.isField(boundTypes[i]))
                      break;
                case FieldName:
-               case EnumName:
                case GetVariable:
                case BoundObjectName:
-                  String styleName = isStaticTarget(i) ? "staticMember" : "member";
-                  adapter.styleStart(styleName);
-                  child.styleNode(adapter, null, null, -1);
-                  adapter.styleEnd(styleName);
-                  handled = true;
+                  styleName = isStaticTarget(i) ? "staticMember" : "member";
+                  break;
+               case EnumName:
+                  styleName = "constant";
                   break;
                case ThisExpression:
                case SuperExpression:
                   styleName = "keyword";
-                  adapter.styleStart(styleName);
-                  child.styleNode(adapter, null, null, -1);
-                  adapter.styleEnd(styleName);
-                  handled = true;
                   break;
                default:
                   break;
             }
          }
-         if (!handled) {
+         if (styleName == null) {
             child.styleNode(adapter, null, null, -1);
+         }
+         else {
+            adapter.styleStart(styleName);
+            child.styleNode(adapter, null, null, -1);
+            adapter.styleEnd(styleName);
          }
       }
       if (argsNode != null)

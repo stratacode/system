@@ -266,8 +266,8 @@ public class ClassType extends JavaType {
 
       Object res = type;
 
-      if (type instanceof TypeDeclaration) {
-         TypeDeclaration td = (TypeDeclaration) type;
+      if (type instanceof ITypeDeclaration) {
+         ITypeDeclaration td = (ITypeDeclaration) type;
          type = td.resolve(true);
          res = type;
       }

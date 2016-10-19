@@ -607,6 +607,16 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return null;
    }
 
+   @Override
+   public ITypeDeclaration resolve(boolean modified) {
+      if (baseType instanceof ITypeDeclaration) {
+         Object newType = ((ITypeDeclaration) baseType).resolve(modified);
+         if (newType != null)
+            baseType = newType;
+      }
+      return this;
+   }
+
    public String toString() {
       StringBuilder sb = new StringBuilder();
       if (baseType != null)

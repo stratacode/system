@@ -418,10 +418,14 @@ public class ModifyDeclaration extends TypeDeclaration {
    }
 
    private void checkModify() {
-      if (getLayer() != null && modifyTypeDecl != null && modifyTypeDecl.getLayer() != null && getLayer().activated != modifyTypeDecl.getLayer().activated) {
-         System.out.println("*** Invalid modify type - mixing inactive and active layers");
-         // TODO: debug only
-         Object modType = getModifyType();
+      if (getLayer() != null && modifyTypeDecl != null && modifyTypeDecl.getLayer() != null) {
+         if (getLayer().activated != modifyTypeDecl.getLayer().activated) {
+            System.out.println("*** Invalid modify type - mixing inactive and active layers");
+            // TODO: debug only
+            Object modType = getModifyType();
+         }
+         if (!modifyInherited && ModelUtil.sameTypes(this, modifyTypeDecl) && getLayer().getLayerName().equals(modifyTypeDecl.getLayer().getLayerName()))
+            System.out.println("*** Warning modifying a type by the one in the same layer: " + modifyTypeDecl);
       }
    }
 
@@ -2670,7 +2674,6 @@ public class ModifyDeclaration extends TypeDeclaration {
 
       if ((options & CopyInitLevels) != 0) {
          res.modifyTypeDecl = modifyTypeDecl;
-         res.checkModify();
          res.modifyClass = modifyClass;
          res.extendsBoundTypes = extendsBoundTypes == null ? null : extendsBoundTypes.clone();
          res.typeInitialized = typeInitialized;

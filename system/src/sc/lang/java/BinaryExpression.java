@@ -31,6 +31,7 @@ public class BinaryExpression extends Expression {
    // These are the source properties when isTreeNode=true, computed otherwise
    public transient Expression lhs;
    public transient String operator;
+   /** The rhs is an Expression for most binary expressions but for instanceof it's a JavaType */
    public transient JavaSemanticNode rhs;
    public transient BinaryExpression rootExpression;
 
@@ -189,7 +190,7 @@ public class BinaryExpression extends Expression {
             break;
          case BooleanArithmetic:
             lhsType = lhs.getTypeDeclaration();
-            rhsType = rhsType = getRhsExpr().getTypeDeclaration();
+            rhsType = getRhsExpr().getTypeDeclaration();
 
             if (lhsType != null && rhsType != null) {
                boolean lhsIsBoolean = ModelUtil.isBoolean(lhsType);
@@ -936,9 +937,14 @@ public class BinaryExpression extends Expression {
       if (lhs != null) {
          lhs.addBreakpointNodes(res, srcStatement);
       }
-      Expression rhsExpr = getRhsExpr();
-      if (rhsExpr != null)
-         rhsExpr.addBreakpointNodes(res, srcStatement);
+      if (rhs instanceof Expression) {
+         Expression rhsExpr = getRhsExpr();
+         if (rhsExpr != null)
+            rhsExpr.addBreakpointNodes(res, srcStatement);
+      }
+      else if (rhs instanceof JavaType) {
+         //...
+      }
    }
 
    public boolean needsEnclosingClass() {

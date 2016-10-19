@@ -341,6 +341,16 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
       return null;
    }
 
+   @Override
+   public ITypeDeclaration resolve(boolean modified) {
+      if (baseType instanceof ITypeDeclaration) {
+         Object newType = ((ITypeDeclaration) baseType).resolve(modified);
+         if (newType != null)
+            baseType = newType;
+      }
+      return this;
+   }
+
    public boolean isLayerType() {
       return false;
    }

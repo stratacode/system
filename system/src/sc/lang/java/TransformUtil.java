@@ -775,6 +775,10 @@ public class TransformUtil {
       else {
          String rootTypeName = ModelUtil.getTypeName(rootType);
          String innerTypeName = ModelUtil.getTypeName(typeObj);
+         if (rootTypeName.length() >= innerTypeName.length()) {
+            System.out.println("*** Error - invalid root type name!");
+            innerTypeName = ModelUtil.getTypeName(typeObj); // debug only
+         }
          String innerPath = innerTypeName.substring(rootTypeName.length()+1);
          innerPath = innerPath.replace(".","_");
          propertyMappingName = "_" + innerPath + "_" + lowerPropertyName + "Prop";

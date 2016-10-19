@@ -147,4 +147,12 @@ public interface ITypeDeclaration {
 
    /** If this type extends for example ArrayList return the value of the first type parameter so we get the accurate component type. */
    Object getArrayComponentType();
+
+   /**
+    * This method is used to be sure the ITypeDeclaration we are referring to is the latest one.  If not, a replacement value is returned.
+    * There are two modes it's used.  When you pass in 'modified=true' it returns the modifying type of this type.  When you pass in modified=false it
+    * just returns a new type if the old one has been replaced in the current type system.   Perhaps a dependent type has been updated or changed on the
+    * file system and refreshed.
+    */
+   ITypeDeclaration resolve(boolean modified);
 }

@@ -945,6 +945,11 @@ public abstract class BaseLambdaExpression extends Expression {
       public Object getArrayComponentType() {
          return null;
       }
+
+      @Override
+      public ITypeDeclaration resolve(boolean modified) {
+         return this;
+      }
    }
 
    /**
@@ -1254,6 +1259,11 @@ public abstract class BaseLambdaExpression extends Expression {
       @Override
       public Object getArrayComponentType() {
          return null;
+      }
+
+      @Override
+      public ITypeDeclaration resolve(boolean modified) {
+         return this;
       }
 
       public String toString() {

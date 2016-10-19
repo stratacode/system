@@ -8976,6 +8976,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          else
             repl.anonIdsAllocated = anonIdsAllocated;
       }
+      checkReplaced();
+   }
+
+   protected void checkReplaced() {
+      if (replacedByType != null && !replaced) {
+         if (replacedByType.getLayer() != null && getLayer() != null && replacedByType.getLayer().getLayerName().equals(getLayer().getLayerName()))
+            System.out.println("**** Warning - replacing a type with one in the same layer: ");
+      }
    }
 
    public boolean isAutomaticBindable(String property) {

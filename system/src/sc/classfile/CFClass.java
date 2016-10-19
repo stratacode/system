@@ -1363,6 +1363,11 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       return null;
    }
 
+   @Override
+   public ITypeDeclaration resolve(boolean modified) {
+      return this; // TODO: should we support replacing these?
+   }
+
    public void error(CharSequence... args) {
       reportMessage(MessageType.Error, args);
    }

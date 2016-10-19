@@ -461,4 +461,14 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
       // No mutable state so no need to clone
       return this;
    }
+
+   @Override
+   public ITypeDeclaration resolve(boolean modified) {
+      if (componentType instanceof ITypeDeclaration) {
+         Object newType = ((ITypeDeclaration) componentType).resolve(modified);
+         if (newType != null)
+            componentType = newType;
+      }
+      return this;
+   }
 }

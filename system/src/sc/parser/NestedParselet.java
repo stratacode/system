@@ -1513,7 +1513,9 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                   break;
 
                case ARRAY:
-                  boolean appendArray = slotIndex > 0 && hasPreviousArray(slotIndex);
+                  boolean appendArray = repeat || (slotIndex > 0 && hasPreviousArray(slotIndex));
+                  //if (appendArray && repeat && (!hasPreviousArray(slotIndex) || slotIndex == 0))
+                  //   System.out.println("***");
                   if (node instanceof IParseNode) {
                      Object sv = ((IParseNode) node).getSemanticValue();
                      if (sv instanceof List) {
@@ -1861,11 +1863,12 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                               List svList = (List) sv;
                               for (int svix = 0; svix < svList.size(); svix++) {
                                  Object svElem = svList.get(svix);
-                                 int oldIx = parentList.indexOf(svElem);
+                                 // Make sure we start at childIndex and only remove elements that are after it.  We might match a 'break' statement or something
+                                 // which occurs multiple times in the children list.
+                                 int oldIx = indexOfFrom(parentList, childIndex, svElem);
                                  if (oldIx != -1)
                                     parentList.remove(oldIx, false);
-                                 //else
-                                 //   System.err.println("*** Could not find old element in semenatic value - not removing");
+                                 // else - we may well have cleared this value already and so do not have to update it
                               }
                            }
                            else {
@@ -1911,6 +1914,21 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          }
       }
       return hasValue;
+   }
+
+   private static int indexOfFrom(List list, int fromIx, Object elem) {
+      int size = list.size();
+      if (elem == null) {
+         for (int i = fromIx; i < size; i++)
+            if (list.get(i) == null)
+               return i;
+      }
+      else {
+         for (int i = fromIx; i < size; i++)
+            if (elem.equals(list.get(i)))
+               return i;
+      }
+      return -1;
    }
 
    /**
