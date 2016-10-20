@@ -30,7 +30,8 @@ public class SysTypeIndex {
    public void buildReverseTypeIndex(LayeredSystem sys) {
       if (inactiveTypeIndex.orderIndex == null || (sys != null && sys.options.typeIndexMode == TypeIndexMode.Rebuild)) {
          LayerOrderIndex loi = new LayerOrderIndex();
-         loi.refreshAll(sys, true);
+         if (sys != null)
+            loi.refreshAll(sys, true);
          inactiveTypeIndex.orderIndex = loi;
       }
 

@@ -1952,7 +1952,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       ArrayList<LayeredSystem> res = new ArrayList<LayeredSystem>();
       List<LayeredSystem> peerSysList;
       List<String> syncProcessNames = null; // sync against the default process
-      if (runtimeProcessor != null) {
+      if (runtimeProcessor != null && runtimeProcessor.getLayeredSystem() != null) {
          peerSysList = runtimeProcessor.getLayeredSystem().peerSystems;
       }
       else
