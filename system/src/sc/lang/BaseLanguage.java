@@ -270,8 +270,11 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
    Sequence alphaNumString = new Sequence("<anyName>('','',)", alphaNumChar,
            new Sequence("('')", REPEAT | OPTIONAL, alphaNumChar), spacing);
 
-   /** Use this to create a parselet for your repeating parselets skipOnError parselet.  It's used to consume the next error token while trying to skip out
-    * of the body of something which is incomplete.  It must consume all text except for the text which would ordinarily complete the parent. */
+   /**
+    * Use this to create a parselet for your repeating parselets skipOnError parselet.  It's used to consume the next error token while trying to skip out
+    * of the body of something which is incomplete.  It consumes text which is safe to skip when we encounter an error parsing
+    * the main parselet.  It must not match text which would ordinarily complete the parent.
+    */
    public Parselet createSkipOnErrorParselet(String name, String... exitSymbols) {
       return new OrderedChoice(name + "(.,.)", alphaNumString, new Sequence(new SymbolChoice(NOT, exitSymbols), spacing));
    }

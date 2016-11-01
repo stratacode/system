@@ -542,12 +542,20 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    KeywordSpace defaultKeyword = new KeywordSpace("default");
 
-   OrderedChoice switchLabel = new OrderedChoice("<switchLabel>",
-         new Sequence("SwitchLabel(operator, expression,)", new KeywordSpace("case"), expression, colonEOL),
-         new Sequence("SwitchLabel(operator,)", defaultKeyword, colonEOL));
+   Sequence caseLabel = new Sequence("SwitchLabel(operator, expression,)", new KeywordSpace("case"), expression, colonEOL);
+   Sequence defaultLabel = new Sequence("SwitchLabel(operator,)", defaultKeyword, colonEOL);
+   OrderedChoice switchLabel = new OrderedChoice("<switchLabel>", caseLabel, defaultLabel);
+   {
+      caseLabel.skipOnErrorSlot = 1;
+      defaultLabel.skipOnErrorSlot = 1;
+   }
 
+   Sequence switchLabels = new Sequence("<switchLabels>([])", REPEAT, switchLabel);
    Sequence switchBlockStatementGroups =
-       new Sequence("<switchBlockStatementGroups>([],[])",  OPTIONAL | REPEAT, new Sequence("<switchLabels>([])", REPEAT, switchLabel), blockStatements);
+       new Sequence("<switchBlockStatementGroups>([],[])",  OPTIONAL | REPEAT, switchLabels, blockStatements);
+   {
+      switchLabels.skipOnErrorParselet = new Sequence("('')", OPTIONAL | REPEAT, new SymbolChoice(NOT, "case", "default", "break", "{", "}", EOF));
+   }
 
    private KeywordSpace whileKeyword = new KeywordSpace("while");
 
