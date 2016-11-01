@@ -100,7 +100,7 @@ public class ParentParseNode extends AbstractParseNode {
          }
 
          if (removeExtraNodes) {
-            clearParsedOldNodes(parser, childIndex + 1, dctx);
+            clearParsedOldNodes(parser, svIndex, childIndex + 1, dctx);
          }
 
          // Need to call this even if the parse node did not change.  A child of the parse-node might have changed.  This will
@@ -110,7 +110,7 @@ public class ParentParseNode extends AbstractParseNode {
       }
    }
 
-   public void cullUnparsedNodes(Parser parser, int startChild, DiffContext dctx) {
+   public void cullUnparsedNodes(Parser parser, int svCount, int startChild, DiffContext dctx) {
       int sz = children.size();
       for (int c = startChild; c < sz; c++) {
          Object oldChild = children.get(c);
@@ -124,7 +124,7 @@ public class ParentParseNode extends AbstractParseNode {
             int oldStartOld = oldPN.getOrigStartIndex();
             int oldStartNew = oldStartOld + dctx.getNewOffsetForOldPos(oldStartOld + oldChildLen);
             if (oldStartNew >= parser.currentIndex) {
-               parselet.removeForReparse(parser, this, c);
+               parselet.removeForReparse(parser, this, svCount, c);
                int newSz = children.size();
                // If we removed one readjust...
                if (newSz != sz) {
@@ -139,7 +139,7 @@ public class ParentParseNode extends AbstractParseNode {
       }
    }
 
-   public void clearParsedOldNodes(Parser parser, int startIx, DiffContext dctx) {
+   public void clearParsedOldNodes(Parser parser, int svCount, int startIx, DiffContext dctx) {
       int sz = children.size();
       for (int c = startIx; c < sz; c++) {
          Object oldChild = children.get(c);
@@ -165,7 +165,7 @@ public class ParentParseNode extends AbstractParseNode {
                   //break;
                }
                */
-               parselet.removeForReparse(parser, this, c);
+               parselet.removeForReparse(parser, this, svCount, c);
                int newSz = children.size();
                // If we removed one readjust...
                if (newSz != sz) {
@@ -180,7 +180,7 @@ public class ParentParseNode extends AbstractParseNode {
       }
    }
 
-   public boolean removeForReparse(int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser) {
+;  public boolean removeForReparse(int svIndex, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser) {
       // If there's no old value or we are inserting off the end, we must be inserting a new value
       if (children == null || childIndex >= children.size()) {
          System.err.println("*** Unable to remove parse node - no children");
@@ -188,7 +188,7 @@ public class ParentParseNode extends AbstractParseNode {
       }
       else {
          Object node = children.remove(childIndex);
-         return parselet.removeFromSemanticValue(this, node, childIndex, slotIndex, skipSemanticValue, parser, false, true);
+         return parselet.removeFromSemanticValue(this, node, svIndex, childIndex, slotIndex, skipSemanticValue, parser, false, true);
       }
    }
 
@@ -1170,6 +1170,23 @@ public class ParentParseNode extends AbstractParseNode {
          for (Object child:children)
             if (child instanceof IParseNode)
                ((IParseNode) child).setErrorNode(val);
+      }
+   }
+
+   public int getNumSemanticValues() {
+      if (parselet.getSemanticValueIsArray() && children != null) {
+         int sz = children.size();
+         int ct = 0;
+         for (int i = 0; i < sz; i++) {
+            Object child = children.get(i);
+            // TODO: how do we accurately determine if each child node here contributes an array element
+            if (child instanceof IParseNode && ((IParseNode) child).getSemanticValue() != null)
+               ct++;
+         }
+         return ct;
+      }
+      else {
+         return 1;
       }
    }
 }

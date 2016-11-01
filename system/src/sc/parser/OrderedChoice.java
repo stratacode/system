@@ -485,7 +485,7 @@ public class OrderedChoice extends NestedParselet  {
             }
             else {
                // Before we start parsing, we might need to skip some previously parsed content so we end up with the proper old node
-               oldParent.clearParsedOldNodes(parser, newChildCount, dctx);
+               oldParent.clearParsedOldNodes(parser, svCount, newChildCount, dctx);
                if (oldParent.children.size() > newChildCount) {
                   oldChildParseNode = oldParent.children.get(newChildCount);
                }
@@ -592,7 +592,7 @@ public class OrderedChoice extends NestedParselet  {
                }
                else {
                   // Before we start parsing, we might need to skip some previously parsed content so we end up with the proper old node
-                  oldParent.clearParsedOldNodes(parser, newChildCount, dctx);
+                  oldParent.clearParsedOldNodes(parser, svCount, newChildCount, dctx);
                   if (oldParent.children.size() > newChildCount) {
                      oldChildParseNode = oldParent.children.get(newChildCount);
                   }
@@ -730,7 +730,7 @@ public class OrderedChoice extends NestedParselet  {
       else {
          // If we are reparsing, we might have produced fewer children than before.  if so, we need to pull them off the the end.
          if (oldParent == value) {
-            removeChildrenForReparse(parser, value, newChildCount);
+            removeChildrenForReparse(parser, value, svCount, newChildCount);
          }
          // If we are producing a smaller result than we did in the previous result, and we are at the end of the
          // changes - so that the old result was at least partially in the "same again" region, make sure we extend

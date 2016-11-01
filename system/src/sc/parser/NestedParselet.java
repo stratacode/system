@@ -1517,7 +1517,8 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                   //if (appendArray && repeat && (!hasPreviousArray(slotIndex) || slotIndex == 0))
                   //   System.out.println("***");
                   if (node instanceof IParseNode) {
-                     Object sv = ((IParseNode) node).getSemanticValue();
+                     IParseNode childNode = (IParseNode) node;
+                     Object sv = childNode.getSemanticValue();
                      if (sv instanceof List) {
                         if (parent.value == null)
                            parent.setSemanticValue(sv, !reparse);
@@ -1553,7 +1554,13 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                               else {
                                  // TODO: Are there any cases where this is not the right thing?
                                  parent.value = sv;
+                                 //valueCount = ((List) sv).size();
                               }
+                           }
+                           else {
+                              // Here we need to figure out how many elements were produced as part of the 'node'
+                              // so that the upstream parselet can figure out how many to skip.
+                              valueCount = childNode.getNumSemanticValues();
                            }
                         }
                      }
@@ -1802,7 +1809,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       return arraySlotFound;
    }
 
-   public boolean removeFromSemanticValue(ParentParseNode parent, Object node, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, boolean replaceValue, boolean reparse) {
+   public boolean removeFromSemanticValue(ParentParseNode parent, Object node, int svCount, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, boolean replaceValue, boolean reparse) {
       if (trace && parser.enablePartialValues)
          System.out.println("*** removing from semantic value of traced element");
 
@@ -1814,6 +1821,8 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                // TODO: maybe we should clear the value when slotIndex = parselets.size() - 1 and remove it when slotIndex == 0
                // When we remove the first value for this array element, we also remove the element in the semantic value
                int svIndex = childIndex / parselets.size();
+               //if (svIndex != svCount) // TODO: should we be using svIndex or svCount here?
+               //   System.out.println("***");
                Object sv = parent.getSemanticValue();
                if (sv instanceof List) {
                   SemanticNodeList parentList = (SemanticNodeList) sv;
@@ -1861,7 +1870,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
                            if (sv instanceof List) {
                               List svList = (List) sv;
-                              for (int svix = 0; svix < svList.size(); svix++) {
+                              for (int svix = svCount; svix < svList.size(); svix++) {
                                  Object svElem = svList.get(svix);
                                  // Make sure we start at childIndex and only remove elements that are after it.  We might match a 'break' statement or something
                                  // which occurs multiple times in the children list.
@@ -2766,16 +2775,16 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
    }
 
-   void removeChildrenForReparse(Parser parser, ParentParseNode value, int newChildCount) {
+   void removeChildrenForReparse(Parser parser, ParentParseNode value, int svCount, int newChildCount) {
       if (value == null || value.children == null)
          return;
       while (value.children.size() > newChildCount) {
          int childIx = value.children.size() - 1;
-         removeForReparse(parser, value, childIx);
+         removeForReparse(parser, value, svCount, childIx);
       }
    }
 
-   void removeForReparse(Parser parser, ParentParseNode value, int childIx) {
+   void removeForReparse(Parser parser, ParentParseNode value, int svIndex, int childIx) {
       // TODO: in the current test case these are ErrorParseNodes but if they are not errors, do we need to update the semantic value?
       Object remValue = value.children.get(childIx);
       if (!(remValue instanceof ErrorParseNode)) {
@@ -2783,7 +2792,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
             Parselet remParselet = ((IParseNode) remValue).getParselet();
             int slotIx = getParseletSlotIx(remParselet);
             if (slotIx != -1)
-               value.removeForReparse(childIx, slotIx, false, parser);
+               value.removeForReparse(svIndex, childIx, slotIx, false, parser);
             else {
                value.children.remove(childIx);
             }
@@ -2791,7 +2800,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          else {
             int slotIx = getParseletSlotIxFromType(remValue);
             if (slotIx != -1)
-               value.removeForReparse(childIx, slotIx, false, parser);
+               value.removeForReparse(svIndex, childIx, slotIx, false, parser);
             else
                value.children.remove(childIx);
          }
@@ -2847,4 +2856,5 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       }
       return null;
    }
+
 }

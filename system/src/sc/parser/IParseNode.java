@@ -112,6 +112,17 @@ public interface IParseNode extends CharSequence, IParseResult {
 
    /** Returns true if any nodes in this tree have been through the 'generate' process.  These nodes might have formatting parse nodes that need to be replaced for some operations */
    boolean isGeneratedTree();
+
+   /**
+    * Used for reparse only, this method determines how many semantic value elements were produced by this parse node.
+    *
+    * Returns 1 for scalar semantic values or for a repeat value, the number of elements in the semantic value array.
+    * It's not just the size of the semantic value List because during reparse, we combine all of the elements from
+    * multiple parse nodes into one List when there's one repeat array node which has a child parselet that's also a
+    * repeat array node.  Instead, we look at the number of child parse nodes and use that to determine how many
+    * array values came from the this node.
+    */
+   int getNumSemanticValues();
 }
 
 

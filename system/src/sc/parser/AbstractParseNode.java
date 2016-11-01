@@ -204,4 +204,8 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
    public void setErrorNode(boolean val) {
       errorNode = val;
    }
+
+   public int getNumSemanticValues() {
+      return 1;
+   }
 }

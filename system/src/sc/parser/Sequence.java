@@ -649,9 +649,9 @@ public class Sequence extends NestedParselet  {
                         err = null; // cancel the error
 
                         // Here we also need to clear out any parse-nodes we did not reparse from the old time.
-                        if (value == origOldParseNode) {
+                        if (value == origOldParseNode && value != null) {
                            // TODO: should we be doing this for other places where we return value?  It seems like general,
-                           value.cullUnparsedNodes(parser, origChildCount, dctx);
+                           value.cullUnparsedNodes(parser, svCount, origChildCount, dctx);
                            newChildCount = origChildCount;
                         }
                      }
@@ -982,6 +982,9 @@ public class Sequence extends NestedParselet  {
       ArrayList<Object> matchedValues;
       ArrayList<Object> errorValues = null;
 
+      if (trace)
+         trace = trace;
+
       boolean anyContent;
       boolean extendedErrorMatches = false;
 
@@ -1153,6 +1156,9 @@ public class Sequence extends NestedParselet  {
       ArrayList<Object> errorValues = null;
       Object oldChildParseNode = null;
 
+      if (trace)
+         trace = true;
+
       ParentParseNode oldParent = oldParseNode instanceof ParentParseNode ? (ParentParseNode) oldParseNode : null;
       // This parent is not for our parselet
       if (oldParent != null && !producesParselet(oldParent.parselet)) {
@@ -1179,7 +1185,6 @@ public class Sequence extends NestedParselet  {
             childParselet = parselets.get(i);
 
             int childIx = newChildCount + numMatchedValues;
-
 
             if (oldParent == null || oldParent.children == null) {
                oldChildParseNode = null;
@@ -1256,7 +1261,7 @@ public class Sequence extends NestedParselet  {
                   // design of the skipOnErrorParselet so that it leaves us in the state for the next match on this choice.  It should not breakup
                   // an identifier for example.
                   Object errorRes = parser.reparseNext(skipOnErrorParselet, oldChildParseNode, dctx, forceReparse, null);
-                  if (!(errorRes instanceof ParseError)) {
+                  if (!(errorRes instanceof ParseError) && errorRes != null) {
                      if (value == null) {
                         value = resetOldParseNode(forceReparse ? null : oldParent, lastMatchIndex, false, false);
                      }
@@ -1291,7 +1296,7 @@ public class Sequence extends NestedParselet  {
 
                // If we are reparsing once we've added the error values, we should remove any thing left over that was not reparsed.
                if (oldParent == value) {
-                  removeChildrenForReparse(parser, value, newChildCount);
+                  removeChildrenForReparse(parser, value, svCount, newChildCount);
                }
 
                return reparsePartialError(parser, dctx, value, lastError, childParselet, "Partial array match: {0} ", this);
@@ -1301,7 +1306,7 @@ public class Sequence extends NestedParselet  {
                newChildCount += errorValues.size();
 
                if (oldParent == value) {
-                  removeChildrenForReparse(parser, value, newChildCount);
+                  removeChildrenForReparse(parser, value, svCount, newChildCount);
                }
 
                ParseError err = reparsePartialError(parser, dctx, value, lastError, childParselet, "Optional continuation: {0} ", this);
@@ -1356,7 +1361,31 @@ public class Sequence extends NestedParselet  {
       }
 
       if (oldParent == value) {
-         removeChildrenForReparse(parser, value, newChildCount);
+         removeChildrenForReparse(parser, value, svCount, newChildCount);
+         Object sv = value.getSemanticValue();
+         // A tricky case - the semantic value in a repeat node can be built from more than one parse node - e.g.
+         // switchStatementBlockGroups contains switchLabels.  During reparse, we can remove a statement which means
+         // the switchLabels is reconfigured - it might go from 1 value to 3 labels if you remove the statement separating
+         // them for example.  Here we cull out any switchLabels remaining after the ones we matched
+         // in the old semantic value.
+         if (repeat && sv instanceof List) {
+            List svList = (List) sv;
+            for (int svIx = svCount; svList.size() > svIx; ) {
+               Object nextSv = svList.get(svIx);
+               if (nextSv instanceof ISemanticNode) {
+                  ISemanticNode nextSN = (ISemanticNode) nextSv;
+                  IParseNode nextPN = (IParseNode) nextSN.getParseNode();
+                  // Need to see if this semantic value came from a child of this parselet.  If so, and we did not
+                  // reparse it this time, it's an "extra" semantic value that needs to be culled.
+                  if (getParseletSlotIx(nextPN.getParselet()) != -1)
+                     svList.remove(svIx);
+                  else
+                     break;
+               }
+               else
+                  break;
+            }
+         }
       }
 
       String customError;
