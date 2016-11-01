@@ -220,4 +220,19 @@ public class SwitchStatement extends Statement implements IBlockStatement {
             statement.addReturnStatements(res, incThrow);
       }
    }
+
+   public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append("switch");
+      if (expression != null) {
+         sb.append(expression);
+      }
+      else
+         sb.append("<null expression>");
+      if (statements != null)
+         sb.append(statements.toString());
+      else
+         sb.append("<null statement>");
+      return sb.toString();
+   }
 }
