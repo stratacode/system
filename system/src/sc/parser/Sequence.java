@@ -359,8 +359,9 @@ public class Sequence extends NestedParselet  {
 
    private static final boolean alwaysExtendErrors = true;
 
-   // TODO: this is a copy of the parse() method but duplicates a lot of code.  Can we refactor the common code into utility
-   // methods or even condense them into one with runtime overhead?
+   // Note: this is a modified copy of the parse() method, duplicating a lot of code but it needs to do more.  We are keeping
+   // them separate because we want the parse method itself to be faster and simpler.  Reparse is only used when editing
+   // a model interactively.
    public Object reparse(Parser parser, Object oldParseNode, DiffContext dctx, boolean forceReparse, Parselet exitParselet) {
       if (trace)
          System.out.println("*** reparse sequence: " + this + " at " + parser.currentIndex);

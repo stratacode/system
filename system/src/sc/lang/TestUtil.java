@@ -536,12 +536,12 @@ public class TestUtil {
                      result = err.getBestPartialValue();
                   }
                   /*
-                  if (reparseFile.contains("6")) {
+                  if (reparseFile.contains("44")) {
                      System.out.println("***");
-                     SCLanguage.getSCLanguage().blockStatements.trace = true;
+                     //SCLanguage.getSCLanguage().switchBlockStatementGroups.trace = true;
                      //JavaLanguage.getJavaLanguage().classBodyDeclarations.trace = true;
                      //HTMLLanguage.getHTMLLanguage().tagAttributes.trace = true;
-//                     SemanticNode.debugDiffTrace = true;
+                     SemanticNode.debugDiffTrace = true;
 
                      //DiffContext.debugDiffContext = true;
                   }
@@ -588,7 +588,7 @@ public class TestUtil {
                      boolean exactMatch = false;
                      boolean modelErrorsOk = false;
                      if (parseComplete instanceof IParseNode) {
-                        Object reparseOrigObj = getTestResult(parseComplete);
+                        Object parseCompleteObj = getTestResult(parseComplete);
 
                         String newResStr = newRes.toString();
                         String parseStr = parseComplete.toString();
@@ -624,13 +624,13 @@ public class TestUtil {
                         if (reparsedModelObj instanceof ISemanticNode) {
                            // These must be inited so some properties get set which are compared - it would be nice to have a way to compare just the parsed models but we need two categories of these
                            // semantic properties - cloned, parsed?
-                           ParseUtil.initComponent(reparseOrigObj);
+                           ParseUtil.initComponent(parseCompleteObj);
                            // Need to reinit so we catch the reparsed models - TODO: ideally we'd clear the inited flag of any parents who have children which are modified in the reparse so we only
                            // have to reinit those.
                            ParseUtil.reinitComponent(reparsedModelObj);
                            StringBuilder diffs = new StringBuilder();
                            ISemanticNode reparsedNode = (ISemanticNode) reparsedModelObj;
-                           reparsedNode.diffNode(reparseOrigObj, diffs);
+                           reparsedNode.diffNode(parseCompleteObj, diffs);
 
                            String modelNewErrorsFile = FileUtil.addExtension(FileUtil.removeExtension(reparseFile), "mismatch");
                            String modelOkErrorsFile = FileUtil.addExtension(FileUtil.removeExtension(reparseFile), "mismatchOK");

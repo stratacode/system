@@ -1520,10 +1520,13 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                      IParseNode childNode = (IParseNode) node;
                      Object sv = childNode.getSemanticValue();
                      if (sv instanceof List) {
-                        if (parent.value == null)
+                        if (parent.value == null) {
                            parent.setSemanticValue(sv, !reparse);
+                           valueCount = childNode.getNumSemanticValues();
+                        }
                         else if (replaceValue) {
                            parent.value = sv;
+                           valueCount = childNode.getNumSemanticValues();
                         }
                         else {
                            if (childIndex == -1)
@@ -1554,7 +1557,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                               else {
                                  // TODO: Are there any cases where this is not the right thing?
                                  parent.value = sv;
-                                 //valueCount = ((List) sv).size();
+                                 valueCount = childNode.getNumSemanticValues();
                               }
                            }
                            else {
