@@ -18,7 +18,8 @@ public class ParseError implements Cloneable, IParseResult {
    public Object partialValue;
    public boolean eof;
    public Object continuationValue; // True for enablePartialValues when this error partially extends the list in the value
-   public boolean optionalContinuation; // True for optional errors which add additional info so we can string together the partial value of a parent
+   // True for optional errors which add additional info so we can string together the partial value of a parent
+   public boolean optionalContinuation;
 
    private final boolean debugErrors = false;
 
