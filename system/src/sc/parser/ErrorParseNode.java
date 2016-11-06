@@ -4,6 +4,8 @@
 
 package sc.parser;
 
+import sc.util.StringUtil;
+
 import java.util.IdentityHashMap;
 
 /**
@@ -153,5 +155,14 @@ public class ErrorParseNode extends AbstractParseNode {
 
    public boolean isGeneratedTree() {
       return false;
+   }
+
+   public void diffParseNode(IParseNode other, StringBuilder diffs) {
+      super.diffParseNode(other, diffs);
+      if (other instanceof ErrorParseNode) {
+         ErrorParseNode otherErr = (ErrorParseNode) other;
+         if (!StringUtil.equalStrings(otherErr.errorText, errorText))
+            diffs.append("Error text does not match: " + errorText + " != " + otherErr.errorText);
+      }
    }
 }

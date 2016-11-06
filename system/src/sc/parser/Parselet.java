@@ -29,6 +29,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
 
    public Language language;
 
+   // Should an empty list be treated as no value
    public boolean ignoreEmptyList = true;
 
    // Set this to true if this parselet is not required to be present in the stream.  In this

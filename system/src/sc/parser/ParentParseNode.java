@@ -6,6 +6,7 @@ package sc.parser;
 
 import sc.lang.ISemanticNode;
 import sc.util.PerfMon;
+import sc.util.StringUtil;
 
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
@@ -1187,6 +1188,48 @@ public class ParentParseNode extends AbstractParseNode {
       }
       else {
          return 1;
+      }
+   }
+
+   public void diffParseNode(IParseNode other, StringBuilder diffs) {
+      super.diffParseNode(other, diffs);
+      if (other instanceof ParentParseNode) {
+         ParentParseNode otherPN = (ParentParseNode) other;
+         if (children == null) {
+            if (otherPN.children != null)
+               diffs.append("Other has children and this does not");
+         }
+         else if (otherPN.children == null) {
+            diffs.append("This has children and other does not");
+         }
+         else {
+            if (children.size() != otherPN.children.size()) {
+               diffs.append("This has: " + children.size() + " other has: " + otherPN.children.size());
+            }
+            else {
+               for (int i = 0; i < children.size(); i++) {
+                  Object thisChild = children.get(i);
+                  Object otherChild = otherPN.children.get(i);
+                  if (thisChild instanceof IParseNode) {
+                     if (!(otherChild instanceof IParseNode)) {
+                        diffs.append("Child: " + i + " is a different type than other");
+                     }
+                     else {
+                        ((IParseNode) thisChild).diffParseNode((IParseNode) otherChild, diffs);
+                     }
+                  }
+                  else if (otherChild instanceof IParseNode) {
+                     diffs.append("Child: " + i + " for other is a parse node and not for this");
+                  }
+                  else {
+                     if (!StringUtil.equalStrings(thisChild == null ? null : thisChild.toString(),
+                                                  otherChild == null ? null : otherChild.toString())) {
+                        diffs.append("Children have different string values");
+                     }
+                  }
+               }
+            }
+         }
       }
    }
 }

@@ -123,6 +123,8 @@ public interface IParseNode extends CharSequence, IParseResult {
     * array values came from the this node.
     */
    int getNumSemanticValues();
+
+   void diffParseNode(IParseNode other, StringBuilder diffs);
 }
 
 

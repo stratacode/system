@@ -208,4 +208,10 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
    public int getNumSemanticValues() {
       return 1;
    }
+
+   public void diffParseNode(IParseNode other, StringBuilder diffs) {
+      if (other.getClass() != this.getClass()) {
+         diffs.append("Difference classes for node: " + this.getClass() + " and " + other.getClass());
+      }
+   }
 }
