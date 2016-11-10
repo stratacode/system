@@ -126,11 +126,8 @@ public class ClassType extends JavaType {
 
    public void stop() {
       super.stop();
-      // Stopping and starting should re-start if not valid (and possibly even if valid?)
-      if (type == FAILED_TO_INIT_SENTINEL) {
-         type = null;
-         errorArgs = null;
-      }
+      type = null;
+      errorArgs = null;
    }
 
    /** Returns the complete type name including the import */

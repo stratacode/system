@@ -209,12 +209,29 @@ public class Sequence extends NestedParselet  {
                            i = resumeIx - 1;
                            continue;
                         }
+                        else {
+                           parser.addSkippedError(err);
+                           // Record the error but move on
+                           if (err.partialValue != null) {
+                              nestedValue = err.partialValue;
+                              parser.changeCurrentIndex(err.endIndex);
+                           }
+                           else
+                              nestedValue = new ErrorParseNode(err, "");
+                           errorNode = true;
+                           err = null;
+                        }
                      }
                      // No parselet - so just skip parsing this sequence and resume parsing from here
                      else {
                         parser.addSkippedError(err);
                         // Record the error but move on
-                        nestedValue = new ErrorParseNode(err, "");
+                        if (err.partialValue != null) {
+                           nestedValue = err.partialValue;
+                           parser.changeCurrentIndex(err.endIndex);
+                        }
+                        else
+                           nestedValue = new ErrorParseNode(err, "");
                         errorNode = true;
                         err = null;
                      }
@@ -599,6 +616,20 @@ public class Sequence extends NestedParselet  {
                            newChildCount = resumeIx;
                            continue;
                         }
+                        // We were not able to consume more node in the error parselet but have completed enough for
+                        // a partial value.  Just use 'null' or the partial value for this node and carry on
+                        else {
+                           parser.addSkippedError(err);
+                           // Record the error but move on
+                           if (err.partialValue != null) {
+                              nestedValue = err.partialValue;
+                              dctx.changeCurrentIndex(parser, err.endIndex);
+                           }
+                           else
+                              nestedValue = new ErrorParseNode(err, "");
+                           errorNode = true;
+                           err = null;
+                        }
                      }
                      else {
                         parser.addSkippedError(err);
@@ -615,7 +646,12 @@ public class Sequence extends NestedParselet  {
                   }
                   else {
                      int origChildCount = newChildCount;
+
+                     // TODO - what we really want to do here is peak the next parselet and if it matches, we'll just
+                     // ignore this error and set nestedValue to null.
+                     //err.optionalContinuation = false;
                      if (err.optionalContinuation) {
+                        /*
                         ParentParseNode errVal;
                         if (pv != null) {
                            if (value == null) {
@@ -640,13 +676,24 @@ public class Sequence extends NestedParselet  {
                                  errVal = value.deepCopy();
                            }
                            svCount += errVal.addForReparse(pv, childParselet, svCount, newChildCount++, i, false, parser, oldChildParseNode, dctx, false, false);
+                           // Add these null slots so that we do all of the node processing, like setting the properties on the last child
+                           //for (int k = i+1; k < numParselets; k++)
+                           //   svCount += errVal.addForReparse(null, parselets.get(k), svCount, newChildCount++, k, false, parser, oldChildParseNode, dctx, true, false);
                         }
                         else
                            errVal = value;
+
                         err = err.propagatePartialValue(errVal);
                         //err.continuationValue = true;
                         err.optionalContinuation = false;
-                        nestedValue = null; // Switch this to optional
+                        */
+                        if (err.partialValue == null) {
+                           nestedValue = null; // Switch this to optional
+                        }
+                        else {
+                           nestedValue = err.partialValue;
+                           dctx.changeCurrentIndex(parser, err.endIndex);
+                        }
                         err = null; // cancel the error
 
                         // Here we also need to clear out any parse-nodes we did not reparse from the old time.
@@ -1449,8 +1496,8 @@ public class Sequence extends NestedParselet  {
    protected static final GenerateError ACCEPT_ERROR = new GenerateError("Accept method failed");
 
    public Object generate(GenerateContext ctx, Object value) {
-      //if (trace)
-      //    System.out.println("*** Generating traced element");
+      if (trace)
+         trace = trace;
 
       if (optional && emptyValue(ctx, value))
           return generateResult(ctx, null);

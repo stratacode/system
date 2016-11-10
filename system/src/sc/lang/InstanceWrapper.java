@@ -8,9 +8,9 @@ import sc.dyn.DynUtil;
 
 public class InstanceWrapper {
    EditorContext ctx;
-   Object theInstance;
+   public Object theInstance;
    boolean canCreate = false;
-   String typeName;
+   public String typeName;
    public InstanceWrapper(EditorContext ctx, boolean canCreate, String typeName) {
       this.typeName = typeName;
       this.canCreate = canCreate;

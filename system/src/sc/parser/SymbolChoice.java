@@ -487,11 +487,17 @@ public class SymbolChoice extends Parselet {
       
       IString istr = PString.toIString(value);
 
-      if (istr == null)
-      {
+      if (istr == null) {
          if (optional)
             return null;
 
+         // If the symbol choice only has one value, we handle it like we do with 'symbol'
+         // This is a weird case in the grammar but useful because Symbol does not implement
+         // the excludedValues like SymbolChoice does.
+         if (!negated && !repeat && expectedValues.size() == 1)
+            return generateResult(ctx, expectedValues.iterator().next());
+
+         // There's not enough information here to generate which of the symbols should be generated
          return SYMBOL_CHOICE_ERROR;
       }
 

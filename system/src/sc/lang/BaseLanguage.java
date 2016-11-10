@@ -126,7 +126,11 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
       spacingEOL.generateParseNode = new SpacingParseNode(spacingEOL, true);
    }
 
-   public SymbolSpace periodSpace = new SymbolSpace(".");
+   public SymbolChoiceSpace periodSpace = new SymbolChoiceSpace(".");
+   {
+      // We want to match '.' but not '...' in the partial values case so excluding '..'
+      periodSpace.addExcludedValues("..");
+   }
    public Symbol period = new Symbol(".");
    public SymbolSpace semicolonEOL = new SymbolSpace(";", SKIP_ON_ERROR);
    {
@@ -442,7 +446,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
       }
 
       SymbolChoiceSpace(String symbol) {
-         this(symbol, 0);
+         this(0, symbol);
       }
 
       public void add(String...choices) {

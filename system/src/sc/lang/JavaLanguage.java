@@ -300,6 +300,10 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
         identifierSuffix);
 
    Sequence classValueExpression = new Sequence("ClassValueExpression(typeIdentifier, arrayBrackets, )", typeIdentifier, openCloseSqBrackets, new KeywordSpace(".class"));
+   {
+      // Don't allow just the type to parse as a class value expression in partial values mode - it should have .class at the end
+      classValueExpression.minContentSlot = 2;
+   }
 
    // Java8 Only
    Sequence methodReference = new Sequence("MethodReference(reference,,typeArguments, methodName)");
@@ -494,6 +498,10 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    {
       formalParameters.set(openParen, formalParameterDecls, closeParenSkipOnError);
       formalParameters.ignoreEmptyList = false;
+      // TODO: this handles the case of swallowing the '.' and '..' leading up to a repeating parameter definition
+      // but probably should be generalized to handle other errors
+      formalParameterDecls.skipOnErrorParselet = new SymbolChoice("..", ".");
+      formalParameterDecls.skipOnErrorSlot = 2;
    }
 
    // Java8 Only
@@ -732,7 +740,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    {
       // When parsing for errors, once we've seen the 'class' skip on error until we see the { so we can resume a misformed class definition
       normalClassDeclaration.skipOnErrorSlot = 1;
-      normalClassDeclaration.skipOnErrorParselet = new Sequence("('')", OPTIONAL | REPEAT, new SymbolChoice(NOT, "extends", "implements", "{", "}", "\n", EOF));
+      normalClassDeclaration.skipOnErrorParselet = new Sequence("('')", OPTIONAL | REPEAT, new SymbolChoice(NOT, "extends", "implements", "class", "static", "public", "private", "{", "}", "\n", EOF));
    }
 
    Sequence enumConstant = new Sequence("EnumConstant(modifiers,typeName,arguments,body)", annotations, identifier,

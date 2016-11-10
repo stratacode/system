@@ -1658,8 +1658,8 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                            pnode.parselet.processSlotMappings(0, pnode, parent.getSemanticValue(), true, childIndex);
                      }
                   }
-                  else if (node != null)
-                     System.err.println("*** The '*' operator was used on a slot which produced an invalid result: " + node);
+                  else if (node != null && !(node instanceof ErrorParseNode))
+                     System.err.println("*** The '*' operator produced a parse node of type: " + node.getClass() + " when it should have produced a ParentParseNode");
                   break;
             }
          }

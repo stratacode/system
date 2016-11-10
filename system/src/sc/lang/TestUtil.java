@@ -215,6 +215,9 @@ public class TestUtil {
                case 'q':
                   quietOutput = true;
                   break;
+               case 'P':
+                  diffParseNodes = true;
+                  break;
                case 'p':
                   if (opt.length() > 1)
                      usage(args);
@@ -370,6 +373,7 @@ public class TestUtil {
    static final FilenameFilter LANG_FILTER = new ExtensionFilenameFilter(Language.getLanguageExtensions(), true);
 
    static boolean verifyResults = true;
+   static boolean diffParseNodes = false;
    static boolean dumpStats = false;
    static boolean quietOutput = false;
 
@@ -535,10 +539,12 @@ public class TestUtil {
                      ParseError err = ((ParseError) result);
                      result = err.getBestPartialValue();
                   }
+                  // 218 - is where we change from forVar to forControl
+                  // 250 - is where it should parse
                   /*
-                  if (reparseFile.contains("44")) {
+                  if (reparseFile.contains("112")) {
                      System.out.println("***");
-                     //SCLanguage.getSCLanguage().switchBlockStatementGroups.trace = true;
+                     SCLanguage.getSCLanguage().parameters.trace = true;
                      //JavaLanguage.getJavaLanguage().classBodyDeclarations.trace = true;
                      //HTMLLanguage.getHTMLLanguage().tagAttributes.trace = true;
                      SemanticNode.debugDiffTrace = true;
@@ -649,7 +655,7 @@ public class TestUtil {
                                  }
                               }
                               else {
-                                 error("*** New model errors for: " + reparseFile + " old:\n" + diffStr);
+                                 error("*** New model errors for: " + reparseFile + ":\n" + diffStr);
                                  saveNew = true;
                               }
                               if (saveNew) {
@@ -674,6 +680,25 @@ public class TestUtil {
                      }
                      else if (parseComplete != null)
                         error("*** Unrecognized return from reparse: " + parseComplete);
+
+                     if (diffParseNodes) {
+                        if (newRes instanceof IParseNode && !(parseComplete instanceof IParseNode)) {
+                           error("Parse node results are not the same");
+                        }
+                        else if (newRes instanceof ParseError && !(parseComplete instanceof ParseError)) {
+                           error("Parse node error is not the same");
+                        }
+                        else if (newRes instanceof IParseNode) {
+                           StringBuilder parseNodeDiffs = new StringBuilder();
+                           ((IParseNode) newRes).diffParseNode((IParseNode) parseComplete, parseNodeDiffs);
+                           if (parseNodeDiffs.length() > 0) {
+                              error("Parse nodes are not the same: " + parseNodeDiffs);
+                           }
+                        }
+                        else {
+                           // TODO: compare the ParseErrors here?
+                        }
+                     }
 
                      double reparsePer = 100.0 * lang.globalReparseCt / (double) lang.globalParseCt;
                      String per = new DecimalFormat("#").format(reparsePer);
@@ -735,6 +760,7 @@ public class TestUtil {
 
                long generateStartTime = System.currentTimeMillis();
 
+               SCLanguage.getSCLanguage().classTypeChainedTypes.trace = true;
                Object generateResult = lang.generate(modelObj, opts.finalGenerate);
                if (generateResult instanceof GenerateError)
                   error("**** FAILURE during generation: " + generateResult);
