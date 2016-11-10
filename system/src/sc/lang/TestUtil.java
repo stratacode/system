@@ -760,7 +760,6 @@ public class TestUtil {
 
                long generateStartTime = System.currentTimeMillis();
 
-               SCLanguage.getSCLanguage().classTypeChainedTypes.trace = true;
                Object generateResult = lang.generate(modelObj, opts.finalGenerate);
                if (generateResult instanceof GenerateError)
                   error("**** FAILURE during generation: " + generateResult);
