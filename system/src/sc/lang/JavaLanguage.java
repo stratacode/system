@@ -92,7 +92,8 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
                              new Sequence("(operator,typeArgument)", OPTIONAL, new SemanticTokenChoice("extends", "super"), argType)));
 
    Sequence typeArgumentList = new Sequence("([],[])", OPTIONAL, typeArgument, new Sequence("(,[])", OPTIONAL | REPEAT, comma, typeArgument));
-   Sequence typeArguments = new Sequence("<typeArguments>(,.,)", lessThan, typeArgumentList, greaterThanSkipOnError);
+   // Note: not using greaterThanSkipOnError here and other type arg lists because it confuses the parsing of partial binary expressions
+   Sequence typeArguments = new Sequence("<typeArguments>(,.,)", lessThan, typeArgumentList, greaterThan);
    {
       typeArguments.ignoreEmptyList = false;
    }
@@ -164,7 +165,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    OrderedChoice typeOrQuestion = new OrderedChoice(argType, new Sequence("ExtendsType(questionMark)", questionMark));
    Sequence simpleTypeArguments = new Sequence("(,[],)", OPTIONAL, lessThan,
            new Sequence("([],[])", OPTIONAL, typeOrQuestion, new Sequence("(,[])",OPTIONAL | REPEAT, comma, typeOrQuestion))
-           , greaterThanSkipOnError);
+           , greaterThan);
    Sequence innerCreator =
            new Sequence("NewExpression(typeArguments, typeIdentifier, *)", simpleTypeArguments, identifier, classCreatorRest);
 
@@ -543,6 +544,11 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    OrderedChoice forInit = new OrderedChoice(OPTIONAL, new Sequence("([])", localVariableDeclaration), expressionList);
    Sequence forVarControl = new Sequence("ForVarStatement(variableModifiers,type,identifier,,expression)",
                                          variableModifiers, type, identifier, colon, expression);
+   {
+      // Until we hit the colon, it could also be a forControl so don't match a partial until then.  It does not matter
+      // much for a complete partial parse, but for reparse, it gets the model off track
+      forVarControl.minContentSlot = 3;
+   }
    Sequence forControlStatement = new Sequence("ForControlStatement(forInit,,condition,,repeat)", forInit, semicolon, optExpression, semicolon, optExpressionList);
    OrderedChoice forControl = new OrderedChoice(forVarControl,forControlStatement);
    Sequence forStatement =
@@ -637,7 +643,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
                                           new Sequence("(,.)", OPTIONAL, extendsKeyword, typeBound));
    Sequence typeParameters =
        new Sequence("<typeParameters>(,[],[],)", lessThan, typeParameter,
-                    new Sequence("(,[])", OPTIONAL | REPEAT, comma, typeParameter), greaterThanSkipOnError);
+                    new Sequence("(,[])", OPTIONAL | REPEAT, comma, typeParameter), greaterThan);
    Sequence optTypeParameters = new Sequence("([])", OPTIONAL, typeParameters);
 
 
