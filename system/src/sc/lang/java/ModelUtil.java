@@ -6512,10 +6512,10 @@ public class ModelUtil {
 
          if (encType != null) // Include members that are visible in the namespace
             suggestMembers(model, encType, prefix, candidates, true, includeProps, includeMethods, false);
-         else // only for the root - search the global ones
+         else if (model != null) // only for the root - search the global ones
             model.findMatchingGlobalNames(prefix, candidates);
       }
-      if (includeClassBodyKeywords && model.getLanguage() instanceof JavaLanguage) {
+      if (includeClassBodyKeywords && model != null && model.getLanguage() instanceof JavaLanguage) {
          List<String> keywords = ((JavaLanguage) model.getLanguage()).getClassLevelKeywords();
          for (int i = 0; i < keywords.size(); i++) {
             String keyword = keywords.get(i);

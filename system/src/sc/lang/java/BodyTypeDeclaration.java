@@ -5443,6 +5443,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             }
             else if (oldBodyDef instanceof TypeDeclaration) {
                TypeDeclaration oldInnerType = (TypeDeclaration) oldBodyDef;
+               if (oldInnerType.typeName == null)
+                  continue;
                List<Object> newDefs = tctx.newFieldIndex.get(oldInnerType.typeName);
                Object newDef = null;
                if (newDefs != null)

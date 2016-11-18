@@ -542,9 +542,9 @@ public class TestUtil {
                   // 218 - is where we change from forVar to forControl
                   // 250 - is where it should parse
                   /*
-                  if (reparseFile.contains("112")) {
+                  if (reparseFile.contains("38")) {
                      System.out.println("***");
-                     SCLanguage.getSCLanguage().parameters.trace = true;
+                     SCLanguage.getSCLanguage().openCloseSqBrackets.trace = true;
                      //JavaLanguage.getJavaLanguage().classBodyDeclarations.trace = true;
                      //HTMLLanguage.getHTMLLanguage().tagAttributes.trace = true;
                      SemanticNode.debugDiffTrace = true;

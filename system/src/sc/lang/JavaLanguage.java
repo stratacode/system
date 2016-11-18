@@ -59,6 +59,9 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    KeywordSpace finalKeyword = new KeywordSpace("final");
 
    Sequence openCloseSqBrackets = new Sequence("('','')", OPTIONAL | REPEAT, openSqBracket, closeSqBracket);
+   {
+      openCloseSqBrackets.minContentSlot = 1;
+   }
    Sequence dotStarTail = new Sequence("('','')", OPTIONAL, periodSpace, asterix);
 
    Sequence importDeclaration = new Sequence("ImportDeclaration(,staticImport,identifier,)",
@@ -202,7 +205,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    }
    Sequence decimalLiteral = new Sequence("(decimalValue)", new OrderedChoice(new Symbol("0"), new Sequence("('','')", nonZeroDigit, optDigits)));
 
-   public OrderedChoice floatingPointLiteral = new OrderedChoice(
+   public OrderedChoice floatingPointLiteral = new OrderedChoice("<floatingPointLiteral>",
          new Sequence("(,'','','','','')", notUnderscore, digits, period, new Sequence("(,'')", OPTIONAL, notUnderscore, digits), optExponent, optFloatTypeSuffix),
          new Sequence("('',,'','','')", period, notUnderscore, digits, optExponent, optFloatTypeSuffix),
          new Sequence("(,'','','')", notUnderscore, digits, exponent, optFloatTypeSuffix),
@@ -230,7 +233,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    public Sequence stringLiteral = new Sequence("StringLiteral(,value,)", doubleQuote, escapedString, doubleQuote);
 
-   Sequence characterLiteral =
+   public Sequence characterLiteral =
          new Sequence("CharacterLiteral(,value,)", singleQuote,
                       new OrderedChoice(escapeSequence,
                                         new SymbolChoice(NOT, "\\", "'", EOF)),

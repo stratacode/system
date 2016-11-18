@@ -4347,8 +4347,9 @@ public class IdentifierExpression extends ArgumentsExpression {
          if (idTypes != null && idTypes[i] != null) {
             switch (idTypes[i]) {
                case SetVariable:
-                  if (!ModelUtil.isField(boundTypes[i]))
-                     break;
+                  // If we have "var = ..." and this maps to setVar(..) we should treat it as a field for styling
+                  //if (!ModelUtil.isField(boundTypes[i]))
+                  //   break;
                case FieldName:
                case GetVariable:
                case BoundObjectName:

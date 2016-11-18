@@ -181,10 +181,11 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
 
    /** Returns only the signature of the parameters of the method - strips off the ( ) and return value - e.g. (I)V becomes I */
    public String getTypeSignature() {
-      if (typeSignature == null)
-         return null;
       if (!started)
          start();
+
+      if (typeSignature == null)
+         return null;
 
       // When type parameters are involved, we need to expand the types here - otherwise, we could try to substring this from typeSignature
       if (parameterJavaTypes != null) {
