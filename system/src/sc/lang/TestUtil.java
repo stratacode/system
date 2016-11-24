@@ -482,6 +482,12 @@ public class TestUtil {
                if (lang == null)
                   throw new IllegalArgumentException("No language for: " + file.getPath());
                lang.debugReparse = true;
+
+               /*
+               SCLanguage.getSCLanguage().identifierExpression.trace = true;
+               SCLanguage.getSCLanguage().selectorExpression.trace = true;
+               */
+
                result = lang.parse(fileName, new StringReader(input), lang.getStartParselet(), opts.enablePartialValues);
             }
             else {
@@ -541,17 +547,16 @@ public class TestUtil {
                   }
                   // 218 - is where we change from forVar to forControl
                   // 250 - is where it should parse
-                  /*
-                  if (reparseFile.contains("112")) {
+                  if (reparseFile.contains("2")) {
                      System.out.println("***");
-                     SCLanguage.getSCLanguage().parameters.trace = true;
+                     //SCLanguage.getSCLanguage().identifierExpression.trace = true;
+                     //SCLanguage.getSCLanguage().selectorExpression.trace = true;
                      //JavaLanguage.getJavaLanguage().classBodyDeclarations.trace = true;
                      //HTMLLanguage.getHTMLLanguage().tagAttributes.trace = true;
                      SemanticNode.debugDiffTrace = true;
 
                      //DiffContext.debugDiffContext = true;
                   }
-                  */
                   if (result == null)
                      out("*** FAILURE: No previous result for reparse");
 
@@ -577,6 +582,12 @@ public class TestUtil {
                      }
 
                      Object reparsedModelObj = getTestResult(newRes);
+
+                     /*
+                     if (reparseFile.contains("2")) {
+                        JavaLanguage.getJavaLanguage().variableDefinition.trace = true;
+                     }
+                     */
 
                      Object parseComplete = lang.parseString(reparsedString, opts.enablePartialValues);
                      boolean parseError = false;

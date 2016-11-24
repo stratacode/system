@@ -136,4 +136,18 @@ public class IfStatement extends NonIndentedStatement {
          falseStatement.addReturnStatements(res, incThrow);
       }
    }
+
+   public Statement findStatement(Statement in) {
+      if (trueStatement != null) {
+         Statement out = trueStatement.findStatement(in);
+         if (out != null)
+            return out;
+      }
+      if (falseStatement != null) {
+         Statement out = falseStatement.findStatement(in);
+         if (out != null)
+            return out;
+      }
+      return super.findStatement(in);
+   }
 }

@@ -385,7 +385,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
    public void makeBindable(boolean referenceOnly) {
       if (!bindable && !referenceOnly) {
          JavaModel model = getJavaModel();
-         LayeredSystem sys = model.getLayeredSystem();
+         LayeredSystem sys = model == null ? null : model.getLayeredSystem();
          // Only start checking after the current buildLayer is compiled.  Otherwise, this touches runtime classes
          // during the normal build which can suck in a version that will be replaced later on.
          // Don't do this test for the JS runtime... it forces us to load the js version of the class
@@ -714,26 +714,46 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
 
    public VariableDefinition refreshNode() {
       JavaModel oldModel = getJavaModel();
-      if (oldModel == null || !oldModel.removed)
-         return this; // We are still valid
       Statement def = getDefinition();
       if (def instanceof FieldDefinition) {
-         Object res = oldModel.layeredSystem.getSrcTypeDeclaration(getEnclosingType().getFullTypeName(), null, true,  false, false, oldModel.layer, oldModel.isLayerModel);
-         if (res instanceof BodyTypeDeclaration) {
-            Object newField = ((BodyTypeDeclaration) res).declaresMember(variableName, MemberType.FieldSet, null, null);
-            if (newField instanceof VariableDefinition)
-               return (VariableDefinition) newField;
-            System.err.println("Failed to find field on refresh " + variableName + " for: ");
-            // TODO: debug only
-            newField = ((BodyTypeDeclaration) res).declaresMember(variableName, MemberType.FieldSet, null, null);
+         BodyTypeDeclaration type = getEnclosingType().refreshNode();
+         if (type == null)
             return this;
+         Object newField = type.declaresMember(variableName, MemberType.FieldSet, null, null);
+         if (newField instanceof VariableDefinition)
+            return (VariableDefinition) newField;
+         System.err.println("Failed to find field on refresh " + variableName + " for: ");
+         // TODO: debug only
+         newField = type.declaresMember(variableName, MemberType.FieldSet, null, null);
+      }
+      else if (def instanceof VariableStatement) {
+         AbstractMethodDefinition newMeth = getEnclosingMethod();
+         VariableStatement varSt;
+         if (newMeth != null) {
+            varSt = (VariableStatement) newMeth.findStatement((Statement) def);
+            if (varSt == null)
+               System.err.println("*** Can't refresh VarStatement from method");
+         }
+         else {
+            TypeDeclaration enclType = getEnclosingType();
+            if (enclType == null)
+               return this;
+            BodyTypeDeclaration type = enclType.refreshNode();
+            if (type == null)
+               return this;
+            varSt = (VariableStatement) type.findStatement((Statement) def);
+            if (varSt == null)
+               System.err.println("*** Can't refresh VarStatement from type");
+         }
+         if (varSt != null) {
+            for (VariableDefinition varDef:varSt.definitions) {
+               if (varDef.variableName.equals(variableName))
+                  return varDef;
+            }
+            System.err.println("*** Can't find varDef");
          }
       }
-      if (def instanceof VariableStatement) {
-         // Don't think we need these references outside of the file
-         return null;
-      }
-      return null;
+      return this;
    }
 
    public ISrcStatement getSrcStatement(Language lang) {

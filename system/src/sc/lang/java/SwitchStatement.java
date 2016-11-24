@@ -235,4 +235,15 @@ public class SwitchStatement extends Statement implements IBlockStatement {
          sb.append("<null statement>");
       return sb.toString();
    }
+
+   public Statement findStatement(Statement in) {
+      if (statements != null) {
+         for (Statement st:statements) {
+            Statement out = st.findStatement(in);
+            if (out != null)
+               return out;
+         }
+      }
+      return null;
+   }
 }

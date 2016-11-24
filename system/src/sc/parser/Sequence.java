@@ -694,7 +694,7 @@ public class Sequence extends NestedParselet  {
                            nestedValue = err.partialValue;
                            dctx.changeCurrentIndex(parser, err.endIndex);
                         }
-                        err = null; // cancel the error
+                        errorNode = true; err = null; // cancel the error
 
                         // Here we also need to clear out any parse-nodes we did not reparse from the old time.
                         if (value == origOldParseNode && value != null) {
@@ -767,7 +767,7 @@ public class Sequence extends NestedParselet  {
                // containing node.  We want to ignore internal errors but catch when this sequence ends in an error - i.e.
                // is some kind of fragment that must be reparsed, even if the beginning content has not changed.
                if (!nestedParseNode.isEmpty())
-                  errorNode = nestedParseNode.isErrorNode();
+                  errorNode |= nestedParseNode.isErrorNode();
             }
             if (pendingErrorIx != -1) {
                if (nestedValue != null) {
@@ -1058,9 +1058,8 @@ public class Sequence extends NestedParselet  {
             if (matchedValues == null)
                matchedValues = new ArrayList<Object>(); // TODO: performance set the init-size here?
 
-            if (nestedValue != null) {
+            if (nestedValue != null && i >= minContentSlot)
                anyContent = true;
-            }
 
             matchedValues.add(nestedValue);
          }
@@ -1127,12 +1126,18 @@ public class Sequence extends NestedParselet  {
                value = newRepeatSequenceResult(errorValues, value, lastMatchIndex, parser);
                return parsePartialError(parser, value, lastError, childParselet, "Partial array match: {0} ", this);
             }
+               /* A bad case for the optional continuation is Foo.this - which needs to only match "Foo" as the identifier expression
+                  and cannot match 'foo.' with the optional continuation, or else it consumes the '.' which won't match the '.this' selector
+                  later on.  It seems like a bad idea to by default match an error case which is optional.  Instead, those specific error cases
+                  should be ignored with skipOnErrorSlot or some other way.
             if (pv == null && optional && anyContent) {
+               System.out.println("***");
                value = newRepeatSequenceResult(errorValues, value, lastMatchIndex, parser);
                ParseError err = parsePartialError(parser, value, lastError, childParselet, "Optional continuation: {0} ", this);
                err.optionalContinuation = true;
                return err;
             }
+               */
          }
 
          if (optional) {
@@ -1266,9 +1271,8 @@ public class Sequence extends NestedParselet  {
             if (matchedValues == null)
                matchedValues = new ArrayList<Object>(); // TODO: performance set the init-size here?
 
-            if (nestedValue != null) {
+            if (nestedValue != null && i >= minContentSlot)
                anyContent = true;
-            }
 
             matchedValues.add(nestedValue);
             numMatchedValues++;
@@ -1349,7 +1353,10 @@ public class Sequence extends NestedParselet  {
 
                return reparsePartialError(parser, dctx, value, lastError, childParselet, "Partial array match: {0} ", this);
             }
+               /*
+                * This case caused problems with Foo.this - where matching Foo. did not work.
             if (pv == null && optional && anyContent) {
+               System.out.println("***");
                value = newRepeatSequenceResultReparse(errorValues, value, svCount, newChildCount, lastMatchIndex, parser, oldParent, dctx);
                newChildCount += errorValues.size();
 
@@ -1358,9 +1365,11 @@ public class Sequence extends NestedParselet  {
                }
 
                ParseError err = reparsePartialError(parser, dctx, value, lastError, childParselet, "Optional continuation: {0} ", this);
-               err.optionalContinuation = true;
+               //err.optionalContinuation = true;
                return err;
             }
+               */
+
          }
 
          if (optional) {

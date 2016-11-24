@@ -180,4 +180,17 @@ public class EnumConstant extends BodyTypeDeclaration {
    public String getOperatorString() {
       return "<enum constant>";
    }
+
+   public EnumConstant refreshNode() {
+      if (typeName == null)
+         return this;
+      TypeDeclaration enclType = getEnclosingType();
+      enclType = (TypeDeclaration) enclType.refreshNode();
+      Object enumConst = enclType.definesMember(typeName, MemberType.EnumOnlySet, null, null);
+      if (enumConst == null || !(enumConst instanceof EnumConstant)) {
+         System.err.println("*** Unable to refresh enum constant");
+         return this;
+      }
+      return (EnumConstant) enumConst;
+   }
 }

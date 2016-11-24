@@ -79,4 +79,15 @@ public class FinallyStatement extends NonIndentedStatement implements IBlockStat
          for (Statement st:statements)
             st.addReturnStatements(res, incThrow);
    }
+
+   public Statement findStatement(Statement in) {
+      if (statements != null) {
+         for (Statement st:statements) {
+            Statement out = st.findStatement(in);
+            if (out != null)
+               return out;
+         }
+      }
+      return null;
+   }
 }

@@ -951,6 +951,8 @@ public class ParseUtil  {
                else
                   System.err.println("*** Unrecognized return type");
             }
+            else
+               System.err.println("*** Failed to find new parse node in model");
          }
       }
       return null;

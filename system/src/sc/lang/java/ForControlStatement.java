@@ -127,4 +127,17 @@ public class ForControlStatement extends ForStatement {
 
       return sb.toString();
    }
+
+   public Statement findStatement(Statement in) {
+      if (forInit != null) {
+         for (Definition def:forInit) {
+            if (def instanceof Statement) {
+               Statement out = ((Statement) def).findStatement(in);
+               if (out != null)
+                  return out;
+            }
+         }
+      }
+      return super.findStatement(in);
+   }
 }

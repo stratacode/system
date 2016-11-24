@@ -186,6 +186,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** Stores the inactive model types, separate from the active ones.  Here the layer stack is lazily formed and contains files we are not compiling... just loading for tooling purposes like the IDE or the doc styling */
    private Map<String,ILanguageModel> inactiveModelIndex = new HashMap<String,ILanguageModel>();
 
+   /** As we are editing, we are only updating the model in one runtime.  Instead, we accumulate the set of models which are stale in the peer runtimes and flush them out periodically. */
+   private Map<String,ILanguageModel> peerModelsToUpdate = new HashMap<String,ILanguageModel>();
+
    /** Works in parallel to modelIndex for the files which are not parsed, so we know when they were last modified to do incremental refreshes of them. */
    public Map<String,IFileProcessorResult> processedFileIndex = new HashMap<String,IFileProcessorResult>();
 
@@ -9747,6 +9750,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public SystemRefreshInfo refreshRuntimes() {
+      updatePeerModels(true);
+
       acquireDynLock(false);
       SystemRefreshInfo sysInfo;
       try {
@@ -10903,7 +10908,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public TypeDeclaration getSrcTypeDeclaration(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden) {
-      return (TypeDeclaration) getSrcTypeDeclaration(typeName, fromLayer, prependPackage, notHidden, true, null, false);
+      Object res = getSrcTypeDeclaration(typeName, fromLayer, prependPackage, notHidden, true, null, false);
+      if (res instanceof CFClass) {
+         System.out.println("***");
+         res = getSrcTypeDeclaration(typeName, fromLayer, prependPackage, notHidden, true, null, false);
+      }
+      return (TypeDeclaration) res;
    }
 
    public Object getSrcTypeDeclaration(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden, boolean srcOnly) {
@@ -11286,7 +11296,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (fromLayer == null && cacheForRefLayer(refLayer)) {
          Object res = innerTypeCache.get(typeName);
          if (res != null) {
-            if (srcOnly && res instanceof Class) {
+            if (srcOnly && ((res instanceof Class) || res instanceof CFClass)) {
                if (!hasAnySrcForRootType(typeName))
                   return null;
                else
@@ -11438,7 +11448,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
-   public Object getRelativeTypeDeclaration(String typeName, String packagePrefix, Layer fromLayer, boolean prependPackage, Layer refLayer, boolean layerResolve) {
+   public Object getRelativeTypeDeclaration(String typeName, String packagePrefix, Layer fromLayer, boolean prependPackage, Layer refLayer, boolean layerResolve, boolean srcOnly) {
       // TODO: Should we first be trying packagePrefix+typeName in the global cache?
       SrcEntry srcFile = getSrcFileFromRelativeTypeName(typeName, packagePrefix, true, fromLayer, prependPackage, refLayer, layerResolve);
       
@@ -11470,7 +11480,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             TypeDeclaration loadedModelType = loading.getModelTypeDeclaration();
             if (loadedModelType != null)
                return loadedModelType;
-            return getRelativeTypeDeclaration(typeName, packagePrefix, srcFile.layer, prependPackage, refLayer, layerResolve);
+            return getRelativeTypeDeclaration(typeName, packagePrefix, srcFile.layer, prependPackage, refLayer, layerResolve, srcOnly);
          }
 
          if (srcFile.layer != null && !srcFile.layer.activated)
@@ -11498,7 +11508,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          return null;
       }
-      return getInnerClassDeclaration(typeName, fromLayer, false, false, refLayer, layerResolve);
+      return getInnerClassDeclaration(typeName, fromLayer, false, srcOnly, refLayer, layerResolve);
    }
 
    public Object parseInactiveFile(SrcEntry srcEnt) {
@@ -14204,6 +14214,43 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public void applyModelChange(ILanguageModel model, boolean changed) {
       if (externalModelIndex != null)
          externalModelIndex.modelChanged(model, changed, model.getLayer());
+
+      peerModelsToUpdate.put(model.getSrcFile().absFileName, model);
+   }
+
+   public void updatePeerModels(boolean doPeers) {
+      try {
+         acquireDynLock(false);
+         for (ILanguageModel peerModel : peerModelsToUpdate.values()) {
+            updateModelInPeers(peerModel);
+         }
+         peerModelsToUpdate.clear();
+      }
+      finally {
+         releaseDynLock(false);
+      }
+
+      if (doPeers && peerSystems != null) {
+         for (int i = 0; i < peerSystems.size(); i++) {
+            LayeredSystem peerSys = peerSystems.get(i);
+            peerSys.updatePeerModels(false);
+         }
+      }
+   }
+
+   public void updateModelInPeers(ILanguageModel model) {
+      if (peerSystems != null) {
+         String absFileName = model.getSrcFile().absFileName;
+         for (LayeredSystem peerSys:peerSystems) {
+            ILanguageModel otherModel = peerSys.inactiveModelIndex.get(absFileName);
+            if (otherModel instanceof JavaModel) {
+               JavaModel otherJavaModel = (JavaModel) otherModel;
+               Layer otherLayer = otherModel.getLayer();
+               ILanguageModel clonedModel = peerSys.cloneModel(otherLayer, (JavaModel) model);
+               peerSys.addNewModel(clonedModel, null, null, otherJavaModel.isLayerModel);
+            }
+         }
+      }
    }
 }
 

@@ -387,4 +387,15 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
       sb.append("}\n");
       return sb.toString();
    }
+
+   public Statement findStatement(Statement in) {
+      if (statements != null) {
+         for (Statement st:statements) {
+            Statement out = st.findStatement(in);
+            if (out != null)
+               return out;
+         }
+      }
+      return null;
+   }
 }

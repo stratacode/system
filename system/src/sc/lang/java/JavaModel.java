@@ -647,7 +647,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    public Object findTypeDeclaration(String typeName, boolean addExternalReference, boolean srcOnly) {
       Object td = typeIndex.get(typeName);
-      if (td != null && (!(td instanceof ModifyDeclaration) || !((ModifyDeclaration) td).isLayerType))
+      if (td != null && (!(td instanceof ModifyDeclaration) || !((ModifyDeclaration) td).isLayerType) && (!srcOnly || !ModelUtil.isCompiledClass(td)))
          return td;
 
       String importedName = null;
@@ -673,7 +673,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       // Need to check relative references in this package before we do the imports cause that's
       // how Java does it.
       if (sys != null && !skipSrc) {
-         td = sys.getRelativeTypeDeclaration(typeName, getPackagePrefix(), null, prependLayerPackage, layer, isLayerModel);
+         td = sys.getRelativeTypeDeclaration(typeName, getPackagePrefix(), null, prependLayerPackage, layer, isLayerModel, srcOnly);
       }
 
       importedName = getImportedName(typeName);
@@ -723,7 +723,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (layeredSystem != null) {
          // Look for a name relative to this path prefix
          if (importedName != typeName && !skipSrc) // intending to use != here to avoid the equals method
-            td = layeredSystem.getRelativeTypeDeclaration(importedName, getPackagePrefix(), null, true, layer, isLayerModel);
+            td = layeredSystem.getRelativeTypeDeclaration(importedName, getPackagePrefix(), null, true, layer, isLayerModel, srcOnly);
          if (td == null) {
             if (!skipSrc) {
                // Look for an absolute name in both source and class form
@@ -765,11 +765,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                }
                // TODO:  Very likely simplify this inner class stuff with the
                // code in LayeredSystem as it seems like there is redundancy.
-               if (td == null)
+               if (td == null && !srcOnly)
                   td = getClass(importedName, false, layer, isLayerModel);
             }
             /* Only if we have not imported a class, try looking for a class in this package */
-            if (td == null && importedName == typeName) {
+            if (td == null && importedName == typeName && !srcOnly) {
                String pref = getPackagePrefix();
                if (pref != null) {
                   String prefTypeName = pref + "." + typeName;
