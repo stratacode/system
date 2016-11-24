@@ -74,6 +74,10 @@ public class LayerListTypeIndex {
       for (Map.Entry<String,TypeIndexEntry> typeEnt:layerTypeIndexMap.entrySet()) {
          TypeIndexEntry entry = typeEnt.getValue();
          String typeName = typeEnt.getKey();
+         if (typeName.contains("TypeTreeModel"))
+            System.out.println("***");
+         if (typeName.equals("sc.editor.TypeTreeModel"))
+            System.out.println("***");
          // Build the reverse list - for each
          if (entry.baseTypes != null) {
             for (String baseType: entry.baseTypes) {

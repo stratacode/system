@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import sc.classfile.CFClass;
 import sc.classfile.CFMethod;
 import sc.dyn.IDynObjManager;
 import sc.dyn.IDynObject;
@@ -2129,7 +2130,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
        * This method will return the most specific type after the refresh.  It should not be used for
        * modify types or super.x constructs which both will need to get a modified type
        */
-      Object newBoundType = model.findTypeDeclaration(getFullTypeName(), false);
+      Object newBoundType = model.findTypeDeclaration(getFullTypeName(), false, true);
+      if (newBoundType instanceof CFClass) {
+         System.out.println("***"); // Why are we resolving a CFClass here?
+         newBoundType = model.findTypeDeclaration(getFullTypeName(), false, true);
+         newBoundType = null;
+      }
       if (newBoundType == null) {
          newBoundType = model.getTypeDeclaration(typeName);
          if (newBoundType == null) {
@@ -8851,24 +8857,33 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return typeName + ": " + getDeclarationType().toString();
    }
 
+   /**
+    * This method is used by the IDE when it wants to convert this type declaration (which it might find in a reference) with the
+    * version of this type managed in the IDE.  It uses the getAnnotatedModel method to find the right model, then looks for this
+    * type in that layered system (since we know by then that the model in that system is annotated .
+    */
    public BodyTypeDeclaration refreshNode() {
-      JavaModel oldModel = getJavaModel();
+      JavaModel myModel = getJavaModel();
+      if (myModel == null)
+         return this;
       // Or we can look our replacement up...
       if (isLayerType()) {
-         JavaModel layerModel = oldModel.layeredSystem.getAnnotatedLayerModel(getTypeName().replace(".", "/"), null);
+         JavaModel layerModel = myModel.layeredSystem.getAnnotatedLayerModel(getTypeName().replace(".", "/"), null);
          if (layerModel != null)
             return layerModel.getModelTypeDeclaration();
          return this;
       }
 
-      if (oldModel == null || !oldModel.removed)
-         return this; // We are still valid
       if (removed) { // For live types we have a ref to the replacement
          if (replacedByType == null)
             return null;
          return replacedByType.refreshNode();
       }
-      Object res = oldModel.layeredSystem.getSrcTypeDeclaration(getFullTypeName(), getLayer().getNextLayer(), true, false, false, layer, oldModel.isLayerModel);
+      JavaModel newModel = (JavaModel) myModel.getLayeredSystem().getAnnotatedModel(myModel.getSrcFile());
+      if (newModel == null)
+         newModel = myModel;
+      Layer newModelLayer = newModel.getLayer();
+      Object res = newModel.layeredSystem.getSrcTypeDeclaration(getFullTypeName(), newModelLayer == null ? null : newModelLayer.getNextLayer(), true, false, false, newModelLayer, newModel.isLayerModel);
       if (res instanceof TypeDeclaration) {
          TypeDeclaration newType = (TypeDeclaration) res;
          // We might switch from an inactive layer to an active layer, or maybe the layers themselves were reloaded?
@@ -8878,7 +8893,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
       displayError("Type removed: ", getFullTypeName(), " for ");
       // TODO - remove for debugging
-      res = oldModel.layeredSystem.getSrcTypeDeclaration(getFullTypeName(), null, true,  false, false, layer, oldModel.isLayerModel);
+      res = newModel.layeredSystem.getSrcTypeDeclaration(getFullTypeName(), null, true,  false, false, newModel.layer, newModel.isLayerModel);
       return null;
    }
 
@@ -8990,5 +9005,16 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public boolean isAutomaticBindable(String property) {
       return propertiesToMakeBindable != null && propertiesToMakeBindable.get(property) != null;
+   }
+
+   public Statement findStatement(Statement in) {
+      if (body != null) {
+         for (Statement st:body) {
+            Statement out = st.findStatement(in);
+            if (out != null)
+               return out;
+         }
+      }
+      return null;
    }
 }

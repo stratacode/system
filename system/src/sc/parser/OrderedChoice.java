@@ -234,10 +234,12 @@ public class OrderedChoice extends NestedParselet  {
       if (optional) {
          parser.changeCurrentIndex(startIndex);
 
+         /*
          if (parser.enablePartialValues && bestError != null && bestError.partialValue != null) {
-            bestError.optionalContinuation = true;
+            //bestError.optionalContinuation = true;
             return bestError;
          }
+         */
          return null;
       }
       if (bestError != null)
@@ -342,10 +344,12 @@ public class OrderedChoice extends NestedParselet  {
       if (optional) {
          dctx.changeCurrentIndex(parser, startIndex);
 
+         /*
          if (parser.enablePartialValues && bestError != null && bestError.partialValue != null) {
-            bestError.optionalContinuation = true;
+            //bestError.optionalContinuation = true;
             return bestError;
          }
+         */
          return null;
       }
 

@@ -951,9 +951,6 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
    }
 
    public PropertyAssignment refreshNode() {
-      JavaModel oldModel = getJavaModel();
-      if (!oldModel.removed)
-         return this; // We are still valid
       BodyTypeDeclaration type = getEnclosingType().refreshNode();
       if (type == null)
          return this;

@@ -59,4 +59,13 @@ public class SynchronizedStatement extends Statement {
       if (statement != null)
          statement.addReturnStatements(res, incThrow);
    }
+
+   public Statement findStatement(Statement in) {
+      if (statement != null) {
+         Statement out = statement.findStatement(in);
+         if (out != null)
+            return out;
+      }
+      return super.findStatement(in);
+   }
 }

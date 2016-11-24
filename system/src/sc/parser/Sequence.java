@@ -1126,12 +1126,18 @@ public class Sequence extends NestedParselet  {
                value = newRepeatSequenceResult(errorValues, value, lastMatchIndex, parser);
                return parsePartialError(parser, value, lastError, childParselet, "Partial array match: {0} ", this);
             }
+               /* A bad case for the optional continuation is Foo.this - which needs to only match "Foo" as the identifier expression
+                  and cannot match 'foo.' with the optional continuation, or else it consumes the '.' which won't match the '.this' selector
+                  later on.  It seems like a bad idea to by default match an error case which is optional.  Instead, those specific error cases
+                  should be ignored with skipOnErrorSlot or some other way.
             if (pv == null && optional && anyContent) {
+               System.out.println("***");
                value = newRepeatSequenceResult(errorValues, value, lastMatchIndex, parser);
                ParseError err = parsePartialError(parser, value, lastError, childParselet, "Optional continuation: {0} ", this);
                err.optionalContinuation = true;
                return err;
             }
+               */
          }
 
          if (optional) {
@@ -1347,7 +1353,10 @@ public class Sequence extends NestedParselet  {
 
                return reparsePartialError(parser, dctx, value, lastError, childParselet, "Partial array match: {0} ", this);
             }
+               /*
+                * This case caused problems with Foo.this - where matching Foo. did not work.
             if (pv == null && optional && anyContent) {
+               System.out.println("***");
                value = newRepeatSequenceResultReparse(errorValues, value, svCount, newChildCount, lastMatchIndex, parser, oldParent, dctx);
                newChildCount += errorValues.size();
 
@@ -1356,9 +1365,11 @@ public class Sequence extends NestedParselet  {
                }
 
                ParseError err = reparsePartialError(parser, dctx, value, lastError, childParselet, "Optional continuation: {0} ", this);
-               err.optionalContinuation = true;
+               //err.optionalContinuation = true;
                return err;
             }
+               */
+
          }
 
          if (optional) {

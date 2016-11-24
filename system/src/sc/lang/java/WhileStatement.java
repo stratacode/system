@@ -101,4 +101,14 @@ public class WhileStatement extends ExpressionStatement {
    public void addReturnStatements(List<Statement> res, boolean incThrow) {
       statement.addReturnStatements(res, incThrow);
    }
+
+   public Statement findStatement(Statement in) {
+      if (statement != null) {
+         Statement out = statement.findStatement(in);
+         if (out != null)
+            return out;
+      }
+      return super.findStatement(in);
+   }
+
 }

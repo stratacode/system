@@ -201,4 +201,13 @@ public class LambdaExpression extends BaseLambdaExpression {
 
       return null;
    }
+
+   public Statement findStatement(Statement in) {
+      if (lambdaBody != null) {
+         Statement out = lambdaBody.findStatement(in);
+         if (out != null)
+            return out;
+      }
+      return null;
+   }
 }

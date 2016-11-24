@@ -624,4 +624,8 @@ public abstract class JavaSemanticNode extends SemanticNode {
       }
       return null;
    }
+
+   public Statement findStatement(Statement in) {
+      return null;
+   }
 }

@@ -1016,14 +1016,13 @@ public class IdentifierExpression extends ArgumentsExpression {
             if (checkAnnotations && member != null && ModelUtil.getAnnotation(member, "sc.bind.Bindable") != null)
                 return;
 
+            Layer nextTDLayer = null;
             // Find the most specific class/object type which defines this property skipping annotation layers which are
             // not generated
             while ((nextType = referenceTD.getDerivedTypeDeclaration()) instanceof TypeDeclaration &&
-                    (nextTD = (TypeDeclaration) nextType).isClassOrObjectType() && !nextTD.getLayer().annotationLayer) {
+                    (nextTD = (TypeDeclaration) nextType).isClassOrObjectType() && ((nextTDLayer = nextTD.getLayer()) == null || !nextTDLayer.annotationLayer)) {
 
-               TypeDeclaration nextTypeTD = (TypeDeclaration) nextType;
-
-               member = nextTypeTD.definesMember(propertyName, MemberType.PropertyAnySet, null, null);
+               member = nextTD.definesMember(propertyName, MemberType.PropertyAnySet, null, null);
                // Make sure this next type actually defines the property before we try to make it bindable
                if (member == null)
                   break;
@@ -1033,7 +1032,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   addBindable = false;
                   break;
                }
-               referenceTD = nextTypeTD;
+               referenceTD = nextTD;
             }
 
             if (!(nextType instanceof TypeDeclaration)) {
@@ -3102,7 +3101,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   return resolveType(smt, ix, idTypes);
                // If ix > 0 and ix - 1's type has type parameters (either a field like List<X> or a method List<X> get(...).
                // need to apply the method's type parameters against the ones in the previous type.
-               return resolveType(ModelUtil.getMethodTypeDeclaration(rootType != null ? rootType : getTypeContext(idTypes, boundTypes, ix), boundTypes[ix], arguments, model.getLayeredSystem(), model, inferredType, definedInType), ix, idTypes);
+               return resolveType(ModelUtil.getMethodTypeDeclaration(rootType != null ? rootType : getTypeContext(idTypes, boundTypes, ix), boundTypes[ix], arguments, model == null ? null : model.getLayeredSystem(), model, inferredType, definedInType), ix, idTypes);
             case SetVariable:
                return resolveType(ModelUtil.getSetMethodPropertyType(boundTypes[ix], model), ix, idTypes);
             case EnumName:

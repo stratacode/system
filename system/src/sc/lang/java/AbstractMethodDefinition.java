@@ -735,11 +735,9 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
    }
 
    public AbstractMethodDefinition refreshNode() {
-      JavaModel oldModel = getJavaModel();
-      if (!oldModel.removed)
-         return this; // We are still valid
       if (replaced)
          return replacedByMethod.refreshNode();
+
       // Or we can look our replacement up...
       TypeDeclaration enclType = getEnclosingType();
       BodyTypeDeclaration newType = enclType == null ? null : enclType.refreshNode();
@@ -792,5 +790,14 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       }
       // Java names these just parentType$1InnerType
       return METHOD_TYPE_PREFIX + anonMethodId;
+   }
+
+   public Statement findStatement(Statement in) {
+      if (body != null) {
+         Statement out = body.findStatement(in);
+         if (out != null)
+            return out;
+      }
+      return super.findStatement(in);
    }
 }

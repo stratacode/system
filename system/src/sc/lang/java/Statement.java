@@ -369,4 +369,11 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       }
       sts.add(this);
    }
+
+   public Statement findStatement(Statement in) {
+      if (deepEquals(in))
+         return this;
+      return null;
+   }
+
 }

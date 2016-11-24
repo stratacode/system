@@ -530,6 +530,10 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    }
 
    public Sequence variableDefinition = new Sequence("(operator,initializer)", OPTIONAL, variableInitializerOperators, variableInitializer);
+   {
+      // If we match the initialization operators, we can't match anything else so this helps with partial parsing
+      variableDefinition.skipOnErrorSlot = 1;
+   }
    public Sequence variableDeclarator = new Sequence("VariableDefinition(*,*)", variableDeclaratorId, variableDefinition);
    public Sequence variableDeclarators =
        new Sequence("([],[])", variableDeclarator,
