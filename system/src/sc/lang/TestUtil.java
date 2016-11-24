@@ -547,6 +547,7 @@ public class TestUtil {
                   }
                   // 218 - is where we change from forVar to forControl
                   // 250 - is where it should parse
+                  /*
                   if (reparseFile.contains("2")) {
                      System.out.println("***");
                      //SCLanguage.getSCLanguage().identifierExpression.trace = true;
@@ -557,6 +558,7 @@ public class TestUtil {
 
                      //DiffContext.debugDiffContext = true;
                   }
+                  */
                   if (result == null)
                      out("*** FAILURE: No previous result for reparse");
 

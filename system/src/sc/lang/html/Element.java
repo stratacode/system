@@ -1199,12 +1199,12 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          if (res == null) {
             JavaModel model = getJavaModel();
             if (model != null) {
-               res = model.findTypeDeclaration(extStr, true, true);
+               res = model.findTypeDeclaration(extStr, true, false);
                if (res == null) {
                   Attr attr = getAttribute("extends");
                   attr.displayError("No extends type: ", extStr, " for tag: ");
                   res = findType(extStr, this, null);
-                  res = model.findTypeDeclaration(extStr, true, true);
+                  res = model.findTypeDeclaration(extStr, true, false);
                }
             }
          }
@@ -2045,7 +2045,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          Object type = tagObject.findType(name, this, null);
          if (type == null) {
             JavaModel model = getJavaModel();
-            type = model.findTypeDeclaration(name, true, true);
+            type = model.findTypeDeclaration(name, true, false);
             if (type == null) {
                Attr attr = getAttribute("implements");
                attr.displayError("No implements type: " + name + ": ");
@@ -2105,7 +2105,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
             if (repeatWrapperType == null) {
                JavaModel model = getJavaModel();
                if (model != null) {
-                  repeatWrapperType = model.findTypeDeclaration(repeatWrapperName, true, true);
+                  repeatWrapperType = model.findTypeDeclaration(repeatWrapperName, true, false);
                   if (repeatWrapperType == null) {
                      displayError("No repeatWrapper type: ", repeatWrapperName, " for tag: ");
                   }

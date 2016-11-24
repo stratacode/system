@@ -752,7 +752,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
          return;
 
       if (defaultExtendsTypeName != null && defaultExtendsType == null) {
-         defaultExtendsType = findTypeDeclaration(defaultExtendsTypeName, true, true);
+         defaultExtendsType = findTypeDeclaration(defaultExtendsTypeName, true, false);
          if (defaultExtendsType == null)
             displayTypeError("No defaultExtendsType: ", defaultExtendsTypeName, " for Template: ");
       }
