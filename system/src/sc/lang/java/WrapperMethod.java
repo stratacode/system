@@ -113,6 +113,10 @@ public abstract class WrapperMethod implements IMethodDefinition {
       return ModelUtil.getSetMethodFromGet(wrapped);
    }
 
+   public Object getFieldFromGetSetMethod() {
+      return ModelUtil.getFieldFromGetSetMethod(wrapped);
+   }
+
    public Object[] getMethodTypeParameters() {
       return ModelUtil.getMethodTypeParameters(wrapped);
    }

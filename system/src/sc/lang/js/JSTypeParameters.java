@@ -846,6 +846,9 @@ public class JSTypeParameters extends ObjectTypeParameters {
          runtimeTypeName = ModelUtil.getRuntimeTypeName(type);
       }
 
+      if (type.typeName != null && type.getEnclosingType() != null && type.typeName.contains("editorModel"))
+         System.out.println("*** editorModel - runtimeTypeName: " + runtimeTypeName);
+
       String rtTypeName = JSUtil.convertTypeName(type.getLayeredSystem(), runtimeTypeName);
       return rtTypeName;
    }

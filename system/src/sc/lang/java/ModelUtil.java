@@ -32,7 +32,6 @@ import sc.dyn.RDynUtil;
 import sc.parser.*;
 
 import java.io.File;
-import java.io.Serializable;
 import java.io.StringReader;
 import java.lang.annotation.ElementType;
 import java.lang.reflect.*;
@@ -1207,8 +1206,8 @@ public class ModelUtil {
                Object c2ArgType = c2ArgTypes[i];
                boolean repeat1Arg = c1Types.length <= i;
                boolean repeat2Arg = c2Types.length <= i;
-               Object c1Arg = repeat1Arg ? c1Types[c1Types.length-1] : c1Types[i];
-               Object c2Arg = repeat2Arg ? c2Types[c2Types.length-1] : c2Types[i];
+               Object c1Arg = repeat1Arg ? c1Types[c1Types.length - 1] : c1Types[i];
+               Object c2Arg = repeat2Arg ? c2Types[c2Types.length - 1] : c2Types[i];
 
                if (c1Arg == c2Arg)
                   continue;
@@ -1245,8 +1244,11 @@ public class ModelUtil {
 
                // TODO: This does not look right - we should pick the more specific the args in both directions here right?
                // And only return if they are diferent.  And why do we return defaultType after the first parameter?
-               if (ModelUtil.isAssignableFrom(c1Arg, c2Arg))
-                  return c2;
+               if (ModelUtil.isAssignableFrom(c1Arg, c2Arg)) {
+                  if (defaultType != c2)
+                     System.out.println("***");
+                  //return c2;
+               }
                //else if (ModelUtil.isAssignableFrom(c2Arg, c1Arg))
 
                boolean argIsArray = ModelUtil.isArray(c1ArgType);
@@ -3123,9 +3125,22 @@ public class ModelUtil {
       if (member instanceof PropertyAssignment)
          member = ((PropertyAssignment) member).getAssignedProperty();
       if (member instanceof IBeanMapper)
-         return((IBeanMapper) member).getGetSelector();
+         return((IBeanMapper) member).getSetSelector();
       if (member instanceof IMethodDefinition)
          return ((IMethodDefinition) member).getSetMethodFromGet();
+      // TODO: handle Method here - usually it will be an IBeanMapper
+      return null;
+   }
+
+   public static Object getFieldFromGetSetMethod(Object member) {
+      if (member instanceof ParamTypedMember)
+         member = ((ParamTypedMember) member).getMemberObject();
+      if (member instanceof PropertyAssignment)
+         member = ((PropertyAssignment) member).getAssignedProperty();
+      if (member instanceof IBeanMapper)
+         return((IBeanMapper) member).getField();
+      if (member instanceof IMethodDefinition)
+         return ((IMethodDefinition) member).getFieldFromGetSetMethod();
       // TODO: handle Method here - usually it will be an IBeanMapper
       return null;
    }
@@ -3946,10 +3961,27 @@ public class ModelUtil {
 
       Object annotation = getAnnotation(assignedProperty, "sc.obj.Constant");
       if (annotation == null && !isField && !(assignedProperty instanceof PropertyAssignment)) {
-         if (!(assignedProperty instanceof IBeanMapper) && ModelUtil.isGetMethod(assignedProperty)) {
-            Object setMethod = ModelUtil.getSetMethodFromGet(assignedProperty);
-            if (setMethod != null)
-               annotation = ModelUtil.getAnnotation(setMethod, "sc.obj.Constant");
+         if (!(assignedProperty instanceof IBeanMapper)) {
+            if (ModelUtil.isGetMethod(assignedProperty)) {
+               Object setMethod = ModelUtil.getSetMethodFromGet(assignedProperty);
+               if (setMethod != null)
+                  annotation = ModelUtil.getAnnotation(setMethod, "sc.obj.Constant");
+               if (annotation == null) {
+                  Object field = ModelUtil.getFieldFromGetSetMethod(assignedProperty);
+                  if (field != null)
+                     annotation = ModelUtil.getAnnotation(field, "sc.obj.Constant");
+               }
+            }
+            else if (ModelUtil.isSetMethod(assignedProperty)) {
+               Object getMethod = ModelUtil.getGetMethodFromSet(assignedProperty);
+               if (getMethod != null)
+                  annotation = ModelUtil.getAnnotation(getMethod, "sc.obj.Constant");
+               if (annotation == null) {
+                  Object field = ModelUtil.getFieldFromGetSetMethod(assignedProperty);
+                  if (field != null)
+                     annotation = ModelUtil.getAnnotation(field, "sc.obj.Constant");
+               }
+            }
          }
       }
       if (annotation == null) {
@@ -6690,7 +6722,7 @@ public class ModelUtil {
 
    public static CoalescedHashMap getMethodCache(Object type) {
       if (type instanceof Class)
-         return RTypeUtil.getMethodCache((Class) type);
+         return RTypeUtil.getMethodCache((Class) type).methodsByName;
       else if (type instanceof CFClass)
          return ((CFClass) type).getMethodCache();
       else if (type instanceof TypeDeclaration)

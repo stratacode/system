@@ -1041,7 +1041,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                }
             }
 
-            if (member != null && ModelUtil.isConstant(member))
+            if (member != null && (ModelUtil.isConstant(member) || (boundType != member && ModelUtil.isConstant(boundType))))
                addBindable = false;
 
             // But then need to resolve it back to the most specific modified type
@@ -3737,7 +3737,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                  typeIx++;
             // Type.Type.Enum - do an IdentifierExpression for that enum.
             if (typeIx < idents.size() && idTypes[typeIx] == IdentifierType.EnumName) {
-               if (boundTypes[typeIx] instanceof Field || boundTypes[typeIx] instanceof IBeanMapper)
+               if (ModelUtil.isField(boundTypes[typeIx]))
                   srcObj = IdentifierExpression.create(ModelUtil.getRuntimeTypeName(boundTypes[0]) + "." + ModelUtil.getPropertyName(boundTypes[typeIx]));
                else
                   srcObj = IdentifierExpression.create(ModelUtil.getRuntimeTypeName(boundTypes[typeIx]));

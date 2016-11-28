@@ -1328,7 +1328,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                // Since we may have added layers, for each process see if those layers also need to go into the peer.
                if (processPeer != null) {
                   String runtimeName = processPeer.getRuntimeName();
-                  if (!isRuntimeDisabled(runtimeName) && (!active || isRuntimeActivated(runtimeName)))
+                  String processIdent = processPeer.getProcessName();
+                  if (!isRuntimeDisabled(runtimeName) && (!active || isRuntimeActivated(runtimeName) || isProcessActivated(processIdent)))
                      updateSystemLayers(processPeer);
                   continue;
                }
@@ -1791,9 +1792,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (procDef == null && existingProc == null)
             return;
          // If the existing proc is null it's a default runtime and no designated process.  If the new guy has a name and the same runtime process, just use it rather than creating a new one.
-         else if (existingProc == null && procDef.getRuntimeProcessor() == null) {
+         else if (existingProc == null && procDef.getRuntimeProcessor() == null && getProcessDefinition(procDef.getProcessName(), procDef.getRuntimeName()) == null) {
             processes.set(procIndex, procDef);
-            if (fromLayer.layeredSystem.processDefinition == null)
+            if (fromLayer != null && fromLayer.layeredSystem.processDefinition == null)
                fromLayer.layeredSystem.updateProcessDefinition(procDef);
             procInfoNeedsSave = true;
             return;
@@ -1806,7 +1807,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (existing != null) {
          int ix = processes.indexOf(existing);
          processes.set(ix, procDef);
-         if (fromLayer.layeredSystem.processDefinition == existing)
+         if (fromLayer != null && fromLayer.layeredSystem.processDefinition == existing)
             fromLayer.layeredSystem.updateProcessDefinition(procDef);
       }
       else {
@@ -1839,6 +1840,23 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return true;
    }
 
+   /** Use this to find the LayeredSystem to debug for the given runtime (or null for the 'java' runtime0 */
+   public LayeredSystem getActiveLayeredSystem(String runtimeName) {
+      if (runtimeName == null)
+         runtimeName = IRuntimeProcessor.DEFAULT_RUNTIME_NAME;
+      boolean isDefault = runtimeName.equals(IRuntimeProcessor.DEFAULT_RUNTIME_NAME);
+      if (layers.size() > 0 && ((runtimeProcessor == null && isDefault) || (runtimeProcessor != null && runtimeProcessor.getRuntimeName().equals(runtimeName))))
+         return this;
+      if (peerSystems != null) {
+         for (int i = 0; i < peerSystems.size(); i++) {
+            LayeredSystem peerSys = peerSystems.get(i);
+            if (peerSys.getRuntimeName().equals(runtimeName) && peerSys.layers.size() > 0)
+               return peerSys;
+         }
+      }
+      return null;
+   }
+
    public static IRuntimeProcessor getRuntime(String name) {
       if (runtimes == null)
          return null;
@@ -1846,6 +1864,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (proc != null) {
             String procName = proc.getRuntimeName();
             if (procName.equals(name))
+               return proc;
+         }
+      }
+      return null;
+   }
+
+   public static IProcessDefinition getProcessDefinition(String procName, String runtimeName) {
+      if (processes != null) {
+         for (IProcessDefinition proc : processes) {
+            if (proc == null && procName == null && runtimeName == null)
+               return null;
+
+            if (proc != null && StringUtil.equalStrings(procName, proc.getProcessName()) && StringUtil.equalStrings(proc.getRuntimeName(), runtimeName))
                return proc;
          }
       }
@@ -1870,8 +1901,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                error("Error - unable to restore cached definition of runtime: " + runtimeName);
                return INVALID_PROCESS_SENTINEL;
             }
-            initProcessesList(proc);
-            processes.add(proc);
+            addProcess(null, proc);
          }
          return proc;
       }
@@ -3609,6 +3639,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (layerPath != null && options.verbose)
                System.out.println("Found system property: sc.layer.path: " + layerPath);
          }
+         if (options.sysDetails) {
+            String systemHome = System.getProperty("user.dir");
+            if (systemHome != null)
+               System.out.println("  in working directory: " + systemHome);
+         }
          /*
          if (buildLayerName == null) {
             System.err.println("Missing layer name to command: " + StringUtil.argsToString(Arrays.asList(args)));
@@ -3761,11 +3796,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
 
          if (options.runClass != null) {
-            if (options.runFromBuildDir) {
-               if (options.useCommonBuildDir)
-                  System.setProperty("user.dir", sys.commonBuildDir);
-               else
-                  System.setProperty("user.dir", sys.buildDir);
+            String runFromDir = sys.getRunFromDir();
+            if (runFromDir != null) {
+               System.setProperty("user.dir", runFromDir);
             }
             // There are situations where we need to reset the class loader - i.e. we cannot use the layered class loaders
             // for a runtime application.   The problem is that some layers included Java classes at runtime look at their
@@ -10910,7 +10943,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public TypeDeclaration getSrcTypeDeclaration(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden) {
       Object res = getSrcTypeDeclaration(typeName, fromLayer, prependPackage, notHidden, true, null, false);
       if (res instanceof CFClass) {
-         System.out.println("***");
+         System.out.println("*** Warning non-source class found when expecting source");
          res = getSrcTypeDeclaration(typeName, fromLayer, prependPackage, notHidden, true, null, false);
       }
       return (TypeDeclaration) res;
@@ -14096,6 +14129,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return false;
    }
 
+   public boolean isProcessActivated(String processName) {
+      // For these other runtimes, make sure the layer which defined the runtime is included.
+      for (int i = 0; i < layers.size(); i++) {
+         Layer layer = layers.get(i);
+         if (layer.definedProcess != null && StringUtil.equalStrings(layer.definedProcess.getProcessName(), processName))
+            return true;
+      }
+      return false;
+   }
+
    public boolean isDisabled() {
       return isRuntimeDisabled(getRuntimeName());
    }
@@ -14251,6 +14294,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
          }
       }
+   }
+
+   public String getRunFromDir() {
+      if (options.runFromBuildDir) {
+         if (options.useCommonBuildDir)
+            return commonBuildDir;
+         return buildDir;
+      }
+      return null;
    }
 }
 

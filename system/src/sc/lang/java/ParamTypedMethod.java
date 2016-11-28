@@ -765,6 +765,11 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
       return ModelUtil.getSetMethodFromGet(method);
    }
 
+   @Override
+   public Object getFieldFromGetSetMethod() {
+      return ModelUtil.getFieldFromGetSetMethod(method);
+   }
+
    public boolean isGetMethod() {
       return ModelUtil.isGetMethod(method);
    }

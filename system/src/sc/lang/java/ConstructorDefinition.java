@@ -74,6 +74,10 @@ public class ConstructorDefinition extends AbstractMethodDefinition {
       return null;  //To change body of implemented methods use File | Settings | File Templates.
    }
 
+   public Object getFieldFromGetSetMethod() {
+      return null;
+   }
+
    public boolean isGetMethod() {
       return false;
    }

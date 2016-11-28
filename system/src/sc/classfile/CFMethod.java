@@ -156,6 +156,12 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
       return null;
    }
 
+   public Object getFieldFromGetSetMethod() {
+      if (isSetMethod() || isGetMethod())
+         return ModelUtil.definesMember(ownerClass, propertyName, JavaSemanticNode.MemberType.FieldSet, null, null);
+      return null;
+   }
+
    public boolean isGetMethod() {
       return propertyName != null && (name.startsWith("get") || name.startsWith("is"));
    }
@@ -228,6 +234,11 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
 
    public String toString() {
       StringBuilder sb = new StringBuilder();
+      String modifiers = modifiersToString(true, true, true, true, false, null);
+      if (modifiers != null) {
+         sb.append(modifiers);
+         sb.append(" ");
+      }
       if (typeParameters != null) {
          sb.append("<");
          boolean first = true;
@@ -264,6 +275,11 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
          }
       }
       sb.append(")");
+
+      if (ownerClass != null) {
+         sb.append(" in: ");
+         sb.append(ownerClass.getTypeName());
+      }
       return sb.toString();
    }
 

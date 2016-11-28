@@ -835,6 +835,15 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          return annot;
 
       Object superType = getDerivedTypeDeclaration();
+      // Look for an annotation layer that might be registered for this compiled class
+      if (superType != null && ModelUtil.isCompiledClass(superType)) {
+         Object srcSuperType = ModelUtil.findTypeDeclaration(getLayeredSystem(), ModelUtil.getTypeName(superType), refLayer, layerResolve);
+         if (srcSuperType != null && srcSuperType != superType) {
+            annot = ModelUtil.getInheritedAnnotation(system, srcSuperType, annotationName, skipCompiled, refLayer, layerResolve);
+            if (annot != null)
+               return annot;
+         }
+      }
       annot = ModelUtil.getInheritedAnnotation(system, superType, annotationName, skipCompiled, refLayer, layerResolve);
       if (annot != null)
          return annot;
@@ -987,7 +996,9 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       if (meths != null) {
          int sz = meths.length;
          for (int i = 0; i < sz; i++) {
-            Object meth = meths[i];
+            CFMethod meth = meths[i];
+            if (meth.isConstructor())
+               continue;
             if (modifier == null || hasModifier == ModelUtil.hasModifier(meth, modifier))
                res.add(meth);
          }

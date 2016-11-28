@@ -31,6 +31,8 @@ public interface IMethodDefinition extends IMember {
 
    Object getSetMethodFromGet();
 
+   Object getFieldFromGetSetMethod();
+
    boolean isGetMethod();
 
    boolean isSetMethod();
@@ -48,4 +50,5 @@ public interface IMethodDefinition extends IMember {
    String getThrowsClause();
 
    Object[] getMethodTypeParameters();
+
 }

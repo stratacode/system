@@ -575,6 +575,12 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       return null;
    }
 
+   public Object getFieldFromGetSetMethod() {
+      if (isSetMethod() || isGetMethod())
+         return getEnclosingType().definesMember(propertyName, MemberType.FieldSet, null, null);
+      return null;
+   }
+
    public boolean isGetMethod() {
       return propertyName != null && ((name.startsWith("get") || name.startsWith("is")) || (origName != null && (origName.startsWith("get") || origName.startsWith("is"))));
    }

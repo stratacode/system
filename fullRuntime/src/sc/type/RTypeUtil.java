@@ -17,7 +17,7 @@ public class RTypeUtil {
    static Map<Class,Field[]> fieldCache = new WeakHashMap<Class,Field[]>();
    static Map<Class,CoalescedHashMap<String,Class>> innerClassIndex = new WeakHashMap<Class,CoalescedHashMap<String,Class>>();
    static Map<Class,CoalescedHashMap<String,Enum>> enumIndex = new WeakHashMap<Class,CoalescedHashMap<String,Enum>>();
-   static Map<Class, CoalescedHashMap<String,Method[]>> methodCache = new HashMap<Class,CoalescedHashMap<String,Method[]>>();
+   static Map<Class, MethodCache> methodCache = new HashMap<Class,MethodCache>();
 
    public static boolean verboseClasses = false;
 
@@ -203,7 +203,15 @@ public class RTypeUtil {
       return result.toArray(new Class[result.size()]);
    }
 
-   static CoalescedHashMap<String,Method[]> initMethodNameCache(Class resultClass) {
+   public static class MethodCache {
+      public CoalescedHashMap<String,Method[]> methodsByName;
+      // The the complete method list for each class.  This preserves the 'native class file order' of the class,
+      // where super methods are before sub-methods unless they are overridden, in which case they occupy the same
+      // spot in the table.
+      public Method[] methodList;
+   }
+
+   static MethodCache initMethodNameCache(Class resultClass) {
       Method[] methods;
       Class superClass;
       try {
@@ -215,30 +223,39 @@ public class RTypeUtil {
          methods = new Method[0];
          superClass = null;
       }
+      MethodCache superCache = null;
       CoalescedHashMap<String,Method[]> superMethods = null, ifMethodList;
-      CoalescedHashMap<String,Method[]>[] interfaceMethods = null;
+      MethodCache[] interfaceMethods = null;
       int tableSize = methods.length;
 
       if (superClass != null) {
-         superMethods = getMethodCache(superClass);
+         superCache = getMethodCache(superClass);
+         superMethods = superCache.methodsByName;
          tableSize += superMethods.size;
       }
 
       Class[] superInterfaces = resultClass.getInterfaces();
       if (superInterfaces != null) {
-         interfaceMethods = new CoalescedHashMap[superInterfaces.length];
+         interfaceMethods = new MethodCache[superInterfaces.length];
          for (int i = 0; i < superInterfaces.length; i++) {
             Class superInt = superInterfaces[i];
             interfaceMethods[i] = getMethodCache(superInt);
-            tableSize += interfaceMethods[i].size;
+            tableSize += interfaceMethods[i].methodsByName.size;
          }
       }
 
-      CoalescedHashMap<String,Method[]> cache = new CoalescedHashMap<String,Method[]>(tableSize);
+      MethodCache methodCacheEnt = new MethodCache();
+      methodCacheEnt.methodsByName = new CoalescedHashMap<String,Method[]>(tableSize);
+      CoalescedHashMap<String,Method[]> cache = methodCacheEnt.methodsByName;
+
+      Method[] allMethodsList = null;
+
+      if (superCache != null)
+         allMethodsList = superCache.methodList;
 
       if (interfaceMethods != null) {
          for (int k = 0; k < interfaceMethods.length; k++) {
-            ifMethodList = interfaceMethods[k];
+            ifMethodList = interfaceMethods[k].methodsByName;
             Object[] keys = ifMethodList.keyTable;
             Object[] values = ifMethodList.valueTable;
             for (int i = 0; i < keys.length; i++) {
@@ -249,6 +266,7 @@ public class RTypeUtil {
                   cache.put(key, newList);
                }
             }
+            allMethodsList = mergeMethodAllLists(interfaceMethods[k].methodList, allMethodsList);
          }
       }
 
@@ -264,6 +282,8 @@ public class RTypeUtil {
             }
          }
       }
+
+      methodCacheEnt.methodList = mergeMethodAllLists(methods, allMethodsList);
 
       for (int i = 0; i < methods.length; i++) {
          Method method = methods[i];
@@ -339,8 +359,8 @@ public class RTypeUtil {
          }
       }
 
-      methodCache.put(resultClass, cache);
-      return cache;
+      methodCache.put(resultClass, methodCacheEnt);
+      return methodCacheEnt;
    }
 
    private static Method[] mergeMethodLists(Method[] subList, Method[] superList) {
@@ -374,16 +394,52 @@ public class RTypeUtil {
       return res.toArray(new Method[res.size()]);
    }
 
-   private static Method[] getInterfaceMethods(CoalescedHashMap[] interfaceMethods, String name) {
+   private static Method[] mergeMethodAllLists(Method[] subList, Method[] superList) {
+      if (superList == null)
+         return subList;
+      else if (subList == null)
+         return superList;
+
+      int superLen = superList.length;
+      int subLen = subList.length;
+      ArrayList<Method> res = new ArrayList<Method>(superLen + subLen);
+      for (int i = 0; i < superLen; i++) {
+         Method superMeth = superList[i];
+         res.add(superMeth);
+      }
+      for (int i = 0; i < subLen; i++) {
+         Method subMeth = subList[i];
+         int j;
+         for (j = 0; j < superLen; j++) {
+            if (overridesMethod(superList[j], subMeth)) {
+
+               Method newMeth = pickMoreSpecificMethod(subMeth, superList[j], null);
+               if (newMeth != res.get(j))
+                  res.set(j, newMeth);
+               break;
+            }
+         }
+         if (j == superLen)
+            res.add(subMeth);
+      }
+      return res.toArray(new Method[res.size()]);
+   }
+
+   private static Method[] getInterfaceMethods(MethodCache[] interfaceMethods, String name) {
       Method[] res = null;
-      for (CoalescedHashMap<String,Method[]> m:interfaceMethods) {
-         Method[] nextRes = m.get(name);
+      for (MethodCache mc:interfaceMethods) {
+         Method[] nextRes = mc.methodsByName.get(name);
          res = mergeMethodLists(res, nextRes);
       }
       return res;
    }
 
    public static boolean overridesMethod(Method subTypeMethod, Method superTypeMethod) {
+      String subName = subTypeMethod.getName();
+      String superName = superTypeMethod.getName();
+      if (!subName.equals(superName))
+         return false;
+
       Class[] subParamTypes = subTypeMethod.getParameterTypes();
       Class[] superParamTypes = superTypeMethod.getParameterTypes();
       int len;
@@ -398,24 +454,8 @@ public class RTypeUtil {
    }
 
    public static Method[] getMethodsWithModifier(Class cl, String modifier, boolean hasModifier) {
-      CoalescedHashMap<String,Method[]> cache = getMethodCache(cl);
-
-      Object[] keyTable = cache.keyTable;
-      Object[] valueTable = cache.valueTable;
-      int len = keyTable.length;
-      int ct = 0;
-      ArrayList<Method> result = new ArrayList<Method>(len);
-      for (int i = 0; i < len; i++) {
-         if (keyTable[i] != null) {
-            Method[] meths = (Method[]) valueTable[i];
-            for (int j = 0; j < meths.length; j++) {
-               Method m = meths[j];
-               if (modifier == null || PTypeUtil.hasModifier(m, modifier) == hasModifier)
-                  result.add(m);
-            }
-         }
-      }
-      return result.toArray(new Method[result.size()]);
+      MethodCache cache = getMethodCache(cl);
+      return cache.methodList;
    }
 
    // TODO: maybe lazily cache these?  It will get called only for a few types but those types
@@ -447,8 +487,8 @@ public class RTypeUtil {
 
    /** Returns the list of methods with the given name */
    public static Method[] getMethods(Class resultClass, String methodName) {
-      CoalescedHashMap<String,Method[]> cache = getMethodCache(resultClass);
-      return cache.get(methodName);
+      MethodCache cache = getMethodCache(resultClass);
+      return cache.methodsByName.get(methodName);
    }
 
    public static Constructor getConstructorFromTypeSignature(Class methClass, String methodSig) {
@@ -478,8 +518,8 @@ public class RTypeUtil {
    public static Method[] getMethods(Class resultClass, String methodName, String modifier) {
       if (modifier == null)
          return getMethods(resultClass, methodName);
-      CoalescedHashMap<String,Method[]> cache = getMethodCache(resultClass);
-      Method[] methods = cache.get(methodName);
+      MethodCache cache = getMethodCache(resultClass);
+      Method[] methods = cache.methodsByName.get(methodName);
       if (methods == null)
          return null;
       int ct = 0;
@@ -500,8 +540,8 @@ public class RTypeUtil {
       }
    }
 
-   public static CoalescedHashMap<String,Method[]> getMethodCache(Class resultClass) {
-      CoalescedHashMap<String,Method[]> cache = methodCache.get(resultClass);
+   public static MethodCache getMethodCache(Class resultClass) {
+      MethodCache cache = methodCache.get(resultClass);
       if (cache == null)
          cache = initMethodNameCache(resultClass);
 
@@ -598,7 +638,7 @@ public class RTypeUtil {
    }
 
    public static int getNumMethods(Class cl) {
-      return getMethodCache(cl).size;
+      return getMethodCache(cl).methodsByName.size;
    }
 
    /**

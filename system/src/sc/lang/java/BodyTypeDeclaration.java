@@ -2132,7 +2132,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
        */
       Object newBoundType = model.findTypeDeclaration(getFullTypeName(), false, true);
       if (newBoundType instanceof CFClass) {
-         System.out.println("***"); // Why are we resolving a CFClass here?
+         System.out.println("*** Error expected source-based class and found compiled"); // Why are we resolving a CFClass here?
          newBoundType = model.findTypeDeclaration(getFullTypeName(), false, true);
          newBoundType = null;
       }

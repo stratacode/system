@@ -128,6 +128,15 @@ public class LayerUtil implements LayerConstants {
          //options.add("-target");
          //options.add("1.5");
 
+         /*
+         StringBuilder cmdDebug  = new StringBuilder();
+         cmdDebug.append("javac " + options);
+         cmdDebug.append(" ");
+         cmdDebug.append(filesToCompile);
+         cmdDebug.append("\n");
+         System.out.println("\n" + cmdDebug);
+         */
+
          Iterable<? extends JavaFileObject> fileObjectsToCompile = fileManager.getJavaFileObjectsFromFiles(filesToCompile);
 
          boolean result = compiler.getTask(null, fileManager, diagnostics, options, null, fileObjectsToCompile).call();
