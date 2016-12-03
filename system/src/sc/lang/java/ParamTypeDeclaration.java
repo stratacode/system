@@ -80,6 +80,9 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
          // TODO: Need to skip to find the most specific version of the other base type which matches to ensure the type parameters match.
          // This may need to be generalized to handle compiled base types but fixes a problem with the js TreeMap when entrySet is assigned a reference to the inner class whose type params get re-mapped during the extends.
          // I feel like we need to remap the type parameters we are given in some cases as they may move around and probably can't always get around skipping them until we find the most specific extends type as done here.
+
+         /* This code below does not work because we are not mapping the parameter values that might be supplied on 'other' as we walk through the type hierarchy.
+            Below, we now call resolveTypeParameter which handles the mapping from 'baseType' to the base type of 'other' while mapping the parameters
          do {
             Object otherBaseTypeExtends = ModelUtil.getExtendsClass(otherBaseType);
             if (otherBaseTypeExtends != null && ModelUtil.isAssignableFrom(baseType, otherBaseTypeExtends, assignmentSemantics, null, getLayeredSystem()) && otherBaseTypeExtends instanceof ParamTypeDeclaration) {
@@ -89,10 +92,11 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
             else
                break;
          } while (true);
+         */
 
          for (int i = 0; i < typeParams.size(); i++) {
             Object typeParam = typeParams.get(i);
-            Object otherTypeParam = ModelUtil.resolveTypeParameter(baseType, otherBaseType, typeParam);
+            Object otherTypeParam = ModelUtil.resolveTypeParameter(baseType, otherParamType, typeParam);
             // May not be mapped to a type parameter in the base type
             if (otherTypeParam == null)
                continue;

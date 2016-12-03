@@ -2346,6 +2346,11 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                   if (!childParselet.emptyValue(ctx, slotValue))
                      return false;
                }
+               // If there are keywords that are matched at the end of the sequence, e.g. the close brace in a block statement
+               // that counts as a non-empty value.  We can't just skip all keywords because there's the case where IfStatement
+               // optionally matches 'else elseStatement'.  If elseStatement is null, there's an empty value.
+               else if (parameterMapping[i] == ParameterMapping.SKIP && i == numParselets - 1)
+                  return false;
             }
             return true;
          }

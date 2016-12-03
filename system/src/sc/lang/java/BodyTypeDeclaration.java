@@ -43,7 +43,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public transient SemanticNodeList<Statement> hiddenBody;
 
    public transient Layer layer;      // Stores the layer this type was defined in.
-   public transient BodyTypeDeclaration replacedByType;  // This type has been modified by a subsquent layer or reloaded - in either case, the replacedByType should be used for operations once it is set this is the current definition
+   public transient BodyTypeDeclaration replacedByType;  // This type has been modified by a subsequent layer or reloaded - in either case, the replacedByType should be used for operations once it is set this is the current definition
 
    /** Names of changed methods from the previous types if this type has been updated at runtime */
    public transient TreeSet<String> changedMethods;
@@ -414,6 +414,16 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (sts == null) {
          sts = new ArrayList<Statement>();
          methodsByName.put(name, sts);
+      }
+      else {
+         for (Statement oldMeth:sts) {
+            if (oldMeth == st)
+               return;
+            if (oldMeth instanceof AbstractMethodDefinition && ModelUtil.sameMethods(oldMeth, st)) {
+               oldMeth.displayError("Duplicate method: ");
+               st.displayError("Duplicate method: ");
+            }
+         }
       }
       sts.add(st);
    }
@@ -5549,6 +5559,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             }
             else if (newBodyDef instanceof TypeDeclaration) {
                TypeDeclaration newInnerType = (TypeDeclaration) newBodyDef;
+
+               if (newInnerType.typeName == null)
+                  continue;
 
                List<Object> oldDefs = tctx.oldFieldIndex.get(newInnerType.typeName);
                Object oldDef;

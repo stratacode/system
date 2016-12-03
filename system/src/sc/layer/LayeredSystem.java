@@ -10675,6 +10675,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public void addTypeByName(Layer layer, String fullTypeName, TypeDeclaration toAdd, Layer fromLayer) {
+      if (toAdd.isTransformed())
+         warning("*** Adding transformed type to type system");
       if (!layer.activated || (toAdd.getLayer() != null && !toAdd.getLayer().activated))
          warning("*** Error adding inactivated type to type system");
       addToRootNameIndex(toAdd);
@@ -14284,7 +14286,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public void updateModelInPeers(ILanguageModel model) {
       if (peerSystems != null) {
          String absFileName = model.getSrcFile().absFileName;
-         for (LayeredSystem peerSys:peerSystems) {
+         for (int i = 0; i < peerSystems.size(); i++) {
+            LayeredSystem peerSys = peerSystems.get(i);
             ILanguageModel otherModel = peerSys.inactiveModelIndex.get(absFileName);
             if (otherModel instanceof JavaModel) {
                JavaModel otherJavaModel = (JavaModel) otherModel;

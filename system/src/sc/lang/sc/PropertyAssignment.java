@@ -865,6 +865,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
    public void stop() {
       super.stop();
       assignedProperty = null;
+      starting = false;
    }
 
    /**

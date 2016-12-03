@@ -106,8 +106,14 @@ public class ClassType extends JavaType {
          return;
 
       if (chainedTypes != null)
-         for (ClassType t:chainedTypes)
-           t.chained = true;
+         for (ClassType t:chainedTypes) {
+            if (t == this) {
+               System.err.println("*** Bad ClassType!");
+               chainedTypes = null;
+               break;
+            }
+            t.chained = true;
+         }
 
       super.init();
    }
@@ -1046,9 +1052,16 @@ public class ClassType extends JavaType {
       if (typeArguments != null)
          return false;
       if (chainedTypes != null) {
-         for (ClassType chained:chainedTypes)
+         for (ClassType chained:chainedTypes) {
+            // Poorly formed ClassType
+            if (chained == this) {
+               System.err.println("*** Bad class type!");
+               chainedTypes = null;
+               return true;
+            }
             if (!chained.isCollapsibleNode())
                return false;
+         }
       }
       return true;
    }

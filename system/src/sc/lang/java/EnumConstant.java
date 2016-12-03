@@ -186,6 +186,8 @@ public class EnumConstant extends BodyTypeDeclaration {
          return this;
       TypeDeclaration enclType = getEnclosingType();
       enclType = (TypeDeclaration) enclType.refreshNode();
+      if (enclType == null)
+         return this;
       Object enumConst = enclType.definesMember(typeName, MemberType.EnumOnlySet, null, null);
       if (enumConst == null || !(enumConst instanceof EnumConstant)) {
          System.err.println("*** Unable to refresh enum constant");

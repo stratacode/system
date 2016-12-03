@@ -188,7 +188,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   Object constr = ModelUtil.declaresConstructor(getLayeredSystem(), enclType, arguments, null);
                   if (constr == null) {
                      if (model != null && !model.disableTypeErrors && isInferredFinal() && isInferredSet()) {
-                        String othersMessage = getOtherConstructorsMessage(enclType);
+                        String othersMessage = getOtherConstructorsMessage(enclType, "\n   Did you mean:\n");
                         displayTypeError("No constructor matching: ", ModelUtil.argumentsToString(arguments), othersMessage, " for: ");
                      }
                   }
@@ -211,6 +211,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             }
             else {
                Object superType = thisType.getDerivedTypeDeclaration();
+               Object extendsType = thisType.getExtendsTypeDeclaration();
 
                if (sz == 1) {
                   if (arguments == null) {
@@ -233,16 +234,30 @@ public class IdentifierExpression extends ArgumentsExpression {
                            constr = superType;
                         }
                         if (constr == null) {
-                           Object[] constructors = ModelUtil.getConstructors(superType, null);
-                           if (arguments.size() > 0 || (constructors != null && constructors.length > 0)) {
-                              if (model != null && !model.disableTypeErrors && isInferredSet() && isInferredFinal()) {
-                                 String othersMessage = getOtherConstructorsMessage(superType);
-                                 displayTypeError("No constructor matching: ", ModelUtil.argumentsToString(arguments), othersMessage, " for: ");
-                                 constr = ModelUtil.declaresConstructor(getLayeredSystem(), superType, arguments, null);
-                              }
+                           if (extendsType != superType && extendsType != null) {
+                              constr = ModelUtil.declaresConstructor(getLayeredSystem(), extendsType, arguments, null);
+                              if (constr != null)
+                                 boundTypes[0] = constr;
                            }
-                           else {
-                              boundTypes[0] = superType; // The zero arg constructor case
+                           if (constr == null) {
+                              Object[] constructors = ModelUtil.getConstructors(superType, null);
+                              if (arguments.size() > 0 || (constructors != null && constructors.length > 0)) {
+                                 if (model != null && !model.disableTypeErrors && isInferredSet() && isInferredFinal()) {
+                                    String typeMessage = superType == extendsType || extendsType == null ?
+                                                      " super type: " + ModelUtil.getTypeName(superType) :
+                                                      " modified/super types: " + ModelUtil.getTypeName(superType) + "/" + ModelUtil.getTypeName(extendsType);
+                                    String othersMessage = getOtherConstructorsMessage(superType, "\n   Did you mean:\n");
+                                    if (extendsType != superType && extendsType != null)
+                                       othersMessage += getOtherConstructorsMessage(extendsType, "\n   Or one of the super type's constructors:\n");
+                                    displayTypeError("No constructor matching: ", ModelUtil.argumentsToString(arguments), othersMessage, " for " + typeMessage + " in: ");
+                                    constr = ModelUtil.declaresConstructor(getLayeredSystem(), superType, arguments, null);
+                                    if (superType != extendsType && extendsType != null)
+                                       constr = ModelUtil.declaresConstructor(getLayeredSystem(), extendsType, arguments, null);
+                                 }
+                              }
+                              else {
+                                 boundTypes[0] = superType; // The zero arg constructor case
+                              }
                            }
                         }
                         else
@@ -1556,12 +1571,12 @@ public class IdentifierExpression extends ArgumentsExpression {
       return boundType;
    }
 
-   private static String getOtherConstructorsMessage(Object currentType) {
+   private static String getOtherConstructorsMessage(Object currentType, String prefix) {
       Object[] otherMethods = ModelUtil.getConstructors(currentType, null);
       StringBuilder otherMessage = null;
       if (otherMethods != null && otherMethods.length > 0) {
          otherMessage = new StringBuilder();
-         otherMessage.append("\n   Did you mean:\n");
+         otherMessage.append(prefix);
          for (Object otherMeth:otherMethods) {
             otherMessage.append("      ");
             otherMessage.append(ModelUtil.elementToString(otherMeth, false));
@@ -4039,9 +4054,9 @@ public class IdentifierExpression extends ArgumentsExpression {
          if (dummyIx != -1) {
             String matchPrefix = identStr.substring(0, dummyIx);
 
-            Object curType = origNode == null ? origModel.getModelTypeDeclaration() : origNode.getEnclosingType();
+            Object curType = origNode == null ? origModel == null ? null : origModel.getModelTypeDeclaration() : origNode.getEnclosingType();
             if (origNode != null && curType == null)
-               curType = origModel.getModelTypeDeclaration();
+               curType = origModel == null ? origModel.getModelTypeDeclaration() : null;
 
             if (origIdent != null && !origIdent.isStarted())
                ParseUtil.initAndStartComponent(origIdent);
@@ -4053,10 +4068,12 @@ public class IdentifierExpression extends ArgumentsExpression {
             }
 
             boolean includeGlobals = idents.size() == 1;
-            if (curType != null)
-               ModelUtil.suggestMembers(origModel, curType, matchPrefix, candidates, includeGlobals, true, true, false);
-            else if (origModel != null) {
-               ModelUtil.suggestTypes(origModel, origModel.getPackagePrefix(), matchPrefix, candidates, includeGlobals);
+            if (origModel != null) {
+               if (curType != null)
+                  ModelUtil.suggestMembers(origModel, curType, matchPrefix, candidates, includeGlobals, true, true, false);
+               else if (origModel != null) {
+                  ModelUtil.suggestTypes(origModel, origModel.getPackagePrefix(), matchPrefix, candidates, includeGlobals);
+               }
             }
 
             IBlockStatement enclBlock = getEnclosingBlockStatement();

@@ -1038,9 +1038,31 @@ public class ModelUtil {
       return ModelUtil.isVarArgs(m1) == ModelUtil.isVarArgs(m2);
    }
 
+   /*
+    * Checks if the parameters in the two methods match.  First call methodNamesMatch if you want to really compare
+    * that they are the same methods.
+    */
+   public static boolean sameMethodParameters(Object m1, Object m2) {
+      if (m1 == null)
+         return m2 == null;
+
+      if (m2 == null)
+         return false;
+
+      Object[] c1Types = ModelUtil.getParameterTypes(m1);
+      Object[] c2Types = ModelUtil.getParameterTypes(m2);
+      if (!sameParameters(c1Types, c2Types, false, null))
+         return false;
+      Object encl1Type = ModelUtil.getEnclosingType(m1);
+      Object encl2Type = ModelUtil.getEnclosingType(m2);
+      if (!ModelUtil.sameTypes(encl1Type, encl2Type))
+         return false;
+      return ModelUtil.isVarArgs(m1) == ModelUtil.isVarArgs(m2);
+   }
+
    /** Returns true for two methods which match in name and parameter signature.  Beware that it will return true for the same method in different layers (use sameMethodInLayer). */
    public static boolean sameMethods(Object m1, Object m2) {
-      return ModelUtil.methodNamesMatch(m1, m2) && ModelUtil.methodsMatch(m1, m2);
+      return ModelUtil.methodNamesMatch(m1, m2) && ModelUtil.sameMethodParameters(m1, m2);
    }
 
    /**
@@ -1060,6 +1082,29 @@ public class ModelUtil {
          }
       }
       return false;
+   }
+
+   public static boolean sameParameters(Object[] c1Types, Object[] c2Types, boolean allowUnbound, LayeredSystem sys) {
+      int c1Len = c1Types == null ? 0 : c1Types.length;
+      int checkLen = c2Types == null ? 0 : c2Types.length;
+      if (c1Len != checkLen)
+         return false;
+
+      if (c1Types != null) {
+         for (int i = 0; i < c1Types.length; i++) {
+            Object c1Arg = c1Types[i];
+            Object c2Arg = c2Types[i];
+
+            if (c1Arg == c2Arg)
+               continue;
+
+            if (sameTypes(c1Arg, c2Arg))
+               continue;
+
+            return false;
+         }
+      }
+      return true;
    }
 
    public static boolean parametersMatch(Object[] c1Types, Object[] c2Types, boolean allowUnbound, LayeredSystem sys) {
@@ -7376,8 +7421,8 @@ public class ModelUtil {
       return boundType;
    }
 
-   public static Object refreshBoundClass(LayeredSystem sys, Class boundClass) {
-      Object res = sys.getClass(boundClass.getName(), true);
+   public static Object refreshBoundClass(LayeredSystem sys, Object boundClass) {
+      Object res = sys.getClass(ModelUtil.getTypeName(boundClass), true);
       if (res != null)
          return res;
       return boundClass;

@@ -450,7 +450,7 @@ public class ModifyDeclaration extends TypeDeclaration {
             DynUtil.execLaterJobs();
             type = thisModel.customResolver.resolveType(thisModel.getPackagePrefix(), ftName, true, this);
          }
-         if (type instanceof Class) {
+         if (ModelUtil.isCompiledClass(type)) {
             modifyClass = type;
          }
          else if (type instanceof TypeDeclaration) {
@@ -1645,7 +1645,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       if (implementsBoundTypes != null) {
          for (int i = 0; i < implementsBoundTypes.length; i++) {
             Object implType = implementsBoundTypes[i];
-            if (implType instanceof Class)
+            if (ModelUtil.isCompiledClass(implType))
                implType = ModelUtil.resolveSrcTypeDeclaration(getLayeredSystem(), implType, false, false);
 
             if (implType instanceof ITypeDeclaration && ((ITypeDeclaration) implType).isAssignableTo(other))
@@ -2311,8 +2311,8 @@ public class ModifyDeclaration extends TypeDeclaration {
             m.layeredSystem.addSubType((TypeDeclaration) modifyTypeDecl, this);
 
       }
-      if (modifyClass instanceof Class && ((flags & ModelUtil.REFRESH_CLASSES) != 0)) {
-         modifyClass = ModelUtil.refreshBoundClass(getLayeredSystem(), (Class) modifyClass);
+      if (ModelUtil.isCompiledClass(modifyClass) && ((flags & ModelUtil.REFRESH_CLASSES) != 0)) {
+         modifyClass = ModelUtil.refreshBoundClass(getLayeredSystem(), modifyClass);
       }
       if (extendsTypes != null) {
          Object[] oldExtTypes = new Object[extendsTypes.size()];
@@ -2329,7 +2329,7 @@ public class ModifyDeclaration extends TypeDeclaration {
                   initExtendsTypes();
                   break;
                }
-               if (((flags & ModelUtil.REFRESH_CLASSES) != 0) && extBoundType instanceof Class) {
+               if (((flags & ModelUtil.REFRESH_CLASSES) != 0) && ModelUtil.isCompiledClass(extBoundType)) {
                   extendsBoundTypes = null;
                   initExtendsTypes();
                   break;
