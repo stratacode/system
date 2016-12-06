@@ -1276,6 +1276,23 @@ public class ModelUtil {
                if (sameTypes(c2ArgType, c2Arg))
                   return c2;
 
+               boolean c1ArgTypePrim = ModelUtil.isPrimitive(c1ArgType);
+               boolean c1ArgPrim = ModelUtil.isPrimitive(c1Arg);
+
+               boolean c2ArgTypePrim = ModelUtil.isPrimitive(c2ArgType);
+               boolean c2ArgPrim = ModelUtil.isPrimitive(c2Arg);
+
+               // Need Integer to int to take precedence over Integer long
+               if (c1ArgTypePrim && !c1ArgPrim && sameTypes(ModelUtil.wrapPrimitiveType(c1ArgType), c1Arg))
+                  return c1;
+               if (!c1ArgTypePrim && c1ArgPrim && sameTypes(ModelUtil.wrapPrimitiveType(c1Arg), c1ArgType))
+                  return c1;
+
+               if (c2ArgTypePrim && !c2ArgPrim && sameTypes(ModelUtil.wrapPrimitiveType(c2ArgType), c2Arg))
+                  return c2;
+               if (!c2ArgTypePrim && c2ArgPrim && sameTypes(ModelUtil.wrapPrimitiveType(c2Arg), c2ArgType))
+                  return c2;
+
                if (isANumber(c1ArgType)) {
                   if (ModelUtil.isInteger(c1ArgType)) {
                      boolean c1Int = ModelUtil.isAnInteger(c1Arg);
