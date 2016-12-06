@@ -1350,28 +1350,29 @@ public class ModelUtil {
       if (typeObj1 == typeObj2)
          return true;
 
-      if (isInteger(typeObj1) && isInteger(typeObj2))
+      if (isInteger(typeObj1) && isInteger(typeObj2) && isPrimitive(typeObj1) == isPrimitive(typeObj2))
          return true;
 
-      if (isLong(typeObj1) && isLong(typeObj2))
+      // For sameMethods at least, it's ok to have foo(long p) and foo(Long p) as separate methods so need to treat these cases differently here
+      if (isLong(typeObj1) && isLong(typeObj2) && isPrimitive(typeObj1) == isPrimitive(typeObj2))
          return true;
 
-      if (isShort(typeObj1) && isShort(typeObj2))
+      if (isShort(typeObj1) && isShort(typeObj2) && isPrimitive(typeObj1) == isPrimitive(typeObj2))
          return true;
 
-      if (isByte(typeObj1) && isByte(typeObj2))
+      if (isByte(typeObj1) && isByte(typeObj2) && isPrimitive(typeObj1) == isPrimitive(typeObj2))
          return true;
 
-      if (isDouble(typeObj1) && isDouble(typeObj2))
+      if (isDouble(typeObj1) && isDouble(typeObj2) && isPrimitive(typeObj1) == isPrimitive(typeObj2))
          return true;
 
-      if (isFloat(typeObj1) && isFloat(typeObj2))
+      if (isFloat(typeObj1) && isFloat(typeObj2) && isPrimitive(typeObj1) == isPrimitive(typeObj2))
          return true;
 
-      if (isBoolean(typeObj1) && isBoolean(typeObj2))
+      if (isBoolean(typeObj1) && isBoolean(typeObj2) && isPrimitive(typeObj1) == isPrimitive(typeObj2))
          return true;
 
-      if (isCharacter(typeObj1) && isCharacter(typeObj2))
+      if (isCharacter(typeObj1) && isCharacter(typeObj2) && isPrimitive(typeObj1) == isPrimitive(typeObj2))
          return true;
 
       if (typeObj1 == null || typeObj2 == null)

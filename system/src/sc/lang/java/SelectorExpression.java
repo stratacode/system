@@ -915,10 +915,6 @@ public class SelectorExpression extends ChainedExpression {
    }
 
    public Statement transformToJS() {
-      if (expression instanceof IdentifierExpression) {
-         IdentifierExpression idx = (IdentifierExpression) expression;
-      }
-
       if (idTypes[0] == IdentifierExpression.IdentifierType.ThisExpression) {
          IdentifierExpression newExpr = IdentifierExpression.create("this");
          Object refType = boundTypes[0];

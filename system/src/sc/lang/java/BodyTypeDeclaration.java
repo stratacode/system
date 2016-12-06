@@ -420,6 +420,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             if (oldMeth == st)
                return;
             if (oldMeth instanceof AbstractMethodDefinition && ModelUtil.sameMethods(oldMeth, st)) {
+               boolean dummy = ModelUtil.sameMethods(oldMeth, st);
                oldMeth.displayError("Duplicate method: ");
                st.displayError("Duplicate method: ");
             }

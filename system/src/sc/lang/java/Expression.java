@@ -465,10 +465,13 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
                CastExpression castExpr = CastExpression.create(ModelUtil.getTypeName(bd.dstPropType), bind);
                bindingExpr = castExpr;
             }
-            else {
+            else if (bd.dstPropType != null) {
                // Note: for primitives createObjectType will return a Class but we already ruled those out above
                CastExpression castExpr = CastExpression.create((JavaType) JavaType.createObjectType(bd.dstPropType), bind);
                bindingExpr = castExpr;
+            }
+            else {
+               return;
             }
          }
          else {

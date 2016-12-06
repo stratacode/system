@@ -2909,8 +2909,10 @@ public class IdentifierExpression extends ArgumentsExpression {
                else
                   se.selectors.add(addIx++, ArraySelector.create(arrSel));
             }
-            if (isAssignment)
+            if (isAssignment) {
                se.setAssignment(true);
+               setAssignment(false);
+            }
             IdentifierExpression nx = IdentifierExpression.create(idents.subList(0,i+1).toArray(new IString[1]));
             nx.setProperty("arguments", args);
             ParseUtil.stopComponent(this);
@@ -2932,8 +2934,11 @@ public class IdentifierExpression extends ArgumentsExpression {
                se.setProperty("expression", thisExpr);
             }
 
-            if (isAssignment)
-              se.setAssignment(true);
+            if (isAssignment) {
+               // This expression is no longer part of the assignment, but the selector expression is instead
+               setAssignment(false);
+               se.setAssignment(true);
+            }
 
          }
 

@@ -786,6 +786,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       ILanguageModel model = inactiveModelIndex.remove(oldSrcEnt.absFileName);
       if (model != null) {
+         if (model.getLayer() != null && model.getLayer().activated)
+            System.out.println("*** Error - renaming activated model to inactive index");
          inactiveModelIndex.put(newSrcEnt.absFileName, model);
          Layer modelLayer = model.getLayer();
          if (modelLayer != null)
@@ -9917,15 +9919,28 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       rebuild(false);
    }
 
+   private void clearBuildAllFiles() {
+      options.buildAllFiles = false;
+
+      // We may have set buildAllFiles in the layer on the first run because the BuildInfo was bad or whatever.
+      for (Layer layer:layers)
+         layer.buildAllFiles = false;
+
+      if (peerSystems != null) {
+         for (LayeredSystem peerSystem:peerSystems) {
+            for (Layer layer:peerSystem.layers)
+               layer.buildAllFiles = false;
+         }
+      }
+   }
+
    @Remote(remoteRuntimes="js")
    public void rebuild(boolean forceBuild) {
       acquireDynLock(false);
 
       // TODO: buildAllFiles does not always work so at some point we need to either fix this or turn it into buildIfAnyChanges
       if (systemCompiled) {
-         options.buildAllFiles = false;
-         if (buildLayer != null)
-            buildLayer.buildAllFiles = false;
+         clearBuildAllFiles();
       }
       buildingSystem = true;
       if (peerSystems != null && !peerMode) {
@@ -10419,6 +10434,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          modelIndex.put(absName, model);
       }
       else {
+         if (model.getLayer() != null && model.getLayer().activated)
+            System.err.println("*** Invalid attempt to add active model into inactive index");
          ILanguageModel oldModel = inactiveModelIndex.put(absName, model);
          if (oldModel != null && model instanceof JavaModel && oldModel != model) {
             if (layer != null)
@@ -11567,6 +11584,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public TypeDeclaration getInactiveTypeDeclaration(SrcEntry srcEnt) {
       ILanguageModel model;
+      if (srcEnt.layer != null && srcEnt.layer.activated)
+         System.err.println("*** Using active layer for inactive lookup!");
       // First try to find the JavaModel cached outside of the system.
       if (externalModelIndex != null) {
          // If we are loading it don't try to load it again
@@ -11575,6 +11594,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             model = externalModelIndex.lookupJavaModel(srcEnt);
             if (model != null) {
                ParseUtil.initAndStartComponent(model);
+               if (model.getLayer() != null && model.getLayer().activated)
+                  System.out.println("*** Error - renaming activated model to inactive index");
                inactiveModelIndex.put(srcEnt.absFileName, model);
             }
          }
@@ -11588,6 +11609,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // models in the local index so we avoid loading them over and over again.
          if (result instanceof ILanguageModel) {
             model = (ILanguageModel) result;
+            if (model.getLayer() != null && model.getLayer().activated)
+               System.out.println("*** Error - adding activated model to inactive index");
             inactiveModelIndex.put(srcEnt.absFileName, model);
          }
       }
@@ -13917,7 +13940,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                String nextPart = layerAndFileName.substring(0, slashIx);
                fileName = layerAndFileName.substring(slashIx+1);
                layerName = FileUtil.concat(layerName, nextPart);
-               layer = activeLayers ? getLayerByPath(layerName, true) : getActiveOrInactiveLayerByPath(layerName, null, openLayer, true, true);
+               layer = activeLayers ? getLayerByPath(layerName, true) : getInactiveLayerByPath(layerName, null, openLayer, true);
                if (layer != null) {
                   if (!activeLayers)
                      layer.markClosed(false, false);
