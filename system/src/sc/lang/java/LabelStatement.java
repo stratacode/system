@@ -34,4 +34,10 @@ public class LabelStatement extends Statement {
       if (statement != null)
          statement.addBreakpointNodes(res, srcStatement);
    }
+
+   public void addReturnStatements(List<Statement> res, boolean incThrow) {
+      if (statement != null) {
+         statement.addReturnStatements(res, incThrow);
+      }
+   }
 }
