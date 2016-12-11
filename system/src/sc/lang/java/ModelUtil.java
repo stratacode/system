@@ -1304,15 +1304,6 @@ public class ModelUtil {
                   }
                }
 
-               // TODO: This does not look right - we should pick the more specific the args in both directions here right?
-               // And only return if they are diferent.  And why do we return defaultType after the first parameter?
-               if (ModelUtil.isAssignableFrom(c1Arg, c2Arg)) {
-                  if (defaultType != c2)
-                     System.out.println("***");
-                  //return c2;
-               }
-               //else if (ModelUtil.isAssignableFrom(c2Arg, c1Arg))
-
                boolean argIsArray = ModelUtil.isArray(c1ArgType);
                if (ModelUtil.isArray(c1Arg) && !ModelUtil.isArray(c2Arg)) {
                   if (argIsArray)

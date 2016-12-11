@@ -138,7 +138,7 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
 
    /** Overridden  */
    protected void addInheritedAnnotationProcessor(IAnnotationProcessor process, String annotName) {
-      System.err.println("*** No support inherited annotations on this definition type: " + this + " for: " + annotName);
+      System.err.println("*** No support for inherited annotations on: " + this.getClass() + ": " + this + " annotation: " + annotName);
    }
 
    protected void processModifiers(List<Object> modifiers) {
