@@ -4101,6 +4101,23 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                return res;
          }
       }
+      // If we are the final build layer, we are built with all of the layers in the stack and so
+      // need to be able to recognize the path types
+      if (activated && buildLayer && this == layeredSystem.buildLayer) {
+         List<Layer> layers = layeredSystem.layers;
+         if (layerPosition != layers.size() - 1)
+            System.out.println("*** Warning - build layer is not the last layer");
+         if (layerPosition >= layers.size())
+            return null;
+         for (int i = layerPosition - 1; i >= 0; i--) {
+            Layer baseLayer = layers.get(i);
+            if (baseLayer == this)
+               continue;
+            SrcPathType res = baseLayer.getSrcPathTypeByName(pathTypeName, buildPrefix);
+            if (res != null)
+               return res;
+         }
+      }
       return null;
    }
 
