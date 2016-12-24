@@ -197,7 +197,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    /** Normalized paths relative to the layer directory that are excluded from processing */
    public List<String> excludedPaths = new ArrayList<String>(Arrays.asList(LayerConstants.DYN_BUILD_DIRECTORY, LayerConstants.BUILD_DIRECTORY, LayerConstants.SC_DIR, "out", "bin", "lib", "build-save"));
 
-   /** Set of paths to which are included in the src cache but not processed */
+   /** Set of src-file pathnames to which are included in the src cache but not processed */
    public List<String> skipStartPaths = new ArrayList<String>();
 
    /** Set of patterns to ignore in any layer src or class directory, using Java's regex language */
@@ -1247,6 +1247,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       excluded = !includeForProcess(layeredSystem.processDefinition);
       if (oldExcluded != excluded) {
          System.err.println("*** Not processing exclusion change for layer: " + this + " restart - required");
+         if (!excluded)
+            markExcluded();
          /*
          if (excluded) {
             layeredSystem.removeExcludedLayers(true);
@@ -1257,6 +1259,13 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          }
          */
       }
+   }
+
+   public void markExcluded() {
+      if (excluded)
+         return;
+      excluded = true;
+      removeFromTypeIndex();
    }
 
    public static boolean getBaseIsDynamic(List<Layer> baseLayers) {
@@ -2206,9 +2215,19 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
 
       String layerName = getLayerName();
-      if (layerName != null)
+      if (layerName != null) {
          useTypeIndex.typeIndex.put(layerName, layerTypeIndex);
+      }
       layerTypeIndex.baseLayerNames = baseLayerNames == null ? null : baseLayerNames.toArray(new String[baseLayerNames.size()]);
+   }
+
+   public void removeFromTypeIndex() {
+      SysTypeIndex sysIndex = layeredSystem.typeIndex;
+      if (sysIndex != null) {
+         LayerListTypeIndex useTypeIndex = activated ? sysIndex.activeTypeIndex : sysIndex.inactiveTypeIndex;
+         String layerName = getLayerName();
+         useTypeIndex.typeIndex.remove(layerName);
+      }
    }
 
    private String getTypeIndexFileName() {
@@ -2625,7 +2644,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                String fullTypeName = CTypeUtil.prefixPath(depProc.getPrependLayerPackage() ? packagePrefix : null, FileUtil.removeExtension(srcFile).replace(FileUtil.FILE_SEPARATOR_CHAR, '.'));
                TypeDeclaration td = (TypeDeclaration) layeredSystem.getSrcTypeDeclaration(fullTypeName, this.getNextLayer(), depProc.getPrependLayerPackage(), false, true, this, false);
                if (td != null) {
-                  ParseUtil.initAndStartComponent(td);
+                  // We always need to begin the start process at the model level
+                  JavaModel model = td.getJavaModel();
+                  ParseUtil.initAndStartComponent(model);
                } else {
                   String subPath = fullTypeName.replace(".", FileUtil.FILE_SEPARATOR);
                   SrcEntry srcEnt = getSrcFileFromTypeName(fullTypeName, true, depProc.getPrependLayerPackage(), subPath, false);
@@ -3995,8 +4016,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       saveTypeIndex();
       LayerListTypeIndex listTypeIndex = activated ? layeredSystem.typeIndex.activeTypeIndex : layeredSystem.typeIndex.inactiveTypeIndex;
       String name = getLayerName();
-      if (name != null)
+      if (name != null) {
          listTypeIndex.typeIndex.put(name, layerTypeIndex);
+      }
    }
 
    public boolean hasDefinitionForType(String typeName) {
@@ -4253,7 +4275,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
    }
 
-   void refreshBoundTypes(int flags) {
+   void refreshBoundTypes(int flags, HashSet<Layer> visited) {
+      if (visited.contains(this))
+         return;
+      visited.add(this);
       if (layerModels != null) {
          // Need to refresh all layerModels currently cached.  As we refresh them, we might add to this list so
          // we make a copy of the list upfront.
@@ -4265,12 +4290,15 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
       if (baseLayers != null) {
          for (Layer baseLayer:baseLayers) {
-            baseLayer.refreshBoundTypes(flags);
+            baseLayer.refreshBoundTypes(flags, visited);
          }
       }
    }
 
-   void flushTypeCache() {
+   void flushTypeCache(HashSet<Layer> visited) {
+      if (visited.contains(this))
+         return;
+      visited.add(this);
       if (layerModels != null) {
          for (IdentityWrapper<ILanguageModel> wrap:layerModels) {
             wrap.wrapped.flushTypeCache();
@@ -4278,7 +4306,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
       if (baseLayers != null) {
          for (Layer baseLayer:baseLayers) {
-            baseLayer.flushTypeCache();
+            baseLayer.flushTypeCache(visited);
          }
       }
    }

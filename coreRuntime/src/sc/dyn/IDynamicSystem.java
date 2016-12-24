@@ -104,8 +104,6 @@ public interface IDynamicSystem {
 
    String getInnerTypeName(Object type);
 
-   int getNumInnerObjectLevels(Object type);
-
    Object resolveRuntimeName(String name, boolean create);
 
    Object findType(String typeName);

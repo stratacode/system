@@ -21,7 +21,8 @@ public class Sequence extends NestedParselet  {
    /** If set with skipOnErrorParselet, stop skip on error parsing at this slot */
    public int skipOnErrorEndSlot = -1;
 
-   /** The minimum number of slots that should be filled before completing a partial value with this sequence. */
+   /** The minimum number of slots that should be filled before considering this parselet produces content.  Used for partial values parsing and to set the 'anyContent' flag */
+   // TODO: this probably should be combined with skipOnErrorSlot, or at least we should use that the partial values and minContentSlot for
    public int minContentSlot = 0;
 
    public Sequence() { super(); }
@@ -161,7 +162,7 @@ public class Sequence extends NestedParselet  {
                // Otherwise, it's possible we'll introduce strange ambiguities into the successfully parsed files.
                if (err != null) {
                   // Skip on error can either be set on the child or as a slot index on the parent
-                  if (childParselet.skipOnError || (skipOnErrorSlot != -1 && i >= skipOnErrorSlot)) {
+                  if ((childParselet.skipOnError && skipOnErrorSlot == -1) || (skipOnErrorSlot != -1 && i >= skipOnErrorSlot)) {
                      if (skipOnErrorParselet != null && (skipOnErrorEndSlot == -1 || i < skipOnErrorEndSlot)) {
                         int errorStart = parser.currentIndex;
 
@@ -265,7 +266,7 @@ public class Sequence extends NestedParselet  {
                         err = null; // cancel the error
                      }
                      // Always call this to try and extend the current error... also see if we can generate a new error
-                     else if (!childParselet.getLookahead() && i >= minContentSlot) {
+                     else if (!childParselet.getLookahead() && i >= minContentSlot && !disableExtendedErrors()) {
 
                         // First complete the value with any partial value from this error and nulls for everything
                         // else.
@@ -542,7 +543,7 @@ public class Sequence extends NestedParselet  {
                // Otherwise, it's possible we'll introduce strange ambiguities into the successfully parsed files.
                if (err != null) {
                   // Skip on error can either be set on the child or as a slot index on the parent
-                  if (childParselet.skipOnError || (skipOnErrorSlot != -1 && i >= skipOnErrorSlot)) {
+                  if ((childParselet.skipOnError && skipOnErrorSlot == -1) || (skipOnErrorSlot != -1 && i >= skipOnErrorSlot)) {
                      if (skipOnErrorParselet != null && (skipOnErrorEndSlot == -1 || i < skipOnErrorEndSlot)) {
                         int errorStart = parser.currentIndex;
 
@@ -2123,6 +2124,10 @@ public class Sequence extends NestedParselet  {
       }
 
       // We have no children which could produce this type so it is not a match
+      return false;
+   }
+
+   protected boolean disableExtendedErrors() {
       return false;
    }
 

@@ -712,15 +712,20 @@ public class ClassType extends JavaType {
       if (chained)
          return;
 
-      if (type != null && type != FAILED_TO_INIT_SENTINEL) {
+      if (type != FAILED_TO_INIT_SENTINEL) {
          if (type instanceof TypeDeclaration) {
             TypeDeclaration td = (TypeDeclaration) type;
             if (td.getTransformed() || (flags & ModelUtil.REFRESH_TRANSFORMED_ONLY) == 0) {
                type = ModelUtil.refreshBoundType(getLayeredSystem(), type, flags);
             }
          }
-         else if (type instanceof Class) {
+         else if (ModelUtil.isCompiledClass(type)) {
             type = ModelUtil.refreshBoundType(getLayeredSystem(), type, flags);
+         }
+         else if (type == null) {
+            ITypeDeclaration itype = getEnclosingIType();
+            if (itype != null)
+               initType(itype.getLayeredSystem(), itype, this, null, true, false, null);
          }
       }
    }

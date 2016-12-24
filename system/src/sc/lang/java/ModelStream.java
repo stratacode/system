@@ -9,6 +9,7 @@ import sc.dyn.DynUtil;
 import sc.lang.SemanticNode;
 import sc.lang.SemanticNodeList;
 import sc.lang.js.JSRuntimeProcessor;
+import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.layer.SrcEntry;
 import sc.obj.ScopeDefinition;
@@ -16,6 +17,7 @@ import sc.parser.ParseUtil;
 import sc.sync.SyncLayer;
 import sc.sync.SyncManager;
 import sc.type.CTypeUtil;
+import sc.type.PTypeUtil;
 import sc.util.StringUtil;
 
 import java.util.HashMap;
@@ -96,10 +98,9 @@ public class ModelStream extends SemanticNode implements ICustomResolver {
       }
    }
 
-   /** TODO: could relax this dependency so it only uses the class loader for basic object lookup and property setting. */
    public void setLayeredSystem(LayeredSystem sys) {
       system = sys;
-      if (sys.hasDynamicLayers())
+      if (sys != null && sys.hasDynamicLayers())
          useRuntimeResolution = false; // Need to turn off this optimization when we may have dynamic types since there are no .class files for them in general
       if (modelList != null) {
          for (JavaModel model:modelList) {
@@ -125,9 +126,10 @@ public class ModelStream extends SemanticNode implements ICustomResolver {
          if (globalType == null) {
             globalModel = new JavaModel();
             globalType = ClassDeclaration.create("class", SyncLayer.GLOBAL_TYPE_NAME, null);
+            Layer buildLayer = system == null ? null : system.buildLayer;
             globalModel.setLayeredSystem(system);
-            globalModel.setLayer(system.buildLayer);
-            globalModel.addSrcFile(new SrcEntry(system.buildLayer, SyncLayer.GLOBAL_TYPE_NAME, SyncLayer.GLOBAL_TYPE_NAME));
+            globalModel.setLayer(buildLayer);
+            globalModel.addSrcFile(new SrcEntry(buildLayer, SyncLayer.GLOBAL_TYPE_NAME, SyncLayer.GLOBAL_TYPE_NAME));
             globalType.setParentNode(globalModel);
             globalModel.addTypeDeclaration(globalType);
          }
@@ -157,11 +159,12 @@ public class ModelStream extends SemanticNode implements ICustomResolver {
             lastTypeForName.put(typeName, fromType);
          }
          String typeTypeName = DynUtil.getTypeName(type, false);
-         Object newType = system.getRuntimeTypeDeclaration(typeTypeName);
+         Object newType = system == null ? PTypeUtil.findType(typeTypeName) : system.getRuntimeTypeDeclaration(typeTypeName);
          if (newType != null)
             type = newType;
          if (type == null && currentPackage != null) {
-            newType = system.getRuntimeTypeDeclaration(CTypeUtil.prefixPath(currentPackage, typeTypeName));
+            String packageTypeName = CTypeUtil.prefixPath(currentPackage, typeTypeName);
+            newType = system == null ? PTypeUtil.findType(packageTypeName) : system.getRuntimeTypeDeclaration(packageTypeName);
             if (newType != null)
                type = newType;
          }

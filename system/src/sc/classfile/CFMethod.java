@@ -11,7 +11,7 @@ import sc.lang.java.*;
 import java.lang.reflect.Method;
 import java.util.List;
 
-/** A Method definition that is extracted directly from the class file representation */
+/** A Method definition that is extracted from the class file representation. */
 public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IMethodDefinition {
    public JavaType returnType;
    public JavaType[] parameterJavaTypes;

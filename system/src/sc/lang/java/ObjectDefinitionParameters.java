@@ -13,7 +13,7 @@ import sc.util.StringUtil;
 import java.util.*;
 
 /**
- * This class is passed to the object and new templates as speciified by the objTemplate and newTemplate fields in
+ * This class is passed to the object and new templates as specified by the objTemplate and newTemplate fields in
  * CompilerSettings.  It exposes the properties and methods these templates can use
  * for generating the code snippet to insert into the object definition.
  */

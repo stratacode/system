@@ -73,6 +73,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          }
          else
             file = new ClassFile(input, layer);
+         file.classFileName = classFileName;
          file.initialize();
          return file.getCFClass();
       }
@@ -125,6 +126,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
                else
                   file = new ClassFile(input, layer);
                file.initialize();
+               file.classFileName = zipFile.getName() + "[pathInZip=" + classPathName + "]";
                return file.getCFClass();
             }
          }

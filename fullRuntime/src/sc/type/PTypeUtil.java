@@ -895,14 +895,15 @@ public class PTypeUtil {
       throw new UnsupportedOperationException();
    }
 
-   // TODO: implemented in JS
    public static boolean isObject(Object obj) {
-      throw new UnsupportedOperationException();
+      return obj != null && isObjectType(obj.getClass());
    }
 
-   // TODO: implemented in JS
    public static boolean isObjectType(Object obj) {
-      throw new UnsupportedOperationException();
+      if (!(obj instanceof Class))
+         throw new UnsupportedOperationException();
+      Object annot = getAnnotationValue((Class) obj, "sc.obj.TypeSettings", "objectType");
+      return annot != null && annot instanceof Boolean && ((Boolean)annot);
    }
 
    public static boolean isArray(Object cl) {

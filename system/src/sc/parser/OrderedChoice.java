@@ -411,9 +411,11 @@ public class OrderedChoice extends NestedParselet  {
          if (optional) {
             // TODO: this rule will technically break the parse in some weird situations since an optional choice should return null
             // even if there's an error in which there's some semantic value present.  Adding back the "eof" test since that seems like a safer bet
+            /*
             if (parser.enablePartialValues && bestError != null && bestError.partialValue != null && bestError.eof) {
                return parsePartialErrorValue(parser, bestError, lastMatchStart, bestErrorSlotIx);
             }
+            */
             parser.changeCurrentIndex(startIndex);
 
             // If we are a repeat optional choice with mappings of '' and we match no elements, we should return an empty string, not null.

@@ -300,8 +300,11 @@ public class TestUtil {
          Language.registerLanguage(JavaLanguage.INSTANCE, "java");
          Language.registerLanguage(JavaLanguage.INSTANCE, "scj");
          Language.registerLanguage(SCLanguage.INSTANCE, "sc");
-         // This one is just for templates we process from Java code, i.e. as part of framework definitions.
-         Language.registerLanguage(TemplateLanguage.INSTANCE, "sctd");
+         TemplateLanguage objDefTemplateLang = new TemplateLanguage();
+         objDefTemplateLang.compiledTemplate = false;
+         objDefTemplateLang.defaultExtendsType = "sc.lang.java.ObjectDefinitionParameters";
+         // This one is for object definition templates we process from Java code, i.e. as part of framework definitions from CompilerSettings, newTemplate, and objTemplate
+         Language.registerLanguage(objDefTemplateLang, "sctd");
          // This is a real template, treated as a regular type in the system, either dynamic or compiled
          Language.registerLanguage(TemplateLanguage.INSTANCE, "sct");
          Language.registerLanguage(JSLanguage.INSTANCE, "js");
@@ -487,6 +490,8 @@ public class TestUtil {
                SCLanguage.getSCLanguage().identifierExpression.trace = true;
                SCLanguage.getSCLanguage().selectorExpression.trace = true;
                */
+
+               //JavaLanguage.getJavaLanguage().switchStatement.trace = true;
 
                result = lang.parse(fileName, new StringReader(input), lang.getStartParselet(), opts.enablePartialValues);
             }

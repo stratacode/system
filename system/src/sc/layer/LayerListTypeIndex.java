@@ -36,6 +36,8 @@ public class LayerListTypeIndex {
       this.layersList = layers;
       this.typeIndex = new LinkedHashMap<String, LayerTypeIndex>();
       this.typeIndexIdent = typeIndexIdent;
+      if (this.orderIndex == null)
+         this.orderIndex = new LayerOrderIndex();
    }
 
    public void clearReverseTypeIndex() {

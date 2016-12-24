@@ -395,6 +395,10 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    }
 
    public SemanticTokenChoice binaryOperators = new SemanticTokenChoice(TypeUtil.binaryOperators);
+   {
+      // TODO: add this?  it might help partial match efficiency: don't match the assignment operators which start with a binary operator character.
+      //binaryOperators.addExcludedValues("+=", "-=", "*=", "/=", "%=", "^=", "|=", "&=");
+   }
 
    public SymbolChoiceSpace assignmentOperator = new SemanticTokenChoice("=", "+=", "-=", "*=", "/=", "%=", "^=", "|=", "&=",
                                                            "<<=", ">>=", ">>>=");
@@ -440,7 +444,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       lambdaExpression.minContentSlot = 1;
    }
 
-   Sequence assignment = new Sequence("AssignmentExpression(operator, rhs)", OPTIONAL, assignmentOperator, expression);
+   public Sequence assignment = new Sequence("AssignmentExpression(operator, rhs)", OPTIONAL, assignmentOperator, expression);
 
    {
       assignmentExpression.set(conditionalExpression, assignment);
@@ -623,8 +627,8 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       statement.put("assert", assertStatement);
       statement.put(";", semicolonEOL);
 
-      // Default rules in case the indexed ones do not match
-      statement.addDefault(exprStatement, labelStatement);
+      // Default rules in case the indexed ones do not match - labelStatement needs to be in front for the partial values mode, otherwise an identifier: will match as identifier skipping the missed ;
+      statement.addDefault(labelStatement, exprStatement);
 
       localVariableDeclaration.set(variableModifiers, type, variableDeclarators);
 

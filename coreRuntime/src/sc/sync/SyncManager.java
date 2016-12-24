@@ -1164,9 +1164,13 @@ public class SyncManager {
       }
 
       /**
-       * This method lets you initialize a given property for synchronization on either the client or the server.
-       * For the server, it adds that property to the synchronized set.  For the client, it initiates a "fetchProperty"
-       * operator to get that property in the next sync.
+       * This method lets you start the synchronization of an on-demand property, marked with @Sync(onDemand=true).
+       * It can be called for either the client, the server, or both.  It's low cost to call it anytime you realize you
+       * need to start synchronizing a property, like when a tree-node is opened.
+       *
+       * For the server, it adds that property to the synchronized set, so it's value is pushed to the client on the
+       * next sync.  For the client, it initiates a "fetchProperty" operation.  The property will be set in processing
+       * the results of the next sync.
        */
       public void startSync(Object inst, String propName) {
          SyncProperties syncProps = getSyncPropertiesForInst(inst);

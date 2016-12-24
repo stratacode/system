@@ -28,11 +28,11 @@ public class SysTypeIndex {
    }
 
    public void buildReverseTypeIndex(LayeredSystem sys) {
-      if (inactiveTypeIndex.orderIndex == null || (sys != null && sys.options.typeIndexMode == TypeIndexMode.Rebuild)) {
-         LayerOrderIndex loi = new LayerOrderIndex();
-         if (sys != null)
+      if (sys != null) {
+         if (sys.options.typeIndexMode == TypeIndexMode.Rebuild) {
+            LayerOrderIndex loi = inactiveTypeIndex.orderIndex;
             loi.refreshAll(sys, true);
-         inactiveTypeIndex.orderIndex = loi;
+         }
       }
 
       // TODO: not using the activeTypeIndex now... maybe just remove it?  We have this same info maintained in separate apis stored on the layered system.
@@ -210,33 +210,29 @@ public class SysTypeIndex {
    }
 
    public void addDisabledLayer(String layerName) {
-      if (inactiveTypeIndex != null && inactiveTypeIndex.orderIndex != null)
+      if (inactiveTypeIndex != null)
          inactiveTypeIndex.orderIndex.disabledLayers.add(layerName);
-      else
-         System.err.println("*** Order index not yet enabled!");
    }
 
    public void addExcludedLayer(String layerName) {
-      if (inactiveTypeIndex != null && inactiveTypeIndex.orderIndex != null)
+      if (inactiveTypeIndex != null)
          inactiveTypeIndex.orderIndex.excludedLayers.add(layerName);
-      else
-         System.err.println("*** Order index not yet enabled!");
    }
 
    public void removeExcludedLayer(String layerName) {
-      if (inactiveTypeIndex != null && inactiveTypeIndex.orderIndex != null)
+      if (inactiveTypeIndex != null)
          inactiveTypeIndex.orderIndex.removeExcludedLayer(layerName);
    }
 
    public void refreshLayerOrder(LayeredSystem sys) {
-      if (inactiveTypeIndex != null && inactiveTypeIndex.orderIndex != null) {
+      if (inactiveTypeIndex != null) {
          if (inactiveTypeIndex.orderIndex.refreshAll(sys, false))
             needsSave = true;
       }
    }
 
    public boolean excludesLayer(String layerName) {
-      if (inactiveTypeIndex != null && inactiveTypeIndex.orderIndex != null)
+      if (inactiveTypeIndex != null)
          return inactiveTypeIndex.orderIndex.excludesLayer(layerName);
       return false;
    }

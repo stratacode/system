@@ -104,6 +104,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    /** Set so we can keep do incremental refreshes */
    public transient long lastModifiedTime = 0;
 
+   /** Set to the timestamp of the time the model was last started */
+   public transient long lastStartedTime = -1;
+
    public transient JavaModel modifiedModel = null;
 
    /** If you want to parse and start a model but insert your own name resolver which runs before the normal system's type look, set this property. */
@@ -309,6 +312,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    public void start() {
       if (started) return;
 
+      if (layeredSystem != null)
+         lastStartedTime = layeredSystem.lastRefreshTime;
+
       PerfMon.start("startJavaModel");
 
       // The layer model can't do this until the layer is started and its class path is set up.
@@ -478,6 +484,36 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          }
       }
       typeInfoInited = true;
+
+
+      // For inactive types, when starting the model we need to make sure we've started the most specific type in the model
+      // so we don't rely on stale data.  We check by getting the current model type if it's in a layer after this one
+      // we need to start it.
+      if (layer != null && !layer.activated && !isLayerModel) {
+         TypeDeclaration layerType = getLayerTypeDeclaration();
+         if (layerType != null) {
+            String modelTypeName = layerType.getFullTypeName();
+            System.out.println("*** Starting inactive model: " + modelTypeName + " in layer: " + layerType.getLayer());
+            if (modelTypeName != null) {
+               TypeDeclaration modelType = (TypeDeclaration) layeredSystem.getSrcTypeDeclaration(modelTypeName, null, prependLayerPackage, false, true, layer, isLayerModel);
+               if (modelType != null && modelType.getLayer() != null && layerType.getLayer() != null) {
+                  if (modelType.getLayer().layerPosition > layerType.getLayer().layerPosition) {
+                     JavaModel modelTypeModel = modelType.getJavaModel();
+                     if (modelTypeModel == this)
+                        System.err.println("*** error in model type");
+                     else {
+                        if (!modelTypeModel.isStarted() && !typeInfoInited) {
+                           System.out.println("*** Starting modified type: " + modelTypeName + " for layer: " + modelType.getLayer() + " from: " + layerType.getLayer());
+                           ParseUtil.realInitAndStartComponent(modelTypeModel);
+                        }
+                        else
+                           System.out.println("*** Modified type already started: " + modelTypeName + " for layer: " + modelType.getLayer() + " from: " + layerType.getLayer());
+                     }
+                  }
+               }
+            }
+         }
+      }
    }
 
    public String getImportedName(String name) {
@@ -1272,8 +1308,12 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    /** Hook to reinitiaze any state after one of your base types gets modified after this type has been processed. */
-   public void dependenciesChanged() {
-      // TODO: should this call reinitialize?  If one of your exstends types has changed, do you need to go back and restart this component?
+   public boolean dependenciesChanged() {
+      if (isStarted() && layeredSystem != null && layeredSystem.lastRefreshTime != lastStartedTime) {
+         reinitialize();
+         return true;
+      }
+      return false;
    }
 
    public void reinitialize() {
@@ -1285,6 +1325,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          processed = false;
          hasErrors = false;
          initPackage = false;
+         clearTransformed();
 
          ParseUtil.initAndStartComponent(this);
       }

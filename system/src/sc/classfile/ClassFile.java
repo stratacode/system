@@ -59,6 +59,8 @@ public class ClassFile {
    InnerClasses theInnerClasses;
    int innerAccessFlags; // Access flags that are stored in theInnerClasses attribute for this class (e.g. 'static')
 
+   public String classFileName;
+
    public ClassFile(InputStream is) {
       input = new DataInputStream(new BufferedInputStream(is));
    }
@@ -842,9 +844,16 @@ public class ClassFile {
       try {
          ClassFile file = new ClassFile(new FileInputStream(new File(args[0])));
          file.initialize();
+         file.classFileName = args[0];
       }
       catch (IOException exc) {
          System.out.println("**** Can't open file: " + exc);
       }
+   }
+
+   public String toString() {
+      if (classFileName != null)
+         return classFileName;
+      return super.toString();
    }
 }

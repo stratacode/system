@@ -70,7 +70,6 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
 
    private transient Object modifyType;
 
-
    private transient TreeMap<String,Element[]> childrenById = null;
 
    private transient boolean startTagValid = false, bodyValid = false;
@@ -1249,6 +1248,11 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
 
          Layer tagPackageLayer = tagPackage.layer;
 
+         // Right now, we add to this tagPackageList for both activated and inactive layers.  So make sure that this reference lines up
+         // with the right one
+         if (tagPackageLayer != null && modelLayer != null && tagPackageLayer.activated != modelLayer.activated)
+            continue;
+
          // Only match against tag packages which we directly extend
          if (tagPackageLayer == null || modelLayer == null || modelLayer.extendsLayer(tagPackageLayer) || modelLayer == tagPackageLayer) {
             String tagName = lowerTagName();
@@ -1262,8 +1266,13 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
             if (templ != null && typeName.equals(templ.getModelTypeName()))
                continue;
             // When we are compiling, need to pick up the src type declaration here so that we can get at the corresponding element to inherit tags.
-            Object res = sys == null ? null : sys.getTypeDeclaration(typeName, true, model == null ? null : model.layer, model != null && model.isLayerModel);
+            Object res = sys == null ? null : sys.getTypeDeclaration(typeName, true, modelLayer, model != null && model.isLayerModel);
             if (res != null && (!processable || ModelUtil.isProcessableType(res))) {
+               if (res instanceof TypeDeclaration) {
+                  TypeDeclaration resTD = (TypeDeclaration) res;
+                  if (modelLayer == null || resTD.getLayer() == null || (resTD.getLayer() != null && resTD.getLayer().activated != modelLayer.activated))
+                     System.out.println("*** Activated layer mismatch");
+               }
                defaultExtendsType = res;
                if (sys.options.verbose) {
                   if (verboseBaseTypeNames == null)
@@ -2087,10 +2096,21 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       JavaModel javaModel = getJavaModel();
       Layer tagLayer = javaModel.getLayer();
 
-      if (extTypeDecl instanceof Class) {
+      if (ModelUtil.isCompiledClass(extTypeDecl)) {
          Object newExtTypeDecl = ModelUtil.resolveSrcTypeDeclaration(javaModel.getLayeredSystem(), extTypeDecl);
          if (newExtTypeDecl instanceof BodyTypeDeclaration)
             extTypeDecl = newExtTypeDecl;
+      }
+
+      if (existing != null && ModelUtil.isCompiledClass(existing)) {
+         Object newExisting = ModelUtil.resolveSrcTypeDeclaration(javaModel.getLayeredSystem(), existing);
+         if (newExisting instanceof BodyTypeDeclaration) {
+            existing = newExisting;
+            if (ModelUtil.isCompiledClass(existing)) {
+               displayWarning("Ignoring compiled class as previous type for tag: " + tagName + " in: ");
+               existing = null;
+            }
+         }
       }
 
       boolean remoteContent = isRemoteContent();
@@ -3566,6 +3586,11 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
    /** This method has to be here so we properly remap JS references to here instead of SemanticNode.stop which does not exist in the JS runtime */
    public void stop() {
       super.stop();
+      defaultExtendsType = null;
+      cachedObjectName = null;
+      childrenById = null;
+      tagObject = null;
+      hiddenChildren = null;
    }
 
    public TypeDeclaration getElementTypeDeclaration() {

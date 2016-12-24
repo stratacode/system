@@ -736,11 +736,13 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
                   Expression declExpr = (Expression) decl;
                   if (staticContentOnly || inactive)
                      ((Expression) decl).errorArgs = new Object[0]; // e.g. for serverContent sections when generating the client class - we are not processing those elements in this runtime
+                  /* We can't get the type until starting the expression and this happens during init
                   else {
                      Object exprType = declExpr.getGenericType();
                      if (exprType != null && ModelUtil.typeIsVoid(exprType))
                         declExpr.displayError("Void types not allowed in a template expression: ");
                   }
+                  */
                }
             }
          }
@@ -748,8 +750,21 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
    }
 
    public void start() {
-      if (started)
+      if (started || beingInitialized)
          return;
+
+      if (templateDeclarations != null) {
+         int ct = 0;
+         for (int i = 0; i < templateDeclarations.size(); i++) {
+            Object decl = templateDeclarations.get(i);
+            if (decl instanceof Expression) {
+               Expression declExpr = (Expression) decl;
+               Object exprType = declExpr.getGenericType();
+               if (exprType != null && ModelUtil.typeIsVoid(exprType))
+                  declExpr.displayError("Void types not allowed in a template expression: ");
+            }
+         }
+      }
 
       if (defaultExtendsTypeName != null && defaultExtendsType == null) {
          defaultExtendsType = findTypeDeclaration(defaultExtendsTypeName, true, false);
@@ -783,6 +798,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
          TypeDeclaration rootTypeDecl = (TypeDeclaration) rootType;
          rootTypeDecl.start();
       }
+
 
       super.start();
    }
@@ -1534,8 +1550,8 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
    }
 
    /** Hook to reinitiaze any state after one of your base types gets modified after this type has been processed. */
-   public void dependenciesChanged() {
-      if (initializedInLayer != null && rootType != null && rootType instanceof TypeDeclaration) {
+   public boolean dependenciesChanged() {
+      if (super.dependenciesChanged() && (initializedInLayer != null && rootType != null && rootType instanceof TypeDeclaration)) {
          TypeDeclaration td = (TypeDeclaration) rootType;
          if (td.changedSinceLayer(initializedInLayer, false, null, null)) {
 
@@ -1553,8 +1569,11 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
             srcLayer.layeredSystem.addTypesByName(srcLayer, getPackagePrefix(), getDefinedTypes(), srcLayer.getNextLayer());
 
             clearTransformed();
+
+            return true;
          }
       }
+      return false;
    }
 
    public boolean isLayerType() {

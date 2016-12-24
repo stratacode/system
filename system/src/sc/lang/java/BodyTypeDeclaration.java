@@ -2106,7 +2106,6 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             return this;
          return replacedByType.refreshBoundType(boundType);
       }
-      JavaModel model = getJavaModel();
       /*
       Layer layer = model.getLayer();
 
@@ -2137,23 +2136,29 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return newBoundType;
       }
       */
-      /**
-       * This method will return the most specific type after the refresh.  It should not be used for
-       * modify types or super.x constructs which both will need to get a modified type
-       */
-      Object newBoundType = model.findTypeDeclaration(getFullTypeName(), false, true);
+      LayeredSystem sys = getLayeredSystem();
+      JavaModel model = getJavaModel();
+      // Special handling for classes defined in the same file that are not inner classes - those are only visible from the model itself
+      // so first need to refresh the model, then we can find the type in the new model.
+      if (getEnclosingType() == null && model.types != null && model.types.size() > 1 && this != model.types.get(0) && !isLayerType) {
+         Object newModelType = sys.getTypeDeclaration(model.getModelTypeName(), true, getLayer(), false);
+         if (newModelType instanceof BodyTypeDeclaration) {
+            JavaModel newModel = ((BodyTypeDeclaration) newModelType).getJavaModel();
+            Object newBoundType = newModel.getTypeDeclaration(typeName);
+            if (newBoundType != null)
+               return newBoundType;
+         }
+      }
+      // TODO: we are not passing in fromLayer here because this method is used by methods and other types to retrieve the most specific type.  I think we might need
+      // a mode flag in here so we can call it both ways as when we are refreshing a modified type, we need to get back the one in the same layer that we started with.
+      Object newBoundType = sys.getSrcTypeDeclaration(getFullTypeName(), null, model.getPrependPackage(), false, true, getLayer(), isLayerType);
+      if (newBoundType == null) {
+         System.err.println("*** Can't find post compiled type for: " + getFullTypeName());
+         newBoundType = sys.getSrcTypeDeclaration(getFullTypeName(), getLayer().getNextLayer(), model.getPrependPackage(), false, true, getLayer(), isLayerType);
+      }
       if (newBoundType instanceof CFClass) {
          System.out.println("*** Error expected source-based class and found compiled"); // Why are we resolving a CFClass here?
-         newBoundType = model.findTypeDeclaration(getFullTypeName(), false, true);
-         newBoundType = null;
-      }
-      if (newBoundType == null) {
-         newBoundType = model.getTypeDeclaration(typeName);
-         if (newBoundType == null) {
-            System.err.println("*** Can't find post compiled type for: " + getFullTypeName());
-            boundType = model.findTypeDeclaration(getFullTypeName(), false); // TODO: debug only
-            return boundType;
-         }
+         newBoundType = sys.getTypeDeclaration(getFullTypeName(), true, getLayer(), isLayerType);
       }
       return newBoundType;
    }

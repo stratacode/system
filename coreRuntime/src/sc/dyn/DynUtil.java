@@ -73,18 +73,33 @@ public class DynUtil {
 
    public static int getNumInnerTypeLevels(Object obj) {
       if (dynamicSystem == null) {
-         throw new IllegalArgumentException("Unable to determine object structure with no dynamic system");
+         if (!(obj instanceof Class))
+            throw new UnsupportedOperationException();
+         Class cl = (Class) obj;
+         int ct = 0;
+         do {
+            Class encl = cl.getEnclosingClass();
+            if (encl == null || hasModifier(cl, "static")) {
+               break;
+            }
+            ct++;
+            cl = encl;
+         } while (true);
+         return ct;
       }
       else
          return dynamicSystem.getNumInnerTypeLevels(obj);
    }
 
+   /** Walks up the object hierarchy until we hit a class or go off the top. */
    public static int getNumInnerObjectLevels(Object obj) {
-      if (dynamicSystem == null) {
-         throw new IllegalArgumentException("Unable to determine object structure with no dynamic system");
+      //if (!objectNameIndex.containsKey(obj))
+      //   return 0; // Not an outer object
+      Object outer = DynUtil.getOuterObject(obj);
+      if (outer == null) {
+         return 0; // Top level object - also not an inner object
       }
-      else
-         return dynamicSystem.getNumInnerObjectLevels(obj);
+      return 1 + getNumInnerObjectLevels(outer);
    }
 
    public static String getInnerTypeName(Object type) {

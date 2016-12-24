@@ -371,8 +371,9 @@ public class ModifyDeclaration extends TypeDeclaration {
          Object extType = extendsBoundTypes[0];
          if (extType != null && modifyTypeDecl instanceof TypeDeclaration) {
             TypeDeclaration baseTypeDecl = (TypeDeclaration) modifyTypeDecl;
-            Object modifyType = baseTypeDecl.getExtendsTypeDeclaration();
-            if (modifyType != null && !ModelUtil.isAssignableFrom(modifyType, extType)) {
+            Object modifyExtendsType = baseTypeDecl.getExtendsTypeDeclaration();
+            // TODO: should we also allow you to extend a sub-class that's already implemented by the type you modify? - i.e. include an && !isAssignableFrom test the other way?
+            if (modifyExtendsType != null && !ModelUtil.isAssignableFrom(modifyExtendsType, extType)) {
                Layer thisLayer = getLayer();
                Layer modLayer = baseTypeDecl.getLayer();
                // For inactivated layers, we need to allow this since it's ok to have lots of layers with different implementations until you run them, but if our layer directly extends
@@ -383,7 +384,7 @@ public class ModifyDeclaration extends TypeDeclaration {
                   if (extendsTypes != null && extendsTypes.size() > 0)
                      node = extendsTypes.get(0);
                   // Is this an error or a warning?  We let you replace the class and break the contract - should we let you replace the extends type?   or should this be a strict option on the layer?
-                  node.displayTypeError("Modify extends incompatible type - ", ModelUtil.getClassName(extType), " should extend existing extends: ", ModelUtil.getClassName(modifyType), " for: ");
+                  node.displayTypeError("Modify extends incompatible type - ", ModelUtil.getClassName(extType), " should extend existing extends: ", ModelUtil.getClassName(modifyExtendsType), " for: ");
                }
             }
          }
