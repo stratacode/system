@@ -2154,6 +2154,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       Object newBoundType = sys.getSrcTypeDeclaration(getFullTypeName(), null, model.getPrependPackage(), false, true, getLayer(), isLayerType);
       if (newBoundType == null) {
          System.err.println("*** Can't find post compiled type for: " + getFullTypeName());
+         newBoundType = sys.getSrcTypeDeclaration(getFullTypeName(), null, model.getPrependPackage(), false, true, getLayer(), isLayerType);
          newBoundType = sys.getSrcTypeDeclaration(getFullTypeName(), getLayer().getNextLayer(), model.getPrependPackage(), false, true, getLayer(), isLayerType);
       }
       if (newBoundType instanceof CFClass) {
@@ -8997,6 +8998,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       fullTypeName = null;
       if (replacedByType != null)
          replacedByType.clearCachedMemberInfo();
+      transformedType = null;
       // Can't clear this out because it's set from the other type - it won't be reset on a restart
       //if (!replaced)
       //   replacedByType = null;

@@ -302,6 +302,7 @@ public class TestUtil {
          Language.registerLanguage(SCLanguage.INSTANCE, "sc");
          TemplateLanguage objDefTemplateLang = new TemplateLanguage();
          objDefTemplateLang.compiledTemplate = false;
+         objDefTemplateLang.runtimeTemplate = true;
          objDefTemplateLang.defaultExtendsType = "sc.lang.java.ObjectDefinitionParameters";
          // This one is for object definition templates we process from Java code, i.e. as part of framework definitions from CompilerSettings, newTemplate, and objTemplate
          Language.registerLanguage(objDefTemplateLang, "sctd");

@@ -201,7 +201,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    public List<String> skipStartPaths = new ArrayList<String>();
 
    /** Set of patterns to ignore in any layer src or class directory, using Java's regex language */
-   public List<String> skipStartFiles = new ArrayList<String>(Arrays.asList(".*.sctd"));
+   public List<String> skipStartFiles; // = new ArrayList<String>(Arrays.asList(".*.sctd"));  TODO: Remove all of the skipStart stuff - pretty sure it's not used anymore
 
    private List<Pattern> skipStartPatterns; // Computed from the above
 
@@ -3125,7 +3125,6 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          }
          refreshDir(srcDir, relDir, lastRefreshTime, ctx, changedModels, updateInfo);
       }
-      lastRefreshTime = System.currentTimeMillis();
    }
 
    public static class ModelUpdate {
@@ -4337,6 +4336,12 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    boolean cacheForRefLayer() {
       return this != Layer.ANY_LAYER && this != Layer.ANY_INACTIVE_LAYER && this != Layer.ANY_OPEN_INACTIVE_LAYER && this.activated;
+   }
+
+   public void addTypeGroupDependency(String relFileName, String typeName, String typeGroupName) {
+      if (activated) {
+         layeredSystem.addTypeGroupDependency(this, relFileName, typeName, typeGroupName);
+      }
    }
 
 }

@@ -45,6 +45,8 @@ public class NewExpression extends IdentifierExpression {
 
    private boolean anonTypeInited = false;
 
+   private int anonId = -1;
+
    public static NewExpression create(String identifier, SemanticNodeList<Expression> args) {
       NewExpression newExpr = new NewExpression();
       // this is not used... oops
@@ -101,8 +103,12 @@ public class NewExpression extends IdentifierExpression {
       starting = true;
 
       JavaModel model = getJavaModel();
-      if (model == null || typeIdentifier == null)
+      if (model == null || typeIdentifier == null) {
+         if (model == null)
+            System.err.println("*** No model when starting new expression");
+         super.start();
          return;
+      }
 
       // Need to define our type before our body so it can be used by statements in the body
       boundType = findType(typeIdentifier);
@@ -506,8 +512,6 @@ public class NewExpression extends IdentifierExpression {
             return arrayInitializer.eval(expectedType, ctx);
       }
    }
-
-   private int anonId = -1;
 
    public ClassDeclaration getAnonymousType(boolean xform) {
       if (anonType == null) {
@@ -1000,5 +1004,18 @@ public class NewExpression extends IdentifierExpression {
             st.addBreakpointNodes(res, srcStatement);
          }
       }
+   }
+
+   public void stop() {
+      super.stop();
+
+      boundType = null;
+      classPropertyName = null;
+      boundTypeName = null;
+      anonType = null;
+      anonTypeTransformed = null;
+      anonTypeInited = false;
+      anonId = -1;
+      constructor = null;
    }
 }

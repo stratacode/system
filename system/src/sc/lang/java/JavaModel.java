@@ -107,12 +107,15 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    /** Set to the timestamp of the time the model was last started */
    public transient long lastStartedTime = -1;
 
+   /** Set to true during the build process if this model needs to stopped when it's reinitialized */
+   public transient boolean needsRestart = false;
+
    public transient JavaModel modifiedModel = null;
 
    /** If you want to parse and start a model but insert your own name resolver which runs before the normal system's type look, set this property. */
    public transient ICustomResolver customResolver = null;
 
-   private transient boolean initPackage = false;
+   protected transient boolean initPackage = false;
 
    // Set this to false for sync-layers and update-layers, i.e. which do not merge when they are transformed.
    public transient boolean mergeDeclaration = true;
@@ -313,7 +316,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (started) return;
 
       if (layeredSystem != null)
-         lastStartedTime = layeredSystem.lastRefreshTime;
+         lastStartedTime = layeredSystem.lastChangedModelTime;
 
       PerfMon.start("startJavaModel");
 
@@ -484,7 +487,6 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          }
       }
       typeInfoInited = true;
-
 
       // For inactive types, when starting the model we need to make sure we've started the most specific type in the model
       // so we don't rely on stale data.  We check by getting the current model type if it's in a layer after this one
@@ -1309,15 +1311,24 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    /** Hook to reinitiaze any state after one of your base types gets modified after this type has been processed. */
    public boolean dependenciesChanged() {
-      if (isStarted() && layeredSystem != null && layeredSystem.lastRefreshTime != lastStartedTime) {
+      if (!isInitialized()) {
+         ParseUtil.initComponent(this);
+         return true;
+      }
+      /*
+      if (isStarted() && layeredSystem != null && (layeredSystem.lastChangedModelTime != lastStartedTime || needsRestart)) {
          reinitialize();
          return true;
       }
+      */
       return false;
    }
 
    public void reinitialize() {
       if (started) {
+         if (layeredSystem != null && layeredSystem.options.verbose && getSrcFile() != null)
+            layeredSystem.verbose("Reinitializing: " + getSrcFile());
+
          stop();
          initialized = false;
          started = false;
@@ -1327,7 +1338,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          initPackage = false;
          clearTransformed();
 
-         ParseUtil.initAndStartComponent(this);
+         ParseUtil.initComponent(this);
       }
    }
 
@@ -2637,6 +2648,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (staticImportMethods != null)
          staticImportMethods = null;
       definedTypesByName.clear();
+      needsRestart = false;
+      clearTransformed();
    }
 
    @Bindable(manual=true)

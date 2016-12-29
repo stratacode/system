@@ -174,7 +174,7 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
    public boolean evalToString = false;
 
    /**
-    * Two types of templates: those evaluated during the build procesds to generate the source and
+    * Two types of templates: those evaluated during the build process to generate the source and
     * those which are compiled into Java files and compiled into the system as objects.
     */
    public boolean compiledTemplate = false;
@@ -205,6 +205,9 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
 
    /** Should we treat this file format as something we run through the template process - i.e. evaluate the template and store it in a file using the result suffix */
    public boolean processTemplate = false;
+
+   /** Is this a template that's only evaluated explicitly by Java code (usually to generate a snippet of code) - e.g. the objectTemplate in CompilerSettings */
+   public boolean runtimeTemplate = false;
 
    /** The HTML language disables processing of types which do not have URL or MainInit */
    public boolean processOnlyURLs = false;
@@ -287,6 +290,11 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
 
       public boolean needsCompile() {
          return compiledTemplate;
+      }
+
+      @Override
+      public boolean isRuntimeTemplate() {
+         return runtimeTemplate;
       }
 
       /**

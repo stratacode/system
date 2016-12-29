@@ -1995,9 +1995,20 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       if (depType instanceof BodyTypeDeclaration)
          depType = ((BodyTypeDeclaration) depType).resolve(false);
 
-      ParseUtil.realInitAndStartComponent(depType);
+      initAndStartType(depType);
 
       return depType;
+   }
+
+   private void initAndStartType(Object depType) {
+      if (depType instanceof BodyTypeDeclaration) {
+         JavaModel model = ((BodyTypeDeclaration) depType).getJavaModel();
+         if (!model.isStarted()) {
+            ParseUtil.realInitAndStartComponent(model);
+            return;
+         }
+      }
+      ParseUtil.realInitAndStartComponent(depType);
    }
 
    Object resolveSrcTypeDeclaration(Object typeObj) {
@@ -2431,10 +2442,16 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    void addInnerTypesToFile(BodyTypeDeclaration td, Map<JSFileEntry,Boolean> typesInFile, String rootLibFile, Layer genLayer, Set<String> typesInSameFile) {
+      BodyTypeDeclaration origtd = td;
       td = ensureTransformedResult(td);
       if (td instanceof EnumDeclaration) {
          EnumDeclaration ed = (EnumDeclaration) td;
          td = ed.transformEnumToJS();
+      }
+      if (td == null) {
+         System.out.println("*** Error - null transformed result from addInnerTypes");
+         td = ensureTransformedResult(origtd);
+         return;
       }
       List<Object> innerTypes = td.getAllInnerTypes(null, true);
       if (innerTypes != null) {

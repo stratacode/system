@@ -284,6 +284,13 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
          if (fieldDef == null) {
             if (ae.lhs instanceof SelectorExpression)
                fieldDef = ((SelectorExpression)ae.lhs).getAssignedProperty();
+            else if (ae.lhs instanceof IdentifierExpression) {
+               fieldDef = ((IdentifierExpression)ae.lhs).getAssignedProperty();
+            }
+            if (fieldDef == null) {
+               System.err.println("*** Invalid model for binding in transformation - no assigned property");
+               throw new UnsupportedOperationException();
+            }
          }
          bd.dstProp = ModelUtil.getPropertyName(fieldDef);
          // Because this is an assignment, we'll get mapped to a setX method in some cases

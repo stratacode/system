@@ -1165,15 +1165,19 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly) {
       List<Object> result = super.getAllInnerTypes(modifier, thisClassOnly);
 
-      initTypeInfo();
+      if (!thisClassOnly) {
+         // Only init the type info if we are looking for the implements types.  In updateType we do not want to init the type just to do the update since
+         // the update happens during the 'reinitialize' process, which is too soon to accurately resolve types.  We need to reinit the other types first.
+         initTypeInfo();
 
-      if (implementsBoundTypes != null && !thisClassOnly) {
-         for (Object impl:implementsBoundTypes) {
-            Object[] implResult = ModelUtil.getAllInnerTypes(impl, modifier, thisClassOnly);
-            if (implResult != null && implResult.length > 0) {
-               if (result == null)
-                  result = new ArrayList<Object>();
-               result.addAll(Arrays.asList(implResult));
+         if (implementsBoundTypes != null) {
+            for (Object impl : implementsBoundTypes) {
+               Object[] implResult = ModelUtil.getAllInnerTypes(impl, modifier, thisClassOnly);
+               if (implResult != null && implResult.length > 0) {
+                  if (result == null)
+                     result = new ArrayList<Object>();
+                  result.addAll(Arrays.asList(implResult));
+               }
             }
          }
       }

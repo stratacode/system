@@ -560,8 +560,12 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
          if (rootType == null && defaultExtendsType != null)
             rootType = defaultExtendsType;
       }
-      else
+      else {
          generateOutputMethod = false;
+         if (templateProcessor != null) {
+            defaultExtendsTypeName = templateProcessor.getDefaultExtendsType();
+         }
+      }
 
       if (types == null)
          setProperty("types", new SemanticNodeList());
@@ -596,6 +600,10 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
    }
 
    private void resetTemplateState() {
+      if (outputMethod != null && generateOutputMethod && rootType instanceof BodyTypeDeclaration) {
+         BodyTypeDeclaration td = (BodyTypeDeclaration) rootType;
+         td.removeStatement(outputMethod);
+      }
       hasErrors = false;
       rootType = null;
       // Reset the types since those are generated in the initialize method
@@ -622,29 +630,33 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
    public void reinitialize() {
       /* NOTE: not using JavaModel for now but these could be reconciled */
       Object oldRootType = rootType;
-      boolean restart = false;
       if (started) {
-         hasErrors = false;
-         restart = true;
-         initialized = false;
-         started = false;
-         validated = false;
-         processed = false;
+         stop();
 
-         resetTemplateState();
+         clearTransformed();
+
+         //resetTemplateState();
 
          // this resets the rootType
          ParseUtil.initComponent(this);
 
-         if (restart && oldRootType instanceof BodyTypeDeclaration && rootType instanceof BodyTypeDeclaration) {
+         /*
+          * TODO: this ends up starting the type in order to do all of the determination about what in the model has changed field etc. info which is not needed during the build's use of "dependenciesChanged" so taking this out.
+          * A couple of issues: 1) was this here because we need to do this in some case to apply dynamic updates to a template?
+          * 2) For the build case, maybe we still need to set replacedByType and replaced = true on all of the types recursively?
+          * Hopefully now we'll always re-start and so resolve stale references to the right ones so there's no need even for that.
+         if (oldRootType instanceof BodyTypeDeclaration && rootType instanceof BodyTypeDeclaration && rootType != oldRootType) {
             BodyTypeDeclaration rootTD = (BodyTypeDeclaration) rootType;
             ((BodyTypeDeclaration) oldRootType).updateType(rootTD, null, TypeUpdateMode.Replace, false, null);
          }
+         */
 
          // Doing the start and validate after we've updated the type so that we are all properly initialized
+         /*
          ParseUtil.startComponent(this);
          ParseUtil.validateComponent(this);
          ParseUtil.processComponent(this);
+         */
       }
    }
 
@@ -753,6 +765,12 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
       if (started || beingInitialized)
          return;
 
+      if (defaultExtendsTypeName != null && defaultExtendsType == null) {
+         defaultExtendsType = findTypeDeclaration(defaultExtendsTypeName, true, false);
+         if (defaultExtendsType == null)
+            displayTypeError("No defaultExtendsType: ", defaultExtendsTypeName, " for Template: ");
+      }
+
       if (templateDeclarations != null) {
          int ct = 0;
          for (int i = 0; i < templateDeclarations.size(); i++) {
@@ -764,12 +782,6 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
                   declExpr.displayError("Void types not allowed in a template expression: ");
             }
          }
-      }
-
-      if (defaultExtendsTypeName != null && defaultExtendsType == null) {
-         defaultExtendsType = findTypeDeclaration(defaultExtendsTypeName, true, false);
-         if (defaultExtendsType == null)
-            displayTypeError("No defaultExtendsType: ", defaultExtendsTypeName, " for Template: ");
       }
 
       if (statefulPage) {
@@ -1335,8 +1347,9 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
    }
 
    public boolean needsCompile() {
-      // The default action here is to compile this file as .java file source unless the processor for the template says otherwise
-      if (templateProcessor == null || !templateProcessor.needsProcessing())
+      // The default action here is to compile this file as .java file source unless the processor for the template says otherwise.
+      // Normally templates that are not processed are compiled, unless they are runtime templates like the sctd files.
+      if (templateProcessor == null || (!templateProcessor.isRuntimeTemplate()) && !templateProcessor.needsProcessing())
          return true;
       return templateProcessor.needsCompile();
    }
@@ -1543,13 +1556,16 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
          return true;
 
       TypeDeclaration td = (TypeDeclaration) rootType;
-      if (td.changedSinceLayer(initializedInLayer, false, null, changedModels)) {
+
+
+      if (td != null && td.changedSinceLayer(initializedInLayer, false, null, changedModels)) {
          return true;
       }
       return false;
    }
 
    /** Hook to reinitiaze any state after one of your base types gets modified after this type has been processed. */
+   /*
    public boolean dependenciesChanged() {
       if (super.dependenciesChanged() && (initializedInLayer != null && rootType != null && rootType instanceof TypeDeclaration)) {
          TypeDeclaration td = (TypeDeclaration) rootType;
@@ -1575,6 +1591,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
       }
       return false;
    }
+   */
 
    public boolean isLayerType() {
       return false;
