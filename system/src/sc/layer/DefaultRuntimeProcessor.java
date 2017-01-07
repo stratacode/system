@@ -70,6 +70,10 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor, Serializable 
    public void postStart(LayeredSystem sys, Layer genLayer) {
    }
 
+   /** Called after stopping all types */
+   public void postStop(LayeredSystem sys, Layer genLayer) {
+   }
+
    /** Called after processing all types */
    public void postProcess(LayeredSystem sys, Layer genLayer) {
    }

@@ -394,6 +394,7 @@ public class ModifyDeclaration extends TypeDeclaration {
    }
 
    public void unregister() {
+      super.unregister();
       if (modifyTypeDecl != null && modifyTypeDecl instanceof TypeDeclaration)
          getLayeredSystem().removeSubType((TypeDeclaration) modifyTypeDecl, this);
    }
@@ -441,7 +442,7 @@ public class ModifyDeclaration extends TypeDeclaration {
 
       boolean skipRoots = false;
 
-      if (thisModel != null && thisModel.customResolver != null) {
+      if (thisModel.customResolver != null) {
          String ftName = getFullTypeName();
 
          // There's a custom resolver for finding types - i.e. the model stream which will string together all of the modify tags that occur in the same stream for one object.

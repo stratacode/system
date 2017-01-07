@@ -188,6 +188,7 @@ public class ClassDeclaration extends TypeDeclaration {
    }
 
    public void unregister() {
+      super.unregister();
       Object ext = getExtendsTypeDeclaration();
       if (ext != null && ext instanceof TypeDeclaration) {
          JavaModel model = getJavaModel();

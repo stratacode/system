@@ -313,8 +313,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
       /**
        * Entry points are used to gather only the necessary types for a JS mainInit type, standard Java main method, or a jsModuleFile annotation.
-       * Each of these types bootstraps the code generation process... all of them are added to each of their files.
-       * Since each type then recursively adds its dependent types as needed each file is generated in the right order.
+       * Each of these types bootstraps the code generation process. Each is added to the JS file specified for that entry point (via
+       * annotations or using defaults)
+       * Since each type then recursively adds its dependent types as needed each file is generated in the right order - so dependent
+       * types are defined before they are used.
        *
        * Dependencies are collected and the list of files sorted.  Any conflicts detected are displayed.
        */
@@ -796,6 +798,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       if (jsDebug) {
          System.out.println("Sorted jsFiles: " + jsBuildInfo.jsFiles + " using dependencies:\n" + jsBuildInfo.typeDeps);
       }
+   }
+
+   public void postStop(LayeredSystem sys, Layer genLayer) {
+      flushTypeCache();
    }
 
    private final static HashSet<String> warnedCompiledTypes = new HashSet<String>();
@@ -1841,6 +1847,16 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          processedTypes.clear();
       if (typesInFileMap != null)
          typesInFileMap.clear();
+
+   }
+
+   public void flushTypeCache() {
+      // In case any types have been stopped and recreated, we'll reset the cached type here
+      for (Iterator<EntryPoint> it = jsBuildInfo.entryPoints.values().iterator(); it.hasNext(); ) {
+         EntryPoint ent = it.next();
+         if (ent.type != null)
+            ent.type = null;
+      }
    }
 
    public void resetBuild() {
@@ -1849,6 +1865,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       changedDefaultType = false;
       jsFileBodyStore.clear();
       postStarted = false;
+
 
       if (system.options.buildAllFiles) {
          // TODO: should we reset anything in the JSBuildInfo?  Since we don't reliably run the start process, I don't think so

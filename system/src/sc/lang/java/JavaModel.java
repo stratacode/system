@@ -47,7 +47,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    transient List<String> globalTypes = new ArrayList<String>();
 
    // Includes inner types as well as regular ones
-   transient Map<String,TypeDeclaration> definedTypesByName = new HashMap<String,TypeDeclaration>();
+   transient HashMap<String,TypeDeclaration> definedTypesByName = new HashMap<String,TypeDeclaration>();
 
    transient Map<String,Object> typeIndex = new HashMap<String,Object>();
 
@@ -272,7 +272,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       }
       types.add(td);
       if (td.typeName != null)
-         typeIndex.put(td.typeName,td);
+         addTypeToIndex(td.typeName, td);
+   }
+
+   private void addTypeToIndex(String typeName, Object td) {
+      typeIndex.put(typeName,td);
    }
 
    private static class WildcardImport {
@@ -818,7 +822,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       }
       if (td != null) {
          if (!skipSrc) {
-            typeIndex.put(typeName, td);
+            addTypeToIndex(typeName, td);
          }
          
          // The system resolved absolute references of all kinds and so might have resolved one defined here.
@@ -921,11 +925,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          if (getPackagePrefix() != null) {
             String fullTypeName = type.getFullTypeName();
             if (fullTypeName != null) {
-               typeIndex.put(fullTypeName, type);
+               addTypeToIndex(fullTypeName, type);
             }
          }
          // TODO: should we be adding this to the types member?  Not sure they always belong in the language model.
-         typeIndex.put(typeName, type);
+         addTypeToIndex(typeName, type);
       }
    }
 
@@ -1196,12 +1200,12 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return layer != null && layer.annotationLayer;
    }
 
-   public boolean changedSinceLayer(Layer l) {
+   public boolean changedSinceLayer(Layer initLayer, Layer buildLayer) {
       TypeDeclaration modelType = getModelTypeDeclaration();
       if (modelType == null)
          return true;
 
-      if (modelType.changedSinceLayer(l, false, null, null))
+      if (modelType.changedSinceLayer(initLayer, buildLayer, false, null, null))
          return true;
       return false;
    }
@@ -1234,7 +1238,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                // reloaded, but the transformed model may be affected by other layers, unless it is final.
                // Sometimes we clone the transformed model without transforming.  In that case, we can just use that model.
                if (transformedModel == null || transformedInLayer == null ||
-                      (transformedModel.getTransformed() && transformedInLayer != layeredSystem.currentBuildLayer) && changedSinceLayer(transformedInLayer))
+                      (transformedModel.getTransformed() && transformedInLayer != layeredSystem.currentBuildLayer) && changedSinceLayer(transformedInLayer, layeredSystem.currentBuildLayer))
                   cloneTransformedModel();
 
                // Already transformed
@@ -1309,12 +1313,19 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return this;
    }
 
-   /** Hook to reinitiaze any state after one of your base types gets modified after this type has been processed. */
+   /** Hook to reinitiualize any state after one of your base types gets modified after this type has been processed. */
    public boolean dependenciesChanged() {
       if (!isInitialized()) {
          ParseUtil.initComponent(this);
          return true;
       }
+      /*
+      TypeDeclaration modelType = getUnresolvedModelTypeDeclaration();
+      if (modelType != null && initializedInLayer != null) {
+         if (modelType.changedSinceLayer(initializedInLayer, false, null, null))
+            return true;
+      }
+      */
       /*
       if (isStarted() && layeredSystem != null && (layeredSystem.lastChangedModelTime != lastStartedTime || needsRestart)) {
          reinitialize();
@@ -2604,7 +2615,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          // so we need to make a copy.
          copy.importsByName = (HashMap<String,Object>) importsByName.clone();
 
-         copy.definedTypesByName = definedTypesByName;
+         copy.definedTypesByName = (HashMap<String,TypeDeclaration>)definedTypesByName.clone();
          copy.typeIndex = typeIndex;
          copy.computedPackagePrefix = computedPackagePrefix;
          copy.temporary = true;
@@ -2845,9 +2856,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return cachedGeneratedJSText;
    }
 
-   public boolean getDependenciesChanged(Map<String,IFileProcessorResult> changedModels) {
+   public boolean getDependenciesChanged(Layer genLayer, Map<String,IFileProcessorResult> changedModels) {
       for (TypeDeclaration td:types) {
-         if (td.changedSinceLayer(initializedInLayer, false, null, changedModels))
+         if (td.changedSinceLayer(initializedInLayer, genLayer, false, null, changedModels))
             return true;
       }
       return false;
@@ -2904,8 +2915,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (oldType != null)
          definedTypesByName.put(newTypeName, oldType);
       Object oldObj = typeIndex.remove(oldTypeName);
-      if (oldObj != null)
-         typeIndex.put(newTypeName, oldObj);
+      if (oldObj != null) {
+         addTypeToIndex(newTypeName, oldObj);
+      }
 
       String pkgName = getPackagePrefix();
       String oldFullName = CTypeUtil.prefixPath(pkgName, oldTypeName);

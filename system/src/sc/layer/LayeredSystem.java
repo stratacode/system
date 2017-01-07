@@ -771,9 +771,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          subTypesByType.put(newFullName, subTypes);
       }
 
-      Object inner = innerTypeCache.remove(oldFullName);
+      Object inner = removeFromInnerTypeCache(oldFullName);
       if (inner != null)
-         innerTypeCache.put(newFullName, inner);
+         addToInnerTypeCache(newFullName, inner);
 
       typeIndex.updateTypeName(oldFullName, newFullName);
 
@@ -7361,55 +7361,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    // in the build layer.
    HashSet<Layer> generatedLayers = new HashSet<Layer>();
 
-   static class BuildState {
-      int numModelsToTransform = 0;
-      boolean changedModelsPrepared = false;
-      boolean changedModelsInited = false;
-      boolean changedModelsStarted = false;
-      boolean changedModelsDetected = false;
-      Set<String> processedFileNames = new HashSet<String>();
-
-      HashSet<SrcEntry> srcEntSet = new HashSet<SrcEntry>();
-      ArrayList<SrcEntry> srcEnts = new ArrayList<SrcEntry>();
-
-      boolean anyError = false;
-      boolean fileErrorsReported = false;
-      LinkedHashSet<SrcEntry> toCompile = new LinkedHashSet<SrcEntry>();
-      // The list of files which have errors of any kind
-      List<SrcEntry> errorFiles = new ArrayList<SrcEntry>();
-      long buildTime = System.currentTimeMillis();
-      LinkedHashSet<SrcDirEntry> srcDirs = new LinkedHashSet<SrcDirEntry>();
-      HashMap<String,ArrayList<SrcDirEntry>> srcDirsByPath = new HashMap<String,ArrayList<SrcDirEntry>>();
-
-      // Models which contribute to typeGroup dependencies, e.g. @MainInit, must be processed
-      HashMap<String,IFileProcessorResult> typeGroupChangedModels = new HashMap<String, IFileProcessorResult>();
-      HashMap<String,SrcEntry> unchangedFiles = new HashMap<String, SrcEntry>();
-
-      // The list of actually changed files we found when we are incrementally compiling
-      ArrayList<SrcEntry> modifiedFiles = new ArrayList<SrcEntry>();
-
-      HashMap<SrcEntry,SrcEntry> dependentFilesChanged = new HashMap<SrcEntry,SrcEntry>();
-      boolean anyChangedClasses = false;
-
-      HashMap<String,Integer> typeGroupChangedModelsCount = new HashMap<String,Integer>();
-
-      void addSrcEntry(int ix, SrcEntry newSrcEnt) {
-         if (!srcEntSet.contains(newSrcEnt)) {
-            if (ix == -1)
-               srcEnts.add(newSrcEnt);
-            else
-               srcEnts.add(ix, newSrcEnt);
-            srcEntSet.add(newSrcEnt);
-         }
-      }
-
-      ArrayList<Layer> startedLayers;
-   }
-
-   public GenerateCodeStatus initPeerChangedModels(Layer genLayer, List<String> includeFiles, BuildPhase phase, boolean separateOnly) {
+   public GenerateCodeStatus preInitPeerChangedModels(Layer genLayer, List<String> includeFiles, BuildPhase phase, boolean separateOnly) {
       // Before we start this model's files, make sure any build layers in peer systems have been started.  This happens when there's an
       // intermediate build layer in the peer before the one in the default runtime.
-      // NOTE: peerMode = true should still iterate over this list.  We have the changedModelsInited flag to prevent recursion.  When we
+      // NOTE: peerMode = true should still iterate over this list.  We have the changedModelsPreInited flag to prevent recursion.  When we
       // build the peer system, it's the itiator and we need to make sure it coordinates with the other systems.
       if (peerSystems != null && !separateOnly) {
          for (LayeredSystem peer:peerSystems) {
@@ -7423,10 +7378,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                if (peerState == null)
                   peerStarted = false;
                else
-                  peerStarted = phase == BuildPhase.Prepare ? peerState.changedModelsPrepared : peerState.changedModelsInited;
+                  peerStarted = phase == BuildPhase.Prepare ? peerState.prepPhase.preInited : peerState.processPhase.preInited;
 
                if (!peerStarted) {
-                  for (int pl = 0; pl < peerLayer.getLayerPosition(); pl++) {
+                  for (int pl = 0; pl <= peerLayer.getLayerPosition(); pl++) {
                      Layer basePeerLayer = peer.layers.get(pl);
                      if (basePeerLayer.isBuildLayer()) {
 
@@ -7440,10 +7395,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         if (basePeerState == null)
                            basePeerStarted = false;
                         else
-                           basePeerStarted = phase == BuildPhase.Prepare ? basePeerState.changedModelsPrepared : basePeerState.changedModelsInited;
+                           basePeerStarted = phase == BuildPhase.Prepare ? basePeerState.prepPhase.preInited : basePeerState.processPhase.preInited;
 
                         if (!basePeerStarted) {
-                           GenerateCodeStatus peerStatus = peer.initChangedModels(basePeerLayer, includeFiles, phase, false);
+                           GenerateCodeStatus peerStatus = peer.preInitChangedModels(basePeerLayer, includeFiles, phase, false);
                            if (peerStatus == GenerateCodeStatus.Error) {
                               return GenerateCodeStatus.Error;
                            }
@@ -7474,6 +7429,39 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return peerLayer;
    }
 
+   public GenerateCodeStatus initPeerChangedModels(Layer genLayer, List<String> includeFiles, BuildPhase phase, boolean separateOnly) {
+      if (peerSystems != null && !separateOnly) {
+         for (LayeredSystem peer : peerSystems) {
+            Layer peerLayer = getFirstMatchingPeerLayer(peer, genLayer);
+            if (peerLayer != null) {
+               setCurrent(peer);
+
+               boolean peerStarted;
+               BuildState peerState = peerLayer.buildState;
+               if (peerState == null)
+                  peerStarted = false;
+               else
+                  peerStarted = phase == BuildPhase.Prepare ? peerState.prepPhase.inited : peerState.processPhase.inited;
+
+               if (!peerStarted) {
+                  for (int pl = 0; pl <= peerLayer.getLayerPosition(); pl++) {
+                     Layer basePeerLayer = peer.layers.get(pl);
+                     if (basePeerLayer.isBuildLayer()) {
+                        GenerateCodeStatus peerStatus = peer.initChangedModels(basePeerLayer, includeFiles, phase, separateOnly);
+                        if (peerStatus == GenerateCodeStatus.Error) {
+                           return GenerateCodeStatus.Error;
+                        }
+                     }
+                  }
+               }
+
+               setCurrent(this);
+            }
+         }
+      }
+      return null;
+   }
+
    public GenerateCodeStatus startPeerChangedModels(Layer genLayer, List<String> includeFiles, BuildPhase phase, boolean separateOnly) {
       if (peerSystems != null && !separateOnly) {
          for (LayeredSystem peer : peerSystems) {
@@ -7486,10 +7474,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                if (peerState == null)
                   peerStarted = false;
                else
-                  peerStarted = phase == BuildPhase.Prepare ? peerState.changedModelsPrepared : peerState.changedModelsStarted;
+                  peerStarted = phase == BuildPhase.Prepare ? peerState.prepPhase.started : peerState.processPhase.started;
 
                if (!peerStarted) {
-                  for (int pl = 0; pl < peerLayer.getLayerPosition(); pl++) {
+                  for (int pl = 0; pl <= peerLayer.getLayerPosition(); pl++) {
                      Layer basePeerLayer = peer.layers.get(pl);
                      if (basePeerLayer.isBuildLayer()) {
                         GenerateCodeStatus peerStatus = peer.startChangedModels(basePeerLayer, includeFiles, phase, separateOnly);
@@ -7558,6 +7546,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             //modelObj = parseSrcType(toGenEnt, null);
          }
          else {
+            if (!langModel.isInitialized())
+               ParseUtil.initComponent(langModel);
             if (!langModel.isAdded())
                addNewModel(langModel, genLayer.getNextLayer(), null, langModel instanceof JavaModel && ((JavaModel) langModel).isLayerModel);
 
@@ -7633,7 +7623,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return false;
    }
 
-   public GenerateCodeStatus initChangedModels(Layer genLayer, List<String> includeFiles, BuildPhase phase, boolean separateOnly) {
+   public GenerateCodeStatus preInitChangedModels(Layer genLayer, List<String> includeFiles, BuildPhase phase, boolean separateOnly) {
       boolean skipBuild = !genLayer.buildSeparate && separateOnly;
 
       BuildState bd;
@@ -7644,14 +7634,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             genLayer.buildState.errorFiles = genLayer.lastBuildState.errorFiles;
       }
 
+      BuildStepFlags flags = phase == BuildPhase.Prepare ? bd.prepPhase : bd.processPhase;
+      if (flags.preInited)
+         return GenerateCodeStatus.NewCompiledFiles;
+
       if (!separateOnly) {
          if (phase == BuildPhase.Process)
-            bd.changedModelsInited = true;
+            bd.processPhase.preInited = true;
          else
-            bd.changedModelsPrepared = true;
+            bd.prepPhase.preInited = true;
       }
 
-      if (initPeerChangedModels(genLayer, includeFiles, phase, separateOnly) == GenerateCodeStatus.Error)
+      if (preInitPeerChangedModels(genLayer, includeFiles, phase, separateOnly) == GenerateCodeStatus.Error)
          return GenerateCodeStatus.Error;
 
       setCurrent(this);
@@ -7702,7 +7696,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (!needsPhase(phase)) {
-         verbose("Skipping initChangedModels " + phase + " phase");
+         verbose("Skipping preInitChangedModels " + phase + " phase");
          return GenerateCodeStatus.NoFilesToCompile;
       }
       // Nothing to generate or compile
@@ -7820,16 +7814,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          verbose("Find changes: " + getRuntimeName() + " runtime -" + (genLayer == buildLayer ? " sys build layer: " : " pre build layer: ") + genLayer + " including: " + startedLayers);
       }
 
-      boolean needToAddAll = false;
+      // Because we pull in dependent files into the 'toGenerate' list make sure we only add each SrcEntry once so we don't try
+      // and transform it more than once.
+      HashSet<SrcEntry> allGenerated = new HashSet<SrcEntry>();
 
       // For each directory or src file we need to look at.  Top level directories are put into this list before we begin.
       // As we find a sub-directory we insert it into the list from inside the loop.
+      // This loop will find all of the files that have changed across all srcDirs.  It builds a SrcDirEnt for each
+      // directory containing source files, and for each of those a 'toGenerate' list - the models in that file that
+      // have changed, or depend on a file which has changed (for incremental builds).
       for (int i = 0; i < bd.srcEnts.size(); i++) {
          SrcEntry srcEnt = bd.srcEnts.get(i);
          String srcDirName = srcEnt.absFileName;
          String srcPath = srcEnt.relFileName;
          LinkedHashSet<SrcEntry> toGenerate = new LinkedHashSet<SrcEntry>();
-         ArrayList<SrcEntry> toStartModels = null;
 
          File srcDir = new File(srcDirName);
          File depFile = new File(genLayer.buildSrcDir, FileUtil.concat(srcEnt.layer.getPackagePath(), srcPath, srcEnt.layer.getLayerName().replace('.', '-') + "-" + phase.getDependenciesFile()));
@@ -7851,7 +7849,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // No dependencies or the layer def file changed - just add all of the files in this directory for generation
          if (!incrCompile || !depFileExists || (lastBuildTime = depFile.lastModified()) == 0 ||
                  (lastBuildTime < srcEnt.layer.getLastModifiedTime())) {
-            addAllFiles(srcEnt.layer, toGenerate, srcDir, srcDirName, srcPath, phase, bd);
+            addAllFiles(srcEnt.layer, toGenerate, allGenerated, srcDir, srcDirName, srcPath, phase, bd);
             // Do a clean build the first time.  The second and subsequent times we need to load the existing deps file because we do not stop and restart all components even when build all is true.
             if (!systemCompiled || !depFileExists)
                deps = DependencyFile.create();
@@ -7867,11 +7865,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
             // Failed to read dependencies
             if (deps == null) {
-               addAllFiles(srcEnt.layer, toGenerate, srcDir, srcDirName, srcPath, phase, bd);
+               addAllFiles(srcEnt.layer, toGenerate, allGenerated, srcDir, srcDirName, srcPath, phase, bd);
                deps = new DependencyFile();
                deps.depList = new ArrayList<DependencyEntry>();
                depsChanged = true;
-               needToAddAll = true;
             }
             else {
                boolean dirChanged = srcDir.lastModified() > lastBuildTime;
@@ -7891,7 +7888,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         warning("source file: " + ent.fileName + " was removed.");
                         deps.removeDependencies(d);
                         depsChanged = true;
-                        needToAddAll = true;
                         d--;
                      }
                   }
@@ -7909,12 +7905,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                            bd.addSrcEntry(i+1, newSrcEnt);
                            deps.addDirectory(newFile);
                            depsChanged = true;
-                           needToAddAll = true;
                         }
                         else if (needsGeneration(newPath, srcEnt.layer, phase) &&
                                 !srcEnt.layer.layerBaseName.equals(newFile) && !srcEnt.layer.excludedFile(newFile, srcDirName)) {
-                           toGenerate.add(new SrcEntry(srcEnt.layer, srcDirName, srcPath, newFile, proc == null || proc.getPrependLayerPackage()));
-                           needToAddAll = true;
+                           SrcEntry newSrcEnt = new SrcEntry(srcEnt.layer, srcDirName, srcPath, newFile, proc == null || proc.getPrependLayerPackage());
+                           if (!allGenerated.contains(newSrcEnt)) {
+                              toGenerate.add(newSrcEnt);
+                              allGenerated.add(newSrcEnt);
+                           }
                         }
                      }
                   }
@@ -8146,7 +8144,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      }
                      if (!needsGenerate && srcEnt.layer.compiled) {
                         ILanguageModel cachedModel = modelIndex.get(absSrcFileName);
-                        if (cachedModel != null && cachedModel instanceof JavaModel && ((JavaModel) cachedModel).getDependenciesChanged(incrCompile ? changedModels : null)) {
+                        if (cachedModel != null && cachedModel instanceof JavaModel && ((JavaModel) cachedModel).getDependenciesChanged(genLayer, incrCompile ? changedModels : null)) {
                            needsGenerate = true;
                            if (traceNeedsGenerate) {
                               verbose("Generating: " + srcFileName + " - dependent type was overridden since the previous layered build");
@@ -8171,7 +8169,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         if (restartAllOnFirstChange(genLayer)) {
                            if (options.verbose)
                               verbose("Detected changed file: " + srcFileName + " with build all per layer set - rebuilding all now.");
-                           return initChangedModels(genLayer, includeFiles, phase, separateOnly);
+                           return preInitChangedModels(genLayer, includeFiles, phase, separateOnly);
                         }
                         SrcEntry prevEnt;
                         if ((prevEnt = bd.unchangedFiles.get(srcTypeName)) != null) {
@@ -8195,14 +8193,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      TypeDeclaration cachedType;
                      if (!needsGenerate && (cachedType = getCachedTypeDeclaration(srcTypeName, null, null, false, true)) != null) {
                         if (cachedType != INVALID_TYPE_DECLARATION_SENTINEL && cachedType.layer != null && cachedType.layer.getLayerPosition() < newSrcEnt.layer.getLayerPosition()) {
-                           /*
-                            * TODO: do we need these "toStartModels" - they are guaranteed to be started but won't be transformed.  Also, any types which depend on these will not be generated.  Originally it seemed like this case should not require the model to be transformed since
-                            * it only change the dependencies on the other models.  But if we do not put this model into the "changedModels" list, other dependent models won't know there's a change to their behavior and so they won't get to the transform stage where they pick up that change.
-                            * The case is where HtmlPage in editor/mixin modifies a base class.  We detect that here and put this model into the "toTransform" stage.  That will ensure the index file also gets re-processed to pick up the change.
-                           if (toStartModels == null)
-                              toStartModels = new ArrayList<SrcEntry>();
-                           toStartModels.add(newSrcEnt);
-                           */
                            SrcEntry prevEnt;
                            if ((prevEnt = bd.unchangedFiles.get(srcTypeName)) != null) {
                               newSrcEnt = prevEnt;
@@ -8222,20 +8212,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
          }
 
-         // TODO: this should not be done on each batch of files found in a given directory - it instead we need to split the process of initializing models into two phases:
-         //    find all changed models (the toGenerate) list
-         //    stop all of the models that are started before the build happened
-         //    init all of the models
-         /*
-         for (SrcEntry toGenEnt:toGenerate) {
-            ILanguageModel cachedModel = modelIndex.get(toGenEnt.absFileName);
-            if (cachedModel != null && cachedModel.isStarted())
-               cachedModel.stop();
-         }
-         */
-
-         LinkedHashSet<ModelToTransform> modelsToTransform = new LinkedHashSet<ModelToTransform>();
-
          // Now, loop over each file that was changed in this directory.
          for (SrcEntry toGenEnt:toGenerate) {
             File srcFile = new File(toGenEnt.absFileName);
@@ -8244,75 +8220,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                bd.addSrcEntry(i+1, toGenEnt);
                if (deps.addDirectory(toGenEnt.baseFileName))
                   depsChanged = true;
-            }
-            else {
-               boolean skipFile = includeFiles != null && !includeFiles.contains(toGenEnt.relFileName);
-               Object modelObj;
-               if (skipFile) {
-                  if (options.verbose)
-                     verbose("Skipping " + toGenEnt);
-                  modelObj = null;
-               }
-               else {
-                  modelObj = initModelForBuild(toGenEnt, genLayer, incrCompile, bd, phase, " new file?");
-                  if (modelObj == INVALID_TYPE_DECLARATION_SENTINEL)
-                     continue;
-               }
-
-
-               boolean fileError = false;
-               if (modelObj instanceof IFileProcessorResult) {
-                  IFileProcessorResult model = (IFileProcessorResult) modelObj;
-
-                  if (model instanceof JavaModel && ((JavaModel) model).getLayeredSystem() != this)
-                     error("*** Error model is in the wrong system!");
-
-                  // Needs to have the extension so build.properties and build.xml go through but also needs type prefix
-                  //String processedName = toGenEnt.getTypeName() + "." + FileUtil.getExtension(toGenEnt.baseFileName);
-                  // Need to do this even if the model has errors so that if we restart the build, these are in the right order
-                  String processedName = model.getProcessedFileId();
-                  boolean generate = !bd.processedFileNames.contains(processedName);
-                  if (generate) {
-                     bd.processedFileNames.add(processedName);
-                  }
-                  ModelToTransform mtt = new ModelToTransform();
-                  mtt.model = model;
-                  mtt.toGenEnt = toGenEnt;
-                  mtt.generate = generate;
-                  modelsToTransform.add(mtt);
-                  changedModels.put(toGenEnt.getTypeName(), model);
-
-                  if (model.hasErrors())
-                     fileError = true;
-               }
-               // Returns a ParseError if anything fails, null if we found nothing to compile in that file
-               else if (modelObj != null)
-                  fileError = true;
-
-               // If we failed to generate this time, do not leave around any trash we might have generated
-               // last time.  You can end up with a false successful build.
-               if (fileError) {
-                  bd.anyError = true;
-                  anyErrors = true;
-                  List<IString> generatedFiles = deps.getGeneratedFiles(toGenEnt.baseFileName);
-                  deps.addErrorDependency(toGenEnt.baseFileName);
-                  depsChanged = true;
-                  if (generatedFiles != null) {
-                     for (IString genFile:generatedFiles) {
-                        File gf = new File(genLayer.buildSrcDir, FileUtil.unnormalize(genFile.toString()));
-                        gf.delete();
-                     }
-                  }
-                  bd.errorFiles.add(toGenEnt);
-                  bd.fileErrorsReported = false;
-               }
-            }
-         }
-
-         // TODO: remove this?  Not used anymore
-         if (toStartModels != null) {
-            for (SrcEntry toStartEnt:toStartModels) {
-               initModelForBuild(toStartEnt, genLayer, incrCompile, bd, phase, " modifies type already loaded");
             }
          }
 
@@ -8325,23 +8232,166 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          srcDirEnt.srcPath = srcPath;
          srcDirEnt.depsChanged = depsChanged;
          srcDirEnt.fileError = true;
-         srcDirEnt.modelsToTransform = modelsToTransform;
+         srcDirEnt.toGenerate = toGenerate;
          bd.srcDirs.add(srcDirEnt);
-         ArrayList<SrcDirEntry> sdEnts = bd.srcDirsByPath.get(srcPath);
-         if (sdEnts == null)
+         ArrayList<SrcDirEntry> sdEnts = bd.srcDirsByPath.get(srcDirName);
+         if (sdEnts == null) {
             sdEnts = new ArrayList<SrcDirEntry>();
+            bd.srcDirsByPath.put(srcDirName, sdEnts);
+         }
          sdEnts.add(srcDirEnt);
-         bd.srcDirsByPath.put(srcPath, sdEnts);
-         bd.numModelsToTransform += modelsToTransform.size();
       }
 
-      /*
-      for (Layer stLayer:startedLayers) {
-         stLayer.changedModelsDetected = true;
+      // Now that we have the complete list of models which are going to be processed, for any models which have already
+      // been parsed and started, we'll stop them to reset their state to the initial state.  It's important that we
+      // stop all models before we start initializing them because that will start to inject references to parts of code
+      // models that we might throw away during 'stop'.
+      for (int i = 0; i < bd.srcEnts.size(); i++) {
+         SrcEntry srcEnt = bd.srcEnts.get(i);
+         boolean incrCompile = doIncrCompileForFile(srcEnt);
+         ArrayList<SrcDirEntry> sdEnts = bd.srcDirsByPath.get(srcEnt.absFileName);
+         if (sdEnts == null)
+            continue;
+         for (SrcDirEntry srcDirEnt:sdEnts) {
+            LinkedHashSet<SrcEntry> toGenerate = srcDirEnt.toGenerate;
+
+            for (SrcEntry toGenEnt:toGenerate) {
+               ILanguageModel cachedModel = modelIndex.get(toGenEnt.absFileName);
+               if (cachedModel != null && cachedModel.isStarted()) {
+                  if (cachedModel instanceof JavaModel) {
+                     JavaModel cachedJModel = (JavaModel) cachedModel;
+                     // This one has not changed since we started this build so no need to stop it since the model is already up-to-date
+                     /*
+                     if (cachedJModel.lastStartedTime == lastChangedModelTime) {
+                        continue;
+                     }
+                     */
+                     // Only need to stop and restart models whose dependencies have changed.  This might be true either because we are
+                     // in a new layered build and the model changed from the previous build layer, or because we started a model on a previous
+                     // build and some model we depend upon has changed since the last build.
+                     if (!cachedJModel.getDependenciesChanged(genLayer, incrCompile ? changedModels : null)) {
+                        if (options.verbose)
+                           verbose("Reusing: " + toGenEnt + " for: " + getProcessIdent());
+                        continue;
+                     }
+                  }
+                  if (options.verbose)
+                     verbose("Stopping: " + toGenEnt + " for: " + getProcessIdent());
+                  cachedModel.stop();
+                  // When we reinit the model, we need to register the types.  for templates specifically they
+                  // destroy and recreate the types on the stop/init cycle so we need to call addTypesByName again
+                  // after we reinit.
+                  cachedModel.setAdded(false);
+               }
+            }
+         }
       }
 
-      bd.changedModelsDetected = true;
-      */
+      // Run the runtimeProcessor hook after stopping some models so it can clear out any cached types and reresolve them
+      // after starting again.
+      if (runtimeProcessor != null)
+         runtimeProcessor.postStop(this, genLayer);
+
+      // TODO: if we find no files to generate we could stop here right?
+      return GenerateCodeStatus.NewCompiledFiles;
+   }
+
+   public GenerateCodeStatus initChangedModels(Layer genLayer, List<String> includeFiles, BuildPhase phase, boolean separateOnly) {
+      BuildState bd = genLayer.buildState;
+
+      BuildStepFlags flags = phase == BuildPhase.Prepare ? bd.prepPhase : bd.processPhase;
+      if (flags.inited)
+         return GenerateCodeStatus.NewCompiledFiles;
+
+      flags.inited = true;
+
+      if (initPeerChangedModels(genLayer, includeFiles, phase, separateOnly) == GenerateCodeStatus.Error)
+         return GenerateCodeStatus.Error;
+
+      // Now that all toGenerate models have been stopped, we iterate through them again and initialize the models.
+      for (int i = 0; i < bd.srcEnts.size(); i++) {
+         SrcEntry srcEnt = bd.srcEnts.get(i);
+         boolean incrCompile = doIncrCompileForFile(srcEnt);
+         ArrayList<SrcDirEntry> sdEnts = bd.srcDirsByPath.get(srcEnt.absFileName);
+         if (sdEnts == null)
+            continue;
+         for (SrcDirEntry srcDirEnt:sdEnts) {
+            LinkedHashSet<ModelToTransform> modelsToTransform = new LinkedHashSet<ModelToTransform>();
+
+            LinkedHashSet<SrcEntry> toGenerate = srcDirEnt.toGenerate;
+            DependencyFile deps = srcDirEnt.deps;
+            boolean depsChanged = srcDirEnt.depsChanged;
+
+            for (SrcEntry toGenEnt:toGenerate) {
+               File srcFile = new File(toGenEnt.absFileName);
+               if (!srcFile.isDirectory()) {
+                  boolean skipFile = includeFiles != null && !includeFiles.contains(toGenEnt.relFileName);
+                  Object modelObj;
+                  if (skipFile) {
+                     if (options.verbose)
+                        verbose("Skipping " + toGenEnt);
+                     modelObj = null;
+                  }
+                  else {
+                     modelObj = initModelForBuild(toGenEnt, genLayer, incrCompile, bd, phase, " new file?");
+                     if (modelObj == INVALID_TYPE_DECLARATION_SENTINEL)
+                        continue;
+                  }
+
+                  boolean fileError = false;
+                  if (modelObj instanceof IFileProcessorResult) {
+                     IFileProcessorResult model = (IFileProcessorResult) modelObj;
+
+                     if (model instanceof JavaModel && ((JavaModel) model).getLayeredSystem() != this)
+                        error("*** Error model is in the wrong system!");
+
+                     // Needs to have the extension so build.properties and build.xml go through but also needs type prefix
+                     //String processedName = toGenEnt.getTypeName() + "." + FileUtil.getExtension(toGenEnt.baseFileName);
+                     // Need to do this even if the model has errors so that if we restart the build, these are in the right order
+                     String processedName = model.getProcessedFileId();
+                     boolean generate = !bd.processedFileNames.contains(processedName);
+                     if (generate) {
+                        bd.processedFileNames.add(processedName);
+                     }
+                     ModelToTransform mtt = new ModelToTransform();
+                     mtt.model = model;
+                     mtt.toGenEnt = toGenEnt;
+                     mtt.generate = generate;
+                     modelsToTransform.add(mtt);
+                     changedModels.put(toGenEnt.getTypeName(), model);
+
+                     if (model.hasErrors())
+                        fileError = true;
+                  }
+                  // Returns a ParseError if anything fails, null if we found nothing to compile in that file
+                  else if (modelObj != null)
+                     fileError = true;
+
+                  // If we failed to generate this time, do not leave around any trash we might have generated
+                  // last time.  You can end up with a false successful build.
+                  if (fileError) {
+                     bd.anyError = true;
+                     anyErrors = true;
+                     List<IString> generatedFiles = deps.getGeneratedFiles(toGenEnt.baseFileName);
+                     deps.addErrorDependency(toGenEnt.baseFileName);
+                     depsChanged = true;
+                     if (generatedFiles != null) {
+                        for (IString genFile:generatedFiles) {
+                           File gf = new File(genLayer.buildSrcDir, FileUtil.unnormalize(genFile.toString()));
+                           gf.delete();
+                        }
+                     }
+                     bd.errorFiles.add(toGenEnt);
+                     bd.fileErrorsReported = false;
+                  }
+               }
+            }
+
+            srcDirEnt.modelsToTransform = modelsToTransform;
+            srcDirEnt.depsChanged = depsChanged;
+            bd.numModelsToTransform += modelsToTransform.size();
+         }
+      }
 
       // Print some info that's useful for diagnosing what gets recompiled and why on a rebuild.
       if (!genLayer.getBuildAllFiles() && options.verbose) {
@@ -8434,7 +8484,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // Make sure we only start/build build layers.
             while (peerLayer != null && !peerLayer.isBuildLayer())
                peerLayer = peerLayer.getNextLayer();
-            if (peerLayer != null && (peerLayer.buildState == null || !peerLayer.buildState.changedModelsInited)) {
+            if (peerLayer != null && (peerLayer.buildState == null || !peerLayer.buildState.changedModelsPreInited)) {
 
                // Before we can start the peer layers, make sure we've compiled any intermediate layers.  This would happen if the java runtime had no intermediates and the js runtime did, for example.
                // TODO: is this necessary now that we start intermediate build layers before?  Why are we compiling the intermediates here... shouldn't we just start them now that we start everything first?
@@ -8465,16 +8515,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return GenerateCodeStatus.Error;
       }
 
-      if (!bd.changedModelsStarted) {
-         if (phase == BuildPhase.Process)
-            bd.changedModelsStarted = true;
-         for (SrcDirEntry srcDirEnt : bd.srcDirs) {
-            for (ModelToTransform mtt : srcDirEnt.modelsToTransform) {
-               IFileProcessorResult model = mtt.model;
-               SrcEntry toGenEnt = mtt.toGenEnt;
+      BuildStepFlags flags = phase == BuildPhase.Process ? bd.processPhase : bd.prepPhase;
+      if (flags.started)
+         return GenerateCodeStatus.NewCompiledFiles;
 
-               startModelForBuild(model, toGenEnt, genLayer, doIncrCompileForFile(toGenEnt), bd, phase);
-            }
+      flags.started = true;
+
+      for (SrcDirEntry srcDirEnt : bd.srcDirs) {
+         for (ModelToTransform mtt : srcDirEnt.modelsToTransform) {
+            IFileProcessorResult model = mtt.model;
+            SrcEntry toGenEnt = mtt.toGenEnt;
+
+            startModelForBuild(model, toGenEnt, genLayer, doIncrCompileForFile(toGenEnt), bd, phase);
          }
       }
       if (startPeerChangedModels(genLayer, includeFiles, phase, separateOnly) == GenerateCodeStatus.Error)
@@ -8535,24 +8587,17 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return GenerateCodeStatus.NoFilesToCompile;
 
       BuildState buildState = genLayer.buildState;
-      boolean alreadyStarted;
+      boolean alreadyPreInited;
       // The generateCode phase happens in two major steps.  First we start all of the changed models, then we transform them into Java code.
       // Ordinarily the first step will be done before we get here... since we have to start all runtimes before we begin transforming.  That's because
       // transforming is a destructive step right now.
       if (buildState == null)
-         alreadyStarted = false;
+         alreadyPreInited = false;
       else
-         alreadyStarted = phase == BuildPhase.Prepare ? buildState.changedModelsPrepared : buildState.changedModelsInited;
-      if (!alreadyStarted) {
+         alreadyPreInited = phase == BuildPhase.Prepare ? buildState.prepPhase.preInited : buildState.processPhase.preInited;
+      if (!alreadyPreInited) {
          // Now go through and find which source files have changed, reload those changes and populate the modelsToTransform
-         GenerateCodeStatus startResult = initChangedModels(genLayer, includeFiles, phase, separateOnly);
-         if (startResult != GenerateCodeStatus.NewCompiledFiles) {
-            if (phase == BuildPhase.Process)
-               genLayer.updateBuildInProgress(false);
-            return startResult;
-         }
-
-         startResult = startChangedModels(genLayer, includeFiles, phase, separateOnly);
+         GenerateCodeStatus startResult = preInitChangedModels(genLayer, includeFiles, phase, separateOnly);
          if (startResult != GenerateCodeStatus.NewCompiledFiles) {
             if (phase == BuildPhase.Process)
                genLayer.updateBuildInProgress(false);
@@ -8560,7 +8605,27 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
 
+
       BuildState bd = genLayer.buildState;
+      BuildStepFlags flags = phase == BuildPhase.Prepare ? bd.prepPhase : bd.processPhase;
+      if (!flags.inited) {
+         // Now go through and find which source files have changed, reload those changes and populate the modelsToTransform
+         GenerateCodeStatus startResult = initChangedModels(genLayer, includeFiles, phase, separateOnly);
+         if (startResult != GenerateCodeStatus.NewCompiledFiles) {
+            if (phase == BuildPhase.Process)
+               genLayer.updateBuildInProgress(false);
+            return startResult;
+         }
+      }
+
+      if (!flags.started) {
+         GenerateCodeStatus startResult = startChangedModels(genLayer, includeFiles, phase, separateOnly);
+         if (startResult != GenerateCodeStatus.NewCompiledFiles) {
+            if (phase == BuildPhase.Process)
+               genLayer.updateBuildInProgress(false);
+            return startResult;
+         }
+      }
 
       // All components will have been started and validated at this point.
       if (!bd.anyError) {
@@ -9339,7 +9404,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return deps;
    }
 
-   public void addAllFiles(Layer layer, Set<SrcEntry> toGenerate, File srcDir, String srcDirName, String srcPath, BuildPhase phase, BuildState bd) {
+   public void addAllFiles(Layer layer, Set<SrcEntry> toGenerate, Set<SrcEntry> allGenerated, File srcDir, String srcDirName, String srcPath, BuildPhase phase, BuildState bd) {
       String [] fileNames = srcDir.list();
       if (fileNames == null) {
          error("Invalid src directory: " + srcDir);
@@ -9357,12 +9422,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if ((prevEnt = bd.unchangedFiles.get(newSrcEnt.getTypeName())) != null) {
                newSrcEnt = prevEnt;
             }
-            toGenerate.add(newSrcEnt);
+            if (!allGenerated.contains(newSrcEnt)) {
+               toGenerate.add(newSrcEnt);
+               allGenerated.add(newSrcEnt);
+            }
          }
          else {
             File subFile = new File(srcDirName, fileName);
-            if (subFile.isDirectory())
-               toGenerate.add(new SrcEntry(layer, srcDirName, srcPath,  fileName, proc == null || proc.getPrependLayerPackage()));
+            if (subFile.isDirectory()) {
+               SrcEntry newSrcDirEnt = new SrcEntry(layer, srcDirName, srcPath, fileName, proc == null || proc.getPrependLayerPackage());
+               if (!allGenerated.contains(newSrcDirEnt)) {
+                  toGenerate.add(newSrcDirEnt);
+                  allGenerated.add(newSrcDirEnt);
+               }
+            }
          }
       }
    }
@@ -10233,8 +10306,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             Layer l = layers.get(i);
             BuildState bd = l.buildState;
             if (bd != null) {
-               bd.changedModelsInited = false;
-               bd.changedModelsPrepared = false;
+               bd.processPhase.reset();
+               bd.prepPhase.reset();
                bd.errorFiles = l.lastBuildState != null ? l.lastBuildState.errorFiles : new ArrayList<SrcEntry>();
                bd.anyError = false;
             }
@@ -10496,7 +10569,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       for (IModelListener ml: modelListeners) {
          ml.innerTypeAdded(innerType);
       }
-      innerTypeCache.remove(innerType.getFullTypeName());
+      removeFromInnerTypeCache(innerType.getFullTypeName());
    }
 
    public void notifyInnerTypeRemoved(BodyTypeDeclaration innerType) {
@@ -10507,7 +10580,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       for (IModelListener ml: modelListeners) {
          ml.innerTypeRemoved(innerType);
       }
-      innerTypeCache.remove(innerType.getFullTypeName());
+      removeFromInnerTypeCache(innerType.getFullTypeName());
    }
 
    public void addNewModelListener(IModelListener l) {
@@ -10883,14 +10956,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (modelLayer.layerPosition < layer.layerPosition) {
                tds.add(i, toAdd);
                int newFrom = fromLayer != null ? fromLayer.layerPosition : getLastStartedPosition();
-               if (newFrom > tds.fromPosition) // Don't lower the from position... only move it up the layer stack as new guys are added
+               if (newFrom > tds.fromPosition) { // Don't lower the from position... only move it up the layer stack as new guys are added
                   tds.fromPosition = newFrom;
+               }
                break;
             }
          }
          if (i == tds.size()) {
-            if (i == 0)
+            if (i == 0) {
                tds.fromPosition = fromLayer != null ? fromLayer.layerPosition : getLastStartedPosition();
+            }
             tds.add(toAdd);
          }
       }
@@ -10911,6 +10986,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             TypeDeclaration inList = tds.get(i);
             if (inList == toRem) {
                tds.remove(i);
+               // Next time we search for this type, we need to look at all files here.  Technically we could probably set this to
+               // the layerPosition of the next type in the list (if there is one) but it's a minor performance thing.
+               tds.fromPosition = 0;
                subTypesByType.remove(toRem.getFullTypeName());
                if (tds.size() == 0)
                   typesByName.remove(fullTypeName);
@@ -11029,8 +11107,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // we will immediately search for it from this position.  For coding convenience, this
             // is updated here.  This would not be threadsafe and is a little ugly.
             if (updateFrom) {
-               if (fromPosition > decls.fromPosition)
+               if (fromPosition > decls.fromPosition) {
                   decls.fromPosition = fromPosition;
+               }
             }
 
             // If the caller provides the current src file with no layer, we can avoid reloading it
@@ -11264,12 +11343,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             decl = getCachedTypeDeclaration(typeName, fromLayer, fromLayer == null ? srcFile.layer : null, false, false);
             if (decl == INVALID_TYPE_DECLARATION_SENTINEL)
                return null;
+            // Because we updated the fromPosition in the previous getCachedTypeDeclaration we might return the wrong
+            // model file here - if so, just ignore and get it from the srcFile.
+            if (decl != null && decl.getLayer() != srcFile.layer)
+               decl = null;
          }
          else
             decl = null;
 
          if ((decl == null || decl == skippedDecl) && srcFile.layer != null && modelObj instanceof JavaModel) {
             JavaModel javaModel = (JavaModel) modelObj;
+            if (!javaModel.isInitialized())
+               ParseUtil.initComponent(javaModel);
             if (javaModel.getModelTypeName().equals(typeName))
                return javaModel.getLayerTypeDeclaration();
          }
@@ -11505,7 +11590,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                if (!hasAnySrcForRootType(typeName))
                   return null;
                else
-                  innerTypeCache.remove(typeName);
+                  removeFromInnerTypeCache(typeName);
             }
             else {
                if (res == INVALID_TYPE_DECLARATION_SENTINEL)
@@ -11590,13 +11675,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         addTypeByName(declLayer, CTypeUtil.prefixPath(rootTypeActualName, subTypeName), decl, fromLayer);
                   }
                   if (fromLayer == null && cacheForRefLayer(refLayer))
-                     innerTypeCache.put(typeName, decl);
+                     addToInnerTypeCache(typeName, decl);
                   return decl;
                }
                else if (declObj != null) {
                   if (!srcOnly) {
                      if (fromLayer == null && cacheForRefLayer(refLayer))
-                        innerTypeCache.put(typeName, declObj);
+                        addToInnerTypeCache(typeName, declObj);
                      return declObj;
                   }
                   // We need source but we got back a compiled inner type.  If it's inherited, maybe we can load the source.  Need to be careful here
@@ -11627,9 +11712,17 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       } while (ix != -1);
 
       if (fromLayer == null && cacheForRefLayer(refLayer)) {
-         innerTypeCache.put(typeName, INVALID_TYPE_DECLARATION_SENTINEL);
+         addToInnerTypeCache(typeName, INVALID_TYPE_DECLARATION_SENTINEL);
       }
       return null;
+   }
+
+   public Object removeFromInnerTypeCache(String typeName) {
+      return innerTypeCache.remove(typeName);
+   }
+
+   private void addToInnerTypeCache(String typeName, Object type) {
+      innerTypeCache.put(typeName, type);
    }
 
    public Object getCompiledType(String fullTypeName) {
@@ -11706,6 +11799,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
          }
          else {
+            if (!langModel.isInitialized())
+               ParseUtil.initComponent(langModel);
             // When we load the model through the IDE, it does not get put into the type cache reliably
             ITypeDeclaration modelType = langModel.getModelTypeDeclaration();
             if (modelType != null && modelType.getFullTypeName().equals(fullTypeName))
@@ -13307,47 +13402,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       ImportDeclaration importDecl;
    }
 
-   private static class SrcDirEntry {
-      DependencyFile deps;
-      File depFile;
-      Layer layer;
-      boolean depsChanged;
-      boolean fileError;
-      boolean anyError;
-      LinkedHashSet<ModelToTransform> modelsToTransform;
-      public String srcPath;
-
-      public String toString() {
-         return "layer: " + layer + "/" + srcPath;
-      }
-   }
-
    private static class ModelToPostBuild {
       IFileProcessorResult model;
       Layer genLayer;
-   }
-
-   private static class ModelToTransform {
-      IFileProcessorResult model;
-      SrcEntry toGenEnt;
-      boolean generate;
-
-      public boolean equals(Object other) {
-         if (!(other instanceof ModelToTransform))
-            return false;
-         ModelToTransform om = (ModelToTransform) other;
-         if (toGenEnt == null || om.toGenEnt == null)
-            return false;
-         return om.toGenEnt.absFileName.equals(toGenEnt.absFileName);
-      }
-
-      public int hashCode() {
-         return toGenEnt == null ? 0 : toGenEnt.absFileName.hashCode();
-      }
-
-      public String toString() {
-         return toGenEnt == null ? "null-model-to-transform" : toGenEnt.toString();
-      }
    }
 
    private static class TypeGroupDep {

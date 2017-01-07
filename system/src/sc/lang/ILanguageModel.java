@@ -88,6 +88,8 @@ public interface ILanguageModel extends IFileProcessorResult {
 
    void flushTypeCache();
 
+   boolean isInitialized();
+
    boolean isStarted();
 
    /** Called when this model nees to be regenerated */

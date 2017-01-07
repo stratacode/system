@@ -185,6 +185,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    /** Caches whether we have the @Constant annotation to avoid the getInheritedAnnotation call */
    public transient Boolean autoComponent = null;
 
+   transient int anonIdsAllocated = 0;
+
+   // Debug flag - keep track of whether this model has ever been stopped
+   public transient boolean hasBeenStopped = false;
+
    public Layer getLayer() {
       return layer;
    }
@@ -2166,6 +2171,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public boolean isDynamicType() {
       BodyTypeDeclaration outer;
+
       if (getCompiledOnly())
          return false;
       return dynamicType || isLayerType || ((outer = getEnclosingType()) != null && outer.isDynamicType());
@@ -7200,7 +7206,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return CTypeUtil.getClassName(typeName);
    }
 
-   public void unregister() {}
+   public void unregister() {
+      String fullTypeName = getFullTypeName();
+      if (fullTypeName != null) {
+         LayeredSystem sys = getLayeredSystem();
+         if (sys != null)
+            sys.removeFromInnerTypeCache(fullTypeName);
+      }
+   }
 
    /** Returns true if this type modifies the supplied type either directly or indirectly */
    public boolean modifiesType(BodyTypeDeclaration other) {
@@ -7764,8 +7777,6 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
       return false;
    }
-
-   transient int anonIdsAllocated = 0;
 
    public int allocateAnonId() {
       // Note: this does not handle the case where the type graph changes after this has been called.
@@ -8982,6 +8993,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public void stop() {
+      hasBeenStopped = true; // TODO: remove - for debug only
       memberCache = null;
       membersByName = null;
       methodsByName = null;
@@ -8999,6 +9011,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (replacedByType != null)
          replacedByType.clearCachedMemberInfo();
       transformedType = null;
+      anonIdsAllocated = 0;
       // Can't clear this out because it's set from the other type - it won't be reset on a restart
       //if (!replaced)
       //   replacedByType = null;

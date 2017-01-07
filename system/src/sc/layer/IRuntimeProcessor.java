@@ -35,6 +35,9 @@ public interface IRuntimeProcessor {
    /** Called after starting all types */
    public void postStart(LayeredSystem sys, Layer genLayer);
 
+   /** Called after stopping any layers from a previous build */
+   public void postStop(LayeredSystem sys, Layer genLayer);
+
    /** Called after processing all types */
    public void postProcess(LayeredSystem sys, Layer genLayer);
 

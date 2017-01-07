@@ -10,5 +10,7 @@
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="fullRuntime" exported="" />
     <orderEntry type="module" module-name="coreRuntime" exported="" />
+    <orderEntry type="library" name="jline-2.12" level="project" />
+    <orderEntry type="library" name="jline2-12" level="project" />
   </component>
 </module>

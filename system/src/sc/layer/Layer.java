@@ -261,7 +261,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    public boolean finalLayer = false;
 
    // For build layers, while the layer is being build this stores the build state - changed files, etc.
-   LayeredSystem.BuildState buildState, lastBuildState;
+   BuildState buildState, lastBuildState;
 
    /** Set to true when this layer has had all changed files detected.  If it's not changed, we will load it as source */
    public boolean changedModelsDetected = false;
@@ -793,7 +793,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    /** Adds the top level src directories for  */
-   public void addBuildDirs(LayeredSystem.BuildState bd) {
+   public void addBuildDirs(BuildState bd) {
       if (topLevelSrcDirs == null || topLevelSrcDirs.size() == 0) {
          warn("No srcPath entries for layer: ", this.toString());
       }

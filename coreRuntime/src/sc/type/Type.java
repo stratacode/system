@@ -745,12 +745,16 @@ public enum Type {
 
    public char arrayTypeCode;
 
+   private final static String NOT_IMPL_ERROR = "Error - method not implemented in coreRuntime - make sure dependency on the fullRuntime is ahead in the classpath";
+
    public Class getArrayClass(Class componentType, int ndims) {
-      throw new UnsupportedOperationException();
+      System.err.println(NOT_IMPL_ERROR);
+      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
    }
 
    public Class getPrimitiveArrayClass(int ndims) {
-      throw new UnsupportedOperationException();
+      System.err.println(NOT_IMPL_ERROR);
+      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
    }
 
 
@@ -782,7 +786,7 @@ public enum Type {
    public boolean evalConditional(String operator, Object lhs, Object rhs) {
       if (operator.equals("instanceof"))
          return DynUtil.instanceOf(lhs, rhs);
-      throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
    }
 
    public abstract Object evalUnary(String operator, Object arg);
@@ -794,7 +798,7 @@ public enum Type {
 
    /** Takes the class used to get this type as the first argument and implements the cast operator on the value */
    public Object evalCast(Class theClass, Object val) {
-      throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
       /*
       if (theClass.isInstance(val)) {
          return val;
@@ -812,31 +816,31 @@ public enum Type {
    }
 
    public boolean isInteger() {
-      throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
    }
 
    public boolean isShort() {
-      throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
    }
 
    public boolean isByte() {
-      throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
    }
 
    public boolean isLong() {
-      throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
    }
 
    public boolean isFloat() {
-      throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
    }
 
    public boolean isDouble() {
-      throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
    }
 
    public boolean isAFloat() {
-      throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
    }
 
    public boolean isAssignableFromAssignment(Type other, Class from, Class to) {

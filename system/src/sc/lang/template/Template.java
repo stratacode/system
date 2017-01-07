@@ -595,18 +595,17 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
    }
 
    public void stop() {
-      resetTemplateState();
+      SrcEntry srcEnt = getSrcFile();
+      if (srcEnt != null)
+         layeredSystem.removeTypesByName(srcEnt.layer, getPackagePrefix(), getDefinedTypes(), getLayer());
+      // Need to stop each of the 'types' in the super here before we reset types = null later
       super.stop();
-   }
-
-   private void resetTemplateState() {
       if (outputMethod != null && generateOutputMethod && rootType instanceof BodyTypeDeclaration) {
          BodyTypeDeclaration td = (BodyTypeDeclaration) rootType;
          td.removeStatement(outputMethod);
       }
       hasErrors = false;
       rootType = null;
-      // Reset the types since those are generated in the initialize method
       types = null;
       implicitRoot = false;
       statefulPage = true;
@@ -621,7 +620,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
          for (Object tempDecl:templateDeclarations) {
             // If the page has any variables in it, we can't make it a stateful page with binding snd auto-invalidation
             if (tempDecl instanceof Element) {
-               ((Element) tempDecl).resetTagObject();
+               ((Element) tempDecl).stop();
             }
          }
       }
@@ -851,7 +850,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
          }
          else if (generateOutputMethod) {
             SemanticNodeList decls = null;
-            if (types.size() != 0) {
+            if (types != null && types.size() != 0) {
                TypeDeclaration rootType = types.get(0);
                Object compilerSettings = rootType.getInheritedAnnotation("sc.obj.CompilerSettings");
                if (compilerSettings != null) {
@@ -1551,14 +1550,14 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
       return null;
    }
 
-   public boolean getDependenciesChanged(Map<String,IFileProcessorResult> changedModels) {
-      if (super.getDependenciesChanged(changedModels))
+   public boolean getDependenciesChanged(Layer genLayer, Map<String,IFileProcessorResult> changedModels) {
+      if (super.getDependenciesChanged(genLayer, changedModels))
          return true;
 
       TypeDeclaration td = (TypeDeclaration) rootType;
 
 
-      if (td != null && td.changedSinceLayer(initializedInLayer, false, null, changedModels)) {
+      if (td != null && td.changedSinceLayer(initializedInLayer, genLayer, false, null, changedModels)) {
          return true;
       }
       return false;

@@ -273,8 +273,10 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
       // Need to start the extends type as we need to dig into it
       Object extendsTypeDecl = extendsType.getTypeDeclaration();
-      if (extendsTypeDecl == null)
+      if (extendsTypeDecl == null) {
          extendsType.displayTypeError("Implemented class not found: ", extendsType.getFullTypeName(), " for ");
+         extendsTypeDecl = extendsType.getTypeDeclaration();
+      }
       return extendsTypeDecl;
    }
 
@@ -286,8 +288,11 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    public void initTypeInfo() {
       if (typeInfoInitialized)
          return;
+      if (!isInitialized()) {
+         JavaModel model = getJavaModel();
+         ParseUtil.initComponent(model);
+      }
       typeInfoInitialized = true;
-
 
       // Need to make sure the parent type is initialized before the sub-type since we need to search the parent types extends/implementBoundTypes to possibly find the implements types here
       TypeDeclaration enclType = getEnclosingType();
@@ -1725,7 +1730,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
    // Changed changed models is null - any changed types where there's a file dependent we return true.  When it's set, only
    // changed files in the dependency chain after the sinceLayer are considered.
-   public boolean changedSinceLayer(Layer sinceLayer, boolean resolve, IdentityHashSet<TypeDeclaration> visited, Map<String,IFileProcessorResult> changedModels) {
+   public boolean changedSinceLayer(Layer sinceLayer, Layer genLayer, boolean resolve, IdentityHashSet<TypeDeclaration> visited, Map<String,IFileProcessorResult> changedModels) {
       if (visited == null)
          visited = new IdentityHashSet<TypeDeclaration>();
       else if (visited.contains(this))
@@ -1736,31 +1741,50 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       // Get the most specific version of this type - i.e. walk up the modified food-chain.
       TypeDeclaration td = resolve ? (TypeDeclaration) resolve(true) : this;
 
-      if (changedModels == null || changedModels.get(td.getFullTypeName()) != null) {
-         Layer typeLayer = td.getLayer();
+      String fullTypeName = td.getFullTypeName();
+      Layer typeLayer = td.getLayer();
+
+      if (changedModels == null || changedModels.get(fullTypeName) != null) {
          if (typeLayer.getLayerPosition() > sinceLayer.getLayerPosition())
             return true;
       }
 
+      Layer fromLayer = genLayer.getNextLayer();
+
+      // For the root type, see if it's been modified by another file in between the layer we are building now to the layer where it
+      // was initialized.  If so, we need to stop it before we do the build.
+      if (getEnclosingType() == null) {
+         LayeredSystem sys = getLayeredSystem();
+         JavaModel model = getJavaModel();
+         SrcEntry srcEnt = sys.getSrcFileFromTypeName(fullTypeName, true, fromLayer, model.getPrependPackage(), null, typeLayer, false);
+         if (srcEnt != null) {
+            Layer srcLayer = srcEnt.layer;
+            // Is there a src file included in this build which is after the layer where we last initialized the type.  If so we need to
+            // restart it on this build.
+            if (srcLayer != null && srcLayer.getLayerPosition() > sinceLayer.getLayerPosition())
+               return true;
+         }
+      }
+
       Object extTD = td.getExtendsTypeDeclaration();
-      if (extTD instanceof TypeDeclaration && ((TypeDeclaration)extTD).changedSinceLayer(sinceLayer, true, visited, changedModels))
+      if (extTD instanceof TypeDeclaration && ((TypeDeclaration)extTD).changedSinceLayer(sinceLayer, genLayer, true, visited, changedModels))
          return true;
 
       Object derivedTD = td.getDerivedTypeDeclaration();
       if (derivedTD != extTD)
-         if (derivedTD instanceof TypeDeclaration && ((TypeDeclaration)derivedTD).changedSinceLayer(sinceLayer, false, visited, changedModels))
+         if (derivedTD instanceof TypeDeclaration && ((TypeDeclaration)derivedTD).changedSinceLayer(sinceLayer, genLayer, false, visited, changedModels))
             return true;
 
-      if (bodyChangedSinceLayer(body, sinceLayer, visited, changedModels) || bodyChangedSinceLayer(hiddenBody, sinceLayer, visited, changedModels))
+      if (bodyChangedSinceLayer(body, sinceLayer, genLayer, visited, changedModels) || bodyChangedSinceLayer(hiddenBody, sinceLayer, genLayer, visited, changedModels))
          return true;
       return false;
    }
 
-   private boolean bodyChangedSinceLayer(SemanticNodeList<Statement> bodyList, Layer sinceLayer, IdentityHashSet<TypeDeclaration> visited, Map<String,IFileProcessorResult> changedModels) {
+   private boolean bodyChangedSinceLayer(SemanticNodeList<Statement> bodyList, Layer sinceLayer, Layer genLayer, IdentityHashSet<TypeDeclaration> visited, Map<String,IFileProcessorResult> changedModels) {
       if (bodyList == null)
          return false;
       for (Statement st:bodyList)
-         if (st instanceof TypeDeclaration && ((TypeDeclaration) st).changedSinceLayer(sinceLayer, true, visited, changedModels))
+         if (st instanceof TypeDeclaration && ((TypeDeclaration) st).changedSinceLayer(sinceLayer, genLayer, true, visited, changedModels))
             return true;
       return false;
    }

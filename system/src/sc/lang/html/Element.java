@@ -738,6 +738,10 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          id = getObjectName();
       do {
          cur = cur.getExtendsElement();
+         if (cur != null && !cur.isInitialized()) {
+            Template templ = cur.getEnclosingTemplate();
+            ParseUtil.initComponent(templ);
+         }
          // Eliminate redundant setId calls in the generated code.  Look for the first tag in our hierarchy which specified the id
          // If it matches, return it.  This is particular important now because unique elements like head, body need to have a fixed id so if you
          // allocate two of them with the same tag name, you end up with the wrong id.
@@ -750,6 +754,8 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       cur = this;
       do {
          cur = cur.getDerivedElement();
+         if (cur != null && !cur.isInitialized())
+            ParseUtil.initComponent(cur.getEnclosingTemplate());
          if (cur != null && cur.specifiedId) {
             elemId = cur.tagObject.typeName;
             if (elemId != null)
@@ -3591,6 +3597,15 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       childrenById = null;
       tagObject = null;
       hiddenChildren = null;
+      modifyType = null;
+      id = null;
+      specifiedId = false;
+      repeatWrapper = null;
+      startTagValid = false;
+      bodyValid = false;
+      needsSuper = false;
+      needsBody = false;
+      convertingToObject = false;
    }
 
    public TypeDeclaration getElementTypeDeclaration() {
