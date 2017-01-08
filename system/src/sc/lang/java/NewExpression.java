@@ -104,8 +104,6 @@ public class NewExpression extends IdentifierExpression {
 
       JavaModel model = getJavaModel();
       if (model == null || typeIdentifier == null) {
-         if (model == null)
-            System.err.println("*** No model when starting new expression");
          super.start();
          return;
       }

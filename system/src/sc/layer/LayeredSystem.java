@@ -7582,6 +7582,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return null; // possibly not processed in this phase
       if (!toGenEnt.layer.skipStart(toGenEnt.baseFileName, toGenEnt.relFileName)) {
          PerfMon.start("startModel", false);
+         if (options.verbose && modelObj instanceof ILifecycle) {
+            ILifecycle modelComp = (ILifecycle) modelObj;
+            if (!modelComp.isStarted()) {
+               String action = "Starting " + (modelComp.isValidated() ? "" : " and validating");
+               verbose(action + ": " + toGenEnt);
+            }
+         }
          ParseUtil.startComponent(modelObj);
          ParseUtil.validateComponent(modelObj);
          PerfMon.end("startModel");
@@ -8242,6 +8249,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          sdEnts.add(srcDirEnt);
       }
 
+      ArrayList<ILanguageModel> toStop = new ArrayList<ILanguageModel>();
+
       // Now that we have the complete list of models which are going to be processed, for any models which have already
       // been parsed and started, we'll stop them to reset their state to the initial state.  It's important that we
       // stop all models before we start initializing them because that will start to inject references to parts of code
@@ -8277,14 +8286,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   }
                   if (options.verbose)
                      verbose("Stopping: " + toGenEnt + " for: " + getProcessIdent());
-                  cachedModel.stop();
-                  // When we reinit the model, we need to register the types.  for templates specifically they
-                  // destroy and recreate the types on the stop/init cycle so we need to call addTypesByName again
-                  // after we reinit.
-                  cachedModel.setAdded(false);
+
+                  toStop.add(cachedModel);
                }
             }
          }
+      }
+
+      for (int i = 0; i < toStop.size(); i++) {
+         ILanguageModel cachedModel = toStop.get(i);
+         cachedModel.stop();
+         // When we reinit the model, we need to register the types.  for templates specifically they
+         // destroy and recreate the types on the stop/init cycle so we need to call addTypesByName again
+         // after we reinit.
+         cachedModel.setAdded(false);
       }
 
       // Run the runtimeProcessor hook after stopping some models so it can clear out any cached types and reresolve them
@@ -8521,6 +8536,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       flags.started = true;
 
+      if (options.verbose) {
+         verbose("Starting models for build layer: " + genLayer + " runtime: " + getProcessIdent());
+      }
+
       for (SrcDirEntry srcDirEnt : bd.srcDirs) {
          for (ModelToTransform mtt : srcDirEnt.modelsToTransform) {
             IFileProcessorResult model = mtt.model;
@@ -8533,10 +8552,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return GenerateCodeStatus.Error;
 
       if (phase == BuildPhase.Process) {
-         if (options.verbose) {
-            verbose("Starting models for build layer: " + genLayer);
-         }
-
          if (bd.anyError)
             return GenerateCodeStatus.Error;
          else {
