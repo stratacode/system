@@ -745,16 +745,18 @@ public class FileUtil {
    }
 
    public static String makePathAbsolute(String path) {
-      String[] pathDirs = StringUtil.split(path, ':');
-      StringBuilder sb = new StringBuilder();
-      boolean first = true;
-      for (String pathDir:pathDirs) {
-         if (!first)
-            sb.append(FileUtil.PATH_SEPARATOR_CHAR);
-         else
-            first = false;
-         sb.append(FileUtil.makeAbsolute(pathDir));
-      }
-      return sb.toString();
+       path = path.replace(":\\", "|");  // replace windows absolute paths of the form C:\ since the split operation below relies on ':' as a separator
+       String[] pathDirs = StringUtil.split(path, ':');
+       StringBuilder sb = new StringBuilder();
+       boolean first = true;
+       for (String pathDir : pathDirs) {
+           if (!first) {
+               sb.append(FileUtil.PATH_SEPARATOR_CHAR);
+           } else {
+               first = false;
+           }
+           sb.append(FileUtil.makeAbsolute(pathDir.replace("|", ":\\")));  // restore windows absolute paths
+       }
+       return sb.toString();
    }
 }
