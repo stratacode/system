@@ -140,6 +140,10 @@ public class SyncManager {
          else
             return super.toString();
       }
+
+      public void setName(String name) {
+         this.name = name;
+      }
    }
 
    public SyncProperties getSyncPropertiesForInst(Object changedObj) {
@@ -494,7 +498,7 @@ public class SyncManager {
             if (initInst) {
                SyncProperties props = getSyncPropertiesForInst(inst);
                if (props != null) {
-                  ii.name = objName;
+                  ii.setName(objName);
                   initOnDemandInst(inst, ii, false, false);
                }
             }
@@ -508,12 +512,12 @@ public class SyncManager {
             if (ii.onDemand && !ii.initialized && initInst) {
                SyncProperties props = getSyncPropertiesForInst(inst);
                if (props != null) {
-                  ii.name = objName;
+                  ii.setName(objName);
                   initOnDemandInst(inst, ii, false, false);
                }
             }
          }
-         ii.name = objName;
+         ii.setName(objName);
          ii.fixedObject = fixedName; // when true the object name is not reset
          ii.registered = nameQueued;
          ii.nameQueued = nameQueued;
@@ -689,7 +693,7 @@ public class SyncManager {
                      System.out.println("*** No instance for: " + objName);
                }
                else
-                  ii.name = objName;
+                  ii.setName(objName);
                return objName;
             }
          }
@@ -712,12 +716,12 @@ public class SyncManager {
             else {
                ii = new InstInfo(null, false, false);
             }
-            ii.name = parentName;
+            ii.setName(parentName);
             syncInsts.put(changedObj, ii);
             objectIndex.put(parentName, changedObj);
          }
          else {
-            ii.name = parentName;
+            ii.setName(parentName);
          }
          ii.inherited = true;
          ii.nameQueued = true;
@@ -1034,7 +1038,7 @@ public class SyncManager {
             return;
 
          if (!isRootedObject(inst)) {
-            ii.name = objName;
+            ii.setName(objName);
             // States disabled, or applying changes any new instances are automatically registered.  When initializing, it's registered only if it's the direct initializer, not part of a binding (that might not run on the other side)
             // SyncState state = getSyncState();
             //if (state != SyncState.RecordingChanges && (state != SyncState.Initializing || Bind.getNestedBindingCount() <= 1)) {
@@ -1053,7 +1057,7 @@ public class SyncManager {
             ii.registered = true;
             ii.nameQueued = true;
             ii.fixedObject = true;
-            ii.name = objName;
+            ii.setName(objName);
             syncType = " object ";
          }
          objectIndex.put(objName, inst);
@@ -1448,7 +1452,7 @@ public class SyncManager {
 
       private InstInfo createInheritedInstInfo(InstInfo ii) {
          InstInfo newInstInfo = new InstInfo(ii.args, ii.initDefault, ii.onDemand);
-         newInstInfo.name = ii.name;
+         newInstInfo.setName(ii.name);
          newInstInfo.fixedObject = ii.fixedObject;
          // TODO: Do we reuse the change maps or should we clone them so we can track the changes for each session, etc.
          newInstInfo.initialValues = ii.initialValues != null ? (HashMap<String,Object>) ii.initialValues.clone() : null;
