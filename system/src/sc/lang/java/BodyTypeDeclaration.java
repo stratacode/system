@@ -157,7 +157,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    protected transient MemberCache memberCache = null;
 
-   /** In the event we modify a compiled type which was an ommitted object type, we need to freeze the compiled class name at the one which was actually compiled.   We could lazily cache the compiledClassName but maybe it will change during start/validate so we'd have to cache it the first time after we've compiled the system.  Instead, we cache it the first time we see that we're stale */
+   /** In the event we modify a compiled type which was an omitted object type, we need to freeze the compiled class name at the one which was actually compiled.   We could lazily cache the compiledClassName but maybe it will change during start/validate so we'd have to cache it the first time after we've compiled the system.  Instead, we cache it the first time we see that we're stale */
    protected transient String staleClassName = null;
 
    protected transient boolean memberCacheEnabled = true;
@@ -186,6 +186,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public transient Boolean autoComponent = null;
 
    transient int anonIdsAllocated = 0;
+
+   transient public ArrayList<SyncProperties> syncProperties = null;
+
+   transient protected boolean syncPropertiesInited = false;
 
    // Debug flag - keep track of whether this model has ever been stopped
    public transient boolean hasBeenStopped = false;
@@ -3878,7 +3882,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
    */
 
-   // TODO: need to validate that all properties etc access are marked with the @Sync annotation
+   // TODO: SECURITY ALERT! For client/server security, we need to validate that all properties etc access are marked with the @Sync annotation.  In other words, don't
+   // let the sync system update any properties in the model - only those which are authorized to be set by the programmer.
    private void updateInstFromBody(Object inst, SyncManager.SyncContext syncCtx, ExecutionContext ctx, SemanticNodeList<Statement> toUpdate) {
       if (toUpdate == null)
          return;
@@ -6998,6 +7003,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          else if (nextType == null || !(nextType instanceof TypeDeclaration))
             return currentType;
 
+         // Will currentType be transformed here?  If not, we basically have to determine if either the extends or modify type of the currentType is compiled.
          if (currentType instanceof ModifyDeclaration) {
             ModifyDeclaration modDecl = (ModifyDeclaration) currentType;
             Object nextModType = modDecl.getExtendsTypeDeclaration();
@@ -7005,8 +7011,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                return nextModType;
             if (ModelUtil.isCompiledClass(nextModType))
                return nextModType;
-            if (!modDecl.needsOwnClass(false) && nextModType instanceof TypeDeclaration && ((TypeDeclaration) nextModType).needsOwnClass(false))
-               return nextModType;
+            if (!modDecl.needsOwnClass(false) && nextModType instanceof TypeDeclaration && ((TypeDeclaration) nextModType).needsOwnClass(false)) {
+               // If the modify type includes the extends type just keep going as we'll encounter this extends type again
+               // If it's a real compiled extends type that's new, we are compiled from here on out based on this class.
+               if (!ModelUtil.isAssignableFrom(nextModType, nextType))
+                  return nextModType;
+            }
          }
 
          // If there are any compiled interfaces we need to compile a real type
@@ -8059,10 +8069,6 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return syncProperties != null;
    }
 
-   transient public ArrayList<SyncProperties> syncProperties = null;
-
-   transient protected boolean syncPropertiesInited = false;
-
    public List<SyncProperties> getSyncProperties() {
       if (!syncPropertiesInited)
          initSyncProperties();
@@ -9001,6 +9007,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       instFields = null;
       allMethods = null;
       staticValues = null;
+      staticFields = null;
       staticFieldMap = null;
       oldInstFields = null;
       oldStaticFields = null;
@@ -9012,10 +9019,48 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          replacedByType.clearCachedMemberInfo();
       transformedType = null;
       anonIdsAllocated = 0;
+      extendsInvalid = false;
+      extendsOverridden = false;
+      dependentTypes = null;
+      autoComponent = null;
+      syncPropertiesInited = false;
+      syncInitDefault = false;
+      syncOnDemand = false;
+      syncConstant = false;
+      cachedNeedsSync = false;
+      dynamicType = false;
+      dynamicNew = false;
+      compiledOnly = false;
+      propertiesToMakeBindable = null;
+      propertiesAlreadyBindable = null;
+      dynInvokeMethods = null;
+      typeInfoCompleted = false;
+      scopeInterfaces = null;
+      dynInstFieldMap = null;
+      dynTransientFields = null;
+      needsCompiledClass = false;
+      needsDynamicStub = false;
+      needsOwnClass = false;
+      allowDynamic = false;
+      needsDynInnerStub = false;
+      stubCompiled = false;
+      stubGenerated = false;
+      needsDynAccess = false;
+      objectSetProperty = false;
+      needsDynDefaultConstructor = false;
+      propertyCache = null;
+      dynChildManager = null;
+      dynObjManager = null;
+      prevCompiledExtends = null;
+      staleClassName = null;
+      syncProperties = null;
+
       // Can't clear this out because it's set from the other type - it won't be reset on a restart
       //if (!replaced)
       //   replacedByType = null;
       super.stop();
+      if (hiddenBody != null)
+         hiddenBody.stop();
    }
 
    public void updateReplacedByType(BodyTypeDeclaration repl) {

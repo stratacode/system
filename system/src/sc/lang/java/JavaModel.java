@@ -2647,6 +2647,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public void stop() {
+      SrcEntry srcEnt = getSrcFile();
+
+      if (srcEnt != null)
+         layeredSystem.removeTypesByName(srcEnt.layer, getPackagePrefix(), getDefinedTypes(), getLayer());
+
       super.stop();
 
       typeInfoInited = false;
@@ -2857,6 +2862,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public boolean getDependenciesChanged(Layer genLayer, Map<String,IFileProcessorResult> changedModels) {
+      if (needsRestart) {
+         return true;
+      }
       for (TypeDeclaration td:types) {
          if (td.changedSinceLayer(initializedInLayer, genLayer, false, null, changedModels))
             return true;

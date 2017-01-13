@@ -854,7 +854,7 @@ public class EditorContext extends ClientEditorContext {
          SrcEntry srcEnt = model.getSrcFile();
          if (srcEnt == null) {
             // The pending model has not been assigned a type yet
-            system.refreshRuntimes();
+            system.refreshRuntimes(true);
             return;
          }
          changedModels.remove(model);
@@ -906,7 +906,7 @@ public class EditorContext extends ClientEditorContext {
    }
 
    public LayeredSystem.SystemRefreshInfo refresh() {
-      return system.refreshRuntimes();
+      return system.refreshRuntimes(true);
    }
 
    void updateCurrentModelStale() {

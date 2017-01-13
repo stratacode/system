@@ -1668,6 +1668,18 @@ public class IdentifierExpression extends ArgumentsExpression {
       return value;
    }
 
+   private Object resolveCustomObj(JavaModel jmodel, int ix) {
+      Object boundType = boundTypes[ix];
+      if (boundType instanceof BodyTypeDeclaration && !((BodyTypeDeclaration) boundType).isStarted()) {
+         ModelUtil.ensureStarted(boundType, true);
+      }
+      Object customObj = null;
+      if (jmodel != null && jmodel.customResolver != null) {
+         return jmodel.customResolver.resolveObject(jmodel.getPackagePrefix(), getIdentifierPathName(ix+1), true, true);
+      }
+      return null;
+   }
+
    public Object eval(Class expectedType, ExecutionContext ctx) {
       String methodName = null;
       boolean superMethod = false;
@@ -1692,8 +1704,16 @@ public class IdentifierExpression extends ArgumentsExpression {
                while (idTypes[nextIx] == IdentifierType.PackageName)
                   nextIx++;
                isType = true;
-               if (idTypes[nextIx] == IdentifierType.BoundTypeName)
-                  value = ModelUtil.getRuntimeType(boundTypes[nextIx++]);
+               if (idTypes[nextIx] == IdentifierType.BoundTypeName) {
+                  value = resolveCustomObj(jmodel, nextIx);
+                  if (value == null) {
+                     value = ModelUtil.getRuntimeType(boundTypes[nextIx]);
+                     isType = true;
+                  }
+                  else
+                     isType = false;
+                  nextIx++;
+               }
                else if (idTypes[nextIx] == IdentifierType.ResolvedObjectName) {
                   jmodel = getJavaModel();
                   value = jmodel.customResolver.resolveObject(jmodel.getPackagePrefix(), getIdentifierPathName(sz), true, true);
@@ -1768,11 +1788,13 @@ public class IdentifierExpression extends ArgumentsExpression {
                break;
 
             case BoundTypeName:
-               if (boundTypes[0] instanceof BodyTypeDeclaration && !((BodyTypeDeclaration) boundTypes[0]).isStarted()) {
-                  ModelUtil.ensureStarted(boundTypes[0], true);
+               Object customObj = resolveCustomObj(jmodel, 0);
+               if (customObj == null) {
+                  value = ModelUtil.getRuntimeType(boundTypes[0]);
+                  isType = true;
                }
-               value = ModelUtil.getRuntimeType(boundTypes[0]);
-               isType = true;
+               else
+                  isType = false;
                break;
 
             case EnumName:
@@ -1868,17 +1890,29 @@ public class IdentifierExpression extends ArgumentsExpression {
                   case GetVariable:
                   case IsVariable:
                   case GetSetMethodInvocation:
-                     if (isType)
-                        value = DynUtil.getStaticProperty(value, id);
+                     // The entire path name for the identifier expression may be the object path name - e.g. like when created as
+                     // outerTypeName.objectId.  In this case, the field name is not a property of the parent type or instance
+                     Object customObj = resolveCustomObj(jmodel, i);
+                     if (customObj != null)
+                        value = customObj;
                      else {
-                        //value = DynUtil.getPropertyValue(value, id);
-                        value = getPropertyValueForType(value, i);
+                        if (isType)
+                           value = DynUtil.getStaticProperty(value, id);
+                        else {
+                           //value = DynUtil.getPropertyValue(value, id);
+                           value = getPropertyValueForType(value, i);
+                        }
                      }
                      isType = false;
                      break;
                   case BoundTypeName:
-                     value = ModelUtil.getRuntimeType(boundTypes[i]);
-                     isType = true;
+                     customObj = resolveCustomObj(jmodel, i);
+                     if (customObj == null) {
+                        value = ModelUtil.getRuntimeType(boundTypes[i]);
+                        isType = true;
+                     }
+                     else
+                        isType = false;
                      break;
                   case ThisExpression:
                      value = ctx.findThisType(value);

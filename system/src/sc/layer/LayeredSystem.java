@@ -184,7 +184,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private Map<String,ILanguageModel> modelIndex = new HashMap<String,ILanguageModel>();
 
    /** Stores the inactive model types, separate from the active ones.  Here the layer stack is lazily formed and contains files we are not compiling... just loading for tooling purposes like the IDE or the doc styling */
-   private Map<String,ILanguageModel> inactiveModelIndex = new HashMap<String,ILanguageModel>();
+   private HashMap<String,ILanguageModel> inactiveModelIndex = new HashMap<String,ILanguageModel>();
 
    /** As we are editing, we are only updating the model in one runtime.  Instead, we accumulate the set of models which are stale in the peer runtimes and flush them out periodically. */
    private Map<String,ILanguageModel> peerModelsToUpdate = new HashMap<String,ILanguageModel>();
@@ -3740,7 +3740,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (!sys.promptUserRetry())
                System.exit(1);
             else {
-               sys.refreshSystem(true);
+               sys.refreshSystem(true, true);
                sys.resetBuild(true);
             }
          }
@@ -6835,9 +6835,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          else if (layer.typeIndexFileLastModified != -1)
             layer.updateFileIndexLastModified();
       }
-      // Save the list of layers here too
       if (typeIndex != null && typeIndex.needsSave)
          typeIndex.saveToDir(getTypeIndexDir());
+      // Save the list of layers here too
    }
 
    // TODO: We need a more accurate way of determining when a model is in use before we cull it.  If there is another
@@ -7905,6 +7905,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      IFileProcessor proc = getFileProcessorForFileName(newPath, srcEnt.layer, phase);
                      if (proc == null)
                         continue;
+                     // If we don't have a record of the file, it's a new file
                      if (deps.getDependencies(newFile) == null) {
                         if (new File(newFile).isDirectory()) {
                            // Pick up new directories that were added
@@ -8541,6 +8542,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       for (SrcDirEntry srcDirEnt : bd.srcDirs) {
+         if (srcDirEnt == null) {
+            System.out.println("*** Warning - null srcDirEnt!");
+            continue;
+         }
          for (ModelToTransform mtt : srcDirEnt.modelsToTransform) {
             IFileProcessorResult model = mtt.model;
             SrcEntry toGenEnt = mtt.toGenEnt;
@@ -9160,7 +9165,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       initSysClassLoader(buildLayer, ClassLoaderMode.ALL);
 
       Thread.currentThread().setContextClassLoader(getSysClassLoader());
-      refreshBoundTypes(ModelUtil.REFRESH_CLASSES);
+      refreshBoundTypes(ModelUtil.REFRESH_CLASSES, true);
 
       // Test processors and other instances need to be refreshed with the new class loader
       if (buildInfo != null)
@@ -9311,7 +9316,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
 
-      refreshBoundTypes(ModelUtil.REFRESH_TYPEDEFS | ModelUtil.REFRESH_TRANSFORMED_ONLY);
+      refreshBoundTypes(ModelUtil.REFRESH_TYPEDEFS | ModelUtil.REFRESH_TRANSFORMED_ONLY, true);
 
       // Need to clear this before we do refreshBoundType.   This was stale after the last recompile which means new classes
       // won't be visible yet - shadowed by cached nulls.  when we validate the models in refreshBoundType we need the new
@@ -9329,19 +9334,27 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   public void refreshBoundTypes(int flags) {
-      // Need to clone here because we'll be adding new types to this map during the refreshBoundType process below - i.e.
-      // remapping transformed types to their untransformed representations
-      Map<String,TypeDeclarationCacheEntry> oldTypesByName = (Map<String,TypeDeclarationCacheEntry>) typesByName.clone();
+   public void refreshBoundTypes(int flags, boolean active) {
+      if (active) {
+         // Need to clone here because we'll be adding new types to this map during the refreshBoundType process below - i.e.
+         // remapping transformed types to their untransformed representations
+         Map<String, TypeDeclarationCacheEntry> oldTypesByName = (Map<String, TypeDeclarationCacheEntry>) typesByName.clone();
 
-      // Now that we've purged the cache of transformed types, go through any remaining types and do the refreshBoundType
-      // operation.  That will drag in new versions of any referenced transformed types.
-      for (Iterator<Map.Entry<String,TypeDeclarationCacheEntry>> it = oldTypesByName.entrySet().iterator(); it.hasNext(); ) {
-         Map.Entry<String,TypeDeclarationCacheEntry> mapEnt = it.next();
-         TypeDeclarationCacheEntry tdEnt = mapEnt.getValue();
-         for (int k = 0; k < tdEnt.size(); k++) {
-            TypeDeclaration td = tdEnt.get(k);
-            td.refreshBoundTypes(flags);
+         // Now that we've purged the cache of transformed types, go through any remaining types and do the refreshBoundType
+         // operation.  That will drag in new versions of any referenced transformed types.
+         for (Iterator<Map.Entry<String, TypeDeclarationCacheEntry>> it = oldTypesByName.entrySet().iterator(); it.hasNext(); ) {
+            Map.Entry<String, TypeDeclarationCacheEntry> mapEnt = it.next();
+            TypeDeclarationCacheEntry tdEnt = mapEnt.getValue();
+            for (int k = 0; k < tdEnt.size(); k++) {
+               TypeDeclaration td = tdEnt.get(k);
+               td.refreshBoundTypes(flags);
+            }
+         }
+      }
+      else {
+         Map<String, ILanguageModel> oldInactiveModels = (Map<String, ILanguageModel>) inactiveModelIndex.clone();
+         for (ILanguageModel oldModel:oldInactiveModels.values()) {
+            oldModel.refreshBoundTypes(flags);
          }
       }
    }
@@ -10015,13 +10028,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   public SystemRefreshInfo refreshRuntimes() {
+   public SystemRefreshInfo refreshRuntimes(boolean active) {
       updatePeerModels(true);
 
       acquireDynLock(false);
       SystemRefreshInfo sysInfo;
       try {
-         sysInfo = refreshSystem(false);
+         sysInfo = refreshSystem(false, active);
          ArrayList<SystemRefreshInfo> peerChangedInfos = new ArrayList<SystemRefreshInfo>();
          if (peerSystems != null) {
             for (LayeredSystem sys : peerSystems) {
@@ -10029,15 +10042,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                // TODO: right now, we ignore the change models in other systems.  These are used by EditorContext to do
                // updating of any errors detected in the models.  Currently EditorContext only knows about one layered system
                // but will need to know about all of them to manage errors, switching views etc. correctly.
-               peerChangedInfos.add(sys.refreshSystem(false));
+               peerChangedInfos.add(sys.refreshSystem(false, active));
             }
             setCurrent(this);
          }
-         completeRefresh(sysInfo);
+         completeRefresh(sysInfo, active);
          if (peerSystems != null) {
             int i = 0;
             for (LayeredSystem peer : peerSystems) {
-               peer.completeRefresh(peerChangedInfos.get(i));
+               peer.completeRefresh(peerChangedInfos.get(i), active);
                i++;
             }
          }
@@ -10063,7 +10076,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public SystemRefreshInfo refreshInactiveTypes() {
 
       UpdateInstanceInfo updateInfo = null;
-      List<Layer.ModelUpdate> changedModels = refreshSystem(null, false);
+      List<Layer.ModelUpdate> changedModels = refreshChangedModels(null, false);
 
       if (changedModels.size() > 0) {
          // Once we've refreshed some of the models in the system, we now need to go and update the type references globally to point to the new references
@@ -10078,23 +10091,28 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public SystemRefreshInfo refreshSystem() {
-      return refreshSystem(true);
+      return refreshSystem(true, true);
    }
 
    public SystemRefreshInfo refreshSystem(boolean refreshPeers) {
+      return refreshSystem(refreshPeers, true);
+   }
+
+   public SystemRefreshInfo refreshSystem(boolean refreshPeers, boolean active) {
       // Before we parse any files, need to clear out any invalid models
       // TODO: remove this unless we are not using clonedTransformedModels
-      cleanTypeCache();
+      if (active)
+         cleanTypeCache();
 
       // We may start some new models here so reset this flag
       allTypesProcessed = false;
 
       UpdateInstanceInfo updateInfo = newUpdateInstanceInfo();
-      List<Layer.ModelUpdate> changedModels = refreshSystem(updateInfo, true);
+      List<Layer.ModelUpdate> changedModels = refreshChangedModels(updateInfo, active);
 
       if (changedModels.size() > 0) {
          // Once we've refreshed some of the models in the system, we now need to go and update the type references globally to point to the new references
-         refreshBoundTypes(ModelUtil.REFRESH_TYPEDEFS);
+         refreshBoundTypes(ModelUtil.REFRESH_TYPEDEFS, active);
       }
 
       SystemRefreshInfo sysInfo = new SystemRefreshInfo();
@@ -10103,7 +10121,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       if (refreshPeers && peerSystems != null) {
          for (LayeredSystem peerSys:peerSystems) {
-            peerSys.refreshSystem(false);
+            peerSys.refreshSystem(false, active);
          }
       }
 
@@ -10127,7 +10145,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       acquireDynLock(false);
       try {
          options.buildAllFiles = true;
-         refreshSystem(true);
+         refreshSystem(true, true);
          resetBuild(true);
          buildSystem(null, false, false);
          if (peerSystems != null) {
@@ -10196,21 +10214,21 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // them there.
             // First we have to refresh the models in all systems so we have a consistent view of the new types across all
             // runtimes.  That way synchronization can be computed accurately for the new changes.
-            SystemRefreshInfo sysInfo = refreshSystem(false);
+            SystemRefreshInfo sysInfo = refreshSystem(false, true);
             changes = sysInfo.changedModels;
             peerChanges = new ArrayList<SystemRefreshInfo>();
             if (peerSystems != null && !peerMode) {
                for (LayeredSystem peer:peerSystems) {
                   peer.buildingSystem = true;
-                  peerChanges.add(peer.refreshSystem(false));
+                  peerChanges.add(peer.refreshSystem(false, true));
                }
             }
 
             // Now we need to validate and process the changed models and update any instances in each system.
-            completeRefresh(sysInfo);
+            completeRefresh(sysInfo, true);
             if (peerSystems != null && !peerMode) {
                for (int i = 0; i < peerSystems.size(); i++) {
-                  peerSystems.get(i).completeRefresh(peerChanges.get(i));
+                  peerSystems.get(i).completeRefresh(peerChanges.get(i), true);
                }
             }
          }
@@ -10261,7 +10279,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   private void completeRefresh(SystemRefreshInfo sysInfo) {
+   private void completeRefresh(SystemRefreshInfo sysInfo, boolean active) {
       List<Layer.ModelUpdate> changes = sysInfo.changedModels;
       if (changes == null)
          return;
@@ -10276,9 +10294,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             removeModel(upd.oldModel, true);
          }
       }
-      ExecutionContext ctx = new ExecutionContext(this);
-      //allTypesProcessed = true;
-      sysInfo.updateInfo.updateInstances(ctx);
+
+      if (active) {
+         ExecutionContext ctx = new ExecutionContext(this);
+         //allTypesProcessed = true;
+         sysInfo.updateInfo.updateInstances(ctx);
+      }
 
    }
 
@@ -10316,6 +10337,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // Need to restart all models that were previously loaded since we are building all files.
       if (options.buildAllFiles)
          lastChangedModelTime = System.currentTimeMillis();
+
+      // When resetting the build if we are building all files and there are cached models, restart them all once.  We could clean out the model index
+      // but this way, we avoid having to reparse everything but still process the build the same way as a clean build.
+      if (options.buildAllFiles) {
+         for (ILanguageModel oldModel : modelIndex.values()) {
+            if (oldModel instanceof JavaModel)
+               ((JavaModel) oldModel).needsRestart = true;
+         }
+      }
+
       if (layers != null) {
          for (int i = 0; i < layers.size(); i++) {
             Layer l = layers.get(i);
@@ -10356,7 +10387,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * incrementally.
     * TODO: instead of using a file watcher, how about just calling this at most once every few seconds?
     */
-   public List<Layer.ModelUpdate> refreshSystem(UpdateInstanceInfo updateInfo, boolean active) {
+   public List<Layer.ModelUpdate> refreshChangedModels(UpdateInstanceInfo updateInfo, boolean active) {
       ExecutionContext ctx = new ExecutionContext(this);
       long changedModelStartTime = System.currentTimeMillis();
       ArrayList<Layer.ModelUpdate> refreshedModels = new ArrayList<Layer.ModelUpdate>();
@@ -10908,11 +10939,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       String rootName = type.getInnerTypeName();
       ArrayList<BodyTypeDeclaration> types = typesByRootName.get(rootName);
       if (types == null) {
+         if (type instanceof AnonClassDeclaration)
+            return;
           return;
       }
       else {
-         if (!types.remove(type))
+         if (!types.remove(type)) {
+            if (type instanceof AnonClassDeclaration)
+               return;
             System.err.println("*** Can't find entry in root name list to remove: " + rootName);
+         }
          else if (types.size() == 0)
             typesByRootName.remove(rootName);
       }
@@ -10993,26 +11029,30 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public void removeTypeByName(Layer layer, String fullTypeName, TypeDeclaration toRem, Layer fromLayer) {
-      removeFromRootNameIndex(toRem);
-      TypeDeclarationCacheEntry tds = typesByName.get(fullTypeName);
-      if (tds != null) {
-         int i;
-         for (i = 0; i < tds.size(); i++) {
-            TypeDeclaration inList = tds.get(i);
-            if (inList == toRem) {
-               tds.remove(i);
-               // Next time we search for this type, we need to look at all files here.  Technically we could probably set this to
-               // the layerPosition of the next type in the list (if there is one) but it's a minor performance thing.
-               tds.fromPosition = 0;
-               subTypesByType.remove(toRem.getFullTypeName());
-               if (tds.size() == 0)
-                  typesByName.remove(fullTypeName);
-               return;
+      if (toRem.layer != null && toRem.layer.activated) {
+         removeFromRootNameIndex(toRem);
+         TypeDeclarationCacheEntry tds = typesByName.get(fullTypeName);
+         if (tds != null) {
+            int i;
+            for (i = 0; i < tds.size(); i++) {
+               TypeDeclaration inList = tds.get(i);
+               if (inList == toRem) {
+                  tds.remove(i);
+                  // Next time we search for this type, we need to look at all files here.  Technically we could probably set this to
+                  // the layerPosition of the next type in the list (if there is one) but it's a minor performance thing.
+                  tds.fromPosition = 0;
+                  subTypesByType.remove(toRem.getFullTypeName());
+                  if (tds.size() == 0)
+                     typesByName.remove(fullTypeName);
+                  return;
+               }
             }
          }
-      }
-      else {
-         warning("*** remove type by name not in list");
+         else {
+            // We don't consistently add the anonymous types to this list so don't warn when we try to remove them.
+            if (!(toRem instanceof AnonClassDeclaration))
+               warning("*** remove type by name not in list");
+         }
       }
    }
 
@@ -13600,7 +13640,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       // As long as there is a dynamic type which we're loading, to be sure we really need to refresh
       // everything.  Evenetually a file system watcher will make this more incremental.
-      refreshRuntimes();
+      refreshRuntimes(true);
 
       //JavaModel model = toRefresh.getJavaModel();
       //ExecutionContext ctx = new ExecutionContext();

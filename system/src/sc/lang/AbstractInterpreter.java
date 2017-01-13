@@ -332,7 +332,7 @@ public abstract class AbstractInterpreter extends EditorContext {
                
                TypeDeclaration currentDef = system.getSrcTypeDeclaration(CTypeUtil.prefixPath(model.getPackagePrefix(), type.typeName), currentLayer.getNextLayer(), true);
                if (currentDef == null || currentDef.getLayer() != layer) {
-                  system.refreshRuntimes();
+                  system.refreshRuntimes(true);
                   currentDef = system.getSrcTypeDeclaration(CTypeUtil.prefixPath(model.getPackagePrefix(), type.typeName), currentLayer.getNextLayer(), true);
                   if (currentDef == null) {
                      System.err.println("No type (mismatching case?): " + type.typeName);

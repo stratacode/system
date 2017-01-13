@@ -23,10 +23,10 @@ import sc.util.StringUtil;
 import java.util.HashMap;
 
 /**
- * These can be craeted by parsing the ModelStream grammar node in the JavaLanguage.  Or it can be created in the code from UpdateInstanceInfo, the
- * data structure generated when performing a system update.  In thise case it represents the program model changes made from since the last refresh.
+ * These can be created by parsing the ModelStream grammar node in the JavaLanguage.  Or it can be created in the code from UpdateInstanceInfo, the
+ * data structure generated when performing a system update.  In this case it represents the program model changes made from since the last refresh.
  *
- * When it is parsed, it (today) represents a sync update to/from the client.
+ * When it is parsed, it's the main data structure that stores info used in a sync update to/from the client.
  */
 public class ModelStream extends SemanticNode implements ICustomResolver {
    public SemanticNodeList<JavaModel> modelList;
@@ -105,7 +105,7 @@ public class ModelStream extends SemanticNode implements ICustomResolver {
       if (modelList != null) {
          for (JavaModel model:modelList) {
             // When we have a sync context, it does the resolving.  We are not updating types, but instances.
-            // When there's no sync context, we're processing a model stream that was generated during the refreshSystem
+            // When there's no sync context, we're processing a model stream that was generated during the refreshChangedModels
             // operation.
             if (isSyncStream) {
                model.customResolver = this;

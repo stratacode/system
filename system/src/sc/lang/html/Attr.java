@@ -29,6 +29,8 @@ public class Attr extends Node implements ISrcStatement {
    // The Element tag which defined this attribute
    public transient Element declaringTag;
 
+   private transient boolean attInit = false;
+
    public boolean isString() {
       return PString.isString(value);
    }
@@ -52,8 +54,6 @@ public class Attr extends Node implements ISrcStatement {
          return (Expression) value;
       return null;
    }
-
-   private transient boolean attInit = false;
 
    public void resetAttribute() {
       attInit = false;
@@ -278,4 +278,14 @@ public class Attr extends Node implements ISrcStatement {
       return false;
    }
 
+
+   public void stop() {
+      super.stop();
+      attInit = false;
+      valueExpr = null;
+      valueExprClone = null;
+      valueProp = null;
+      unknown = false;
+      declaringTag = null;
+   }
 }

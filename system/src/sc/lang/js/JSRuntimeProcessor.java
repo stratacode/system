@@ -2805,9 +2805,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    /*
-   public CharSequence refreshSystem() {
+   public CharSequence refreshChangedModels() {
       JSUpdateInstanceInfo info = new JSUpdateInstanceInfo();
-      system.refreshSystem(info);
+      system.refreshChangedModels(info);
       system.completeRefreshSystem(info);
       return info.convertToJS();
    }

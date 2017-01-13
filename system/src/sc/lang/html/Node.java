@@ -141,4 +141,9 @@ public abstract class Node extends JavaSemanticNode implements IDynObject, ISrcS
       return false;
    }
 
+
+   public void stop() {
+      super.stop();
+      errorArgs = null;
+   }
 }
