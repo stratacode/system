@@ -585,6 +585,8 @@ public class SyncLayer {
       Object newObjType = DynUtil.getType(newObj);
       String newLastPackageName = changeCtx.lastPackageName;
 
+      boolean useObjNameForPackage = true;
+
       // When we are creating a new type, the current object is the parent of the object itself
       if (isNew) {
          SyncManager.InstInfo instInfo = parentContext.getInstInfo(changedObj);
@@ -609,8 +611,10 @@ public class SyncLayer {
                if (numLevels > 0)
                   newObjName = CTypeUtil.getPackageName(objTypeName);
                // Creating a new top level object with new args.  Use the class as the context for the static variable
-               else
+               else {
                   newObjName = CTypeUtil.getClassName(DynUtil.getTypeName(newObjType, false));
+                  useObjNameForPackage = false;
+               }
             }
             objName = syncHandler.getObjectBaseName(depChanges, this);
          }
@@ -648,7 +652,7 @@ public class SyncLayer {
       StringBuilder newSB = new StringBuilder();
       StringBuilder switchSB = null;
 
-      String newPackageName = syncHandler.getPackageName();
+      String newPackageName = useObjNameForPackage ? syncHandler.getPackageName() : CTypeUtil.getPackageName(objTypeName);
       boolean packagesMatch = !(changeCtx.lastPackageName != newPackageName && (changeCtx.lastPackageName == null || !changeCtx.lastPackageName.equals(newPackageName)));
 
       boolean pushName = true;
@@ -726,7 +730,7 @@ public class SyncLayer {
          System.err.println("*** No object name for sync operation");
       }
       else {
-         String packageName = syncHandler.getPackageName();
+         String packageName = useObjNameForPackage ? syncHandler.getPackageName() : CTypeUtil.getPackageName(objTypeName);
          if (changeCtx.lastPackageName != packageName && (changeCtx.lastPackageName == null || !changeCtx.lastPackageName.equals(packageName))) {
             if (newObjNames.size() > 0)
                System.err.println("*** Mismatching packages with somehow matching types");

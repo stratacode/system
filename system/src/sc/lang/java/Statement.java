@@ -331,6 +331,8 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       super.stop();
 
       errorArgs = null;
+      fromStatement = null;
+      childNestingDepth = -1;
    }
 
    /**

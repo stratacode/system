@@ -610,7 +610,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                // This happens for the tag expressions inside of Element objects.  We really just need a layered system and a layer
                // to resolve this reference so no need to find the accurate tag object.
                definedInType = rootExpr.getJavaModel().getModelTypeDeclaration();
-               if (definedInType == null)
+               if (definedInType == null) // This happens when parsing JSTypeTemplate sometimes because there's no enclosing type in that situation
                   System.err.println("*** Unable to parameterize reference - no enclosing type");
             }
             ParamTypedMethod ptm = new ParamTypedMethod(rootExpr.getLayeredSystem(), foundMeth, currentType instanceof ITypeParamContext ? (ITypeParamContext) currentType : null, definedInType, arguments, inferredType, methodTypeArgs);
@@ -1784,11 +1784,18 @@ public class IdentifierExpression extends ArgumentsExpression {
                break;
 
             case UnboundName:
-               value = ctx.resolveUnboundName(idents.get(0).toString());
+               // If it's not bound, check if the entire identifier expression maps to a name - if so, we are done just
+               // return the customObj.
+               Object customObj = resolveCustomObj(jmodel, sz-1);
+               if (customObj == null) {
+                  value = ctx.resolveUnboundName(idents.get(0).toString());
+               }
+               else
+                  return customObj;
                break;
 
             case BoundTypeName:
-               Object customObj = resolveCustomObj(jmodel, 0);
+               customObj = resolveCustomObj(jmodel, 0);
                if (customObj == null) {
                   value = ModelUtil.getRuntimeType(boundTypes[0]);
                   isType = true;
@@ -4343,7 +4350,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       // and we have the ; we need to handle in 'remaining'  This could be handled more generically in the grammar.
       // See comment for this method.
       if (topParselet != idExParselet) {
-         ParentParseNode nextP = null;
+         boolean foundIdx = false;
          for (int i = 0; i < pp.children.size(); i++) {
             Object child = pp.children.get(i);
             if (child instanceof ParentParseNode && ((ParentParseNode) child).getParselet() == idExParselet) {
@@ -4355,19 +4362,28 @@ public class IdentifierExpression extends ArgumentsExpression {
                      remaining.add(remainingNode);
                }
                pp = (ParentParseNode) child;
+               foundIdx = true;
                break;
             }
             else {
                ParseUtil.toStyledChild(adapter, pp, child, i);
             }
          }
+         // If parent is <annotationValue.0> the identifierExpression is in side of child.get(1) inside of a ParseNode
+         if (!foundIdx)
+            return;
       }
       ParentParseNode identsNode = (ParentParseNode) pp.children.get(0);
-      ParentParseNode argsNode;
-      if (pp.children.size() > 1)
-         argsNode = (ParentParseNode) pp.children.get(1);
-      else
-         argsNode = null;
+      ParentParseNode argsNode = null;
+      if (pp.children.size() > 1) {
+         Object secondChild = pp.children.get(1);
+         if (secondChild instanceof ParentParseNode)
+            argsNode = (ParentParseNode) secondChild;
+         else if (secondChild instanceof ParseNode) {
+            System.out.println("*** Untested case in styleExpression");
+            ParseUtil.toStyledChild(adapter, pp, secondChild, 1);
+         }
+      }
 
       if (identsNode == null) {
          super.styleNode(adapter);
@@ -4377,18 +4393,32 @@ public class IdentifierExpression extends ArgumentsExpression {
       for (int i = 0; i < sz; i++) {
          IParseNode child;
          // TODO: Here we are unwrapping the grammar rule for creating the identifiers property - this could be solved in parselets more generically (see comment above)
-         if (i == 0)
-            child = (IParseNode) identsNode.children.get(0);
+         if (i == 0) {
+            Object firstChild = identsNode.children.get(0);
+            if (firstChild instanceof IParseNode)
+               child = (IParseNode) firstChild;
+            else {
+               ParseUtil.toStyledChild(adapter, identsNode, firstChild, 0);
+               continue;
+            }
+         }
          else {
-            ParentParseNode nextChildren = (ParentParseNode) identsNode.children.get(1);
-            int childIx = (i - 1) * 2;
-            if (nextChildren != null && nextChildren.children.size() > childIx) {
-               // First do the '.'
-               ParseUtil.toStyledString(adapter, nextChildren.children.get(childIx));
-               // Then the next identifier
-               child = (IParseNode) nextChildren.children.get(childIx+1);
+            Object nextChildObj = identsNode.children.get(1);
+            if (nextChildObj instanceof ParentParseNode) {
+               ParentParseNode nextChildren = (ParentParseNode) nextChildObj;
+               int childIx = (i - 1) * 2;
+               if (nextChildren.children.size() > childIx) {
+                  // First do the '.'
+                  ParseUtil.toStyledString(adapter, nextChildren.children.get(childIx));
+                  // Then the next identifier
+                  child = (IParseNode) nextChildren.children.get(childIx + 1);
+               }
+               else {
+                  continue;
+               }
             }
             else {
+               ParseUtil.toStyledString(adapter, nextChildObj);
                continue;
             }
          }

@@ -65,6 +65,14 @@ public class AssignmentExpression extends TwoOperatorExpression {
       }
    }
 
+   public void stop() {
+      super.stop();
+      selfOperator = null;
+      fromDefinition = null;
+      assignedProperty = null;
+      assignmentBinding = false;
+   }
+
    private boolean isArithSelfOperator() {
       if (selfOperator == null)
          return false;

@@ -83,7 +83,14 @@ public class RTypeUtil {
       if (innerMap == null) {
          int superSize = 0;
          // Needs to get non-public classes as well so use declared
-         Class[] innerClasses = outer.getDeclaredClasses();
+         Class[] innerClasses;
+         try {
+            innerClasses = outer.getDeclaredClasses();
+         }
+         catch (IllegalAccessError err) {
+            System.err.println("IllegalAccessError loading inner classes for: " + outer.getName());
+            innerClasses = null;
+         }
          CoalescedHashMap<String,Class> superMap;
 
          Class superClass = outer.getSuperclass();

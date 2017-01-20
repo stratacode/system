@@ -4,17 +4,14 @@
 
 package sc.classfile;
 
-import sc.util.MessageType;
+import sc.util.*;
 import sc.lang.SemanticNode;
 import sc.lang.sc.ModifyDeclaration;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.lifecycle.ILifecycle;
 import sc.type.*;
-import sc.util.CoalescedHashMap;
-import sc.util.FileUtil;
 import sc.lang.java.*;
-import sc.util.StringUtil;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -601,7 +598,14 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
                ParamTypedMethod paramMethod = null;
                if (ModelUtil.isParameterizedMethod(toCheck)) {
 
-                  paramMethod = new ParamTypedMethod(system, toCheck, ctx, this, parametersOrExpressions, inferredType, methodTypeArgs);
+                  Object definedInType = this;
+                  if (ctx instanceof ParamTypeDeclaration) {
+                     ParamTypeDeclaration paramCtx = (ParamTypeDeclaration) ctx;
+                     if (paramCtx.getDefinedInType() != null)
+                        definedInType = paramCtx.getDefinedInType();
+                  }
+
+                  paramMethod = new ParamTypedMethod(system, toCheck, ctx, definedInType, parametersOrExpressions, inferredType, methodTypeArgs);
 
                   parameterTypes = paramMethod.getParameterTypes(true);
                   toCheck = paramMethod;
@@ -1186,7 +1190,19 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
    public Object getTypeDeclaration(String name) {
       if (system == null)
          return RTypeUtil.loadClass(name);
-      return system.getTypeDeclaration(name);
+      Object res = system.getTypeDeclaration(name);
+      Object newRes = system.getClassWithPathName(name);
+      if (res != newRes) {
+         if (newRes == null) {
+            // TODO: Should we allow this case?  Normally a class file should resolve to another class file for it's dependencies
+            // A CFClass should not be able to resolve againt a src type.  And one big problem here is that we don't have a refLayer
+            // to specify for the getSrcTypeDeclaration made by getTypeDeclaration so it can end up caching even when the CFClass is loaded
+            // by an inactive type.
+            MessageHandler.warning(classFile.msg, "Class file: " + this.classFile + " depends on source type: " + res);
+            return res;
+         }
+      }
+      return newRes;
    }
 
    public Object getAnnotation(String annotName) {

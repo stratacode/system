@@ -143,8 +143,11 @@ public class DynBeanMapper extends AbstractBeanMapper {
                   // TODO: need to deal with class here?
                   return ((BodyTypeDeclaration)ownerType).getDynStaticField(getPropertyName());
                }
-               else
+               else {
+                  if (!(getSelector instanceof Field))
+                     throw new IllegalArgumentException("No property: " + getSelector + " on: " + parent);
                   return ((Field) getSelector).get(null);
+               }
             }
             else {
                if ((attMask & GET_IS_DYN) != 0) {

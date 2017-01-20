@@ -2916,6 +2916,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       if (ent == null)
          return null;
+
+      String innerTypeName = fullTypeName + "$" + name;
+      Object res = otherClassCache.get(innerTypeName);
+      if (res != null)
+         return res;
       if (ent.zip)
          return CFClass.load(getCachedZipFile(ent.fileName), parentClassPathName + "$" + name + ".class", this);
       else
@@ -4839,7 +4844,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (res != null) {
          for (int i = 0; i < res.size(); i++) {
             ModelToUpdate mt = res.get(i);
-            refresh(mt.srcEnt, mt.oldModel, ctx, updateInfo);
+            refresh(mt.srcEnt, mt.oldModel, ctx, updateInfo, mt.srcEnt.layer.activated);
          }
       }
 
@@ -5110,7 +5115,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (res != null) {
                for (int i = 0; i < res.size(); i++) {
                   ModelToUpdate mt = res.get(i);
-                  refresh(mt.srcEnt, mt.oldModel, ctx, updateInfo);
+                  refresh(mt.srcEnt, mt.oldModel, ctx, updateInfo, isActive);
                }
             }
 
@@ -7585,7 +7590,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (options.verbose && modelObj instanceof ILifecycle) {
             ILifecycle modelComp = (ILifecycle) modelObj;
             if (!modelComp.isStarted()) {
-               String action = "Starting " + (modelComp.isValidated() ? "" : " and validating");
+               String action = "Starting" + (modelComp.isValidated() ? "" : " and validating");
                verbose(action + ": " + toGenEnt);
             }
          }
@@ -9236,6 +9241,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public void flushTypeCache() {
       sysDetails("Flushing type cache");
 
+      innerTypeCache.clear();
+
       // Don't need to do this when we clone the models before the transform.  When verbose is on, for now it's a diagnostic
       // TODO: we don't need this code with the clonedTransform mode
       //if (options.clonedTransform)
@@ -10392,13 +10399,17 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       long changedModelStartTime = System.currentTimeMillis();
       ArrayList<Layer.ModelUpdate> refreshedModels = new ArrayList<Layer.ModelUpdate>();
       if (active) {
-         for (Layer l:layers) {
-            l.refresh(lastRefreshTime, ctx, refreshedModels, updateInfo);
+         int numLayers = layers.size();
+         for (int i = 0; i < numLayers; i++) {
+            Layer l = layers.get(i);
+            l.refresh(lastRefreshTime, ctx, refreshedModels, updateInfo, true);
          }
       }
       else {
-         for (Layer l:inactiveLayers) {
-            l.refresh(lastRefreshTime, ctx, refreshedModels, updateInfo);
+         int numLayers = inactiveLayers.size();
+         for (int i = 0; i < numLayers; i++) {
+            Layer l = inactiveLayers.get(i);
+            l.refresh(lastRefreshTime, ctx, refreshedModels, updateInfo, false);
          }
       }
       if (refreshedModels.size() > 0)
@@ -10416,20 +10427,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // Not using the language model here since that will automatically load the new file
       ILanguageModel oldModel = modelIndex.get(srcEnt.absFileName);
       UpdateInstanceInfo info = newUpdateInstanceInfo();
-      Object res = refresh(srcEnt, oldModel, ctx, info);
+      Object res = refresh(srcEnt, oldModel, ctx, info, true);
       info.updateInstances(ctx);
       return res;
    }
 
    /** Refreshes one file and batches the changes into the supplied UpdateInstanceInfo arg */
-   public Object refresh(SrcEntry srcEnt, ExecutionContext ctx, UpdateInstanceInfo info) {
+   public Object refresh(SrcEntry srcEnt, ExecutionContext ctx, UpdateInstanceInfo info, boolean active) {
       // Not using the getLanguageModel here cause we really need the old model
-      boolean active = srcEnt.layer == null || srcEnt.layer.activated;
       ILanguageModel oldModel = active ? modelIndex.get(srcEnt.absFileName) : inactiveModelIndex.get(srcEnt.absFileName);
-      return refresh(srcEnt, oldModel, ctx, info);
+      return refresh(srcEnt, oldModel, ctx, info, active);
    }
 
-   public Object refresh(SrcEntry srcEnt, ILanguageModel oldModel, ExecutionContext ctx, UpdateInstanceInfo updateInfo) {
+   public Object refresh(SrcEntry srcEnt, ILanguageModel oldModel, ExecutionContext ctx, UpdateInstanceInfo updateInfo, boolean active) {
       if (oldModel != null) {
          File f = new File(srcEnt.absFileName);
          if (!f.canRead()) {
@@ -10521,7 +10531,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
-   public void refreshFile(SrcEntry srcEnt, Layer fromLayer) {
+   public void refreshFile(SrcEntry srcEnt, Layer fromLayer, boolean active) {
+      if (!active)
+         return;
       IFileProcessor proc = getFileProcessorForFileName(srcEnt.absFileName, fromLayer, BuildPhase.Process);
       if (proc != null) {
          Object res = proc.process(srcEnt, false);

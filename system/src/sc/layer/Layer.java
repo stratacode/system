@@ -3115,7 +3115,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       model = m;
    }
 
-   public void refresh(long lastRefreshTime, ExecutionContext ctx, List<ModelUpdate> changedModels, UpdateInstanceInfo updateInfo) {
+   public void refresh(long lastRefreshTime, ExecutionContext ctx, List<ModelUpdate> changedModels, UpdateInstanceInfo updateInfo, boolean active) {
       for (int i = 0; i < srcDirs.size(); i++) {
          String srcDir = srcDirs.get(i);
          String relDir = null;
@@ -3123,7 +3123,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          if (srcDir.startsWith(layerPathName) && (pathLen = layerPathName.length()) + 1 < srcDir.length()) {
             relDir = srcDir.substring(pathLen+1);
          }
-         refreshDir(srcDir, relDir, lastRefreshTime, ctx, changedModels, updateInfo);
+         refreshDir(srcDir, relDir, lastRefreshTime, ctx, changedModels, updateInfo, active);
       }
    }
 
@@ -3146,7 +3146,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
    }
 
-   public void refreshDir(String srcDir, String relDir, long lastRefreshTime, ExecutionContext ctx, List<ModelUpdate> changedModels, UpdateInstanceInfo updateInfo) {
+   public void refreshDir(String srcDir, String relDir, long lastRefreshTime, ExecutionContext ctx, List<ModelUpdate> changedModels, UpdateInstanceInfo updateInfo, boolean active) {
       File f = new File(srcDir);
       long newTime = -1;
       String prefix = relDir == null ? "" : relDir;
@@ -3169,12 +3169,12 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          if (subF.isDirectory()) {
             if (!excludedFile(subF.getName(), prefix)) {
                // Refresh anything that might have changed
-               refreshDir(path, FileUtil.concat(relDir, subF.getName()), lastRefreshTime, ctx, changedModels, updateInfo);
+               refreshDir(path, FileUtil.concat(relDir, subF.getName()), lastRefreshTime, ctx, changedModels, updateInfo, active);
             }
          }
          else if (Language.isParseable(path) || (proc = layeredSystem.getFileProcessorForFileName(path, this, BuildPhase.Process)) != null) {
             SrcEntry srcEnt = new SrcEntry(this, srcDir, relDir == null ? "" : relDir, subF.getName(), proc == null || proc.getPrependLayerPackage());
-            ILanguageModel oldModel = layeredSystem.getLanguageModel(srcEnt, false, null);
+            ILanguageModel oldModel = layeredSystem.getLanguageModel(srcEnt, active, null);
             long newLastModTime = new File(srcEnt.absFileName).lastModified();
             if (oldModel == null) {
                // The processedFileIndex only holds entries we processed.  If this file did not change from when we did the build, we just have to
@@ -3184,14 +3184,14 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                        layeredSystem.lastRefreshTime == -1 ? layeredSystem.buildStartTime : layeredSystem.lastRefreshTime :
                        oldFile.getLastModifiedTime();
                if (lastTime == -1 || newLastModTime > lastTime) {
-                  layeredSystem.refreshFile(srcEnt, this); // For non parseableable files - do the file copy since the source file changed
+                  layeredSystem.refreshFile(srcEnt, this, active); // For non parseableable files - do the file copy since the source file changed
                }
             }
 
             // We are refreshing any models which have changed on disk or had errors last time.  Technically for the error models, we could just restart them perhaps
             // but we need to clear old all of the references to anything else which has changed.  Seems like this might be more reliable now though obviously a bit slower.
             if (newLastModTime > lastRefreshTime || (oldModel != null && oldModel.hasErrors())) {
-               Object res = layeredSystem.refresh(srcEnt, ctx, updateInfo);
+               Object res = layeredSystem.refresh(srcEnt, ctx, updateInfo, active);
                if (res != null)
                   changedModels.add(new ModelUpdate(oldModel, res));
             }

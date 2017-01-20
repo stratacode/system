@@ -8260,8 +8260,8 @@ public class ModelUtil {
                   }
                }
             }
-            if (!found)
-               System.err.println("*** Warning - some statements not matched up with the generated source: " + fromSt);
+            //if (!found) - this happens for mixin templates but they should be caught by the default statement
+            //   System.err.println("*** Warning - some statements not matched up with the generated source: " + fromSt);
          }
       }
       // Do this even if there are no assignments - any statement which does not have a fromStatement will be set to
