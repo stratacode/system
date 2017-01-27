@@ -983,7 +983,6 @@ public class SyncManager {
             syncInsts.put(inst, ii);
          }
          else {
-            ii = new InstInfo(args, initDefault, onDemand);
             if (ii.args == null && args != null && args.length > 0)
                ii.args = args;
             ii.initDefault = ii.initDefault || initDefault;

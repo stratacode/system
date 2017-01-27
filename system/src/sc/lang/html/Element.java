@@ -17,6 +17,7 @@ import sc.lang.sc.PropertyAssignment;
 import sc.lang.template.*;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
+import sc.lifecycle.ILifecycle;
 import sc.obj.*;
 import sc.parser.*;
 import sc.sync.ISyncInit;
@@ -47,7 +48,7 @@ import java.util.*;
 // Using the js_ prefix for the tags.  Because tags.js uses the SyncManager in the JS file, we need to add this dependency explicitly.
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js")
 @CompilerSettings(dynChildManager="sc.lang.html.TagDynChildManager")
-public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjChildren, ITypeUpdateHandler, ISrcStatement {
+public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjChildren, ITypeUpdateHandler, ISrcStatement, IStoppable {
    public static boolean trace = false;
 
    public String tagName;
@@ -106,7 +107,8 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       Bind.sendChangedEvent(this, "visible");
    }
 
-   public boolean getVisible() {
+   /** Is this tag visible.  Note: using isVisible here to match swing's isVisible */
+   public boolean isVisible() {
       return visible;
    }
 
@@ -3592,6 +3594,24 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
    /** This method has to be here so we properly remap JS references to here instead of SemanticNode.stop which does not exist in the JS runtime */
    public void stop() {
       super.stop();
+      // NOTE: this probably already happens from JavaModel's types array which contains tagObject but just in case
+      // that's not up-to-date, stop the tagObject here as well.
+      if (tagObject != null) {
+         tagObject.stop();
+      }
+      if (repeatWrapper != null)
+         repeatWrapper.stop();
+      if (hiddenChildren != null)
+         hiddenChildren.stop();
+      if (inheritedAttributes != null)
+         inheritedAttributes.stop();
+      // Do we need to do this?  Children should be a semantic node but for some reason it does not seem to be stopping all of the children
+      if (children != null) {
+         for (Object child:children) {
+            if (child instanceof ILifecycle)
+               ((ILifecycle) child).stop();
+         }
+      }
       defaultExtendsType = null;
       cachedObjectName = null;
       childrenById = null;

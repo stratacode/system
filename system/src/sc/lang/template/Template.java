@@ -1494,6 +1494,14 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
       return res;
    }
 
+   public Object getModelType() {
+      Object res = getModelTypeDeclaration();
+      if (res == null) {
+         res = rootType;
+      }
+      return res;
+   }
+
    public Template deepCopy(int options, IdentityHashMap<Object, Object> oldNewMap) {
       Template res = (Template) super.deepCopy(options, oldNewMap);
 

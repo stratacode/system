@@ -598,7 +598,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
                ParamTypedMethod paramMethod = null;
                if (ModelUtil.isParameterizedMethod(toCheck)) {
 
-                  Object definedInType = this;
+                  Object definedInType = refType != null ? refType : this;
                   if (ctx instanceof ParamTypeDeclaration) {
                      ParamTypeDeclaration paramCtx = (ParamTypeDeclaration) ctx;
                      if (paramCtx.getDefinedInType() != null)
@@ -1198,7 +1198,9 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
             // A CFClass should not be able to resolve againt a src type.  And one big problem here is that we don't have a refLayer
             // to specify for the getSrcTypeDeclaration made by getTypeDeclaration so it can end up caching even when the CFClass is loaded
             // by an inactive type.
-            MessageHandler.warning(classFile.msg, "Class file: " + this.classFile + " depends on source type: " + res);
+            // Can't issue this warning because there are some places where this type is looked up from a broader context... either the definedInType is
+            // not correct or we are looking up in the wrong order?
+            //MessageHandler.warning(classFile.msg, "Class file: " + this.classFile + " depends on source type: " + res);
             return res;
          }
       }

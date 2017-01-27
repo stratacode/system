@@ -605,12 +605,12 @@ public class IdentifierExpression extends ArgumentsExpression {
    static Object parameterizeMethod(Expression rootExpr, Object foundMeth, Object currentType, Object inferredType, List<Expression> arguments, List<JavaType> methodTypeArgs) {
       if (foundMeth != null) {
          if (!(foundMeth instanceof ParamTypedMethod) && (ModelUtil.isMethod(foundMeth) || ModelUtil.isConstructor(foundMeth)) && (ModelUtil.hasMethodUnboundTypeParameters(foundMeth) || currentType instanceof ITypeParamContext || methodTypeArgs != null)) {
-            TypeDeclaration definedInType = rootExpr.getEnclosingType();
+            Object definedInType = rootExpr.getEnclosingType();
             if (definedInType == null) {
                // This happens for the tag expressions inside of Element objects.  We really just need a layered system and a layer
                // to resolve this reference so no need to find the accurate tag object.
-               definedInType = rootExpr.getJavaModel().getModelTypeDeclaration();
-               if (definedInType == null) // This happens when parsing JSTypeTemplate sometimes because there's no enclosing type in that situation
+               definedInType = rootExpr.getJavaModel().getModelType();
+               if (definedInType == null) // Use getModelType for parsing templates which use a class
                   System.err.println("*** Unable to parameterize reference - no enclosing type");
             }
             ParamTypedMethod ptm = new ParamTypedMethod(rootExpr.getLayeredSystem(), foundMeth, currentType instanceof ITypeParamContext ? (ITypeParamContext) currentType : null, definedInType, arguments, inferredType, methodTypeArgs);

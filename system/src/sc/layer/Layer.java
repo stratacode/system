@@ -4226,8 +4226,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    void appendBuildURLs(ArrayList<URL> urls) {
+      // Add the main build dir for this layer
       urls.add(FileUtil.newFileURL(LayerUtil.appendSlashIfNecessary(getBuildClassesDir())));
       compiledInClassPath = true;
+      // Add the buildSrcDir to the classPath if the framework requires it (e.g. gwt)
       if (!buildDir.equals(buildSrcDir) && layeredSystem.includeSrcInClassPath)
          urls.add(FileUtil.newFileURL(LayerUtil.appendSlashIfNecessary(buildSrcDir)));
    }

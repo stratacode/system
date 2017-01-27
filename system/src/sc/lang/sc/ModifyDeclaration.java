@@ -1628,6 +1628,8 @@ public class ModifyDeclaration extends TypeDeclaration {
    }
 
    public boolean isAssignableFrom(ITypeDeclaration other, boolean assignmentSemantics) {
+      if (other.getFullTypeName().equals(getFullTypeName()))
+         return true;
       Object extType = getDerivedTypeDeclaration();
       return ModelUtil.isAssignableFrom(extType, other, assignmentSemantics, null, getLayeredSystem());
    }

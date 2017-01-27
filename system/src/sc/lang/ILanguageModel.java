@@ -39,6 +39,9 @@ public interface ILanguageModel extends IFileProcessorResult {
    /** Returns the main type declaration for the model - the one with the same name as the file */
    TypeDeclaration getModelTypeDeclaration();
 
+   /** Same as getModelTypeDeclaration but if you have a template where the root type is a compiled class this method returns the class */
+   Object getModelType();
+
    /** Returns the type declaration for this model for this layer */
    TypeDeclaration getLayerTypeDeclaration();
 

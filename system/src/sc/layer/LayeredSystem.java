@@ -10044,21 +10044,24 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          sysInfo = refreshSystem(false, active);
          ArrayList<SystemRefreshInfo> peerChangedInfos = new ArrayList<SystemRefreshInfo>();
          if (peerSystems != null) {
-            for (LayeredSystem sys : peerSystems) {
-               setCurrent(sys);
+            int sz = peerSystems.size();
+            for (int i = 0; i < sz; i++) {
+               LayeredSystem peer = peerSystems.get(i);
+               setCurrent(peer);
                // TODO: right now, we ignore the change models in other systems.  These are used by EditorContext to do
                // updating of any errors detected in the models.  Currently EditorContext only knows about one layered system
                // but will need to know about all of them to manage errors, switching views etc. correctly.
-               peerChangedInfos.add(sys.refreshSystem(false, active));
+               peerChangedInfos.add(peer.refreshSystem(false, active));
             }
             setCurrent(this);
          }
          completeRefresh(sysInfo, active);
          if (peerSystems != null) {
-            int i = 0;
-            for (LayeredSystem peer : peerSystems) {
-               peer.completeRefresh(peerChangedInfos.get(i), active);
-               i++;
+            int sz = peerSystems.size();
+            for (int i = 0; i < sz; i++) {
+               LayeredSystem peer = peerSystems.get(i);
+               if (i < peerChangedInfos.size())
+                  peer.completeRefresh(peerChangedInfos.get(i), active);
             }
          }
       }
@@ -10302,7 +10305,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
 
-      if (active) {
+      if (active && !options.compileOnly) {
          ExecutionContext ctx = new ExecutionContext(this);
          //allTypesProcessed = true;
          sysInfo.updateInfo.updateInstances(ctx);
@@ -12970,7 +12973,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                       (!startLayer.buildSeparate || layer == startLayer || startLayer.extendsLayer(layer))) {
 
                      if (layer == buildLayer || !options.buildAllLayers) {
-                        layer.appendBuildURLs(urls);
+                        // Don't include the buildDir for the IDE and other environments when we are compiling only and not running
+                        if (!options.compileOnly)
+                           layer.appendBuildURLs(urls);
                      }
                   }
                }

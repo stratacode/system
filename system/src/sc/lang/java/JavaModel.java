@@ -1097,6 +1097,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return (TypeDeclaration) types.get(0).resolve(true);
    }
 
+   public Object getModelType() {
+      return getModelTypeDeclaration();
+   }
+
    public TypeDeclaration getImplicitTypeDeclaration() {
       return null;
    }
