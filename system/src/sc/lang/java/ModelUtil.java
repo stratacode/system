@@ -6236,6 +6236,10 @@ public class ModelUtil {
       return null;
    }
 
+   /**
+    * Modifies the code for the current program model, setting the specified property called 'elem' to a text value specified.   This
+    * operation is invoked when you update the initialization expression for a property, field, etc. in a program editor.
+    */
    public static Object setElementValue(Object type, Object instance, Object elem, String text, boolean updateInstances, boolean valueIsExpr) {
       String origText = text;
       if (elem instanceof IBeanMapper) {

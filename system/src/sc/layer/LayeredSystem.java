@@ -2996,6 +2996,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return ModelUtil.getPropertyMapping(type, dstPropName);
    }
 
+   /** Treats dynamic types as objects, not actual types.  Used to allow serializing types as normal objects across the wire in the dynamic runtime. */
    public boolean isSTypeObject(Object obj) {
       // Must test this case first - it extends TypeDeclaration but is used to serialize a type across the wire so is explicitly excluded
       if (obj instanceof ClientTypeDeclaration)
@@ -3005,7 +3006,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return (obj instanceof ITypeDeclaration && !(obj instanceof Template)) || obj instanceof Class;
    }
 
-   /** Part of the IDyamicModel interface - identifies the type we use to identifify dynamic types */
+   /** Part of the IDynamicModel interface - identifies the type we use to identify dynamic types */
    public boolean isTypeObject(Object obj) {
       // Must test this case first - it extends TypeDeclaration but is used to serialize a type across the wire so is explicitly excluded
       if (obj instanceof ClientTypeDeclaration)
@@ -3965,7 +3966,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          SyncManager.addSyncHandler(ClientTypeDeclaration.class, LayerSyncHandler.class); // Need this so we can use restore to go back
 
          SyncManager.addSyncType(VariableDefinition.class, new SyncProperties(null, null, new Object[] { "variableName" , "initializerExprStr" , "operatorStr" , "layer", "comment", "variableTypeName"}, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, globalScopeId));
-         SyncManager.addSyncType(PropertyAssignment.class, new SyncProperties(null, null, new Object[] { "propertyName" , "operatorStr", "initializerExprStr", "layer" , "comment" }, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, globalScopeId));
+         SyncManager.addSyncType(PropertyAssignment.class, new SyncProperties(null, null, new Object[] { "propertyName" , "operatorStr", "initializerExprStr", "layer" , "comment", "variableTypeName" }, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, globalScopeId));
 
          SyncProperties modelProps = new SyncProperties(null, null, new Object[] {"layer", "srcFile", "needsModelText", "cachedModelText", "needsGeneratedText", "cachedGeneratedText", "cachedGeneratedJSText", "cachedGeneratedSCText", "cachedGeneratedClientJavaText", "existsInJSRuntime", "layerTypeDeclaration"}, null, SyncOptions.SYNC_INIT_DEFAULT, globalScopeId);
          SyncManager.addSyncType(JavaModel.class, modelProps);
@@ -8547,7 +8548,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       for (SrcDirEntry srcDirEnt : bd.srcDirs) {
-         if (srcDirEnt == null) {
+         if (srcDirEnt == null || srcDirEnt.modelsToTransform == null) {
             System.out.println("*** Warning - null srcDirEnt!");
             continue;
          }
@@ -11352,11 +11353,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          srcFile = getSrcFileFromTypeName(typeName, true, fromLayer, prependPackage, null, refLayer, layerResolve);
 
       if (srcFile == null && layerResolve) {
-         Layer layer = getLayerByDirName(typeName);
-         if (layer != null && layer.model != null) {
-            decl = layer.model.getModelTypeDeclaration();
-            if (decl != null)
-               return decl;
+         Layer layer;
+         if (refLayer == null || refLayer.activated) {
+            layer = getLayerByDirName(typeName);
+            if (layer != null && layer.model != null) {
+               decl = layer.model.getModelTypeDeclaration();
+               if (decl != null)
+                  return decl;
+            }
          }
          layer = refLayer == null || refLayer.activated ? pendingActiveLayers.get(typeName) : pendingInactiveLayers.get(typeName);
          if (layer != null && layer.model != null) {

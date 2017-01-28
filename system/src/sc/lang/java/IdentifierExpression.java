@@ -2247,7 +2247,19 @@ public class IdentifierExpression extends ArgumentsExpression {
       List<IString> idents = getAllIdentifiers();
       int sz = idents.size();
       String identifier = idents.get(i).toString();
-      return (sz == 1 && inNamedPropertyMethod(identifier)) || isThisExpression() || isSuperExpression() || !getJavaModel().enableExtensions() || (isAssignment && i == sz-1);
+      return (sz == 1 && inNamedPropertyMethod(identifier)) || isThisExpression() || isSuperExpression() || !getJavaModel().enableExtensions() || isManualGetSet() || (isAssignment && i == sz-1);
+   }
+
+   private boolean isManualGetSet() {
+      AbstractMethodDefinition enclMeth = getEnclosingMethod();
+      if (enclMeth != null) {
+         Object annotObj = enclMeth.getAnnotation("sc.obj.ManualGetSet");
+         if (annotObj != null) {
+            Object manualObj = ModelUtil.getAnnotationValue(annotObj, "value");
+            return manualObj == null || !(manualObj instanceof Boolean) || ((Boolean) manualObj);
+         }
+      }
+      return false;
    }
 
    public boolean needsTransform() {
@@ -2570,7 +2582,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       // in a property method we do the set conversion.
       return (idType == IdentifierType.SetVariable ||
              (idType == IdentifierType.FieldName && ModelUtil.needsSet(boundTypes[last]))) &&
-             !inPropertyMethodForDef(boundTypes[last]);
+             !inPropertyMethodForDef(boundTypes[last]) && !isManualGetSet();
    }
 
    public boolean needsGetMethod(int ix) {

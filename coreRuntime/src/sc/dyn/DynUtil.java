@@ -290,8 +290,8 @@ public class DynUtil {
    }
 
    /**
-    * StrataCode uses some objects to implement dynamic types.  This method returns true if the given object is either
-    * a plain old Class type or a dynamic type.
+    * Unlike isType, treats TypeDeclaration's as non-types so they can be serialized across the wire as objects in
+    * the dynamic runtime in some cases
     */
    public static boolean isSType(Object obj) {
       if (obj instanceof Class)

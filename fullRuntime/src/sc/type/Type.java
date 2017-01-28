@@ -85,6 +85,15 @@ public enum Type {
       public boolean isAssignableFromAssignment(Type other, Class from, Class to) {
          return other == Boolean;
       }
+
+      public Object stringToValue(String val) {
+         if (val.equalsIgnoreCase("true"))
+            return java.lang.Boolean.TRUE;
+         else if (val.equalsIgnoreCase("false"))
+            return java.lang.Boolean.FALSE;
+         else
+            throw new IllegalArgumentException("Invalid boolean: " + val);
+      }
    },
    Byte {
       public Object evalArithmetic(String operator, Object lhsObj, Object rhsObj) {
@@ -107,6 +116,10 @@ public enum Type {
       }
       public Object getDefaultObjectValue() {
          return IntegerZero;
+      }
+
+      public Object stringToValue(String val) {
+         return java.lang.Integer.valueOf(val);
       }
    },
    Short {
@@ -131,6 +144,10 @@ public enum Type {
       public Object getDefaultObjectValue() {
          return IntegerZero;
       }
+
+      public Object stringToValue(String val) {
+         return java.lang.Integer.valueOf(val);
+      }
    }, Character {
       public Object evalArithmetic(String operator, Object lhsObj, Object rhsObj) {
          throw new IllegalArgumentException("Illegal arithmetic operation for a char expression");
@@ -146,6 +163,10 @@ public enum Type {
       }
       public Object getDefaultObjectValue() {
          return '\0';
+      }
+
+      public Object stringToValue(String val) {
+         return val.length() == 0 ? '\0' : val.charAt(0);
       }
    },
    Integer {
@@ -267,6 +288,9 @@ public enum Type {
       public Object getDefaultObjectValue() {
          return IntegerZero;
       }
+      public Object stringToValue(String val) {
+         return java.lang.Integer.valueOf(val);
+      }
    },
    Float {
       public Object evalArithmetic(String operator, Object lhsObj, Object rhsObj) {
@@ -365,6 +389,10 @@ public enum Type {
       }
       public Object getDefaultObjectValue() {
          return FloatZero;
+      }
+
+      public Object stringToValue(String val) {
+         return java.lang.Float.valueOf(val);
       }
    },
    Long {
@@ -479,6 +507,10 @@ public enum Type {
       public Object getDefaultObjectValue() {
          return 0L;
       }
+
+      public Object stringToValue(String val) {
+         return java.lang.Long.valueOf(val);
+      }
    },
    Double {
       public Object evalArithmetic(String operator, Object lhsObj, Object rhsObj) {
@@ -578,6 +610,10 @@ public enum Type {
       public Object getDefaultObjectValue() {
          return DoubleZero;
       }
+
+      public Object stringToValue(String val) {
+         return java.lang.Double.valueOf(val);
+      }
    },
    String {
       public Object evalArithmetic(String operator, Object lhsObj, Object rhsObj) {
@@ -613,6 +649,10 @@ public enum Type {
       }
       public Object evalUnary(String operator, Object value) {
          throw new IllegalArgumentException("String type does not support unary operator: " + operator);
+      }
+
+      public Object stringToValue(String val) {
+         return val;
       }
    },
    Object {
@@ -677,6 +717,10 @@ public enum Type {
       }
       public boolean isAssignableFromParameter(Type other, Class from, Class to) {
          return other.isANumber();
+      }
+
+      public Object stringToValue(String val) {
+         return java.lang.Double.valueOf(val);
       }
    },
    Void {
@@ -906,7 +950,22 @@ public enum Type {
       return this == Float || this == Double;
    }
 
+   public Object stringToValue(String val) {
+      throw new UnsupportedOperationException("Unable to convert string to type");
+   }
+
    public static final Integer IntegerZero = new Integer(0);
    public static final Float FloatZero = new Float(0.0);
    public static final Double DoubleZero = new Double(0.0);
+
+   public static Object propertyStringToValue(Object propType, String strVal) {
+      if (propType instanceof Class) {
+         sc.type.Type t = sc.type.Type.get((Class) propType);
+         return t.stringToValue(strVal);
+      }
+      else {
+         throw new IllegalArgumentException("Unable to convert to: " + propType + " from string");
+      }
+   }
+
 }

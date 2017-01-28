@@ -714,8 +714,11 @@ public class BinaryExpression extends Expression {
 
                int ndim = rhsType.getNdims();
                Object rhsTypeDecl = rhsType.getTypeDeclaration();
-               if (ndim != -1 || ModelUtil.isInterface(rhsTypeDecl) || ModelUtil.isNumber(rhsTypeDecl) || ModelUtil.isAssignableFrom(String.class, rhsTypeDecl) || ModelUtil.isAssignableFrom(Boolean.class, rhsTypeDecl)) {
-                  IdentifierExpression iexpr = IdentifierExpression.create(ndim == -1 ? "sc_instanceOf" : "sc_arrayInstanceOf");
+               // Special case for instanceof Class - we use an internal function because Number, String etc. should match here and they do not extend jv_Object
+               boolean isClassType = ModelUtil.sameTypes(rhsTypeDecl, Class.class);
+               if (ndim != -1 || ModelUtil.isInterface(rhsTypeDecl) || ModelUtil.isNumber(rhsTypeDecl) ||
+                   ModelUtil.isAssignableFrom(String.class, rhsTypeDecl) || ModelUtil.isAssignableFrom(Boolean.class, rhsTypeDecl) || isClassType) {
+                  IdentifierExpression iexpr = IdentifierExpression.create(isClassType ? "sc_instanceOfClass" : ndim == -1 ? "sc_instanceOf" : "sc_arrayInstanceOf");
                   SemanticNodeList<Object> snl = new SemanticNodeList<Object>();
                   if (i == 0) {
                      snl.add(firstExpr);

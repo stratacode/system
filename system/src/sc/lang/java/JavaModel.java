@@ -1644,7 +1644,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          ParseUtil.validateComponent(newModel);
       }
       newModel.readReverseDeps(layeredSystem.buildLayer);
-      if (!newModel.isProcessed()) {
+      // We only process activated components
+      if (!newModel.isProcessed() && getLayer() != null && getLayer().activated) {
          ParseUtil.processComponent(newModel);
       }
 

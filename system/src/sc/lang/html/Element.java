@@ -2988,6 +2988,12 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       }
    }
 
+   /** For application code to manually synchronize the repeat state of the tags */
+   public void refreshRepeat() {
+      if (repeat != null)
+         syncRepeatTags(repeat);
+   }
+
    public void outputTag(StringBuilder sb) {
       if (!visible)
          return;
