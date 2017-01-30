@@ -733,6 +733,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          }
       }
 
+      if (system.options.verbose)
+         system.verbose("Starting JS build: " + td.getFullTypeName());
+
       // Need to figure out what JS libraries are needed so that it can be used to generate the HTML template to include them
       //LinkedHashMap<JSFileEntry,Boolean> typesInFile = new LinkedHashMap<JSFileEntry,Boolean>();
       addTypeLibsToFile(td, getTypesInFile(td), null, null, null);
@@ -821,6 +824,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       jsEnt.fullTypeName = type.getFullTypeName();
       Boolean state = typesInFile.get(jsEnt);
       String jsModuleFile = null;
+
       if (state == null) {
          String fullTypeName = type.getFullTypeName();
 
@@ -883,7 +887,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          if (!hasLibFile) {
 
             if (typeLibFile != null) {
-               changedJSFiles.add(typeLibFile);
+               addChangedJSFile(typeLibFile, fullTypeName);
             }
             else if (type.getEnclosingType() == null) {
                // Need to mark the fact that we changed a type which lives in the default module.  Any file which has a dependency from the <default> file will need to be changed since it may include this type.
@@ -891,7 +895,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                changedDefaultType = true;
 
                String modLibFile = getJSDefaultModuleFile(type);
-               changedJSFiles.add(modLibFile);
+               addChangedJSFile(modLibFile, fullTypeName);
             }
 
             addExtendsTypeLibsToFile(type, typesInFile, typeLibFile);
@@ -1074,6 +1078,13 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             }
          }
       }
+   }
+
+   private void addChangedJSFile(String jsFile, String fromTypeName) {
+      if (system.options.verbose && !changedJSFiles.contains(jsFile)) {
+         system.verbose("JS file: " + jsFile + " changed by changed type: " + fromTypeName);
+      }
+      changedJSFiles.add(jsFile);
    }
 
    private void addEntryPoint(EntryPoint ent) {
@@ -1859,8 +1870,15 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       }
    }
 
+   /** Need to reset this always in between builds - even if no files changed */
+   public void buildCompleted() {
+      postStarted = false;
+   }
+
    public void resetBuild() {
       resetBuildLayerState();
+      if (system.options.verbose)
+         system.verbose("Resetting JS build");
       changedJSFiles.clear();
       changedDefaultType = false;
       jsFileBodyStore.clear();
@@ -2289,6 +2307,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                               String depTypeName = ModelUtil.getTypeName(depType);
                               JSTypeInfo depJTI = getJSTypeInfo(depTypeName, false);
                               if (depJTI != null) {
+                                 if (depJTI.hasLibFile)
+                                    continue;
                                  // If it's an unassigned class it's in the same file, or if the files match.
                                  if (depJTI.jsModuleFile == null || (typeLibFile != null && depJTI.jsModuleFile.equals(typeLibFile))) {
                                     addCompiledTypesToFile(depTypeName, typesInFile, parentLibFile, genLayer, jsFileBody, typesInSameFile);

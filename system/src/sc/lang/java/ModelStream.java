@@ -84,7 +84,7 @@ public class ModelStream extends SemanticNode implements ICustomResolver {
       BindingContext.setBindingContext(ctx);
 
       try {
-         // Don't need this now that we set syncInProgress.  This breaks down because we need to evaluate all expressions including those which
+         // Don't need this now that we set the syncState to applyingChanges.  This breaks down because we need to evaluate all expressions including those which
          // depend on things we haven't created yet.  Instead, we capture the previous values during the initial layer of setX calls.
          //for (JavaModel model:modelList)
          //   model.updatePreviousValues(syncCtx);
@@ -207,9 +207,26 @@ public class ModelStream extends SemanticNode implements ICustomResolver {
       String rootName = CTypeUtil.getPackageName(typeName);
       if (rootName != null) {
          for (JavaModel model:modelList) {
-            if (StringUtil.equalStrings(model.getPackagePrefix(), pkgName)) {
+            String prefix = model.getPackagePrefix();
+            if (StringUtil.equalStrings(prefix, pkgName)) {
                TypeDeclaration modelType = model.getUnresolvedModelTypeDeclaration();
                if (modelType != null && modelType.body != null && modelType.typeName.equals(rootName)) {
+                  for (Statement st:modelType.body) {
+                     if (st instanceof FieldDefinition) {
+                        FieldDefinition fd = (FieldDefinition) st;
+                        for (VariableDefinition varDef:fd.variableDefinitions) {
+                           if (varDef.variableName.equals(varName))
+                              return varDef;
+                        }
+                     }
+                  }
+               }
+            }
+            // This is the static field case, where we are matching the modelPrefix.variableName against the incoming typeName
+            // the model type is the type of the variable which right now is part of the name - i.e. typeName_instanceId
+            else if (StringUtil.equalStrings(prefix,rootName)) {
+               TypeDeclaration modelType = model.getUnresolvedModelTypeDeclaration();
+               if (modelType != null && modelType.body != null && modelType.typeName != null && varName.startsWith(modelType.typeName)) {
                   for (Statement st:modelType.body) {
                      if (st instanceof FieldDefinition) {
                         FieldDefinition fd = (FieldDefinition) st;

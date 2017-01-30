@@ -285,9 +285,9 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
       if (dstPropType instanceof Class) {
          Class cl = (Class) dstPropType;
          if (cl.isPrimitive()) {
-            return ClassType.createPrimitiveWrapper(cl.getName());
+            return ClassType.createPrimitiveWrapper(cl.getName().replace('$', '.'));
          }
-         return ClassType.create(StringUtil.split(cl.getName(), '.'));
+         return ClassType.create(StringUtil.split(cl.getName().replace('$', '.'), '.'));
       }
       else if (dstPropType instanceof ITypeDeclaration) {
          return ClassType.create(StringUtil.split(((ITypeDeclaration) dstPropType).getFullTypeName(), '.'));

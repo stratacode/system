@@ -2164,7 +2164,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (newBoundType == null) {
          System.err.println("*** Can't find post compiled type for: " + getFullTypeName());
          newBoundType = sys.getSrcTypeDeclaration(getFullTypeName(), null, model.getPrependPackage(), false, true, getLayer(), isLayerType);
-         newBoundType = sys.getSrcTypeDeclaration(getFullTypeName(), getLayer().getNextLayer(), model.getPrependPackage(), false, true, getLayer(), isLayerType);
+         if (getLayer() != null)
+            newBoundType = sys.getSrcTypeDeclaration(getFullTypeName(), getLayer().getNextLayer(), model.getPrependPackage(), false, true, getLayer(), isLayerType);
       }
       if (newBoundType instanceof CFClass) {
          System.out.println("*** Error expected source-based class and found compiled"); // Why are we resolving a CFClass here?

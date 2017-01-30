@@ -86,4 +86,7 @@ public interface IRuntimeProcessor {
 
    /** Called when all of the active layers have been cleared - to reset the state for a new clean compile */
    void clearRuntime();
+
+   /** Called after a build has been completed, to init any state for the next new build */
+   void buildCompleted();
 }

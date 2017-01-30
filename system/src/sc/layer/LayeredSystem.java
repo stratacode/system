@@ -8638,8 +8638,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // Now go through and find which source files have changed, reload those changes and populate the modelsToTransform
          GenerateCodeStatus startResult = initChangedModels(genLayer, includeFiles, phase, separateOnly);
          if (startResult != GenerateCodeStatus.NewCompiledFiles) {
-            if (phase == BuildPhase.Process)
-               genLayer.updateBuildInProgress(false);
+            markBuildCompleted(genLayer, phase);
             return startResult;
          }
       }
@@ -8647,8 +8646,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (!flags.started) {
          GenerateCodeStatus startResult = startChangedModels(genLayer, includeFiles, phase, separateOnly);
          if (startResult != GenerateCodeStatus.NewCompiledFiles) {
-            if (phase == BuildPhase.Process)
-               genLayer.updateBuildInProgress(false);
+            markBuildCompleted(genLayer, phase);
             return startResult;
          }
       }
@@ -8964,6 +8962,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          genLayer.updateBuildInProgress(false);
       }
 
+      if (runtimeProcessor != null)
+         runtimeProcessor.buildCompleted();
+
       if (!bd.anyError) {
          boolean compileFailed = false;
 
@@ -9055,6 +9056,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return GenerateCodeStatus.Error;
       }
       return GenerateCodeStatus.Error;
+   }
+
+   private void markBuildCompleted(Layer genLayer, BuildPhase phase) {
+      if (phase == BuildPhase.Process) {
+         genLayer.updateBuildInProgress(false);
+         if (runtimeProcessor != null)
+            runtimeProcessor.buildCompleted();
+      }
    }
 
    public SrcIndexEntry getPrevSrcIndex(Layer genLayer, SrcEntry genFile) {
@@ -10458,6 +10467,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
             //if (options.verbose)
             //   System.out.println("No change: " + srcEnt.absFileName);
+
+            // This model might have been copied from another runtime which has already called refresh on this file or reinitialized here - either way, it's a changed model
+            if (!oldModel.isStarted())
+               return oldModel;
+
             return null;
          }
       }
