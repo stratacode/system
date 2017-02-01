@@ -6,9 +6,10 @@ package sc.lang;
 
 import sc.dyn.DynUtil;
 import sc.obj.IObjectId;
+import sc.sync.SyncManager;
 
 @sc.obj.Sync(onDemand=true)
-public class InstanceWrapper implements IObjectId {
+public class InstanceWrapper {
    EditorContext ctx;
    public Object theInstance;
    boolean canCreate = false;
@@ -17,11 +18,13 @@ public class InstanceWrapper implements IObjectId {
       this.typeName = typeName;
       this.canCreate = canCreate;
       this.ctx = ctx;
+      SyncManager.addSyncInst(this, true, true, null, ctx, canCreate, typeName);
    }
 
    public InstanceWrapper(EditorContext ctx, Object inst) {
       this.theInstance = inst;
       this.ctx = ctx;
+      SyncManager.addSyncInst(this, true, true, null, ctx, inst);
    }
 
    public Object getInstance() {
@@ -55,14 +58,4 @@ public class InstanceWrapper implements IObjectId {
       return theInstance.hashCode();
    }
 
-   public String getObjectId() {
-      // We have to put the type name in the object id.  It has to do with name scoping through the sync system since this
-      // instance turns into a static field of the type it makes sense that the type name should be on there.
-      String base = "sc.lang.InstanceWrapper";
-      if (typeName == null)
-         return base + "__nullWrapper";
-      else if (theInstance == null)
-         return base + "__type_" + typeName.replace(".", "_");
-      return base + "__" + DynUtil.getObjectId(theInstance, null, typeName);
-   }
 }
