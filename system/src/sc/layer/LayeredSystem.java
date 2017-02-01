@@ -3986,6 +3986,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          SyncManager.addSyncHandler(Template.class, LayerSyncHandler.class);
          SyncManager.addSyncHandler(Layer.class, LayerSyncHandler.class);
 
+         SyncManager.addSyncType(InstanceWrapper.class, new SyncProperties(null, null, new Object[] {}, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, globalScopeId));
+
          SyncManager.addSyncType(Layer.class,
                  new SyncProperties(null, null,
                          new Object[]{"packagePrefix", "defaultModifier", "dynamic", "hidden", "compiledOnly", "transparent",
