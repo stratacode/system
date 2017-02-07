@@ -1145,7 +1145,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    void checkForStaleAdd() {
-      Layer l = getLayer();
+      if (isTransformedType()) return; Layer l = getLayer();
       if (l != null && l.compiled && !isDynamicNew() && staleClassName == null && !isGeneratedType()) {
          LayeredSystem sys = l.layeredSystem;
          sys.setStaleCompiledModel(true, "Added statement to compiled type: ", typeName);
@@ -4708,10 +4708,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             if (insts != null) {
                while (insts.hasNext()) {
                   Object nextInst = insts.next();
+                  /* We can't call setDynType this soon because it needs to remap the properties.  For templates, we create new properties in 'start' which has not been called yet.
+                     so we now do it just before we start updating the instances of this type
                   if (nextInst instanceof IDynObject) {
                      IDynObject inst = (IDynObject) nextInst;
                      inst.setDynType(newType); // Forces the type to recompute the field mapping using "getOldInstFields"
                   }
+                  */
                   String newTypeName = newType.getFullTypeName();
                   // This handles the case where you modify a type from a sub-type.  In effect, this dynamically creates
                   // a new inner type which extends the original inner type.  We'll update the type of the instance and
@@ -5809,8 +5812,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       updateTypeInternals(tctx, newType, ctx, updateMode, updateInstances, info, true);
 
       // Start the type after it's fully registered into the new type system so any new references we create point
-      // to the new model.
-      if (updateMode != TypeUpdateMode.Remove);
+      // to the new model.  If we are batching updates do not start the type here.  We may be updating many types and
+      // if we start it here, we'll resolve references to other types that will become stale.
+      if (updateMode != TypeUpdateMode.Remove && info == null)
          ParseUtil.realInitAndStartComponent(newType);
 
       completeUpdateType(tctx, newType, ctx, updateMode, updateInstances, info, true);
@@ -5865,7 +5869,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
 
       if (updateMode != TypeUpdateMode.Remove && info != null)
-         info.typeChanged(this);
+         info.typeChanged(this, newType);
 
       if (!skipAdd) {
          for (int i = 0; i < tctx.toAddObjs.size(); i++) {
@@ -5953,7 +5957,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
       }
 
-      /* If there are connected clients listening to this model, they will be synchrhonized on the clientTypeDeclaration - some of the fields in that may have changed but for now, just refresh the entire thing and reuse the instance */
+      /* If there are connected clients listening to this model, they will be synchronized on the clientTypeDeclaration - some of the fields in that may have changed but for now, just refresh the entire thing and reuse the instance */
       if (updateMode == TypeUpdateMode.Replace && clientTypeDeclaration != null) {
          newType.clientTypeDeclaration = clientTypeDeclaration;
          newType.refreshClientTypeDeclaration();
@@ -7047,7 +7051,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       boolean doValidate = isValidated();
       boolean incrNest = false;
       JavaSemanticNode extendsNode = extendsModel == null ? extendsType : extendsModel;
-      if (extendsModel.layer != null && extendsModel.isLayerModel && extendsModel.layer.excluded)
+      if (extendsModel != null && extendsModel.layer != null && extendsModel.isLayerModel && extendsModel.layer.excluded)
          return;
       // Do nothing if the type or model is already at the level we need it
       if ((!doValidate && extendsNode.isStarted()) || (doValidate && extendsNode.isValidated()))

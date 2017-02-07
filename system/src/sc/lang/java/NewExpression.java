@@ -1016,4 +1016,10 @@ public class NewExpression extends IdentifierExpression {
       anonId = -1;
       constructor = null;
    }
+
+   // Don't let the IdentifierExpression implementation work on new expressions.  It can cause weird problems parsing
+   // partial values (see reparseTest/re70)
+   public boolean applyPartialValue(Object value) {
+      return false;
+   }
 }

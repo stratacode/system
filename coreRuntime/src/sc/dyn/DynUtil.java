@@ -1216,6 +1216,16 @@ public class DynUtil {
       throw new UnsupportedOperationException();
    }
 
+   public static Object getAnnotation(Object typeObj, String annotName) {
+      if (typeObj instanceof Class) {
+         return PTypeUtil.getAnnotation((Class) typeObj, annotName);
+      }
+      else if (dynamicSystem != null) {
+         return dynamicSystem.getAnnotationByName(typeObj, annotName);
+      }
+      else throw new UnsupportedOperationException();
+   }
+
    public static Object getAnnotationValue(Object typeObj, String annotName, String attName) {
       if (typeObj instanceof Class) {
          return PTypeUtil.getAnnotationValue((Class) typeObj, annotName, attName);
@@ -1327,6 +1337,18 @@ public class DynUtil {
          System.out.println("*** No DynChildManager registered for addChild on parent type: " + type);
       else
          childMgr.addChild(ix, parent, child);
+   }
+
+   public static int getLayerPosition(Object type) {
+      if (dynamicSystem == null)
+         return -1;
+      return dynamicSystem.getLayerPosition(type);
+   }
+
+   /** Call this method to be notified when dynamic types change */
+   public static void registerTypeChangeListener(ITypeChangeListener listener) {
+      if (dynamicSystem != null)
+         dynamicSystem.registerTypeChangeListener(listener);
    }
 
 }

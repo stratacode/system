@@ -940,6 +940,19 @@ public class PTypeUtil {
       return TypeUtil.invokeMethod(annotation, method, (Object[])null);
    }
 
+   public static Object getAnnotation(Class cl, String annotName) {
+      Class annotClass = RDynUtil.loadClass(annotName);
+      Annotation annotation = null;
+      do {
+         annotation = cl.getAnnotation(annotClass);
+         if (annotation != null)
+            break;
+         cl = cl.getSuperclass();
+      } while (cl != null);
+
+      return annotation;
+   }
+
    public static Object getEnclosingType(Object typeObj, boolean instOnly) {
       if (typeObj instanceof Class) {
          if (instOnly && hasModifier(typeObj, "static"))

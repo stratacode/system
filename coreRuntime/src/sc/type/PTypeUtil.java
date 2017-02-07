@@ -445,6 +445,10 @@ public class PTypeUtil {
       return null;
    }
 
+   public static Object getAnnotation(Class cl, String annotName) {
+      return null;
+   }
+
    public static Object getEnclosingType(Object typeObj, boolean instOnly) {
       return null;
    }

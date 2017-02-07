@@ -24,6 +24,8 @@ public interface IDynamicSystem {
 
    Object getAnnotation(Object def, Class annotClass);
 
+   Object getAnnotationByName(Object def, String annotName);
+
    Object[] getMethods(Object type, String methodName);
 
    Object getDeclaringClass(Object method);
@@ -135,4 +137,8 @@ public interface IDynamicSystem {
    Iterator<Object> getInstancesOfTypeAndSubTypes(String typeName);
 
    String getInheritedScopeName(Object obj);
+
+   void registerTypeChangeListener(ITypeChangeListener type);
+
+   int getLayerPosition(Object type);
 }

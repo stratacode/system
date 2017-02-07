@@ -4,6 +4,9 @@
 
 package sc.lang.java;
 
+import sc.dyn.IDynObject;
+import sc.dyn.ITypeChangeListener;
+import sc.layer.LayeredSystem;
 import sc.obj.ITypeUpdateHandler;
 
 import java.util.Iterator;
@@ -11,6 +14,11 @@ import java.util.LinkedList;
 import java.util.List;
 
 
+/**
+ * This class is used by the dynamic runtime to update the system in response to changes made to the source files
+ * in the running application.   It's constructed during the updateModel/updateType process to hold all of the updates
+ * that need to be made to the instances and notifications that need to be made to framework components - e.g. the TypeChangeListener
+ */
 public class UpdateInstanceInfo {
 
    /** For the default action, we do not queue the removes.  They are executed during the updateType operation.
@@ -20,20 +28,37 @@ public class UpdateInstanceInfo {
    }
 
    public static abstract class UpdateAction {
-      protected BodyTypeDeclaration baseType;
+      protected BodyTypeDeclaration newType;
 
       abstract void doAction(ExecutionContext ctx);
    }
 
    public static class UpdateType extends UpdateAction {
+      protected BodyTypeDeclaration oldType;
       void doAction(ExecutionContext ctx) {
-         if (baseType.implementsType("sc.obj.TypeUpdateHandler", false, false)) {
-            Iterator insts = baseType.getLayeredSystem().getInstancesOfTypeAndSubTypes(baseType.getFullTypeName());
-            while (insts.hasNext()) {
-               Object inst = insts.next();
-               if (inst instanceof ITypeUpdateHandler)
-                  ((ITypeUpdateHandler) inst)._updateInst();
+         Iterator insts = newType.getLayeredSystem().getInstancesOfTypeAndSubTypes(newType.getFullTypeName());
+         while (insts.hasNext()) {
+            Object inst = insts.next();
+            if (inst instanceof IDynObject) {
+               IDynObject dynInst = (IDynObject) inst;
+               dynInst.setDynType(newType); // Forces the type to recompute the field mapping using "getOldInstFields"
             }
+            if (inst instanceof ITypeUpdateHandler)
+               ((ITypeUpdateHandler) inst)._updateInst();
+         }
+
+         LayeredSystem sys = newType.getLayeredSystem();
+         for (ITypeChangeListener tcl:sys.getTypeChangeListeners()) {
+            tcl.updateType(oldType, newType);
+         }
+      }
+   }
+
+   public static class NewType extends UpdateAction {
+      void doAction(ExecutionContext ctx) {
+         LayeredSystem sys = newType.getLayeredSystem();
+         for (ITypeChangeListener tcl:sys.getTypeChangeListeners()) {
+            tcl.typeCreated(newType);
          }
       }
    }
@@ -43,7 +68,7 @@ public class UpdateInstanceInfo {
       protected BodyTypeDeclaration.InitInstanceType initType;
 
       public void doAction(ExecutionContext ctx) {
-         baseType.updateInstancesForProperty(overriddenAssign, ctx, initType);
+         newType.updateInstancesForProperty(overriddenAssign, ctx, initType);
       }
    }
 
@@ -51,7 +76,7 @@ public class UpdateInstanceInfo {
       protected BlockStatement blockStatement;
 
       public void doAction(ExecutionContext ctx) {
-         baseType.execBlockStatement(blockStatement, ctx);
+         newType.execBlockStatement(blockStatement, ctx);
       }
    }
 
@@ -61,9 +86,9 @@ public class UpdateInstanceInfo {
       return new UpdateProperty();
    }
 
-   public void addUpdateProperty(BodyTypeDeclaration bodyTypeDeclaration, JavaSemanticNode overriddenAssign, BodyTypeDeclaration.InitInstanceType initType) {
+   public void addUpdateProperty(BodyTypeDeclaration newType, JavaSemanticNode overriddenAssign, BodyTypeDeclaration.InitInstanceType initType) {
       UpdateProperty prop = newUpdateProperty();
-      prop.baseType = bodyTypeDeclaration;
+      prop.newType = newType;
       prop.overriddenAssign = overriddenAssign;
       prop.initType = initType;
       actionsToPerform.add(prop);
@@ -73,17 +98,24 @@ public class UpdateInstanceInfo {
       return new ExecBlock();
    }
 
-   public void addBlockStatement(BodyTypeDeclaration theType, BlockStatement blockStatement) {
+   public void addBlockStatement(BodyTypeDeclaration newType, BlockStatement blockStatement) {
       ExecBlock eb = newExecBlock();
-      eb.baseType = theType;
+      eb.newType = newType;
       eb.blockStatement = blockStatement;
       actionsToPerform.add(eb);
    }
 
-   public void typeChanged(BodyTypeDeclaration typeChanged) {
+   public void typeChanged(BodyTypeDeclaration oldType, BodyTypeDeclaration newType) {
       UpdateType ut = new UpdateType();
-      ut.baseType = typeChanged;
+      ut.oldType = oldType;
+      ut.newType = newType;
       actionsToPerform.add(ut);
+   }
+
+   public void typeCreated(BodyTypeDeclaration newType) {
+      NewType nt = new NewType();
+      nt.newType = newType;
+      actionsToPerform.add(nt);
    }
 
    public void methodChanged(AbstractMethodDefinition methChanged) {

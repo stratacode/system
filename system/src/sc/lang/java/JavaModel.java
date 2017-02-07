@@ -171,6 +171,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public void setLayer(Layer l) {
+      if (l != null && l.layeredSystem != getLayeredSystem())
+         System.out.println("*** Error - mismatching runtime for setLayer in Java model!");
       layer = l;
    }
 
@@ -1041,9 +1043,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return res;
    }
 
-   /** Here to convince the sync system this property can be synchronized to the client (without loading the JavaModel.sc file on the client) */
    public void setSrcFile(SrcEntry srcFile) {
-      throw new UnsupportedOperationException();
+      if (srcFiles != null)
+         srcFiles = null;
+      addSrcFile(srcFile);
    }
 
    /** Returns the main source file for this model */
@@ -1633,20 +1636,22 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (updateMode == TypeUpdateMode.Remove || updateMode == TypeUpdateMode.Replace)
          removed = true;
 
-      // The type will have been started inside of updateType but the model also should be started for consistency
-      if (!newModel.isStarted()) {
+      // If we are batching updates (updateInfo != null), we might be updating more than one model so don't start it here.
+      if (!newModel.isStarted() && updateInfo == null) {
          ParseUtil.realInitAndStartComponent(newModel);
       }
    }
 
-   public void completeUpdateModel(JavaModel newModel) {
-      if (!newModel.isValidated()) {
-         ParseUtil.validateComponent(newModel);
-      }
-      newModel.readReverseDeps(layeredSystem.buildLayer);
-      // We only process activated components
-      if (!newModel.isProcessed() && getLayer() != null && getLayer().activated) {
-         ParseUtil.processComponent(newModel);
+   public void completeUpdateModel(JavaModel newModel, boolean updateRuntime) {
+      if (updateRuntime) {
+         if (!newModel.isValidated()) {
+            ParseUtil.validateComponent(newModel);
+         }
+         newModel.readReverseDeps(layeredSystem.buildLayer);
+         // We only process activated components
+         if (!newModel.isProcessed() && getLayer() != null && getLayer().activated) {
+            ParseUtil.processComponent(newModel);
+         }
       }
 
       newModel.setNeedsModelText(needsModelText);
@@ -2867,7 +2872,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public boolean getDependenciesChanged(Layer genLayer, Map<String,IFileProcessorResult> changedModels) {
-      if (needsRestart) {
+      if (needsRestart) {  // Has this model been explicitly marked for a 'restart' (e.g. during a second buildAll build) - if so, consider it as changed even if it has not actually changed.
          return true;
       }
       for (TypeDeclaration td:types) {

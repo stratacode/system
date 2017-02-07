@@ -144,7 +144,6 @@ import java.util.zip.ZipFile;
  * -vl - show the initial layers as in verbose
  */
 public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSystem, IClassResolver {
-
    {
       setCurrent(this);
    }
@@ -862,6 +861,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private EnumMap<BuildPhase,List<BuildCommandHandler>> testCommands = new EnumMap<BuildPhase,List<BuildCommandHandler>>(BuildPhase.class);
 
    private List<IModelListener> modelListeners = new ArrayList<IModelListener>();
+   private List<ITypeChangeListener> typeChangeListeners = new ArrayList<ITypeChangeListener>();
 
    EditorContext editorContext;
 
@@ -3030,6 +3030,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return ModelUtil.getAnnotation(def, ModelUtil.getTypeName(annotClass));
    }
 
+   public Object getAnnotationByName(Object def, String annotName) {
+      return ModelUtil.getAnnotation(def, annotName);
+   }
+
    public Object[] getMethods(Object type, String methodName) {
       return ModelUtil.getMethods(type, methodName, null);
    }
@@ -3103,6 +3107,27 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public String getInheritedScopeName(Object typeObj) {
       return ModelUtil.getInheritedScopeName(this, typeObj);
+   }
+
+   public void registerTypeChangeListener(ITypeChangeListener type) {
+      typeChangeListeners.add(type);
+   }
+
+   public int getLayerPosition(Object type) {
+      if (type instanceof ITypeDeclaration) {
+         Layer l = ((ITypeDeclaration) type).getLayer();
+         if (l != null)
+            return l.layerPosition;
+      }
+      return -1;
+   }
+
+   public void removeTypeChangeListener(ITypeChangeListener type) {
+      typeChangeListeners.remove(type);
+   }
+
+   public List<ITypeChangeListener> getTypeChangeListeners() {
+      return typeChangeListeners;
    }
 
    public Object getStaticProperty(Object object, String propertyName) {
@@ -3266,6 +3291,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       /** Maximum number of errors to display in one build */
       @Constant public int maxErrors = 100;
+
+      /** After the first successful build, should we continue to use buildAllFiles or set it to false. */
+      @Constant public boolean rebuildAllFiles = false;
    }
 
    @MainSettings(produceJar = true, produceScript = true, produceBAT = true, execName = "bin/scc", jarFileName="bin/sc.jar", debug = false, maxMemory = 2048, defaultArgs = "-restartArgsFile <%= getTempDir(\"restart\", \"tmp\") %>")
@@ -4159,7 +4187,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (getCurrent() != this)
             System.out.println("*** Error mismatching layered system");
 
-         if ((!newLayersOnly || !layer.compiled) && (!separateLayersOnly || layer.buildSeparate) && (result = generateCode(layer, includeFiles, phase, separateLayersOnly)) != GenerateCodeStatus.Error) {
+         if ((!newLayersOnly || !layer.compiled) && (!separateLayersOnly || layer.buildSeparate) &&
+             (result = generateCode(layer, includeFiles, phase, separateLayersOnly)) != GenerateCodeStatus.Error) {
             if (phase == BuildPhase.Process && !skipBuild) {
                layer.compiled = true;
                // Mark all previous layers as compiled when we successfully compile the build layer
@@ -4177,7 +4206,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   }
                }
                if (result == GenerateCodeStatus.ChangedCompiledFiles) {
-                  setStaleCompiledModel(true, "Regeneration of compiled files that are in use by the system");
+                  internalSetStaleCompiledModel(true, "Regeneration of compiled files that are in use by the system");
                   masterResult = result;
                }
                else if (masterResult == GenerateCodeStatus.NoFilesToCompile)
@@ -4400,6 +4429,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    void buildCompleted(boolean doPeers) {
       systemCompiled = true;
+      // Any models that are started after we need to mark as changed.
+      lastStartedLayer = null;
+      lastBuiltLayer = null;
       changedModels.clear();
       processedModels.clear();
 
@@ -4645,7 +4677,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (jmodel.replacesModel != null) {
                jmodel.replacesModel.updateModel(jmodel, ctx, TypeUpdateMode.Replace, true, null);
                // TODO: this should be moved till after the updateLayer is run on the other layered system
-               jmodel.replacesModel.completeUpdateModel(jmodel);
+               jmodel.replacesModel.completeUpdateModel(jmodel, true);
                jmodel.replacesModel = null;
             }
             else if (jmodel.isLayerModel && jmodel.modifiesModel())
@@ -5004,7 +5036,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                JavaModel lastModel = (JavaModel) last;
                JavaModel newModel = (JavaModel) mtr.newModel;
                lastModel.updateModel(newModel, ctx, TypeUpdateMode.Remove, true, updateInfo);
-               lastModel.completeUpdateModel(newModel);
+               lastModel.completeUpdateModel(newModel, true);
             }
 
             // Need to remove all of the models except for the last one which we just updated.  UpdateType right now updates the types in these models.
@@ -6837,15 +6869,22 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public void saveTypeIndexChanges() {
-      for (Layer layer:inactiveLayers) {
-         if (layer.typeIndexNeedsSave)
-            layer.saveTypeIndex();
-         else if (layer.typeIndexFileLastModified != -1)
-            layer.updateFileIndexLastModified();
+      try {
+         acquireDynLock(false);
+         for (int i = 0; i < inactiveLayers.size(); i++) {
+            Layer layer = inactiveLayers.get(i);
+            if (layer.typeIndexNeedsSave)
+               layer.saveTypeIndex();
+            else if (layer.typeIndexFileLastModified != -1)
+               layer.updateFileIndexLastModified();
+         }
+         if (typeIndex != null && typeIndex.needsSave)
+            typeIndex.saveToDir(getTypeIndexDir());
+         // Save the list of layers here too
       }
-      if (typeIndex != null && typeIndex.needsSave)
-         typeIndex.saveToDir(getTypeIndexDir());
-      // Save the list of layers here too
+      finally {
+         releaseDynLock(false);
+      }
    }
 
    // TODO: We need a more accurate way of determining when a model is in use before we cull it.  If there is another
@@ -8287,7 +8326,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      // Only need to stop and restart models whose dependencies have changed.  This might be true either because we are
                      // in a new layered build and the model changed from the previous build layer, or because we started a model on a previous
                      // build and some model we depend upon has changed since the last build.
-                     if (!cachedJModel.getDependenciesChanged(genLayer, incrCompile ? changedModels : null)) {
+                     if (!isChangedModel(cachedJModel, genLayer, incrCompile)) {
                         if (options.verbose)
                            verbose("Reusing: " + toGenEnt + " for: " + getProcessIdent());
                         continue;
@@ -8318,6 +8357,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       // TODO: if we find no files to generate we could stop here right?
       return GenerateCodeStatus.NewCompiledFiles;
+   }
+
+   public boolean isChangedModel(JavaModel cachedModel, Layer genLayer, boolean incrCompile) {
+      // Only need to stop and restart models whose dependencies have changed.  This might be true either because we are
+      // in a new layered build and the model changed from the previous build layer, or because we started a model on a previous
+      // build and some model we depend upon has changed since the last build.
+      if (!cachedModel.getDependenciesChanged(genLayer, incrCompile ? changedModels : null)) {
+         return false;
+      }
+      return true;
    }
 
    public GenerateCodeStatus initChangedModels(Layer genLayer, List<String> includeFiles, BuildPhase phase, boolean separateOnly) {
@@ -8840,8 +8889,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                            if (sie == null || !Arrays.equals(sie.hash, hash)) {
                               SrcIndexEntry prevSrc = getPrevSrcIndex(genLayer, genFile);
 
-                              if (systemCompiled && isClassLoaded(toGenEnt.getTypeName())) {
-                                 setStaleCompiledModel(true, "Loaded compiled type: " + genFile.relFileName + " changed");
+                              if (runClassStarted && isClassLoaded(toGenEnt.getTypeName())) {
+                                 internalSetStaleCompiledModel(true, "Loaded compiled type: " + genFile.relFileName + " changed");
+                                 bd.anyChangedClasses = true;
                               }
 
                               if (prevSrc != null && Arrays.equals(prevSrc.hash, hash)) {
@@ -8865,9 +8915,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                                  // If not and we haven't started any main methods, we won't have loaded the compiled version of
                                  // those classes.
                                  // If this is not the buildLayer... it's possible we are generating a previous version of a file which has not
+                                 /* TODO: don't think we need this anymore because we have the tracking class loader
                                  Layer prevLayer = genLayer.getPrevSrcFileLayer(genFile.relFileName);
-                                 if (prevSrc != null && prevLayer != null && (prevLayer.buildSeparate || runClassStarted))
+                                 if ((prevSrc != null && prevLayer != null && (prevLayer.buildSeparate || runClassStarted)))
                                     bd.anyChangedClasses = true;
+                                 */
                               }
 
                               if (sie != null) {
@@ -10047,6 +10099,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
+   /** This call will update the models in all of the runtimes, but will not rebuild the system. */
    public SystemRefreshInfo refreshRuntimes(boolean active) {
       updatePeerModels(true);
 
@@ -10067,15 +10120,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
             setCurrent(this);
          }
-         completeRefresh(sysInfo, active);
-         if (peerSystems != null) {
-            int sz = peerSystems.size();
-            for (int i = 0; i < sz; i++) {
-               LayeredSystem peer = peerSystems.get(i);
-               if (i < peerChangedInfos.size())
-                  peer.completeRefresh(peerChangedInfos.get(i), active);
-            }
-         }
+         completeRefresh(sysInfo, peerChangedInfos, active, true);
       }
       finally {
          releaseDynLock(false);
@@ -10209,12 +10254,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public void rebuild(boolean forceBuild) {
       acquireDynLock(false);
 
-      // TODO: buildAllFiles does not always work so at some point we need to either fix this or turn it into buildIfAnyChanges
-      /*
-      if (systemCompiled) {
+      if (systemCompiled && !options.rebuildAllFiles) {
          clearBuildAllFiles();
       }
-      */
       buildingSystem = true;
       if (peerSystems != null && !peerMode) {
          for (LayeredSystem peer:peerSystems) {
@@ -10223,10 +10265,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       boolean initialBuild;
+      SystemRefreshInfo sysInfo = null;
       try {
          PerfMon.start("rebuildSystem");
          List<Layer.ModelUpdate> changes = null;
-         ArrayList<SystemRefreshInfo> peerChanges = null;
+         ArrayList<SystemRefreshInfo> peerRefreshInfos = null;
 
          // If we've been through here at least once...
          if (systemCompiled || anyErrors) {
@@ -10236,23 +10279,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // them there.
             // First we have to refresh the models in all systems so we have a consistent view of the new types across all
             // runtimes.  That way synchronization can be computed accurately for the new changes.
-            SystemRefreshInfo sysInfo = refreshSystem(false, true);
+            sysInfo = refreshSystem(false, true);
             changes = sysInfo.changedModels;
-            peerChanges = new ArrayList<SystemRefreshInfo>();
+            peerRefreshInfos = !peerMode ? new ArrayList<SystemRefreshInfo>() : null;
             if (peerSystems != null && !peerMode) {
                for (LayeredSystem peer:peerSystems) {
                   peer.buildingSystem = true;
-                  peerChanges.add(peer.refreshSystem(false, true));
+                  peerRefreshInfos.add(peer.refreshSystem(false, true));
                }
             }
 
-            // Now we need to validate and process the changed models and update any instances in each system.
-            completeRefresh(sysInfo, true);
-            if (peerSystems != null && !peerMode) {
-               for (int i = 0; i < peerSystems.size(); i++) {
-                  peerSystems.get(i).completeRefresh(peerChanges.get(i), true);
-               }
-            }
+            // Now we need to validate and process the changed models - not refreshing the instances yet because they
+            // need to be transformed.
+            completeRefresh(sysInfo, peerRefreshInfos, true, false);
          }
          else {
             initialBuild = true;
@@ -10275,7 +10314,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             for (LayeredSystem peer:peerSystems) {
                peer.buildingSystem = true;
                try {
-                  SystemRefreshInfo peerSysInfo = peerChanges == null ? null : peerChanges.get(i);
+                  SystemRefreshInfo peerSysInfo = peerRefreshInfos == null ? null : peerRefreshInfos.get(i);
                   List<Layer.ModelUpdate> peerChangedModels = peerSysInfo == null ? null : peerSysInfo.changedModels;
                   if (initialBuild || peer.anyCompiledChanged(peerChangedModels) || forceBuild) {
                      if (!reset && !initialBuild)
@@ -10291,6 +10330,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                i++;
             }
          }
+         // Now that we've finished transforming and rebuilding all of the models, we can update the types and instances
+         // by calling out to the runtime
+         updateRuntime(sysInfo, peerRefreshInfos);
          buildCompleted(true);
          setCurrent(this);
       }
@@ -10301,7 +10343,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   private void completeRefresh(SystemRefreshInfo sysInfo, boolean active) {
+   private void completeRefresh(SystemRefreshInfo sysInfo, ArrayList<SystemRefreshInfo> peerChangedInfos, boolean active, boolean updateRuntime) {
       List<Layer.ModelUpdate> changes = sysInfo.changedModels;
       if (changes == null)
          return;
@@ -10310,19 +10352,45 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          ILanguageModel oldModel = upd.oldModel;
          Object newModel = upd.changedModel;
          if (oldModel instanceof JavaModel && newModel instanceof JavaModel) {
-            ((JavaModel) oldModel).completeUpdateModel((JavaModel) newModel);
+            ((JavaModel) oldModel).completeUpdateModel((JavaModel) newModel, updateRuntime);
          }
          else if (upd.removed) {
             removeModel(upd.oldModel, true);
          }
       }
-
-      if (active && !options.compileOnly) {
-         ExecutionContext ctx = new ExecutionContext(this);
-         //allTypesProcessed = true;
-         sysInfo.updateInfo.updateInstances(ctx);
+      if (peerSystems != null && peerChangedInfos != null) {
+         int sz = peerSystems.size();
+         for (int i = 0; i < sz; i++) {
+            LayeredSystem peer = peerSystems.get(i);
+            setCurrent(peer);
+            if (i < peerChangedInfos.size())
+               peer.completeRefresh(peerChangedInfos.get(i), null, active, false);
+         }
+         setCurrent(this);
       }
 
+      if (updateRuntime && active && !options.compileOnly)
+         updateRuntime(sysInfo, peerChangedInfos);
+   }
+
+   private void updateRuntime(SystemRefreshInfo sysInfo, ArrayList<SystemRefreshInfo> peerRefreshInfos) {
+      ExecutionContext ctx = new ExecutionContext(this);
+      //allTypesProcessed = true;
+      if (sysInfo == null || sysInfo.updateInfo == null)
+         return;
+      sysInfo.updateInfo.updateInstances(ctx);
+
+      if (peerSystems != null && peerRefreshInfos != null) {
+         int sz = peerSystems.size();
+         for (int i = 0; i < sz; i++) {
+            LayeredSystem peer = peerSystems.get(i);
+            if (i < peerRefreshInfos.size()) {
+               setCurrent(peer);
+               peer.updateRuntime(peerRefreshInfos.get(i), null);
+            }
+         }
+         setCurrent(this);
+      }
    }
 
    public void rebuildSystem() {
@@ -10528,6 +10596,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                JavaModel oldJavaModel = (JavaModel) oldModel;
                if (oldJavaModel.isLayerModel) // Can't update layers for now
                   return null;
+
+               // We need to mark the model as changed before we start it, so that the JSRuntime and other hooks can
+               // detect changed types as they are started.
+               if (!oldJavaModel.equals(newModel))
+                  changedModels.put(oldJavaModel.getModelTypeName(), newModel);
                oldJavaModel.updateModel(newModel, ctx, TypeUpdateMode.Replace, activated, updateInfo);
             }
             else if (newModel.modifiesModel()) {
@@ -10536,9 +10609,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                newModel.updateLayeredModel(ctx, activated, updateInfo);
             }
             // Make sure this gets added so we don't get keep doing it over and over again
-            else if (addModel)
+            else if (addModel) {
                addNewModel(newModel, srcEnt.layer, null, false);
-
+               // Register the new type here so we can notify listeners when the type has been fully initialized
+               if (updateInfo != null) {
+                  Map<String,TypeDeclaration> types = newModel.getDefinedTypes();
+                  for (TypeDeclaration newType:types.values()) {
+                     updateInfo.typeCreated(newType);
+                  }
+               }
+            }
          }
          return newModel;
       }
@@ -10848,6 +10928,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          ml.modelRemoved(model);
       }
 
+      if (typeChangeListeners.size() > 0) {
+         Map<String, TypeDeclaration> typesByName = model.getDefinedTypes();
+         for (TypeDeclaration remType : typesByName.values()) {
+            for (ITypeChangeListener typeChangeListener:typeChangeListeners)
+               typeChangeListener.typeRemoved(remType);
+         }
+      }
    }
 
    private boolean isActivated(Layer layer) {
@@ -11617,6 +11704,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                template.defaultExtendsType = paramClass;
                template.layer = srcFile.layer;
                template.setLayeredSystem(this);
+               template.setSrcFile(srcFile);
 
                // Force this to false for templates that are evaluated without converting to Java first
                template.generateOutputMethod = false;
@@ -13561,6 +13649,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (buildingSystem)
          return;
 
+      internalSetStaleCompiledModel(val, reason);
+   }
+
+   private void internalSetStaleCompiledModel(boolean val, String... reason) {
       // No need for this for the JS runtime since we can just reload the classes
       if (isDynamicRuntime())
          return;
@@ -13980,8 +14072,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          try {
             acquireDynLock(false);
             Layer layer = getInactiveLayerByPath(layerPath, prefix, true, true);
-            if (layer != null && layer.model != null)
-               return parseInactiveModel(layer.model.getSrcFile());
+            if (layer != null && layer.model != null)  // NOTE: this layer may not be from this layered system
+               return layer.layeredSystem.parseInactiveModel(layer.model.getSrcFile());
          }
          finally {
             releaseDynLock(false);
@@ -14012,7 +14104,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    void addLayerPathToAllIndex(String pathName) {
       // First populate all of the LayerIndexInfo's by walking the directory tree
-      addLayerPathToAllIndex(pathName, null, new DirectoryFilter());
+      addLayerPathToAllIndex(pathName, null, new LayerUtil.DirectoryFilter());
 
       // Now lookup the package names for any which inherit them from the extends type
       for (LayerIndexInfo lii:allLayerIndex.values()) {
@@ -14084,15 +14176,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             else // possibly a layer group so recursively add layers from here
                addLayerPathToAllIndex(pathName, FileUtil.concat(prefix, fileName), filter);
          }
-      }
-   }
-
-   public class DirectoryFilter implements FilenameFilter {
-      public DirectoryFilter() {
-      }
-
-      public boolean accept(File dir, String fileInDir) {
-         return new File(dir, fileInDir).isDirectory();
       }
    }
 

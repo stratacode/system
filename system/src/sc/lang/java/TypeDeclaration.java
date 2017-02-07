@@ -1746,7 +1746,11 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       Layer typeLayer = td.getLayer();
 
       if (changedModels == null || changedModels.get(fullTypeName) != null) {
-         if (typeLayer.getLayerPosition() > sinceLayer.getLayerPosition())
+         if (sinceLayer == null)
+            return true;
+         if (typeLayer == null)
+            return true;
+         if (genLayer == null || typeLayer.getLayerPosition() > sinceLayer.getLayerPosition())
             return true;
       }
 
@@ -1762,7 +1766,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
             Layer srcLayer = srcEnt.layer;
             // Is there a src file included in this build which is after the layer where we last initialized the type.  If so we need to
             // restart it on this build.
-            if (srcLayer != null && srcLayer.getLayerPosition() > sinceLayer.getLayerPosition())
+            if (sinceLayer != null && srcLayer != null && srcLayer.getLayerPosition() > sinceLayer.getLayerPosition())
                return true;
          }
       }

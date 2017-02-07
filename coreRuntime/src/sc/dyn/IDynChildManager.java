@@ -6,8 +6,10 @@ package sc.dyn;
 
 /**
  * This interface is implemented by framework components that want to use the StrataCode Object hierarchy with
- * dynamic types.  The logic here will mirror the logic you add to your objTemplate and newTemplate for managing
- * children objects.  For dynamic behavior though, you also must support incremental add/remove operations.
+ * dynamic types and want to manage dynamic instances of those types automatically.  In that case, for each parent/child relationship
+ * write a manager class that implements this interface to perform the same logic that you have in your type's objTemplate and newTemplate for managing
+ * children - basically the init/add/remove/get operations.  When new instances are added or removed, your IDynChildManager implementation is
+ * called.
  */
 @sc.js.JSSettings(jsLibFiles="js/scdyn.js", prefixAlias="sc_")
 public interface IDynChildManager {

@@ -887,7 +887,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          if (!hasLibFile) {
 
             if (typeLibFile != null) {
-               addChangedJSFile(typeLibFile, fullTypeName);
+               addChangedJSFile(type, typeLibFile);
             }
             else if (type.getEnclosingType() == null) {
                // Need to mark the fact that we changed a type which lives in the default module.  Any file which has a dependency from the <default> file will need to be changed since it may include this type.
@@ -895,7 +895,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                changedDefaultType = true;
 
                String modLibFile = getJSDefaultModuleFile(type);
-               addChangedJSFile(modLibFile, fullTypeName);
+               addChangedJSFile(type, modLibFile);
             }
 
             addExtendsTypeLibsToFile(type, typesInFile, typeLibFile);
@@ -1080,9 +1080,17 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       }
    }
 
-   private void addChangedJSFile(String jsFile, String fromTypeName) {
+   private void addChangedJSFile(BodyTypeDeclaration fromType, String jsFile) {
+      // TODO: maybe we can remove this buildAllFiles check and use isChangedModel even in that case?  Might reduce layered builds - so we don't process JS files if we've already processed them and no types changed
+      // If we are rebuilding - (i.e. systemCompiled = true), we are just looking for changed models since the rebuild so we pass in a null layer.  Otherwise, we are looking for files that
+      // have changed since the layer in which this type was initialized.
+      if (!system.options.buildAllFiles && !system.isChangedModel(fromType.getJavaModel(), system.systemCompiled ? null : system.buildLayer, !system.buildLayer.getBuildAllFiles())) {
+         if (system.options.verbose)
+            system.verbose("Reusing JS file: " + jsFile + " for unchanged type: " + fromType.getFullTypeName());
+         return;
+      }
       if (system.options.verbose && !changedJSFiles.contains(jsFile)) {
-         system.verbose("JS file: " + jsFile + " changed by changed type: " + fromTypeName);
+         system.verbose("JS file: " + jsFile + " changed by changed type: " + fromType.getFullTypeName());
       }
       changedJSFiles.add(jsFile);
    }
@@ -2722,8 +2730,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          public void doAction(ExecutionContext ctx) {
             super.doAction(ctx);
 
-            JavaModel model = baseType.getJavaModel();
-            TypeDeclaration modifyType = getOrCreateModifyDeclaration(baseType.getFullTypeName(), model.getModelTypeName(), model.getPackagePrefix());
+            JavaModel model = newType.getJavaModel();
+            TypeDeclaration modifyType = getOrCreateModifyDeclaration(newType.getFullTypeName(), model.getModelTypeName(), model.getPackagePrefix());
             modifyType.addBodyStatement(blockStatement.deepCopy(ISemanticNode.CopyNormal | ISemanticNode.CopyInitLevels, null));
          }
       }
@@ -2736,8 +2744,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          public void doAction(ExecutionContext ctx) {
             super.doAction(ctx);
 
-            JavaModel model = baseType.getJavaModel();
-            TypeDeclaration modifyType = getOrCreateModifyDeclaration(baseType.getFullTypeName(), model.getModelTypeName(), model.getPackagePrefix());
+            JavaModel model = newType.getJavaModel();
+            TypeDeclaration modifyType = getOrCreateModifyDeclaration(newType.getFullTypeName(), model.getModelTypeName(), model.getPackagePrefix());
 
             if (overriddenAssign instanceof VariableDefinition || overriddenAssign instanceof PropertyAssignment) {
                IVariableInitializer assign = (IVariableInitializer) overriddenAssign;
@@ -2749,12 +2757,12 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
                modifyType.addBodyStatement(pa);
 
-               if (baseType.changedMethods == null)
-                  baseType.changedMethods = new TreeSet<String>();
+               if (newType.changedMethods == null)
+                  newType.changedMethods = new TreeSet<String>();
                String upperPropName = CTypeUtil.capitalizePropertyName(propName);
                // TODO: should probably validate this VarDef has get set but this is not the definitive list, it just specifies matching methods get put into the output
-               baseType.changedMethods.add("get" + upperPropName);
-               baseType.changedMethods.add("set" + upperPropName);
+               newType.changedMethods.add("get" + upperPropName);
+               newType.changedMethods.add("set" + upperPropName);
             }
             else if (overriddenAssign instanceof TypeDeclaration) {
                String opName = "add";
@@ -2773,7 +2781,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                      newType = (TypeDeclaration) overriddenAssign;
                      SemanticNodeList addArgs = new SemanticNodeList();
                      if (opName.equals("add")) {
-                        Object[] children = baseType.getObjChildrenTypes(null, false, false, false);
+                        Object[] children = newType.getObjChildrenTypes(null, false, false, false);
                         if (children != null) {
                            int ix = Arrays.asList(children).indexOf(newType);
                            if (ix != -1)

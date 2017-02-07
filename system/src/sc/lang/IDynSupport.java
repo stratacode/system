@@ -6,7 +6,7 @@ package sc.lang;
 
 import sc.dyn.IDynObject;
 
-// TODO: use this approach to keep IDynObject from generating too many stub methods.
+// TODO: use this approach to keep IDynObject from generating too many stub methods. (or remove this?)
 public interface IDynSupport {
    Object getPropertyFromWrapper(IDynObject origObj, String propName);
 

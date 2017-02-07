@@ -52,8 +52,9 @@ public abstract class Node extends JavaSemanticNode implements IDynObject, ISrcS
    public void setProperty(String propName, Object value, boolean setField) {
       if (dynObj == null)
          TypeUtil.setPropertyFromName(this, propName, value);
-      else
+      else {
          dynObj.setPropertyFromWrapper(this, propName, value, setField);
+      }
    }
    public void setProperty(int propIndex, Object value, boolean setField) {
       if (dynObj == null) {

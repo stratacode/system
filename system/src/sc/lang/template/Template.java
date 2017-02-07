@@ -802,13 +802,14 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
          }
       }
 
+      super.start();
+
+      // The rootType probably will be started as it's inside of 'types' but just in case do it here (after we've
+      // set the this object's started = true so the template is not started twice
       if (rootType != null && rootType instanceof TypeDeclaration) {
          TypeDeclaration rootTypeDecl = (TypeDeclaration) rootType;
          rootTypeDecl.start();
       }
-
-
-      super.start();
    }
 
    public void validate() {

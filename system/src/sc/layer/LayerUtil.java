@@ -734,7 +734,7 @@ public class LayerUtil implements LayerConstants {
       int line = -1;
       int col = -1;
       IParseNode parseNode = node.getParseNode();
-      if (parseNode != null) {
+      if (parseNode != null && srcEnt != null) {
          int startIx = parseNode.getStartIndex();
          if (startIx != -1) {
             FilePosition pos = ParseUtil.charOffsetToLinePos(new File(srcEnt.absFileName), startIx);
@@ -798,4 +798,12 @@ public class LayerUtil implements LayerConstants {
       return null;
    }
 
+   public static class DirectoryFilter implements FilenameFilter {
+      public DirectoryFilter() {
+      }
+
+      public boolean accept(File dir, String fileInDir) {
+         return new File(dir, fileInDir).isDirectory();
+      }
+   }
 }

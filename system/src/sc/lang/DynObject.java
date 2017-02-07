@@ -85,8 +85,13 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
             IBeanMapper mapper = DynUtil.getPropertyMapping(type, propName);
             if (mapper == null)
                type.runtimeError(IllegalArgumentException.class, "No property: " + propName + " for set value in type: ");
-            else
+            else {
+               //TODO: if (mapper instanceof DynBeanMapper)
+               //   ... sometimes this causes an infinite loop if index = -1 for a dyn property that uses the DynBeanMapper
+               //   but not all of the time - because Node and other classes implement IDynObject which then route here to find
+               //   the dyn bean property.  If we ask for a property which is not found, this method will just try to call the dyn property again.
                TypeUtil.setProperty(origObj, mapper, value);
+            }
          }
          else
             type.setDynStaticField(index, value);

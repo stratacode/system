@@ -143,8 +143,9 @@ public class ModifyDeclaration extends TypeDeclaration {
             // specific definition.  It does not matter much for most contracts given type compatibility but the
             // assignment contract requires the most specific definition so we can detect cycles properly.
             if (!inactiveType && !temporaryType && !thisModel.temporary) {
-               if (modifyTypeDecl.replacedByType != null) {
-                  if (modifyTypeDecl.replacedByType == this) {
+               BodyTypeDeclaration modReplacedByType = modifyTypeDecl.replacedByType ;
+               if (modReplacedByType != null) {
+                  if (modReplacedByType == this) {
                      System.out.println("*** Warning - already modified this type");
                      modifyTypeDecl.replacedByType = null;
                   }
@@ -154,8 +155,8 @@ public class ModifyDeclaration extends TypeDeclaration {
                   }
                   // If we are in the same layer, we are just about to replace the type as part of updateType
                   // Just don't update replacedByType in this case since we'll set that later on anyway.
-                  else if (modifyTypeDecl.replacedByType.getLayer() != getLayer()) {
-                     if (modifyTypeDecl.replacedByType.removed)
+                  else if (modReplacedByType.getLayer() != getLayer()) {
+                     if (modReplacedByType.removed || modReplacedByType.getLayer().excluded)
                         modifyTypeDecl.replacedByType = null;
                      else {
                         // For layer components we might get the wrong type here - we use the baseLayers to do teh resolution so we may not find the
@@ -166,7 +167,7 @@ public class ModifyDeclaration extends TypeDeclaration {
                            System.out.println("**** Warning - modify declaration: " + typeName + " in layer: " + getLayer() + " not replacing upstream layer of: " + modifyTypeDecl.getLayer() + " since it's already modified by: " + modifyTypeDecl.replacedByType.getLayer());
                         } else {
                            // This layer should be in front of us -
-                           if (getLayer().layerPosition != -1 && getLayer().layerPosition < modifyTypeDecl.replacedByType.getLayer().layerPosition)
+                           if (getLayer().layerPosition != -1 && getLayer().layerPosition < modReplacedByType.getLayer().layerPosition)
                               System.out.println("*** Error - improper layer init ordering");
                            else {
                               while (modifyTypeDecl.replacedByType != null) {
