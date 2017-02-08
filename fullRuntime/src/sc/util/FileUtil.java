@@ -745,7 +745,7 @@ public class FileUtil {
    }
 
    public static String makePathAbsolute(String path) {
-      String[] pathDirs = StringUtil.split(path, ':');
+      String[] pathDirs = StringUtil.split(path, FileUtil.PATH_SEPARATOR_CHAR);
       StringBuilder sb = new StringBuilder();
       boolean first = true;
       for (String pathDir:pathDirs) {

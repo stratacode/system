@@ -2571,7 +2571,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                checkIfStarted();
 
                String rest = absFileName.substring(dir.length());
-               while (rest.startsWith("/"))
+               while (rest.startsWith(FileUtil.FILE_SEPARATOR))
                   rest = rest.substring(1);
                File f = srcDirCache.get(rest);
                if (f != null)

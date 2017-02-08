@@ -520,7 +520,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       removeAllActivePackageIndexEntries();
 
-      if (!peerMode)
+      if (!peerMode && !options.disableGC)
          System.gc();
 
    }
@@ -1710,7 +1710,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
 
-      System.gc();
+      if (!options.disableGC)
+         System.gc();
    }
 
    /**
@@ -3294,6 +3295,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       /** After the first successful build, should we continue to use buildAllFiles or set it to false. */
       @Constant public boolean rebuildAllFiles = false;
+
+      @Constant public boolean disableGC = false;
    }
 
    @MainSettings(produceJar = true, produceScript = true, produceBAT = true, execName = "bin/scc", jarFileName="bin/sc.jar", debug = false, maxMemory = 2048, defaultArgs = "-restartArgsFile <%= getTempDir(\"restart\", \"tmp\") %>")
