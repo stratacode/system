@@ -30,6 +30,7 @@ class BuildState {
    ArrayList<SrcEntry> modifiedFiles = new ArrayList<SrcEntry>();
 
    HashMap<SrcEntry,SrcEntry> dependentFilesChanged = new HashMap<SrcEntry,SrcEntry>();
+
    boolean anyChangedClasses = false;
 
    HashMap<String,Integer> typeGroupChangedModelsCount = new HashMap<String,Integer>();
@@ -45,4 +46,20 @@ class BuildState {
    }
 
    ArrayList<Layer> startedLayers;
+
+   String getDependentNamesString() {
+      StringBuilder sb = new StringBuilder();
+      boolean first = true;
+      for (Map.Entry<SrcEntry,SrcEntry> ent:dependentFilesChanged.entrySet()) {
+         if (!first) {
+            sb.append(", ");
+         }
+         else
+            first = false;
+         sb.append(ent.getKey().baseFileName);
+         sb.append("->");
+         sb.append(ent.getValue().baseFileName);
+      }
+      return sb.toString();
+   }
 }

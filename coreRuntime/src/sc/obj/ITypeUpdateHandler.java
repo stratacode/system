@@ -5,8 +5,8 @@
 package sc.obj;
 
 /**
- * This method is called (right now in JS only) when
- * Created by jvroom on 4/16/14.
+ * This method is called for an instance whose type has been modified
+ * in the dynamic runtime.
  */
 public interface ITypeUpdateHandler {
    public void _updateInst();

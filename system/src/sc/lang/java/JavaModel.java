@@ -162,6 +162,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    /** Has this model been added to the type system */
    public transient boolean added = false;
 
+   /** Is this a new model which has not yet been saved or a model whose memory representation is more recent than the file system */
+   public transient boolean unsavedModel = false;
+
    public void setLayeredSystem(LayeredSystem system) {
       layeredSystem = system;
    }
@@ -260,6 +263,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (initialized)
          return;
 
+      //initializedInLayer = layer != null ? layer.layeredSystem.lastModelsStartedLayer : null;
+      // Used for setting fromPosition in the type cache - we want to mark which layers are included in the search
+      // to know when the type cache need to be refreshed for a new layer
       initializedInLayer = layer != null ? layer.layeredSystem.lastStartedLayer : null;
 
       initPackageAndImports();
@@ -501,7 +507,6 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          TypeDeclaration layerType = getLayerTypeDeclaration();
          if (layerType != null) {
             String modelTypeName = layerType.getFullTypeName();
-            System.out.println("*** Starting inactive model: " + modelTypeName + " in layer: " + layerType.getLayer());
             if (modelTypeName != null) {
                TypeDeclaration modelType = (TypeDeclaration) layeredSystem.getSrcTypeDeclaration(modelTypeName, null, prependLayerPackage, false, true, layer, isLayerModel);
                if (modelType != null && modelType.getLayer() != null && layerType.getLayer() != null) {
@@ -511,11 +516,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                         System.err.println("*** error in model type");
                      else {
                         if (!modelTypeModel.isStarted() && !typeInfoInited) {
-                           System.out.println("*** Starting modified type: " + modelTypeName + " for layer: " + modelType.getLayer() + " from: " + layerType.getLayer());
                            ParseUtil.realInitAndStartComponent(modelTypeModel);
                         }
-                        else
-                           System.out.println("*** Modified type already started: " + modelTypeName + " for layer: " + modelType.getLayer() + " from: " + layerType.getLayer());
                      }
                   }
                }
@@ -1212,7 +1214,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (modelType == null)
          return true;
 
-      if (modelType.changedSinceLayer(initLayer, buildLayer, false, null, null))
+      if (modelType.changedSinceLayer(initLayer, buildLayer, false, null, null, false))
          return true;
       return false;
    }
@@ -1493,6 +1495,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          else
             didTransform = needsTransform();
       }
+
+      transformedInLayer = getLayeredSystem().currentBuildLayer;
+
       if (!didTransform && !layer.copyPlainJavaFiles) {
          return Collections.singletonList(src);
       }
@@ -1807,6 +1812,13 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          if (type instanceof TypeDeclaration) {
             TypeDeclaration td = (TypeDeclaration) type;
             if (!td.isLayerType) {
+               if (ModelUtil.isObjectType(td)) {
+                  Object sysObj = layeredSystem != null ? layeredSystem.resolveName(name, create, getLayer(), isLayerModel) : null;
+                  if (sysObj != null)
+                     return sysObj;
+                  else
+                     System.err.println("*** Object type has no globally registered instance");
+               }
                Class cl = td.getCompiledClass();
                if (cl != null)
                   return cl;
@@ -2216,9 +2228,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       }
    }
 
-   public void cleanStaleEntries(HashMap<String,IFileProcessorResult> changedModels) {
+   public void cleanStaleEntries(HashSet<String> changedTypes) {
       if (reverseDeps != null) {
-         reverseDeps.cleanStaleEntries(changedModels);
+         reverseDeps.cleanStaleEntries(changedTypes);
       }
    }
 
@@ -2657,6 +2669,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public void stop() {
+      if (modifiedModel != null)
+         modifiedModel.stop();
+
       SrcEntry srcEnt = getSrcFile();
 
       if (srcEnt != null)
@@ -2871,12 +2886,12 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return cachedGeneratedJSText;
    }
 
-   public boolean getDependenciesChanged(Layer genLayer, Map<String,IFileProcessorResult> changedModels) {
+   public boolean getDependenciesChanged(Layer genLayer, Set<String> changedTypes, boolean processJava) {
       if (needsRestart) {  // Has this model been explicitly marked for a 'restart' (e.g. during a second buildAll build) - if so, consider it as changed even if it has not actually changed.
          return true;
       }
       for (TypeDeclaration td:types) {
-         if (td.changedSinceLayer(initializedInLayer, genLayer, false, null, changedModels))
+         if (td.changedSinceLayer(transformedInLayer, genLayer, false, null, changedTypes, processJava))
             return true;
       }
       return false;
@@ -2990,6 +3005,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          }
       }
       return res.toString();
+   }
+
+   public boolean isUnsavedModel() {
+      return unsavedModel;
    }
 }
 

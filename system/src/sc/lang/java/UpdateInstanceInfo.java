@@ -4,14 +4,13 @@
 
 package sc.lang.java;
 
+import sc.dyn.DynUtil;
 import sc.dyn.IDynObject;
 import sc.dyn.ITypeChangeListener;
 import sc.layer.LayeredSystem;
 import sc.obj.ITypeUpdateHandler;
 
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 
 
 /**
@@ -20,6 +19,8 @@ import java.util.List;
  * that need to be made to the instances and notifications that need to be made to framework components - e.g. the TypeChangeListener
  */
 public class UpdateInstanceInfo {
+   List<UpdateAction> actionsToPerform = new LinkedList<UpdateAction>();
+   HashMap<String,List<UpdateAction>> actionsByType = new HashMap<String,List<UpdateAction>>();
 
    /** For the default action, we do not queue the removes.  They are executed during the updateType operation.
     *  But for Javascript, we need to queue them so we can record them in JS. */
@@ -30,19 +31,34 @@ public class UpdateInstanceInfo {
    public static abstract class UpdateAction {
       protected BodyTypeDeclaration newType;
 
-      abstract void doAction(ExecutionContext ctx);
+      /** First pass - update data structures in the type system so instances are valid */
+      abstract void updateTypes(ExecutionContext ctx);
+      /** Second pass - now the type system is fine - it's ok to update the instances */
+      abstract void updateInstances(ExecutionContext ctx);
+
+      /** Third pass - after the instances have been updated, notify any listeners */
+      abstract void postUpdate(ExecutionContext ctx);
    }
 
    public static class UpdateType extends UpdateAction {
       protected BodyTypeDeclaration oldType;
-      void doAction(ExecutionContext ctx) {
-         Iterator insts = newType.getLayeredSystem().getInstancesOfTypeAndSubTypes(newType.getFullTypeName());
+      void updateTypes(ExecutionContext ctx) {
+         oldType.updateStaticValues(newType);
+         Iterator insts = newType.getLayeredSystem().getInstancesOfType(newType.getFullTypeName());
          while (insts.hasNext()) {
             Object inst = insts.next();
             if (inst instanceof IDynObject) {
                IDynObject dynInst = (IDynObject) inst;
                dynInst.setDynType(newType); // Forces the type to recompute the field mapping using "getOldInstFields"
             }
+         }
+      }
+      void updateInstances(ExecutionContext ctx) {
+      }
+      void postUpdate(ExecutionContext ctx) {
+         Iterator insts = newType.getLayeredSystem().getInstancesOfType(newType.getFullTypeName());
+         while (insts.hasNext()) {
+            Object inst = insts.next();
             if (inst instanceof ITypeUpdateHandler)
                ((ITypeUpdateHandler) inst)._updateInst();
          }
@@ -55,10 +71,33 @@ public class UpdateInstanceInfo {
    }
 
    public static class NewType extends UpdateAction {
-      void doAction(ExecutionContext ctx) {
+      void updateTypes(ExecutionContext ctx) {
          LayeredSystem sys = newType.getLayeredSystem();
          for (ITypeChangeListener tcl:sys.getTypeChangeListeners()) {
             tcl.typeCreated(newType);
+         }
+      }
+      void updateInstances(ExecutionContext ctx) {
+      }
+      void postUpdate(ExecutionContext ctx) {
+      }
+   }
+
+   public static class RemovedType extends UpdateAction {
+      BodyTypeDeclaration oldType;
+      void updateTypes(ExecutionContext ctx) {
+      }
+      void updateInstances(ExecutionContext ctx) {
+      }
+      void postUpdate(ExecutionContext ctx) {
+         LayeredSystem sys = oldType.getLayeredSystem();
+         for (ITypeChangeListener tcl:sys.getTypeChangeListeners()) {
+            tcl.typeRemoved(oldType);
+         }
+         Iterator insts = oldType.getLayeredSystem().getInstancesOfTypeAndSubTypes(oldType.getFullTypeName());
+         while (insts.hasNext()) {
+            Object inst = insts.next();
+            DynUtil.dispose(inst);
          }
       }
    }
@@ -67,20 +106,27 @@ public class UpdateInstanceInfo {
       protected JavaSemanticNode overriddenAssign;
       protected BodyTypeDeclaration.InitInstanceType initType;
 
-      public void doAction(ExecutionContext ctx) {
+      public void updateTypes(ExecutionContext ctx) {
+      }
+
+      public void updateInstances(ExecutionContext ctx) {
          newType.updateInstancesForProperty(overriddenAssign, ctx, initType);
+      }
+      void postUpdate(ExecutionContext ctx) {
       }
    }
 
    public static class ExecBlock extends UpdateAction {
       protected BlockStatement blockStatement;
 
-      public void doAction(ExecutionContext ctx) {
+      public void updateTypes(ExecutionContext ctx) {
+      }
+      public void updateInstances(ExecutionContext ctx) {
          newType.execBlockStatement(blockStatement, ctx);
       }
+      void postUpdate(ExecutionContext ctx) {
+      }
    }
-
-   List<UpdateAction> actionsToPerform = new LinkedList<UpdateAction>();
 
    public UpdateProperty newUpdateProperty() {
       return new UpdateProperty();
@@ -106,10 +152,32 @@ public class UpdateInstanceInfo {
    }
 
    public void typeChanged(BodyTypeDeclaration oldType, BodyTypeDeclaration newType) {
+      String typeName = oldType.getFullTypeName();
+      List<UpdateAction> oldActions = actionsByType.get(typeName);
+      boolean found = false;
+      if (oldActions != null) {
+         for (UpdateAction oldAction:oldActions) {
+            if (oldAction instanceof UpdateType)
+               found = true;
+            oldAction.newType = newType;
+         }
+
+         if (found) {
+            return;
+         }
+         System.err.println("*** Failed to find previous UpdateType but where there are old updates for a type");
+      }
+
       UpdateType ut = new UpdateType();
       ut.oldType = oldType;
       ut.newType = newType;
       actionsToPerform.add(ut);
+
+      if (oldActions == null) {
+         oldActions = new ArrayList<UpdateAction>();
+         actionsByType.put(typeName, oldActions);
+      }
+      oldActions.add(ut);
    }
 
    public void typeCreated(BodyTypeDeclaration newType) {
@@ -118,12 +186,25 @@ public class UpdateInstanceInfo {
       actionsToPerform.add(nt);
    }
 
+   public void typeRemoved(BodyTypeDeclaration oldType) {
+      RemovedType nt = new RemovedType();
+      nt.oldType = oldType;
+      actionsToPerform.add(nt);
+   }
+
    public void methodChanged(AbstractMethodDefinition methChanged) {
    }
 
    public void updateInstances(ExecutionContext ctx) {
+      // First we update all of the types
       for (UpdateAction act:actionsToPerform)
-         act.doAction(ctx);
+         act.updateTypes(ctx);
+      // Then update the instances
+      for (UpdateAction act:actionsToPerform)
+         act.updateInstances(ctx);
+      // Then notify listeners
+      for (UpdateAction act:actionsToPerform)
+         act.postUpdate(ctx);
    }
 
 

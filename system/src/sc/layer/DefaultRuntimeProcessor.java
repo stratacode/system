@@ -57,6 +57,9 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor, Serializable 
    public void process(BodyTypeDeclaration def) {
    }
 
+   public void stop(BodyTypeDeclaration def) {
+   }
+
    public List<SrcEntry> getProcessedFiles(IFileProcessorResult model, Layer genLayer, String buildSrcDir, boolean generate) {
       return model.getProcessedFiles(genLayer, genLayer.buildSrcDir, generate);
    }

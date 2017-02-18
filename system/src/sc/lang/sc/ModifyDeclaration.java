@@ -427,7 +427,7 @@ public class ModifyDeclaration extends TypeDeclaration {
             // TODO: debug only
             Object modType = getModifyType();
          }
-         if (!modifyInherited && ModelUtil.sameTypes(this, modifyTypeDecl) && getLayer().getLayerName().equals(modifyTypeDecl.getLayer().getLayerName()))
+         if (!temporaryType && !modifyInherited && ModelUtil.sameTypes(this, modifyTypeDecl) && getLayer().getLayerName().equals(modifyTypeDecl.getLayer().getLayerName()))
             System.out.println("*** Warning modifying a type by the one in the same layer: " + modifyTypeDecl);
       }
    }

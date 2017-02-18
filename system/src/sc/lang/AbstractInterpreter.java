@@ -463,12 +463,13 @@ public abstract class AbstractInterpreter extends EditorContext {
       else if (statement instanceof PropertyAssignment) {
          Object curObj;
          boolean pushed = false;
+         boolean noInstance = false;
          PropertyAssignment pa = (PropertyAssignment) statement;
          if (!pa.isStatic() && autoObjectSelect) {
             if (!hasCurrentObject() || (curObj = getCurrentObject()) == null) {
                Object res = SelectObjectWizard.start(this, statement);
                if (res == SelectObjectWizard.NO_INSTANCES_SENTINEL)
-                  skipEval = true;
+                  noInstance = true; // TODO: see below - used to set skipEval = true here
                else if (res == null)
                   return;
                else {
@@ -486,6 +487,8 @@ public abstract class AbstractInterpreter extends EditorContext {
          try {
             BodyTypeDeclaration current = currentTypes.get(currentTypes.size()-1);
             PropertyAssignment assign = (PropertyAssignment) statement;
+
+            // TODO: if noInstance = true and assign.assignedProperty is an instance property we should not try to update the instances
 
             JavaSemanticNode newDefinition = current.updateProperty(assign, execContext, !skipEval, null);
             addChangedModel(pendingModel);
@@ -1034,11 +1037,28 @@ public abstract class AbstractInterpreter extends EditorContext {
    /** Directory to run commands - defaults to the current directory */
    public String execDir = null;
 
+   // TODO: should we use a more complete shell environment - support with JLine 3.x or Crashub.org to get complete shell features, remote access, etc?
    /** Run a system command */
    public int exec(String argStr) {
       String[] args = StringUtil.splitQuoted(argStr);
+      String outputFile = null;
+      String inputFile = null;
+      for (int i = 0; i < args.length; i++) {
+         String arg = args[i];
+         if ((arg.equals(">") || arg.equals("<")) && i < args.length - 1) {
+            if (arg.equals(">"))
+               outputFile = args[i+1];
+            else
+               inputFile = args[i+1];
+            ArrayList<String> argsList = new ArrayList<String>(Arrays.asList(args));
+            argsList.remove(i);
+            argsList.remove(i);
+            args = argsList.toArray(new String[argsList.size()]);
+            i--;
+         }
+      }
       ProcessBuilder pb = new ProcessBuilder(args);
-      return LayerUtil.execCommand(pb, execDir);
+      return LayerUtil.execCommand(pb, execDir, inputFile, outputFile);
    }
 
    public void quit() {

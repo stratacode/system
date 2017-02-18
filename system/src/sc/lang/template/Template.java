@@ -1556,14 +1556,14 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
       return null;
    }
 
-   public boolean getDependenciesChanged(Layer genLayer, Map<String,IFileProcessorResult> changedModels) {
-      if (super.getDependenciesChanged(genLayer, changedModels))
+   public boolean getDependenciesChanged(Layer genLayer, Set<String> changedTypes, boolean processJava) {
+      if (super.getDependenciesChanged(genLayer, changedTypes, processJava))
          return true;
 
       TypeDeclaration td = (TypeDeclaration) rootType;
 
 
-      if (td != null && td.changedSinceLayer(initializedInLayer, genLayer, false, null, changedModels)) {
+      if (td != null && td.changedSinceLayer(transformedInLayer, genLayer, false, null, changedTypes, processJava)) {
          return true;
       }
       return false;

@@ -263,7 +263,6 @@ public class DynStubParameters extends AbstractTemplateParameters {
       if (componentDef && ModelUtil.getEnclosingType(objType) != null && objTypeDecl.isComponentType() && objTypeDecl.needsDynInnerStub)
          return new DynConstructor[0];
 
-
      // Before we were always getting the constructors on the base type.  Why?  Maybe Java SHOULD work that way but it doesn't... we need the constructors on this type
      // so we do the proper parameters and can create the "superArgs" - which get propagated through.
      // Object extTypeDecl = ModelUtil.getExtendsClass(objType);

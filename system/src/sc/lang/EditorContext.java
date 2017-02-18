@@ -152,6 +152,7 @@ public class EditorContext extends ClientEditorContext {
 
       if (!changedModels.contains(model)) {
          changedModels.add(model);
+         model.unsavedModel = true;
          if (changedModels.size() == 1)
             Bind.sendEvent(IListener.VALUE_CHANGED, this, needsSaveProperty);
       }
@@ -163,6 +164,7 @@ public class EditorContext extends ClientEditorContext {
          if (model.getSrcFile() != null) {
             model.saveModel();
             model.layer.addNewSrcFile(model.getSrcFile(), true);
+            model.unsavedModel = false;
          }
       }
       changedModels.clear();
@@ -859,6 +861,7 @@ public class EditorContext extends ClientEditorContext {
          }
          changedModels.remove(model);
          JavaModel origModel = model;
+         model.unsavedModel = false;
          SrcEntry srcFile = model.getSrcFile();
          if (srcFile.canRead()) {
             // TODO: we are using execContext here even if model != pendingModel?   Shouldn't we be building an execContext from model

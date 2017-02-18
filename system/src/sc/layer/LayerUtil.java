@@ -488,30 +488,38 @@ public class LayerUtil implements LayerConstants {
       return tempDir;
    }
 
-   public static int execCommand(ProcessBuilder cmd, String dir) {
+   public static int execCommand(ProcessBuilder cmd, String dir, String inputFile, String outputFile) {
       if (dir != null)
          cmd.directory(new File(dir));
-      
+
+      PrintStream outStream = outputFile == null ? System.out : System.err;
+      if (inputFile != null)
+         cmd.redirectInput(new File(inputFile));
+      if (outputFile != null)
+         cmd.redirectOutput(new File(outputFile));
+
       try {
-         cmd.redirectErrorStream(true);
+         if (outputFile == null)
+            cmd.redirectErrorStream(true);
 
          Process p = cmd.start();
 
-         BufferedInputStream bis = new BufferedInputStream(p.getInputStream());
+         BufferedInputStream bis = new BufferedInputStream(outputFile == null ? p.getInputStream() : p.getErrorStream());
          byte [] buf = new byte[1024];
          int len;
-         while ((len = bis.read(buf, 0, buf.length)) != -1)
-            System.out.write(buf, 0, len);
+         while ((len = bis.read(buf, 0, buf.length)) != -1) {
+            outStream.write(buf, 0, len);
+         }
          int stat = p.waitFor();
          return stat;
       }
       catch (InterruptedException exc) {
          if (cmd.command() != null)
-            System.err.println("*** package of: " + StringUtil.arrayToCommand(cmd.command().toArray()) + " - wait interrupted: " + exc);
+            System.err.println("*** exec cmd of: " + StringUtil.arrayToCommand(cmd.command().toArray()) + " inputFile: " + inputFile + " outputFile: " + outputFile + " - wait interrupted: " + exc);
       }
       catch (IOException exc) {
          if (cmd.command() != null)
-            System.err.println("*** package of: " + StringUtil.arrayToCommand(cmd.command().toArray()) + " failed: " + exc);
+            System.err.println("*** exec cmd of: " + StringUtil.arrayToCommand(cmd.command().toArray()) + " inputFile: " + inputFile + " outputFile: " + outputFile + " failed: " + exc);
       }
       return -1;
    }
@@ -538,7 +546,7 @@ public class LayerUtil implements LayerConstants {
       for (ProcessBuilder b:cmds) {
          if (info)
             System.out.println("Executing: '" + StringUtil.arrayToCommand(b.command().toArray()) + "' in: " + directory);
-         if (execCommand(b, directory) != 0) {
+         if (execCommand(b, directory, null, null) != 0) {
             System.err.println("*** Exec of: " + StringUtil.arrayToCommand(b.command().toArray()) + " failed");
             return false;
          }

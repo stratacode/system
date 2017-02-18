@@ -58,7 +58,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public transient boolean removed = false;  // Set to true when another type in the same layer has replaced this type
 
-   /** Set to true for types which are modified dyanmically.  Either because they have the dynamic keyword or because they're in or modified in a dynamic layer */
+   /** Set to true for types which are modified dynamically.  Either because they have the dynamic keyword or because they're in or modified by a dynamic layer */
    public transient boolean dynamicType = false;
 
    /** If we only set properties in a dynamic configuration, we only need to do "dynamicNew" - no stub is created - we configure the properties of the existing class */
@@ -89,7 +89,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public transient Object[] scopeInterfaces;
 
    /* Parallel array to staticFields, stores the initial static properties for this type */
-   public transient Object[] staticValues;
+   public transient Object[] staticValues, oldStaticValues;
 
    private transient IntCoalescedHashMap staticFieldMap = null;
    private transient IntCoalescedHashMap dynInstFieldMap = null;  // Name to field or object
@@ -1447,7 +1447,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // externally.
       if (typeName == null)
          return null;
-      if (isDynamicStub(true) && init) {
+      if (isDynamicStub(true) && init) { // TODO: check if the class has already been loaded - if so, shouldn't we wait till the next run to try and update the class?
          compileDynamicStub(true, true);
       }
       LayeredSystem sys = getLayeredSystem();
@@ -2974,8 +2974,24 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
          boolean isInterface = getDeclarationType() == DeclarationType.INTERFACE;
 
-         // Note: cache.propertyCount is set in addPropertiesInBody
+         // For concrete classes which inherit instance fields from interfaces (i.e. the SC multiple inheritance feature)
+         // we need to override the get/set methods in the interface with the actual variable definition we'd inherit
+         // we we map these properties to the dynamic field, not the getX/setX methods
+         if (!isInterface) {
+            List<Object> dynIfaceFields = getDynCompiledIFields();
+            if (dynIfaceFields != null) {
+               for (int i = 0; i < dynIfaceFields.size(); i++) {
+                  Object field = dynIfaceFields.get(i);
+                  if (field instanceof FieldDefinition) {
+                     addFieldToPropertyCache((FieldDefinition) field, cache, false);
+                  }
+                  else if (field instanceof VariableDefinition)
+                     addVarDefToPropertyCache((VariableDefinition) field, cache, false, false);
+               }
+            }
+         }
 
+         // Note: cache.propertyCount is set in addPropertiesInBody
          addPropertiesInBody(body, cache, superType, isInterface);
          /* Scopes a.b transformations add to the set of properties from their definition so account for those here */
          addPropertiesInBody(hiddenBody, cache, superType, isInterface);
@@ -3006,9 +3022,48 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
    }
 
+   private void addVarDefToPropertyCache(VariableDefinition varDef, DynType cache, boolean isInterface, boolean isStatic) {
+      String name = varDef.variableName;
+      DynBeanMapper newMapper = new DynBeanMapper(varDef, varDef, varDef);
+
+      // Fields that are arrays need this interface as a marker so we know to send indexed change
+      // events.
+      Object varType = varDef.getTypeDeclaration();
+      if (ModelUtil.isArray(varType))
+         newMapper = new DynBeanIndexMapper(newMapper);
+
+      IBeanMapper oldMapper;
+      // This happens when a field in a subclass overrides a get/set method in a superclass
+      // We don't allocate a new position for this case because it creates a null slot if we ever
+      // turn this into a property list.
+      if ((oldMapper = cache.addProperty(name, newMapper)) != null) {
+         newMapper.instPosition = oldMapper.getPropertyPosition();
+         newMapper.staticPosition = oldMapper.getStaticPropertyPosition();
+         newMapper.ownerType = oldMapper.getOwnerType();
+      }
+      else {
+         if (isStatic) {
+            newMapper.staticPosition = cache.staticPropertyCount++;
+            newMapper.ownerType = this;
+         }
+         else {
+            if (isInterface || isLayerType)
+               newMapper.instPosition = IBeanMapper.DYNAMIC_LOOKUP_POSITION;
+            else
+               newMapper.instPosition = cache.propertyCount++;
+         }
+      }
+
+   }
+
+   private void addFieldToPropertyCache(FieldDefinition field, DynType cache, boolean isInterface) {
+      boolean isStatic = field.hasModifier("static");
+      for (VariableDefinition varDef:field.variableDefinitions) {
+         addVarDefToPropertyCache(varDef, cache, isInterface, isStatic);
+      }
+   }
+
    private void addPropertiesInBody(SemanticNodeList<Statement> body, DynType cache, DynType superType, boolean isInterface) {
-      int pos = cache.propertyCount;
-      int staticPos = cache.staticPropertyCount;
       DynBeanMapper newMapper;
       IBeanMapper mapper;
 
@@ -3018,39 +3073,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             Statement statement = body.get(i);
             if (statement instanceof FieldDefinition) {
                FieldDefinition field = (FieldDefinition) statement;
-               boolean isStatic = field.hasModifier("static");
-               for (VariableDefinition varDef:field.variableDefinitions) {
-                  String name = varDef.variableName;
-                  newMapper = new DynBeanMapper(varDef, varDef, varDef);
-
-                  // Fields that are arrays need this interface as a marker so we know to send indexed change
-                  // events.
-                  Object varType = varDef.getTypeDeclaration();
-                  if (ModelUtil.isArray(varType))
-                     newMapper = new DynBeanIndexMapper(newMapper);
-
-                  IBeanMapper oldMapper;
-                  // This happens when a field in a subclass overrides a get/set method in a superclass
-                  // We don't allocate a new position for this case because it creates a null slot if we ever
-                  // turn this into a property list.
-                  if ((oldMapper = cache.addProperty(name, newMapper)) != null) {
-                     newMapper.instPosition = oldMapper.getPropertyPosition();
-                     newMapper.staticPosition = oldMapper.getStaticPropertyPosition();
-                     newMapper.ownerType = oldMapper.getOwnerType();
-                  }
-                  else {
-                     if (isStatic) {
-                        newMapper.staticPosition = staticPos++;
-                        newMapper.ownerType = this;
-                     }
-                     else {
-                        if (isInterface || isLayerType)
-                           newMapper.instPosition = IBeanMapper.DYNAMIC_LOOKUP_POSITION;
-                        else
-                           newMapper.instPosition = pos++;
-                     }
-                  }
-               }
+               addFieldToPropertyCache(field, cache, isInterface);
             }
             else if (statement instanceof BodyTypeDeclaration && statement.isDynamicType()) {
                BodyTypeDeclaration innerType = (BodyTypeDeclaration) statement;
@@ -3072,11 +3095,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                   }
                   else {
                      if (isStatic) {
-                        newMapper.staticPosition = staticPos++;
+                        newMapper.staticPosition = cache.staticPropertyCount++;
                         newMapper.ownerType = this;
                      }
                      else
-                        newMapper.instPosition = pos++;
+                        newMapper.instPosition = cache.propertyCount++;
                   }
                }
             }
@@ -3136,14 +3159,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                if (mapper == null) {
                   newMapper = new DynBeanMapper();
                   if (isStatic) {
-                     newMapper.staticPosition = staticPos++;
+                     newMapper.staticPosition = cache.staticPropertyCount++;
                      newMapper.ownerType = this;
                   }
                   else {
                      if (isInterface || isLayerType)
                         newMapper.instPosition = IBeanMapper.DYNAMIC_LOOKUP_POSITION;
                      else
-                        newMapper.instPosition = pos++;
+                        newMapper.instPosition = cache.propertyCount++;
                   }
                   cache.addProperty(propName, newMapper);
                }
@@ -3168,7 +3191,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                      if (isInterface || isLayerType)
                         newMapper.instPosition = IBeanMapper.DYNAMIC_LOOKUP_POSITION;
                      else
-                        newMapper.instPosition = pos++;
+                        newMapper.instPosition = cache.propertyCount++;
                   }
                }
                switch (type) {
@@ -3244,12 +3267,6 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
       }
 
-      if (pos != cache.propertyCount) {
-         cache.propertyCount = pos;
-      }
-      if (staticPos != cache.staticPropertyCount) {
-         cache.staticPropertyCount = staticPos;
-      }
    }
 
    public Object getExtendsTypeDeclaration() {
@@ -4212,7 +4229,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          SrcEntry srcEnt = new SrcEntry(lyr, newFile, stubRelName);
 
          if (doGen && (srcIndex == null || !Arrays.equals(srcIndex.hash, hash) || !(srcFile.canRead()))) {
-            FileUtil.saveStringAsFile(newFile, stubResult, true);
+            FileUtil.saveStringAsReadOnlyFile(newFile, stubResult, true);
 
             toCompileEnts.add(srcEnt);
 
@@ -4377,8 +4394,40 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return resEnt;
    }
 
+   /**
+    * Returns the set of instance fields we inherit from interfaces we implement - i.e. as part of multiple inheritance
+    * support.  These are the fields to be compiled into this type as properties.
+    */
    public List<Object> getCompiledIFields() {
       return Collections.emptyList();
+   }
+
+   /** Returns the subset of the compiledIFields which are implemented as dynamic fields in this type */
+   public List<Object> getDynCompiledIFields() {
+      List<Object> fields = getCompiledIFields();
+
+      if (fields == null)
+         return null;
+
+      int sz = fields.size();
+
+      ArrayList<Object> res = new ArrayList<Object>(sz);
+
+      for (int i = 0; i < sz; i++) {
+         Object fieldObj = fields.get(i);
+         if (fieldObj instanceof PropertyAssignment)
+            fieldObj = ((PropertyAssignment) fieldObj).getAssignedProperty();
+
+         String propName = ModelUtil.getPropertyName(fieldObj);
+
+         // Skip compiled properties here - just need those which are dynamic
+         if (isCompiledProperty(propName, false, false)) {
+            continue;
+         }
+
+         res.add(fieldObj);
+      }
+      return res;
    }
 
    public List<Object> getDynCompiledMethods() {
@@ -4664,6 +4713,24 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return false;
    }
 
+   public void updateStaticValues(BodyTypeDeclaration newType) {
+      if (oldStaticFields == null || oldStaticValues == null)
+         return;
+      int[] statMap = new int[oldStaticFields.length];
+      for (int i = 0; i < oldStaticFields.length; i++) {
+         statMap[i] = newType.getDynStaticFieldIndex(ModelUtil.getPropertyName(oldStaticFields[i]));
+      }
+
+      if (oldStaticValues != null) {
+         Object[] newStaticValues = new Object[newType.getDynStaticFieldCount()];
+         for (int i = 0; i < oldStaticValues.length; i++) {
+            if (statMap[i] != -1)
+               newStaticValues[statMap[i]] = oldStaticValues[i];
+         }
+         newType.staticValues = newStaticValues;
+      }
+   }
+
    public void updateBaseTypeLeaf(BodyTypeDeclaration newType) {
       if (newType.getDeclarationType() != DeclarationType.INTERFACE) {
          if (instFields != null) {
@@ -4674,22 +4741,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
          if (staticFields != null) {
             oldStaticFields = staticFields;
-
-            int[] statMap = new int[oldStaticFields.length];
-            for (int i = 0; i < oldStaticFields.length; i++) {
-               statMap[i] = newType.getDynStaticFieldIndex(ModelUtil.getPropertyName(oldStaticFields[i]));
-            }
-
-            Object[] oldStaticValues = staticValues;
-
-            if (staticValues != null) {
-               Object[] newStaticValues = new Object[newType.getDynStaticFieldCount()];
-               for (int i = 0; i < oldStaticValues.length; i++) {
-                  if (statMap[i] != -1)
-                     newStaticValues[statMap[i]] = oldStaticValues[i];
-               }
-               newType.staticValues = newStaticValues;
-            }
+            oldStaticValues = staticValues;
+            updateStaticValues(newType);
             staticFieldMap = null;
          }
       }
@@ -5319,7 +5372,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    private static class UpdateTypeCtx {
-      boolean thisOriginallyDynamic;
+      /** Copied from the old type before the update - when we stop the old type they are erased so need to use them here after that */
+      boolean dynamicType, dynamicNew, dynamicStub;
 
       List<Object> oldFields;
       int numOldFields;
@@ -5352,6 +5406,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // they point to this type.
       ArrayList<IVariableInitializer> toAddFields = new ArrayList<IVariableInitializer>();
       ArrayList<BlockStatement> toExecBlocks = new ArrayList<BlockStatement>();
+
+      /** Does this type change introduce new constructors?  For dynamic stubs this introduces a compile time change */
+      boolean newConstructors = false;
    }
 
    UpdateTypeCtx buildUpdateTypeContext(BodyTypeDeclaration newType, TypeUpdateMode updateMode, UpdateInstanceInfo info) {
@@ -5360,7 +5417,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // TODO: performance - when the layer is not activated I think we could skip a lot of this - fields, etc.... it's nice that we can refresh type and variable references without a global refresh
       // but maybe it's not worth it?
 
-      tctx.thisOriginallyDynamic = isDynamicType();
+      tctx.dynamicType = isDynamicType();
+      tctx.dynamicStub = isDynamicStub(false);
+      tctx.dynamicNew = dynamicNew;
 
       // During initialization, this type might have been turned into a dynamic type from a subsequent layer.
       // Since we do not restart all of the other layers, we won't turn this new guy back into a dynamic type
@@ -5573,6 +5632,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                      enclType.changedMethods = new TreeSet<String>();
                   enclType.changedMethods.add(newMeth.getMethodName());
                }
+
+               if (newBodyDef instanceof ConstructorDefinition && oldMeth == null)
+                  tctx.newConstructors = true;
             }
             else if (newBodyDef instanceof BlockStatement) {
                BlockStatement newBlock = (BlockStatement) newBodyDef;
@@ -5829,12 +5891,17 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          dynamicNew = false;
          dynamicType = true;
       }
-      if (!dynamicType && (tctx.toAddObjs.size() > 0 || tctx.toAddFields.size() > 0) && sys.hasInstancesOfType(fullTypeName)) {
+      // TODO: should we use sys.isClassLoaded here as well as hasInstancesOfType?
+      if (!tctx.dynamicType && (tctx.toAddObjs.size() > 0 || tctx.toAddFields.size() > 0) && sys.hasInstancesOfType(fullTypeName)) {
          if (tctx.toAddFields.size() > 0)
             sys.setStaleCompiledModel(true, "Recompile needed to add fields: " + tctx.toAddFields + " to compiled type: " + fullTypeName);
          if (tctx.toAddObjs.size() > 0)
             sys.setStaleCompiledModel(true, "Recompile needed to add inner objects: " + tctx.toAddObjs + " to compiled type: " + fullTypeName);
          skipAdd = true;
+      }
+      if (tctx.newConstructors) {
+         if (tctx.dynamicType && tctx.dynamicStub && sys.isClassLoaded(getCompiledClassName()))
+            sys.setStaleCompiledModel(true, "Recompile needed - constructor added to dynamic stub class: " + fullTypeName);
       }
 
       // Any change to the extends type will require a recompile if there are any instances of that type outstanding
@@ -5851,7 +5918,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          boolean classLoaded = sys.isClassLoaded(fullTypeName);
          boolean hasInstances = sys.hasInstancesOfType(fullTypeName);
          // Only a problem if there are any instances of this type outstanding right now
-         if (!tctx.thisOriginallyDynamic) {
+         if (!tctx.dynamicType) {
             sys.setStaleCompiledModel(true, "Recompile needed: " + typeName + " 's " + (prevExtends ? "previous " : "") + "extends type changed from: " + oldExtType + " to: " + newExtType);
             skipAdd = true;
             skipUpdate = true;
@@ -5868,8 +5935,18 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
       }
 
-      if (updateMode != TypeUpdateMode.Remove && info != null)
+      if (updateMode != TypeUpdateMode.Remove && info != null) {
          info.typeChanged(this, newType);
+
+         Iterator<TypeDeclaration> subTypes = this instanceof TypeDeclaration ? sys.getSubTypesOfType((TypeDeclaration) this) : null;
+         if (subTypes != null) {
+            while (subTypes.hasNext()) {
+               TypeDeclaration subType = subTypes.next();
+               subType = (TypeDeclaration) subType.resolve(true);
+               info.typeChanged(subType, subType);
+            }
+         }
+      }
 
       if (!skipAdd) {
          for (int i = 0; i < tctx.toAddObjs.size(); i++) {
@@ -6055,9 +6132,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if (sys.options.verbose) {
             String message = overriddenAssign.toString();
             if (insts.hasNext())
-               System.out.println("Updating instances for property change: " + message);
+               System.out.println("Updating instances for property change: " + message + " for: " + iit);
             else
-               System.out.println("No instances to update for property change: " + message);
+               System.out.println("No instances to update for property change: " + message + " for: " + iit);
          }
          if (insts != null) {
             while (insts.hasNext()) {
@@ -6066,7 +6143,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                   initInstance(overriddenAssign, inst, ctx, iit);
                }
                catch (IllegalArgumentException exc) {
-                  sys.setStaleCompiledModel(true, "Failed to set property: ", ModelUtil.getPropertyName(overriddenAssign), " on instance: ", DynUtil.getInstanceName(inst));
+                  sys.setStaleCompiledModel(true, "Failed to set property: ", ModelUtil.getPropertyName(overriddenAssign), " on instance: ", DynUtil.getInstanceName(inst) + " for: " + iit);
                }
             }
          }
@@ -6079,17 +6156,19 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                initInstance(overriddenAssign, enumValue, ctx, iit);
             }
             catch (IllegalArgumentException exc) {
-               sys.setStaleCompiledModel(true, "Failed to set enum val ue: ", ModelUtil.getPropertyName(overriddenAssign));
+               sys.setStaleCompiledModel(true, "Failed to set enum val ue: ", ModelUtil.getPropertyName(overriddenAssign) + " for: " + iit);
             }
          }
          else
-            System.err.println("*** Null enum value for: " + this);
+            System.err.println("*** Null enum value for: " + this + " for: " + iit);
       }
    }
 
+   /*
    public void updatePropertyForTypeLeaf(JavaSemanticNode overriddenAssign, ExecutionContext ctx, InitInstanceType iit, boolean updateInstances) {
       updatePropertyForTypeLeaf(overriddenAssign, ctx, iit, updateInstances, null);
    }
+   */
 
    boolean isConstructedType() {
       DeclarationType t = getDeclarationType();
@@ -6290,11 +6369,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                if (innerType.isDynObj(false) && currentObj instanceof IDynObject) {
                   mgr = getDynChildManager();
                   Object toRemove = ((IDynObject)currentObj).getProperty(ix);
-                  if (mgr != null)
-                     mgr.removeChild(currentObj, toRemove);
-                  // Since we do not remove slots we'll just null it out
-                  ((IDynObject) currentObj).setProperty(ix, null, true);
-                  getLayeredSystem().removeDynInstance(innerType.getFullTypeName(), toRemove);
+                  if (toRemove != null) {
+                     if (mgr != null)
+                        mgr.removeChild(currentObj, toRemove);
+                     // Since we do not remove slots we'll just null it out
+                     ((IDynObject) currentObj).setProperty(ix, null, true);
+                     getLayeredSystem().removeDynInstance(innerType.getFullTypeName(), toRemove);
+                  }
                }
                else {
                   JavaModel model = getJavaModel();
@@ -6313,7 +6394,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       removed = true;
       if (this instanceof TypeDeclaration) {
          TypeDeclaration td = (TypeDeclaration) this;
-         if (!td.isEnumConstant())  // enum constants are not added to the type name list I think because they are just beacause they are BodyTypeDeclarations, unless they are modified
+         if (!td.isEnumConstant())  // enum constants are not added to the type name list I think because they are just because they are BodyTypeDeclarations, unless they are modified
             model.layeredSystem.removeTypeByName(model.getLayer(), getFullTypeName(), td, null);
       }
 
@@ -9004,7 +9085,25 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public void stop() {
-      hasBeenStopped = true; // TODO: remove - for debug only
+      LayeredSystem sys = getLayeredSystem();
+
+      if (instFields != null) {
+         oldInstFields = instFields; // Preserve these for updating any instances that might have been created until we finish the updateType
+      }
+      if (staticFields != null) {
+         oldStaticFields = staticFields;
+      }
+      if (staticValues != null) {
+         oldStaticValues = staticValues;
+      }
+
+      if (sys != null) {
+         Layer layer = getLayer();
+         IRuntimeProcessor proc = sys.runtimeProcessor;
+         if (proc != null && (getExecMode() & sys.runtimeProcessor.getExecMode()) != 0 && layer != null && layer.activated)
+            proc.stop(this);
+      }
+      hasBeenStopped = true; // Note: for debugging only - nice to know when a type has been stopped to find bugs
       memberCache = null;
       membersByName = null;
       methodsByName = null;
@@ -9014,8 +9113,6 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       staticValues = null;
       staticFields = null;
       staticFieldMap = null;
-      oldInstFields = null;
-      oldStaticFields = null;
       dynTransientFields = null;
       innerObjs = null;
       defaultConstructor = null;

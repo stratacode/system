@@ -590,7 +590,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          if (bindingDirection != null && bindingDirection.doReverse() && arguments != null) {
             int last = sz-1;
             // Bi-directional bindings work differently...
-            if (bindingDirection.doForward() && boundTypes[last] != null && (ModelUtil.getAnnotation(boundTypes[last], "BindSettings") == null))
+            if (bindingDirection.doForward() && boundTypes[last] != null && (ModelUtil.getAnnotation(boundTypes[last], "sc.bind.BindSettings") == null))
                displayTypeError("Reverse binding defined for method expression where the method: " + idents.get(last).toString() + " does not have BindSettings(reverseMethod) set on it");
          }
 
@@ -2221,7 +2221,7 @@ public class IdentifierExpression extends ArgumentsExpression {
 
    void checkNull(Object value, String name) {
       if (value == null)
-         throw new NullPointerException("Null value encountered deferencing: " + name + " in: " + toDefinitionString());
+         throw new NullPointerException("Null value encountered referencing: " + name + " in: " + toDefinitionString());
    }
 
    private Object checkNullThis(Object value, String name) {

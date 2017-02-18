@@ -349,6 +349,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
    public Object evalBinding(Class expectedType, ExecutionContext ctx) {
       String bindingType = getBindingTypeName();
 
+
       assert bindingStatement != null && bindingType != null;
 
       List<Object> bindArgs = new ArrayList<Object>(5);

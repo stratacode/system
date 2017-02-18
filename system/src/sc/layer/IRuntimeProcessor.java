@@ -29,6 +29,8 @@ public interface IRuntimeProcessor {
 
    public void process(BodyTypeDeclaration def);
 
+   public void stop(BodyTypeDeclaration def);
+
    /** The prefix to use for transforming to JS */
    public String getStaticPrefix(Object def, JavaSemanticNode refNode);
 

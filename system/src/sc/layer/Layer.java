@@ -3184,6 +3184,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                        layeredSystem.lastRefreshTime == -1 ? layeredSystem.buildStartTime : layeredSystem.lastRefreshTime :
                        oldFile.getLastModifiedTime();
                if (lastTime == -1 || newLastModTime > lastTime) {
+                  if (model.isUnsavedModel())
+                     System.out.println("*** Should we be refreshing an unsaved model?");
                   layeredSystem.refreshFile(srcEnt, this, active); // For non parseableable files - do the file copy since the source file changed
                }
             }
@@ -3280,6 +3282,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             return true;
       }
       return false;
+   }
+
+   public boolean extendsOrIsLayer(Layer other) {
+      return this == other || this.extendsLayer(other);
    }
 
    void initReplacedLayers() {
@@ -4326,7 +4332,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       for (IdentityWrapper<ILanguageModel> layerWrapper:layerModels) {
          ILanguageModel model = layerWrapper.wrapped;
          SrcEntry srcFile = model.getSrcFile();
-         if (srcFile != null && !srcFile.canRead()) {
+         if (srcFile != null && !srcFile.canRead() && !model.isUnsavedModel()) {
             ModelUpdate removedModel = new ModelUpdate(model, null);
             removedModel.removed = true;
             changedModels.add(removedModel);

@@ -556,7 +556,7 @@ public class TestUtil {
                   /*
                   if (reparseFile.contains("2")) {
                      System.out.println("***");
-                     //SCLanguage.getSCLanguage().identifierExpression.trace = true;
+                     SCLanguage.getSCLanguage().parenExpression.trace = true;
                      //SCLanguage.getSCLanguage().selectorExpression.trace = true;
                      //JavaLanguage.getJavaLanguage().classBodyDeclarations.trace = true;
                      //HTMLLanguage.getHTMLLanguage().tagAttributes.trace = true;

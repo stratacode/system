@@ -1729,9 +1729,9 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return res;
    }
 
-   // Changed changed models is null - any changed types where there's a file dependent we return true.  When it's set, only
+   // When changed models is null - any changed types where there's a file dependent we return true.  When it's set, only
    // changed files in the dependency chain after the sinceLayer are considered.
-   public boolean changedSinceLayer(Layer sinceLayer, Layer genLayer, boolean resolve, IdentityHashSet<TypeDeclaration> visited, Map<String,IFileProcessorResult> changedModels) {
+   public boolean changedSinceLayer(Layer sinceLayer, Layer genLayer, boolean resolve, IdentityHashSet<TypeDeclaration> visited, Set<String> changedTypes, boolean processJava) {
       if (visited == null)
          visited = new IdentityHashSet<TypeDeclaration>();
       else if (visited.contains(this))
@@ -1745,13 +1745,28 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       String fullTypeName = td.getFullTypeName();
       Layer typeLayer = td.getLayer();
 
-      if (changedModels == null || changedModels.get(fullTypeName) != null) {
-         if (sinceLayer == null)
-            return true;
+      if (changedTypes == null || changedTypes.contains(fullTypeName)) {
          if (typeLayer == null)
             return true;
-         if (genLayer == null || typeLayer.getLayerPosition() > sinceLayer.getLayerPosition())
-            return true;
+         // If it's an annotation layer, we don't generate anything for it so don't consider
+         if (sinceLayer == null) {
+            boolean fixedModel = false;
+            // If the type layer is already compiled and final - e.g. sys.sccore the model is not changed even if sinceLayer == null but not for JS where we process Java files
+            if (typeLayer.finalLayer && typeLayer.compiled && !processJava)
+               fixedModel = true;
+
+            // We do not have to consider annotation layers as changed at least in terms of dependent files.  They are not transformed anyway so will never have a "sinceLayer" that's not null
+            if (typeLayer.annotationLayer)
+               fixedModel = true;
+
+            // Unless it's a special case model (i.e. one that's fixed in this case) if it has not been transformed yet, it's changed
+            if (!fixedModel)
+               return true;
+         }
+         if (sinceLayer != null) {
+            if (genLayer == null || typeLayer.getLayerPosition() > sinceLayer.getLayerPosition())
+               return true;
+         }
       }
 
       Layer fromLayer = genLayer.getNextLayer();
@@ -1772,24 +1787,24 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       }
 
       Object extTD = td.getExtendsTypeDeclaration();
-      if (extTD instanceof TypeDeclaration && ((TypeDeclaration)extTD).changedSinceLayer(sinceLayer, genLayer, true, visited, changedModels))
+      if (extTD instanceof TypeDeclaration && ((TypeDeclaration)extTD).changedSinceLayer(sinceLayer, genLayer, true, visited, changedTypes, processJava))
          return true;
 
       Object derivedTD = td.getDerivedTypeDeclaration();
       if (derivedTD != extTD)
-         if (derivedTD instanceof TypeDeclaration && ((TypeDeclaration)derivedTD).changedSinceLayer(sinceLayer, genLayer, false, visited, changedModels))
+         if (derivedTD instanceof TypeDeclaration && ((TypeDeclaration)derivedTD).changedSinceLayer(sinceLayer, genLayer, false, visited, changedTypes, processJava))
             return true;
 
-      if (bodyChangedSinceLayer(body, sinceLayer, genLayer, visited, changedModels) || bodyChangedSinceLayer(hiddenBody, sinceLayer, genLayer, visited, changedModels))
+      if (bodyChangedSinceLayer(body, sinceLayer, genLayer, visited, changedTypes, processJava) || bodyChangedSinceLayer(hiddenBody, sinceLayer, genLayer, visited, changedTypes, processJava))
          return true;
       return false;
    }
 
-   private boolean bodyChangedSinceLayer(SemanticNodeList<Statement> bodyList, Layer sinceLayer, Layer genLayer, IdentityHashSet<TypeDeclaration> visited, Map<String,IFileProcessorResult> changedModels) {
+   private boolean bodyChangedSinceLayer(SemanticNodeList<Statement> bodyList, Layer sinceLayer, Layer genLayer, IdentityHashSet<TypeDeclaration> visited, Set<String> changedTypes, boolean processJava) {
       if (bodyList == null)
          return false;
       for (Statement st:bodyList)
-         if (st instanceof TypeDeclaration && ((TypeDeclaration) st).changedSinceLayer(sinceLayer, genLayer, true, visited, changedModels))
+         if (st instanceof TypeDeclaration && ((TypeDeclaration) st).changedSinceLayer(sinceLayer, genLayer, true, visited, changedTypes, processJava))
             return true;
       return false;
    }

@@ -35,6 +35,10 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
       properties = new Object[type.getDynInstFieldCount()];
    }
 
+   // TODO: remove - debug only
+   ThreadLocal<Integer> nestCount = new ThreadLocal<Integer>();
+   ThreadLocal<Integer> setNestCount = new ThreadLocal<Integer>();
+
    public Object getPropertyFromWrapper(IDynObject origObj, String propName) {
       int index = type.getDynInstPropertyIndex(propName);
       if (index == -1) {
@@ -44,7 +48,24 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
             // Note: DynBeanMapper, at least with the GET method thing wraps back around so don't vector of to it
             if (mapper == null)
                throw new IllegalArgumentException("No property: " + propName + " for get value on type: " + type.typeName);
-            return TypeUtil.getPropertyValue(origObj, mapper);
+
+            Integer nestCt = nestCount.get();
+            if (nestCt == null)
+               nestCount.set(0);
+            else {
+               if (nestCt > 10) {
+                  System.out.println("*** Invalid get dynamic property property error: " + propName);
+                  throw new IllegalArgumentException("No property: " + propName);
+               }
+               nestCount.set(nestCt + 1);
+            }
+            try {
+               return TypeUtil.getPropertyValue(origObj, mapper);
+            }
+            finally {
+               if (nestCt == null)
+                  nestCount.set(null);
+            }
          }
          else
             return type.getDynStaticProperty(index);
@@ -86,11 +107,27 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
             if (mapper == null)
                type.runtimeError(IllegalArgumentException.class, "No property: " + propName + " for set value in type: ");
             else {
+               Integer nestCt = setNestCount.get();
+               if (nestCt == null)
+                  setNestCount.set(0);
+               else {
+                  if (nestCt > 10) {
+                     System.out.println("*** Invalid dynamic set property property error: " + propName);
+                     throw new IllegalArgumentException("No property: " + propName);
+                  }
+                  setNestCount.set(nestCt + 1);
+               }
                //TODO: if (mapper instanceof DynBeanMapper)
                //   ... sometimes this causes an infinite loop if index = -1 for a dyn property that uses the DynBeanMapper
                //   but not all of the time - because Node and other classes implement IDynObject which then route here to find
                //   the dyn bean property.  If we ask for a property which is not found, this method will just try to call the dyn property again.
-               TypeUtil.setProperty(origObj, mapper, value);
+               try {
+                  TypeUtil.setProperty(origObj, mapper, value);
+               }
+               finally {
+                  if (nestCt == null)
+                     setNestCount.set(null);
+               }
             }
          }
          else
@@ -106,8 +143,25 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
                System.err.println("*** Property has index but no mapper: " + propName);
                properties[index] = value;
             }
-            else if (!setField && mapper.getSetSelector() != null)
-               mapper.setPropertyValue(origObj, value);
+            else if (!setField && mapper.getSetSelector() != null) {
+               Integer nestCt = setNestCount.get();
+               if (nestCt == null)
+                  setNestCount.set(0);
+               else {
+                  if (nestCt > 10) {
+                     System.out.println("*** Invalid dynamic set property property error: " + propName);
+                     throw new IllegalArgumentException("No property: " + propName);
+                  }
+                  setNestCount.set(nestCt + 1);
+               }
+               try {
+                  mapper.setPropertyValue(origObj, value);
+               }
+               finally {
+                  if (nestCt == null)
+                     setNestCount.set(null);
+               }
+            }
             else
                properties[index] = value;
 
@@ -513,6 +567,11 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
             if (newIx != -1)
                newProperties[newIx] = properties[i+incr];
          }
+      }
+      else {
+         System.err.println("*** Missing old field mapping in set type!");
+         if (newType.getDynInstFieldCount() == properties.length)
+            newProperties = properties;
       }
       type = newType;
       properties = newProperties;

@@ -389,7 +389,8 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          // Only start checking after the current buildLayer is compiled.  Otherwise, this touches runtime classes
          // during the normal build which can suck in a version that will be replaced later on.
          // Don't do this test for the JS runtime... it forces us to load the js version of the class
-         if (sys != null && sys.buildLayer != null && sys.buildLayer.compiled && !sys.isDynamicRuntime()) {
+         // Don't do this when we are being restarted - i.e. before we are validated - it's too soon to init the property cache
+         if (sys != null && sys.buildLayer != null && sys.buildLayer.compiled && !sys.isDynamicRuntime() && isValidated()) {
             Object field = getRuntimePropertyMapping();
             // If field is null, it means we have not compiled a compiled class yet
             if (field != null && (!ModelUtil.isDynamicType(field) && !ModelUtil.isBindable(field)) && canMakeBindable() && !ModelUtil.isConstant(field))
