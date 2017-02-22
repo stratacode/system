@@ -268,15 +268,14 @@ public class ExecutionContext {
          if (res != null)
             return res;
       }
-      if (resolver != null) {
-         return resolver.resolveName(name, createObjects);
-      }
-      return null;
+      return resolveName(name);
    }
 
    public Object resolveName(String name) {
       if (resolver != null)
          return resolver.resolveName(name, createObjects);
+      if (system != null)
+         return system.resolveName(name, createObjects);
       return null;
    }
 
