@@ -1035,6 +1035,7 @@ public class Bind {
       bindState.nestedLevel++;
       bindState.obj = obj;
       bindState.prop = prop;
+      // When nestedLevel > the threshold.  Turn on recursion detection.  For each new frame we add: obj, prop, listener, eventDetail? to a list.  Keep recording until we find a matching list already in the list.  Then gather up the list, format it into a nice error message.
       if (bindState.nestedLevel >= RecursionDetectionThreadhold) {
          if (bindState.recurseFrames == null)
             bindState.recurseFrames = new ArrayList<BindFrame>();
@@ -1047,7 +1048,6 @@ public class Bind {
          }
          bindState.recurseFrames.add(bf);
       }
-      // TODO: insert check for nestedLevel > some threshold.  Turn on recursion detection.  When that's on, we add: obj, prop, listener, eventDetail? to a list.  Keep recording until we find a matching list already in the list.  Then gather up the list, format it into a nice error message.
       try {
          switch (event) {
             case IListener.VALUE_INVALIDATED:
