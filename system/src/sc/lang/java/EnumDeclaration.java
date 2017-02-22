@@ -291,6 +291,8 @@ public class EnumDeclaration extends TypeDeclaration {
       //parentNode.replaceChild(this, enumCl);
 
       enumClass = enumCl;
+      // Need this to be started before we return it
+      ParseUtil.initAndStartComponent(enumCl);
       return enumCl;
    }
 
