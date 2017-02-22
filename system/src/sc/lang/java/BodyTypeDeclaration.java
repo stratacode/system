@@ -9129,7 +9129,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       syncInitDefault = false;
       syncOnDemand = false;
       syncConstant = false;
-      cachedNeedsSync = false;
+      cachedNeedsSync = null;
       dynamicType = false;
       dynamicNew = false;
       compiledOnly = false;
