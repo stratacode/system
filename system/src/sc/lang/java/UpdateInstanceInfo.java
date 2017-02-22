@@ -68,6 +68,10 @@ public class UpdateInstanceInfo {
             tcl.updateType(oldType, newType);
          }
       }
+
+      public String toString() {
+         return newType != oldType ? (" type changed: " + newType.typeName) : " base-type changed: " + newType.typeName;
+      }
    }
 
    public static class NewType extends UpdateAction {
@@ -80,6 +84,10 @@ public class UpdateInstanceInfo {
       void updateInstances(ExecutionContext ctx) {
       }
       void postUpdate(ExecutionContext ctx) {
+      }
+
+      public String toString() {
+         return "new type: " + newType.typeName;
       }
    }
 
@@ -100,6 +108,9 @@ public class UpdateInstanceInfo {
             DynUtil.dispose(inst);
          }
       }
+      public String toString() {
+         return "removed type: " + newType.typeName;
+      }
    }
 
    public static class UpdateProperty extends UpdateAction {
@@ -114,6 +125,9 @@ public class UpdateInstanceInfo {
       }
       void postUpdate(ExecutionContext ctx) {
       }
+      public String toString() {
+         return "property " + initType + " : " + newType.typeName + "." + overriddenAssign.toString();
+      }
    }
 
    public static class ExecBlock extends UpdateAction {
@@ -125,6 +139,10 @@ public class UpdateInstanceInfo {
          newType.execBlockStatement(blockStatement, ctx);
       }
       void postUpdate(ExecutionContext ctx) {
+      }
+
+      public String toString() {
+         return "exec for: " + newType.typeName + ": " + blockStatement.toString();
       }
    }
 
