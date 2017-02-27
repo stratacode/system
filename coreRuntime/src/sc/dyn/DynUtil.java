@@ -1191,8 +1191,18 @@ public class DynUtil {
    }
 
    public static IScheduler frameworkScheduler;
+   public static ThreadLocal<IScheduler> threadScheduler = new ThreadLocal<IScheduler>();
+
+   public static void setThreadScheduler(IScheduler sched) {
+      threadScheduler.set(sched);
+   }
 
    public static void invokeLater(Runnable r, int priority) {
+      IScheduler sched = threadScheduler.get();
+      if (sched != null) {
+         sched.invokeLater(r, priority);
+         return;
+      }
       if (frameworkScheduler == null)
          throw new IllegalArgumentException("Must set DynUtil.frameworkScheduler before calling invokeLater");
       frameworkScheduler.invokeLater(r, priority);

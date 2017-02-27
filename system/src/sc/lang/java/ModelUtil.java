@@ -8464,4 +8464,13 @@ public class ModelUtil {
       }
       return extendsType;
    }
+
+   /** Returns true if  is equal to child or is in the  */
+   public static boolean isOuterTypeOf(BodyTypeDeclaration parentTD, TypeDeclaration enclType) {
+      if (enclType == null)
+         return false;
+      if (ModelUtil.sameTypes(parentTD, enclType))
+         return true;
+       return isOuterTypeOf(parentTD, enclType.getEnclosingType());
+   }
 }

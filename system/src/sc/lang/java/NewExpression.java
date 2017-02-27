@@ -71,11 +71,22 @@ public class NewExpression extends IdentifierExpression {
    public void init() {
       if (initialized) return;
 
+      super.init();
+   }
+
+   /* TODO: remove this method Previously we needed a first-pass to just initialize the type and the id without copying over the members.
+    * We would do this step during 'init' and then during 'start' we'd finish creating the type.  Because we init
+    * all body members in a layer before we've assembled the layers into one, we can't allocate the anonIds until
+    * the start phase.  So this method can probably be removed.
+    */
+   private void initAnonId() {
       LayeredSystem sys = getLayeredSystem();
 
       // First assign the anonId before we get into things so that if any children start creating anonymous types which
-      // ends up copying around NewExpressions, we have a consistnt anonId for the original and the copy.
-      if (anonId == -1 && classBody != null && sys != null && sys.getNeedsAnonymousConversion()) {
+      // ends up copying around NewExpressions, we have a consistent anonId for the original and the copy.
+      // NOTE: Now that we call initAnonymousType in start() no matter what, we are not doing the NeedsAnonymousConversion check
+      // Why are we initializing the anonymous type if we are not transforming them to JS?
+      if (anonId == -1 && classBody != null && sys != null /* && sys.getNeedsAnonymousConversion()*/) {
          BodyTypeDeclaration enclType = getEnclosingType();
          if (enclType != null) {
             // Need to create this up front so we can return it in getEnclosingType for any children of the class body
@@ -84,6 +95,8 @@ public class NewExpression extends IdentifierExpression {
             // maybe we do not need to do this afterall?   Right now it's a mix of both approaches.
             anonType = new AnonClassDeclaration();
             anonId = enclType.allocateAnonId();
+            if (enclType.typeName.equals("EditorModel"))
+               System.out.println("*** init setting anonId for: " + typeIdentifier + ": " + anonId);
             anonType.typeName = ANON_TYPE_PREFIX + anonId;
             anonType.operator = "class";
             anonType.newExpr = this;
@@ -91,8 +104,6 @@ public class NewExpression extends IdentifierExpression {
             enclType.addToHiddenBody(anonType);
          }
       }
-
-      super.init();
    }
 
    private transient boolean starting = false;
@@ -230,7 +241,7 @@ public class NewExpression extends IdentifierExpression {
    public boolean transform(ILanguageModel.RuntimeType runtime) {
       boolean any = false;
 
-      if (classBody != null && getLayeredSystem().getNeedsAnonymousConversion()) {
+      if (classBody != null  && getLayeredSystem().getNeedsAnonymousConversion()) {
          // Need to create the anonymous type during the transform step, so that it shows up as an inner type even
          // if we never called transformToJS - cause needsSave is false.
          ClassDeclaration anonType = getAnonymousType(true);
@@ -534,8 +545,14 @@ public class NewExpression extends IdentifierExpression {
          return;
 
       if (!anonTypeInited) {
-         if (!isStarted() && !starting)
-            ParseUtil.initAndStartComponent(this);
+         // It seems we can get here at least from refreshBoundTypes - when after an incremental compile we might not have started the model.
+         // always start models from the top-down, or weird problems show up - like anonIds getting allocated in an inconsistent order
+         if (!isStarted() && !starting) {
+            JavaModel model = getJavaModel();
+            if (!model.isStarted())
+               ParseUtil.initAndStartComponent(model);
+         }
+
          BodyTypeDeclaration enclType = getEnclosingType();
          if (anonTypeInited)
             return;

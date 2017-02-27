@@ -3614,17 +3614,21 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   else if (opt.equals("vlck"))
                      options.verboseLocks = true;
                   else if (opt.equals("vsa")) {
+                     ScopeDefinition.verbose = true;
+                     ScopeDefinition.trace = true;
                      SyncManager.trace = true;
                      SyncManager.traceAll = true;
                      // Includes JS that is sent to the browser due to changed source files
                      JSRuntimeProcessor.traceSystemUpdates = true;
                   }
                   else if (opt.equals("vsv")) {
-                     SyncManager.trace = true;
-                     SyncManager.traceAll = true;
-                     // includes the page content and javascript output
+                     // Verbose messages for sync events on the instance-level
                      SyncManager.verbose = true;
-                     JSRuntimeProcessor.traceSystemUpdates = true;
+                     ScopeDefinition.verbose = true;
+                  }
+                  else if (opt.equals("vsp")) {
+                     // Verbose messages for sync events on the instance and property levels
+                     SyncManager.verboseValues = true;
                   }
                   else if (opt.equals("vp"))
                      PerfMon.enabled = true;
@@ -5306,7 +5310,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       System.err.println("   <buildLayer>:  The build layer is the last layer in your stack.\n" +
                          "   [ -dyn ]: Layers specified after -dyn (and those they extend) are made dynamic unless they are marked: 'compiledOnly'\n" +
                          "   [ -c ]: Generate and compile only - do not run any main methods\n" +
-                         "   [ -v ]: Verbose info about the layered system.  [-vb ] [-vba] Trace data binding (or trace all) [-vs] [-vsa] [-vsv] Trace the sync system (or verbose and trace all)\n" +
+                         "   [ -v ]: Verbose info about the layered system.  [-vb ] [-vba] Trace data binding (or trace all) [-vs] [-vsa] [-vsv] [-vsp] Trace options for the sync system: trace, traceAll, verbose-inst, verbose-inst+props \n" +
                          "   [ -vh ]: verbose html [ -vl ]: display initial layers [ -vp ] turn on performance monitoring [ -vc ]: info on loading of class files\n" +
                          "   [ -f <file-list>]: Process/compile only these files\n" +
                          "   [ -cp <classPath>]: Use this classpath for resolving compiled references.\n" +
@@ -9966,8 +9970,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                return modelObj;
             }
          }
-         catch (IllegalArgumentException exc) { // file not found
-            error("SrcFile no longer exists: " + srcEnt + ": " + exc + "");
+         catch (IllegalArgumentException exc) { // file not found - this happens for unsaved models which get added to the layer index before they have been saved.
+            //error("SrcFile no longer exists: " + srcEnt + ": " + exc + "");
          }
       }
       return null;
@@ -10437,6 +10441,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                sysInfo.updateInfo.typeRemoved(oldType);
             }
          }
+         stoppedTypes = null;
       }
    }
    private void updateRuntime(SystemRefreshInfo sysInfo, ArrayList<SystemRefreshInfo> peerRefreshInfos) {
@@ -14379,7 +14384,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public boolean isGlobalScope(String scopeName) {
       // TODO: generalize this as an attribute of the scope
-      if (runtimeProcessor instanceof JSRuntimeProcessor && (scopeName.equals("session") || scopeName.equals("window")))
+      if (runtimeProcessor instanceof JSRuntimeProcessor && (scopeName.equals("session") || scopeName.equals("window") || scopeName.equals("appSession")))
          return true;
       return false;
    }

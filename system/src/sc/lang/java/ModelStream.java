@@ -59,6 +59,7 @@ public class ModelStream extends SemanticNode implements ICustomResolver {
       return jsProc.processModelStream(this);
    }
 
+   /** This is called to apply the model stream to the system using the supplied default scope. */
    public void updateRuntime(String destName, String defaultScope, boolean resetSync) {
       syncCtx = SyncManager.getSyncContext(destName, defaultScope, true);
 

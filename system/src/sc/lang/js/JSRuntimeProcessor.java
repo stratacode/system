@@ -989,7 +989,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                   ParseUtil.startComponent(depTD);
 
                   // If depTD extends type, do not add it here.  Instead, we need to add type before depTD in this case
-                  if (!type.isAssignableFrom(depTD, false) && depTD != type.getEnclosingType())
+                  if (!type.isAssignableFrom(depTD, false) && !ModelUtil.isOuterType(type.getEnclosingType(), depTD))
                      addTypeLibsToFile(depTD, typesInFile, typeLibFile, type, "uses");
                }
 

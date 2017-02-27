@@ -6549,7 +6549,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          scopeDef = GlobalScopeDefinition.getScopeByName(scopeName);
       }
       String typeName = getFullTypeName();
-      ScopeContext ctx = scopeDef.getScopeContext();
+      ScopeContext ctx = scopeDef.getScopeContext(true);
       // Can't create an instance in this context
       if (ctx == null)
          return null;

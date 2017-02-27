@@ -115,9 +115,9 @@ public abstract class SyncDestination {
    public boolean sendSync(SyncManager.SyncContext parentContext, ArrayList<SyncLayer> layers, String syncGroup, boolean resetSync) {
       StringBuilder sb = new StringBuilder();
       HashSet<String> createdTypes = new HashSet<String>();
-      // Going in reverse order - global, then session.
+      // Going in sorted order - e.g. global, then session.
       // Changes found during the traversal of the global graph adds changes to the session so we miss these if we go in the reverse order.
-      for (int i = layers.size() - 1; i >= 0; i--) {
+      for (int i = 0; i < layers.size(); i++) {
          SyncLayer layer = layers.get(i);
          CharSequence syncRequest = layer.serialize(parentContext, createdTypes, false);
          layer.markSyncPending();

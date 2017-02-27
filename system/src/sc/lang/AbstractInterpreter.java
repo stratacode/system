@@ -7,6 +7,7 @@ package sc.lang;
 import sc.bind.Bind;
 import sc.bind.DestinationListener;
 import sc.dyn.DynUtil;
+import sc.dyn.IScheduler;
 import sc.lang.sc.PropertyAssignment;
 import sc.lang.sc.EndTypeDeclaration;
 import sc.lang.sc.ModifyDeclaration;
@@ -24,8 +25,9 @@ import sc.layer.Layer;
 
 import java.io.*;
 import java.util.*;
+import sc.dyn.ScheduledJob;
 
-public abstract class AbstractInterpreter extends EditorContext {
+public abstract class AbstractInterpreter extends EditorContext implements IScheduler {
    static SCLanguage vlang = SCLanguage.INSTANCE;
 
    StringBuffer pendingInput = new StringBuffer();
@@ -1131,4 +1133,23 @@ public abstract class AbstractInterpreter extends EditorContext {
       return 80;
    }
 
+   public void initReadThread() {
+      DynUtil.setThreadScheduler(this);
+   }
+
+   private ArrayList<ScheduledJob> toRunLater = new ArrayList<ScheduledJob>();
+
+   public void invokeLater(Runnable r, int priority) {
+      ScheduledJob job = new ScheduledJob();
+      job.priority = priority;
+      job.toInvoke = r;
+      ScheduledJob.addToJobList(toRunLater, job);
+   }
+
+   public void execLaterJobs() {
+      for (int i = 0; i < toRunLater.size(); i++) {
+         ScheduledJob toRun = toRunLater.get(i);
+         toRun.toInvoke.run();
+      }
+   }
 }

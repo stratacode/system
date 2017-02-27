@@ -49,6 +49,7 @@ public class JLineInterpreter extends AbstractInterpreter implements Runnable, C
    }
 
    public boolean readParseLoop() {
+      initReadThread();
       do {
          try {
             String nextLine;
@@ -85,6 +86,8 @@ public class JLineInterpreter extends AbstractInterpreter implements Runnable, C
                   pendingInput = new StringBuffer();
                }
                else {
+                  execLaterJobs();
+
                   nextPrompt = prompt();
                }
             }
