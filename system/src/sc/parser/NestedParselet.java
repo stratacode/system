@@ -2836,28 +2836,37 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       if (res != null)
          return res;
 
+      int curStartIx = startIx;
+      int curEndIx = endIx;
+
       if (value instanceof ParentParseNode) {
          ParentParseNode pn = (ParentParseNode) value;
          ArrayList<Object> children = pn.children;
          if (children != null) {
             int ix = 0;
             for (Object child:children) {
+               int childSz = 0;
+               // Note: for startIndex here, the child parse node may still be using the old index, so we are going off
+               // of the startIndex of the current parse, plus the length of the children we have to accept.
                if (child instanceof IParseNode) {
                   IParseNode childPN = (IParseNode) child;
-                  // TODO: is endIx necessary here?
-                  res = childPN.getParselet().acceptTree(ctx, child, childPN.getStartIndex(), -1);
+                  res = childPN.getParselet().acceptTree(ctx, child, curStartIx, curEndIx);
                   if (res != null)
                      return res;
+                  childSz = childPN.length();
                }
                else if (child != null) {
                   Parselet childParselet = getChildParselet(child, ix);
                   if (childParselet != null) {
-                     // TODO: we could compute the startIx and endIx if necessary
-                     res = childParselet.acceptTree(ctx, child, -1, -1);
+                     res = childParselet.acceptTree(ctx, child, curStartIx, curEndIx);
                      if (res != null)
                         return res;
                   }
+                  if (child instanceof CharSequence)
+                     childSz = ((CharSequence) child).length();
                }
+               curStartIx += childSz;
+               curEndIx += childSz;
                ix++;
             }
          }
