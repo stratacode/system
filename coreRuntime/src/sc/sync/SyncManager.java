@@ -101,22 +101,22 @@ public class SyncManager {
    public final static String SYNC_ALL = "syncAll";
 
    /** This is the primary sync data structure we use for storing data for each synchronized object instance */
-   static class InstInfo {
+   public static class InstInfo {
       Object[] args;       // Any argument values used in the constructor to construct this instance?
       boolean initDefault;
       String name;
       // TODO: turn this into bitflags for efficiency (or better yet, build an SC plugin that can do that transformation automatically in code-gen!)
-      boolean registered;  // Has this object's name been sent to the client
-      boolean nameQueued;  // Has this object's name been at least queued to send to he client
-      boolean onDemand;
-      boolean fixedObject;
-      boolean initialized;
-      boolean inherited; // Set to true when the instance in this SyncContext is inherited from the parentContext.
-      SyncProperties props;
-      TreeMap<String,Boolean> onDemandProps; // The list of on-demand properties which have been fetched for this instance - stores true when the prop has been initialized, false for when it's been requested before the object has been initialized.
+      public boolean registered;  // Has this object's name been sent to the client
+      public boolean nameQueued;  // Has this object's name been at least queued to send to he client
+      public boolean onDemand;
+      public boolean fixedObject;
+      public boolean initialized;
+      public boolean inherited; // Set to true when the instance in this SyncContext is inherited from the parentContext.
+      public SyncProperties props;
+      public TreeMap<String,Boolean> onDemandProps; // The list of on-demand properties which have been fetched for this instance - stores true when the prop has been initialized, false for when it's been requested before the object has been initialized.
 
-      HashMap<String,Object> previousValues;
-      HashMap<String,Object> initialValues;  // TODO: REMOVE THIS - it's not used!
+      public HashMap<String,Object> previousValues;
+      public HashMap<String,Object> initialValues;  // TODO: REMOVE THIS - it's not used!
       //int refcnt = 1;
 
       DefaultValueListener valueListener;
@@ -1762,12 +1762,12 @@ public class SyncManager {
       }
 
       public synchronized void scopeDestroyed(ScopeContext scope) {
-         SyncContext childSyncCtx = (SyncContext) scope.getValue(SC_SYNC_CONTEXT);
+         SyncContext childSyncCtx = (SyncContext) scope.getValue(SC_SYNC_CONTEXT_SCOPE_KEY);
          if (trace)
             System.out.println("Destroying scope : " + scope.getScopeDefinition().name + ":" + scope.getId());
          childSyncCtx.disposeContext();
          // Need this to find and remove the sync insts so remove it after we are done.
-         scope.setValue(SC_SYNC_CONTEXT, null);
+         scope.setValue(SC_SYNC_CONTEXT_SCOPE_KEY, null);
       }
 
       public void disposeContext() {
@@ -2289,7 +2289,7 @@ public class SyncManager {
          return null;
       }
       ScopeContext scopeCtx = scopeDef.getScopeContext(create);
-      SyncContext syncCtx = scopeCtx == null ? null : (SyncContext) scopeCtx.getValue(SC_SYNC_CONTEXT);
+      SyncContext syncCtx = scopeCtx == null ? null : (SyncContext) scopeCtx.getValue(SC_SYNC_CONTEXT_SCOPE_KEY);
       if (syncCtx == null && create) {
          if (scopeCtx == null) {
             System.err.println("*** No scope: " + scopeDef.name + " to create sync context");
@@ -2297,7 +2297,7 @@ public class SyncManager {
          }
          syncCtx = newSyncContext(scopeDef.name);
          syncCtx.scope = scopeCtx;
-         scopeCtx.setValue(SC_SYNC_CONTEXT, syncCtx);
+         scopeCtx.setValue(SC_SYNC_CONTEXT_SCOPE_KEY, syncCtx);
          ArrayList<ScopeDefinition> parentScopes = scopeDef.getParentScopes();
          if (parentScopes != null) {
             for (ScopeDefinition parentScope : parentScopes) {
@@ -2320,7 +2320,7 @@ public class SyncManager {
       return syncCtx;
    }
 
-   private final static String SC_SYNC_CONTEXT = "sc.SyncContext";
+   public final static String SC_SYNC_CONTEXT_SCOPE_KEY = "sc.SyncContext";
 
    private void addSyncInst(Object inst, boolean onDemand, boolean initDefault, int scopeId, SyncProperties syncProps, Object...args) {
       SyncContext ctx;
@@ -2396,7 +2396,7 @@ public class SyncManager {
       for (ScopeDefinition scopeDef:scopeDefs) {
          ScopeContext scopeCtx = scopeDef.getScopeContext(false);
          if (scopeCtx != null) {
-            SyncContext syncCtx = (SyncContext) scopeCtx.getValue(SC_SYNC_CONTEXT);
+            SyncContext syncCtx = (SyncContext) scopeCtx.getValue(SC_SYNC_CONTEXT_SCOPE_KEY);
             if (syncCtx != null && syncCtx.hasSyncInst(inst)) {
                SyncProperties syncProps = syncCtx.getSyncManager().getSyncProperties(type);
                if (syncProps != null) {
@@ -2420,7 +2420,7 @@ public class SyncManager {
          ScopeContext scopeCtx = scopeDef.getScopeContext(false);
          if (scopeCtx == null)
             continue;
-         SyncContext syncCtx = (SyncContext) scopeCtx.getValue(SC_SYNC_CONTEXT);
+         SyncContext syncCtx = (SyncContext) scopeCtx.getValue(SC_SYNC_CONTEXT_SCOPE_KEY);
          if (syncCtx.hasSyncInst(fromInst)) {
             SyncProperties syncProps = syncCtx.getSyncManager().getSyncProperties(type);
             if (syncProps != null) {

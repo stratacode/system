@@ -13,10 +13,7 @@ import sc.lang.sc.PropertyAssignment;
 import sc.lifecycle.ILifecycle;
 import sc.lang.sc.ModifyDeclaration;
 import sc.lang.java.*;
-import sc.obj.CompilerSettings;
-import sc.obj.Constant;
-import sc.obj.GlobalScopeDefinition;
-import sc.obj.SyncMode;
+import sc.obj.*;
 import sc.parser.Language;
 import sc.parser.ParseUtil;
 import sc.repos.*;
@@ -371,6 +368,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    public HashMap<String, IScopeProcessor> scopeProcessors = null;
 
+   private TreeMap<String,String> scopeAliases = null;
+
    public HashMap<String,IAnnotationProcessor> annotationProcessors = null;
 
    private ArrayList<ReplacedType> replacedTypes;
@@ -660,11 +659,36 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          if (proc != null)
             return proc;
       }
+      if (scopeAliases != null && annotName != null) {
+         String aliasName = scopeAliases.get(annotName);
+         if (aliasName != null) {
+            proc = layeredSystem.getScopeProcessor(this, aliasName);
+            if (proc != null)
+               return proc;
+         }
+      }
       if (baseLayers != null && checkBaseLayers) {
          for (Layer baseLayer:baseLayers) {
             proc = baseLayer.getScopeProcessor(annotName, true);
             if (proc != null)
                return proc;
+         }
+      }
+      return null;
+   }
+
+   public String getScopeAlias(String scopeName, boolean checkBaseLayers) {
+      if (scopeAliases != null) {
+         String aliasName = scopeAliases.get(scopeName);
+         if (aliasName != null) {
+            return aliasName;
+         }
+      }
+      if (baseLayers != null && checkBaseLayers) {
+         for (Layer baseLayer:baseLayers) {
+            String alias = baseLayer.getScopeAlias(scopeName, true);
+            if (alias != null)
+               return alias;
          }
       }
       return null;
@@ -1148,8 +1172,17 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             baseLayer.ensureValidated(true);
       }
 
-      initImportCache();
+      if (scopeAliases != null) {
+         for (Map.Entry<String,String> aliasEnt:scopeAliases.entrySet()) {
+            String scopeName = aliasEnt.getValue();
+            // It might be a custom scope or global or appGobal
+            if (layeredSystem.getScopeProcessor(this, scopeName) == null && ScopeDefinition.getScopeByName(scopeName) == null) {
+               error("No definition for scope: " + aliasEnt.getValue() + " to register alias: " + aliasEnt.getKey());
+            }
+         }
+      }
 
+      initImportCache();
       callLayerMethod("validate");
    }
 
@@ -3974,6 +4007,12 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (old != null && layeredSystem.options.verbose) {
          System.out.println("Scope processor for: " + scopeName + " replaced: " + old + " with: " + processor);
       }
+   }
+
+   public void registerScopeAlias(String newScopeName, String aliasedToName) {
+      if (scopeAliases == null)
+         scopeAliases = new TreeMap<String,String>();
+      scopeAliases.put(newScopeName, aliasedToName);
    }
 
    public void registerFileProcessor(IFileProcessor proc, String ext) {

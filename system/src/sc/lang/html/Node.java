@@ -78,7 +78,8 @@ public abstract class Node extends JavaSemanticNode implements IDynObject, ISrcS
       return dynObj == null ? getClass() : dynObj.getDynType();
    }
    public void setDynType(Object typeObj) {
-      dynObj.setTypeFromWrapper(this, typeObj);
+      if (dynObj != null)
+         dynObj.setTypeFromWrapper(this, typeObj);
    }
    public <_TPROP> _TPROP getTypedProperty(String propName, Class<_TPROP> propType) {
       if (dynObj == null)

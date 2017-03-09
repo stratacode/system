@@ -14,6 +14,7 @@ import sc.lang.java.*;
 import sc.lang.js.JSRuntimeProcessor;
 import sc.lang.sc.ModifyDeclaration;
 import sc.lang.sc.PropertyAssignment;
+import sc.lang.sc.ScopeModifier;
 import sc.lang.template.*;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
@@ -2093,6 +2094,8 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       MergeMode tagMerge = getTagMergeMode();
       MergeMode bodyMerge = getBodyMergeMode();
 
+      String scopeName = getFixedAttribute("scope");
+
       if (existing == null) {
          if (parentType != null)
             existing = parentType.getInnerType(objName, null);
@@ -2302,6 +2305,11 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          // to check Element.isAbstract.
          if (isAbstract() && tagTypeNeedsAbstract())
             tagType.addModifier("abstract");
+      }
+      if (scopeName != null) {
+         ScopeModifier scopeMod = new ScopeModifier();
+         scopeMod.scopeName = scopeName;
+         tagType.addModifier(scopeMod);
       }
       // Leave a trail for finding where this statement was generated from for debugging purposes
       tagType.fromStatement = this;
@@ -2711,6 +2719,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       behaviorAttributes.add("addAfter");
       behaviorAttributes.add("orderValue");
       behaviorAttributes.add("noCache");
+      behaviorAttributes.add("scope");
 
       // For select only
       behaviorAttributes.add("optionDataSource");

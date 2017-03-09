@@ -554,9 +554,9 @@ public class TestUtil {
                   // 218 - is where we change from forVar to forControl
                   // 250 - is where it should parse
                   /*
-                  if (reparseFile.contains("2")) {
+                  if (reparseFile.contains("153")) {
                      System.out.println("***");
-                     SCLanguage.getSCLanguage().parenExpression.trace = true;
+                     HTMLLanguage.getHTMLLanguage().templateBodyDeclarations.trace = true;
                      //SCLanguage.getSCLanguage().selectorExpression.trace = true;
                      //JavaLanguage.getJavaLanguage().classBodyDeclarations.trace = true;
                      //HTMLLanguage.getHTMLLanguage().tagAttributes.trace = true;
@@ -590,12 +590,6 @@ public class TestUtil {
                      }
 
                      Object reparsedModelObj = getTestResult(newRes);
-
-                     /*
-                     if (reparseFile.contains("2")) {
-                        JavaLanguage.getJavaLanguage().variableDefinition.trace = true;
-                     }
-                     */
 
                      Object parseComplete = lang.parseString(reparsedString, opts.enablePartialValues);
                      boolean parseError = false;

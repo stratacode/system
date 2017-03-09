@@ -1057,9 +1057,14 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
 
             if (!handled) {
                if (!mergeStringInOutput(block, expr, null)) {
-                  Statement outputSt = getExprStringOutputStatement(parseResult.toString());
-                  outputSt.fromStatement = parentElement;
-                  addToOutputMethod(block, outputSt);
+                  String resultStr = parseResult.toString();
+                  Statement outputSt = getExprStringOutputStatement(resultStr);
+                  if (outputSt != null) {
+                     outputSt.fromStatement = parentElement;
+                     addToOutputMethod(block, outputSt);
+                  }
+                  else
+                     origExpr.displayError("Invalid expression for template string - converted to: " + resultStr + " for: ");
                }
             }
          }
@@ -1170,8 +1175,9 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
    }
 
    public static Statement getExprStringOutputStatement(String exprStr) {
-      if (exprStr == null || exprStr.length() == 0)
-         System.err.println("*** invalid empty expression");
+      if (exprStr == null || exprStr.length() == 0 || exprStr.equals(".")) {
+         return null;
+      }
       return (Statement) ((List) TransformUtil.parseCodeTemplate(new ExprParams(exprStr), "out.append(<%= expr %>);", SCLanguage.INSTANCE.blockStatements, true)).get(0);
    }
 

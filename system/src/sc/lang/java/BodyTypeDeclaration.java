@@ -5849,6 +5849,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
     * we are adding a new layered version of this type.  In other words, adding a new modify that modifies this type.
     */
    public void updateType(BodyTypeDeclaration newType, ExecutionContext ctx, TypeUpdateMode updateMode, boolean updateInstances, UpdateInstanceInfo info) {
+      if (typeName == null || newType.typeName == null) {
+         displayError("updateType - skipping update for type with no name.");
+         return;
+      }
       // Are we removing a type layer?  If so we first modify the previous type, then remove this type
       if (updateMode == TypeUpdateMode.Remove && this instanceof ModifyDeclaration) {
          ModifyDeclaration modThis = (ModifyDeclaration) this;

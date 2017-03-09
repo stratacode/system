@@ -28,7 +28,7 @@ public class AppGlobalScopeDefinition extends ScopeDefinition {
       }
 
       public String getId() {
-         return "appGlobal:";
+         return "appGlobal:" + appId;
       }
    }
 

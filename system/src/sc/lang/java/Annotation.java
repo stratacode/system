@@ -13,13 +13,12 @@ import java.lang.reflect.Array;
 import java.util.IdentityHashMap;
 import java.util.List;
 
-public class Annotation extends JavaSemanticNode implements IAnnotation {
+public class Annotation extends ErrorSemanticNode implements IAnnotation {
    public String typeName;
    // either List<elementValue> or elementValue
    public Object elementValue;
 
    public transient Object boundType;
-   transient Object[] errorArgs;
 
    public static Annotation create(String typeName) {
       Annotation annot = new Annotation();
@@ -316,29 +315,8 @@ public class Annotation extends JavaSemanticNode implements IAnnotation {
       return super.toSafeLanguageString();
    }
 
-   public boolean displayTypeError(String...args) {
-      Statement st;
-      if (super.displayTypeError(args)) {
-         errorArgs = args;
-         return true;
-      }
-      return false;
-   }
-
-   public String getNodeErrorText() {
-      if (errorArgs != null) {
-         StringBuilder sb = new StringBuilder();
-         for (Object arg:errorArgs)
-            sb.append(arg.toString());
-         sb.append(this.toString());
-         return sb.toString();
-      }
-      return null;
-   }
-
    public void stop() {
       super.stop();
       boundType = null;
-      errorArgs = null;
    }
 }

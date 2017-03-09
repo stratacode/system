@@ -174,7 +174,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public void setLayer(Layer l) {
-      if (l != null && l.layeredSystem != getLayeredSystem())
+      if (l != null && l.layeredSystem != getLayeredSystem() && layeredSystem != null)
          System.out.println("*** Error - mismatching runtime for setLayer in Java model!");
       layer = l;
    }

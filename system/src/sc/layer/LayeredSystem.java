@@ -1152,6 +1152,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       layerPath = layerPathNames;
 
+      // Make sure appGlobal and global scopes are available since those are defined in the both the compilation runtime and at runtime
+      ScopeDefinition.initScopes();
+
       initLayerPath();
 
       // Sets the coreBuildLayer - used for storing dynamic stubs needed for the layer init process
@@ -14572,6 +14575,31 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       if (searchInactiveTypesForLayer(refLayer)) {
          return refLayer.getScopeProcessor(scopeName, true);
+      }
+      return null;
+   }
+
+   public String getScopeAlias(Layer refLayer, String scopeName) {
+      int startIx;
+      if (searchActiveTypesForLayer(refLayer)) {
+         // In general we search from most recent to original
+         startIx = refLayer == null ? layers.size() - 1 : refLayer.getLayerPosition();
+
+         // During layer init we may not have been added yet
+         if (startIx >= layers.size())
+            return null;
+
+         // Only look at layers which precede the supplied layer
+         for (int i = startIx; i >= 0; i--) {
+            Layer layer = layers.get(i);
+
+            String aliasName = layer.getScopeAlias(scopeName, false);
+            if (aliasName != null)
+               return aliasName;
+         }
+      }
+      if (searchInactiveTypesForLayer(refLayer)) {
+         return refLayer.getScopeAlias(scopeName, true);
       }
       return null;
    }

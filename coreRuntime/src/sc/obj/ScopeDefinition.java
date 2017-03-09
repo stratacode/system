@@ -90,6 +90,8 @@ public abstract class ScopeDefinition {
       int i = 0;
       // Optimize for the common case which all scopes are active.  just return the scopes list.
       for (ScopeDefinition scopeDef:scopes) {
+         if (scopeDef == null)
+            continue;
          if (scopeDef.getScopeContext(false) != null) {
             if (res != null) {
                res.add(scopeDef);
@@ -198,9 +200,12 @@ public abstract class ScopeDefinition {
    }
 
    public static ScopeDefinition getScopeByName(String scopeName) {
-      for (ScopeDefinition scope:scopes)
+      for (ScopeDefinition scope:scopes) {
+         if (scope == null)
+            continue;
          if (DynUtil.equalObjects(scope.name, scopeName) || (scope.matchesScope(scopeName)))
             return scope;
+      }
       return null;
    }
 
@@ -219,17 +224,27 @@ public abstract class ScopeDefinition {
       ctx.setValue(typeName, inst);
    }
 
+   public String getExternalName() {
+      return name == null ? "global" : name;
+   }
+
    public String toString() {
-      return "scope<" + (name == null ? "global" : name) + ">";
+      return "scope<" + getExternalName() + ">";
    }
 
    public boolean isGlobal() {
       return this.name == null;
    }
 
+   /** True for scopes like 'request' that only live for the duration of the operation. */
+   public boolean isTemporary() {
+      return false;
+   }
+
    /** Initialize the scopes that are always available */
    public static void initScopes() {
       GlobalScopeDefinition.getGlobalScopeDefinition();
       AppGlobalScopeDefinition.getAppGlobalScopeDefinition();
+      RequestScopeDefinition.getRequestScopeDefinition();
    }
 }
