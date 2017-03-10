@@ -4,6 +4,9 @@
 
 package sc.parser;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 
 public class Symbol extends Parselet {
@@ -12,6 +15,12 @@ public class Symbol extends Parselet {
 
    public ArrString expectedValue;
    private int expectedValueLength;
+
+   // index for excludedValues - foreach excluded symbol - e.g. %> this table stores remaining string to exclude - here >
+   private ArrayList<ArrString> excludedPeekStrings = null;
+
+   // Optional set of symbols that include the expectedValues but should not cause a match - e.g. %> for TemplateLanguage to not match the % for the modulo operator
+   private HashSet<IString> excludedValues = null;
 
    public Symbol(String id, int options, String ev) {
       super(id, options);
@@ -25,6 +34,18 @@ public class Symbol extends Parselet {
       // For negated repeat we can only advance 1 char at a time or we'll only reject the symbol if we hit it on a boundary
       if (negated && repeat && expectedValueLength > 1)
          expectedValueLength = 1;
+
+      if (excludedValues != null) {
+         excludedPeekStrings = new ArrayList<ArrString>();
+         for (IString excludeValue:excludedValues) {
+            if (excludeValue.startsWith(expectedValue)) {
+               IString peekStr = excludeValue.substring(expectedValue.length());
+               excludedPeekStrings.add(ArrString.toArrString(peekStr.toString()));
+            }
+            else
+               System.err.println("*** Warning: ignoring excluded value: " + excludeValue + " does not match the expected value: " + expectedValue);
+         }
+      }
    }
 
    public Symbol(int options, String ev) {
@@ -74,7 +95,7 @@ public class Symbol extends Parselet {
                break;
             }
 
-            if ((customError = accept(parser.semanticContext, input, input.startIndex, input.startIndex + 1)) != null)
+            if ((customError = acceptMatch(parser, input, input.startIndex, input.startIndex + 1)) != null)
                break;
 
             if (matchedValue == null) {
@@ -97,7 +118,7 @@ public class Symbol extends Parselet {
                input.len = len;
                input.hc = -333;
 
-               if ((customError = accept(parser.semanticContext, input, startIx, startIx + len)) != null)
+               if ((customError = acceptMatch(parser, input, startIx, startIx + len)) != null)
                   break;
 
                if (matchedValue == null) {
@@ -126,6 +147,19 @@ public class Symbol extends Parselet {
       }
    }
 
+   String acceptMatch(Parser parser, StringToken matchedValue, int lastStart, int current) {
+      String customError = accept(parser.semanticContext, matchedValue, lastStart, current);
+      if (customError != null)
+         return customError;
+      if (excludedPeekStrings != null) {
+         for (ArrString excludedValue:excludedPeekStrings) {
+            // If we match the excluded peek string for this symbol, it's not a match
+            if (parser.peekInputStr(excludedValue, false) == 0)
+               return "excluded token";
+         }
+      }
+      return null;
+   }
 
    private String getSymbolValue()
    {
@@ -238,4 +272,12 @@ public class Symbol extends Parselet {
    public boolean isNullValid() {
       return expectedValue == null;
    }
+
+   public void addExcludedValues(String... values) {
+      if (excludedValues == null)
+         excludedValues = new HashSet<IString>();
+      for (String val:values)
+         excludedValues.add(PString.toIString(val));
+   }
+
 }

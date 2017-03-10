@@ -355,6 +355,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
    }
 
    public class SymbolSpace extends Sequence {
+      Symbol symbolParselet;
       /**
        * Creates a symbol space token with a deliminator for output purposes.  This
        * deliminator is appended to the symbol on output.
@@ -366,11 +367,13 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
       public SymbolSpace(String symbol, String delim, int options) {
          // We used to include NOERROR here but need errors for ; and in general these seem to be important parselets
          super("('',):(.," + delim + ")", options);
-         add(new Symbol(NOERROR, symbol), spacing);
+         symbolParselet = new Symbol(NOERROR, symbol);
+         add(symbolParselet, spacing);
       }
       public SymbolSpace(String symbol, int options) {
          super("('',)", options);
-         add(new Symbol(NOERROR, symbol), spacing);
+         symbolParselet = new Symbol(NOERROR, symbol);
+         add(symbolParselet, spacing);
       }
 
       public SymbolSpace(String symbol, String delim) {
@@ -383,6 +386,10 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
 
       public String toString() {
          return "Symbol: '" + ((Symbol) parselets.get(0)).expectedValue + "'";
+      }
+
+      public void addExcludedValues(String... excludedValues) {
+         symbolParselet.addExcludedValues(excludedValues);
       }
    }
 

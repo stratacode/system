@@ -125,17 +125,23 @@ public class ParseError implements Cloneable, IParseResult {
    public Object getBestPartialValue() {
       if (partialValue != null)
          return partialValue;
+      int pvSz = -1;
+      Object pv = null;
       for (Object errArg : errorArgs) {
          if (errArg instanceof ParseError) {
             ParseError nestedErr = (ParseError) errArg;
-            // TODO: for now just return the first one - the errors are already known to have the same start/index and we should have filtered out
-            // errors that are parent/child of each other.
-            if (nestedErr.partialValue != null) {
-               return nestedErr.partialValue;
+            // Picking the largest error in the list
+            CharSequence nestedPv = (CharSequence) nestedErr.partialValue;
+            if (nestedPv != null) {
+               int newSz = nestedPv.length();
+               if (newSz > pvSz) {
+                  pv = nestedPv;
+                  pvSz = newSz;
+               }
             }
          }
       }
-      return null;
+      return pv;
    }
 
    public ParseError propagatePartialValue(Object pv) {

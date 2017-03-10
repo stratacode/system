@@ -598,11 +598,23 @@ public class Parser implements IString {
       return parseError(currentParselet, null, null, errorCode, currentIndex, currentIndex, (Object[])null);
    }
 
-   public static boolean isBetterError(int currentStart, int currentEnd, int newStart, int newEnd, boolean replace) {
+   public static boolean isBetterError(int currentStart, int currentEnd, int newStart, int newEnd, boolean replaceIfEqual) {
       if (currentStart == -1)
          return true;
 
-      if (replace)
+      int newLen = newEnd - newStart;
+      int currentLen = currentEnd - currentStart;
+
+      // There's a case where we might have a parse-error that represents a small fragment in the middle of the document.
+      // Rather than using that, we'd rather use the error chunk that comes before it, as long as is parses more of the
+      // document.
+      if (newLen < currentLen && currentLen > 2 && currentStart == 0 && newEnd > currentEnd && newStart >= currentEnd)
+         return false;
+
+      if (currentLen < newLen && newLen > 2 && newStart == 0 && currentEnd > newEnd && currentStart >= newEnd)
+         return true;
+
+      if (replaceIfEqual)
          return newEnd > currentEnd || (newEnd == currentEnd && newStart <= currentStart);
       else
          return newEnd > currentEnd || (newEnd == currentEnd && newStart < currentStart);

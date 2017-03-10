@@ -1489,9 +1489,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       ISemanticNode pnode = parentNode instanceof BodyTypeDeclaration || parentNode instanceof JavaModel ? parentNode : parentNode == null ? null : parentNode.getParentNode(); // Skip the list, not there for command completion
 
       String useTypeName = typeName;
-      // Local methods - those inside of blocks - for now, just naming them like they are innner classes but that might cause problems because they can't be found from
+      // Local methods - those inside of blocks - for now, just naming them like they are inner classes but that might cause problems because they can't be found from
       // that absolute type name.
-      while (pnode instanceof AbstractBlockStatement || pnode instanceof AbstractMethodDefinition || pnode instanceof SemanticNodeList) {
+      while (pnode instanceof AbstractBlockStatement || pnode instanceof AbstractMethodDefinition || pnode instanceof SemanticNodeList || pnode instanceof ForStatement || pnode instanceof IfStatement) {
          if (pnode instanceof AbstractMethodDefinition) {
             // Classes defined inside of methods get an internal name in their class name $1TypeName.  We're using a prefix like _M__1 only because then we can generate the Java code... maybe we should
             // use the $ and ensure these type names never make it into the type system?   We are not putting a "." here because we don't want the method to need to implement ITypeDeclaration just so it
@@ -1521,8 +1521,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
       else if (pnode == null)
          res = useTypeName;
-      else
+      else {
          throw new UnsupportedOperationException();
+      }
       return res;
    }
 

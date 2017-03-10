@@ -73,6 +73,12 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
 
    // Start must chew up space following the delimiter since it is the start of a code construct.
    SymbolSpace startCodeDelimiter = new SymbolSpace(START_CODE_DELIMITER);
+   {
+      // This constraints the symbol match so it will not inaccurately match these more specific tokens.
+      // We don't require this for the grammar but it's helpful for reparsing - so we never match a code segment because it has
+      // better error consumption than the declaration statement
+      startCodeDelimiter.addExcludedValues("<%@", "<%!", "<%=");
+   }
    SymbolSpace startExpDelimiter = new SymbolSpace(START_EXP_DELIMITER);
    SymbolSpace startDeclDelimiter = new SymbolSpace(START_DECL_DELIMITER);
 

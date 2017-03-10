@@ -96,8 +96,10 @@ public class ErrorParseNode extends AbstractParseNode {
       }
       if (atEnd && textLen > ctx.startChangeOffset) {
          IParseNode last = ctx.lastVisitedNode;
-         ctx.firstDiffNode = last.getParselet().getBeforeFirstNode(last);
-         ctx.beforeFirstNode = ctx.firstDiffNode;
+         if (last != null) {
+            ctx.firstDiffNode = last.getParselet().getBeforeFirstNode(last);
+            ctx.beforeFirstNode = ctx.firstDiffNode;
+         }
       }
    }
 

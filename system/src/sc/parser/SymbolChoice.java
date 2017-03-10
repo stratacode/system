@@ -185,7 +185,11 @@ public class SymbolChoice extends Parselet {
                if (excludeValue.startsWith(expectedValue)) {
                   matched = true;
                   IString peekStr = excludeValue.substring(expectedValue.length());
-                  excludedPeekString.put(expectedValue, ArrString.toArrString(peekStr.toString()));
+                  IString oldValue = excludedPeekString.put(expectedValue, ArrString.toArrString(peekStr.toString()));
+                  // TODO: this should be an array list of strings for each expectedValue right?
+                  if (oldValue != null) {
+                     System.err.println("*** Warning - ignoring a skip prefix for a symbol choice");
+                  }
                }
             }
             if (!matched)
