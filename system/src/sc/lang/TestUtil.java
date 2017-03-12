@@ -634,7 +634,8 @@ public class TestUtil {
                            else {
                               if (!reparseSameAsOrig)
                                  error("*** REPARSE FAILURE - reparsed text does not match");
-                              else if (!newResStr.startsWith(parseStr) || newResStr.length() - 1 != parseStr.length())
+                              // There are valid cases where the reparsed string is longer than the parse-string
+                              else if (!newResStr.startsWith(parseStr))
                                  error("*** REPARSE FAILURE - reparsed text does not match - parsed"); // is this possible?
                            }
                         }
