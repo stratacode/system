@@ -23,7 +23,7 @@ public class CurrentScopeContext {
    ScopeContext getScopeContext(int scopeId) {
       for (int i = 0; i < scopeContexts.size(); i++) {
          ScopeContext ctx = scopeContexts.get(i);
-         if (ctx.getScopeDefinition().scopeId == scopeId)
+         if (ctx != null && ctx.getScopeDefinition().scopeId == scopeId)
             return ctx;
       }
       return null;
@@ -67,6 +67,8 @@ public class CurrentScopeContext {
          return envCtx;
       CurrentScopeContext ctx = new CurrentScopeContext();
       for (ScopeDefinition scope : ScopeDefinition.scopes) {
+         if (scope == null)
+            continue;
          ScopeContext scopeCtx = scope.getScopeContext(false);
          if (scopeCtx != null)
             ctx.scopeContexts.add(scopeCtx);

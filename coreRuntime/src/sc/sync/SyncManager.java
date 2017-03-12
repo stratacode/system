@@ -1763,11 +1763,13 @@ public class SyncManager {
 
       public synchronized void scopeDestroyed(ScopeContext scope) {
          SyncContext childSyncCtx = (SyncContext) scope.getValue(SC_SYNC_CONTEXT_SCOPE_KEY);
-         if (trace)
-            System.out.println("Destroying scope : " + scope.getScopeDefinition().name + ":" + scope.getId());
-         childSyncCtx.disposeContext();
-         // Need this to find and remove the sync insts so remove it after we are done.
-         scope.setValue(SC_SYNC_CONTEXT_SCOPE_KEY, null);
+         if (childSyncCtx != null) {
+            if (trace)
+               System.out.println("Destroying scope : " + scope.getScopeDefinition().name + ":" + scope.getId());
+            childSyncCtx.disposeContext();
+            // Need this to find and remove the sync insts so remove it after we are done.
+            scope.setValue(SC_SYNC_CONTEXT_SCOPE_KEY, null);
+         }
       }
 
       public void disposeContext() {
