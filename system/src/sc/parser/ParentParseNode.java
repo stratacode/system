@@ -74,6 +74,8 @@ public class ParentParseNode extends AbstractParseNode {
                return 0;
          }
 
+         Object replacedValue = null;
+
          if (node != oldChildParseNode) {
             Object oldNode = children.get(childIndex);
             if (parseArray && oldNode instanceof IParseNode) {
@@ -92,7 +94,7 @@ public class ParentParseNode extends AbstractParseNode {
             }
             if (!insert) {
                if (node != children.get(childIndex)) {
-                  Object replaced = children.set(childIndex, node);
+                  replacedValue = children.set(childIndex, node);
                }
             }
             else {
@@ -107,7 +109,7 @@ public class ParentParseNode extends AbstractParseNode {
          // Need to call this even if the parse node did not change.  A child of the parse-node might have changed.  This will
          // cause some properties to be changed to the same value but it may be good to signal the model that something underneath
          // has changed.
-         return parselet.setSemanticValue(this, node, svIndex, slotIndex, skipSemanticValue, parser, false, true);
+         return parselet.setSemanticValue(this, node, svIndex, slotIndex, skipSemanticValue, parser, false, true, replacedValue);
       }
    }
 
@@ -253,7 +255,7 @@ public class ParentParseNode extends AbstractParseNode {
          children.add(node);
 
       // Only nested parselets should be using the ParentParseNode
-      return parselet.setSemanticValue(this, node, svIndex, index, skipSemanticValue, parser, false, false);
+      return parselet.setSemanticValue(this, node, svIndex, index, skipSemanticValue, parser, false, false, null);
    }
 
    public void addOrSet(Object node, Parselet p, int svIndex, int index, boolean skipSemanticValue, Parser parser) {
@@ -310,7 +312,7 @@ public class ParentParseNode extends AbstractParseNode {
          children.set(index, node);
 
       // Only nested parselets should be using the ParentParseNode
-      parselet.setSemanticValue(this, node, -1, index, skipSemanticValue, parser, true, false);
+      parselet.setSemanticValue(this, node, -1, index, skipSemanticValue, parser, true, false, null);
    }
 
    public void addGeneratedNode(Object node) {

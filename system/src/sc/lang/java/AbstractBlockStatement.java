@@ -398,4 +398,9 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
       }
       return null;
    }
+
+   public boolean isLeafStatement() {
+      return false;
+   }
+
 }

@@ -15,7 +15,7 @@ import sc.parser.ParseUtil;
 
 import java.util.*;
 
-public abstract class AbstractMethodDefinition extends TypedDefinition implements IMethodDefinition, INamedNode {
+public abstract class AbstractMethodDefinition extends TypedDefinition implements IMethodDefinition, INamedNode, IBlockStatementWrapper {
    public String name;
    public Parameter parameters;
    public String arrayDimensions;
@@ -799,5 +799,13 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
             return out;
       }
       return super.findStatement(in);
+   }
+
+   public boolean isLeafStatement() {
+      return false;
+   }
+
+   public BlockStatement getWrappedBlockStatement() {
+      return body;
    }
 }

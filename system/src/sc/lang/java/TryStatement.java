@@ -223,4 +223,16 @@ public class TryStatement extends Statement implements IBlockStatement {
       }
       return null;
    }
+
+   public boolean isLeafStatement() {
+      return false;
+   }
+
+   public String getStartBlockString() {
+      return "{";
+   }
+
+   public String getEndBlockString() {
+      return "}";
+   }
 }

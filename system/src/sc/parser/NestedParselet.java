@@ -1414,7 +1414,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       return pn;
    }
 
-   public int setSemanticValue(ParentParseNode parent, Object node, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, boolean replaceValue, boolean reparse) {
+   public int setSemanticValue(ParentParseNode parent, Object node, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, boolean replaceValue, boolean reparse, Object replacedValue) {
       if (trace && parser.enablePartialValues)
          System.out.println("*** setting semantic value of traced element");
 
@@ -1645,21 +1645,17 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                case INHERIT:
                   if (node instanceof ParentParseNode) {
                      ParentParseNode pnode = (ParentParseNode) node;
-                     // TODO: need to make sure these get processed
-                     if (pnode.parselet.slotMapping != null) {
-                        if (getSemanticValueIsArray() && !pnode.parselet.getSemanticValueIsArray()) {
-                           List semValList = (List) parent.getSemanticValue();
-                           if (semValList.size() == 0)
-                              System.err.println("**** Warning: not processing slot mappings for value: " + pnode);
-                           else
-                              pnode.parselet.processSlotMappings(0, pnode, semValList.get(semValList.size() - 1), true, childIndex);
-                        }
-                        else
-                           pnode.parselet.processSlotMappings(0, pnode, parent.getSemanticValue(), true, childIndex);
-                     }
+                     NestedParselet childParselet = pnode.parselet;
+                     processInheritedSlotMappings(parent, childParselet, pnode, childIndex, reparse);
                   }
                   else if (node != null && !(node instanceof ErrorParseNode))
                      System.err.println("*** The '*' operator produced a parse node of type: " + node.getClass() + " when it should have produced a ParentParseNode");
+                  // This is the case where we are reparsing and we now have a null where we used to have a value with inherited property assignments.  We need to
+                  // process these assignments with the null value on the old-node's child parselet
+                  else if (reparse && replacedValue instanceof ParentParseNode && node == null) {
+                     ParentParseNode replacedNode = (ParentParseNode) replacedValue;
+                     processInheritedSlotMappings(parent, replacedNode.parselet, null, childIndex, reparse);
+                  }
                   break;
             }
          }
@@ -1781,7 +1777,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
             // Two reasons to wait: 1) for chained sequences and 2) for propagated values
             // so that we don't try to set the value before the propagated slot has been
             // processed.
-            processSlotMappings(startIx, parent, toProcess, false, childIndex);
+            processSlotMappings(startIx, parent, toProcess, false, childIndex, reparse);
 
             if (trace && parser.enablePartialValues)
                System.out.println("*** Semantic value of: " + this + FileUtil.LINE_SEPARATOR +
@@ -1789,6 +1785,21 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          }
       }
       return valueCount;
+   }
+
+   private void processInheritedSlotMappings(ParentParseNode parent, NestedParselet childParselet, ParentParseNode pnode, int childIndex, boolean reparse) {
+      // TODO: are we missing any cases here that are not being processed?
+      if (childParselet.slotMapping != null) {
+         if (getSemanticValueIsArray() && !childParselet.getSemanticValueIsArray()) {
+            List semValList = (List) parent.getSemanticValue();
+            if (semValList.size() == 0)
+               System.err.println("**** Warning: not processing slot mappings for value: " + pnode);
+            else
+               childParselet.processSlotMappings(0, pnode, semValList.get(semValList.size() - 1), true, childIndex, reparse);
+         }
+         else
+            childParselet.processSlotMappings(0, pnode, parent.getSemanticValue(), true, childIndex, reparse);
+      }
    }
 
    boolean propagatesArray() {
@@ -1953,7 +1964,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       return false;
    }
 
-   public void processSlotMappings(int startIx, ParentParseNode srcNode, Object dstNode, boolean recurse, int childIndex) {
+   public void processSlotMappings(int startIx, ParentParseNode srcNode, Object dstNode, boolean recurse, int childIndex, boolean reparse) {
       if (dstNode == null)
          return;
 
@@ -1988,6 +1999,10 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                value = ParseUtil.nodeToSemanticValue(oldResult);
                setSemanticProperty(dstNode, slotMapping[i], value);
             }
+            // When reparsing, if we have a null value it's possible the original did not have a null so need to clear it out here
+            else if (reparse && srcNode == null) {
+               setSemanticProperty(dstNode, slotMapping[i], null);
+            }
             // else - when dealing with partial results, we might not have parsed this slot so don't bother with the semantic value
          }
       }
@@ -2000,7 +2015,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          for (int inheritSlot : inheritSlots)
             if (srcNode.parselet.slotMapping != null)
                ((NestedParselet) parselets.get(inheritSlot)).processSlotMappings(0,
-                       (ParentParseNode) srcNode.children.get(inheritSlot), dstNode, true, childIndex);
+                       (ParentParseNode) srcNode.children.get(inheritSlot), dstNode, true, childIndex, reparse);
       }
 
       if (language.debug)

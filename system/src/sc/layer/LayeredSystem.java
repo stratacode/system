@@ -11026,14 +11026,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public ILanguageModel getAnnotatedLanguageModel(SrcEntry srcEnt, boolean activeOrInactive) {
-      ILanguageModel m = getLanguageModel(srcEnt, activeOrInactive, null);
+      ILanguageModel m = getLanguageModel(srcEnt, activeOrInactive, null, true);
       if (m != null && m.getUserData() != null)
          return m;
       if (peerSystems != null) {
          for (LayeredSystem peerSys:peerSystems) {
             SrcEntry peerEnt = peerSys.getPeerSrcEntry(srcEnt);
             if (peerEnt != null) {
-               m = peerSys.getLanguageModel(peerEnt);
+               m = peerSys.getLanguageModel(peerEnt, activeOrInactive, null, true);
                if (m != null && m.getUserData() != null)
                   return m;
             }
@@ -11054,10 +11054,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public ILanguageModel getLanguageModel(SrcEntry srcEnt) {
-      return getLanguageModel(srcEnt, false, null);
+      return getLanguageModel(srcEnt, false, null, true);
    }
 
-   public ILanguageModel getLanguageModel(SrcEntry srcEnt, boolean activeOrInactive, List<Layer.ModelUpdate> changedModels) {
+   public ILanguageModel getLanguageModel(SrcEntry srcEnt, boolean activeOrInactive, List<Layer.ModelUpdate> changedModels, boolean loadIfUnloaded) {
       Layer layer = srcEnt.layer;
 
       // If we are in the midst of loading this model via createFile, we cannot try to go back to the file manager and get the same file as it will recurse endlessly
@@ -11065,8 +11065,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (cachedModel != null && cachedModel.getLayer() == srcEnt.layer)
          return cachedModel;
       // We only inactive models to go through the external model index.
-      if (externalModelIndex != null && (layer != null && !layer.activated)) {
-         ILanguageModel extModel = externalModelIndex.lookupJavaModel(srcEnt);
+      if (externalModelIndex != null && (layer != null && !layer.activated) && !activeOrInactive) {
+         ILanguageModel extModel = externalModelIndex.lookupJavaModel(srcEnt, loadIfUnloaded);
          // We may end up storing two copies of the model - activated and inactivated.  The editor can be out of sync
          // with what we are requesting here, in which case we may need to load a new copy that's in the right state.
          if (extModel != null) {
@@ -12093,7 +12093,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public Object parseInactiveFile(SrcEntry srcEnt) {
       // First try to find the JavaModel cached outside of the system.
       if (externalModelIndex != null) {
-         ILanguageModel model = externalModelIndex.lookupJavaModel(srcEnt);
+         ILanguageModel model = externalModelIndex.lookupJavaModel(srcEnt, true);
          if (model != null)
             return model;
       }
@@ -12118,7 +12118,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // If we are loading it don't try to load it again
          model = beingLoaded.get(srcEnt.absFileName);
          if (model == null) {
-            model = externalModelIndex.lookupJavaModel(srcEnt);
+            model = externalModelIndex.lookupJavaModel(srcEnt, true);
             if (model != null) {
                ParseUtil.initAndStartComponent(model);
                if (model.getLayer() != null && model.getLayer().activated)

@@ -246,4 +246,16 @@ public class SwitchStatement extends Statement implements IBlockStatement {
       }
       return null;
    }
+
+   public boolean isLeafStatement() {
+      return false;
+   }
+
+   public String getStartBlockString() {
+      return "{";
+   }
+
+   public String getEndBlockString() {
+      return "}";
+   }
 }

@@ -63,10 +63,17 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
       return toString().charAt(ix);
    }
 
+   // TODO: this could be made a lot faster
    public int indexOf(String substr) {
       return toString().indexOf(substr);
    }
 
+   // TODO: this too
+   public int indexOf(String substr, int fromIndex) {
+      return toString().indexOf(substr, fromIndex);
+   }
+
+   // TODO: and this!
    public int lastIndexOf(String substr) {
       return toString().lastIndexOf(substr);
    }

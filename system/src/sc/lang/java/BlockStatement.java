@@ -45,4 +45,12 @@ public class BlockStatement extends AbstractBlockStatement {
    public boolean needsEnclosingClass() {
       return true;
    }
+
+   public String getStartBlockString() {
+      return "{";
+   }
+
+   public String getEndBlockString() {
+      return "}";
+   }
 }

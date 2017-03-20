@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Set;
 
 /** Java 8 lambda expression.  To run these in JS we need to convert them to anonymous classes */
-public class LambdaExpression extends BaseLambdaExpression {
+public class LambdaExpression extends BaseLambdaExpression implements IStatementWrapper {
    public Object lambdaParams; // An identifier, e.g. x -> y, Parameter list (int a, int b) -> y, or SemanticNodeList<IString> (a, b) -> y
    public Statement lambdaBody; // Either an expression or a BlockStatement
 
@@ -209,5 +209,17 @@ public class LambdaExpression extends BaseLambdaExpression {
             return out;
       }
       return null;
+   }
+
+   public boolean isLeafStatement() {
+      return false;
+   }
+
+   public Statement getWrappedStatement() {
+      return lambdaBody;
+   }
+
+   public String getFunctionEndString() {
+      return "{";
    }
 }

@@ -72,36 +72,41 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
    public final static TemplateLanguage INSTANCE = new TemplateLanguage();
 
    // Start must chew up space following the delimiter since it is the start of a code construct.
-   SymbolSpace startCodeDelimiter = new SymbolSpace(START_CODE_DELIMITER);
+   public SymbolSpace startCodeDelimiter = new SymbolSpace(START_CODE_DELIMITER);
    {
       // This constraints the symbol match so it will not inaccurately match these more specific tokens.
       // We don't require this for the grammar but it's helpful for reparsing - so we never match a code segment because it has
       // better error consumption than the declaration statement
       startCodeDelimiter.addExcludedValues("<%@", "<%!", "<%=");
    }
-   SymbolSpace startExpDelimiter = new SymbolSpace(START_EXP_DELIMITER);
-   SymbolSpace startDeclDelimiter = new SymbolSpace(START_DECL_DELIMITER);
+   public SymbolSpace startExpDelimiter = new SymbolSpace(START_EXP_DELIMITER);
+   public SymbolSpace startDeclDelimiter = new SymbolSpace(START_DECL_DELIMITER);
+   public SymbolSpace startImportDelimiter = new SymbolSpace(START_IMPORT_DELIMITER);
 
    // End does not consume space since that space should be part of the template string
-   Symbol endDelimiter = new Symbol(END_DELIMITER);
+   public Symbol endDelimiter = new Symbol(END_DELIMITER);
+   // Creating these so we have different tokens to match up against the start token - not really needed here but the lexer/highlighting in intelliJ requires separate tokens
+   public Symbol endExpDelimiter = new Symbol(END_DELIMITER);
+   public Symbol endImportDelimiter = new Symbol(END_DELIMITER);
+   public Symbol endDeclDelimiter = new Symbol(END_DELIMITER);
 
    {
-      startCodeDelimiter.styleName = startExpDelimiter.styleName = startDeclDelimiter.styleName = endDelimiter.styleName = "keyword";
+      startCodeDelimiter.styleName = startExpDelimiter.styleName = startDeclDelimiter.styleName = endDelimiter.styleName = endExpDelimiter.styleName = endDeclDelimiter.styleName = endImportDelimiter.styleName = "keyword";
    }
 
    OrderedChoice htmlCommentBody = new OrderedChoice("('','','')", REPEAT | OPTIONAL,
                    new Sequence("('',)", new Symbol("--"), new Symbol(NOT | LOOKAHEAD, ">")),
                    new Sequence("('',)", new Symbol("-"), new Symbol(NOT | LOOKAHEAD, "-")),
                    new Sequence("('',)", new Symbol(NOT, "-"), new Symbol(LOOKAHEAD, Symbol.ANYCHAR)));
-   Sequence tagComment = new Sequence("HTMLComment(,commentBody,)", new Symbol(START_HTML_COMMENT), htmlCommentBody, new Symbol(END_HTML_COMMENT));
-   SymbolChoice templateString = new SymbolChoice(NOT | REPEAT, START_HTML_COMMENT, END_HTML_COMMENT, START_EXP_DELIMITER, START_CODE_DELIMITER, END_DELIMITER, EOF);
+   public Sequence tagComment = new Sequence("HTMLComment(,commentBody,)", new Symbol(START_HTML_COMMENT), htmlCommentBody, new Symbol(END_HTML_COMMENT));
+   public SymbolChoice templateString = new SymbolChoice(NOT | REPEAT, START_HTML_COMMENT, END_HTML_COMMENT, START_EXP_DELIMITER, START_CODE_DELIMITER, END_DELIMITER, EOF);
    {
       templateString.styleName = "templateString";
    }
-   Sequence templateExpression = new Sequence("(,.,)", startExpDelimiter, expression, endDelimiter);
+   Sequence templateExpression = new Sequence("(,.,)", startExpDelimiter, expression, endExpDelimiter);
    Sequence templateStatement = new Sequence("TemplateStatement(,statements,)", startCodeDelimiter,
                                              blockStatements, endDelimiter);
-   Sequence templateDeclaration = new Sequence("TemplateDeclaration(,body,)", startDeclDelimiter, classBodyDeclarations, endDelimiter);
+   Sequence templateDeclaration = new Sequence("TemplateDeclaration(,body,)", startDeclDelimiter, classBodyDeclarations, endDeclDelimiter);
    public OrderedChoice simpleTemplateDeclarations = new OrderedChoice("([],[])", OPTIONAL | REPEAT, templateExpression, templateString);
    Sequence glueExpression = new Sequence("GlueExpression(,expressions,)", endDelimiter, simpleTemplateDeclarations, startCodeDelimiter);
    Sequence glueStatement = new Sequence("GlueStatement(,declarations,)", endDelimiter, simpleTemplateDeclarations, startCodeDelimiter);
@@ -125,7 +130,7 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
       // Do not parse %>bodyText by itself.   We need to match a the open <% as well in partial values mode or else we consume the %>bodyText as part of 'classBodyDeclarations' so it's not there for the close template
       glueDeclaration.minContentSlot = 2;
    }
-   Sequence templateAnnotations = new Sequence("(,,imports, templateModifiers,)", OPTIONAL, new Symbol(START_IMPORT_DELIMITER), spacing, imports, modifiers, endDelimiter);
+   Sequence templateAnnotations = new Sequence("(,imports, templateModifiers,)", OPTIONAL, startImportDelimiter, imports, modifiers, endImportDelimiter);
    Sequence template = new Sequence("Template(, *, templateDeclarations,)", spacing, templateAnnotations, templateBodyDeclarations, new Symbol(EOF));
    {
       // Add this to the regular Java grammar.  It recognizes the %> followed by text or <%= %> statements

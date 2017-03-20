@@ -1039,4 +1039,8 @@ public class NewExpression extends IdentifierExpression {
    public boolean applyPartialValue(Object value) {
       return false;
    }
+
+   public boolean isLeafStatement() {
+      return classBody == null;
+   }
 }

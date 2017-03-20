@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Set;
 
 /** Do/While statement */
-public class WhileStatement extends ExpressionStatement {
+public class WhileStatement extends ExpressionStatement implements IStatementWrapper {
    public Statement statement;
 
    public ExecResult exec(ExecutionContext ctx) {
@@ -111,4 +111,15 @@ public class WhileStatement extends ExpressionStatement {
       return super.findStatement(in);
    }
 
+   public boolean isLeafStatement() {
+      return false;
+   }
+
+   public Statement getWrappedStatement() {
+      return statement;
+   }
+
+   public String getFunctionEndString() {
+      return ")";
+   }
 }

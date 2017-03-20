@@ -224,6 +224,59 @@ public class ParseUtil  {
       return new FilePosition(lineCt, column);
    }
 
+   /**
+    * Utility method to find a single contiguous error inside of a specified region of a parse node.
+    * If there are multiple errors, the 'error region' inside of the specified startIx and endIx params
+    * is returned.  This is used for identifying unparsed regions in building a formatting code model
+    * for this file to capture errors that exist between recognized parsed types.  It's not OK to just treat
+    * them as whitespace since IntelliJ complains.
+    */
+   public static ParseRange findErrorsInRange(IParseNode pn, int startIx, int endIx) {
+      int pnStart = pn.getStartIndex();
+      int pnLen = pn.length();
+      int pnEnd = pnStart + pnLen;
+
+      if (pnStart > endIx || pnEnd < startIx)
+         return null;
+
+      // NOTE: pn.isErrorNode() does not work here - we set the error node flag on the parent if any child has an error but the entire node is not an error node
+      if (pn instanceof ErrorParseNode) {
+         return new ParseRange(Math.max(pnStart,startIx), Math.min(pnEnd, endIx));
+      }
+      else if (pn instanceof ParseNode) {
+         ParseNode p = (ParseNode) pn;
+         if (p.value instanceof IParseNode) {
+            return findErrorsInRange((IParseNode) p.value, startIx, endIx);
+         }
+         return null;
+      }
+      else if (pn instanceof ParentParseNode) {
+         ParentParseNode p = (ParentParseNode) pn;
+         ParseRange errors = null;
+         if (p.children != null) {
+            for (int i = 0; i < p.children.size(); i++) {
+               Object child = p.children.get(i);
+               if (child instanceof IParseNode) {
+                  IParseNode childPN = (IParseNode) child;
+                  if (childPN.getStartIndex() > endIx)
+                     return errors;
+                  ParseRange range = findErrorsInRange(childPN, startIx, endIx);
+                  if (range != null) {
+                     if (errors == null)
+                        errors = range;
+                     else {
+                        errors.mergeInto(range.startIx, range.endIx);
+                     }
+                  }
+               }
+            }
+         }
+         return errors;
+      }
+      else // String based parse-node cannot be an error
+         return null;
+   }
+
    /** Given a parse node, returns either that parse node or a child of that parse node. */
    public static IParseNode findClosestParseNode(IParseNode parent, int offset) {
       if (parent.getStartIndex() > offset)
@@ -294,8 +347,7 @@ public class ParseUtil  {
       return parentNode;
    }
 
-   public static String getInputString(File file, int startIndex, int i)
-   {
+   public static String getInputString(File file, int startIndex, int i) {
       String str = readFileString(file);
       if (str == null)
          return "can't open file: " + file;
@@ -306,8 +358,7 @@ public class ParseUtil  {
       return str.substring(startIndex, startIndex + i);
    }
 
-   public static String escapeObject(Object value)
-   {
+   public static String escapeObject(Object value) {
       if (value == null)
          return "null";
       return escapeString(value.toString());

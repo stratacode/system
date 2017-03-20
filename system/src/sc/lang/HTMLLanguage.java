@@ -402,7 +402,7 @@ public class HTMLLanguage extends TemplateLanguage {
       tagAttribute.cacheResults = true;
    }
    // TODO: how do we deal with appending newlines after the start tag?  Used to having tagSpacingEOL here but that ate up the space in the content.  Need features of tagSpacingEOL perhaps when processing the endTagChar?
-   Sequence simpleTag = new Sequence("Element(,tagName,attributeList,selfClose,)", beginTagChar, anyTagName, tagAttributes, new Sequence("('')", OPTIONAL, closeTagChar), endTagChar);
+   public Sequence simpleTag = new Sequence("Element(,tagName,attributeList,selfClose,)", beginTagChar, anyTagName, tagAttributes, new Sequence("('')", OPTIONAL, closeTagChar), endTagChar);
    {
       simpleTag.enableTagMode = true;
       // If an error occurs after we parse the name we can skip it (enablePartialValues only)
@@ -410,7 +410,7 @@ public class HTMLLanguage extends TemplateLanguage {
       // Don't match just the < for a partial value match
       simpleTag.minContentSlot = 1;
    }
-   Sequence closeTag = new Sequence("(,,'',)", beginTagChar, closeTagChar, closeTagName, endTagChar);
+   public Sequence closeTag = new Sequence("(,,'',)", beginTagChar, closeTagChar, closeTagName, endTagChar);
    {
       closeTag.skipOnErrorSlot = 3;
    }

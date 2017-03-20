@@ -378,4 +378,8 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       return null;
    }
 
+   public boolean isLeafStatement() {
+      return !(this instanceof IBlockStatement);
+   }
+
 }

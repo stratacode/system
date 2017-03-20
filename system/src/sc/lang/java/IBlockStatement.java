@@ -14,4 +14,8 @@ public interface IBlockStatement {
    List<Statement> getBlockStatements();
 
    IBlockStatement getEnclosingBlockStatement();
+
+   String getStartBlockString();
+
+   String getEndBlockString();
 }

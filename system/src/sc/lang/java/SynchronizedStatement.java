@@ -7,7 +7,7 @@ package sc.lang.java;
 import java.util.List;
 import java.util.Set;
 
-public class SynchronizedStatement extends Statement {
+public class SynchronizedStatement extends Statement implements IStatementWrapper {
    public Expression expression;
    public Statement statement;
 
@@ -67,5 +67,13 @@ public class SynchronizedStatement extends Statement {
             return out;
       }
       return super.findStatement(in);
+   }
+
+   public Statement getWrappedStatement() {
+      return statement;
+   }
+
+   public String getFunctionEndString() {
+      return ")";
    }
 }

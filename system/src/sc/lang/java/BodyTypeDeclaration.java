@@ -9203,4 +9203,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
       return null;
    }
+
+   public boolean isLeafStatement() {
+      return false;
+   }
 }

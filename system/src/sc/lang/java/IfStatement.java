@@ -5,6 +5,7 @@
 package sc.lang.java;
 
 import sc.lang.ISrcStatement;
+import sc.parser.IParseNode;
 
 import java.util.List;
 import java.util.Set;
@@ -149,5 +150,21 @@ public class IfStatement extends NonIndentedStatement {
             return out;
       }
       return super.findStatement(in);
+   }
+
+   public boolean isLeafStatement() {
+      return false;
+   }
+
+   /** Return true for a statement where there's no falseStatement yet but there is an 'else' that was parsed as part of the partial value */
+   public boolean isIncompleteElse() {
+      IParseNode ifPN = getParseNode();
+      if (falseStatement == null && trueStatement != null && ifPN != null) {
+         IParseNode truePN = trueStatement.getParseNode();
+         int trueOffset = (truePN.getStartIndex() - ifPN.getStartIndex()) + truePN.toString().trim().length();
+         if (ifPN.indexOf("else", trueOffset) != -1)
+            return true;
+      }
+      return false;
    }
 }

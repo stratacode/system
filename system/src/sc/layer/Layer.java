@@ -3207,7 +3207,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          }
          else if (Language.isParseable(path) || (proc = layeredSystem.getFileProcessorForFileName(path, this, BuildPhase.Process)) != null) {
             SrcEntry srcEnt = new SrcEntry(this, srcDir, relDir == null ? "" : relDir, subF.getName(), proc == null || proc.getPrependLayerPackage());
-            ILanguageModel oldModel = layeredSystem.getLanguageModel(srcEnt, active, null);
+            ILanguageModel oldModel = layeredSystem.getLanguageModel(srcEnt, active, null, active);
             long newLastModTime = new File(srcEnt.absFileName).lastModified();
             if (oldModel == null) {
                // The processedFileIndex only holds entries we processed.  If this file did not change from when we did the build, we just have to
@@ -3225,7 +3225,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
             // We are refreshing any models which have changed on disk or had errors last time.  Technically for the error models, we could just restart them perhaps
             // but we need to clear old all of the references to anything else which has changed.  Seems like this might be more reliable now though obviously a bit slower.
-            if (newLastModTime > lastRefreshTime || (oldModel != null && oldModel.hasErrors())) {
+            if ((lastRefreshTime != -1 && newLastModTime > lastRefreshTime) || (oldModel != null && (oldModel.hasErrors() || newLastModTime > oldModel.getLastModifiedTime()))) {
                Object res = layeredSystem.refresh(srcEnt, ctx, updateInfo, active);
                if (res != null)
                   changedModels.add(new ModelUpdate(oldModel, res));

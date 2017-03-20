@@ -396,6 +396,8 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
 
    public boolean execOmitObject() {
       Template template = getEnclosingTemplate();
+      if (template == null)
+         return false;
       int genFlags = template.getGenerateExecFlags();
       return (((genFlags & getComputedExecFlags()) == 0 && !childNeedsObject()) && genFlags == ExecServer);
    }

@@ -4,6 +4,7 @@
 
 package sc.lang.template;
 
+import sc.lang.TemplateLanguage;
 import sc.lang.java.AbstractBlockStatement;
 import sc.lang.java.Definition;
 import sc.lang.java.TypeContext;
@@ -19,4 +20,13 @@ public class TemplateStatement extends AbstractBlockStatement {
       return super.findMember(name, mtype, fromChild, refType, ctx, skipIfaces);
    }
 
+   @Override
+   public String getStartBlockString() {
+      return TemplateLanguage.START_CODE_DELIMITER;
+   }
+
+   @Override
+   public String getEndBlockString() {
+      return TemplateLanguage.END_DELIMITER;
+   }
 }
