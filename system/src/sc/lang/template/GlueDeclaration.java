@@ -5,6 +5,7 @@
 package sc.lang.template;
 
 import sc.lang.ILanguageModel;
+import sc.lang.TemplateLanguage;
 import sc.lang.java.Statement;
 import sc.parser.IStyleAdapter;
 
@@ -17,7 +18,7 @@ import java.util.Set;
  * This lets you mix in template strings along with methods etc.  I'm not sure how often this will be used and exactly
  * what to do with that text content... right now it gets put into the root template.
  */
-public class GlueDeclaration extends Statement {
+public class GlueDeclaration extends Statement implements ITemplateDeclWrapper {
    public List<Object> declarations; // any template body declaration
 
    public void styleNode(IStyleAdapter adapter) {
@@ -55,5 +56,29 @@ public class GlueDeclaration extends Statement {
             if (o instanceof Statement)
                ((Statement) o).transformToJS();
       return this;
+   }
+
+   @Override
+   public List<Object> getTemplateDeclarations() {
+      return declarations;
+   }
+
+   public String getTemplateDeclStartString() {
+      return TemplateLanguage.END_DELIMITER; // NOTE: the start delimiter for the glue is really the end delimiter token so start/end are reversed intentionally
+   }
+
+   public String getTemplateDeclEndString() {
+      return TemplateLanguage.START_CODE_DELIMITER;
+   }
+
+   public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append(getTemplateDeclStartString());
+      if (declarations != null) {
+         for (Object decl:declarations)
+            sb.append(decl);
+      }
+      sb.append(getTemplateDeclEndString());
+      return sb.toString();
    }
 }

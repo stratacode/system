@@ -17,7 +17,7 @@ import java.util.*;
  */
 public class IndexedChoice extends OrderedChoice {
    SymbolChoice indexedKeys = new SymbolChoice(LOOKAHEAD | SKIP | NOERROR);
-   Map<CharSequence,OrderedChoice.MatchResult> indexedParselets = new HashMap<CharSequence,OrderedChoice.MatchResult>();
+   HashMap<CharSequence,OrderedChoice.MatchResult> indexedParselets = new HashMap<CharSequence,OrderedChoice.MatchResult>();
    OrderedChoice.MatchResult defaultParselets = new OrderedChoice.MatchResult();
 
    public IndexedChoice() { super(); }
@@ -245,5 +245,13 @@ public class IndexedChoice extends OrderedChoice {
             return choices.get(0);
       }
       return super.getChildParselet(childParseNode, index);
+   }
+
+   public IndexedChoice clone() {
+      IndexedChoice res = (IndexedChoice) super.clone();
+      res.indexedKeys = (SymbolChoice) res.indexedKeys.clone();
+      res.defaultParselets = res.defaultParselets.clone();
+      res.indexedParselets = (HashMap<CharSequence,OrderedChoice.MatchResult>) res.indexedParselets.clone();
+      return res;
    }
 }

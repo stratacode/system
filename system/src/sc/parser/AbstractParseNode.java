@@ -182,6 +182,10 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
       return null;
    }
 
+   public int getChildStartOffset(Parselet matchParselet) {
+      return -1;
+   }
+
    public abstract Object getSkippedValue();
 
    public boolean canSkip() {

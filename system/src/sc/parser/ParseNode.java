@@ -278,6 +278,10 @@ public class ParseNode extends AbstractParseNode {
       return null;
    }
 
+   public int getChildStartOffset(Parselet matchParselet) {
+      return -1; // TODO: we could see if this matchParselet is the parselet of our propagated value and return the index of that?
+   }
+
    public Object getSkippedValue() {
       return value;
    }

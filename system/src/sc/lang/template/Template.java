@@ -26,7 +26,7 @@ import sc.util.PerfMon;
 
 import java.util.*;
 
-public class Template extends SCModel implements IValueNode, ITypeDeclaration {
+public class Template extends SCModel implements IValueNode, ITypeDeclaration, ITemplateDeclWrapper {
    public SemanticNodeList<Object> templateDeclarations; // Strings, template declarations, expressions, template statements, htmlTags
 
    public final static String TAG_PACKAGE = "sc.lang.html";
@@ -1275,7 +1275,6 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
       return true;
    }
 
-
    static class ExprParams {
       String expr;
       public ExprParams(String val) {
@@ -1606,5 +1605,17 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration {
 
    public boolean isLayerType() {
       return false;
+   }
+
+   public List<Object> getTemplateDeclarations() {
+      return templateDeclarations;
+   }
+
+   public String getTemplateDeclStartString() {
+      return "";
+   }
+
+   public String getTemplateDeclEndString() {
+      return "";
    }
 }

@@ -526,6 +526,10 @@ public class SymbolChoice extends Parselet {
       SymbolChoice newP = (SymbolChoice) super.clone();
       newP.expectedValues = (HashSet<IString>) newP.expectedValues.clone();
       newP.valueIndex = (HashMap<IString,List<IString>>) newP.valueIndex.clone();
+      if (newP.excludedValues != null)
+         newP.excludedValues = (HashSet<IString>) newP.excludedValues.clone();
+      if (newP.excludedPeekString != null)
+         newP.excludedPeekString = (HashMap<IString,ArrString>) newP.excludedPeekString.clone();
       return newP;
    }
 }

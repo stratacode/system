@@ -188,8 +188,8 @@ public class HTMLLanguage extends TemplateLanguage {
 
    Symbol closeTagChar = new Symbol("/");
    Symbol beginTagChar = new Symbol("<");
-   Symbol endTagChar = new Symbol(SKIP_ON_ERROR, ">");
-   Symbol reqEndTagChar = new Symbol(">");
+   public Symbol endTagChar = new Symbol(SKIP_ON_ERROR, ">");
+   public Symbol reqEndTagChar = new Symbol(">");
 
    public boolean validTagChar(char c) {
       return Character.isLetterOrDigit(c) || c == '-' || c == ':';
@@ -354,7 +354,7 @@ public class HTMLLanguage extends TemplateLanguage {
                break;
          }
 
-         // This is called for both parsing and generation.  We are not doing the tag name stack during the generate
+         // This is called for both parsing when startIx is known and generation when it's -1.  We are not doing the tag name stack during the generate since the tagStack is about creating the tree and it already tree exists
          if (startIx != -1 && (matchType == TagNameMatchType.UnescapedOpen || matchType == TagNameMatchType.EscapedOpen))
             ((HTMLSemanticContext) ctx).addEntry(value, startIx, endIx);
          return null;

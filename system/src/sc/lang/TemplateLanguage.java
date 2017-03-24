@@ -14,12 +14,10 @@ import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.layer.SrcEntry;
 import sc.parser.*;
-import sc.type.TypeUtil;
 import sc.util.FileUtil;
 import sc.util.StringUtil;
 
 import java.io.File;
-import java.io.Reader;
 import java.util.Collections;
 import java.util.List;
 
@@ -104,8 +102,16 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
       templateString.styleName = "templateString";
    }
    Sequence templateExpression = new Sequence("(,.,)", startExpDelimiter, expression, endExpDelimiter);
-   Sequence templateStatement = new Sequence("TemplateStatement(,statements,)", startCodeDelimiter,
-                                             blockStatements, endDelimiter);
+   OrderedChoice templateBlockStatements = (OrderedChoice) blockStatements.clone();
+   // For Java uses of blockStatement, we also match glueStatement (added below to statement because we need that in all normal Java uses of statement).  But for templateStatement
+   // we do not want to match the glue (or it will sometimes match the template statement's end token).  Making a copy of statement before glue is added below and using the copy
+   // for the TemplateStatement's blockStatements copy.
+   IndexedChoice noGlueStatement = (IndexedChoice) statement.clone();
+   {
+      noGlueStatement.changeParseletName("noGlueStatement");
+      templateBlockStatements.set(2, noGlueStatement);
+   }
+   Sequence templateStatement = new Sequence("TemplateStatement(,statements,)", startCodeDelimiter, templateBlockStatements, endDelimiter);
    Sequence templateDeclaration = new Sequence("TemplateDeclaration(,body,)", startDeclDelimiter, classBodyDeclarations, endDeclDelimiter);
    public OrderedChoice simpleTemplateDeclarations = new OrderedChoice("([],[])", OPTIONAL | REPEAT, templateExpression, templateString);
    Sequence glueExpression = new Sequence("GlueExpression(,expressions,)", endDelimiter, simpleTemplateDeclarations, startCodeDelimiter);
@@ -133,6 +139,11 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
    Sequence templateAnnotations = new Sequence("(,imports, templateModifiers,)", OPTIONAL, startImportDelimiter, imports, modifiers, endImportDelimiter);
    Sequence template = new Sequence("Template(, *, templateDeclarations,)", spacing, templateAnnotations, templateBodyDeclarations, new Symbol(EOF));
    {
+      // Disable partial values on exprStatement because of problems matching glueExpression in the template language in partial values mode.   In general though it seems like we may not want
+      // to match an expression by itself since it might be a part of something larger?  We're doing this for now in TemplateLanguage.  To really fix the bug, ideally glueExpression would not be
+      // the expression used by templateStatement since the end of the templatestatement gets missparsed as the start of the glue.
+      exprStatement.skipOnErrorSlot = 2;
+
       // Add this to the regular Java grammar.  It recognizes the %> followed by text or <%= %> statements
       statement.put(END_DELIMITER, glueStatement);
       statement.setName("<statement>(.,.,.,.,.,.,.,.,.,.,.,.,.,,.,.,.)"); // Forward

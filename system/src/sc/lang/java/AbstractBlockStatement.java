@@ -364,18 +364,21 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
    private final static int STATEMENTS_IN_STRING = 6;
 
    public String toString() {
+      String start = getStartBlockString();
+      String end = getEndBlockString();
       if (statements == null) {
-         return "{}";
+         return start + end;
       }
       StringBuilder sb = new StringBuilder();
       if (staticEnabled)
          sb.append("static ");
-      sb.append("{\n");
+      sb.append(start);
+      sb.append("\n");
       boolean printElipsis = false;
       for (int i = 0; i < Math.min(statements.size(), STATEMENTS_IN_STRING); i++) {
          Statement st = statements.get(i);
          sb.append("   ");
-         sb.append(statements.toString());
+         sb.append(st);
          // In case we have long statements we should trim it earlier
          if (sb.length() > 60) {
             printElipsis = true;
@@ -384,7 +387,8 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
       }
       if (printElipsis || statements.size() > STATEMENTS_IN_STRING)
          sb.append("   ...\n");
-      sb.append("}\n");
+      sb.append(end);
+      sb.append("\n");
       return sb.toString();
    }
 

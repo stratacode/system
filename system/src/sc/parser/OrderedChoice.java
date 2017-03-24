@@ -10,6 +10,7 @@ import sc.util.IntStack;
 import sc.util.PerfMon;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -1303,6 +1304,13 @@ public class OrderedChoice extends NestedParselet  {
 
    static class MatchResult extends ArrayList<Parselet> {
       int[] slotIndexes;
+
+      public MatchResult clone() {
+         MatchResult res = (MatchResult) super.clone();
+         if (res.slotIndexes != null)
+            res.slotIndexes = Arrays.copyOf(res.slotIndexes, res.slotIndexes.length);
+         return res;
+      }
 
       void resetSlotIndexes(OrderedChoice parent) {
          slotIndexes = new int[size()];

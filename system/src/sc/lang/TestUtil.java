@@ -494,6 +494,8 @@ public class TestUtil {
 
                //JavaLanguage.getJavaLanguage().switchStatement.trace = true;
 
+               //HTMLLanguage.getHTMLLanguage().templateBlockStatements.trace = true;
+
                result = lang.parse(fileName, new StringReader(input), lang.getStartParselet(), opts.enablePartialValues);
             }
             else {

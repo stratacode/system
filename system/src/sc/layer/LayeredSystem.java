@@ -9456,14 +9456,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             TypeDeclarationCacheEntry tdEnt = mapEnt.getValue();
             for (int k = 0; k < tdEnt.size(); k++) {
                TypeDeclaration td = tdEnt.get(k);
-               td.refreshBoundTypes(flags);
+               if (td.isStarted())
+                  td.refreshBoundTypes(flags);
             }
          }
       }
       else {
          Map<String, ILanguageModel> oldInactiveModels = (Map<String, ILanguageModel>) inactiveModelIndex.clone();
          for (ILanguageModel oldModel:oldInactiveModels.values()) {
-            oldModel.refreshBoundTypes(flags);
+            if (oldModel.isStarted())
+               oldModel.refreshBoundTypes(flags);
          }
       }
    }

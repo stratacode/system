@@ -3649,4 +3649,14 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
    public TypeDeclaration getElementTypeDeclaration() {
       return tagObject;
    }
+
+   public int getCloseStartTagOffset() {
+      IParseNode pn = getParseNode();
+      // Finds the start index of the parse-node which was produced by the child of this node's parselet so we know where the end
+      // of the start tag for the element began.  We might parse this with either of these symbol parselets depending
+      int ix = pn.getChildStartOffset(((HTMLLanguage) pn.getParselet().getLanguage()).reqEndTagChar);
+      if (ix == -1)
+         ix = pn.getChildStartOffset(((HTMLLanguage) pn.getParselet().getLanguage()).endTagChar);
+      return ix;
+   }
 }

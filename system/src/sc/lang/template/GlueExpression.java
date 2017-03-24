@@ -195,4 +195,8 @@ public class GlueExpression extends Expression {
          }
       }
    }
+
+   public boolean isLeafStatement() {
+      return false;
+   }
 }

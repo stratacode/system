@@ -413,6 +413,12 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       return name;
    }
 
+   /** Changes the internal name of the parselet while preserving the semantic parameters */
+   public void changeParseletName(String newName) {
+      int ix = name.indexOf('(');
+      name = "<" + newName + ">" + (ix == -1 ? "" : name.substring(ix));
+   }
+
    public Language getLanguage() {
       return language;
    }
@@ -570,6 +576,9 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       node.formatStyled(ctx, adapter);
    }
 
+   /**
+    * The main parse method for the parselet.  Use the supplied parser and generate a 'result' either a CharSequence or an IParseNode.
+    */
    public abstract Object parse(Parser p);
 
    protected boolean anyReparseChanges(Parser parser, Object oldParseNode, DiffContext dctx, boolean forceReparse) {

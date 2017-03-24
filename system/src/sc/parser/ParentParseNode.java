@@ -1234,6 +1234,22 @@ public class ParentParseNode extends AbstractParseNode {
          }
       }
    }
+
+   public int getChildStartOffset(Parselet matchParselet) {
+      int childIx = parselet.parselets.indexOf(matchParselet);
+      if (childIx == -1)
+         return -1;
+      if (children != null && children.size() > childIx) {
+         int offset = 0;
+         for (int i = 0; i < childIx; i++) {
+            Object child = children.get(i);
+            if (child instanceof CharSequence)
+               offset += ((CharSequence) child).length();
+         }
+         return offset;
+      }
+      return -1;
+   }
 }
 
 
