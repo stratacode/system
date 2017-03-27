@@ -102,9 +102,10 @@ public class SyncManager {
 
    /** This is the primary sync data structure we use for storing data for each synchronized object instance */
    public static class InstInfo {
-      Object[] args;       // Any argument values used in the constructor to construct this instance?
-      boolean initDefault;
-      String name;
+      // NOTE: these are public for the debugging package only - not intended to be manipulated in user code
+      public Object[] args;       // Any argument values used in the constructor to construct this instance?
+      public boolean initDefault;
+      public String name;
       // TODO: turn this into bitflags for efficiency (or better yet, build an SC plugin that can do that transformation automatically in code-gen!)
       public boolean registered;  // Has this object's name been sent to the client
       public boolean nameQueued;  // Has this object's name been at least queued to send to he client

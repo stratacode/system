@@ -177,7 +177,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public List<File> layerPathDirs;
    public String rootClassPath; /* The classpath passed to the layered system constructor - usually the system */
    public String classPath;  /* The complete external class path, used for javac, not for looking up internal classes */
-   public String userClassPath;  /* The part of the above which is user specified - i.e. to be used for scripts */
+   public String userClassPath;  /* The part of the above which is not part of the system classpath.  It is used to generate run scripts for example where we don't want to include the JRE or anything present when the script is run.  */
 
    /** Stores the latest representation of each model from the absolute file name.  When the externalModelIndex is set, this index shadows the external index, i.e. storing the last result we retreive from that index. */
    private Map<String,ILanguageModel> modelIndex = new HashMap<String,ILanguageModel>();
@@ -4330,15 +4330,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
               initSysClassLoader(l, ClassLoaderMode.BUILD);
 
                /*
-               * This is necessary both to free up resources and also because the transformed models no longer
-               * obey all of the StrataCode contracts.  For example, we transform bindings to method calls and can't detect
-               * cycles on the transformed model.  We do lose the ability to cache models across the compile to
-               * runtime phases which is a loss... maybe the transformed models should try to preserve all of the
-               * behavior of the original?  It would just require cloning some nodes at key spots such as the
-               * data binding initializer and likely other places.
+               * This is done to free up resources.  TODO: Maybe it's not necessary anymore?
                *
                * Must be done after we have set the sys class loader because of the refreshBoundType process.  That
-               * requires replacing transformed models with their runtime types.
+               * used to be necessary to replace transformed models with their runtime types.
                */
                flushTypeCache();
             }
@@ -10158,7 +10153,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   /** This call will update the models in all of the runtimes, but will not rebuild the system. */
+   /**
+    * This call will update the models in all of the runtimes for either active or inactive types.
+    *  Even if you specify active, this will not rebuild the active layers.
+    */
    public SystemRefreshInfo refreshRuntimes(boolean active) {
       updatePeerModels(true);
 
@@ -10224,11 +10222,36 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return refreshSystem(refreshPeers, true);
    }
 
+   /**
+    * For CFClasses and cached null references we can quickly refresh the contents.  Not currently trying to refresh
+    * java.lang.Class instances in the compiledClassCache since those are synchronized with the class loader and so cannot
+    * be as easily refreshed
+    */
+   public void refreshClassCache() {
+      Iterator<Map.Entry<String,Object>> otherIt = otherClassCache.entrySet().iterator();
+      while (otherIt.hasNext()) {
+         Map.Entry<String,Object> otherEnt = otherIt.next();
+         Object val = otherEnt.getValue();
+         if (val == NullClassSentinel.class)
+            otherIt.remove();
+         else if (val instanceof CFClass) {
+            if (((CFClass) val).fileChanged()) {
+               otherIt.remove();
+               if (options.verbose)
+                  verbose("Removing changed class from class cache: " + val);
+            }
+         }
+      }
+   }
+
    public SystemRefreshInfo refreshSystem(boolean refreshPeers, boolean active) {
       // Before we parse any files, need to clear out any invalid models
       // TODO: remove this unless we are not using clonedTransformedModels
       if (active)
          cleanTypeCache();
+
+      // Clear out any compiled classes which might have changed as a result of being compiled elsewhere - this currently does not support .class files since that requires messing with class loaders and instances
+      refreshClassCache();
 
       // We may start some new models here so reset this flag
       allTypesProcessed = false;

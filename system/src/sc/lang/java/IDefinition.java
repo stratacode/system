@@ -9,5 +9,12 @@ public interface IDefinition {
    boolean hasModifier(String modifierName);
    AccessLevel getAccessLevel(boolean explicitOnly);
    Object getEnclosingIType();
-   String modifiersToString(boolean includeAnnotations, boolean includeAccess, boolean includeFinal, boolean includeScopes, boolean abs, JavaSemanticNode.MemberType filterType);
+
+   /**
+    * Returns the a specific set of of modifiers in string form - including annotations, access, final, or scopes with flags.
+    * Used for generating the modifiers string for one definition generated from another (e.g. a setX method from a field)
+    * If absoluteTypeNames is true, the absolute path of annotations is used.
+    * If filterType is not null, only annotations appropriate for the given member type are included.  If you are generating code from a field for a setX method, you'd set a filter type of MemberType.Method.
+    */
+   String modifiersToString(boolean includeAnnotations, boolean includeAccess, boolean includeFinal, boolean includeScopes, boolean absoluteTypeNames, JavaSemanticNode.MemberType filterType);
 }

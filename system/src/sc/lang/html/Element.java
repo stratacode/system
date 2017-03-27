@@ -2308,11 +2308,9 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          if (isAbstract() && tagTypeNeedsAbstract())
             tagType.addModifier("abstract");
       }
-      if (scopeName != null) {
-         ScopeModifier scopeMod = new ScopeModifier();
-         scopeMod.scopeName = scopeName;
-         tagType.addModifier(scopeMod);
-      }
+
+      processScope(tagType, scopeName);
+
       // Leave a trail for finding where this statement was generated from for debugging purposes
       tagType.fromStatement = this;
       if (repeatWrapper == null && extTypeDecl != null) {
@@ -2593,6 +2591,22 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
 
       // Generate the outputBody method
       return tagType;
+   }
+
+   private void processScope(TypeDeclaration tagType, String scopeName) {
+      if (scopeName != null) {
+         if (ScopeModifier.isValidScope(getJavaModel(), scopeName)) {
+            ScopeModifier scopeMod = new ScopeModifier();
+            scopeMod.scopeName = scopeName;
+            tagType.addModifier(scopeMod);
+         }
+         else {
+            Attr attr = getAttribute("scope");
+            if (attr != null)
+               attr.displayTypeError("No scope " + scopeName + " for tag: ");
+         }
+      }
+
    }
 
    private boolean tagTypeNeedsAbstract() {

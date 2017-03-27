@@ -60,6 +60,7 @@ public class ClassFile {
    int innerAccessFlags; // Access flags that are stored in theInnerClasses attribute for this class (e.g. 'static')
 
    public String classFileName;
+   public long lastModifiedTime;
 
    public ClassFile(InputStream is) {
       input = new DataInputStream(new BufferedInputStream(is));
@@ -855,5 +856,9 @@ public class ClassFile {
       if (classFileName != null)
          return classFileName;
       return super.toString();
+   }
+
+   public boolean fileChanged() {
+      return new File(classFileName).lastModified() > lastModifiedTime;
    }
 }

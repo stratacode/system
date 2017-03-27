@@ -21,13 +21,20 @@ public class ScopeModifier extends ErrorSemanticNode {
    public void validate() {
       super.validate();
 
-      LayeredSystem sys = getLayeredSystem();
       JavaModel model = getJavaModel();
       if (model == null || scopeName == null)
          return;
       // Valid scopes may either be registerScopeProcessors (e.g. session) or defined statically and shared by the runtime and compilation environments (e.g. global and appGlobal)
-      if (sys != null && sys.getScopeProcessor(model.getLayer(), scopeName) == null && ScopeDefinition.getScopeByName(scopeName) == null && sys.getScopeAlias(model.getLayer(), scopeName) == null) {
+      if (!isValidScope(model, scopeName)) {
          displayError("No scope: " + scopeName + " for: ");
       }
+   }
+
+   public static boolean isValidScope(JavaModel model, String scopeName) {
+      LayeredSystem sys = model.getLayeredSystem();
+      if (sys != null && sys.getScopeProcessor(model.getLayer(), scopeName) == null && ScopeDefinition.getScopeByName(scopeName) == null && sys.getScopeAlias(model.getLayer(), scopeName) == null) {
+         return false;
+      }
+      return true;
    }
 }

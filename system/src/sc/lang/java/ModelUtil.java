@@ -147,6 +147,14 @@ public class ModelUtil {
             paramMap.put(new TypeParamKey(tp), boundType);
       }
 
+
+      // For Java 7 and Java 8 the targetType or inferredType of the method call can bind more parameters
+      // Need to do this before we process the parameters, since if a type parameter is bound by a parameter it will replace the
+      // return type (see test.methParam for a simple example that requires this order)
+      if (retInferredType != null && retType != null) {
+         addTypeParamDefinitions(paramMap, retType, retInferredType, retInferredType);
+      }
+
       int argSize = arguments.size();
 
       if (genericParamTypes != null) {
@@ -190,11 +198,6 @@ public class ModelUtil {
 
             addTypeParamDefinitions(paramMap, genParam, argType, paramArgType);
          }
-      }
-
-      // For Java 7 and Java 8 the targetType or inferredType of the method call can bind more parameters
-      if (retInferredType != null && retType != null) {
-         addTypeParamDefinitions(paramMap, retType, retInferredType, retInferredType);
       }
 
       return paramMap;
@@ -8472,5 +8475,32 @@ public class ModelUtil {
       if (ModelUtil.sameTypes(parentTD, enclType))
          return true;
        return isOuterTypeOf(parentTD, enclType.getEnclosingType());
+   }
+
+   public static String getDebugName(Object privRes) {
+      if (ModelUtil.isField(privRes))
+         return "field";
+      if (ModelUtil.isMethod(privRes))
+         return "method";
+      if (ModelUtil.isEnum(privRes))
+         return "enum";
+      if (ModelUtil.isCompiledClass(privRes))
+         return "compiled class";
+      if (privRes instanceof TypeDeclaration)
+         return "type";
+      if (privRes == null)
+         return "<null member>";
+      return "<unknown member>";
+   }
+
+   public static Object[] getTypesFromExpressions(List<Expression> args) {
+      if (args == null)
+         return null;
+      int sz = args.size();
+      Object[] res = new Object[sz];
+      for (int i = 0; i < sz; i++) {
+         res[i] = args.get(i).getTypeDeclaration();
+      }
+      return res;
    }
 }

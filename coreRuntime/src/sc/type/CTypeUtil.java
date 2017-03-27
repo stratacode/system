@@ -7,9 +7,9 @@ package sc.type;
 import sc.js.JSSettings;
 
 /**
- * Some utiliities for managing types.  These are the TypeUtil methods that can get converted automatically to Javascript.
+ * Some utilities for managing types.  These are the TypeUtil methods that can get converted automatically to Javascript.
  * The PTypeUtil are those that must be ported by writing them in JS natively.  The RTypeUtil use reflection and are tied to the
- * dynamic runtime. TypeUtil can run on GWT.
+ * dynamic runtime. TypeUtil was originally designed to run on GWT.
  */
 @JSSettings(jsModuleFile="js/scgen.js", prefixAlias="sc_")
 public class CTypeUtil {

@@ -318,6 +318,8 @@ public class IdentifierExpression extends ArgumentsExpression {
                   checkRemoteMethod(this, null, firstIdentifier, 0, idTypes, boundTypes, arguments, false, inferredType);
                }
                if (boundTypes[0] == null && model != null && !model.disableTypeErrors && isInferredSet() && isInferredFinal()) {
+                  // For the IDE - might as well point to something close for reference checking etc.
+                  boundTypes[0] = findClosestMethod(enclType, firstIdentifier, arguments);
                   String otherMethods = enclType == null ? "" : getOtherMethodsMessage(enclType, firstIdentifier);
                   displayRangeError(0, 0, "No method named: ", firstIdentifier, ModelUtil.argumentsToString(arguments), otherMethods, " for: ");
                   foundMeth = findMethod(firstIdentifier, arguments, this, enclType, isStatic(), inferredType);
@@ -1418,6 +1420,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                if (methVar == null) {
                   idTypes[i] = IdentifierType.UnboundMethodName;
                   if (model != null && !model.disableTypeErrors && expr.isInferredSet() && expr.isInferredFinal()) {
+                     boundTypes[i] = findClosestMethod(currentType, nextName, arguments); // For the IDE - map to something at least
                      String otherMessage = getOtherMethodsMessage(currentType, nextName);
                      expr.displayRangeError(i, i, "No method: ", nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentTypeDecl),otherMessage == null ? "" : otherMessage.toString(),  " for ");
                      methVar = currentTypeDecl.definesMethod(nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs);
@@ -1427,13 +1430,13 @@ public class IdentifierExpression extends ArgumentsExpression {
          }
          else {
             // The parser won't generate these where 'this' is not in the first position but we do
-            // sometimes create them programatically since it is easier than doing the selector expression
+            // sometimes create them in code since it is easier than doing the selector expression and generates to the same thing
             if (nextName.equals("this"))
                idTypes[i] = IdentifierType.ThisExpression;
             else if (nextName.equals("super"))
                idTypes[i] = IdentifierType.SuperExpression;
             else {
-               Object var = currentTypeDecl.definesMember(nextName, MemberType.VariableSet, null, null);
+               Object var = currentTypeDecl.definesMember(nextName, MemberType.VariableSet, enclosingType, null);
                if (var != null) {
                   idTypes[i] = IdentifierType.VariableName;
                   boundTypes[i] = var;
@@ -1442,7 +1445,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   EnumSet<MemberType> toFind = model != null && model.enableExtensions() ?
                           (setLast ? MemberType.PropertySetSet : MemberType.PropertyAssignmentSet) :
                           MemberType.FieldEnumSet;
-                  Object methPropVar = currentTypeDecl.definesMember(nextName, toFind, null, null);
+                  Object methPropVar = currentTypeDecl.definesMember(nextName, toFind, enclosingType, null);
                   if (methPropVar != null) {
                      boundTypes[i] = methPropVar;
                      // If we are in an assignment, only look for the setX method.  If reading the value, look for a getX method
@@ -1466,11 +1469,27 @@ public class IdentifierExpression extends ArgumentsExpression {
                      }
                      else {
                         idTypes[i] = IdentifierType.UnboundName;
+
                         String message = "No nested property: ";
-                        // If we are missing the setX method, provide a more accurate message
-                        if (setLast && model != null && model.enableExtensions() && currentTypeDecl.definesMember(nextName, MemberType.PropertyAssignmentSet, null, null) != null)
-                           message = "Unable to assign read-only property: ";
-                        expr.displayRangeError(i, i, message, nextName, " in type: ", ModelUtil.getTypeName(currentTypeDecl), " for ");
+                        String append = "";
+                        // Check again but without a refType in case there's a member which is private
+                        Object privRes = currentTypeDecl.definesMember(nextName, toFind, null, null);
+                        if (privRes != null) {
+                           String modStr = ModelUtil.modifiersToString(privRes, false, true, false, false, true, null);
+                           if (modStr.trim().length() == 0)
+                              modStr = "package-private";
+                           String kindStr = ModelUtil.getDebugName(privRes);
+                           message = "No access to: " + modStr + " " + kindStr + ": ";
+                           append = " referenced from type: " + ModelUtil.getTypeName(enclosingType);
+
+                           boundTypes[i] = privRes; // For IDE navigation we will just bind to this value even after printing the error
+                        }
+                        else {
+                           // If we are missing the setX method, provide a more accurate message
+                           if (setLast && model != null && model.enableExtensions() && currentTypeDecl.definesMember(nextName, MemberType.PropertyAssignmentSet, null, null) != null)
+                              message = "Unable to assign read-only property: ";
+                        }
+                        expr.displayRangeError(i, i, message, nextName, " in type: ", ModelUtil.getTypeName(currentTypeDecl), append, " for ");
                      }
                   }
                }
@@ -1492,6 +1511,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                if (methObj == null && remoteMeth == null) {
                   idTypes[i] = IdentifierType.UnboundMethodName;
                   if (model != null && !model.disableTypeErrors && expr.isInferredFinal() && expr.isInferredSet()) {
+                     boundTypes[i] = findClosestMethod(currentClass, nextName, arguments); // For the IDE - map to something at least
                      String otherMethods = getOtherMethodsMessage(currentClass, nextName);
                      expr.displayRangeError(i, i, "No method: ", nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentClass), otherMethods, " for ");
                      methObj = ModelUtil.definesMethod(currentClass, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs, sys); // TODO: remove - for debugging only
@@ -1599,6 +1619,38 @@ public class IdentifierExpression extends ArgumentsExpression {
          }
       }
       return otherMessage == null ? "" : otherMessage.toString();
+   }
+
+   /** For error checking, return a method of the same name which has the fewest mismatching arguments */
+   public static Object findClosestMethod(Object currentType, String nextName, List<Expression> args) {
+      Object[] otherMethods = ModelUtil.getMethods(currentType, nextName, null);
+      if (otherMethods == null)
+         return null;
+      int numParams = args == null ? 0 : args.size();
+      Object bestMatch = null;
+      int bestMatchNum = -1;
+      Object[] ps = ModelUtil.getTypesFromExpressions(args);
+      for (Object other:otherMethods) {
+         Object[] ops = ModelUtil.getParameterTypes(other);
+         int numOtherParams = ops == null ? 0 : ops.length;
+         if (numOtherParams == numParams) {
+            if (bestMatchNum == -1) {
+               bestMatchNum = 0;
+               bestMatch = other;
+            }
+            int matchNum = 0;
+            for (int i = 0; i < numParams; i++) {
+               if (ModelUtil.sameTypes(ops[i], ps[i]))
+                  matchNum++;
+            }
+            if (matchNum > bestMatchNum) {
+               bestMatch = other;
+            }
+         }
+         if (bestMatch == null)
+            bestMatch = other;
+      }
+      return bestMatch;
    }
 
    protected int offset() {
@@ -4115,6 +4167,8 @@ public class IdentifierExpression extends ArgumentsExpression {
             Object curType = origNode == null ? origModel == null ? null : origModel.getModelTypeDeclaration() : origNode.getEnclosingType();
             if (origNode != null && curType == null)
                curType = origModel == null ? origModel.getModelTypeDeclaration() : null;
+            else if (origNode == null && replacedByStatement instanceof IdentifierExpression)
+               origIdent = (IdentifierExpression) replacedByStatement;
 
             if (origIdent != null && !origIdent.isStarted())
                ParseUtil.initAndStartComponent(origIdent);
@@ -4127,10 +4181,13 @@ public class IdentifierExpression extends ArgumentsExpression {
 
             boolean includeGlobals = idents.size() == 1;
             if (origModel != null) {
-               if (curType != null)
+               if (curType != null) {
                   ModelUtil.suggestMembers(origModel, curType, matchPrefix, candidates, includeGlobals, true, true, false);
+                  //System.out.println("*** SuggestMembers returns: " + candidates + " for type: " + curType);
+               }
                else if (origModel != null) {
                   ModelUtil.suggestTypes(origModel, origModel.getPackagePrefix(), matchPrefix, candidates, includeGlobals);
+                  //System.out.println("*** SuggestTypes returns: " + candidates);
                }
             }
 

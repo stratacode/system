@@ -83,13 +83,19 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
 
    // End does not consume space since that space should be part of the template string
    public Symbol endDelimiter = new Symbol(END_DELIMITER);
+
+   // Yes, start/end are swapped in these next two.  It's nice to have separate tokens for brace matching purposes in the lexer, or maybe separate styles?
+   public Symbol startGlueDelimiter = new Symbol(END_DELIMITER);
+   public Symbol endGlueDelimiter = new Symbol(START_CODE_DELIMITER);
+
    // Creating these so we have different tokens to match up against the start token - not really needed here but the lexer/highlighting in intelliJ requires separate tokens
    public Symbol endExpDelimiter = new Symbol(END_DELIMITER);
    public Symbol endImportDelimiter = new Symbol(END_DELIMITER);
    public Symbol endDeclDelimiter = new Symbol(END_DELIMITER);
 
    {
-      startCodeDelimiter.styleName = startExpDelimiter.styleName = startDeclDelimiter.styleName = endDelimiter.styleName = endExpDelimiter.styleName = endDeclDelimiter.styleName = endImportDelimiter.styleName = "keyword";
+      startCodeDelimiter.styleName = startExpDelimiter.styleName = startDeclDelimiter.styleName = startImportDelimiter.styleName = endDelimiter.styleName =
+              endExpDelimiter.styleName = endDeclDelimiter.styleName = endImportDelimiter.styleName = startGlueDelimiter.styleName = endGlueDelimiter.styleName = "keyword";
    }
 
    OrderedChoice htmlCommentBody = new OrderedChoice("('','','')", REPEAT | OPTIONAL,
