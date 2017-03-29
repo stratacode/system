@@ -286,7 +286,11 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
       public HashMap<String,String> replaceTypes = new HashMap<String,String>();
 
+      /** Cached jsModuleFile for a given type name */
       public HashMap<String,String> jsModuleNames = new HashMap<String,String>();
+
+      /** Cached jsLibFiles for a given type name */
+      public HashMap<String,String> jsLibFilesForType = new HashMap<String,String>();
 
       /** Map from Java type names to JSTypeInfo for that type */
       public HashMap<String,JSTypeInfo> jsTypeInfo = new HashMap<String,JSTypeInfo>();
@@ -1224,14 +1228,19 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
    public String getCachedJSModuleFile(String typeName) {
       String res = jsBuildInfo.jsModuleNames.get(typeName);
+      if (res == NULL_JS_MODULE_NAMES_SENTINEL)
+         res = null;
       return res;
    }
 
    public String getJSModuleFile(Object type, boolean resolveSrc) {
       String typeName = ModelUtil.getTypeName(type);
       String res = jsBuildInfo.jsModuleNames.get(typeName);
-      if (res != null)
+      if (res != null) {
+         if (res == NULL_JS_MODULE_NAMES_SENTINEL)
+            res = null;
          return res;
+      }
       PerfMon.start("getJSModuleFile");
 
       try {
@@ -1252,8 +1261,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          Object enclType = ModelUtil.getEnclosingType(type);
          if (enclType != null) {
             jsModuleStr = getJSModuleFile(enclType, resolveSrc);
-            if (jsModuleStr != null)
+            if (jsModuleStr != null) {
+               jsBuildInfo.jsModuleNames.put(typeName, jsModuleStr);
                return jsModuleStr;
+            }
          }
 
          Layer lyr = ModelUtil.getLayerForType(system, type);
@@ -1290,7 +1301,14 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          }
 
          if (ModelUtil.isCompiledClass(type)) {
-            return jsBuildInfo.jsModuleNames.get(typeName);
+            // I'm not sure why we are getting this again since we tried getting it above, but just in case adding the null sentinel processing here
+            res = jsBuildInfo.jsModuleNames.get(typeName);
+            if (res == null) {
+               jsBuildInfo.jsModuleNames.put(typeName, NULL_JS_MODULE_NAMES_SENTINEL);
+            }
+            else if (res == NULL_JS_MODULE_NAMES_SENTINEL)
+               res = null;
+            return res;
          }
       }
       finally {
@@ -1310,6 +1328,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          return;
 
       String typeName = td.getFullTypeName();
+
       removeTypesInFile(td);
       jsBuildInfo.jsModuleNames.remove(typeName);
       if (queuedEntryPoints != null)
@@ -1320,6 +1339,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       // to the same JS type (e.g. sc.js.bind and sc.bind
       jsBuildInfo.jsTypeInfoByJS.remove(getJSTypeName(typeName));
       removeEntryPoints(typeName);
+      jsBuildInfo.jsLibFilesForType.remove(typeName);
    }
 
    void addLibFile(String libFile, String beforeLib, Object type, Object depType, String relation) {
@@ -1389,6 +1409,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return null;
    }
 
+   private final static String NULL_JS_LIB_FILES_SENTINEL = "<no-js-lib-files>";
+   private final static String NULL_JS_MODULE_NAMES_SENTINEL = "<no-js-module-names-files>";
+   private final static String HAS_ALIAS_SENTINEL = "<class-is-aliases-for-js>";
+
    String getDependentJSLibFiles(Object type) {
       if (!(type instanceof PrimitiveType)) {
          return getJSSettingsStringValue(type, "dependentJSFiles", false, true);
@@ -1397,27 +1421,49 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    String getJSLibFiles(Object type) {
+      String typeName = ModelUtil.getTypeName(type);
+      String res = jsBuildInfo.jsLibFilesForType.get(typeName);
+      if (res != null && res != HAS_ALIAS_SENTINEL)
+         return res == NULL_JS_LIB_FILES_SENTINEL ? null : res;
       if (!(type instanceof PrimitiveType)) {
-         return getJSSettingsStringValue(type, "jsLibFiles", false, true);
+         res = getJSSettingsStringValue(type, "jsLibFiles", false, true);
+         if (res != null) {
+            jsBuildInfo.jsLibFilesForType.put(typeName, res);
+         }
+         else {
+            if (getAlias(type) != null)
+               jsBuildInfo.jsLibFilesForType.put(typeName, HAS_ALIAS_SENTINEL);
+            else
+               jsBuildInfo.jsLibFilesForType.put(typeName, NULL_JS_LIB_FILES_SENTINEL);
+         }
+         return res;
       }
-      String alias = getAlias(type);
-      if (alias != null)
-         return null;
       return null;
    }
 
    boolean hasJSLibFiles(Object type) {
+      String res = null;
       if (!(type instanceof PrimitiveType)) {
-         // Make sure we get the most specific type for this type.  We might have a dependency on java.lang.Object
-         // for example when there's an annotation set on the annotation layer for java.lang.Object.
-         type = ModelUtil.resolveSrcTypeDeclaration(system, type, false, false);
-         Object settingsObj = ModelUtil.getAnnotation(type, "sc.js.JSSettings");
-         if (settingsObj != null) {
-            String jsFilesStr = (String) ModelUtil.getAnnotationValue(settingsObj, "jsLibFiles");
-            return jsFilesStr != null && jsFilesStr.length() > 0;
+         String typeName = ModelUtil.getTypeName(type);
+         res = jsBuildInfo.jsLibFilesForType.get(typeName);
+         if (res != null) {
+            // If we have a cached that we have an alias or a js lib files just return
+            if (res != NULL_JS_LIB_FILES_SENTINEL)
+               return true;
+            // else - try the parent type
+         }
+         else {
+            // Make sure we get the most specific type for this type.  We might have a dependency on java.lang.Object
+            // for example when there's an annotation set on the annotation layer for java.lang.Object.
+            type = ModelUtil.resolveSrcTypeDeclaration(system, type, false, false);
+            Object settingsObj = ModelUtil.getAnnotation(type, "sc.js.JSSettings");
+            if (settingsObj != null) {
+               String jsFilesStr = (String) ModelUtil.getAnnotationValue(settingsObj, "jsLibFiles");
+               return jsFilesStr != null && jsFilesStr.length() > 0;
+            }
          }
       }
-      if (hasAlias(type))
+      if (res == null && hasAlias(type))
          return true;
       Object parentType = ModelUtil.getEnclosingType(type);
       if (parentType != null)
@@ -1510,10 +1556,13 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       boolean handled = false;
       if (settingsObj != null) {
 
+         String typeName = ModelUtil.getTypeName(type);
          String replaceWith = (String) ModelUtil.getAnnotationValue(settingsObj, "replaceWith");
          if (replaceWith != null && replaceWith.length() > 0) {
-            jsBuildInfo.replaceTypes.put(ModelUtil.getTypeName(type), replaceWith);
+            jsBuildInfo.replaceTypes.put(typeName, replaceWith);
             handled = true;
+            if (jsBuildInfo.jsLibFilesForType.get(typeName) == null)
+               jsBuildInfo.jsLibFilesForType.put(typeName, HAS_ALIAS_SENTINEL);
          }
 
          String jsFilesStr = (String) ModelUtil.getAnnotationValue(settingsObj, "jsLibFiles");
@@ -1526,6 +1575,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                else if (!jsBuildInfo.jsFiles.contains(newJsFiles[i]))
                   System.err.println("*** jsFiles for type: " + type + " not added during process phase");
             }
+            jsBuildInfo.jsLibFilesForType.put(typeName, jsFilesStr);
+
             return newJsFiles;
          }
 
@@ -1977,7 +2028,6 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       changedDefaultType = false;
       jsFileBodyStore.clear();
       postStarted = false;
-
 
       if (system.options.buildAllFiles) {
          // TODO: should we reset anything in the JSBuildInfo?  Since we don't reliably run the start process, I don't think so

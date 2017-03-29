@@ -4,6 +4,7 @@
 
 package sc.parser;
 
+import sc.lang.ILanguageModel;
 import sc.layer.*;
 import sc.type.DynType;
 import sc.type.IBeanMapper;
@@ -437,6 +438,7 @@ public abstract class Language extends LayerFileComponent {
       LayeredSystem sys = LayeredSystem.getCurrent().getMainLayeredSystem();
       fileName = FileUtil.unnormalize(fileName);
       String absFileName = fileName;
+      boolean active = false;
       // TODO: this is a hack!  Add a new parameter or maybe disabled:layerName?
       if (layerName != null) {
          Layer layer = sys.getActiveOrInactiveLayerByPathSync(layerName, null, true, true, layerEnabled);
@@ -447,20 +449,29 @@ public abstract class Language extends LayerFileComponent {
          absFileName = FileUtil.concat(layer.getLayerPathName(), fileName);
          // Want to start the layer before we start loading types into it.  Otherwise, when it gets started we see that we have types to replace when we really don't.
          layer.checkIfStarted();
+         active = layer.activated;
       }
-      // TODO should we check the system.getCachedModel to see if we have this guy already?
-      File file = new File(absFileName);
-      try {
-         Object result = parse(file);
-         if (result instanceof ParseError) {
-            System.err.println("Error parsing string to be styled - no styling for this section: " + file + ": " + ((ParseError) result).errorStringWithLineNumbers(file));
-            return "";
+
+      // Don't load the model twice if we've already loaded it.  This is a little weird because sometimes in the styling we have the type already loaded in the active model
+      // so we just use it rather than loading it again.  If not, we might need to get it in an inactive layer.
+      ILanguageModel oldModel = sys.getCachedModelByPath(absFileName, active);
+      if (oldModel == null) {
+         File file = new File(absFileName);
+         try {
+            Object result = parse(file);
+            if (result instanceof ParseError) {
+               System.err.println("Error parsing string to be styled - no styling for this section: " + file + ": " + ((ParseError) result).errorStringWithLineNumbers(file));
+               return "";
+            }
+            return ParseUtil.styleParseResult(layerName, layerName, fileName, displayError, isLayer, result, layerEnabled);
          }
-         return ParseUtil.styleParseResult(layerName, layerName, fileName, displayError, isLayer, result, layerEnabled);
+         catch (IllegalArgumentException exc) {
+            System.err.println("Error reading file to be styled: " + absFileName + ": " + exc);
+            return "Missing file: " + absFileName;
+         }
       }
-      catch (IllegalArgumentException exc) {
-         System.err.println("Error reading file to be styled: " + absFileName + ": " + exc);
-         return "Missing file: " + absFileName;
+      else {
+         return ParseUtil.styleSemanticValue(oldModel, oldModel.getParseNode(), layerName, fileName);
       }
    }
 

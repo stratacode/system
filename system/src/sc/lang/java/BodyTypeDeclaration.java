@@ -45,6 +45,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public transient Layer layer;      // Stores the layer this type was defined in.
    public transient BodyTypeDeclaration replacedByType;  // This type has been modified by a subsequent layer or reloaded - in either case, the replacedByType should be used for operations once it is set this is the current definition
 
+   public transient BodyTypeDeclaration replacesType;  // This type replaced a previous type - the inverse to replacedByType
+
    /** Names of changed methods from the previous types if this type has been updated at runtime */
    public transient TreeSet<String> changedMethods;
 
@@ -2091,8 +2093,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if ((flags & ModelUtil.REFRESH_TYPEDEFS) != 0) {
          if (replacedByType != null && !replaced && !removed) {
             Layer replacedByLayer = replacedByType.getLayer();
-            if (replacedByLayer.closed)
+            if (replacedByLayer.closed) {
+               replacedByType.replacesType = null;
                replacedByType = null;
+            }
          }
       }
 
@@ -5733,6 +5737,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if (newType == replacedByType)
             System.err.println("*** Replacing a type with itself!");
          newType.replacedByType = replacedByType;
+         if (replacedByType != null)
+            replacedByType.replacesType = newType;
          replaced = true;
       }
 
@@ -9105,7 +9111,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (sys != null) {
          Layer layer = getLayer();
          IRuntimeProcessor proc = sys.runtimeProcessor;
-         if (proc != null && (getExecMode() & sys.runtimeProcessor.getExecMode()) != 0 && layer != null && layer.activated)
+         if (proc != null && (getExecMode() & sys.runtimeProcessor.getExecMode()) != 0 && layer != null && layer.activated && isRealType())
             proc.stop(this);
       }
       hasBeenStopped = true; // Note: for debugging only - nice to know when a type has been stopped to find bugs
@@ -9124,6 +9130,16 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       fullTypeName = null;
       if (replacedByType != null)
          replacedByType.clearCachedMemberInfo();
+
+      // Can't clear this out because it's set from the other type - it won't be reset on a restart
+      //if (!replaced)
+      //   replacedByType = null;
+      if (replacesType != null) {
+         // Once we are stopped, we do not want to leave a stale references to the type we replaced
+         if (replacesType.replacedByType == this)
+            replacesType.replacedByType = null;
+         replacesType = null;
+      }
       transformedType = null;
       anonIdsAllocated = 0;
       extendsInvalid = false;
@@ -9162,9 +9178,6 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       staleClassName = null;
       syncProperties = null;
 
-      // Can't clear this out because it's set from the other type - it won't be reset on a restart
-      //if (!replaced)
-      //   replacedByType = null;
       super.stop();
       if (hiddenBody != null)
          hiddenBody.stop();
@@ -9172,6 +9185,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public void updateReplacedByType(BodyTypeDeclaration repl) {
       this.replacedByType = repl;
+      repl.replacesType = this;
       if (anonIdsAllocated > 0) {
          if (repl.anonIdsAllocated > 0) {
             System.err.println("*** Anon-ids database collision between: " + this + " and: " + repl);

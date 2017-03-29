@@ -3225,7 +3225,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
             // We are refreshing any models which have changed on disk or had errors last time.  Technically for the error models, we could just restart them perhaps
             // but we need to clear old all of the references to anything else which has changed.  Seems like this might be more reliable now though obviously a bit slower.
-            if ((lastRefreshTime != -1 && newLastModTime > lastRefreshTime) || (oldModel != null && (oldModel.hasErrors() || newLastModTime > oldModel.getLastModifiedTime()))) {
+            if ((lastRefreshTime != -1 && newLastModTime > lastRefreshTime) || (oldModel != null && (oldModel.hasErrors() || (newLastModTime > oldModel.getLastModifiedTime() && oldModel.getLastModifiedTime() != 0)))) {
                Object res = layeredSystem.refresh(srcEnt, ctx, updateInfo, active);
                if (res != null)
                   changedModels.add(new ModelUpdate(oldModel, res));
@@ -4108,8 +4108,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    /**
-    *  Adds a new src path with srcPathType.  The srcPathType specifies the nature of the files under this
-    * directory - e.g. for web/** the srcPathType is 'web'.   The default type for normal source files is null.
+    * Adds a new src path directory using the supplied srcPathType.  The srcPathType specifies rules for processing src files found there.
+    * For example for src files in the web directory, the srcPathType is 'web'.  If you want your files to be treated as ordinary source files
+    * use null for the srcPathType.  Each type can have an optional buildPrefix
     */
    public void addSrcPath(String srcPath, String srcPathType, String buildPrefix) {
       boolean abs;

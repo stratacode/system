@@ -5,9 +5,9 @@
 package sc.layer;
 
 public class InitTypeInfo implements Comparable {
-   TypeGroupMember initType;
-   boolean doStartup;
-   Integer priority = 0;
+   public TypeGroupMember initType;
+   public boolean doStartup;
+   public Integer priority = 0;
 
    public int compareTo(Object o) {
       InitTypeInfo other = (InitTypeInfo) o;

@@ -1220,10 +1220,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (!peerMode)
-         this.repositorySystem = new RepositorySystem(new RepositoryStore(getStrataCodeHomeDir("pkgs")), messageHandler, this, options.verbose, options.reinstall, options.update, options.installExisting);
+         this.repositorySystem = new RepositorySystem(new RepositoryStore(getStrataCodeHomeDir("pkgs")), messageHandler, this, options.verbose, options.reinstall, options.updateSystem, options.installExisting);
       else {
          messageHandler = parentSystem.messageHandler;
-         this.repositorySystem = new RepositorySystem(parentSystem.repositorySystem.store, messageHandler, this, options.verbose, options.reinstall, options.update, options.installExisting);
+         this.repositorySystem = new RepositorySystem(parentSystem.repositorySystem.store, messageHandler, this, options.verbose, options.reinstall, options.updateSystem, options.installExisting);
       }
 
       if (initLayerNames != null) {
@@ -3279,9 +3279,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // As soon as any file in a build-dir is changed, build all files.  A simpler alternative to incremental compile that performs better than build all
       @Constant public boolean buildAllPerLayer = false;
 
-      /** Should dependent packages be updated using the repository package system */
-      @Constant public boolean updateSystem = false;
-
       @Constant public TypeIndexMode typeIndexMode = TypeIndexMode.Lazy;
 
       @Constant public ArrayList<String> disabledRuntimes;
@@ -3304,7 +3301,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       @Constant public boolean installExisting;
 
       /** Should we update all external repository packages on this run of the system (instead of using previously downloaded versions) */
-      @Constant public boolean update;
+      @Constant public boolean updateSystem;
 
       /** Maximum number of errors to display in one build */
       @Constant public int maxErrors = 100;
@@ -8379,6 +8376,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          cachedModel.setAdded(false);
       }
 
+      // TODO: There are cases where we may not have stopped a type which depends on a stopped type - e.g. when changing menuStyle.scss, we stop EditorFrame but not HtmlPage which
+      // has an editorMixin tag tht extends EditorFrame.  Either we need to accurate find and stop all references or we do this refresh - so we remove references to potentially now stale
+      // types that are created when we initialize the template.
+      if (toStop.size() > 0)
+         refreshBoundTypes(ModelUtil.REFRESH_TYPEDEFS, true);
+
       // Run the runtimeProcessor hook after stopping some models so it can clear out any cached types and reresolve them
       // after starting again.
       if (runtimeProcessor != null)
@@ -9995,6 +9998,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return m;
    }
 
+   public ILanguageModel getCachedModelByPath(String absFileName, boolean active) {
+      ILanguageModel m = beingLoaded.get(absFileName);
+      if (m != null && m.getLayer() != null && m.getLayer().activated == active)
+         return m;
+      return active ? modelIndex.get(absFileName) : inactiveModelIndex.get(absFileName);
+   }
+
    /** Returns the cached active model for the specified runtime processor */
    public ILanguageModel getActiveModel(SrcEntry srcEnt, IRuntimeProcessor proc) {
       ILanguageModel m;
@@ -10246,7 +10256,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public SystemRefreshInfo refreshSystem(boolean refreshPeers, boolean active) {
       // Before we parse any files, need to clear out any invalid models
-      // TODO: remove this unless we are not using clonedTransformedModels
+      // TODO: remove this cleanTypeCache call unless we are not using clonedTransformedModels
       if (active)
          cleanTypeCache();
 
@@ -10258,11 +10268,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       UpdateInstanceInfo updateInfo = newUpdateInstanceInfo();
       List<Layer.ModelUpdate> changedModels = refreshChangedModels(updateInfo, active);
-
-      if (changedModels.size() > 0) {
-         // Once we've refreshed some of the models in the system, we now need to go and update the type references globally to point to the new references
-         refreshBoundTypes(ModelUtil.REFRESH_TYPEDEFS, active);
-      }
 
       SystemRefreshInfo sysInfo = new SystemRefreshInfo();
       sysInfo.updateInfo = updateInfo;
@@ -10449,6 +10454,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                peer.completeRefresh(peerChangedInfos.get(i), null, active, false);
          }
          setCurrent(this);
+      }
+
+      if (changes.size() > 0) {
+         // Once we've refreshed some of the models in the system, we now need to go and update the type references globally to point to the new references
+         // TODO: we are doing this twice now if we need to rebuild the system as well as just refreshing the types - maybe eliminate this one in that case?
+         refreshBoundTypes(ModelUtil.REFRESH_TYPEDEFS, active);
       }
 
       if (updateRuntime && active && !options.compileOnly)

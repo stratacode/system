@@ -36,8 +36,8 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
    }
 
    // TODO: remove - debug only
-   ThreadLocal<Integer> nestCount = new ThreadLocal<Integer>();
-   ThreadLocal<Integer> setNestCount = new ThreadLocal<Integer>();
+   transient ThreadLocal<Integer> nestCount = new ThreadLocal<Integer>();
+   transient ThreadLocal<Integer> setNestCount = new ThreadLocal<Integer>();
 
    public Object getPropertyFromWrapper(IDynObject origObj, String propName) {
       int index = type.getDynInstPropertyIndex(propName);

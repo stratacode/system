@@ -723,6 +723,10 @@ public class ParseUtil  {
          ParseUtil.initAndStartComponent(semanticValue);
       }
 
+      return styleSemanticValue(semanticValue, result, dispLayerPath, fileName);
+   }
+
+   public static Object styleSemanticValue(Object semanticValue, Object result, String dispLayerPath, String fileName) {
       StringBuilder sb = new StringBuilder();
       if (dispLayerPath != null && fileName != null) {
          sb.append("<div class='filename'>");

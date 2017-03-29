@@ -156,6 +156,7 @@ public class MvnDescriptor implements Serializable {
       String groupId = file.getTagValue(tag, "groupId", required);
       String artifactId = file.getTagValue(tag, "artifactId", required);
       String type = file.getTagValue(tag, "type", required);
+      // DEBUGGING NOTE: This is a good place to set a break point for a given artifact.  You can then see where it gets it's version here.
       String version = file.getTagValue(tag, "version", required);
       String classifier = file.getTagValue(tag, "classifier", required);
       MvnDescriptor desc = new MvnDescriptor(groupId, null, null, artifactId, version, type, classifier);
