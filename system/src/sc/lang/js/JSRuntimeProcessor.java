@@ -48,7 +48,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    public static boolean traceSystemUpdates = false;
 
    /** Additional debug messages for JS  */
-   public boolean verboseJS = false;
+   public boolean verboseJS = true;
 
    public String templatePrefix;
    public String srcPathType;
@@ -1228,7 +1228,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
    public String getCachedJSModuleFile(String typeName) {
       String res = jsBuildInfo.jsModuleNames.get(typeName);
-      if (res == NULL_JS_MODULE_NAMES_SENTINEL)
+      if (res != null && res.equals(NULL_JS_MODULE_NAMES_SENTINEL))
          res = null;
       return res;
    }
@@ -1237,7 +1237,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       String typeName = ModelUtil.getTypeName(type);
       String res = jsBuildInfo.jsModuleNames.get(typeName);
       if (res != null) {
-         if (res == NULL_JS_MODULE_NAMES_SENTINEL)
+         if (res.equals(NULL_JS_MODULE_NAMES_SENTINEL))
             res = null;
          return res;
       }
@@ -1306,7 +1306,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             if (res == null) {
                jsBuildInfo.jsModuleNames.put(typeName, NULL_JS_MODULE_NAMES_SENTINEL);
             }
-            else if (res == NULL_JS_MODULE_NAMES_SENTINEL)
+            else if (res.equals(NULL_JS_MODULE_NAMES_SENTINEL))
                res = null;
             return res;
          }
@@ -1423,8 +1423,13 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    String getJSLibFiles(Object type) {
       String typeName = ModelUtil.getTypeName(type);
       String res = jsBuildInfo.jsLibFilesForType.get(typeName);
-      if (res != null && res != HAS_ALIAS_SENTINEL)
-         return res == NULL_JS_LIB_FILES_SENTINEL ? null : res;
+      if (res != null) {
+         if (res.equals(NULL_JS_LIB_FILES_SENTINEL))
+            return null;
+         if (res.equals(HAS_ALIAS_SENTINEL))
+            return null;
+         return res;
+      }
       if (!(type instanceof PrimitiveType)) {
          res = getJSSettingsStringValue(type, "jsLibFiles", false, true);
          if (res != null) {
@@ -1448,7 +1453,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          res = jsBuildInfo.jsLibFilesForType.get(typeName);
          if (res != null) {
             // If we have a cached that we have an alias or a js lib files just return
-            if (res != NULL_JS_LIB_FILES_SENTINEL)
+            if (!res.equals(NULL_JS_LIB_FILES_SENTINEL))
                return true;
             // else - try the parent type
          }
@@ -2610,7 +2615,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    boolean appendJSType(BodyTypeDeclaration td, StringBuilder result) {
       td = ensureTransformedResult(td);
       if (td == null) {
-         System.err.println("*** No trnasformed result in appendJSType: ");
+         System.err.println("*** No transformed result in appendJSType: ");
+         td = ensureTransformedResult(td);
          return false;
       }
       if (!processedTypes.contains(td.getFullTypeName()) && !hasJSLibFiles(td)) {
