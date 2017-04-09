@@ -291,7 +291,7 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
     * code.  You can provide a 'fromStatement' and a default statement.  If the from statement matches, this node is
     * updated.  If the fromStatement is null the defaultStatement is used.
     * <p>
-    * To determine whether the fromStatement matches this statememtn, we call matchesStatement.  For assignment expressions
+    * To determine whether the fromStatement matches this statement, we call matchesStatement.  For assignment expressions
     * right now, that allows us to match the right assignment statement in the list to the source from which it was generated from.
     * </p>
     */
@@ -382,4 +382,109 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       return !(this instanceof IBlockStatement);
    }
 
+   public boolean isLineStatement() {
+      return isLeafStatement();
+   }
+
+   /** Returns the number of lines this statement occupies for means of navigation, breakpoints, debugging etc. */
+   public int getNumStatementLines() {
+      if (this instanceof IStatementWrapper) // e.g. synchronized, for, while, etc.  TODO: handle the case where the first part is split over more than one line - i.e. get the parse-node for the first part and count the lines there
+         return 1;
+      // While the TypeDeclarations are not leaf statements and so don't get added explicitly, we might point the generated
+      // line at the first line of the class declaration if it's generated as part of the definition for that type.
+      // This also handles NewExpression when there's a classBody
+      if (this instanceof IClassBodyStatement && !isLeafStatement())
+         return 1;
+      return ParseUtil.countLinesInNode(getParseNode());
+   }
+
+   public void addToFileLineIndex(GenFileLineIndex idx) {
+      if (isLineStatement()) {
+         ISrcStatement srcStatement = getSrcStatement(null);
+         if (srcStatement != null && srcStatement != this) {
+            ISemanticNode srcRoot = srcStatement.getRootNode();
+            if (srcRoot instanceof JavaModel) {
+               JavaModel srcModel = (JavaModel) srcRoot;
+               int startGenOffset = getParseNode().getStartIndex();
+               if (startGenOffset == -1) {
+                  System.out.println("*** Attempt to add statement to genLine index with a parse-node that's missing a startIndex");
+                  return;
+               }
+               int startGenLine = idx.genFileLineIndex.getLineForOffset(startGenOffset);
+               int numGenLines = getNumStatementLines();
+               if (numGenLines > 0)
+                  numGenLines--;
+               int endGenLine = startGenLine + numGenLines;
+
+               IParseNode srcParseNode = srcStatement.getParseNode();
+               if (srcParseNode == null) {
+                  int ict = 0;
+                  ISemanticNode srcParent = srcStatement.getParentNode();
+                  while (srcParent != null && srcParseNode == null && ict < 2) {
+                     srcParseNode = srcParent.getParseNode();
+                     if (srcParseNode == null || !(srcParent instanceof ISrcStatement))
+                        srcParent = srcParent.getParentNode();
+                     else
+                        break;
+                     ict++;
+                  }
+                  if (srcParseNode != null) {
+                     if (srcParent instanceof ISrcStatement)
+                        srcStatement = (ISrcStatement) srcParent;
+                     else {
+                        System.err.println("*** found a non-statement parent!");
+                        srcParseNode = null;
+                     }
+                  }
+               }
+               if (srcParseNode != null) {
+                  int startSrcLine = idx.getSrcFileIndex(srcModel.getSrcFile()).srcFileLineIndex.getLineForOffset(srcParseNode.getStartIndex());
+                  int numSrcLines = srcStatement.getNumStatementLines();
+                  if (numSrcLines > 0)
+                     numSrcLines--;
+                  int endSrcLine = startSrcLine + numSrcLines;
+
+                  idx.addMapping(srcModel.getSrcFile(), startGenLine, endGenLine, startSrcLine, endSrcLine);
+               }
+               else if (GenFileLineIndex.verbose) {
+                  System.out.println("*** Warning - no source for statement: " + this);
+               }
+            }
+            else {
+               System.err.println("*** Unrecognized root node for src statement in generated model");
+            }
+         }
+         // else - these statements are not generated with the fromStatement set - break here to improve the registration
+      }
+      if (this instanceof IBlockStatement) {
+         List<Statement> blockSts = ((IBlockStatement) this).getBlockStatements();
+         if (blockSts != null) {
+            for (Statement blockSt:blockSts) {
+               blockSt.addToFileLineIndex(idx);
+            }
+         }
+      }
+      else if (this instanceof IStatementWrapper) {
+         Statement wrappedSt = ((IStatementWrapper) this).getWrappedStatement();
+         if (wrappedSt != null)
+            wrappedSt.addToFileLineIndex(idx);
+      }
+      else if (this instanceof IBlockStatementWrapper) {
+         BlockStatement bst = ((IBlockStatementWrapper) this).getWrappedBlockStatement();
+         if (bst != null)
+            bst.addToFileLineIndex(idx);
+      }
+      // NewExpression and TypeDeclaration
+      else if (this instanceof IClassBodyStatement) {
+         List<Statement> sts = ((IClassBodyStatement) this).getBodyStatements();
+         if (sts != null) {
+            for (Statement st:sts)
+               st.addToFileLineIndex(idx);
+         }
+      }
+   }
+
+   public void setFromStatement(ISrcStatement from) {
+      fromStatement = from;
+   }
 }

@@ -25,7 +25,7 @@ public interface IFileProcessorResult {
    boolean needsPostBuild();
 
    /** Returns the set of result processed files for dependency purposes. */
-   List<SrcEntry> getProcessedFiles(Layer buildLayer, String buildDir, boolean generate);
+   List<SrcEntry> getProcessedFiles(Layer buildLayer, String buildSrcDir, boolean generate);
 
    void postBuild(Layer buildLayer, String buildDir);
 

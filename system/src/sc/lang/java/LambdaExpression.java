@@ -19,7 +19,10 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
-/** Java 8 lambda expression.  To run these in JS we need to convert them to anonymous classes */
+/**
+ * Java 8 lambda expression.  To run these in JS we convert them to anonymous classes.
+ * TODO: ideally we could optimize the JS code-gen of lambda classes where 'this' of the anonymous class is not used like in java
+ */
 public class LambdaExpression extends BaseLambdaExpression implements IStatementWrapper {
    public Object lambdaParams; // An identifier, e.g. x -> y, Parameter list (int a, int b) -> y, or SemanticNodeList<IString> (a, b) -> y
    public Statement lambdaBody; // Either an expression or a BlockStatement
@@ -212,7 +215,7 @@ public class LambdaExpression extends BaseLambdaExpression implements IStatement
    }
 
    public boolean isLeafStatement() {
-      return false;
+      return lambdaBody != null && !lambdaBody.isLeafStatement();
    }
 
    public Statement getWrappedStatement() {

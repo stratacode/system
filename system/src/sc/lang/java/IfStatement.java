@@ -5,7 +5,9 @@
 package sc.lang.java;
 
 import sc.lang.ISrcStatement;
+import sc.parser.GenFileLineIndex;
 import sc.parser.IParseNode;
+import sc.parser.ParseUtil;
 
 import java.util.List;
 import java.util.Set;
@@ -166,5 +168,24 @@ public class IfStatement extends NonIndentedStatement {
             return true;
       }
       return false;
+   }
+
+   /** For the if-statement, our breakpoints really are set on the if (expression) part only */
+   public int getNumStatementLines() {
+      if (expression != null)
+         return ParseUtil.countLinesInNode(expression.getParseNode());
+      return super.getNumStatementLines();
+   }
+
+   public boolean isLineStatement() {
+      return true;
+   }
+
+   public void addToFileLineIndex(GenFileLineIndex idx) {
+      super.addToFileLineIndex(idx);
+      if (trueStatement != null)
+         trueStatement.addToFileLineIndex(idx);
+      if (falseStatement != null)
+         falseStatement.addToFileLineIndex(idx);
    }
 }

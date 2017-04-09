@@ -3310,6 +3310,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       @Constant public boolean rebuildAllFiles = false;
 
       @Constant public boolean disableGC = false;
+
+      /** Should we generate the debugging line number mappings for generated source */
+      @Constant public boolean genDebugInfo = true;
    }
 
    @MainSettings(produceJar = true, produceScript = true, produceBAT = true, execName = "bin/scc", jarFileName="bin/sc.jar", debug = false, maxMemory = 2048, defaultArgs = "-restartArgsFile <%= getTempDir(\"restart\", \"tmp\") %>")
@@ -5960,7 +5963,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public String getClassPathForLayer(Layer startLayer, boolean includeBuildDir, String useBuildDir, boolean addSysClassPath) {
       StringBuilder sb = new StringBuilder();
       boolean addOrigBuild = true;
-      if (useBuildDir != null)
+      if (useBuildDir != null && includeBuildDir)
          sb.append(useBuildDir); // Our build dir overrides all other directories
       if (startLayer == coreBuildLayer) {
          addOrigBuild = startLayer.appendClassPath(sb, includeBuildDir, useBuildDir, addOrigBuild);
@@ -11742,7 +11745,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             return cl;
       }
       Object td = getSrcTypeDeclaration(typeName, null, true, false, srcOnly, refLayer, layerResolve);
-      if (td == null)
+      if (td == null && !srcOnly)
          return getClassWithPathName(typeName, refLayer, layerResolve, false, false);
       return td;
    }

@@ -77,6 +77,10 @@ public class ForStatement extends Statement implements IStatementWrapper {
       return false;
    }
 
+   public boolean isLineStatement() {
+      return true;
+   }
+
    public Statement getWrappedStatement() {
       return statement;
    }

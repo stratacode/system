@@ -462,6 +462,13 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
 
       PerfMon.start("initTemplate", false);
 
+      /*
+      LayeredSystem sys = getLayeredSystem();
+      if (sys != null && sys.options.verbose) {
+         sys.verbose("Init " + getSrcFile());
+      }
+      */
+
       // If we are an annotation layer, the template itself is not active - the elements can be used to create new types though
       // The key is that we do not generate a type for this class... we're just annotating a class in the classpath with a defaut template.
       if (layer == null || !layer.annotationLayer) {
@@ -508,6 +515,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
                      singleElementType = true;
                      Object modifyType = templateProcessor.getDefaultModify() ? getPreviousDeclaration(getFullTypeName()) : null;
                      rootType = td = elem.convertToObject(this, null, modifyType, templateModifiers, preTagContent);
+                     td.fromStatement = elem;
                   }
                }
 
@@ -540,12 +548,12 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
                   }
                   if (templateModifiers != null)
                      cd.setProperty("modifiers", templateModifiers);
+                   td.fromStatement = findFirstSrcStatement();
                }
                td.parentNode = this;
                rootType = td;
                implicitRoot = true;
                td.modelType = this;
-
             }
             elementsOnly = false;
          }
@@ -592,6 +600,14 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
 
       beingInitialized = false;
       PerfMon.end("initTemplate");
+   }
+
+   private ISrcStatement findFirstSrcStatement() {
+      if (templateDeclarations != null)
+         for (Object decl:templateDeclarations)
+            if (decl instanceof ISrcStatement)
+               return (ISrcStatement) decl;
+      return null;
    }
 
    public void stop() {
@@ -839,7 +855,6 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
    }
 
    private void initOutputMethod() {
-
       if (outputMethod == null) {
          if (singleElementType && rootType != null) {
             outputRuntimeMethod = ModelUtil.definesMethod(rootType, "output", null, null, null, false, false, null, null);
@@ -909,14 +924,29 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
       initOutputMethod();
       if (templateDeclarations != null && !singleElementType) {
          int ct = 0;
-         for (int i = 0; i < templateDeclarations.size(); i++) {
+         ISrcStatement lastSrcSt = null;
+         int sz = templateDeclarations.size();
+         for (int i = 0; i < sz; i++) {
             Object decl = templateDeclarations.get(i);
-            ct = addTemplateDeclToOutputMethod((TypeDeclaration) rootType, outputMethod.body, decl, true, "", ct, null, true, false);
+            if (decl instanceof ISrcStatement)
+               lastSrcSt = (ISrcStatement) decl;
+            // If this is a string token on the first node, we really just need a srcStatement adjacent to the
+            // token to use for debugging so we are going to look for the next one so this is not null.
+            else if (lastSrcSt == null) {
+               for (int j = i + 1; j < sz; j++) {
+                  Object nextDecl = templateDeclarations.get(j);
+                  if (nextDecl instanceof ISrcStatement) {
+                     lastSrcSt = (ISrcStatement) nextDecl;
+                     break;
+                  }
+               }
+            }
+            ct = addTemplateDeclToOutputMethod((TypeDeclaration) rootType, outputMethod.body, decl, true, "", ct, null, lastSrcSt, true, false);
          }
       }
    }
 
-   public int addTemplateDeclToOutputMethod(TypeDeclaration parentType, BlockStatement block, Object decl, boolean copy, String methSuffix, int ct, Element parentElement, boolean statefulContext, boolean escape) {
+   public int addTemplateDeclToOutputMethod(TypeDeclaration parentType, BlockStatement block, Object decl, boolean copy, String methSuffix, int ct, Element parentElement, ISrcStatement lastSrcSt, boolean statefulContext, boolean escape) {
       int initCt = ct;
       if (decl instanceof TemplateStatement) {
          if (parentElement == null || !parentElement.staticContentOnly) {
@@ -940,8 +970,12 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
       else if (decl instanceof GlueDeclaration) {
          GlueDeclaration gd = (GlueDeclaration) decl;
          if (gd.declarations != null) {
+            ISrcStatement glueLastSrcSt = null;
             for (int j = 0; j < gd.declarations.size(); j++) {
-               ct = addTemplateDeclToOutputMethod(parentType, block, gd.declarations.get(j), true, methSuffix, -1, parentElement, statefulContext, escape);
+               Object glueDecl = gd.declarations.get(j);
+               if (glueDecl instanceof ISrcStatement)
+                  glueLastSrcSt = (ISrcStatement) glueDecl;
+               ct = addTemplateDeclToOutputMethod(parentType, block, glueDecl, true, methSuffix, -1, parentElement, glueLastSrcSt, statefulContext, escape);
             }
          }
       }
@@ -1028,27 +1062,25 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
                      }
                      // The field's variable definition's initializer is the parseResult's semantic value.
                      FieldDefinition tempField = FieldDefinition.createFromJavaType(ClassType.create("Object"), fieldName, ":=", expr);
-                     tempField.fromStatement = parentElement;
+                     tempField.fromStatement = getSrcStatement(parentElement, decl, lastSrcSt);
                      tempField.addModifier("public");
                      parentType.addBodyStatementIndent(tempField);
 
                      // Then add a property assignment with reverse binding for this field.
                      IdentifierExpression methCall = IdentifierExpression.createMethodCall(new SemanticNodeList(), "invalidate" + methSuffix);
-                     methCall.fromStatement = parentElement; // We will likely strip off the reverse-only PropertyAssignment so put it at this level here.
+                     methCall.fromStatement = getSrcStatement(parentElement, decl, lastSrcSt); // We will likely strip off the reverse-only PropertyAssignment so put it at this level here.
                      PropertyAssignment ba = PropertyAssignment.create(fieldName, methCall, "=:");
-                     ba.fromStatement = parentElement;
-                     parentType.addBodyStatementIndent(ba);
+                     addParentTypeBodyStatement(parentType, ba, parentElement, decl, lastSrcSt);
                   }
                   else {
                      // Then add a property assignment with reverse binding for this field.
                      PropertyAssignment ba = PropertyAssignment.create(fieldName, expr, ":=");
-                     ba.fromStatement = parentElement;
-                     parentType.addBodyStatementIndent(ba);
+                     addParentTypeBodyStatement(parentType, ba, parentElement, decl, lastSrcSt);
                   }
 
                   // Then add to the output method a new identifier expression for the field.
                   Statement outputCall = getExprStringOutputStatement(fieldName);
-                  outputCall.fromStatement = parentElement;
+                  outputCall.fromStatement = getSrcStatement(parentElement, decl, lastSrcSt);
                   addToOutputMethod(block, outputCall);
 
                   handled = true;
@@ -1056,11 +1088,11 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
             }
 
             if (!handled) {
-               if (!mergeStringInOutput(block, expr, null)) {
+               if (!mergeStringInOutput(block, expr, null, getSrcStatement(parentElement, decl, lastSrcSt))) {
                   String resultStr = parseResult.toString();
                   Statement outputSt = getExprStringOutputStatement(resultStr);
                   if (outputSt != null) {
-                     outputSt.fromStatement = parentElement;
+                     outputSt.fromStatement = getSrcStatement(parentElement, decl, lastSrcSt);
                      addToOutputMethod(block, outputSt);
                   }
                   else
@@ -1074,10 +1106,10 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
       else if (PString.isString(decl) || decl instanceof ControlTag) {
          String newStr = decl.toString();
          // This is an optimization - if there's a StringLiteral right before us, just merge it in.
-         if (!mergeStringInOutput(block, null, newStr)) {
+         if (!mergeStringInOutput(block, null, newStr, getSrcStatement(parentElement, decl, lastSrcSt))) {
             // Output sb.append('the string')
             Statement outExpr = getConstStringOutputStatement(newStr);
-            outExpr.fromStatement = parentElement;
+            outExpr.fromStatement = getSrcStatement(parentElement, decl, lastSrcSt);
             addToOutputMethod(block, outExpr);
          }
       }
@@ -1096,7 +1128,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
                      if (childTD.body != null) {
                         for (Statement childTypeDecl:childTD.body) {
                            if (childTypeDecl instanceof GlueDeclaration)
-                              ct = addTemplateDeclToOutputMethod(td, block, childTypeDecl, true, methSuffix, -1, parentElement, statefulContext, escape);
+                              ct = addTemplateDeclToOutputMethod(td, block, childTypeDecl, true, methSuffix, -1, parentElement, lastSrcSt, statefulContext, escape);
                         }
                      }
                   }
@@ -1119,7 +1151,23 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
       return ct;
    }
 
-   private boolean mergeStringInOutput(BlockStatement block, Expression expr, String str) {
+   private ISrcStatement getSrcStatement(Element parentElement, Object decl, ISrcStatement lastSrcSt) {
+      if (parentElement == null) {
+         if (decl instanceof ISrcStatement)
+            return (ISrcStatement) decl;
+         else
+            return lastSrcSt;
+      }
+      else
+         return parentElement;
+   }
+
+   private void addParentTypeBodyStatement(BodyTypeDeclaration parentType, Statement toAdd, Element parentElement, Object decl, ISrcStatement lastSrcSt) {
+      parentType.addBodyStatementIndent(toAdd);
+      toAdd.fromStatement = getSrcStatement(parentElement, decl, lastSrcSt);
+   }
+
+   private boolean mergeStringInOutput(BlockStatement block, Expression expr, String str, ISrcStatement nextSrcSt) {
       if ((expr == null || expr instanceof StringLiteral) && (block.statements != null && block.statements.size() > 1)) {
          Statement st = block.statements.get(getLastOutStatementPos(block));
          if (str == null && expr != null)
@@ -1131,6 +1179,9 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
                if (lastArg instanceof StringLiteral) {
                   StringLiteral lastStr = (StringLiteral) lastArg;
                   lastStr.appendString(str);
+
+                  // We've merged strings from more than one statement into this one out.append call - picking the first child statement we run into
+                  st.fromStatement = pickBestFromStatement(st.fromStatement, nextSrcSt);
                   return true;
                }
             }
@@ -1138,6 +1189,20 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
          }
       }
       return false;
+   }
+
+   private ISrcStatement pickBestFromStatement(ISrcStatement st1, ISrcStatement st2) {
+      if (st1 == null)
+         return st2;
+      if (st2 == null)
+         return st1;
+
+      if (st1 == st2)
+         return st1;
+
+      if (st2 instanceof Element && ((Element) st2).getEnclosingTag() == st1)
+         return st2;
+      return st1;
    }
 
    /** When the processTemplate operation is running we override the template's execMode - setting it to "server" to avoid the client-only parts.  This defaults to 0 which means automatically determine the execMode. */
@@ -1388,11 +1453,11 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
          clearParseTree();
    }
 
-   public List<SrcEntry> getCompiledProcessedFiles(Layer buildLayer, String buildDir, boolean generate) {
+   public List<SrcEntry> getCompiledProcessedFiles(Layer buildLayer, String buildSrcDir, boolean generate) {
       BodyTypeDeclaration modelType = getModelTypeDeclaration();
       if (modelType == null)
          return Collections.emptyList();
-      return super.getProcessedFiles(buildLayer, buildDir, generate);
+      return super.getProcessedFiles(buildLayer, buildSrcDir, generate);
    }
 
    public void postBuild(Layer buildLayer, String buildDir) {
@@ -1400,15 +1465,15 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
          templateProcessor.postBuild(buildLayer, buildDir);
    }
 
-   public List<SrcEntry> getProcessedFiles(Layer buildLayer, String buildDir, boolean generate) {
+   public List<SrcEntry> getProcessedFiles(Layer buildLayer, String buildSrcDir, boolean generate) {
       if (templateProcessor == null || (!templateProcessor.needsProcessing())) {
          if (needsCompile()) {
-            return getCompiledProcessedFiles(buildLayer, buildDir, generate);
+            return getCompiledProcessedFiles(buildLayer, buildSrcDir, generate);
          }
          else
             return Collections.emptyList();
       }
-      return templateProcessor.getProcessedFiles(buildLayer, buildDir, generate);
+      return templateProcessor.getProcessedFiles(buildLayer, buildSrcDir, generate);
    }
 
    /**
@@ -1427,8 +1492,13 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
          displayError("*** Unable to generate template model for: " );
          return null;
       }
-      else
+      else if (generateResult instanceof IParseNode) {
+         // Need to format it and remove spacing and newline parse-nodes so we can accurately compute line numbers and offsets for registering gen source
+         return ((IParseNode) generateResult).formatString(null, null, -1, true).toString();
+      }
+      else {
          return generateResult.toString();
+      }
    }
 
    public String getProcessedFileId() {
@@ -1559,6 +1629,12 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
          return res.toString();
       }
       return null;
+   }
+
+   /** For debugging, this lets you print out the generated code for a template in SC, before it's transformed to Java */
+   public String getGeneratedSCCode() {
+      SCLanguage lang = SCLanguage.getSCLanguage();
+      return ((BodyTypeDeclaration) rootType).toLanguageString(lang.typeDeclaration);
    }
 
    public boolean getDependenciesChanged(Layer genLayer, Set<String> changedTypes, boolean processJava) {

@@ -808,4 +808,10 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
    public BlockStatement getWrappedBlockStatement() {
       return body;
    }
+
+   public void setFromStatement(ISrcStatement from) {
+      fromStatement = from;
+      if (body != null)
+         body.setFromStatement(from);
+   }
 }

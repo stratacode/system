@@ -798,6 +798,11 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       return this == partNode || sameSrcLocation(partNode);
    }
 
+   @Override
+   public int getNumStatementLines() {
+      return ParseUtil.countLinesInNode(getParseNode());
+   }
+
    public boolean childIsTopLevelStatement(ISrcStatement st) {
       return false;
    }

@@ -165,6 +165,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    /** Is this a new model which has not yet been saved or a model whose memory representation is more recent than the file system */
    public transient boolean unsavedModel = false;
 
+   /** Caches the line index for the generated file for this src model */
+   private transient GenFileLineIndex fileLineIndex = null;
+
    public void setLayeredSystem(LayeredSystem system) {
       layeredSystem = system;
    }
@@ -1399,10 +1402,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
     * any dynamic stubs for the main type or inner types, and any extra files added by extra features defined on this
     * model (e.g. the GWT module file)
     */
-   public List<SrcEntry> getProcessedFiles(Layer buildLayer, String buildDir, boolean generate) {
+   public List<SrcEntry> getProcessedFiles(Layer buildLayer, String buildSrcDir, boolean generate) {
       PerfMon.start("getProcessedFiles");
       try {
-         List<SrcEntry> computedFiles = getComputedProcessedFiles(buildLayer, buildDir, generate);
+         List<SrcEntry> computedFiles = getComputedProcessedFiles(buildLayer, buildSrcDir, generate);
          if (extraFiles == null)
             return computedFiles;
          if (computedFiles == null)
@@ -1411,7 +1414,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          // If any additional files were attached to this model, save them to the buildDir and buildLayer
          ArrayList<SrcEntry> result = new ArrayList<SrcEntry>(computedFiles);
          for (ExtraFile f:extraFiles) {
-            String absPath = FileUtil.concat(buildDir, f.relFilePath);
+            String absPath = FileUtil.concat(buildSrcDir, f.relFilePath);
             byte[] hash = StringUtil.computeHash(f.fileBody);
 
             SrcIndexEntry srcIndex = buildLayer.getSrcFileIndex(f.relFilePath);
@@ -1521,8 +1524,13 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
             // If there's a previous entry which is the same, we'll skip saving altogether.
             if ((prevEntry == null || !Arrays.equals(prevEntry.hash, mainSrcEnt.hash))) {
-               if (isChanged)
+               if (isChanged) {
                   FileUtil.saveStringAsReadOnlyFile(newFile, transformedResult, true);
+
+                  if (layeredSystem.options.genDebugInfo)
+                     updateFileLineIndex(transformedResult, buildDir);
+                  // TODO: else - remove the the file if it does not exist?
+               }
                else {
                   File classFile = LayerUtil.getClassFile(buildLayer, mainSrcEnt);
                   // As long as the class file is up to date before, we'll make sure it stays up to date after.
@@ -1771,7 +1779,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
       validateSavedModel(true);
 
-      return getParseNode().toString();
+      return getParseNode().formatString(null, null, -1, true).toString();
    }
 
    public void validateSavedModel(boolean finalGen) {
@@ -3009,6 +3017,136 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    public boolean isUnsavedModel() {
       return unsavedModel;
+   }
+
+   public static File getLineIndexFileName(String genSrcName, String buildSrcDir) {
+      return new File(FileUtil.replaceExtension(genSrcName, "dbgIdx"));
+   }
+
+   public File getLineIndexFile(String buildSrcDir) {
+      return getLineIndexFileName(getProcessedFileName(buildSrcDir), buildSrcDir);
+   }
+
+   public void updateFileLineIndex(String transformedResult, String buildSrcDir) {
+      if (transformedModel != null) {
+         // The generation process does not set these so we need to reset them before doing the line number processing
+         ParseUtil.resetStartIndexes(transformedModel);
+         GenFileLineIndex idx = transformedModel.generateFileLineIndex(transformedResult, buildSrcDir);
+         if (idx.genFileName.contains("UnitConverter.java")) {
+            System.out.println(idx.dump(0, 100));
+         }
+
+         fileLineIndex = transformedModel.fileLineIndex = idx;
+
+         // Should this file have a '.' in front of it to hide it by default?
+         File lineIndexFile = getLineIndexFile(buildSrcDir);
+         ObjectOutputStream os = null;
+         try {
+            os = new ObjectOutputStream(new FileOutputStream(lineIndexFile));
+            os.writeObject(idx);
+         }
+         catch (IOException exc) {
+            System.out.println("*** can't save file line index: " + exc);
+         }
+         finally {
+            FileUtil.safeClose(os);
+         }
+      }
+      else {
+         // TODO: remove an old file line index?
+      }
+   }
+
+   public static GenFileLineIndex readFileLineIndexFile(String srcName, String buildSrcDir) {
+      File lineIndexFile = getLineIndexFileName(srcName, buildSrcDir);
+      GenFileLineIndex idx = null;
+      if (lineIndexFile.canRead()) {
+         ObjectInputStream ois = null;
+         FileInputStream fis = null;
+         try {
+            ois = new ObjectInputStream(fis = new FileInputStream(lineIndexFile));
+            idx = (GenFileLineIndex) ois.readObject();
+         }
+         catch (InvalidClassException exc) {
+            System.out.println("file line index - version changed: " + lineIndexFile);
+            lineIndexFile.delete();
+         }
+         catch (IOException exc) {
+            System.out.println("*** can't file line index: " + exc);
+         }
+         catch (ClassNotFoundException exc) {
+            System.out.println("*** can't read file line index: " + exc);
+         }
+         finally {
+            FileUtil.safeClose(ois);
+            FileUtil.safeClose(fis);
+         }
+      }
+      return idx;
+   }
+
+   public GenFileLineIndex readFileLineIndex(String buildSrcDir) {
+      if (fileLineIndex != null && fileLineIndex.buildSrcDir.equals(buildSrcDir))
+         return fileLineIndex;
+      fileLineIndex = readFileLineIndexFile(getProcessedFileName(buildSrcDir), buildSrcDir);
+      return fileLineIndex;
+   }
+
+   public List<Integer> getGenLinesForSrcStatement(ISrcStatement st, String buildDir) {
+      GenFileLineIndex idx = readFileLineIndex(buildDir);
+      if (idx != null) {
+         return idx.getGenLinesForSrcLine(getSrcFile().absFileName, ParseUtil.getLineNumberForNode(getParseNode(), st.getParseNode()));
+      }
+      return null;
+   }
+
+   public ISrcStatement getSrcStatementForGenLine(int lineNum, String buildDir) {
+      GenFileLineIndex idx = readFileLineIndex(buildDir);
+      if (idx != null) {
+         FileRangeRef ref = idx.getSrcFileForGenLine(lineNum);
+         if (ref != null) {
+            LayeredSystem sys = getLayeredSystem();
+            // If there's already an inactive model, grab it.
+            ILanguageModel model = sys.getCachedModelByPath(ref.absFileName, true);
+            if (model == null) {
+               model = sys.getCachedModelByPath(ref.absFileName, false);
+               if (model == null) {
+                  SrcEntry src = sys.getSrcEntryForPath(ref.absFileName, false, true);
+                  System.out.println("*** Need to load the model?");
+               }
+            }
+            if (model != null) {
+               ISemanticNode res = ParseUtil.getNodeAtLine(model.getParseNode(), ref.startLine);
+               if (res instanceof ISrcStatement)
+                  return ((ISrcStatement) res);
+               else if (res != null)
+                  res = ModelUtil.getTopLevelStatement(res);
+               if (res instanceof ISrcStatement)
+                  return ((ISrcStatement) res);
+            }
+         }
+      }
+      return null;
+   }
+
+   public GenFileLineIndex generateFileLineIndex(String transformedResult, String buildSrcDir) {
+      String genFileName = getProcessedFileName(buildSrcDir);
+      GenFileLineIndex idx = new GenFileLineIndex(genFileName, transformedResult, buildSrcDir);
+      if (idx.verbose)
+         System.out.println("*** Starting genFileIndex for: " + getSrcFile() + " -> " + genFileName);
+      if (types != null) {
+         for (TypeDeclaration type:types) {
+            SemanticNodeList<Statement> body = type.body;
+            if (body != null) {
+               for (Statement st:body) {
+                  st.addToFileLineIndex(idx);
+               }
+            }
+         }
+      }
+      System.out.println("*** Completed genFileIndex for: " + getSrcFile() + " index: " + idx);
+      idx.cleanUp();
+      return idx;
    }
 }
 

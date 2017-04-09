@@ -559,8 +559,10 @@ public class TransformUtil {
 
    public static void addInitedDefinition(ClassDeclaration classDeclaration, boolean useAltComponent) {
       List<Statement> sts = useAltComponent ? TransformUtil.getAltInitedDefinition() : TransformUtil.getInitedDefinition();
-      for (Statement s:sts)
+      for (Statement s:sts) {
          classDeclaration.addBodyStatementIndent(s);
+         s.setFromStatement(classDeclaration.fromStatement);
+      }
    }
 
    static SemanticNodeList<Statement> getInitedDefinition() {
@@ -962,6 +964,11 @@ public class TransformUtil {
                // Must put these before any property definitions so that the _Prop variable references will all have been assigned.
                // Alternatively, we could just not use _Prop in the bind call (i.e. only use it for sendEvent)
                enclosingType.addBodyStatementsAt(enclosingType.propDefInsertIndex, staticList);
+
+               // Should we register these lines with the property for debugging purposes?  Since these are at the top of the file, they tend to
+               // be the ones we navigate to since they show up first in the list.  Also, why would we need to debug the definition of the property mapper anyway?
+               //for (Statement newSt:staticList)
+               //   newSt.setFromStatement(srcStatement);
 
                // Offset ix cause we just inserted a statement ahead of the one we are about to insert it
                if (ix >= enclosingType.propDefInsertIndex && enclosingType == propType)

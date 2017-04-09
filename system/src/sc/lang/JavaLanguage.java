@@ -122,12 +122,16 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       public Object generate(GenerateContext ctx, Object value) {
          if (!fastGenExpressions)
             return super.generate(ctx, value);
+
          //if (!ctx.finalGeneration)
          //   return super.generate(ctx, value);
          if (!(value instanceof Expression))
             return ctx.error(this, NO_MATCH_ERROR, value, 0);
 
-         return ((Expression) value).toGenerateString();
+         Expression expr = ((Expression) value);
+         if (expr.isLeafStatement())
+             return expr.toGenerateString();
+         return super.generate(ctx, value);
       }
    };
 
@@ -757,7 +761,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    {
       // When parsing for errors, once we've seen the 'class' skip on error until we see the { so we can resume a misformed class definition
       normalClassDeclaration.skipOnErrorSlot = 1;
-      normalClassDeclaration.skipOnErrorParselet = new Sequence("('')", OPTIONAL | REPEAT, new SymbolChoice(NOT, "extends", "implements", "class", "static", "public", "private", "{", "}", "\n", EOF));
+      normalClassDeclaration.skipOnErrorParselet = new Sequence("('')", OPTIONAL | REPEAT, new SymbolChoice(NOT, "extends", "implements", "class", "static", "public", "private", "{", "}", "\n", EOF)); // TODO: add equals for html attribute
    }
 
    Sequence enumConstant = new Sequence("EnumConstant(modifiers,typeName,arguments,body)", annotations, identifier,

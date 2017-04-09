@@ -391,6 +391,24 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
       public void addExcludedValues(String... excludedValues) {
          symbolParselet.addExcludedValues(excludedValues);
       }
+
+      public void setSymbolStyleName(String styleName) {
+         symbolParselet.styleName = styleName;
+      }
+   }
+
+   /** Like SymbolSpace but styled as a keyword */
+   public class KeywordSymbolSpace extends SymbolSpace {
+      public KeywordSymbolSpace(String symbol) {
+         super(symbol);
+         symbolParselet.styleName = "keyword";
+      }
+   }
+
+   public class KeywordSymbol extends Symbol {
+      public KeywordSymbol(String ev) {
+         super(ev);
+      }
    }
 
    private final static GenerateError MISSING_SEMANTIC_VALUE = new GenerateError("Null value for semantic parselet");

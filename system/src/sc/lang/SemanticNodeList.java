@@ -676,7 +676,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
 
    private static void diffAppend(StringBuilder diffs, Object val) {
       if (SemanticNode.debugDiffTrace)
-         diffs = diffs;
+         diffs = diffs; // set breakpoint here
       diffs.append(val);
    }
 

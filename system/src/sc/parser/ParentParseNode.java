@@ -515,9 +515,9 @@ public class ParentParseNode extends AbstractParseNode {
                   node.format(ctx);
                else {
                   parselet.format(ctx, node);
-                  if (ctx.replaceNode == node)
-                     children.set(i, ctx.createReplaceNode());
                }
+               if (ctx.replaceNode == node)
+                  children.set(i, ctx.createReplaceNode());
             }
             else if (p != null) {
                ctx.append((CharSequence) p);

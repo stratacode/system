@@ -361,7 +361,7 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
       return true;
    }
 
-   private final static int STATEMENTS_IN_STRING = 6;
+   private final static int MAX_STATEMENTS_IN_TOSTRING = 6;
 
    public String toString() {
       String start = getStartBlockString();
@@ -375,7 +375,7 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
       sb.append(start);
       sb.append("\n");
       boolean printElipsis = false;
-      for (int i = 0; i < Math.min(statements.size(), STATEMENTS_IN_STRING); i++) {
+      for (int i = 0; i < Math.min(statements.size(), MAX_STATEMENTS_IN_TOSTRING); i++) {
          Statement st = statements.get(i);
          sb.append("   ");
          sb.append(st);
@@ -385,7 +385,7 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
             break;
          }
       }
-      if (printElipsis || statements.size() > STATEMENTS_IN_STRING)
+      if (printElipsis || statements.size() > MAX_STATEMENTS_IN_TOSTRING)
          sb.append("   ...\n");
       sb.append(end);
       sb.append("\n");
@@ -407,4 +407,14 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
       return false;
    }
 
+   public int getNumStatementLines() {
+      return 1;
+   }
+
+   public void setFromStatement(ISrcStatement from) {
+      if (statements != null) {
+         for (Statement st:statements)
+            st.setFromStatement(from);
+      }
+   }
 }

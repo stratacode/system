@@ -6,8 +6,10 @@ package sc.util;
 
 import sc.js.JSSettings;
 
+import java.io.Serializable;
+
 @JSSettings(jsModuleFile="js/scgen.js", prefixAlias="sc_")
-public class IntStack {
+public class IntStack implements Serializable {
    int[] elements;
 
    int top = -1;
@@ -21,8 +23,7 @@ public class IntStack {
    }
 
    public void push(int val) {
-      if (++top == elements.length)
-      {
+      if (++top >= elements.length) {
          int[] newElements = new int[elements.length * 2];
          System.arraycopy(elements, 0, newElements, 0, elements.length);
          elements = newElements;
@@ -58,8 +59,7 @@ public class IntStack {
       return elements[top];
    }
 
-   public int pop()
-   {
+   public int pop() {
       if (top == -1)
          throw new IllegalArgumentException("popped off the top!");
       return elements[top--];

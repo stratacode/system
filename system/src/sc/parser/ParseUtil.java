@@ -225,6 +225,28 @@ public class ParseUtil  {
    }
 
    /**
+    * Returns the number of spaces for the given line for the given file name.  Uses line numbers starting at 1.
+    * Warning - no caching or indexing - reads the file, counts the chars so don't put this into a loop.
+    * Returns 0 if the line number is found
+    */
+   public static int getIndentColumnForLine(String fileName, int lineNum) {
+      String fileStr = FileUtil.getFileAsString(fileName);
+      int len = fileStr.length();
+      int lineCt = 1;
+      for (int i = 0; i < len; i++) {
+         if (lineCt == lineNum) {
+            int spaceCt = 0;
+            while (i < len && Character.isWhitespace(fileStr.charAt(i++)))
+               spaceCt++;
+            return spaceCt;
+         }
+         if (fileStr.charAt(i) == '\n')
+            lineCt++;
+      }
+      return 0; // If we can't find the indent - just return 0 since this is used for UI navigation
+   }
+
+   /**
     * Utility method to find a single contiguous error inside of a specified region of a parse node.
     * If there are multiple errors, the 'error region' inside of the specified startIx and endIx params
     * is returned.  This is used for identifying unparsed regions in building a formatting code model
@@ -780,11 +802,15 @@ public class ParseUtil  {
          node.setParseNode(npn);
    }
 
-   /** Removes the formating parse-nodes, like SpacingParseNode and replaces them with actual text based on the reformat algorithm.  When we re-generate a model, we are unable to
+   /**
+    * Removes the formatting parse-nodes, like SpacingParseNode and NewlineParseNode and replaces them with actual text based on the reformat algorithm.
+    * Some background on this: when we re-generate a model, i.e. update the parse-node representation for changes in the semantic node tree, we are unable to
     * determine the spacing and other text which is generated based on the complete context.  Instead, we insert these formatting parse-nodes as placeholders.  The format process starts then
     * from the top of the file and can accurately generate the indentation, newlines and spaces as per the formatting rules.   This method performs that global operation but also replaces
-    * the formatting parse-nodes with the actual formatting characters - e.g. the whitepsace, newlines, etc.  so they can be more easily manipulated.   Operations like reparsing and generating
-    * the IDE representation of the parse-nodes requires that the spacing is all evaulated.
+    * the formatting parse-nodes with the actual formatting characters - e.g. the whitespace, newlines, etc.  so they can be more easily manipulated.   Operations like reparsing and generating
+    * the IDE representation of the parse-nodes requires that the spacing is all evaluated.
+    *
+    * See also ParseUtil.resetSpacing which does the opposite - replacing the explicit spacing nodes with generated nodes so you can reformat a file.
     */
    public static void reformatParseNode(IParseNode node) {
       node.formatString(null, null, -1, true);
@@ -966,6 +992,9 @@ public class ParseUtil  {
 
    public static int countLinesInNode(CharSequence nodeStr) {
       int numLines = 0;
+      // TODO: we should probably just have a method which counts newlines in the parse-node strings since length is almost as expensive as just doing that and length is inside of charAt - or cache len in the parse node?
+      if (nodeStr instanceof IParseNode)
+         nodeStr = nodeStr.toString();
       for (int i = 0; i < nodeStr.length(); i++) {
          char c = nodeStr.charAt(i);
          if (c == '\n')

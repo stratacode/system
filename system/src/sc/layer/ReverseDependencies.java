@@ -9,7 +9,7 @@ import sc.util.FileUtil;
 import java.io.*;
 import java.util.*;
 
-/** For a given type, stores the references to the set of types which require bindable or dynamic behavior from this type */
+/** For a given type, stores the references to the set of types which require bindable or dynamic behavior from this type for a given build layer */
 public class ReverseDependencies implements Serializable {
    public static final String REVERSE_DEPENDENCIES_EXTENSION = "rdps";
    int typeCount = 0;

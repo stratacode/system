@@ -184,8 +184,8 @@ public class Sequence extends NestedParselet  {
 
                               if (value.children != null) {
                                  Object nextSlotVal = value.children.get(nextIx);
-                                 // Can't retry this slot as we already parsed it
-                                 if (nextSlotVal != null && !(nextSlotVal instanceof ErrorParseNode))
+                                 // Can't retry this slot as we already parsed it - an error can be parsed but a pre-error cannot because it's an error followed by a matched result
+                                 if (nextSlotVal != null && (!(nextSlotVal instanceof ErrorParseNode) || nextSlotVal instanceof PreErrorParseNode))
                                     break;
                                  resumeSlotVal = nextSlotVal;
                               }
@@ -200,6 +200,8 @@ public class Sequence extends NestedParselet  {
                               value.addOrSet(pendingError, parselets.get(resumeIx), -1, resumeIx, true, parser);
                            }
                            else {
+                              if (resumeSlotVal instanceof PreErrorParseNode)
+                                 System.err.println("*** Bad code - trying to resume pre-errors");
                               ErrorParseNode resumeNode = (ErrorParseNode) resumeSlotVal;
                               resumeNode.errorText += errorRes.toString();
                               pendingErrorIx = resumeIx;
@@ -575,8 +577,8 @@ public class Sequence extends NestedParselet  {
 
                               if (value.children != null && nextIx < value.children.size()) {
                                  Object nextSlotVal = value.children.get(nextIx);
-                                 // Can't retry this slot as we already parsed it
-                                 if (nextSlotVal != null && !(nextSlotVal instanceof ErrorParseNode))
+                                 // Can't retry this slot as we already parsed it - an error can be parsed but a pre-error cannot because it's an error followed by a matched result
+                                 if (nextSlotVal != null && (!(nextSlotVal instanceof ErrorParseNode) || nextSlotVal instanceof PreErrorParseNode))
                                     break;
                                  resumeSlotVal = nextSlotVal;
                               }
@@ -591,6 +593,8 @@ public class Sequence extends NestedParselet  {
                               value.addForReparse(pendingError, parselets.get(resumeIx), -1, resumeIx, resumeIx, true, parser, errorChildParseNode, dctx, false, false);
                            }
                            else {
+                              if (resumeSlotVal instanceof PreErrorParseNode)
+                                 System.err.println("*** Error - should not be reparsing something that finished successfully in the previous parse");
                               if (resumeSlotVal instanceof ErrorParseNode) {
                                  ErrorParseNode resumeNode = (ErrorParseNode) resumeSlotVal;
                                  if (pendingErrorIx == -1) {

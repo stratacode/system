@@ -9,6 +9,7 @@ import sc.classfile.CFMethod;
 import sc.dyn.IDynObjManager;
 import sc.dyn.IDynObject;
 import sc.lang.*;
+import sc.lang.html.Element;
 import sc.lang.js.JSRuntimeProcessor;
 import sc.lang.sc.*;
 import sc.lang.template.Template;
@@ -32,7 +33,7 @@ import java.util.*;
 /**
  * The base type of TypeDeclaration and EnumConstant.  Because EnumConstants have the bulk of the functionality of a class, this class maintains most of the core functionality of a type.
  */
-public abstract class BodyTypeDeclaration extends Statement implements ITypeDeclaration, INamedNode {
+public abstract class BodyTypeDeclaration extends Statement implements ITypeDeclaration, INamedNode, IClassBodyStatement {
    public final static String INNER_STUB_SEPARATOR = "__";
 
    @Constant
@@ -1523,6 +1524,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
       else if (pnode == null)
          res = useTypeName;
+      else if (pnode instanceof Element) {
+         if (useTypeName == null)
+            return null;
+         // TODO: is this right?
+         res = CTypeUtil.prefixPath(getJavaModel().getPackagePrefix(), ((Element) pnode).getFullTypeName());
+         res = res + innerTypeSep + useTypeName;
+      }
       else {
          throw new UnsupportedOperationException();
       }
@@ -9220,5 +9228,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public boolean isLeafStatement() {
       return false;
+   }
+
+   public List<Statement> getBodyStatements() {
+      return body;
    }
 }

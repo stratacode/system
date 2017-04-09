@@ -151,6 +151,7 @@ public class GlueExpression extends Expression {
          res = BinaryExpression.createMultiExpression(exprs.toArray(new Expression[exprs.size()]), "+");
          if (bindingDirection != null)
             res.setBindingInfo(bindingDirection, bindingStatement, nestedBinding);
+         res.fromStatement = this;
       }
       if (parentNode.replaceChild(this, res) == -1) {
          System.err.println("*** - unable to replace glue expreession child");

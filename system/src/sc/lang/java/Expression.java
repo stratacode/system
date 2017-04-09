@@ -23,7 +23,7 @@ import sc.util.StringUtil;
 import java.lang.reflect.Method;
 import java.util.*;
 
-public abstract class Expression extends Statement implements IValueNode, ITypedObject {
+public abstract class Expression extends Statement implements IValueNode, ITypedObject, IClassBodyStatement {
    transient public BindingDirection bindingDirection;
    transient public Statement bindingStatement;
    transient public boolean nestedBinding;
@@ -1021,4 +1021,13 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
          return replacedByStatement.getNodeErrorText();
       return null;
    }
+
+   public boolean isLeafStatement() {
+      return getBodyStatements() == null;
+   }
+
+   public List<Statement> getBodyStatements() {
+      return null;
+   }
+
 }

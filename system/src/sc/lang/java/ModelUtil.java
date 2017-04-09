@@ -8227,6 +8227,11 @@ public class ModelUtil {
    }
 
    public static ISemanticNode getTopLevelStatement(ISemanticNode node) {
+      ISemanticNode origNode = node;
+      while (node instanceof SemanticNodeList)
+         node = node.getParentNode();
+      if (node == null)
+         return origNode;
       Statement st = node instanceof Statement ? (Statement) node : ((JavaSemanticNode) node).getEnclosingStatement();
       if (st == null)
          return node;

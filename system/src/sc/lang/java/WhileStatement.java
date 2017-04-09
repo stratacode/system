@@ -5,6 +5,7 @@
 package sc.lang.java;
 
 import sc.lang.ISrcStatement;
+import sc.parser.ParseUtil;
 
 import java.util.List;
 import java.util.Set;
@@ -121,5 +122,12 @@ public class WhileStatement extends ExpressionStatement implements IStatementWra
 
    public String getFunctionEndString() {
       return ")";
+   }
+
+   /** For the while-statement, our breakpoints really are set on the while (expression) part */
+   public int getNumStatementLines() {
+      if (expression != null)
+         return ParseUtil.countLinesInNode(expression.getParseNode());
+      return super.getNumStatementLines();
    }
 }

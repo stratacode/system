@@ -365,6 +365,18 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       return null;
    }
 
+   boolean getContextSupportsObjects() {
+      Object ctx = getEnclosingContext();
+      while (ctx instanceof Element) {
+         ctx = ((Element) ctx).getEnclosingContext();
+      }
+      if (ctx instanceof GlueExpression || ctx instanceof GlueStatement)
+         return false;
+      if (ctx == null)
+         System.err.println("*** No context for element?");
+      return true;
+   }
+
    private boolean childNeedsObject() {
       // TODO: should be checking these children (and their children for explicit exec=".." lines which override the parent's exec=".." line (e.g. an exec="server" inside of an exec="client" or vice versa)
       // in that case, it seems like the parents in the chain above the  should not have isRemoteContent... it's more like setting exec=".." on each of the other children individually down to th
@@ -423,11 +435,11 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
 
       boolean needsObject = getElementId() != null || getAttribute("extends") != null || getAttribute("tagMerge") != null || getDynamicAttribute() != null || isRepeatElement();
 
-      Object ctx = getEnclosingContext();
-      // When not part of a top-level tag, we can't define the object structure.  We'll have to treat this case as elements having no state - just do normal string processing on the templates
+      // When not part of a top-level tag, we currently can't define the object structure.  We'll have to treat this case as elements having no state - just do normal string processing on the templates and print an error
+      // if any features are used that are not compatible with that behavior.  To support normal tag objects here, we could use inner types which are created, output and then destroyed
       // TODO: Do we need to do anything to tags nested inside of TemplateStatements?  I.e. those that would be theoretically created/destroyed in the outputBody method.  We could do it perhaps
       // with inner types and an inline-destroy method?
-      if (ctx instanceof GlueStatement || ctx instanceof GlueExpression) {
+      if (!getContextSupportsObjects()) {
          if (!nestedTagsInStatements) {
             if (needsObject) {
                displayError("Tag object is inside of a statement or expression - this case is not yet supported: ");
@@ -1120,7 +1132,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
             }
             if (strExprs.size() > 0) {
                for (Expression strExpr:strExprs) {
-                  ix = template.addTemplateDeclToOutputMethod(parentType, block, strExpr, false, "Body", ix, this, statefulContext, false);
+                  ix = template.addTemplateDeclToOutputMethod(parentType, block, strExpr, false, "Body", ix, this, this, statefulContext, false);
                }
                strExprs = new SemanticNodeList<Expression>();
             }
@@ -1131,7 +1143,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                   childExpr.inactive = true;
                }
                else
-                 ix = template.addTemplateDeclToOutputMethod(parentType, block, child, true, "Body", ix, this, statefulContext, true);
+                 ix = template.addTemplateDeclToOutputMethod(parentType, block, child, true, "Body", ix, this, this, statefulContext, true);
             }
          }
          if ((selfClose == null || !selfClose || needsBody) && closeTagName != null && (doFlags & doOutputEnd) != 0 && !inactive) {
@@ -1166,7 +1178,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          }
 
          if (tagExpr != null)
-            ix = template.addTemplateDeclToOutputMethod(parentType, block, tagExpr, false, methSuffix, ix, this, statefulContext, false);
+            ix = template.addTemplateDeclToOutputMethod(parentType, block, tagExpr, false, methSuffix, ix, this, this, statefulContext, false);
       }
       return ix;
    }
@@ -1279,6 +1291,9 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                continue;
             // When we are compiling, need to pick up the src type declaration here so that we can get at the corresponding element to inherit tags.
             Object res = sys == null ? null : sys.getTypeDeclaration(typeName, true, modelLayer, model != null && model.isLayerModel);
+            if (res == null) // But since the default classes are compiled classes, if we can't find a src one look for the compiled type
+               res = sys.getTypeDeclaration(typeName, false, modelLayer, model != null && model.isLayerModel);
+
             if (res != null && (!processable || ModelUtil.isProcessableType(res))) {
                if (res instanceof TypeDeclaration) {
                   TypeDeclaration resTD = (TypeDeclaration) res;
@@ -1946,6 +1961,11 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       return false;
    }
 
+   @Override
+   public int getNumStatementLines() {
+      return 1;
+   }
+
    public String getSimpleChildValue(String childName) {
       Element[] childTags = getChildTagsWithName(childName);
       if (childTags == null)
@@ -2160,7 +2180,8 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          repeatWrapper.addModifier("public");
 
          if (needsWrapperInterface) {
-            SemanticNodeList repeatMethList = (SemanticNodeList) TransformUtil.parseCodeTemplate(Object.class,
+            // TODO: cache this to avoid reparsing it each time?
+            SemanticNodeList<Statement> repeatMethList = (SemanticNodeList<Statement>) TransformUtil.parseCodeTemplate(Object.class,
                     "   public sc.lang.html.Element createElement(Object val, int ix, sc.lang.html.Element oldTag) {\n " +
                             "      if (oldTag != null)\n" +
                             "         return oldTag;\n " +
@@ -2171,10 +2192,12 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                             "   }",
                     SCLanguage.INSTANCE.classBodySnippet, false);
 
+            Statement repeatMeth = repeatMethList.get(0);
+            repeatMeth.setFromStatement(this);
             // TODO: should the Repeat wrapper implement IObjChildren so that the getObjChildren method is implemented by
             // retrieving the current repeat tags?   This would let a node in the editor that is a repeat display its
             // children in the child form.
-            repeatWrapper.addBodyStatement((Statement) repeatMethList.get(0));
+            repeatWrapper.addBodyStatement(repeatMeth);
          }
 
          if (parentType != null)
@@ -2183,6 +2206,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
             template.addTypeDeclaration(repeatWrapper);
 
          addParentNodeAssignment(repeatWrapper);
+         repeatWrapper.fromStatement = this;
       }
 
       modifyType = tagMerge == MergeMode.Replace ? null : existing;
@@ -2380,13 +2404,13 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          if (getNeedsClientServerSpecificId())
             args.add(BooleanLiteral.create(true));
          // Needs to be after the setParent call.
-         tagType.addBodyStatement(PropertyAssignment.create("id", IdentifierExpression.createMethodCall(args, "allocUniqueId"), "="));
+         addTagTypeBodyStatement(tagType, PropertyAssignment.create("id", IdentifierExpression.createMethodCall(args, "allocUniqueId"), "="));
          specifiedId = true;
       }
       if (tagName != null) {
          // If either we are the first class to extend HTMLElement or we are derived indirectly from Page (and so may not have assigned a tag name)
          if (extTypeDecl == HTMLElement.class || ModelUtil.isAssignableFrom(Page.class, extTypeDecl)) {
-            tagType.addBodyStatement(PropertyAssignment.create("tagName", StringLiteral.create(tagName), "="));
+            addTagTypeBodyStatement(tagType, PropertyAssignment.create("tagName", StringLiteral.create(tagName), "="));
          }
       }
 
@@ -2478,7 +2502,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                repeatExpr = CastExpression.create(ModelUtil.getTypeName(repeatElementType), repeatExpr);
             }
             FieldDefinition repeatVarField = FieldDefinition.create(getLayeredSystem(), repeatElementType, repeatVarName, ":=:", repeatExpr);
-            tagType.addBodyStatementIndent(repeatVarField);
+            addTagTypeBodyStatement(tagType, repeatVarField);
          }
       }
 
@@ -2513,7 +2537,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                }
             }
             if (preTagContent != null && (preTagStr = preTagContent.toString().trim()).length() > 0) {
-               template.addTemplateDeclToOutputMethod(tagType, outputStartMethod.body, preTagStr, false, "StartTag", resCt, this, true, false);
+               template.addTemplateDeclToOutputMethod(tagType, outputStartMethod.body, preTagStr, false, "StartTag", resCt, this, this, true, false);
             }
             resCt = addToOutputMethod(tagType, outputStartMethod.body, template, doOutputStart, children, resCt, true);
             tagType.addBodyStatementIndent(outputStartMethod);
@@ -2563,7 +2587,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                else
                   displayWarning("Use of addBefore/addAfter with bodyMerge='prepend' - not prepending to eliminate duplicate content");
             }
-            tagType.addBodyStatementIndent(outputBodyMethod);
+            addTagTypeBodyStatement(tagType, outputBodyMethod);
          }
       }
 
@@ -2591,6 +2615,11 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
 
       // Generate the outputBody method
       return tagType;
+   }
+
+   private void addTagTypeBodyStatement(BodyTypeDeclaration tagType, Statement st) {
+      tagType.addBodyStatementIndent(st);
+      st.fromStatement = this;
    }
 
    private void processScope(TypeDeclaration tagType, String scopeName) {
@@ -2631,7 +2660,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       if (parentType != null) {
          //PropertyAssignment pa = PropertyAssignment.create("parentNode", IdentifierExpression.create(parentType.typeName, "this"), "=");
          PropertyAssignment pa = PropertyAssignment.create("parentNode", SelectorExpression.create(IdentifierExpression.create(parentType.typeName), VariableSelector.create("this", null)), "=");
-         type.addBodyStatementIndent(pa);
+         addTagTypeBodyStatement(type, pa);
          return type.body.size();
       }
       return 0;
@@ -2642,7 +2671,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       if (parentType != null) {
          //PropertyAssignment pa = PropertyAssignment.create("parentNode", IdentifierExpression.create(parentType.typeName, "this"), "=");
          PropertyAssignment pa = PropertyAssignment.create("serverContent", BooleanLiteral.create(true), "=");
-         type.addBodyStatementIndent(pa);
+         addTagTypeBodyStatement(type, pa);
          return type.body.size();
       }
       return idx;

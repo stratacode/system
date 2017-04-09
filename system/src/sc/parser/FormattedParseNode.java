@@ -25,9 +25,11 @@ public class FormattedParseNode extends ParseNode {
          int len = formattingParseNodes.length;
          for (int i = 0; i < len; i++) {
             IParseNode pn = formattingParseNodes[i];
-            pn.format(ctx);
-            if (ctx.replaceNode == pn) {
-               formattingParseNodes[i] = ctx.createReplaceNode();
+            if (pn != null) {
+               pn.format(ctx);
+               if (ctx.replaceNode == pn) {
+                  formattingParseNodes[i] = ctx.createReplaceNode();
+               }
             }
          }
       }
@@ -37,7 +39,8 @@ public class FormattedParseNode extends ParseNode {
       super.computeLineNumberForNode(ctx, toFindPN);
       if (formattingParseNodes != null) {
          for (IParseNode pn:formattingParseNodes) {
-            pn.computeLineNumberForNode(ctx, toFindPN);
+            if (pn != null)
+               pn.computeLineNumberForNode(ctx, toFindPN);
          }
       }
    }
@@ -49,9 +52,11 @@ public class FormattedParseNode extends ParseNode {
 
       if (formattingParseNodes != null) {
          for (IParseNode pn:formattingParseNodes) {
-            res = pn.getNodeAtLine(ctx, lineNum);
-            if (res != null)
-               return res;
+            if (pn != null) {
+               res = pn.getNodeAtLine(ctx, lineNum);
+               if (res != null)
+                  return res;
+            }
          }
       }
       return null;
@@ -82,5 +87,19 @@ public class FormattedParseNode extends ParseNode {
 
    public boolean isCompressedNode() {
       return true;
+   }
+
+   public int resetStartIndex(int ix, boolean validate, boolean updateNewIndex) {
+      int res = super.resetStartIndex(ix, validate, updateNewIndex);
+      if (formattingParseNodes != null) {
+         for (IParseNode fpn:formattingParseNodes) {
+            if (fpn != null) {
+               int sz = fpn.length();
+               if (sz > 0)
+                  res += sz;
+            }
+         }
+      }
+      return res;
    }
 }

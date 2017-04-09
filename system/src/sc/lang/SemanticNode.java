@@ -502,7 +502,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
 
    static void diffAppend(StringBuilder diffs, Object val) {
       if (debugDiffTrace)
-         diffs = diffs;
+         diffs = diffs; // set breakpoint here
       diffs.append(val);
    }
 

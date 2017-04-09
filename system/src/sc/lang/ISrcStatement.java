@@ -35,4 +35,7 @@ public interface ISrcStatement extends ISemanticNode {
    ISrcStatement getFromStatement();
 
    boolean getNodeContainsPart(ISrcStatement partNode);
+
+   /** For breakpoint and navigation purposes, how many lines does this statement take up - usually it's 1 */
+   int getNumStatementLines();
 }

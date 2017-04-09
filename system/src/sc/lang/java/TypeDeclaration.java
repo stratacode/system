@@ -17,6 +17,7 @@ import sc.layer.IFileProcessorResult;
 import sc.layer.SrcEntry;
 import sc.obj.IComponent;
 import sc.layer.LayeredSystem;
+import sc.parser.GenFileLineIndex;
 import sc.parser.ParseUtil;
 import sc.type.CTypeUtil;
 import sc.util.IdentityHashSet;
@@ -124,7 +125,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       // Don't add the transformed types to the main type system.
       if (m != null && !isTransformedType()) {
          // Types defined inside of a method are not globally visible within the file
-         if (getEnclosingMethod() == null)
+         if (getEnclosingMethod() == null && typeName != null)
             m.addTypeDeclaration(getFileRelativeTypeName(), this);
       }
 
@@ -621,7 +622,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
       // Occasionally, like when styling code snippets we'll bring in a new type with layer=null so it does not
       // get stored in the type cache but we still want to consider it the same type if its name is the same.
-      if (this == other || (typeName.equals(other.getTypeName()) && getFullTypeName().equals(other.getFullTypeName())))
+      if (this == other || (typeName != null && typeName.equals(other.getTypeName()) && getFullTypeName().equals(other.getFullTypeName())))
          return true;
 
       if (other instanceof ModifyDeclaration) {
@@ -971,14 +972,17 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return result;
    }
 
-   private void addIFieldDefinition(Object modifiers, JavaType type, String varName, String operator, Expression initializer, boolean bindable) {
+   private void addIFieldDefinition(Object modifiers, JavaType type, String varName, String operator, Expression initializer, boolean bindable, ISrcStatement fromSt) {
       initializer = initializer == null ? null : (Expression) initializer.deepCopy(CopyNormal, null);
       FieldDefinition newField = FieldDefinition.createFromJavaType(type, varName, operator, initializer);
       if (modifiers instanceof ISemanticNode)
          modifiers = ((ISemanticNode) modifiers).deepCopy(CopyNormal, null);
       newField.setProperty("modifiers", modifiers);
-      newField.variableDefinitions.get(0).convertGetSet = true;
-      newField.variableDefinitions.get(0).bindable = bindable;
+      VariableDefinition newVarDef = newField.variableDefinitions.get(0);
+      newVarDef.convertGetSet = true;
+      newVarDef.bindable = bindable;
+      newVarDef.fromStatement = fromSt;
+      newField.fromStatement = fromSt;
       addBodyStatementIndent(newField);
    }
 
@@ -1063,7 +1067,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
                         // Need to call this so we have the types imported before the referenced field is initialized
                         addInterfaceImports(res);
                         // Note addFieldDefinition does a deep copy on the initExpr
-                        addIFieldDefinition(fd.modifiers, fd.type, varDef.variableName, initializer.getOperatorStr(), initExpr, varDef.bindable);
+                        addIFieldDefinition(fd.modifiers, fd.type, varDef.variableName, initializer.getOperatorStr(), initExpr, varDef.bindable, assign);
                      }
                      else // Right now we can only inherit interface fields from source based definitions - this is a special case of one where we refer to a compiled definition.  Need a metadata solution to store the info we need to create the field
                         System.err.println("*** Interface property refers to compiled field!");
@@ -1071,7 +1075,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
                   else if (resVarDef != null) {
                      FieldDefinition fd = (FieldDefinition) resVarDef.getDefinition();
                      Expression initExpr = resVarDef.initializer;
-                     addIFieldDefinition(fd.modifiers, fd.type, resVarDef.variableName, resVarDef.operator, initExpr, resVarDef.bindable);
+                     addIFieldDefinition(fd.modifiers, fd.type, resVarDef.variableName, resVarDef.operator, initExpr, resVarDef.bindable, resVarDef);
                      addInterfaceImports(res);
                   }
                }
@@ -1115,7 +1119,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
                      FieldDefinition fd = (FieldDefinition) resVarDef.getDefinition();
                      IVariableInitializer initializer = pa.getInheritedMember();
                      addInterfaceImports(res);
-                     addIFieldDefinition(fd.modifiers, fd.type, resVarDef.variableName, initializer.getOperatorStr(), pa.getInitializerExpr(), resVarDef.bindable);
+                     addIFieldDefinition(fd.modifiers, fd.type, resVarDef.variableName, initializer.getOperatorStr(), pa.getInitializerExpr(), resVarDef.bindable, pa);
                   }
                }
                // else - there's a definition for a field in this type.  even if there's no initializer, we will not use the one in the interface.  This is a questionable case but basing this on the need to inherit from an interface and override the value to null.
@@ -1816,4 +1820,5 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    public AccessLevel getDefaultAccessLevel() {
       return null;
    }
+
 }

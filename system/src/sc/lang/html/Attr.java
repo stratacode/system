@@ -278,6 +278,11 @@ public class Attr extends Node implements ISrcStatement {
       return false;
    }
 
+   @Override
+   public int getNumStatementLines() {
+      return 1;
+   }
+
 
    public void stop() {
       super.stop();

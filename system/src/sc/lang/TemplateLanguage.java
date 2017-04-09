@@ -77,26 +77,21 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
       // better error consumption than the declaration statement
       startCodeDelimiter.addExcludedValues("<%@", "<%!", "<%=");
    }
-   public SymbolSpace startExpDelimiter = new SymbolSpace(START_EXP_DELIMITER);
-   public SymbolSpace startDeclDelimiter = new SymbolSpace(START_DECL_DELIMITER);
-   public SymbolSpace startImportDelimiter = new SymbolSpace(START_IMPORT_DELIMITER);
+   public SymbolSpace startExpDelimiter = new KeywordSymbolSpace(START_EXP_DELIMITER);
+   public SymbolSpace startDeclDelimiter = new KeywordSymbolSpace(START_DECL_DELIMITER);
+   public SymbolSpace startImportDelimiter = new KeywordSymbolSpace(START_IMPORT_DELIMITER);
 
    // End does not consume space since that space should be part of the template string
-   public Symbol endDelimiter = new Symbol(END_DELIMITER);
+   public Symbol endDelimiter = new KeywordSymbol(END_DELIMITER);
 
    // Yes, start/end are swapped in these next two.  It's nice to have separate tokens for brace matching purposes in the lexer, or maybe separate styles?
-   public Symbol startGlueDelimiter = new Symbol(END_DELIMITER);
-   public Symbol endGlueDelimiter = new Symbol(START_CODE_DELIMITER);
+   public Symbol startGlueDelimiter = new KeywordSymbol(END_DELIMITER);
+   public Symbol endGlueDelimiter = new KeywordSymbol(START_CODE_DELIMITER);
 
    // Creating these so we have different tokens to match up against the start token - not really needed here but the lexer/highlighting in intelliJ requires separate tokens
-   public Symbol endExpDelimiter = new Symbol(END_DELIMITER);
-   public Symbol endImportDelimiter = new Symbol(END_DELIMITER);
-   public Symbol endDeclDelimiter = new Symbol(END_DELIMITER);
-
-   {
-      startCodeDelimiter.styleName = startExpDelimiter.styleName = startDeclDelimiter.styleName = startImportDelimiter.styleName = endDelimiter.styleName =
-              endExpDelimiter.styleName = endDeclDelimiter.styleName = endImportDelimiter.styleName = startGlueDelimiter.styleName = endGlueDelimiter.styleName = "keyword";
-   }
+   public Symbol endExpDelimiter = new KeywordSymbol(END_DELIMITER);
+   public Symbol endImportDelimiter = new KeywordSymbol(END_DELIMITER);
+   public Symbol endDeclDelimiter = new KeywordSymbol(END_DELIMITER);
 
    OrderedChoice htmlCommentBody = new OrderedChoice("('','','')", REPEAT | OPTIONAL,
                    new Sequence("('',)", new Symbol("--"), new Symbol(NOT | LOOKAHEAD, ">")),

@@ -1040,7 +1040,12 @@ public class NewExpression extends IdentifierExpression {
       return false;
    }
 
-   public boolean isLeafStatement() {
-      return classBody == null;
+   public boolean isLineStatement() {
+      return true;
+   }
+
+   @Override
+   public List<Statement> getBodyStatements() {
+      return classBody;
    }
 }

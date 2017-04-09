@@ -27,6 +27,16 @@ public class Symbol extends Parselet {
       initSymbol(ev);
    }
 
+   public Symbol(int options, String ev) {
+      super(options);
+      initSymbol(ev);
+   }
+
+   public Symbol(String ev) {
+      super();
+      initSymbol(ev);
+   }
+
    private void initSymbol(String ev) {
       expectedValue = ArrString.toArrString(ev);
       if (expectedValue != null)
@@ -46,16 +56,6 @@ public class Symbol extends Parselet {
                System.err.println("*** Warning: ignoring excluded value: " + excludeValue + " does not match the expected value: " + expectedValue);
          }
       }
-   }
-
-   public Symbol(int options, String ev) {
-      super(options);
-      initSymbol(ev);
-   }
-
-   public Symbol(String ev) {
-      super();
-      initSymbol(ev);
    }
 
    /** Number of chars this symbol should consume if not repeating */
