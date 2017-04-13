@@ -805,6 +805,14 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       return false;
    }
 
+   public boolean isLineStatement() {
+      return true; // For JS we are returning true here so we can register the method's first line to use for the classInit call... TODO: for Java, should this be the last line though?
+   }
+
+   public int getNumStatementLines() {
+      return 1;
+   }
+
    public BlockStatement getWrappedBlockStatement() {
       return body;
    }

@@ -1043,7 +1043,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          return null;
       ArrayList<SrcEntry> res = new ArrayList<SrcEntry>();
       for (SrcEntry src:srcFiles) {
-         res.add(new SrcEntry(src.layer, src.absFileName, src.relFileName, src.prependPackage));
+         //res.add(new SrcEntry(src.layer, src.absFileName, src.relFileName, src.prependPackage));
+         res.add(src.clone());
       }
       return res;
    }
@@ -3019,12 +3020,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return unsavedModel;
    }
 
-   public static File getLineIndexFileName(String genSrcName, String buildSrcDir) {
-      return new File(FileUtil.replaceExtension(genSrcName, "dbgIdx"));
-   }
-
    public File getLineIndexFile(String buildSrcDir) {
-      return getLineIndexFileName(getProcessedFileName(buildSrcDir), buildSrcDir);
+      return GenFileLineIndex.getLineIndexFile(getProcessedFileName(buildSrcDir));
    }
 
    public void updateFileLineIndex(String transformedResult, String buildSrcDir) {
@@ -3040,55 +3037,19 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
          // Should this file have a '.' in front of it to hide it by default?
          File lineIndexFile = getLineIndexFile(buildSrcDir);
-         ObjectOutputStream os = null;
-         try {
-            os = new ObjectOutputStream(new FileOutputStream(lineIndexFile));
-            os.writeObject(idx);
-         }
-         catch (IOException exc) {
-            System.out.println("*** can't save file line index: " + exc);
-         }
-         finally {
-            FileUtil.safeClose(os);
-         }
+
+         idx.saveLineIndexFile(lineIndexFile);
       }
       else {
          // TODO: remove an old file line index?
       }
    }
 
-   public static GenFileLineIndex readFileLineIndexFile(String srcName, String buildSrcDir) {
-      File lineIndexFile = getLineIndexFileName(srcName, buildSrcDir);
-      GenFileLineIndex idx = null;
-      if (lineIndexFile.canRead()) {
-         ObjectInputStream ois = null;
-         FileInputStream fis = null;
-         try {
-            ois = new ObjectInputStream(fis = new FileInputStream(lineIndexFile));
-            idx = (GenFileLineIndex) ois.readObject();
-         }
-         catch (InvalidClassException exc) {
-            System.out.println("file line index - version changed: " + lineIndexFile);
-            lineIndexFile.delete();
-         }
-         catch (IOException exc) {
-            System.out.println("*** can't file line index: " + exc);
-         }
-         catch (ClassNotFoundException exc) {
-            System.out.println("*** can't read file line index: " + exc);
-         }
-         finally {
-            FileUtil.safeClose(ois);
-            FileUtil.safeClose(fis);
-         }
-      }
-      return idx;
-   }
 
    public GenFileLineIndex readFileLineIndex(String buildSrcDir) {
       if (fileLineIndex != null && fileLineIndex.buildSrcDir.equals(buildSrcDir))
          return fileLineIndex;
-      fileLineIndex = readFileLineIndexFile(getProcessedFileName(buildSrcDir), buildSrcDir);
+      fileLineIndex = GenFileLineIndex.readFileLineIndexFile(getProcessedFileName(buildSrcDir));
       return fileLineIndex;
    }
 
@@ -3139,12 +3100,13 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             SemanticNodeList<Statement> body = type.body;
             if (body != null) {
                for (Statement st:body) {
-                  st.addToFileLineIndex(idx);
+                  st.addToFileLineIndex(idx, -1);
                }
             }
          }
       }
-      System.out.println("*** Completed genFileIndex for: " + getSrcFile() + " index: " + idx);
+      if (idx.verbose)
+         System.out.println("*** Completed genFileIndex for: " + getSrcFile() + " index: " + idx);
       idx.cleanUp();
       return idx;
    }

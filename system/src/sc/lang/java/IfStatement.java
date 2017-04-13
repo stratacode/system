@@ -181,11 +181,11 @@ public class IfStatement extends NonIndentedStatement {
       return true;
    }
 
-   public void addToFileLineIndex(GenFileLineIndex idx) {
-      super.addToFileLineIndex(idx);
+   public void addToFileLineIndex(GenFileLineIndex idx, int startGenLine) {
+      super.addToFileLineIndex(idx, startGenLine);
       if (trueStatement != null)
-         trueStatement.addToFileLineIndex(idx);
+         trueStatement.addToFileLineIndex(idx, startGenLine);
       if (falseStatement != null)
-         falseStatement.addToFileLineIndex(idx);
+         falseStatement.addToFileLineIndex(idx, startGenLine);
    }
 }

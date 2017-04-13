@@ -19,7 +19,7 @@ public class OffsetToLineIndex {
             offsets.push(i);
          }
       }
-      numLines = offsets.size();
+      numLines = offsets.size() + 1;
    }
 
    public int getLineForOffset(int offset) {
@@ -31,7 +31,7 @@ public class OffsetToLineIndex {
 
       // Use a binary search to find the line number for the supplied character offset
       int minLine = 1;
-      int maxLine = numLines+1;
+      int maxLine = numLines == 0 ? 1 : numLines;
       int minOffset = 0;
       int maxOffset = numChars;
 
@@ -51,7 +51,7 @@ public class OffsetToLineIndex {
          }
 
          int curOffset = offsets.get(curLine - 1);
-         int nextOffset = curLine >= numLines ? numChars : offsets.get(curLine);
+         int nextOffset = curLine >= offsets.size() ? numChars : offsets.get(curLine);
          // Is the supplied offset on this line - i.e. it starts after this line starts and before it ends
          if (offset > curOffset) {
             if (offset <= nextOffset)

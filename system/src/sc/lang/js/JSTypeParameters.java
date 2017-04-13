@@ -5,12 +5,17 @@
 package sc.lang.js;
 
 import sc.dyn.RDynUtil;
+import sc.lang.ISemanticNode;
+import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
 import sc.lang.java.*;
 import sc.lang.sc.ModifyDeclaration;
 import sc.lang.sc.PropertyAssignment;
 import sc.layer.LayeredSystem;
+import sc.layer.SrcEntry;
 import sc.parser.FormatContext;
+import sc.parser.GenFileLineIndex;
+import sc.parser.ParseUtil;
 import sc.sync.SyncLayer;
 import sc.type.CTypeUtil;
 import sc.type.MethodBindSettings;
@@ -24,6 +29,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.TreeSet;
 
+/**
+ * An instance of this class is created to convert a Java type to a JS type.  It's available to the JSTypeTemplate
+ * which is used to do the actual conversion and supplies the model-methods to make that somewhat convenient.
+ */
 public class JSTypeParameters extends ObjectTypeParameters {
    public BodyTypeDeclaration type;
    private JSMethod[] jsTypeMethods;
@@ -41,6 +50,8 @@ public class JSTypeParameters extends ObjectTypeParameters {
 
    /** When mergeTemplate is true, we are updating the type and so only need to include the changed methods */
    public TreeSet<String> changedMethods = null;
+
+   public GenFileLineIndex lineIndex = null;
 
    public JSTypeParameters() {
    }
@@ -81,7 +92,6 @@ public class JSTypeParameters extends ObjectTypeParameters {
       AbstractMethodDefinition jsDefaultMethod;
       ArrayList<List<JSMethod>> methsByParamNum;
       boolean constructor = false;
-
 
       JSMethod(AbstractMethodDefinition[] meths, AbstractMethodDefinition[] jsMeths) {
          methods = meths;
@@ -253,54 +263,68 @@ public class JSTypeParameters extends ObjectTypeParameters {
                //}
                constructorInit = "   this._" + JSUtil.convertTypeName(sys, ModelUtil.getTypeName(type)) + "Init();\n";
                if (superAppended) {
+                  addGenLineMapping(type, constructorInit, ParseUtil.countCodeLinesInNode(sb));
                   sb.append(constructorInit);
                   constructorInit = null;
                }
             }
          }
          if (defaultMethod == null || defaultMethod.hasModifier("abstract") || defaultMethod.body == null) {
-            if (constructorInit != null)
+            if (constructorInit != null) {
+               addGenLineMapping(type, constructorInit, ParseUtil.countCodeLinesInNode(sb));
                sb.append(constructorInit);
+            }
             return replaceIndent(indent, sb.toString()); // default constructor - there's no actual method and no code to run to init
          }
 
          // If this is an inherited method, it will always be a sub-method, like in an alias.  Instead of the body return the super call.
          if (isInherited()) {
-            sb.append(StringUtil.indent(indent));
+            StringBuilder superSt = new StringBuilder();
+            superSt.append(StringUtil.indent(indent));
             if (!constructor) {
                Object retType = ModelUtil.getReturnJavaType(defaultMethod);
                if (!ModelUtil.typeIsVoid(retType))
-                  sb.append("return ");
+                  superSt.append("return ");
             }
             else if (constructorInit != null) {
-               sb.append(constructorInit);
+               superSt.append(constructorInit);
                constructorInit = null;
             }
             Object methEnclType = defaultMethod.getEnclosingType();
-            sb.append(JSUtil.convertTypeName(type.getLayeredSystem(), ModelUtil.getTypeName(methEnclType)));
-            sb.append(((JSRuntimeProcessor)sys.runtimeProcessor).prototypeSuffix);
-            sb.append('.');
-            sb.append(defaultMethod.name);
+            superSt.append(JSUtil.convertTypeName(type.getLayeredSystem(), ModelUtil.getTypeName(methEnclType)));
+            superSt.append(((JSRuntimeProcessor)sys.runtimeProcessor).prototypeSuffix);
+            superSt.append('.');
+            superSt.append(defaultMethod.name);
             boolean firstComma = false;
             if (!ModelUtil.hasModifier(defaultMethod, "static")) {
-               sb.append('.');
-               sb.append("call(this ");
+               superSt.append('.');
+               superSt.append("call(this ");
                firstComma = true;
             }
             else {
-               sb.append('(');
+               superSt.append('(');
             }
             int np = getNumParameters();
             for (int i = 0; i < np; i++) {
                if (i != 0 || firstComma)
-                  sb.append(", ");
-               sb.append("arguments[");
-               sb.append(i);
-               sb.append("]");
+                  superSt.append(", ");
+               superSt.append("arguments[");
+               superSt.append(i);
+               superSt.append("]");
             }
-            sb.append(");\n");
+            superSt.append(");\n");
+
+            String superStStr = superSt.toString();
+            addGenLineMapping(type, superStStr, ParseUtil.countCodeLinesInNode(sb));
+            sb.append(superStStr);
             return sb.toString();
          }
+
+         // TODO: should we put a newline on the sb when we start or does that mess up lines for the previous returns here?
+         StringBuilder newSb = new StringBuilder();
+         newSb.append("\n");
+         newSb.append(sb);
+         sb = newSb;
 
          BlockStatement jsBody = jsDefaultMethod.body;
 
@@ -321,7 +345,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
             for (int s = 0; s < sz; s++) {
                Statement st = sts.get(s);
                // Normally statements will add indent but not always so need to do this manually to stitch together these statements
-               String nextStatement = st.formatToJS(JSFormatMode.InstInit).toString();
+               String nextStatement = st.formatToJS(JSFormatMode.InstInit, JSTypeParameters.this, ParseUtil.countLinesInNode(sb)).toString();
                if (needsIndent && !nextStatement.startsWith(" "))
                   nextStatement = StringUtil.indent(indent) + nextStatement;
                needsIndent = !nextStatement.endsWith(" ");
@@ -330,7 +354,6 @@ public class JSTypeParameters extends ObjectTypeParameters {
                   nextStatement = nextStatement.replaceAll("\\s+$", "");
                }
                */
-
                sb.append(nextStatement);
                if (constructorInit != null && st.callsSuper()) {
                   sb.append(constructorInit);
@@ -338,9 +361,11 @@ public class JSTypeParameters extends ObjectTypeParameters {
                }
             }
          }
-         if (constructorInit != null)
+         if (constructorInit != null) {
+            addGenLineMapping(type, constructorInit, ParseUtil.countLinesInNode(sb));
             sb.append(constructorInit);
-         return "\n" + sb.toString();
+         }
+         return sb.toString();
          //return "\n" + replaceIndent(indent, sb.toString());
          }
          finally {
@@ -348,6 +373,15 @@ public class JSTypeParameters extends ObjectTypeParameters {
          }
       }
 
+      public String getMethodClassInit() {
+         if (this.getNeedsClassInit()) {
+            String methClassInit = "\n   " + getTypeName() + "_c._clInit();";
+            // We want to attach this statement in the debugger or else it floats to the previous statement
+            addGenLineMapping(getNeedsDispatch() ? type : defaultMethod, methClassInit, 0);
+            return methClassInit;
+         }
+         return "";
+      }
 
       public boolean getNeedsDispatch() {
          if (methods == null)
@@ -540,7 +574,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
             rt.appendInnerJSMergeTemplate(btd, sb, syncTemplate);
             return sb.toString();
          }
-         return jsStatement.formatToJS(mode).toString();
+         return jsStatement.formatToJS(mode, JSTypeParameters.this, 0).toString();
       }
    }
 
@@ -651,6 +685,17 @@ public class JSTypeParameters extends ObjectTypeParameters {
       }
       */
       return sb == null ? "" : sb.toString();
+   }
+
+   /** The code segment we add for code in the class init section */
+   public String getClassInit() {
+      if (getNeedsClassInit()) {
+         // TODO: shouldn't this indent be based on the type's indent levels?
+         String classInit = "\n   " + getTypeName() + "_c._clInit();\n";
+         addGenLineMapping(type, classInit, 0);
+         return classInit;
+      }
+      return "";
    }
 
    public boolean getNeedsClassDef() {
@@ -1082,5 +1127,19 @@ public class JSTypeParameters extends ObjectTypeParameters {
          res = StringUtil.indent(indent) + res + (append ? FileUtil.LINE_SEPARATOR : "");
       }
       return res;
+   }
+
+   public void addGenLineMapping(Statement st, CharSequence genStatementCode, int extraLines) {
+      if (lineIndex != null && st.isLineStatement()) {
+         int genStartLine = getGenLineCount();
+         if (genStartLine == -1)
+            return;
+
+         Statement.addMappingForStatement(lineIndex, st, genStartLine + extraLines, genStatementCode);
+      }
+   }
+
+   public int getGenLineCount() {
+      return -1;
    }
 }

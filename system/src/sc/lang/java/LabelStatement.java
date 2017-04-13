@@ -9,7 +9,7 @@ import sc.lang.ISrcStatement;
 import java.util.List;
 import java.util.Set;
 
-public class LabelStatement extends Statement {
+public class LabelStatement extends Statement implements IStatementWrapper {
    public String labelName;
    public Statement statement;
 
@@ -39,5 +39,15 @@ public class LabelStatement extends Statement {
       if (statement != null) {
          statement.addReturnStatements(res, incThrow);
       }
+   }
+
+   @Override
+   public Statement getWrappedStatement() {
+      return statement;
+   }
+
+   @Override
+   public String getFunctionEndString() {
+      return ":";
    }
 }

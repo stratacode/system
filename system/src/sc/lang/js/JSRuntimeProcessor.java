@@ -4,6 +4,7 @@
 
 package sc.lang.js;
 
+import com.sun.org.apache.bcel.internal.generic.JSR;
 import sc.bind.Bind;
 import sc.dyn.DynUtil;
 import sc.lang.*;
@@ -16,6 +17,7 @@ import sc.lang.template.Template;
 import sc.layer.*;
 import sc.obj.ComponentImpl;
 import sc.obj.IComponent;
+import sc.parser.GenFileLineIndex;
 import sc.parser.ParseUtil;
 import sc.sync.SyncManager;
 import sc.type.CTypeUtil;
@@ -89,7 +91,14 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
    private transient HashMap<String,LinkedHashMap<JSFileEntry,Boolean>> typesInFileMap = new HashMap<String,LinkedHashMap<JSFileEntry,Boolean>>();
 
-   private transient HashMap<String,StringBuilder> jsFileBodyStore = new HashMap<String, StringBuilder>();
+   static class JSFileBodyCache {
+      StringBuilder jsFileBody = new StringBuilder();
+      GenFileLineIndex lineIndex = null;
+   }
+
+   private transient HashMap<String,GenFileLineIndex> lineIndexCache = new HashMap<String, GenFileLineIndex>();
+
+   private transient HashMap<String,JSFileBodyCache> jsFileBodyStore = new HashMap<String, JSFileBodyCache>();
 
    /** Set to true in the post start phase - after that phase, any other start models are not part of the build process (e.g. we might load the type declarations because they are init types when generating the page dispatcher)  */
    private transient boolean postStarted = false;
@@ -590,7 +599,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       }
 
       String resultStr = null;
-      // The theory here is that we tranform all of the types that should have changed and so if this type is not
+      // The theory here is that we transform all of the types that should have changed and so if this type is not
       // transformed, it hasn't changed so there's no need to save it.
       // TODO: Unfortunately we are not always transforming the Anon classes and those that come from the external source path.
       // Those types won't get updated on an incremental build as it stands now.   We should replace this with a more reliable change
@@ -602,13 +611,22 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       }
 
       if (resultStr == null) {
-         if (appendJSType(td, result)) {
+         GenFileLineIndex lineIndex = system.options.genDebugInfo ? new GenFileLineIndex(resEnt.absFileName) : null;
+         // convert the type declaration into JS and append it to result
+         if (appendJSType(td, result, lineIndex)) {
             resultStr = result.toString();
             FileUtil.saveStringAsFile(resEnt.absFileName, resultStr, true);
+
+            if (lineIndex != null) {
+               File lineIndexFile = GenFileLineIndex.getLineIndexFile(resEnt.absFileName);
+               lineIndexCache.put(resEnt.absFileName, lineIndex);
+               lineIndex.numLines = ParseUtil.countLinesInNode(resultStr) + 1;
+               lineIndex.saveLineIndexFile(lineIndexFile);
+            }
          }
       }
       else if (resEnt != srcEnt) {
-         FileUtil.copyFile(srcEnt.absFileName, resEnt.absFileName, true);
+         copyFileAndIndex(srcEnt.absFileName, resEnt.absFileName);
       }
 
       if (resultStr != null) {
@@ -638,6 +656,20 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       // For Java types specified in a final/compiled layer, we will never transform - need to set this here to enable incremental JS builds.
       if (javaModel.transformedInLayer == null)
          javaModel.transformedInLayer = system.currentBuildLayer;
+   }
+
+   private void copyFileAndIndex(String srcFileName, String dstFileName) {
+      FileUtil.copyFile(srcFileName, dstFileName, true);
+      String srcIndexFileName = GenFileLineIndex.getLineIndexFileName(srcFileName);
+      if (new File(srcIndexFileName).canRead())
+         FileUtil.copyFile(srcIndexFileName, GenFileLineIndex.getLineIndexFileName(dstFileName), true);
+   }
+
+   private void copyFileAndMap(String srcFileName, String dstFileName) {
+      FileUtil.copyFile(srcFileName, dstFileName, true);
+      String srcMapFileName = srcFileName + ".map";
+      if (new File(srcMapFileName).canRead())
+         FileUtil.copyFile(srcMapFileName, dstFileName + ".map", true);
    }
 
    public SrcEntry findJSSrcEntry(Layer startLayer, BodyTypeDeclaration type) {
@@ -1721,7 +1753,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       */
    }
 
-   void appendJSTypeTemplate(BodyTypeDeclaration td, StringBuilder result) {
+   void appendJSTypeTemplate(BodyTypeDeclaration td, StringBuilder result, GenFileLineIndex lineIndex) {
       /*
       ParseUtil.initAndStartComponent(td);
       if (td instanceof EnumDeclaration) {
@@ -1737,7 +1769,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          return;
       }
 
-      Object typeParams = new JSTypeParameters(td);
+      JSTypeParameters typeParams = new JSTypeParameters(td);
+
+      typeParams.lineIndex = lineIndex;
 
       String templatePath = getJSTypeTemplatePath(td);
       String rootTypeResult = system.evalTemplate(typeParams, templatePath, JSTypeParameters.class, td.getLayer(), td.isLayerType);
@@ -1921,7 +1955,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
                         // Track the min and max layers for each gen file.  If we find the layer for the file and it includes the last type, just copy from there to here.
                         // If not, our version must be more up to date if it's not changed so do not copy.
-                        FileUtil.copyFile(baseSrc.absFileName, absFilePath, true);
+                        copyFileAndMap(baseSrc.absFileName, absFilePath);
                      }
                   }
                }
@@ -1935,8 +1969,13 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          if (sys.options.verbose)
             System.out.println("Generating js file: " + jsFile + " for build layer: " + genLayer);
 
-         StringBuilder jsFileBody = new StringBuilder();
-         jsFileBodyStore.put(jsFile, jsFileBody);
+         JSFileBodyCache jsFileBodyCache = new JSFileBodyCache();
+         jsFileBodyStore.put(jsFile, jsFileBodyCache);
+         StringBuilder jsFileBody = jsFileBodyCache.jsFileBody;
+         GenFileLineIndex jsLineIndex = null;
+         if (system.options.genDebugInfo)
+            jsLineIndex = jsFileBodyCache.lineIndex = new GenFileLineIndex(jsFile);
+
          entryPointsFrozen = true;
          try {
             // First define the types for each entry point that goes in this file
@@ -1964,30 +2003,61 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             }
          }
 
+         /**
+          * Now add code for each entryPoint that is run during initialization - i.e. main methods or objects marked to be created on startup
+          */
          boolean needsSync = hasDependency(jsFile, "js/sync.js");
-         StringBuilder initBody = new StringBuilder();
+         ArrayList<InitCodeInfo> initCodeInfos = new ArrayList<InitCodeInfo>();
          for (EntryPoint e:jsBuildInfo.entryPoints.values()) {
             if (e.jsFile.equals(jsFile)) {
                if (e.needsInit) {
                   BodyTypeDeclaration initType = e.getResolvedType(sys);
+                  InitCodeInfo initCodeInfo = new InitCodeInfo(initType);
+                  initCodeInfos.add(initCodeInfo);
                   if (sys.options.verbose)
-                     initBody.append("console.log(\"Init type: " + initType.typeName + "\");\n");
+                     initCodeInfo.initBody.append("console.log(\"Init type: " + initType.typeName + "\");\n");
 
                   if (!e.isMain)
-                     initBody.append(getInstanceTemplate(initType));
+                     initCodeInfo.initBody.append(getInstanceTemplate(initType));
                   else
-                     initBody.append(evalMainTemplate(initType));
+                     initCodeInfo.initBody.append(evalMainTemplate(initType));
                }
             }
          }
-         if (needsSync && initBody.length() > 0) {
-            // Now generate the main object/method call to kick things off, wrapped around a start/end sync call.
-            jsFileBody.append(JSRuntimeProcessor.SyncBeginCode);
-            jsFileBody.append(initBody);
-            jsFileBody.append(JSRuntimeProcessor.SyncEndCode);
+         // Now generate the main object/method call to kick things off, wrapped around a start/end sync call.
+         if (initCodeInfos.size() > 0) {
+            if (needsSync) {
+               if (jsLineIndex != null)
+                  jsLineIndex.numLines += ParseUtil.countLinesInNode(JSRuntimeProcessor.SyncBeginCode);
+               // TODO: register a debug line mapping for this code?
+               jsFileBody.append(JSRuntimeProcessor.SyncBeginCode);
+            }
+            for (InitCodeInfo initCodeInfo:initCodeInfos) {
+               if (jsLineIndex != null) {
+                  BodyTypeDeclaration bodyType = initCodeInfo.type;
+                  ISrcStatement srcSt;
+                  // The type here is typically already the src type unless we are generating it from a template in which case we need to resolve the source statement
+                  if (bodyType.fromStatement != null)
+                     srcSt = bodyType.getSrcStatement(null);
+                  else
+                     srcSt = bodyType;
+                  Statement.addMappingForSrcStatement(jsLineIndex, srcSt, jsLineIndex.numLines, initCodeInfo.initBody);
+                  jsLineIndex.numLines += ParseUtil.countLinesInNode(initCodeInfo.initBody);
+               }
+               jsFileBody.append(initCodeInfo.initBody);
+            }
+            if (needsSync) {
+               jsFileBody.append(JSRuntimeProcessor.SyncEndCode);
+               if (jsLineIndex != null)
+                  jsLineIndex.numLines += ParseUtil.countLinesInNode(JSRuntimeProcessor.SyncEndCode);
+            }
          }
-         else
-            jsFileBody.append(initBody);
+
+         if (jsLineIndex != null) {
+            String sourceMapName = absFilePath + ".map";
+            jsFileBody.append("\n//# sourceMappingURL=" + FileUtil.getFileName(sourceMapName) + "\n");
+            FileUtil.saveStringAsFile(sourceMapName, jsLineIndex.getSourceMappingJSON(), true);
+         }
          FileUtil.saveStringAsFile(absFilePath, jsFileBody.toString(), true);
       }
 
@@ -2000,6 +2070,14 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          resetBuildLayerState();
 
       PerfMon.end("postProcessJS");
+   }
+
+   private static class InitCodeInfo {
+      StringBuilder initBody = new StringBuilder();
+      BodyTypeDeclaration type;
+      InitCodeInfo(BodyTypeDeclaration type) {
+         this.type = type;
+      }
    }
 
    public void resetBuildLayerState() {
@@ -2361,7 +2439,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          notInParentFile = hasAlias(type);
 
       //addLibFile(typeLibFile, rootLibFile);
-      StringBuilder jsFileBody = jsFileBodyStore.get(typeLibFile);
+      JSFileBodyCache jsFileBodyCache = jsFileBodyStore.get(typeLibFile);
+      StringBuilder jsFileBody = jsFileBodyCache == null ? null : jsFileBodyCache.jsFileBody;
+      GenFileLineIndex lineIndex = jsFileBodyCache == null ? null : jsFileBodyCache.lineIndex;
 
       String fullTypeName = type.getFullTypeName();
       JSFileEntry jsEnt = new JSFileEntry();
@@ -2407,8 +2487,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             }
 
             try {
-               String fileBody = FileUtil.getFileAsString(srcEnt.absFileName);
-               jsFileBody.append(fileBody);
+               appendJSFileBody(srcEnt, jsFileBody, lineIndex);
             }
             catch (IllegalArgumentException exc) {
                System.err.println("*** No dependent js file: " + srcEnt.absFileName);
@@ -2460,7 +2539,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                                     continue;
                                  // If it's an unassigned class it's in the same file, or if the files match.
                                  if (depJTI.jsModuleFile == null || (typeLibFile != null && depJTI.jsModuleFile.equals(typeLibFile))) {
-                                    addCompiledTypesToFile(depTypeName, typesInFile, parentLibFile, genLayer, jsFileBody, typesInSameFile);
+                                    addCompiledTypesToFile(depTypeName, typesInFile, parentLibFile, genLayer, jsFileBody, lineIndex, typesInSameFile);
                                  }
                                  continue;
                               }
@@ -2494,7 +2573,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             else if (enclType == null) {
                if (typeInfo.typesInSameFile != null) {
                   for (String subTypeName:typeInfo.typesInSameFile) {
-                     addCompiledTypesToFile(subTypeName, typesInFile, rootLibFile, genLayer, jsFileBody, typeInfo.typesInSameFile);
+                     addCompiledTypesToFile(subTypeName, typesInFile, rootLibFile, genLayer, jsFileBody, lineIndex, typeInfo.typesInSameFile);
                   }
                }
             }
@@ -2503,11 +2582,30 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       }
    }
 
+   private void appendJSFileBody(SrcEntry srcEnt, StringBuilder jsFileBody, GenFileLineIndex lineIndex) {
+      String fileBody = FileUtil.getFileAsString(srcEnt.absFileName);
+      jsFileBody.append(fileBody);
+      if (lineIndex != null) {
+         GenFileLineIndex newLineIndex = getFileLineIndex(srcEnt.absFileName);
+         lineIndex.appendIndex(newLineIndex);
+      }
+   }
+
    private boolean isCompiledInType(Object depType) {
       return ((depType instanceof PrimitiveType) || (depType instanceof TypeVariable) || (ModelUtil.isWildcardType(depType)) || ModelUtil.isUnboundSuper(depType));
    }
 
-   private void addCompiledTypesToFile(String typeName, Map<JSFileEntry,Boolean> typesInFile, String rootLibFile, Layer genLayer, StringBuilder jsFileBody, Set<String> typesInSameFile) {
+   private GenFileLineIndex getFileLineIndex(String genSrcName) {
+      GenFileLineIndex res = lineIndexCache.get(genSrcName);
+      if (res == null) {
+         res = GenFileLineIndex.readFileLineIndexFile(GenFileLineIndex.getLineIndexFileName(genSrcName));
+         if (res != null)
+            lineIndexCache.put(genSrcName, res);
+      }
+      return res;
+   }
+
+   private void addCompiledTypesToFile(String typeName, Map<JSFileEntry,Boolean> typesInFile, String rootLibFile, Layer genLayer, StringBuilder jsFileBody, GenFileLineIndex lineIndex, Set<String> typesInSameFile) {
       JSTypeInfo subTypeInfo = jsBuildInfo.jsTypeInfo.get(typeName);
       if (subTypeInfo != null && !subTypeInfo.presentInLayer(genLayer))
          return;
@@ -2528,8 +2626,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             return;
          }
          try {
-            String fileBody = FileUtil.getFileAsString(subSrcEnt.absFileName);
-            jsFileBody.append(fileBody);
+            appendJSFileBody(subSrcEnt, jsFileBody, lineIndex);
 
             if (subTypeInfo == null)
                System.err.println("*** Missing JS type info");
@@ -2539,7 +2636,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                      System.err.println("*** Invalid sub-type name - same as main type: " + subTypeName);
                      continue;
                   }
-                  addCompiledTypesToFile(subTypeName, typesInFile, rootLibFile, genLayer, jsFileBody, subTypeInfo.typesInSameFile);
+                  addCompiledTypesToFile(subTypeName, typesInFile, rootLibFile, genLayer, jsFileBody, lineIndex, subTypeInfo.typesInSameFile);
                }
             }
 
@@ -2612,7 +2709,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return td;
    }
 
-   boolean appendJSType(BodyTypeDeclaration td, StringBuilder result) {
+   /** Makes sure the type has been transformed and converts it to JS */
+   boolean appendJSType(BodyTypeDeclaration td, StringBuilder result, GenFileLineIndex lineIndex) {
       td = ensureTransformedResult(td);
       if (td == null) {
          System.err.println("*** No transformed result in appendJSType: ");
@@ -2621,7 +2719,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       }
       if (!processedTypes.contains(td.getFullTypeName()) && !hasJSLibFiles(td)) {
          td.getJavaModel().disableTypeErrors = true;
-         appendJSTypeTemplate(td, result);
+         appendJSTypeTemplate(td, result, lineIndex);
          //appendInnerJSTypes(td, result);
          return true;
       }
@@ -2817,7 +2915,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    public void initAfterRestore() {
       processedTypes = new HashSet<String>();
       typesInFileMap = new HashMap<String,LinkedHashMap<JSFileEntry,Boolean>>();
-      jsFileBodyStore = new HashMap<String, StringBuilder>();
+      jsFileBodyStore = new HashMap<String, JSFileBodyCache>();
       changedJSFiles = new LinkedHashSet<String>();
    }
 

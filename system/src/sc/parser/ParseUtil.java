@@ -1002,6 +1002,28 @@ public class ParseUtil  {
       }
       return numLines;
    }
+   public static int countCodeLinesInNode(CharSequence nodeStr) {
+      return countCodeLinesInNode(nodeStr, nodeStr.length());
+   }
+
+   public static int countCodeLinesInNode(CharSequence nodeStr, int len) {
+      int numLines = 0;
+      // TODO: we should probably just have a method which counts newlines in the parse-node strings since length is almost as expensive as just doing that and length is inside of charAt - or cache len in the parse node?
+      if (nodeStr instanceof IParseNode)
+         nodeStr = nodeStr.toString();
+      int nextLines = 0;
+      for (int i = 0; i < len; i++) {
+         char c = nodeStr.charAt(i);
+         if (c == '\n')
+            nextLines++;
+         // Do not count extra newlines after the node - those might be trailing comments or whatever which we do not track.
+         else if (!Character.isWhitespace(c)) {
+            numLines += nextLines;
+            nextLines = 0;
+         }
+      }
+      return numLines;
+   }
 
    public static ISemanticNode getNodeAtLine(IParseNode parseNode, int requiredLineNum) {
       NodeAtLineCtx ctx = new NodeAtLineCtx();

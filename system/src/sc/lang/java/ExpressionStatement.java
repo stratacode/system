@@ -56,4 +56,7 @@ public abstract class ExpressionStatement extends Statement {
       return -1;
    }
 
+   public boolean isLineStatement() {
+      return true;
+   }
 }

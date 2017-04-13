@@ -6,6 +6,7 @@ package sc.lang.java;
 
 import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
+import sc.parser.GenFileLineIndex;
 
 import java.util.Collections;
 import java.util.EnumSet;
@@ -234,5 +235,16 @@ public class TryStatement extends Statement implements IBlockStatement {
 
    public String getEndBlockString() {
       return "}";
+   }
+
+   public void addToFileLineIndex(GenFileLineIndex idx, int startGenLine) {
+      super.addToFileLineIndex(idx, startGenLine);
+      if (catchStatements != null) {
+         for (CatchStatement catchSt:catchStatements)
+            catchSt.addToFileLineIndex(idx, startGenLine);
+      }
+      if (finallyStatement != null) {
+         finallyStatement.addToFileLineIndex(idx, startGenLine);
+      }
    }
 }

@@ -2215,6 +2215,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public String getStrataCodeRuntimePath(boolean core, boolean src) {
+      // sc.core.src.path or sc.src.path
       String propName = "sc." + (core ? "core." : "") + (src ? "src." : "") + "path";
       String path;
       if ((path = System.getProperty(propName)) != null)

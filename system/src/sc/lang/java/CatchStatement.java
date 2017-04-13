@@ -4,6 +4,8 @@
 
 package sc.lang.java;
 
+import sc.parser.GenFileLineIndex;
+
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;

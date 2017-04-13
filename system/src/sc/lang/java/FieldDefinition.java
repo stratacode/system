@@ -10,6 +10,7 @@ import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
 import sc.lang.js.JSFormatMode;
 import sc.lang.js.JSRuntimeProcessor;
+import sc.lang.js.JSTypeParameters;
 import sc.lang.js.JSUtil;
 import sc.layer.LayeredSystem;
 import sc.obj.ScopeDefinition;
@@ -19,6 +20,7 @@ import sc.sync.SyncManager;
 import sc.type.CTypeUtil;
 import sc.type.Type;
 import sc.type.TypeUtil;
+import sc.util.LineCountStringBuilder;
 import sc.util.StringUtil;
 
 import java.util.EnumSet;
@@ -518,10 +520,10 @@ public class FieldDefinition extends TypedDefinition {
       return nullInit;
    }
 
-   public CharSequence formatToJS(JSFormatMode mode) {
+   public CharSequence formatToJS(JSFormatMode mode, JSTypeParameters params, int extraLines) {
       JavaModel model = getJavaModel();
       int sz = variableDefinitions.size();
-      StringBuilder res = new StringBuilder();
+      LineCountStringBuilder res = new LineCountStringBuilder();
       for (int i = 0; i < sz; i++) {
          VariableDefinition varDef = variableDefinitions.get(i);
          String nullInit = getNullInit(varDef);
@@ -530,6 +532,7 @@ public class FieldDefinition extends TypedDefinition {
             if (mode == JSFormatMode.InstInit)
                continue;
          }
+
          if (i != 0)
             res.append(" ");
          else
@@ -638,13 +641,15 @@ public class FieldDefinition extends TypedDefinition {
                res.append(nullInit);
             }
             else
-               res.append(varDef.initializer.formatToJS(mode));
+               res.append(varDef.initializer.formatToJS(mode, params, extraLines + res.lineCount));
          }
          else
             res.append(nullInit);
 
          res.append(";\n");
       }
+      // TODO: do we need this?
+      //params.addGenLineMapping(this, res.toString(), extraLines);
       return res;
    }
 

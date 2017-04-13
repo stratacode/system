@@ -9233,4 +9233,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public List<Statement> getBodyStatements() {
       return body;
    }
+
+   // Not sure if Java treats this as a line statement but we need a debugger location for all of the code generated for a class.
+   public boolean isLineStatement() {
+      return true;
+   }
+
+   public int getNumStatementLines() {
+      return 1;
+   }
 }
