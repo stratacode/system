@@ -1,0 +1,27 @@
+image: java:8-jdk
+
+stages:
+  - build
+  - deploy
+
+build:
+  tags:
+    - docker
+  image: java:8-jdk
+  stage: build
+  artifacts:
+    name: "stratacode"
+    expire_in: 1 month
+    paths:
+      - coreRuntime/build/libs
+      - fullRuntime/build/libs
+      - system/build/libs
+  script:
+  - ./gradlew
+
+deploy:
+  tags:
+    - docker
+  stage: deploy
+  script:
+  - ./gradlew uploadArchives
