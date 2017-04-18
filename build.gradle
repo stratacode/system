@@ -66,6 +66,22 @@ subprojects {
             }
        }
    }
+
+    project.uploadArchives {
+        repositories {
+            mavenDeployer {
+                repository(url: System.getenv('MAVEN_DEPLOYER_REPOSITORY')) {
+                    authentication(userName: System.getenv('MAVEN_DEPLOYER_USERNAME'), password: System.getenv('MAVEN_DEPLOYER_PASSWORD'))
+                }
+                snapshotRepository(url: System.getenv('MAVEN_DEPLOYER_SNAPSHOT_REPOSITORY')) {
+                    authentication(userName: System.getenv('MAVEN_DEPLOYER_USERNAME'), password: System.getenv('MAVEN_DEPLOYER_PASSWORD'))
+                }
+                pom.version = version
+                // pom.artifactId is set automatically for each project (coreRuntime, fullRuntime, system)
+                pom.groupId = stratacodeGroup
+            }
+        }
+    }
 }
 
 project(':coreRuntime') {
