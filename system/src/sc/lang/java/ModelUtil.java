@@ -8253,6 +8253,9 @@ public class ModelUtil {
          if (parentStatement.childIsTopLevelStatement(st))
             return st;
       }
+      // Element and other statements
+      else if (parent instanceof ISrcStatement)
+         return parent;
 
       // TODO: what about variable definitions and fields?  Shouldn't the variable definition be the top-level statement?
       return getTopLevelStatement(parent);

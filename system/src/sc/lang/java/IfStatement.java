@@ -172,8 +172,12 @@ public class IfStatement extends NonIndentedStatement {
 
    /** For the if-statement, our breakpoints really are set on the if (expression) part only */
    public int getNumStatementLines() {
-      if (expression != null)
-         return ParseUtil.countLinesInNode(expression.getParseNode());
+      if (expression != null) {
+         IParseNode pn = expression.getParseNode();
+         if (pn == null)
+            return 0;
+         return ParseUtil.countLinesInNode(pn);
+      }
       return super.getNumStatementLines();
    }
 

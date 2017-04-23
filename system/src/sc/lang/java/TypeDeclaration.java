@@ -125,7 +125,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       // Don't add the transformed types to the main type system.
       if (m != null && !isTransformedType()) {
          // Types defined inside of a method are not globally visible within the file
-         if (getEnclosingMethod() == null && typeName != null)
+         if (getEnclosingMethod() == null && typeName != null && !isAnonymousType())
             m.addTypeDeclaration(getFileRelativeTypeName(), this);
       }
 

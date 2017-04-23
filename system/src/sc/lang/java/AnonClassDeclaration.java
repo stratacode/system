@@ -51,4 +51,8 @@ public class AnonClassDeclaration extends ClassDeclaration {
          return null;
       return newExpr.getEnclosingType();
    }
+
+   public boolean isAnonymousType() {
+      return true;
+   }
 }

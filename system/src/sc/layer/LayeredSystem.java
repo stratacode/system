@@ -11811,6 +11811,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          System.err.println("*** No template named: " + typeName);
          return "<error evaluating template>";
       }
+      // TODO: for JSTypeTemplate we now should be creating JSTypeTemplateBase, the initTemplate so we are recording line numbers for debugging
       // TODO: should we lazy compile the template here?  It does not seem to make enough of a performance difference
       // to be worth it now.
       String res = TransformUtil.evalTemplate(paramObj, template);
@@ -12160,7 +12161,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (model == null) {
             model = externalModelIndex.lookupJavaModel(srcEnt, true);
             if (model != null) {
-               ParseUtil.initAndStartComponent(model);
+               if (!model.isInitialized())
+                  System.err.println("*** Error - external index returns model that's not initialized!");
+
+               //ParseUtil.initAndStartComponent(model);
                if (model.getLayer() != null && model.getLayer().activated)
                   System.out.println("*** Error - renaming activated model to inactive index");
                inactiveModelIndex.put(srcEnt.absFileName, model);
@@ -12422,7 +12426,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       while ((lix = rootTypeName.lastIndexOf(".")) != -1) {
          String nextRoot = rootTypeName.substring(0, lix);
          String tail = pathName.substring(lix+1);
-         if (alwaysCheckInnerTypes || systemCompiled || !toBeCompiled(nextRoot, refLayer, layerResolve)) {
+         if (alwaysCheckInnerTypes || !buildingSystem || !toBeCompiled(nextRoot, refLayer, layerResolve)) {
             Object rootClass = getClass(nextRoot, layerResolve);
             if (rootClass != null && (c = ModelUtil.getInnerType(rootClass, tail, null)) != null)
                return c;
@@ -13222,8 +13226,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                       (!startLayer.buildSeparate || layer == startLayer || startLayer.extendsLayer(layer))) {
 
                      if (layer == buildLayer || !options.buildAllLayers) {
-                        // Don't include the buildDir for the IDE and other environments when we are compiling only and not running
-                        if (!options.compileOnly)
+                        // Don't include the buildDir for the IDE and other environments when we are compiling only and not running unless it's a final layer like js.prebuild where
+                        // we want the compilation process to load the compiled classes for speed.
+                        if (!options.compileOnly || layer.finalLayer)
                            layer.appendBuildURLs(urls);
                      }
                   }

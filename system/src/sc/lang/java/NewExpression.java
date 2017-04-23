@@ -544,9 +544,13 @@ public class NewExpression extends IdentifierExpression {
       if (classBody == null)
          return;
 
+      if (!started && !starting)
+         System.err.println("*** Initializing anonymous type on an unstarted new expression");
+
       if (!anonTypeInited) {
          // It seems we can get here at least from refreshBoundTypes - when after an incremental compile we might not have started the model.
          // always start models from the top-down, or weird problems show up - like anonIds getting allocated in an inconsistent order
+         // One place this can happen is getEnclosingType, which for a new expression will call this.
          if (!isStarted() && !starting) {
             JavaModel model = getJavaModel();
             if (!model.isStarted())

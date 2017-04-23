@@ -791,8 +791,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          }
       }
 
-      if (verboseJS && td.getEnclosingType() == null)
-         system.verbose("Starting for JS: " + td.getFullTypeName());
+      //if (verboseJS && td.getEnclosingType() == null)
+      //   system.verbose("Starting for JS: " + td.getFullTypeName());
 
       // Need to figure out what JS libraries are needed so that it can be used to generate the HTML template to include them
       //LinkedHashMap<JSFileEntry,Boolean> typesInFile = new LinkedHashMap<JSFileEntry,Boolean>();
@@ -969,6 +969,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
                String modLibFile = getJSDefaultModuleFile(type);
                addChangedJSFile(type, modLibFile);
+
+               if (verboseJS)
+                  system.verbose("Converting to JS: " + jsEnt.fullTypeName);
             }
 
             addExtendsTypeLibsToFile(type, typesInFile, typeLibFile);
@@ -1044,6 +1047,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          else {
             String depJSFilesStr = getDependentJSLibFiles(type);
             if (depJSFilesStr != null) {
+               if (verboseJS)
+                  system.verbose("JS native type: " + jsEnt.fullTypeName + " defined in lib files: " + depJSFilesStr);
+
                String[] depJSFiles = StringUtil.split(depJSFilesStr, ',');
 
                for (String depFile:depJSFiles)
@@ -1058,6 +1064,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          if (mainInit != null && !type.hasModifier("abstract")) {
             Boolean subTypesOnly = (Boolean) ModelUtil.getAnnotationValue(mainInit, "subTypesOnly");
             if (subTypesOnly == null || !subTypesOnly || type.getAnnotation("sc.html.MainInit") == null) {
+               if (verboseJS)
+                  system.verbose("JS @MainInit entry point: " + jsEnt.fullTypeName);
+
                String jsFile = (String) ModelUtil.getAnnotationValue(mainInit, "jsFile");
                EntryPoint ent = new EntryPoint();
                ent.jsFile = jsFile == null || jsFile.isEmpty() ? getJSDefaultModuleFile(type) : jsFile;
@@ -1105,6 +1114,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                         if (ent.layer != null)
                            ent.layerName = ent.layer.getLayerUniqueName();
                         addEntryPoint(ent);
+
+                        if (verboseJS)
+                           system.verbose("JS main method entry point: " + jsEnt.fullTypeName);
                      }
                      ent.isMain = true;
                      ent.isDefault = jsModuleFile == null;
@@ -2917,6 +2929,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       typesInFileMap = new HashMap<String,LinkedHashMap<JSFileEntry,Boolean>>();
       jsFileBodyStore = new HashMap<String, JSFileBodyCache>();
       changedJSFiles = new LinkedHashSet<String>();
+      lineIndexCache = new HashMap<String,GenFileLineIndex>();
    }
 
    /** Called after we clear all of the layers to reset the JSBuildInfo state */

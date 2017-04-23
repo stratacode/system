@@ -7406,6 +7406,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          Class cl = getCompiledClass();
          if (cl == null) {
             System.out.println("*** No compiled class for dynamic enum: " + propName + " access: " + getFullTypeName() + " compiled class: " + getCompiledClassName());
+            cl = getCompiledClass();
             return null;
          }
          return RTypeUtil.getEnum(cl, propName);
@@ -9241,5 +9242,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public int getNumStatementLines() {
       return 1;
+   }
+
+   public boolean isAnonymousType() {
+      return false;
    }
 }

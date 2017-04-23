@@ -903,20 +903,27 @@ public class ParentParseNode extends AbstractParseNode {
                if (parselet == null || parselet.parselets == null)
                   System.err.println("*** parselet not initialized in getNodeAtLine");
                int parseletIndex = childIx % parselet.parselets.size();
-               if (parseletIndex == 0 && listVal.size() > listIx) {
+               NestedParselet.ParameterMapping paramMapping = parselet.parameterMapping == null ? NestedParselet.ParameterMapping.ARRAY : parselet.parameterMapping[parseletIndex];
+               boolean producesArrayValue = paramMapping == NestedParselet.ParameterMapping.ARRAY || (parseletIndex == 0 && paramMapping != NestedParselet.ParameterMapping.SKIP);
+               if (producesArrayValue && listVal.size() > listIx) {
                   // We have a child of a parselet which produces a list.  For this current slot mapping:
                   // SKIP corresponds to whitespace which should not match the node.  PROPAGATE and ARRAY slots which support the appropriate semantic value that's tied into the tree do match.
-                  if (parselet.parameterMapping == null || parselet.parameterMapping[parseletIndex] != NestedParselet.ParameterMapping.SKIP) {
-                     if (childNode instanceof IParseNode) {
-                        Object elemObj = listVal.get(listIx++);
-                        if (elemObj instanceof ISemanticNode) {
-                           ISemanticNode node = (ISemanticNode) elemObj;
-                           if (node.getParentNode() != null) {
-                              ctx.lastVal = node;
-                           }
+                  // TODO: templateBodyDeclarations uses [] for each parselet mapping so we need to consider those as lines as long as they are not string-tokens.
+                  // The original code here only counted a line for parseletIndex == 0 so kept that part the same but not sure why.
+
+                  if (!producesArrayValue && parseletIndex > 0 && paramMapping != NestedParselet.ParameterMapping.SKIP)
+                     System.out.println("***");
+                  if (childNode instanceof IParseNode) {
+                     Object elemObj = listVal.get(listIx++);
+                     if (elemObj instanceof ISemanticNode) {
+                        ISemanticNode node = (ISemanticNode) elemObj;
+                        if (node.getParentNode() != null) {
+                           ctx.lastVal = node;
                         }
                      }
                   }
+                  else
+                     listIx++;
                }
             }
             if (PString.isString(childNode)) {
@@ -927,7 +934,7 @@ public class ParentParseNode extends AbstractParseNode {
                   // This is the case where we have a token which includes a newline - say }\n that's a child parselet for a block statement.  In this case, we need to match with the block statement as the semantic value.
                   // Specifically for the block statement note that we match the parent value as a node to match the end brace.  This is a little odd... should we really match the semicolonEOL parselet?
                   // for IntelliJ at least, the block statement uses the navigation element to point to the close brace so it fixes that oddity but if that becomes a problem for another framework we can fix this another way.
-                  if (value instanceof ISemanticNode && value != ctx.lastVal)
+                  if (!isList && value instanceof ISemanticNode && value != ctx.lastVal)
                      ctx.lastVal = (ISemanticNode) value;
                   return ctx.lastVal;
                }

@@ -1132,7 +1132,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
    public void addGenLineMapping(Statement st, CharSequence genStatementCode, int extraLines) {
       if (lineIndex != null && st.isLineStatement()) {
          int genStartLine = getGenLineCount();
-         if (genStartLine == -1)
+         if (genStartLine == -1) // We can either compile or interpret the JSTypeTemplate (where compiling is faster) - if interpreting, we don't support line number registration right now
             return;
 
          Statement.addMappingForStatement(lineIndex, st, genStartLine + extraLines, genStatementCode);
