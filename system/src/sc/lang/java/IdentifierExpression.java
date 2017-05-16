@@ -1004,7 +1004,7 @@ public class IdentifierExpression extends ArgumentsExpression {
 
    /**
     * Checks if the given property is bindable already.  If not, it will add the property to the list of those to inject bindability to during class transformation.  If "makeBindable" is true
-    * this is called from the makeBindable method which has already deteremined we need to make it bindable.  If not, we look for any bindable annotation in the chain and abort the binding.
+    * this is called from the makeBindable method which has already determined we need to make it bindable.  If not, we look for any bindable annotation in the chain and abort the binding.
     */
    static private void checkForBindableCompiledField(String propertyName, Object boundType, Object annotType, Object referenceType, Statement fromExpr, boolean referenceOnly, boolean checkAnnotations) {
       TypeDeclaration referenceTD;
@@ -3503,7 +3503,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          // Do we start out here with the current object's type or the current expression's enclosing type?
          Object pType = DynUtil.getType(srcObj);
 
-         // First check if the object's type is the same as identiier's type.  If so we just return the object.
+         // First check if the object's type is the same as identifier's type.  If so we just return the object.
          if (ModelUtil.isAssignableFrom(srcType, pType))
             return srcObj;
 
@@ -4620,10 +4620,11 @@ public class IdentifierExpression extends ArgumentsExpression {
    }
 
 
-   private boolean needsClassInitConversion(Object srcType) {
+   private boolean needsClassInitConversion(Object srcType, boolean methodsType) {
       // The children of AssignmentExpressions used to be excluded here as well but for an enum variable reference
       // we definitely need this.
-      return arguments == null && !(parentNode instanceof SelectorExpression) && ModelUtil.needsClassInit(srcType) && !ModelUtil.isAssignableFrom(srcType, getEnclosingType()) && !(parentNode instanceof SwitchLabel);
+      // If we are at srcType.methodName(..) we do not need the classInit but if we have srcType.field.methodName() we do.
+      return (!methodsType || arguments == null) && !(parentNode instanceof SelectorExpression) && ModelUtil.needsClassInit(srcType) && !ModelUtil.isAssignableFrom(srcType, getEnclosingType()) && !(parentNode instanceof SwitchLabel);
    }
 
    /*
@@ -4665,6 +4666,8 @@ public class IdentifierExpression extends ArgumentsExpression {
 
       Statement result = this;
 
+      int origSz = sz;
+
       int start = 0;
       for (int i = 1; i < sz; i++) {
          if (idTypes[i] == IdentifierType.ThisExpression) {
@@ -4690,24 +4693,29 @@ public class IdentifierExpression extends ArgumentsExpression {
             start = i;
       }
 
+      LayeredSystem sys = getLayeredSystem();
       boolean retried = false;
       for (int i = start; i < sz; i++) {
          if (idTypes[i] == IdentifierType.UnboundName && !retried && !specialJSIdentifier(i)) {
             retried = true;
             resolveTypeReference();
          }
-         String str = idents.get(i).toString();
-         if (JSUtil.jsKeywords.contains(str))
-            idents.set(i, new PString("_" + str));
+         String ident = idents.get(i).toString();
+         if (JSUtil.jsKeywords.contains(ident))
+            idents.set(i, new PString("_" + ident));
 
          if (idTypes[i] == IdentifierType.EnumName) {
-            if (boundTypes[i] instanceof EnumConstant && ((EnumConstant) boundTypes[i]).body != null) {
+            if (boundTypes[i] instanceof EnumConstant) { // just like fields, enums need to be renamed
                EnumConstant enumConst = (EnumConstant) boundTypes[i];
-               EnumDeclaration enumDecl = (EnumDeclaration) enumConst.getEnclosingType();
-               LayeredSystem sys = getLayeredSystem();
-               String prefix = sys.runtimeProcessor.getStaticPrefix(enumDecl, this);
+               if (enumConst.shadowedByMethod) {
+                  idents.set(i, new PString(JSUtil.ShadowedPropertyPrefix + ident));
+               }
+               if (((EnumConstant) boundTypes[i]).body != null) {
+                  EnumDeclaration enumDecl = (EnumDeclaration) enumConst.getEnclosingType();
+                  String prefix = sys.runtimeProcessor.getStaticPrefix(enumDecl, this);
 
-               addIdentifier(0, prefix, IdentifierType.BoundTypeName, enumDecl);
+                  addIdentifier(0, prefix, IdentifierType.BoundTypeName, enumDecl);
+               }
             }
 
             // When there's a body we create an actual type for each enum constant.  We need to transform the
@@ -4726,8 +4734,8 @@ public class IdentifierExpression extends ArgumentsExpression {
          }
 
          if (idTypes[i] == IdentifierType.FieldName && ModelUtil.isFieldShadowedByMethod(boundTypes[i])) {
-            if (!str.startsWith(JSUtil.ShadowedPropertyPrefix))
-               idents.set(i, new PString(JSUtil.ShadowedPropertyPrefix + str));
+            if (!ident.startsWith(JSUtil.ShadowedPropertyPrefix))
+               idents.set(i, new PString(JSUtil.ShadowedPropertyPrefix + ident));
          }
 
          if (idTypes[i] == IdentifierType.MethodInvocation || idTypes[i] == IdentifierType.RemoteMethodInvocation) {
@@ -4735,7 +4743,10 @@ public class IdentifierExpression extends ArgumentsExpression {
             // Meth here is TypeDeclaration when we have a newX method that we could not resolve
             if (meth != null && !(meth instanceof TypeDeclaration)) {
                JavaModel model = getJavaModel();
-               if (model.customResolver == null || !model.customResolver.useRuntimeResolution())
+               if (model == null) {
+                  System.out.println("*** No java model for transformToJS of: " + this);
+               }
+               else if (model.customResolver == null || !model.customResolver.useRuntimeResolution())
                   meth = ModelUtil.resolveSrcMethod(getLayeredSystem(), meth, true, false);
 
                Object jsMethSettings = ModelUtil.getAnnotation(meth, "sc.js.JSMethodSettings");
@@ -4753,6 +4764,15 @@ public class IdentifierExpression extends ArgumentsExpression {
                   int aix = 0;
                   Object[] paramTypes = ModelUtil.getParameterTypes(meth);
                   if (paramTypes != null) {
+                     // Let the JS annotation override the conversion for this parameter - e.g. disable the char to int conversion for indexOf(int ch)
+                     Object[] jsParamTypes = ((JSRuntimeProcessor) sys.runtimeProcessor).getJSParameterTypes(meth, model.getLayer());
+                     if (jsParamTypes != null) {
+                        if (jsParamTypes.length != paramTypes.length)
+                           System.err.println("*** Warning - ignoring invalid JSMethodSettings(paramTypes=..) for method: " + meth + " num params: " + jsParamTypes.length + " != " + paramTypes.length);
+                        else
+                           paramTypes = jsParamTypes;
+                     }
+                     // NOTE: varArgs stuff is handled in Javascript, not here.  This makes the JS apis more like the Java ones and it seems like we can just as accurately do it there.
                      for (Expression arg:args) {
                         if (aix < paramTypes.length) { // Skip repeat args for now
                            Expression newExpr = arg.applyJSConversion(paramTypes[aix]);
@@ -4765,9 +4785,6 @@ public class IdentifierExpression extends ArgumentsExpression {
                }
             }
          }
-
-
-
       }
 
       if (idTypes.length > start) {
@@ -4812,7 +4829,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   prefix =  getLayeredSystem().runtimeProcessor.getStaticPrefix(srcType, this);
 
                   // Do we need to inject the classInit call for this type first?  Optimize out the case where we are in a method of the same type.
-                  if (needsClassInitConversion(srcType)) {
+                  if (needsClassInitConversion(srcType, start == origSz - 2)) {
                      SemanticNodeList<Expression> clInitArgs = new SemanticNodeList<Expression>();
                      clInitArgs.add(IdentifierExpression.create(prefix));
                      IdentifierExpression baseExpr = IdentifierExpression.createMethodCall(clInitArgs, "sc_clInit");
@@ -4896,7 +4913,6 @@ public class IdentifierExpression extends ArgumentsExpression {
                   if (idTypes != null && i >= idTypes.length)
                      System.out.println("*** Error - unresolved identifier expression");
                   Object boundType = getTypeForIdentifier(i);
-                  LayeredSystem sys = getLayeredSystem();
                   JavaModel model = getJavaModel();
                   if (model.customResolver == null || !model.customResolver.useRuntimeResolution())
                      boundType = ModelUtil.resolveSrcTypeDeclaration(sys, boundType, false, false);
@@ -4907,7 +4923,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                      sz--;
                   }
 
-                  if (needsClassInitConversion(boundType)) {
+                  if (needsClassInitConversion(boundType, i == origSz - 2)) {
                      SemanticNodeList<Expression> clInitArgs = new SemanticNodeList<Expression>();
                      clInitArgs.add(IdentifierExpression.create(prefix));
 
@@ -4959,7 +4975,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                String resolverTypeName = CTypeUtil.getPackageName(resolverName);
                String methodName = CTypeUtil.getClassName(resolverName);
                String jsName = JSUtil.convertTypeName(model.layeredSystem, resolverTypeName);
-               jsName += ((JSRuntimeProcessor) model.layeredSystem.runtimeProcessor).prototypeSuffix;
+               jsName += ((JSRuntimeProcessor) model.layeredSystem.runtimeProcessor).typeNameSuffix;
                String typeName = getIdentifierPathName(sz);
                String pkgName = model.getPackagePrefix();
                String typeTypeName = ModelUtil.getTypeName(boundTypes[sz-1]);

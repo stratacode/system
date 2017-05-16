@@ -167,7 +167,7 @@ public class VariableBinding extends DestinationListener {
 
          for (int i = 0; i <= last && isValidObject(obj); i++) {
             Object oldValue = boundValues[i];
-            boundValues[i] = PBindUtil.getPropertyValue(bindingParent, boundProps[i]);
+            boundValues[i] = getBoundProperty(bindingParent, i);
             // Need to add/remove the listeners if the instance changed
             if (!isAssignment && (!DynUtil.equalObjects(oldValue, boundValues[i]) || oldValue != boundValues[i])) {
                if (isValidObject(oldValue)) {
@@ -384,8 +384,7 @@ public class VariableBinding extends DestinationListener {
                // If we have changed our value, we have not updated the bindingParent yet so getting the property value here would just
                // mark it was valid again with the old stale value.
                else {
-                  Object newValue = !isValidObject(bindingParent) ?
-                                    (bindingParent == PENDING_VALUE_SENTINEL ? PENDING_VALUE_SENTINEL : UNSET_VALUE_SENTINEL) : PBindUtil.getPropertyValue(bindingParent, boundProps[i]);
+                  Object newValue = getBoundProperty(bindingParent, i);
 
                   if (!equalValues(i, newValue)) {
                      changed = true;
@@ -625,7 +624,7 @@ public class VariableBinding extends DestinationListener {
       Object bindingParent = srcObj;
 
       for (int i = 0; i <= last; i++) {
-         bindingParent = PBindUtil.getPropertyValue(bindingParent, boundProps[i]);
+         bindingParent = PBindUtil.getPropertyValue(bindingParent, boundProps[i]); // TODO: should we use getBoundProperty here to deal with null bindingParent?
       }
       return bindingParent;
    }

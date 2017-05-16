@@ -211,7 +211,7 @@ public class FieldDefinition extends TypedDefinition {
 
             Expression initializer = v.initializer;
             Object newValue;
-            // Note: we already cleared prim nums to zero so do not set things to null here
+
             if (initializer != null) {
                newValue = initializer.eval(rtClass, ctx);
 
@@ -249,10 +249,10 @@ public class FieldDefinition extends TypedDefinition {
 
                // Also need to register the name with the sync system so it uses the same name for the object.  This has to happen after the addSyncInst call
                // but we have enabled the sync queue so we know this will happen before we actually add the sync inst itself, so it will get the right name.
-               // Since this reference comes from the client, when the client refreshes, we do need to send the register inst the next time (hence false for the last arg)
+               // Since this reference comes from the client, when the client refreshes, we do need to send the register inst the next time (hence false for the fixedName when
+               // we are on the server but true if we ever run this code on the client)
                if (newValue != null) {
-                  syncCtx.registerObjName(newValue, objName, false, false);
-
+                  syncCtx.registerObjName(newValue, objName, syncCtx.getSyncManager().syncDestination.clientDestination, false);
                }
 
                if (flushQueue) {
@@ -571,7 +571,7 @@ public class FieldDefinition extends TypedDefinition {
                   String regInstTypeName = CTypeUtil.getPackageName(regInstName);
                   String jsName = JSUtil.convertTypeName(sys, regInstTypeName);
                   res.append(jsName);
-                  res.append(((JSRuntimeProcessor) model.layeredSystem.runtimeProcessor).prototypeSuffix);
+                  res.append(((JSRuntimeProcessor) model.layeredSystem.runtimeProcessor).typeNameSuffix);
                   res.append(".");
                   res.append(CTypeUtil.getClassName(regInstName));
                   res.append("(");
@@ -595,7 +595,7 @@ public class FieldDefinition extends TypedDefinition {
                   String regInstTypeName = CTypeUtil.getPackageName(regInstName);
                   String jsName = JSUtil.convertTypeName(sys, regInstTypeName);
                   res.append(jsName);
-                  res.append(((JSRuntimeProcessor) model.layeredSystem.runtimeProcessor).prototypeSuffix);
+                  res.append(((JSRuntimeProcessor) model.layeredSystem.runtimeProcessor).typeNameSuffix);
                   res.append(".");
                   res.append(CTypeUtil.getClassName(regInstName));
                   res.append("(\"");

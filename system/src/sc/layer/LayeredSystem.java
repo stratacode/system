@@ -3140,6 +3140,44 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return -1;
    }
 
+   public void applySyncLayer(String language, String destName, String scopeName, String codeString, boolean isReset, boolean allowCodeEval) {
+      if (language.equals("js")) {
+         throw new IllegalArgumentException("javascript layers - only supported in the browser");
+      }
+      else if (language.equals("stratacode") ) {
+         if (codeString == null || codeString.length() == 0)
+            return;
+
+         ModelStream stream = ModelStream.convertToModelStream(codeString);
+
+         if (stream != null) {
+            boolean trace = SyncManager.trace;
+            long startTime = trace ? System.currentTimeMillis() : 0;
+            stream.updateRuntime(destName, "window", isReset);
+            if (SyncManager.trace)
+               System.out.println("Applied sync layer to system in: " + StringUtil.formatFloat((System.currentTimeMillis() - startTime)/1000.0) + " secs");
+         }
+      }
+   }
+
+   @Override
+   public Object newInnerInstance(Object typeObj, Object outerObj, String constrSig, Object[] params) {
+      if (isComponentType(typeObj)) {
+         Class compClass = ModelUtil.getCompiledClass(typeObj);
+         if (outerObj != null)
+            return RTypeUtil.newInnerComponent(outerObj, ModelUtil.getCompiledClass(DynUtil.getType(outerObj)), compClass, ModelUtil.getTypeName(typeObj), params);
+         else
+            return RTypeUtil.newComponent(compClass, params);
+      }
+      else
+         return DynUtil.createInnerInstance(typeObj, outerObj, constrSig, params);
+   }
+
+   @Override
+   public boolean isComponentType(Object type) {
+      return ModelUtil.isComponentType(type);
+   }
+
    public void removeTypeChangeListener(ITypeChangeListener type) {
       typeChangeListeners.remove(type);
    }
@@ -3182,10 +3220,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return DynObject.create((TypeDeclaration) typeObj, outerObj, constrSig, params);
       }
       else if (typeObj instanceof Class) {
-         Object[] newParams = new Object[params.length+1];
-         newParams[0] = outerObj;
-         System.arraycopy(params, 0, newParams, 1, params.length);
-         return PTypeUtil.createInstance((Class) typeObj, constrSig, newParams);
+         if (outerObj != null && !DynUtil.isType(outerObj)) {
+            Object[] newParams = new Object[params.length + 1];
+            newParams[0] = outerObj;
+            System.arraycopy(params, 0, newParams, 1, params.length);
+            params = newParams;
+         }
+         return PTypeUtil.createInstance((Class) typeObj, constrSig, params);
       }
       else
          throw new IllegalArgumentException("Invalid type to createInstace: " + typeObj);
@@ -3419,6 +3460,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                case 'h':
                   usage("", args);
                   break;
+
+               case 's':
+                  if (opt.equals("scn"))
+                     SyncManager.defaultLanguage = "stratacode";
+                  else
+                     usage("Unrecognized option: " + opt, args);
+                  break;
                case 'm':
                   if (opt.equals("me")) {
                      if (args.length < i + 1)
@@ -3607,7 +3655,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   }
                   else if (opt.equals("vl"))
                      options.verboseLayers = true;
-                  else if (opt.equals("vh") || opt.equals("vha"))
+                  else if (opt.equals("vh"))
+                     Element.verbose = true;
+                  else if (opt.equals("vha"))
                      Element.trace = true;
                   else if (opt.equals("vs"))
                      SyncManager.trace = true;
@@ -3620,6 +3670,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   else if (opt.equals("vsa")) {
                      ScopeDefinition.verbose = true;
                      ScopeDefinition.trace = true;
+                     SyncManager.verbose = true;
                      SyncManager.trace = true;
                      SyncManager.traceAll = true;
                      // Includes JS that is sent to the browser due to changed source files
@@ -5310,7 +5361,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                          "   [ -dyn ]: Layers specified after -dyn (and those they extend) are made dynamic unless they are marked: 'compiledOnly'\n" +
                          "   [ -c ]: Generate and compile only - do not run any main methods\n" +
                          "   [ -v ]: Verbose info about the layered system.  [-vb ] [-vba] Trace data binding (or trace all) [-vs] [-vsa] [-vsv] [-vsp] Trace options for the sync system: trace, traceAll, verbose-inst, verbose-inst+props \n" +
-                         "   [ -vh ]: verbose html [ -vl ]: display initial layers [ -vp ] turn on performance monitoring [ -vc ]: info on loading of class files\n" +
+                         "   [ -vh ]: verbose html [ -vha ]: trace html [ -vl ]: display initial layers [ -vp ] turn on performance monitoring [ -vc ]: info on loading of class files\n" +
                          "   [ -f <file-list>]: Process/compile only these files\n" +
                          "   [ -cp <classPath>]: Use this classpath for resolving compiled references.\n" +
                          "   [ -lp <layerPath>]: Set of directories to search in order for layer directories.\n" +
@@ -7311,7 +7362,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       for (String fn:files) {
          if (layer != null && layer.excludedFile(fn, null))
             continue;
-         if (isParseable(fn) || fn.endsWith(".class"))
+         if ((isParseable(fn) || fn.endsWith(".class")) && !fn.contains("$"))
             addToPackageIndex(rootDir, layer, false, false, relDir, fn);
          else {
             File subDir = new File(dirFile, fn);
@@ -9056,8 +9107,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          genLayer.updateBuildInProgress(false);
       }
 
-      if (runtimeProcessor != null)
-         runtimeProcessor.buildCompleted();
+      if (runtimeProcessor != null) {
+         List<SrcEntry> errorFiles = runtimeProcessor.buildCompleted();
+         if (errorFiles != null) {
+            bd.anyError = true;
+            for (SrcEntry jsError:errorFiles)
+               if (!bd.errorFiles.contains(jsError))
+                  bd.errorFiles.add(jsError);
+         }
+      }
 
       if (!bd.anyError) {
          boolean compileFailed = false;

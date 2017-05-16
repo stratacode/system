@@ -89,6 +89,10 @@ public interface IRuntimeProcessor {
    /** Called when all of the active layers have been cleared - to reset the state for a new clean compile */
    void clearRuntime();
 
-   /** Called after a build has been completed, to init any state for the next new build */
-   void buildCompleted();
+   /**
+    * Called after a build has been completed, to init any state for the next new build.  Returns a list of error files if there are any
+    * runtime specific build errors that should stop the compilation (e.g. a source file we depend on for the JS conversion
+    * that is not part of the project, but instead gets pulled in via a src.jar file like scrt.jar).
+    */
+   public List<SrcEntry> buildCompleted();
 }

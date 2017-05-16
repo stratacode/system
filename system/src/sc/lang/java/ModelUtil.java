@@ -2437,6 +2437,15 @@ public class ModelUtil {
    }
 
    private static boolean numberTypesAssignableFrom(Object lhsType, Object rhsType, boolean assignmentSemantics) {
+      // In case there are annotation layers that modify the Java native types (like there are for JS) we need to skip those types
+      while (lhsType instanceof ModifyDeclaration) {
+         lhsType = ((ModifyDeclaration) lhsType).getDerivedTypeDeclaration();
+      }
+
+      while (rhsType instanceof ModifyDeclaration) {
+         rhsType = ((ModifyDeclaration) rhsType).getDerivedTypeDeclaration();
+      }
+
       // Any number can be assigned to a double or a number
       if (isDouble(lhsType) || isNumber(lhsType)) {
          return true;
@@ -3591,82 +3600,6 @@ public class ModelUtil {
       else if (srcMember instanceof java.lang.Enum)
          return ((java.lang.Enum) srcMember).getDeclaringClass();
       throw new UnsupportedOperationException();
-   }
-
-   public static String unescapeJavaString(String str) {
-      StringBuilder sb = new StringBuilder(str.length());
-      int len = str.length();
-      for (int i = 0; i < len; i++) {
-         char charVal = str.charAt(i);
-         if (charVal == '\\' && i < len - 1) {
-            i++;
-            switch (str.charAt(i)) {
-               case 'b':
-                  charVal = '\b';
-                  break;
-               case 't':
-                  charVal = '\t';
-                  break;
-               case 'n':
-                  charVal = '\n';
-                  break;
-               case 'f':
-                  charVal = '\f';
-                  break;
-               case 'r':
-                  charVal = '\r';
-                  break;
-               case '"':
-                  charVal = '\"';
-                  break;
-               case '\\':
-                  charVal = '\\';
-                  break;
-               case '\'':
-                  charVal = '\'';
-                  break;
-               case 'u':
-                  String hexStr = str.substring(i+1,i+5);
-                  i += 4;
-                  try {
-                     charVal = (char) Integer.parseInt(hexStr, 16);
-                  }
-                  catch (NumberFormatException exc) {
-                     System.err.println("**** Invalid character unicode escape: " + hexStr + " should be a hexadecimal number");
-                  }
-                  break;
-               case '0':
-               case '1':
-               case '2':
-               case '3':
-               case '4':
-               case '5':
-               case '6':
-               case '7':
-                  int olen = 1;
-                  // May be \3\u1234  or \123 or \1\2\3
-                  for (int oix = i + 1; oix < len; oix++) {
-                     char nextChar = str.charAt(i + olen);
-                     if (Character.isDigit(nextChar) && nextChar < '8')
-                        olen++;
-                     else
-                        break;
-                  }
-
-                  String octStr = str.substring(i, i + olen);
-                  i += olen - 1;
-                  try {
-                     charVal = (char) Integer.parseInt(octStr, 8);
-                  }
-                  catch (NumberFormatException exc) {
-                     System.err.println("**** Invalid character octal escape: " + octStr + " should be an octal number");
-                  }
-                  break;
-            }
-         }
-         sb.append(charVal);
-      }
-      return sb.toString();
    }
 
    public static Object getOuterObject(Object toConstructType, ExecutionContext ctx) {

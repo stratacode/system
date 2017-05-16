@@ -25,7 +25,11 @@ public @interface JSSettings {
    String mergeTemplate() default "";
    /** Registers an alias for this types package to use as the prefix instead of the default convention of pkgA_pkgB_ */
    String prefixAlias() default "";
-   /** Replace references to this type in the generated JS code with the JS type name specified (e.g. jv_Object to just eliminate this type from Javascript land) */
+   /**
+    * Replace references to this type in the generated JS code with the JS type name specified (e.g. use jv_Object to
+    * just eliminate this type from Javascript land).
+    * Don't specify the java type name here - e.g. use String rather than java.lang.String
+    */
    String replaceWith() default "";
    /** Comma separated list of jsLibFiles which this lib file depends on being included before it */
    String dependentJSFiles() default "";

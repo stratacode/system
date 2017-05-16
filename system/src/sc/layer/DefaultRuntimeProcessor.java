@@ -103,7 +103,8 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor, Serializable 
    public void clearRuntime() {
    }
 
-   public void buildCompleted() {
+   public List<SrcEntry> buildCompleted() {
+      return null;
    }
 
    public boolean getCompiledOnly() {

@@ -1022,7 +1022,7 @@ public class RTypeUtil {
       return null;
    }
 
-   /** Constructs a new cmponent type object with the given set of parameters.  Just calls the newX method */
+   /** Constructs a new component type object with the given set of parameters.  Calls the newX method generated for the component */
    public static Object newComponent(Class theClass, Object... params) {
       String methodName = "new" + CTypeUtil.capitalizePropertyName(CTypeUtil.getClassName(theClass.getName().replace('$', '.')));
       Method method = getMethodFromArgs(theClass, methodName, params);

@@ -113,6 +113,11 @@ public class DynUtil {
          return dynamicSystem.getInnerTypeName(type);
    }
 
+   public static Object getPropertyType(Object objType, String propName) {
+      IBeanMapper mapper = getPropertyMapping(objType, propName);
+      return mapper == null ? null : mapper.getPropertyType();
+   }
+
    public static IBeanMapper getPropertyMapping(Object type, String dstPropName) {
       if (dynamicSystem == null) {
          if (type instanceof Class)
@@ -515,6 +520,28 @@ public class DynUtil {
       }
       else
          throw new IllegalArgumentException("Invalid dynamic type: " + typeObj);
+   }
+
+   public static Object newInnerInstance(Object typeObj, Object outerObj, String constrSig, Object...params) {
+      if (dynamicSystem != null)
+         return dynamicSystem.newInnerInstance(typeObj, outerObj, constrSig, params);
+      else if (typeObj instanceof Class) {
+         if (isComponentType(typeObj)) {
+            String typeName = getTypeName(typeObj, false);
+            String methodName = "new" + CTypeUtil.capitalizePropertyName(CTypeUtil.getClassName(typeName));
+            Object newMeth = resolveMethod(typeObj, methodName, constrSig);
+            if (newMeth !=  null) {
+               return invokeMethod(outerObj, newMeth, params);
+            }
+            else
+               throw new IllegalArgumentException("Missing new method for component type: " + typeName);
+         }
+         else {
+            return createInnerInstance(typeObj, outerObj, constrSig, params);
+         }
+      }
+      else
+         throw new UnsupportedOperationException();
    }
 
    public static void addDynObject(String typeName, Object instObj) {
@@ -1118,6 +1145,13 @@ public class DynUtil {
       throw new UnsupportedOperationException();
    }
 
+   public static void applySyncLayer(String lang, String destName, String scopeName, String code, boolean isReset, boolean allowCodeEval) {
+      if (dynamicSystem != null)
+         dynamicSystem.applySyncLayer(lang, destName, scopeName, code, isReset, allowCodeEval);
+      else
+         throw new UnsupportedOperationException(("Attempt to evalCode without a dynamic runtime"));
+   }
+
    public static boolean isObjectType(Object type) {
       if (dynamicSystem != null)
          return dynamicSystem.isObjectType(type);
@@ -1359,6 +1393,17 @@ public class DynUtil {
    public static void registerTypeChangeListener(ITypeChangeListener listener) {
       if (dynamicSystem != null)
          dynamicSystem.registerTypeChangeListener(listener);
+   }
+
+   public static boolean isComponentType(Object type) {
+      if (dynamicSystem != null)
+         return dynamicSystem.isComponentType(type);
+      else if (type instanceof Class) {
+         Class cl = (Class) type;
+         return IComponent.class.isAssignableFrom(cl) || IAltComponent.class.isAssignableFrom(cl);
+      }
+      else
+         throw new UnsupportedOperationException();
    }
 
 }

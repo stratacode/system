@@ -1500,7 +1500,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    private final static String STATIC_DYN_TEMPLATE_FILE = "sc/lang/java/StaticDynTypeTemplate.sctp";
 
    public void transformCompiledType() {
-      // Do this for classes for which we're generating reflective dyn type info - don't do it for types which we are skipping though
+      // Do this for classes for which we're generating reflective dyn type info - don't do it for types for which there's no compiled class
       if ((needsDynType() || ModelUtil.getSuperInitTypeCall(getLayeredSystem(), this) != null) && needsOwnClass(false)) {
          DynStubParameters params = getDynamicStubParameters();
          if (!ModelUtil.isAssignableFrom(IDynObject.class, this)) {

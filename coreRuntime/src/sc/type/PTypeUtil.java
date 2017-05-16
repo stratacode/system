@@ -393,6 +393,10 @@ public class PTypeUtil {
       return false;
    }
 
+   public static Object getComponentType(Object cl) {
+      return cl instanceof Class ? ((Class) cl).getComponentType() : null;
+   }
+
    public static boolean isAssignableFrom(Class cl, Class other) {
       if (cl == other || cl.getName().equals(other.getName()))
          return true;

@@ -1238,9 +1238,11 @@ public class Bind {
       }
    }
 
-   public static String indent(int l) {
-      StringBuffer sb = new StringBuffer();
-      for (int i = 0; i < l; i++)
+   public static String indent(int n) {
+      if (n == 0)
+         return "";
+      StringBuilder sb = new StringBuilder();
+      for (int i = 0; i < n; i++)
          sb.append("   ");
       return sb.toString();
    }

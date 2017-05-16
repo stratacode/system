@@ -11,6 +11,7 @@ import sc.lang.sc.PropertyAssignment;
 import sc.parser.IStyleAdapter;
 import sc.type.TypeUtil;
 
+import java.util.Arrays;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
@@ -26,6 +27,15 @@ public class VariableSelector extends Selector {
    public static VariableSelector create(String id, SemanticNodeList<Expression> args) {
       VariableSelector sel = new VariableSelector();
       sel.identifier = id;
+      sel.setProperty("arguments", args);
+      return sel;
+   }
+
+   public static VariableSelector createArgs(String id, Expression...argsArr) {
+      VariableSelector sel = new VariableSelector();
+      sel.identifier = id;
+      SemanticNodeList<Expression> args = new SemanticNodeList<Expression>();
+      args.addAll(Arrays.asList(argsArr));
       sel.setProperty("arguments", args);
       return sel;
    }

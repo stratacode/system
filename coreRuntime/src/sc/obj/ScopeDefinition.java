@@ -113,6 +113,8 @@ public abstract class ScopeDefinition {
    public static Object lookupName(String typeName) {
       // Optimize for the common case which all scopes are active.  just return the scopes list.
       for (ScopeDefinition scopeDef:scopes) {
+         if (scopeDef == null)
+            continue;
          ScopeContext ctx = scopeDef.getScopeContext(false);
          if (ctx != null) {
             Object res = ctx.getValue(typeName);
@@ -164,7 +166,6 @@ public abstract class ScopeDefinition {
                         if (enumRes != null) {
                            value = enumRes;
                            enumFound = true;
-                           break;
                         }
                      }
                   }

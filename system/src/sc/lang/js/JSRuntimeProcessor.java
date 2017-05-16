@@ -22,6 +22,7 @@ import sc.parser.ParseUtil;
 import sc.sync.SyncManager;
 import sc.type.CTypeUtil;
 import sc.type.RTypeUtil;
+import sc.type.Type;
 import sc.util.FileUtil;
 import sc.util.PerfMon;
 import sc.util.StringUtil;
@@ -52,6 +53,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    /** Additional debug messages for JS  */
    public boolean verboseJS = true;
 
+   /** Use _c (or typeNameSuffix) as a variable for each type def to avoid reusing the type name for every method and field (smaller JS files but this hurts stack traces and code readability) */
+   public boolean useShortTypeNames = false;
+
    public String templatePrefix;
    public String srcPathType;
    /** The prefix for generated individual .js files like Java "one-class-per-file".  This is a normalized path name for portability */
@@ -79,7 +83,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    public String scLib = "js/sc.js";
    public String jsCoreLib = "js/sccore.js";
 
-   public String prototypeSuffix = "_c";
+   public String typeNameSuffix = "_c";
 
    /** For a given build, the list of JS files that have changed since the previous build - either the build of the previous buildLayer or a previous incremental build of this layer. */
    private transient HashSet<String> changedJSFiles = new LinkedHashSet<String>();
@@ -103,21 +107,25 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    /** Set to true in the post start phase - after that phase, any other start models are not part of the build process (e.g. we might load the type declarations because they are init types when generating the page dispatcher)  */
    private transient boolean postStarted = false;
 
+   private transient boolean anyErrors = false;
+
+   private ArrayList<SrcEntry> errorFiles = new ArrayList<SrcEntry>();
+
    // For Javascript, we sync against the default runtime
    { syncRuntimes.add(null); }
 
    /** Used to generate the JS code snippet to prefix all class-based type references */
-   public String classPrefix = "<%= typeName %>" + prototypeSuffix;
+   public String classPrefix = "<%= typeName %>" + typeNameSuffix;
 
    /** Used to generate the JS code snippet to instantiate a type, to implement MainInit */
    public String instanceTemplate =
           "<%= needsSync ? \"sc_SyncManager_c.beginSyncQueue();\\n\" : \"\" %>" + // The sync queue is here because we need the children sync-insts to be registered with their parent's names.
           "<% if (objectType) { %>" +
-             "var _inst = <%= accessorTypeName %>" + prototypeSuffix + ".get<%= upperBaseTypeName %>();\n<% " +
+             "var _inst = <%= accessorTypeName %>" + typeNameSuffix + ".get<%= upperBaseTypeName %>();\n<% " +
           "} " +
           "else if (componentType) { " +
              "%>var _inst;\n" +
-             "sc_DynUtil_c.addDynObject(\"<%= javaTypeName %>\", _inst = <%= accessorTypeName %>" + prototypeSuffix + ".new<%= className %>());\n<% " +
+             "sc_DynUtil_c.addDynObject(\"<%= javaTypeName %>\", _inst = <%= accessorTypeName %>" + typeNameSuffix + ".new<%= className %>());\n<% " +
           "} " +
           "else { " +
              "%>var _inst;\n" +
@@ -128,7 +136,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
              "sc_SyncManager_c.initChildren(_inst);\n" +
           "<% } %>\n";
 
-   public String mainTemplate = "<%= typeName %>" + prototypeSuffix + ".main([]);\n";
+   public String mainTemplate = "<%= typeName %>" + typeNameSuffix + ".main([]);\n";
 
    private transient ArrayList<SystemUpdate> systemUpdates = new ArrayList<SystemUpdate>();
 
@@ -295,6 +303,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
       public HashMap<String,String> replaceTypes = new HashMap<String,String>();
 
+      /** The inverse of replaceTypes - the list of Java types registered for a given JS type */
+      public HashMap<String,List<String>> typeAliases = new HashMap<String,List<String>>();
+
       /** Cached jsModuleFile for a given type name */
       public HashMap<String,String> jsModuleNames = new HashMap<String,String>();
 
@@ -326,9 +337,19 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          replaceTypes.put("long", "Number");
          replaceTypes.put("short", "Number");
          replaceTypes.put("java.lang.Class", "jv_Object"); // TODO
-         replaceTypes.put("sc.lang.JLineInterpreter", "sc_EditorContext");
+         addReplaceType("sc.lang.JLineInterpreter", "sc_EditorContext");
 
          prefixAliases.put("java.util", "jv_");
+      }
+
+      public void addReplaceType(String javaType, String jsType) {
+         replaceTypes.put(javaType, jsType);
+         List<String> aliases = typeAliases.get(jsType);
+         if (aliases == null) {
+            aliases = new ArrayList<String>(2);
+            typeAliases.put(jsType, aliases);
+         }
+         aliases.add(javaType);
       }
 
       /**
@@ -1017,7 +1038,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                         }
                      }
                   }
-                  else if (!isCompiledInType(depType))
+                  else if (!isCompiledInType(depType)) // Note: if there is a bug we don't match a source method but do match the compiled method, we can see this error even when there's source available.  In this case, the source method should match (or the compiled one should not)
                      System.err.println("*** Warning: unrecognized js type: " + type.typeName + " depends on compiled thing: " + depType);
                }
 
@@ -1162,6 +1183,13 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                addDependency(typeLibFile == null ? defaultLib : typeLibFile, depJSFile, type, null, "dependentJSLibFiles");
             }
          }
+      }
+      // We need to catch errors on files that Javascript pulls in that are not part of the project - otherwise, the build keeps going
+      if (javaModel.hasErrors()) {
+         SrcEntry errorSrc = javaModel.getSrcFile();
+         if (!errorFiles.contains(errorSrc))
+            errorFiles.add(errorSrc);
+         anyErrors = true;
       }
    }
 
@@ -1608,7 +1636,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          String typeName = ModelUtil.getTypeName(type);
          String replaceWith = (String) ModelUtil.getAnnotationValue(settingsObj, "replaceWith");
          if (replaceWith != null && replaceWith.length() > 0) {
-            jsBuildInfo.replaceTypes.put(typeName, replaceWith);
+            jsBuildInfo.addReplaceType(typeName, replaceWith);
             handled = true;
             if (jsBuildInfo.jsLibFilesForType.get(typeName) == null)
                jsBuildInfo.jsLibFilesForType.put(typeName, HAS_ALIAS_SENTINEL);
@@ -1815,7 +1843,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       }
       if (!(typeObj instanceof BodyTypeDeclaration)) {
          // TODO: convert JSTypeParameters to use Object types just for this?
-         return JSUtil.convertTypeName(system, ModelUtil.getTypeName(typeObj)) + prototypeSuffix;
+         return JSUtil.convertTypeName(system, ModelUtil.getTypeName(typeObj)) + typeNameSuffix;
       }
 
       BodyTypeDeclaration td = (BodyTypeDeclaration) typeObj;
@@ -2111,8 +2139,11 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    /** Need to reset this always in between builds - even if no files changed */
-   public void buildCompleted() {
+   public List<SrcEntry> buildCompleted() {
       postStarted = false;
+      if (anyErrors)
+         return errorFiles;
+      return null;
    }
 
    public void resetBuild() {
@@ -2123,6 +2154,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       changedDefaultType = false;
       jsFileBodyStore.clear();
       postStarted = false;
+      anyErrors = false;
+      errorFiles.clear();
 
       if (system.options.buildAllFiles) {
          // TODO: should we reset anything in the JSBuildInfo?  Since we don't reliably run the start process, I don't think so
@@ -2137,11 +2170,11 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return true;
    }
 
-   public CharSequence processModelStream(ModelStream stream) {
+   public StringBuilder processModelStream(ModelStream stream) {
       StringBuilder sb = new StringBuilder();
 
       if (stream.modelList == null)
-         return "";
+         return sb;
 
       stream.setLayeredSystem(system);
 
@@ -2599,7 +2632,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       jsFileBody.append(fileBody);
       if (lineIndex != null) {
          GenFileLineIndex newLineIndex = getFileLineIndex(srcEnt.absFileName);
-         lineIndex.appendIndex(newLineIndex);
+         if (newLineIndex != null)
+            lineIndex.appendIndex(newLineIndex);
+         else
+            System.err.println("*** Missing generated file line index: "+ srcEnt.absFileName);
       }
    }
 
@@ -2787,6 +2823,33 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          }
       }
       return name;
+   }
+
+   public Object[] getJSParameterTypes(Object methObj, Layer refLayer) {
+      Object jsMethSettings = ModelUtil.getAnnotation(methObj, "sc.js.JSMethodSettings");
+      if (jsMethSettings != null) {
+         String paramTypesStr = (String) ModelUtil.getAnnotationValue(jsMethSettings, "parameterTypes");
+         if (paramTypesStr != null) {
+            String[] typeNames = paramTypesStr.split(",");
+            Object[] res = new Object[typeNames.length];
+            int i = 0;
+            for (String typeName:typeNames) {
+               Object type = system.getTypeDeclaration(typeName, false, refLayer, false);
+               if (type == null) {
+                  Type prim = Type.getPrimitiveType(typeName);
+                  if (prim != null)
+                     type = prim.primitiveClass;
+               }
+               if (type == null) {
+                  System.err.println("*** Invalid JSMethodSettings paramTypes value for method: " + methObj + " type: " + typeName + " not found");
+                  return null;
+               }
+               res[i++] = type;
+            }
+            return res;
+         }
+      }
+      return null;
    }
 
    public void setLayeredSystem(LayeredSystem sys) {

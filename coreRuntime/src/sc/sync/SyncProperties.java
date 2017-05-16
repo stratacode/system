@@ -15,7 +15,9 @@ import java.util.Arrays;
 public class SyncProperties {
    public String destName;
    public String syncGroup;
+   /** Array of either property names or SyncPropOption instances to control which properties are to be synchronized */
    public Object[] classProps;
+   /** Then sync properties of a base type we are chained from */
    public SyncProperties chainedProps;
 
    // The default value for initDefault for those cases where you do not call addSyncInst explicitly

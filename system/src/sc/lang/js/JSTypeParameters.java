@@ -17,6 +17,7 @@ import sc.parser.FormatContext;
 import sc.parser.GenFileLineIndex;
 import sc.parser.ParseUtil;
 import sc.sync.SyncLayer;
+import sc.sync.SyncProperties;
 import sc.type.CTypeUtil;
 import sc.type.MethodBindSettings;
 import sc.util.FileUtil;
@@ -24,10 +25,7 @@ import sc.util.PerfMon;
 import sc.util.StringUtil;
 
 import java.lang.annotation.RetentionPolicy;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.TreeSet;
+import java.util.*;
 
 /**
  * An instance of this class is created to convert a Java type to a JS type.  It's available to the JSTypeTemplate
@@ -108,7 +106,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
 
       /**
        * Allows the code generation to handle the case where there's a getX(foo) method.  The runtime needs a way to tell that there's no getX() method so we'll
-       * inject code to return undefined if arguments.lenght == 0.   When there are variable parameter numbers, we already check the parameters and will return undefined
+       * inject code to return undefined if arguments.length == 0.   When there are variable parameter numbers, we already check the parameters and will return undefined
        * cause no case will match.
        */
       public boolean isGetWithArgs() {
@@ -292,7 +290,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
             }
             Object methEnclType = defaultMethod.getEnclosingType();
             superSt.append(JSUtil.convertTypeName(type.getLayeredSystem(), ModelUtil.getTypeName(methEnclType)));
-            superSt.append(((JSRuntimeProcessor)sys.runtimeProcessor).prototypeSuffix);
+            superSt.append(getJSRuntimeProcessor().typeNameSuffix);
             superSt.append('.');
             superSt.append(defaultMethod.name);
             boolean firstComma = false;
@@ -333,7 +331,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
          // name spaces get merged which leads to this weird requirement.
          if (defaultMethod != null && isClassMethod()) {
             sb.append("   if (this.hasOwnProperty(\"$protoName\")) {\n");
-            sb.append("      return jv_Class_c." + defaultMethod.name + ".apply(this, arguments);\n");
+            sb.append("      return jv_Class" + getJSRuntimeProcessor().typeNameSuffix + "." + defaultMethod.name + ".apply(this, arguments);\n");
             sb.append("   }\n");
          }
 
@@ -375,7 +373,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
 
       public String getMethodClassInit() {
          if (this.getNeedsClassInit()) {
-            String methClassInit = "\n   " + getTypeName() + "_c._clInit();";
+            String methClassInit = "\n   " + getJSTypeName() + "._clInit();";
             // We want to attach this statement in the debugger or else it floats to the previous statement
             addGenLineMapping(getNeedsDispatch() ? type : defaultMethod, methClassInit, 0);
             return methClassInit;
@@ -569,7 +567,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
          if (jsStatement instanceof BodyTypeDeclaration) {
             BodyTypeDeclaration btd = (BodyTypeDeclaration) jsStatement;
             LayeredSystem sys = btd.getLayeredSystem();
-            JSRuntimeProcessor rt = (JSRuntimeProcessor) sys.runtimeProcessor;
+            JSRuntimeProcessor rt = getJSRuntimeProcessor();
             StringBuilder sb = new StringBuilder();
             rt.appendInnerJSMergeTemplate(btd, sb, syncTemplate);
             return sb.toString();
@@ -659,7 +657,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
       StringBuilder sb = null;
       Object[] impls = type.getImplementsTypeDeclarations();
       LayeredSystem sys = type.getLayeredSystem();
-      JSRuntimeProcessor rp = (JSRuntimeProcessor) sys.runtimeProcessor;
+      JSRuntimeProcessor rp = getJSRuntimeProcessor();
       if (impls != null) {
          sb = new StringBuilder();
          for (Object impl:impls) {
@@ -679,7 +677,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
          if (ModelUtil.needsClassInit(extType)) {
             sb.append("\n   sc_clInit(");
             sb.append(getExtendsClass());
-            sb.append(rp.prototypeSuffix);
+            sb.append(rp.typeNameSuffix);
             sb.append(");");
          }
       }
@@ -691,7 +689,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
    public String getClassInit() {
       if (getNeedsClassInit()) {
          // TODO: shouldn't this indent be based on the type's indent levels?
-         String classInit = "\n   " + getTypeName() + "_c._clInit();\n";
+         String classInit = "\n   " + getJSTypeName() + "._clInit();\n";
          addGenLineMapping(type, classInit, 0);
          return classInit;
       }
@@ -723,7 +721,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
             System.out.println("*** Error - invalid extends for update inst in JS conversion");
             return "";
          }
-         return getExtendsClass() + "_c" + "._updateInst.call(this);\n   ";
+         return getExtendsClass() + getJSRuntimeProcessor().typeNameSuffix + "._updateInst.call(this);\n   ";
       }
       return "";
    }
@@ -925,7 +923,8 @@ public class JSTypeParameters extends ObjectTypeParameters {
                      runtimePolicy = getRuntimeRetention(cl, "java.lang.annotation.Retention");
                   if (runtimePolicy != null && runtimePolicy) {
                      //sb.append(getStaticPrefix());
-                     sb.append("_c._A_");
+                     sb.append(getShortJSTypeName());
+                     sb.append("._A_");
                      sb.append(CTypeUtil.getClassName(annotTypeName));
                      Object elementValue = annot.elementValue;
                      if (elementValue != null) {
@@ -966,6 +965,66 @@ public class JSTypeParameters extends ObjectTypeParameters {
             sb.append("\n");
       }
       return sb.toString();
+   }
+
+   // When we replace one type with another in JS land, we may need to register the old type name as an alias so we know
+   // what type to create when de-serializing an instance sent across from the server.
+   public String getTypeAliases() {
+      if (updateTemplate)
+         return "";
+
+      List<String> typeAliases = getJSRuntimeProcessor().jsBuildInfo.typeAliases.get(getTypeName());
+      if (typeAliases == null)
+         return "";
+      StringBuilder aliasArray = new StringBuilder();
+      aliasArray.append("[");
+      for (String typeAlias:typeAliases) {
+         aliasArray.append('"');
+         aliasArray.append(typeAlias);
+         aliasArray.append('"');
+      }
+      aliasArray.append("]");
+      return "sc_addTypeAliases(" + getShortJSTypeName() + ", " + aliasArray + ");\n";
+   }
+
+   public String getPropertyMetadata() {
+      if (updateTemplate)
+         return "";
+      List<Object> props = type.getDeclaredProperties();
+      StringBuilder sb = null;
+      TreeSet<String> visited = new TreeSet<String>();
+      if (props != null) {
+         for (Object prop:props) {
+            String propName = ModelUtil.getPropertyName(prop);
+            Object propType = ModelUtil.getPropertyType(prop);
+            if (propType != null && needsJSMetadata(propType) && type.isSynced(propName)) {
+               // getDeclaredProperties returns more than one representation for the same property
+               if (visited.contains(propName))
+                  continue;
+               JSRuntimeProcessor proc = getJSRuntimeProcessor();
+               visited.add(propName);
+               if (sb == null) {
+                  sb = new StringBuilder();
+                  sb.append(getShortJSTypeName());
+                  sb.append("._PROPS = {");
+               }
+               else
+                  sb.append(", ");
+               sb.append('"');
+               sb.append(propName);
+               sb.append("\":\"");
+               sb.append(ModelUtil.getTypeName(propType));
+               sb.append("\"");
+            }
+         }
+      }
+      if (sb != null)
+         sb.append("};\n");
+      return sb == null ? "" : sb.toString();
+   }
+
+   private boolean needsJSMetadata(Object propType) {
+      return ModelUtil.isArray(propType) || ModelUtil.isAssignableFrom(Collection.class, propType);
    }
 
    private Boolean getRuntimeRetention(Object cl, String retentionAnnotTypeName) {
@@ -1103,7 +1162,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
       return !updateTemplate || needsConstructor;
    }
 
-   /** Do we need to define the _c variable? */
+   /** Do we need to define the _c variable (aka ? */
    public boolean getHasTypeChanges() {
       return getMethods().length > 0 || getNeedsClassInit() || getNeedsInstInit();
    }
@@ -1141,5 +1200,25 @@ public class JSTypeParameters extends ObjectTypeParameters {
 
    public int getGenLineCount() {
       return -1;
+   }
+
+   public JSRuntimeProcessor getJSRuntimeProcessor() {
+      return ((JSRuntimeProcessor) system.runtimeProcessor);
+   }
+
+   public boolean getUseShortTypeNames() {
+      return getJSRuntimeProcessor().useShortTypeNames;
+   }
+
+   public String getTypeNameSuffix() {
+      return getJSRuntimeProcessor().typeNameSuffix;
+   }
+
+   public String getShortJSTypeName() {
+      return getUseShortTypeNames() ? getJSRuntimeProcessor().typeNameSuffix : getJSTypeName();
+   }
+
+   public String getJSTypeName() {
+      return getTypeName() + getJSRuntimeProcessor().typeNameSuffix;
    }
 }

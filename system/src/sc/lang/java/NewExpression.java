@@ -910,6 +910,31 @@ public class NewExpression extends IdentifierExpression {
          for (Expression expr:arguments)
             expr.transformToJS();
       }
+
+      // A call to new String(char[] arr) or new String(char[] arr, int start, int end) - needs to be converted so we add a join('') on the array.
+      if (boundTypeName != null && boundTypeName.equals("java.lang.String") && arguments != null) {
+         int numArgs = arguments.size();
+         if (numArgs == 1 || numArgs == 3) {
+            Expression firstArg = arguments.get(0);
+            Object firstArgType = firstArg.getTypeDeclaration();
+            if (ModelUtil.isArray(firstArgType) && ModelUtil.isCharacter(ModelUtil.getArrayComponentType(firstArgType))) {
+               SemanticNodeList<Expression> joinArgs = new SemanticNodeList<Expression>();
+               joinArgs.add(StringLiteral.create(""));
+               VariableSelector joinSel = VariableSelector.create("join", joinArgs);
+               VariableSelector spliceSel;
+               if (numArgs == 3) {
+                  spliceSel = VariableSelector.createArgs("splice", arguments.get(1), arguments.get(2));
+                  arguments.remove(2);
+                  arguments.remove(1);
+                  arguments.set(0, SelectorExpression.create(firstArg, spliceSel, joinSel));
+               }
+               else {
+                  arguments.set(0, SelectorExpression.create(firstArg, joinSel));
+               }
+            }
+         }
+      }
+
       return this;
    }
 

@@ -258,7 +258,11 @@ public class EnumDeclaration extends TypeDeclaration {
                ArrayList<Object> newTypes = new ArrayList<Object>();
                ArrayList<String> newNames = new ArrayList<String>();
                Object[] oldTypes = constr.getParameterTypes(false);
-               String[] oldNames = constr.parameters.getParameterNames();
+               String[] oldNames;
+               if (constr.parameters == null)
+                  oldNames = new String[0];
+               else
+                  oldNames = constr.parameters.getParameterNames();
 
                for (int i = 0; i < defaultConstrParamNames.length; i++) {
                   newTypes.add(defaultConstrParamTypes[i]);
@@ -309,7 +313,7 @@ public class EnumDeclaration extends TypeDeclaration {
       for (String pname:defaultConstrParamNames) {
          args.add(IdentifierExpression.create(pname));
       }
-      constr.addStatement(IdentifierExpression.createMethodCall(args, "super"));
+      constr.addStatementAt(0, IdentifierExpression.createMethodCall(args, "super"));
    }
 
    public EnumDeclaration deepCopy(int options, IdentityHashMap<Object, Object> oldNewMap) {

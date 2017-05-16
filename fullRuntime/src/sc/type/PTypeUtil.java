@@ -910,6 +910,10 @@ public class PTypeUtil {
       return cl instanceof Class && ((Class) cl).isArray();
    }
 
+   public static Object getComponentType(Object cl) {
+      return cl instanceof Class ? ((Class) cl).getComponentType() : null;
+   }
+
    public static Object getAnnotationValue(Class cl, String annotName, String annotValue) {
       Class annotClass = RDynUtil.loadClass(annotName);
       if (annotClass == null)

@@ -11,7 +11,7 @@ public class CharacterLiteral extends AbstractLiteral {
 
    public void init() {
       if (value != null) {
-         String str = ModelUtil.unescapeJavaString(value);
+         String str = CTypeUtil.unescapeJavaString(value);
          if (str.length() == 1)
             charValue = str.charAt(0);
          else if (str.length() > 1)

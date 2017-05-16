@@ -51,7 +51,7 @@ import java.util.*;
 @CompilerSettings(dynChildManager="sc.lang.html.TagDynChildManager")
 @ResultSuffix("html")
 public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjChildren, ITypeUpdateHandler, ISrcStatement, IStoppable {
-   public static boolean trace = false;
+   public static boolean trace = false, verbose = false;
 
    public String tagName;
    public SemanticNodeList<Attr> attributeList;

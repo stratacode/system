@@ -7,12 +7,17 @@ package sc.lang.java;
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
 import sc.lang.js.JSLanguage;
+import sc.layer.LayeredSystem;
 import sc.type.DynType;
+import sc.util.StringUtil;
 
 import java.util.List;
 
 public class EnumConstant extends BodyTypeDeclaration {
    public List<Expression> arguments;
+
+   // Set to true if there's a method of the same name.  This is used in the Javascript conversion, which unlike Java has one namespace shared by fields and methods (and the enum is converted to a field there)
+   public transient boolean shadowedByMethod = false;
 
    public DeclarationType getDeclarationType() {
       return DeclarationType.ENUMCONSTANT;
@@ -20,6 +25,15 @@ public class EnumConstant extends BodyTypeDeclaration {
 
    public void init() {
       super.init();
+   }
+
+   public void validate() {
+      super.validate();
+
+      LayeredSystem sys = getLayeredSystem();
+      TypeDeclaration enclType = getEnclosingType();
+      if (sys != null && enclType != null && StringUtil.equalStrings(sys.getRuntimeName(), "js") && enclType.getMethods(typeName, null) != null)
+         shadowedByMethod = true;
    }
 
    /** For this type only we add the enum constants as properties */

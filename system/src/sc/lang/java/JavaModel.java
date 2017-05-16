@@ -3029,9 +3029,12 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          // The generation process does not set these so we need to reset them before doing the line number processing
          ParseUtil.resetStartIndexes(transformedModel);
          GenFileLineIndex idx = transformedModel.generateFileLineIndex(transformedResult, buildSrcDir);
+
+         /* For debugging you can do something like this
          if (idx.genFileName.contains("UnitConverter.java")) {
             System.out.println(idx.dump(0, 100));
          }
+         */
 
          fileLineIndex = transformedModel.fileLineIndex = idx;
 

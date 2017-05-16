@@ -4392,5 +4392,14 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
    }
 
+   /**
+    * In case there's a file which generates an error that's not part of the project - i.e. gets included via a src-path
+    * entry like scrt-core-src.jar for Javascript code gen, we still need to report that file as one having a syntax error
+    */
+   public void addErrorFile(SrcEntry srcEnt) {
+      if (buildState != null && !buildState.errorFiles.contains(srcEnt))
+         buildState.errorFiles.add(srcEnt);
+   }
+
 }
 

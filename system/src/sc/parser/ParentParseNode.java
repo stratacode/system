@@ -911,8 +911,6 @@ public class ParentParseNode extends AbstractParseNode {
                   // TODO: templateBodyDeclarations uses [] for each parselet mapping so we need to consider those as lines as long as they are not string-tokens.
                   // The original code here only counted a line for parseletIndex == 0 so kept that part the same but not sure why.
 
-                  if (!producesArrayValue && parseletIndex > 0 && paramMapping != NestedParselet.ParameterMapping.SKIP)
-                     System.out.println("***");
                   if (childNode instanceof IParseNode) {
                      Object elemObj = listVal.get(listIx++);
                      if (elemObj instanceof ISemanticNode) {

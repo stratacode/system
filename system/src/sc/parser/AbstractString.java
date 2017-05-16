@@ -50,13 +50,13 @@ public abstract class AbstractString implements IString {
 
       if (obj instanceof String) {
          String s = (String) obj;
-         if (s.length() != length())
+         int len = length();
+         if (s.length() != len)
             return false;
 
          if (s.hashCode() != hashCode())
             return false;
 
-         int len = length();
          for (int i = 0; i < len; i++)
             if (s.charAt(i) != charAt(i))
                return false;

@@ -141,4 +141,10 @@ public interface IDynamicSystem {
    void registerTypeChangeListener(ITypeChangeListener type);
 
    int getLayerPosition(Object type);
+
+   void applySyncLayer(String lang, String destName, String scopeName, String code, boolean isReset, boolean allowCodeEval);
+
+   Object newInnerInstance(Object typeObj, Object outerObj, String constrSig, Object[] params);
+
+   boolean isComponentType(Object type);
 }

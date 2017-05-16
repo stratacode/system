@@ -93,14 +93,14 @@ public class CTypeUtil {
       return Integer.toHexString(v).toUpperCase();
    }
 
-   private static String noEscapeChars = "~!_-'.*()\"";
+   private static String noEscapeChars = "/~!_-'.*();:@&#[]\"";
 
    public static String escapeURLString(String s) {
       StringBuilder res = new StringBuilder();
       for (int i = 0; i < s.length(); i++) {
          char c = s.charAt(i);
          if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-             (c >= '0' && c <= '9') || noEscapeChars.indexOf(c) == -1)
+             (c >= '0' && c <= '9') || noEscapeChars.indexOf(c) != -1)
             res.append(c);
          else if (c == ' ')
             res.append('+');
@@ -233,4 +233,81 @@ public class CTypeUtil {
          return sb.toString();
       return s;
    }
+
+   public static String unescapeJavaString(CharSequence str) {
+      StringBuilder sb = new StringBuilder(str.length());
+      int len = str.length();
+      for (int i = 0; i < len; i++) {
+         char charVal = str.charAt(i);
+         if (charVal == '\\' && i < len - 1) {
+            i++;
+            switch (str.charAt(i)) {
+               case 'b':
+                  charVal = '\b';
+                  break;
+               case 't':
+                  charVal = '\t';
+                  break;
+               case 'n':
+                  charVal = '\n';
+                  break;
+               case 'f':
+                  charVal = '\f';
+                  break;
+               case 'r':
+                  charVal = '\r';
+                  break;
+               case '"':
+                  charVal = '\"';
+                  break;
+               case '\\':
+                  charVal = '\\';
+                  break;
+               case '\'':
+                  charVal = '\'';
+                  break;
+               case 'u':
+                  CharSequence hexStr = str.subSequence(i+1,i+5);
+                  i += 4;
+                  try {
+                     charVal = (char) Integer.parseInt(hexStr.toString(), 16);
+                  }
+                  catch (NumberFormatException exc) {
+                     System.err.println("**** Invalid character unicode escape: " + hexStr + " should be a hexadecimal number");
+                  }
+                  break;
+               case '0':
+               case '1':
+               case '2':
+               case '3':
+               case '4':
+               case '5':
+               case '6':
+               case '7':
+                  int olen = 1;
+                  // May be \3\u1234  or \123 or \1\2\3
+                  for (int oix = i + 1; oix < len; oix++) {
+                     char nextChar = str.charAt(i + olen);
+                     if (Character.isDigit(nextChar) && nextChar < '8')
+                        olen++;
+                     else
+                        break;
+                  }
+
+                  CharSequence octStr = str.subSequence(i, i + olen);
+                  i += olen - 1;
+                  try {
+                     charVal = (char) Integer.parseInt(octStr.toString(), 8);
+                  }
+                  catch (NumberFormatException exc) {
+                     System.err.println("**** Invalid character octal escape: " + octStr + " should be an octal number");
+                  }
+                  break;
+            }
+         }
+         sb.append(charVal);
+      }
+      return sb.toString();
+   }
+
 }
