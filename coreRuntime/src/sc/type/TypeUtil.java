@@ -301,7 +301,7 @@ public class TypeUtil  {
       Object newMapping = getPropertyMapping(parent.getClass(), propName, null, null);
       // No mapping
       if (newMapping == null) {
-         throw new IllegalArgumentException("Can't get property value: " + propName + " from: " + parent.getClass() + ": " + DynUtil.getInstanceName(parent));
+         throw new IllegalArgumentException("No property: " + propName + " in class: " + parent.getClass() + " for instance: " + DynUtil.getInstanceName(parent));
       }
       return getPropertyValue(parent, newMapping);
    }

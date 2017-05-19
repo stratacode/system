@@ -250,7 +250,7 @@ public class FieldDefinition extends TypedDefinition {
                // Also need to register the name with the sync system so it uses the same name for the object.  This has to happen after the addSyncInst call
                // but we have enabled the sync queue so we know this will happen before we actually add the sync inst itself, so it will get the right name.
                // Since this reference comes from the client, when the client refreshes, we do need to send the register inst the next time (hence false for the fixedName when
-               // we are on the server but true if we ever run this code on the client)
+               // we are on the server but true if we ever run this )
                if (newValue != null) {
                   syncCtx.registerObjName(newValue, objName, syncCtx.getSyncManager().syncDestination.clientDestination, false);
                }
@@ -290,7 +290,7 @@ public class FieldDefinition extends TypedDefinition {
       for (int i = 0; i < variableDefinitions.size(); i++) {
          VariableDefinition v = variableDefinitions.get(i);
          Object oldVar;
-         if ((oldVar = base.definesMember(v.variableName, MemberType.FieldSet, refType, null)) != null) {
+         if ((oldVar = base.declaresMember(v.variableName, MemberType.FieldSet, refType, null)) != null) {
             if (oldVar == v) {
                System.out.println("*** error: base type returns same field as modified type!");
                break;
@@ -309,11 +309,16 @@ public class FieldDefinition extends TypedDefinition {
 
             overrides = oldFieldDef;
 
-            if (oldFieldDef.variableDefinitions.size() == 1)
-               oldFieldDef.parentNode.removeChild(oldFieldDef);
+            if (ModelUtil.sameTypes(oldFieldDef.getEnclosingType(), refType)) {
+               if (oldFieldDef.variableDefinitions.size() == 1)
+                  oldFieldDef.parentNode.removeChild(oldFieldDef);
+               else {
+                  int ix = oldFieldDef.variableDefinitions.indexOf(oldVarDef);
+                  oldFieldDef.variableDefinitions.remove(ix);
+               }
+            }
             else {
-               int ix = oldFieldDef.variableDefinitions.indexOf(oldVarDef);
-               oldFieldDef.variableDefinitions.remove(ix);
+               System.err.println("*** Shadowed field - not in the same type?");
             }
          }
       }

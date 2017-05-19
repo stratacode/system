@@ -29,6 +29,13 @@ public class IfStatement extends NonIndentedStatement {
          expression.setInferredType(Boolean.class, true);
    }
 
+   public void validate() {
+      super.validate();
+      Object type = expression.getTypeDeclaration();
+      if (type != null && expression != null && !ModelUtil.isAssignableFrom(Boolean.class, type))
+         expression.displayError("Type: " + ModelUtil.getTypeName(type) + " not a boolean for if expression: ");
+   }
+
    public ExecResult exec(ExecutionContext ctx) {
       if ((Boolean) expression.eval(Boolean.TYPE, ctx)) {
          return trueStatement.exec(ctx);

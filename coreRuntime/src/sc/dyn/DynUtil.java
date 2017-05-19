@@ -1406,4 +1406,27 @@ public class DynUtil {
          throw new UnsupportedOperationException();
    }
 
+   public static boolean isArray(Object type) {
+      if (dynamicSystem != null)
+         return dynamicSystem.isArray(type);
+      if (type instanceof Class) {
+         return PTypeUtil.isArray(type);
+      }
+      throw new UnsupportedOperationException();
+   }
+
+   public static Object getComponentType(Object type) {
+      if (dynamicSystem != null)
+         return dynamicSystem.getComponentType(type);
+      if (type instanceof Class) {
+         return PTypeUtil.getComponentType(type);
+      }
+      throw new UnsupportedOperationException();
+   }
+
+   public static boolean hasProperty(Object obj, String propName) {
+      if (obj == null)
+          return false;
+      return getPropertyMapping(getType(obj), propName) != null;
+   }
 }

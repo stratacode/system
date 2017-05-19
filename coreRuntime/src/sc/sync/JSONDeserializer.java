@@ -233,8 +233,8 @@ public class JSONDeserializer {
                               propVal = propValList.toArray();
                            }
                            // Convert if necessary to get the correct array type - e.g. a String[] instead of just an Object[]
-                           else if (PTypeUtil.isArray(propType)) {
-                              propVal = propValList.toArray((Object[]) PTypeUtil.newArray((Class) PTypeUtil.getComponentType(propType), propValList.size()));
+                           else if (DynUtil.isArray(propType)) {
+                              propVal = propValList.toArray((Object[]) PTypeUtil.newArray((Class) DynUtil.getComponentType(propType), propValList.size()));
                            }
                            // Call the constructor to create the right type of collection, i.e. Collection((Collection a))
                            else {

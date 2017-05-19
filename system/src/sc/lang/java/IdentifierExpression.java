@@ -4748,7 +4748,6 @@ public class IdentifierExpression extends ArgumentsExpression {
                }
                else if (model.customResolver == null || !model.customResolver.useRuntimeResolution())
                   meth = ModelUtil.resolveSrcMethod(getLayeredSystem(), meth, true, false);
-
                Object jsMethSettings = ModelUtil.getAnnotation(meth, "sc.js.JSMethodSettings");
                if (jsMethSettings != null) {
                   String replaceWith = (String) ModelUtil.getAnnotationValue(jsMethSettings, "replaceWith");

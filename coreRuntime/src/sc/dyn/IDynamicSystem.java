@@ -147,4 +147,8 @@ public interface IDynamicSystem {
    Object newInnerInstance(Object typeObj, Object outerObj, String constrSig, Object[] params);
 
    boolean isComponentType(Object type);
+
+   boolean isArray(Object type);
+
+   Object getComponentType(Object arrayType);
 }

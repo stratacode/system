@@ -222,6 +222,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public boolean includeSrcInClassPath = false;  /* Frameworks like GWT require the generated src to be included in the classpath for compilation, DevMode etc. */
 
+   public boolean needsDynamicRuntime = false; /* Set to true for processes that only work with the dynamicRuntime - i.e. can't be run directly with a normal java 'main' and no LayeredSystem class  */
+
    public IRuntimeProcessor runtimeProcessor = null; /** Hook to inject new runtimes like javascript, etc. which processor Java */
 
    /** Each LayeredSystem stores the layers for one process.  This holds the configuration info for that process.  */
@@ -3178,6 +3180,21 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return ModelUtil.isComponentType(type);
    }
 
+   @Override
+   public boolean isArray(Object type) {
+      if (type instanceof ArrayTypeDeclaration)
+         return true;
+      return PTypeUtil.isArray(type);
+   }
+
+   @Override
+   public Object getComponentType(Object arrayType) {
+      if (arrayType instanceof ArrayTypeDeclaration) {
+         return ((ArrayTypeDeclaration) arrayType).getComponentType();
+      }
+      return PTypeUtil.getComponentType(arrayType);
+   }
+
    public void removeTypeChangeListener(ITypeChangeListener type) {
       typeChangeListeners.remove(type);
    }
@@ -3211,8 +3228,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       else if (typeObj instanceof IMethodMapper) {
          return ((IMethodMapper) typeObj).invoke(null, params);
       }
+      else if (typeObj instanceof ParamTypeDeclaration) {
+         return createInstance(((ParamTypeDeclaration)typeObj).getBaseType(), constrSig, params);
+      }
       else
-         throw new IllegalArgumentException("Invalid type to createInstace: " + typeObj);
+         throw new IllegalArgumentException("Invalid type to createInstance: " + typeObj);
    }
 
    public Object createInnerInstance(Object typeObj, Object outerObj, String constrSig, Object[] params) {
@@ -3229,7 +3249,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return PTypeUtil.createInstance((Class) typeObj, constrSig, params);
       }
       else
-         throw new IllegalArgumentException("Invalid type to createInstace: " + typeObj);
+         throw new IllegalArgumentException("Invalid type to createInstance: " + typeObj);
    }
 
    public Object[] getAllMethods(Object typeObj, String modifier, boolean hasModifier) {
