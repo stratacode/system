@@ -544,8 +544,11 @@ public class NewExpression extends IdentifierExpression {
       if (classBody == null)
          return;
 
-      if (!started && !starting)
+      /* This happens when styling nodes but we start the model properly below I think?
+      if (!started && !starting) {
          System.err.println("*** Initializing anonymous type on an unstarted new expression");
+      }
+      */
 
       if (!anonTypeInited) {
          // It seems we can get here at least from refreshBoundTypes - when after an incremental compile we might not have started the model.

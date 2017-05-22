@@ -15,8 +15,9 @@ import java.util.List;
  */
 public interface ISrcStatement extends ISemanticNode {
    /**
-    * When called on a generated node, finds the original source node for the specified language.  Lang can be null in
-    * which case the original source node is returned.
+    * When called on a generated node, finds the original source node for the specified language which must be one of the intermediate
+    * languages this node was generated from.  Lang can be null in
+    * which case we trace generated nodes to find the original source language.
     */
    ISrcStatement getSrcStatement(Language lang);
 

@@ -8,6 +8,7 @@ import sc.lang.*;
 import sc.lang.js.JSFormatMode;
 import sc.lang.js.JSLanguage;
 import sc.lang.js.JSTypeParameters;
+import sc.lang.template.Template;
 import sc.layer.SrcEntry;
 import sc.parser.*;
 import sc.type.DynType;
@@ -492,6 +493,7 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
          ISemanticNode srcParent = srcStatement.getParentNode();
          while (srcParent != null && srcParseNode == null && ict < 2) {
             srcParseNode = srcParent.getParseNode();
+            // TODO: should we have Template implement ISrcStatement for the empty src case?
             if (srcParseNode == null || !(srcParent instanceof ISrcStatement))
                srcParent = srcParent.getParentNode();
             else
@@ -501,8 +503,7 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
          if (srcParseNode != null) {
             if (srcParent instanceof ISrcStatement)
                srcStatement = (ISrcStatement) srcParent;
-            else {
-               System.err.println("*** found a non-statement parent!");
+            if (srcParent == null) {  // this happens with Template which is not an
                srcParseNode = null;
             }
          }
