@@ -210,6 +210,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public boolean systemCompiled = false;  // Set to true when the system has been fully compiled once
    public boolean buildingSystem = false;
+   public boolean needsRefresh = false;  // Set to true when any build is completed.  after the first build, we need to potentially refresh files before we start the second
    public boolean initializingLayers = false; // Set to true when we are initializing layers
    public boolean runClassStarted = false;
    public boolean allTypesProcessed = false;
@@ -4518,6 +4519,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    void buildCompleted(boolean doPeers) {
       systemCompiled = true;
+      needsRefresh = true;
       // Any models that are started after we need to mark as changed.
       lastStartedLayer = null;
       lastModelsStartedLayer = null;
@@ -10441,7 +10443,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          ArrayList<SystemRefreshInfo> peerRefreshInfos = null;
 
          // If we've been through here at least once...
-         if (systemCompiled || anyErrors) {
+         if (needsRefresh || anyErrors) {
             initialBuild = false;
 
             // When using an IDE, it will handle the refresh for us.  We learn about changes in the getLanguageModel method and apply
@@ -10551,6 +10553,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    private void processStoppedTypes(SystemRefreshInfo sysInfo, ArrayList<SystemRefreshInfo> peerRefreshInfos) {
       if (stoppedTypes != null) {
+         if (sysInfo == null) {
+            return;
+         }
          for (Map.Entry<String,TypeDeclaration> ent:stoppedTypes.entrySet()) {
             String typeName = ent.getKey();
             TypeDeclaration oldType = ent.getValue();

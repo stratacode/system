@@ -258,7 +258,9 @@ public class JSONSerializer extends SyncSerializer {
    }
 
    public void formatReference(StringBuilder out, String objName, String currentPackageName) {
-      if (currentPackageName != null && objName.startsWith(currentPackageName) && currentPackageName.length() > 0) {
+      if (objName == null)
+         formatNullValue(out);
+      else if (currentPackageName != null && objName.startsWith(currentPackageName) && currentPackageName.length() > 0) {
          formatRef(out, objName.substring(currentPackageName.length() + 1));
       }
       else
@@ -346,6 +348,10 @@ public class JSONSerializer extends SyncSerializer {
    }
 
    public void formatFloat(StringBuilder out, Float val) {
+      out.append(val.toString());
+   }
+
+   public void formatNumber(StringBuilder out, Number val) {
       out.append(val.toString());
    }
 

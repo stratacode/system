@@ -41,8 +41,11 @@ public abstract class SyncDestination {
    /** Set by components like ServletSyncDestination via the initOnStartup hook */
    public static SyncDestination defaultDestination;
 
-   /** Takes a sync request string, already converted to the format required by the destination (e.g. JS for JS) */
-   public abstract void writeToDestination(String syncRequestStr, String syncGroup, IResponseListener listener, String paramStr);
+   /**
+    * Takes a sync request string, already converted to the format required by the destination (e.g. JS for JS).  There's an optional list of parameters, a listener
+    * from which you can receive response events (if this is writing a client request), and an optional buffer of codeUpdates
+    */
+   public abstract void writeToDestination(String syncRequestStr, String syncGroup, IResponseListener listener, String paramStr, CharSequence codeUpdates);
 
    /**
     * Takes as input a serialized sync layer and translates it to the format required by this destination.
@@ -54,7 +57,7 @@ public abstract class SyncDestination {
    /** Applies the layer definition received from the remote definition.  For JS, we'll eval the returned Javascript.  For stratacode or json, we'll parse the layer definition and apply it as a set of changes to the instances.
     * The receiveLanguage may be specified or if null, we look for SYNC_LAYER_START and pull the receive language out of the text
     * */
-   public void applySyncLayer(String layerDef, String receiveLanguage, boolean resetSync) {
+   public void applySyncLayer(String input, String receiveLanguage, boolean resetSync) {
       SyncManager.SyncState oldSyncState = SyncManager.getSyncState();
 
       // After we've resolved all of the objects which are referenced on the client, we do a "reset" since this will line us
@@ -62,7 +65,7 @@ public abstract class SyncDestination {
       // TODO: maybe the client should send two different layers during a reset - for the committed and uncommitted changes.
       // That way, all of the committed changes would be applied before the resetSync.  As it is now, those changes will be applied after this sendSync call.
       if (resetSync) {
-         SyncManager.sendSync(name, null, true);
+         SyncManager.sendSync(name, null, true, null);
       }
 
       // Queuing up events so they are all fired after the sync has completed
@@ -70,23 +73,45 @@ public abstract class SyncDestination {
       BindingContext oldBindCtx = BindingContext.getBindingContext();
       BindingContext.setBindingContext(ctx);
 
-      if (layerDef.length() > 0) {
+      while (input != null && input.length() > 0) {
+         String layerDef = input;
+         boolean success = false;
          // When no receiveLanguage is known at this time, we must parse it from the header in the value itself
          if (receiveLanguage == null) {
+            // Otherwise, it's a string in the form sync:language:len:data:sync:language:len:data
+            // Supporting more than one format - e.g. json and js when there are code updates to be applied
             if (layerDef.startsWith(SYNC_LAYER_START)) {
                int endLangIx = layerDef.indexOf(':', SYNC_LAYER_START_LEN);
                if (endLangIx != -1) {
-                  if (layerDef.length() > endLangIx + 1) {
-                     receiveLanguage = layerDef.substring(SYNC_LAYER_START_LEN, endLangIx);
-                     layerDef = layerDef.substring(endLangIx + 1);
+                  receiveLanguage = layerDef.substring(SYNC_LAYER_START_LEN, endLangIx);
+                  int lenStart = endLangIx + 1;
+                  if (layerDef.length() > lenStart) {
+                     int endLenIx = layerDef.indexOf(':', lenStart);
+                     if (endLenIx != -1) {
+                        String lenStr = layerDef.substring(lenStart, endLenIx);
+                        try {
+                           int syncLen = Integer.parseInt(lenStr);
+                           int layerDefStart = endLenIx + 1;
+                           layerDef = layerDef.substring(layerDefStart, layerDefStart + syncLen);
+                           // Process the next chunk on the next iteration of the loop.
+                           input = input.substring(layerDefStart + syncLen + 1);
+                           success = true;
+                        }
+                        catch (NumberFormatException exc) {
+                        }
+                     }
                   }
                }
             }
-            if (receiveLanguage == null)
-               throw new IllegalArgumentException("Invalid sync layer header for applySyncLayer");
+         }
+         else {
+            success = true;
+            input = null;
          }
 
          try {
+            if (receiveLanguage == null || !success)
+               throw new IllegalArgumentException("Invalid sync layer header for applySyncLayer");
             SyncManager.setSyncState(SyncManager.SyncState.ApplyingChanges);
             SerializerFormat format = SerializerFormat.getFormat(receiveLanguage);
             if (format != null) {
@@ -100,6 +125,9 @@ public abstract class SyncDestination {
             ctx.dispatchEvents(null);
             SyncManager.setSyncState(oldSyncState);
          }
+
+         if (input != null)
+            receiveLanguage = null; // Reset this so we look for it the next time
       }
    }
 
@@ -185,7 +213,7 @@ public abstract class SyncDestination {
                sb.append(sl.serialize(clientContext, null, true));
             }
             */
-            writeToDestination(sb.toString(), null, this, "reset=true");
+            writeToDestination(sb.toString(), null, this, "reset=true", null);
          }
          else {
             completeSync(true);
@@ -200,7 +228,7 @@ public abstract class SyncDestination {
          syncManager.setNumSendsInProgress(syncManager.getNumSendsInProgress() + (start ? 1 : -1));
    }
 
-   public boolean sendSync(SyncManager.SyncContext parentContext, ArrayList<SyncLayer> layers, String syncGroup, boolean resetSync) {
+   public boolean sendSync(SyncManager.SyncContext parentContext, ArrayList<SyncLayer> layers, String syncGroup, boolean resetSync, CharSequence codeUpdates) {
       SyncSerializer lastSer = null;
       HashSet<String> createdTypes = new HashSet<String>();
       // Going in sorted order - e.g. global, then session.
@@ -230,7 +258,7 @@ public abstract class SyncDestination {
          }
          if (!resetSync) {
             updateInProgress(true);
-            writeToDestination(layerDef, syncGroup, new SyncListener(layers), null);
+            writeToDestination(layerDef, syncGroup, new SyncListener(layers), null, codeUpdates);
          }
          complete = true;
       }

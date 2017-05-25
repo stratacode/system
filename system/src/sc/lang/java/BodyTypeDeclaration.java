@@ -2160,6 +2160,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       */
       LayeredSystem sys = getLayeredSystem();
       JavaModel model = getJavaModel();
+      if (model == null)
+         return boundType;
       // Special handling for classes defined in the same file that are not inner classes - those are only visible from the model itself
       // so first need to refresh the model, then we can find the type in the new model.
       if (getEnclosingType() == null && model.types != null && model.types.size() > 1 && this != model.types.get(0) && !isLayerType) {
@@ -8768,6 +8770,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          ctd.setDeclarationType(getDeclarationType());
          ctd.setDeclaredProperties(getDeclaredProperties());
          ctd.setPackageName(getPackageName());
+         ctd.setScopeName(getScopeName());
          ctd.setDynamicType(isDynamicType());
          ctd.setLayer(getLayer());
          ctd.setComment(getComment());

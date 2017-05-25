@@ -2068,6 +2068,9 @@ public class ModifyDeclaration extends TypeDeclaration {
       else if (modifyClass instanceof CFClass) {
          return getLayeredSystem().getCompiledClass(getFullTypeName());
       }
+      else if (enumConstant) {
+         return getEnclosingType().getCompiledClass();
+      }
       else
          return null;
    }
@@ -2088,7 +2091,7 @@ public class ModifyDeclaration extends TypeDeclaration {
     * The initDynInstance handles all of the initialization
     *
    public void initDynInstance(Object inst, ExecutionContext ctx, boolean popCurrentObj) {
-      // TODO: should avoid double initialization here by overriden fields
+      // TODO: should avoid double initialization here by overridden fields
       if (modifyTypeDecl != null)
          modifyTypeDecl.initDynInstance(inst, ctx, popCurrentObj);
       super.initDynInstance(inst, ctx, popCurrentObj);

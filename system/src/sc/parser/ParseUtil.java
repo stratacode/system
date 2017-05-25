@@ -1054,14 +1054,16 @@ public class ParseUtil  {
                Object semValue = newNode.getSemanticValue();
                if (semValue instanceof JavaSemanticNode)
                   return (JavaSemanticNode) semValue;
-               else
+               else {
                   System.err.println("*** Unrecognized return type");
+               }
             }
-            else
+            else {
                System.err.println("*** Failed to find new parse node in model");
+            }
          }
       }
-      return null;
+      return oldNode;
    }
 
    /**

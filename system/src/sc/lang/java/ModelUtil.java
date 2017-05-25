@@ -5575,6 +5575,8 @@ public class ModelUtil {
 
    /** Returns true for EnumConstants */
    public static boolean isEnum(Object varObj) {
+      if (varObj instanceof ClientTypeDeclaration)
+         varObj = ((ClientTypeDeclaration) varObj).getOriginal();
       if (varObj instanceof EnumConstant)
          return true;
       if (varObj instanceof CFField && ((CFField) varObj).isEnumConstant())
@@ -5613,6 +5615,8 @@ public class ModelUtil {
    }
 
    public static boolean isEnumType(Object varObj) {
+      if (varObj instanceof ClientTypeDeclaration)
+         varObj = ((ClientTypeDeclaration) varObj).getOriginal();
       return varObj instanceof EnumDeclaration || ((varObj instanceof Class) && ((Class) varObj).isEnum()) ||
              ((varObj instanceof CFClass) && ((CFClass) varObj).isEnum()) || (varObj instanceof ModifyDeclaration && isEnumType(((ModifyDeclaration) varObj).getModifiedType()));
    }

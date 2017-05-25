@@ -1007,7 +1007,7 @@ public class ClassType extends JavaType {
          isQualifiedType = true;
       }
       else {
-         packagePrefix = origModel.getPackagePrefix();
+         packagePrefix = origModel == null ? null : origModel.getPackagePrefix();
       }
       ModelUtil.suggestTypes(origModel, packagePrefix, matchPrefix, candidates, true);
       if (origModel != null && !isQualifiedType) {

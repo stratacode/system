@@ -13,7 +13,7 @@ public class SymbolChoice extends Parselet {
    HashMap<IString,List<IString>> valueIndex = new HashMap<IString,List<IString>>();
 
    // index for excludedValues - foreach excluded symbol - e.g. %> this table stores remaining string to exclude - here >
-   private HashMap<IString,ArrString> excludedPeekString = null;
+   private HashMap<IString,ArrayList<ArrString>> excludedPeekString = null;
 
    // Specifies the number of characters to use as an index for choosing the choice
    public int keySize = -1;
@@ -24,7 +24,7 @@ public class SymbolChoice extends Parselet {
    // Match any character in the stream (or do not match if negated is true).
    private boolean matchANY = false;
 
-   // Optimizae the case where each pattern is only a single character
+   // Optimize the case where each pattern is only a single character
    private boolean allSingleCharPatterns = true;
 
    private char[] expectedChars;
@@ -178,18 +178,19 @@ public class SymbolChoice extends Parselet {
       expectedValues.remove(null); // this one messes up comparisons with strings that have a null char apparently!
 
       if (excludedValues != null) {
-         excludedPeekString = new HashMap<IString,ArrString>();
+         excludedPeekString = new HashMap<IString,ArrayList<ArrString>>();
          for (IString excludeValue:excludedValues) {
             boolean matched = false;
             for (IString expectedValue:expectedValues) {
                if (excludeValue.startsWith(expectedValue)) {
                   matched = true;
                   IString peekStr = excludeValue.substring(expectedValue.length());
-                  IString oldValue = excludedPeekString.put(expectedValue, ArrString.toArrString(peekStr.toString()));
-                  // TODO: this should be an array list of strings for each expectedValue right?
-                  if (oldValue != null) {
-                     System.err.println("*** Warning - ignoring a skip prefix for a symbol choice");
+                  ArrayList<ArrString> excludePeekList = excludedPeekString.get(expectedValue);
+                  if (excludePeekList == null) {
+                     excludePeekList = new ArrayList<ArrString>();
+                     excludedPeekString.put(expectedValue, excludePeekList);
                   }
+                  excludePeekList.add(ArrString.toArrString(peekStr.toString()));
                }
             }
             if (!matched)
@@ -401,11 +402,13 @@ public class SymbolChoice extends Parselet {
          return customError;
       if (excludedValues != null) {
          // Some input symbols may be excluded e.g. %> will override %
-         ArrString excludedTokensToPeek = excludedPeekString.get(matchedValue);
+         ArrayList<ArrString> excludedTokensToPeek = excludedPeekString.get(matchedValue);
          if (excludedTokensToPeek != null) {
-            // If we match the excluded peek string for this symbol, it's not a match
-            if (parser.peekInputStr(excludedTokensToPeek, false) == 0)
-               return "excluded token";
+            for (ArrString excludeToken:excludedTokensToPeek) {
+               // If we match the excluded peek string for this symbol, it's not a match
+               if (parser.peekInputStr(excludeToken, false) == 0)
+                  return "excluded token";
+            }
          }
       }
       return null;
@@ -529,7 +532,7 @@ public class SymbolChoice extends Parselet {
       if (newP.excludedValues != null)
          newP.excludedValues = (HashSet<IString>) newP.excludedValues.clone();
       if (newP.excludedPeekString != null)
-         newP.excludedPeekString = (HashMap<IString,ArrString>) newP.excludedPeekString.clone();
+         newP.excludedPeekString = (HashMap<IString,ArrayList<ArrString>>) newP.excludedPeekString.clone();
       return newP;
    }
 }

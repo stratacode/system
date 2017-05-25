@@ -400,8 +400,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    public SemanticTokenChoice binaryOperators = new SemanticTokenChoice(TypeUtil.binaryOperators);
    {
-      // TODO: add this?  it might help partial match efficiency: don't match the assignment operators which start with a binary operator character.
-      //binaryOperators.addExcludedValues("+=", "-=", "*=", "/=", "%=", "^=", "|=", "&=");
+      binaryOperators.addExcludedValues("+=", "-=", "*=", "/=", "%=", "^=", "|=", "&=");
    }
 
    public SymbolChoiceSpace assignmentOperator = new SemanticTokenChoice("=", "+=", "-=", "*=", "/=", "%=", "^=", "|=", "&=",

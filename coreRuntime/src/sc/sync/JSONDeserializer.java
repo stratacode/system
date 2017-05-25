@@ -263,10 +263,11 @@ public class JSONDeserializer {
 
    public void invokeMethod(CharSequence methName, List args, CharSequence callIdSeq) {
       Object curObj = getCurObj();
+      Object curType = DynUtil.isSType(curObj) ? curObj : DynUtil.getSType(curObj);
       String callId = callIdSeq.toString();
-      Object meth = DynUtil.resolveMethod(curObj, methName.toString(), null);
+      Object meth = DynUtil.resolveMethod(curType, methName.toString(), null);
       if (meth == null) {
-         System.err.println("No method: " + methName + " in type: " + DynUtil.getTypeName(curObj, false));
+         System.err.println("No method: " + methName + " in type: " + DynUtil.getTypeName(curType, false));
       }
       else {
          // TODO: security: need to validate that this method is authorized for remote access

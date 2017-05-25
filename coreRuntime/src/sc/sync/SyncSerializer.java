@@ -226,7 +226,9 @@ public class SyncSerializer {
    }
 
    public void formatReference(StringBuilder out, String objName, String currentPackageName) {
-      if (currentPackageName != null && objName.startsWith(currentPackageName) && currentPackageName.length() > 0) {
+      if (objName == null)
+         formatNullValue(out);
+      else if (currentPackageName != null && objName.startsWith(currentPackageName) && currentPackageName.length() > 0) {
          out.append(objName.substring(currentPackageName.length() + 1));
       }
       else
@@ -435,13 +437,21 @@ public class SyncSerializer {
       sb.append('f');
    }
 
+   // Here for javascript
+   public void formatNumber(StringBuilder sb, Number val) {
+      sb.append(val.toString());
+   }
+
    public void formatDouble(StringBuilder sb, Double val) {
       sb.append(val.toString());
       sb.append('d');
    }
 
    public void formatDefault(StringBuilder sb, Object val) {
-      sb.append(val.toString());
+      String str = DynUtil.getTypeName(DynUtil.getType(val), true) + ": " + val.toString();
+      sb.append('"');
+      sb.append(str);
+      sb.append('"');
    }
 
    public void formatChar(StringBuilder sb, String val) {

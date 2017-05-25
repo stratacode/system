@@ -2744,7 +2744,7 @@ public class SyncManager {
    public static boolean sendSync(String syncGroup, boolean resetSync) {
       boolean sentAnything = false;
       for (String destName:syncManagersByDest.keySet())
-         sentAnything = sendSync(destName, syncGroup, resetSync) || sentAnything;
+         sentAnything = sendSync(destName, syncGroup, resetSync, null) || sentAnything;
       return sentAnything;
    }
 
@@ -2762,17 +2762,17 @@ public class SyncManager {
       return syncScope;
    }
 
-   public static boolean sendSync(String destName, String syncGroup, boolean resetSync) {
+   public static boolean sendSync(String destName, String syncGroup, boolean resetSync, CharSequence codeUpdates) {
       ScopeDefinition syncScope = getDefaultScope();
       if (syncScope == null)
          throw new IllegalArgumentException("*** No active scopes to sync");
       else
-         return sendSync(destName, syncGroup, syncScope.scopeId, resetSync);
+         return sendSync(destName, syncGroup, syncScope.scopeId, resetSync, codeUpdates);
    }
 
-   public static boolean sendSync(String destName, String syncGroup, int scopeId, boolean resetSync) {
+   public static boolean sendSync(String destName, String syncGroup, int scopeId, boolean resetSync, CharSequence codeUpdates) {
       SyncManager syncMgr = syncManagersByDest.get(destName);
-      return syncMgr.sendSync(syncGroup, scopeId, resetSync);
+      return syncMgr.sendSync(syncGroup, scopeId, resetSync, codeUpdates);
    }
 
    private SyncContext getFirstParentSyncContext(int scopeId, boolean create) {
@@ -2795,7 +2795,7 @@ public class SyncManager {
       return null;
    }
 
-   public boolean sendSync(String syncGroup, int scopeId, boolean resetSync) {
+   public boolean sendSync(String syncGroup, int scopeId, boolean resetSync, CharSequence codeUpdates) {
       SyncContext ctx = getSyncContext(scopeId, false);
       if (ctx == null) {  // If the default scope does not have a context, check for a sync context on the parent scope
          ctx = getFirstParentSyncContext(scopeId, false);
@@ -2818,7 +2818,7 @@ public class SyncManager {
                toSend.add(changedLayer);
             }
          }
-         return syncDestination.sendSync(ctx, toSend, syncGroup, resetSync);
+         return syncDestination.sendSync(ctx, toSend, syncGroup, resetSync, codeUpdates);
       }
       else if (verbose) {
          System.out.println("No changes to synchronize for scope: " + ScopeDefinition.getScope(scopeId));

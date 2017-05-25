@@ -796,20 +796,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       PerfMon.start("startJS", false);
 
       if (td.getEnclosingType() == null) {
-         String prefixStr = (String) ModelUtil.getTypeOrLayerAnnotationValue(system, td, "ls.js.JSSettings", "prefixAlias");
-         if (prefixStr != null && prefixStr.length() > 0) {
-            String pkgName = CTypeUtil.getPackageName(ModelUtil.getTypeName(td));
-            String oldPrefix = jsBuildInfo.prefixAliases.put(pkgName, prefixStr);
-            if (oldPrefix != null && !oldPrefix.equals(prefixStr)) {
-               System.err.println("*** JSSettings.prefixAlias value on type: " + td + " set to: " + prefixStr + " which conflicts with the old prefixAlias for pkg: " + pkgName + " of: " + oldPrefix);
-            }
-            List<String> pkgs = jsBuildInfo.aliasedPackages.get(prefixStr);
-            if (pkgs == null) {
-               pkgs = new ArrayList<String>();
-               jsBuildInfo.aliasedPackages.put(prefixStr, pkgs);
-            }
-            pkgs.add(pkgName);
-         }
+         registerPrefixAlias(td);
       }
 
       //if (verboseJS && td.getEnclosingType() == null)
@@ -1364,6 +1351,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                if (type instanceof TypeDeclaration && (elem = ((TypeDeclaration) type).element) != null && elem.isAbstract())
                   return null;
 
+               // Need to do this here because it might impact the type name used in the file - and we may not have hit this type due to the weird way we start from bottom up
+               registerPrefixAlias(type);
+
                Object typeParams = new ObjectTypeParameters(system, type);
                String jsModuleRes = TransformUtil.evalTemplate(typeParams, jsModuleStr, true); // TODO: preparse these strings for speed
                addModuleEntryPoint(type, jsModuleRes);
@@ -1614,19 +1604,37 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return false;
    }
 
-   /** This gets called in two modes - during start to collect the jsLibFiles for each type and populate the jsLibFiles in the build info.  This is with (append=true).
-    * It is also called from the getProcessedFiles method (append=false) to copy the files for a given type. */
-   String[] addJSLibFiles(Object type, boolean append, String rootTypeLibFile, Object depType, String relation) {
+   /**
+    * This must be called on the type before we try to use the js type name.
+    * TODO - performance: we are calling this more often than necessary... need to check each type in each layer but maybe we can remove one or two of the calls to it?
+    */
+   private void registerPrefixAlias(Object type) {
       // This prefix alias attribute does not work for inner classes.
       if (ModelUtil.getEnclosingType(type) == null) {
+         String typeName = ModelUtil.getTypeName(type);
          String prefixStr = (String) ModelUtil.getTypeOrLayerAnnotationValue(system, type, "sc.js.JSSettings", "prefixAlias");
-         if (append && prefixStr != null && prefixStr.length() > 0) {
+         if (prefixStr != null && prefixStr.length() > 0) {
             String pkgName = CTypeUtil.getPackageName(ModelUtil.getTypeName(type));
             String oldPrefix = jsBuildInfo.prefixAliases.put(pkgName, prefixStr);
             if (oldPrefix != null && !oldPrefix.equals(prefixStr)) {
                System.err.println("*** JSSettings.prefixAlias value on type: " + type + " set to: " + prefixStr + " which conflicts with the old prefixAlias for pkg: " + pkgName + " of: " + oldPrefix);
             }
+            List<String> pkgs = jsBuildInfo.aliasedPackages.get(prefixStr);
+            if (pkgs == null) {
+               pkgs = new ArrayList<String>();
+               jsBuildInfo.aliasedPackages.put(prefixStr, pkgs);
+            }
+            pkgs.add(pkgName);
          }
+      }
+   }
+
+   /** This gets called in two modes - during start to collect the jsLibFiles for each type and populate the jsLibFiles in the build info.  This is with (append=true).
+    * It is also called from the getProcessedFiles method (append=false) to copy the files for a given type. */
+   String[] addJSLibFiles(Object type, boolean append, String rootTypeLibFile, Object depType, String relation) {
+      // This prefix alias attribute does not work for inner classes.
+      if (ModelUtil.getEnclosingType(type) == null && append) {
+         registerPrefixAlias(type);
       }
 
       Object settingsObj = ModelUtil.getAnnotation(type, "sc.js.JSSettings");
@@ -2156,10 +2164,6 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       postStarted = false;
       anyErrors = false;
       errorFiles.clear();
-
-      if (system.options.buildAllFiles) {
-         // TODO: should we reset anything in the JSBuildInfo?  Since we don't reliably run the start process, I don't think so
-      }
    }
 
    public boolean getCompiledOnly() {
@@ -2544,7 +2548,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             // When we have not transformed the type and we've cached the type to file membership, we can take a faster path and just gather up the files.
             // We can't use the untransformed model to reliably get the list of inner types cause it mises the __Anon classes and anything which is generated.
             // The order is also messed up.
-            if (needsSave || (enclType == null && typeInfo.typesInSameFile == null) || processedTypes.contains(fullTypeName)) {
+            if (needsSave || (enclType == null && typeInfo != null && typeInfo.typesInSameFile == null) || processedTypes.contains(fullTypeName)) {
                if (enclType == null) {
                   // Preserve the order in which we add them but make it quick to reject duplicates
                   typesInSameFile = new LinkedHashSet<String>();
@@ -2616,7 +2620,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                }
             }
             else if (enclType == null) {
-               if (typeInfo.typesInSameFile != null) {
+               if (typeInfo != null && typeInfo.typesInSameFile != null) {
                   for (String subTypeName:typeInfo.typesInSameFile) {
                      addCompiledTypesToFile(subTypeName, typesInFile, rootLibFile, genLayer, jsFileBody, lineIndex, typeInfo.typesInSameFile);
                   }

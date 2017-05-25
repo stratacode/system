@@ -222,8 +222,13 @@ public class JSONParser {
    }
 
    public void expectNextName(String val) {
+      skipWhitespace();
       expect(",");
+      skipWhitespace();
+      expect("\"");
       expect(val);
+      expect("\"");
+      expect(":");
    }
 
    public String toString() {

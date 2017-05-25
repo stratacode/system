@@ -542,6 +542,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       String imported;
       if (modifiedModel != null) {
          if (modifiedModel != this && modifiedModel.getUnresolvedModifiedModel() != this) {
+            if (!modifiedModel.initialized) // If it's not inited, the importsByName are not set
+               System.err.println("*** Modified model not initialized in getImportedName!");
+            if (modifiedModel.replacedByModel != null)
+               modifiedModel = modifiedModel.replacedByModel;
+
             imported = modifiedModel.getImportedName(name);
             if (imported != null)
                return imported;
@@ -2678,8 +2683,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public void stop() {
-      if (modifiedModel != null)
+      if (modifiedModel != null) {
          modifiedModel.stop();
+         // This gets reset lazily from the modified type, but during a rebuild if we leave this value around, it could be stale
+         modifiedModel = null;
+      }
 
       SrcEntry srcEnt = getSrcFile();
 

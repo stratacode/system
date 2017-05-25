@@ -175,6 +175,7 @@ public abstract class ScopeDefinition {
                         // we look for a lower case property that does not exist.
                         propName = CTypeUtil.decapitalizePropertyName(propName);
                         try {
+                           //if (DynUtil.hasProperty(value, propName)) - not working for some reason
                            value = DynUtil.getPropertyValue(value, propName);
                         }
                         catch (IllegalArgumentException exc) {

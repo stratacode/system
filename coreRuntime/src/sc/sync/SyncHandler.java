@@ -144,13 +144,16 @@ public class SyncHandler {
             case String:
                ser.formatString(out, changedObj.toString());
                break;
+            case Number: // Here for JS
+               ser.formatNumber(out, (Number) changedObj);
+               break;
             case Object:
                String val = syncContext.getObjectName(changedObj, varName, false, false, null, syncLayer);
                if (val == null)
                   val = syncContext.createOnDemandInst(changedObj, depChanges, varName, syncLayer);
                ser.formatReference(out, val, currentPackageName);
                break;
-            default: // TODO: Number on the JS side falls into this case
+            default:
                ser.formatDefault(out, changedObj);
                break;
          }

@@ -1292,6 +1292,16 @@ public class DynUtil {
 
    public static String getScopeName(Object obj) {
       Object typeObj = DynUtil.getType(obj);
+      String res = getScopeNameForType(typeObj);
+      if (res != null)
+         return res;
+      Object outer = DynUtil.getOuterObject(obj);
+      if (outer != null)
+         return getScopeName(outer);
+      return null;
+   }
+
+   public static String getScopeNameForType(Object typeObj) {
       if (dynamicSystem != null) {
          // Need to check both the sc.obj.Scope and scope<name> in tandem so each can override the other
          String scopeName = dynamicSystem.getInheritedScopeName(typeObj);
@@ -1303,9 +1313,6 @@ public class DynUtil {
          if (scopeNameObj != null)
             return (String) scopeNameObj;
       }
-      Object outer = DynUtil.getOuterObject(obj);
-      if (outer != null)
-         return getScopeName(outer);
       return null;
    }
 

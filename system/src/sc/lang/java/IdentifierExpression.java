@@ -3219,6 +3219,10 @@ public class IdentifierExpression extends ArgumentsExpression {
             case GetSetMethodInvocation:
             case GetObjectMethodInvocation:
                return resolveType(ModelUtil.getVariableTypeDeclaration(boundTypes[ix], model), ix, idTypes);
+            case UnboundMethodName:
+               if (boundTypes[ix] == null)
+                  return null;
+               // else - fall through - when a method is overloaded, we bind to the closest approximate method so treat it like a regular method call
             case MethodInvocation:
             case RemoteMethodInvocation:
                Object smt = getSpecialMethodType(ix, idTypes, boundTypes, model, rootType, definedInType);

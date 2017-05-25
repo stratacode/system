@@ -89,6 +89,7 @@ public class JSONFormat extends SerializerFormat {
             CharSequence methName = dser.parseMethName();
             dser.parser.expectNextName(MethodArgs.callId.name());
             CharSequence callIdVal = dser.parser.parseString();
+            dser.parser.expectNextName(MethodArgs.args.name());
             List args = dser.parser.parseArray();
             if (methName != null && callIdVal != null) {
                dser.invokeMethod(methName, args, callIdVal);
