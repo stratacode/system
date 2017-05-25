@@ -26,7 +26,7 @@ public class ScopeModifier extends ErrorSemanticNode {
          return;
       // Valid scopes may either be registerScopeProcessors (e.g. session) or defined statically and shared by the runtime and compilation environments (e.g. global and appGlobal)
       if (!isValidScope(model, scopeName)) {
-         displayError("No scope: " + scopeName + " for: ");
+         displayTypeError("No scope: " + scopeName + " for: ");
       }
    }
 

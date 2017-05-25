@@ -542,8 +542,6 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       String imported;
       if (modifiedModel != null) {
          if (modifiedModel != this && modifiedModel.getUnresolvedModifiedModel() != this) {
-            if (!modifiedModel.initialized) // If it's not inited, the importsByName are not set
-               System.err.println("*** Modified model not initialized in getImportedName!");
             if (modifiedModel.replacedByModel != null)
                modifiedModel = modifiedModel.replacedByModel;
 
