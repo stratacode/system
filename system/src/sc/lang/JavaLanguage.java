@@ -597,8 +597,8 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    Sequence whileStatement = new Sequence("WhileStatement(operator, expression, statement)", whileKeyword, parenExpression, statement);
    Sequence catchStatement = new Sequence("CatchStatement(,parameters,statements)",  new KeywordSpace("catch"), catchParameter, block);
-   Sequence finallyStatement = new Sequence("FinallyStatement(,statements)", OPTIONAL, new KeywordSpace("finally"), block);
-   Sequence tryStatement = new Sequence("TryStatement(, resources, statements,*)", new KeywordSpace("try"), tryResources, block,
+   Sequence finallyStatement = new Sequence("FinallyStatement(,block)", OPTIONAL, new KeywordSpace("finally"), block);
+   Sequence tryStatement = new Sequence("TryStatement(, resources, block,*)", new KeywordSpace("try"), tryResources, block,
                                         new Sequence("(catchStatements,finallyStatement)", OPTIONAL, new Sequence("([])", OPTIONAL | REPEAT, catchStatement), finallyStatement));
    Sequence switchStatement = new Sequence("SwitchStatement(,expression,,statements,)", new KeywordSpace("switch"), parenExpression, openBraceEOL, switchBlockStatementGroups, closeBraceEOL);
    Sequence returnStatement = new Sequence("ReturnStatement(operator,expression,)", new KeywordSpace("return"), optExpression, endStatement);

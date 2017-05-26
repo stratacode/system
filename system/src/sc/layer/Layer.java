@@ -2910,6 +2910,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       return res;
    }
 
+   // TODO: Performance - can we use the package index to avoid this search through all of the jar files?
    public Object getCFClass(String classFileName, boolean external) {
       List<String> cdirs = external ? externalClassDirs : classDirs;
       ZipFile[] zfiles = external ? externalZipFiles : zipFiles;

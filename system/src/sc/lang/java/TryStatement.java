@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Set;
 
 public class TryStatement extends Statement implements IBlockStatement {
-   public List<Statement> statements;
+   public BlockStatement block; // TODO: should this just be a BlockStatement?  Wouldn't that make the code easier to manage so Try is not such a special case?
    public List<CatchStatement> catchStatements;
    // Java 7 auto-close resources
    public SemanticNodeList<VariableStatement> resources;
@@ -26,7 +26,7 @@ public class TryStatement extends Statement implements IBlockStatement {
       if (initialized) return;
       super.init();
 
-      frameSize = ModelUtil.computeFrameSize(statements);
+      frameSize = block == null ? 0 : ModelUtil.computeFrameSize(block.statements);
    }
 
    public ExecResult exec(ExecutionContext ctx) {
@@ -35,7 +35,8 @@ public class TryStatement extends Statement implements IBlockStatement {
       try {
          ctx.pushFrame(false, frameSize);
 
-         res = ModelUtil.execStatements(ctx, statements);
+         if (block != null)
+            res = ModelUtil.execStatements(ctx, block.statements);
       }
       catch (Throwable th) {
          // This frame should not be visible while executing any catches
@@ -61,8 +62,8 @@ public class TryStatement extends Statement implements IBlockStatement {
    }
 
    public void refreshBoundTypes(int flags) {
-      if (statements != null)
-         for (Statement st : statements)
+      if (block != null && block.statements != null)
+         for (Statement st : block.statements)
             st.refreshBoundTypes(flags);
       if (catchStatements != null)
          for (CatchStatement cs : catchStatements)
@@ -72,8 +73,8 @@ public class TryStatement extends Statement implements IBlockStatement {
    }
 
    public void addChildBodyStatements(List<Object> sts) {
-      if (statements != null)
-         for (Statement st : statements)
+      if (block != null && block.statements != null)
+         for (Statement st : block.statements)
             st.addChildBodyStatements(sts);
       if (catchStatements != null)
          for (Statement st : catchStatements)
@@ -83,8 +84,8 @@ public class TryStatement extends Statement implements IBlockStatement {
    }
 
    public void addDependentTypes(Set<Object> types) {
-      if (statements != null)
-         for (Statement st : statements)
+      if (block != null && block.statements != null)
+         for (Statement st : block.statements)
             st.addDependentTypes(types);
       if (catchStatements != null)
          for (CatchStatement cs : catchStatements)
@@ -94,8 +95,8 @@ public class TryStatement extends Statement implements IBlockStatement {
    }
 
    public Statement transformToJS() {
-      if (statements != null)
-         for (Statement st : statements)
+      if (block != null && block.statements != null)
+         for (Statement st : block.statements)
             st.transformToJS();
       if (catchStatements != null) {
          // JS only has a single 'catch' statement
@@ -141,7 +142,7 @@ public class TryStatement extends Statement implements IBlockStatement {
    }
 
    public List<Statement> getBlockStatements() {
-      return statements;
+      return block.statements;
    }
 
    public Object definesMember(String name, EnumSet<MemberType> mtype, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {
@@ -174,8 +175,8 @@ public class TryStatement extends Statement implements IBlockStatement {
    }
 
    public void addReturnStatements(List<Statement> res, boolean incThrow) {
-      if (statements != null) {
-         for (Statement statement : statements)
+      if (block != null && block.statements != null) {
+         for (Statement statement : block.statements)
             statement.addReturnStatements(res, incThrow);
       }
       if (catchStatements != null) {
@@ -190,8 +191,8 @@ public class TryStatement extends Statement implements IBlockStatement {
    public String toString() {
       StringBuilder sb = new StringBuilder();
       sb.append("try ");
-      if (statements != null) {
-         sb.append(statements.toString());
+      if (block != null && block.statements != null) {
+         sb.append(block.statements.toString());
       }
       if (catchStatements != null) {
          sb.append(catchStatements.toString());
@@ -203,8 +204,8 @@ public class TryStatement extends Statement implements IBlockStatement {
    }
 
    public Statement findStatement(Statement in) {
-      if (statements != null) {
-         for (Statement st : statements) {
+      if (block != null && block.statements != null) {
+         for (Statement st : block.statements) {
             Statement out = st.findStatement(in);
             if (out != null)
                return out;

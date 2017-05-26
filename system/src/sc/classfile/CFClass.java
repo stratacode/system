@@ -780,6 +780,9 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
    }
 
    public Object getInnerType(String name, TypeContext ctx) {
+      if (!started)
+         start();
+
       // This will return for SortedMap.Entry which appears to exist as a type but is inherited from java/util/Map$Entry.class so need to check the extendsType if we get back null
       if (classFile.hasInnerClass(name)) {
          Object res;
