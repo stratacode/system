@@ -51,7 +51,7 @@ public class JSONFormat extends SerializerFormat {
       pkg {
          // { "pkg": "pkgName" }
          public void apply(JSONDeserializer dser, boolean topLevel) {
-            CharSequence pkg = dser.parser.parseString();
+            CharSequence pkg = dser.parser.parseString(true);
             dser.currentPackage = pkg == null ? null : pkg.toString();
          }
       },
@@ -70,9 +70,10 @@ public class JSONFormat extends SerializerFormat {
          }
 
       },
+      // TODO: remove this?  Is it used?
       eval {
          public void apply(JSONDeserializer dser, boolean topLevel) {
-            CharSequence code = dser.parser.parseString();
+            CharSequence code = dser.parser.parseString(false);
             if (code != null) {
                if (dser.allowCodeEval) {
                   DynUtil.evalScript(code.toString());
@@ -88,9 +89,9 @@ public class JSONFormat extends SerializerFormat {
          public void apply(JSONDeserializer dser, boolean topLevel) {
             CharSequence methName = dser.parseMethName();
             dser.parser.expectNextName(MethodArgs.typeSig.name());
-            CharSequence typeSig = dser.parser.parseString();
+            CharSequence typeSig = dser.parser.parseString(true);
             dser.parser.expectNextName(MethodArgs.callId.name());
-            CharSequence callIdVal = dser.parser.parseString();
+            CharSequence callIdVal = dser.parser.parseString(false);
             dser.parser.expectNextName(MethodArgs.args.name());
             List args = dser.parser.parseArray();
             if (methName != null && callIdVal != null) {
@@ -105,9 +106,9 @@ public class JSONFormat extends SerializerFormat {
             // Method return value comes first
             Object returnValue = dser.parser.parseJSONValue();
             dser.parser.expectNextName(JSONSerializer.MethodReturnArgs.callId.name());
-            CharSequence callIdVal = dser.parser.parseString();
+            CharSequence callIdVal = dser.parser.parseString(false);
             dser.parser.expectNextName(JSONSerializer.MethodReturnArgs.retType.name());
-            CharSequence retTypeName = dser.parser.parseString();
+            CharSequence retTypeName = dser.parser.parseString(true);
             if (callIdVal != null) {
                dser.applyMethodResult(callIdVal.toString(), returnValue, retTypeName == null ? null : DynUtil.findType(retTypeName.toString()));
             }
@@ -117,7 +118,7 @@ public class JSONFormat extends SerializerFormat {
       },
       get {
          public void apply(JSONDeserializer dser, boolean topLevel) {
-            CharSequence propName = dser.parser.parseString();
+            CharSequence propName = dser.parser.parseString(false);
             if (propName != null) {
                dser.fetchProperty(propName.toString());
             }
@@ -127,7 +128,7 @@ public class JSONFormat extends SerializerFormat {
       },
       syncState {
          public void apply(JSONDeserializer dser, boolean topLevel) {
-            CharSequence stateName = dser.parser.parseString();
+            CharSequence stateName = dser.parser.parseString(false);
             if (stateName != null) {
                SyncManager.SyncState state;
                if (stateName.equals("init"))

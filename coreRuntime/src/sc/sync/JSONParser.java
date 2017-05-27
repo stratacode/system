@@ -45,11 +45,11 @@ public class JSONParser {
       return res;
    }
 
-   // Parses: "string"
-   public CharSequence parseString() {
+   // Parses: "string" or null
+   public CharSequence parseString(boolean allowNull) {
       char c;
       do {
-         if (curPos >= input.length())
+         if (curPos >= len)
             return null;
 
          c = input.charAt(curPos++);
@@ -67,14 +67,18 @@ public class JSONParser {
             } while (c != '"');
             return input.subSequence(nameStart, curPos - 1);
          }
+         else if (allowNull && c == 'n' && (len - curPos) >= 3 && input.charAt(curPos) == 'u' && input.charAt(curPos + 1) == 'l' && input.charAt(curPos + 2) == 'l') {
+            curPos += 3;
+            return null;
+         }
       } while (Character.isWhitespace(c));
       curPos--;
       return null;
    }
 
-   /** The JSON format does not natively support references so we need to use a string with a special prefix 'ref:' */
+   /** The JSON format does not natively support references so we need to use a string with a special prefix 'ref:'.  This also allows null */
    public Object parseRefOrString() {
-      CharSequence val = parseString();
+      CharSequence val = parseString(true);
       int len;
       if (val != null && (len = val.length()) > 4) {
          if (isRefPrefix(val, 0)) {
@@ -95,7 +99,7 @@ public class JSONParser {
 
    // Parses: "string":
    public CharSequence parseName() {
-      CharSequence res = parseString();
+      CharSequence res = parseString(false);
       if (res == null || !parseCharToken(':'))
          return null;
       return res;

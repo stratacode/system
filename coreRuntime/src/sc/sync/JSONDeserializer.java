@@ -78,14 +78,14 @@ public class JSONDeserializer {
    }
 
    public CharSequence parseMethName() {
-      CharSequence methName = parser.parseString();
+      CharSequence methName = parser.parseString(false);
       if (methName == null)
          throw new IllegalArgumentException(("JSON document missing meth name at : " + parser));
       return methName;
    }
 
    public CharSequence parseObjName() {
-      CharSequence objName = parser.parseString();
+      CharSequence objName = parser.parseString(false);
       if (objName == null)
          throw new IllegalArgumentException(("JSON document missing object name at : " + parser));
       return objName;
