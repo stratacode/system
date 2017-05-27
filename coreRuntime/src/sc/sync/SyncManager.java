@@ -1544,7 +1544,7 @@ public class SyncManager {
          initSyncInst(changedObj, instInfo, instInfo == null ? props == null ? false : props.initDefault : instInfo.initDefault, scope == null ? 0 : scope.getScopeDefinition().scopeId, props, instInfo == null ? null : instInfo.args, false, inherited, addPropChanges, true);
       }
 
-      public RemoteResult invokeRemote(String syncGroup, Object obj, String methName, Object[] args) {
+      public RemoteResult invokeRemote(String syncGroup, Object obj, String methName, String paramSig, Object[] args) {
          SyncLayer changedLayer = getChangedSyncLayer(syncGroup);
          if (!needsSync) {
             setNeedsSync(true);
@@ -1552,7 +1552,7 @@ public class SyncManager {
          if (trace) {
             System.out.println("Remote method call: " + DynUtil.getInstanceName(obj) + "." + methName + "(" + DynUtil.arrayToInstanceName(args) + ")");
          }
-         return changedLayer.invokeRemote(obj, methName, args);
+         return changedLayer.invokeRemote(obj, methName,  paramSig, args);
       }
 
       public void addMethodResult(Object ctxObj, String objName, Object retValue) {
@@ -2826,8 +2826,8 @@ public class SyncManager {
       return true;
    }
 
-   public static RemoteResult invokeRemote(Object obj, String methName, Object...args) {
-      return invokeRemoteDest(SyncDestination.defaultDestination.name, null, obj, methName, args);
+   public static RemoteResult invokeRemote(Object obj, String methName, String paramSig, Object...args) {
+      return invokeRemoteDest(SyncDestination.defaultDestination.name, null, obj, methName, paramSig, args);
    }
 
    public static void setCurrentSyncLayers(ArrayList<SyncLayer> current) {
@@ -2853,13 +2853,13 @@ public class SyncManager {
          System.err.println("processMethodReturn called when no current sync layer is registered");
    }
 
-   public static RemoteResult invokeRemoteDest(String destName, String syncGroup, Object obj, String methName, Object...args) {
+   public static RemoteResult invokeRemoteDest(String destName, String syncGroup, Object obj, String methName, String paramSig, Object...args) {
       SyncManager mgr = getSyncManager(destName);
       int scopeId = getScopeIdForSyncInst(obj);
       if (scopeId == -1)
          scopeId = GlobalScopeDefinition.getGlobalScopeDefinition().scopeId;
       SyncContext ctx = obj == null ? mgr.getDefaultSyncContext() : mgr.getSyncContext(scopeId, true);
-      return ctx.invokeRemote(syncGroup, obj, methName, args);
+      return ctx.invokeRemote(syncGroup, obj, methName, paramSig, args);
    }
 
    public static SyncContext getDefaultSyncContext() {

@@ -291,6 +291,9 @@ public class JSONSerializer extends SyncSerializer {
       int ix = newObjNames.size();
       appendCommandStart(Commands.meth, smc.methName, ix);
 
+      appendName(MethodArgs.typeSig.toString());
+      appendString(smc.paramSig);
+
       appendName(MethodArgs.callId.toString());
       appendString(smc.callId);
 
@@ -301,15 +304,20 @@ public class JSONSerializer extends SyncSerializer {
    }
 
    enum MethodReturnArgs {
-      callId
+      callId, retType
    }
 
    public void appendMethodResult(SyncManager.SyncContext parentContext, SyncLayer.SyncMethodResult mres, ArrayList<String> newObjNames, String newLastPackageName, ArrayList<SyncLayer.SyncChange> depChanges, SyncLayer syncLayer) {
       int ix = newObjNames.size();
       appendNameStart(Commands.methReturn.cmd, ix);
       parentContext.formatExpression(this, sb, mres.retValue, newObjNames, newLastPackageName, null, null, null, true, "", depChanges, syncLayer);
-      appendName(MethodReturnArgs.callId.toString());
+      appendName(MethodReturnArgs.callId.name());
       appendString(mres.callId);
+      appendName(MethodReturnArgs.retType.name());
+      if (mres.retValue == null)
+         appendNullValue();
+      else
+         appendString(DynUtil.getTypeName(DynUtil.getType(mres.retValue), true));
       if (ix == 0)
          appendObjEnd();
    }

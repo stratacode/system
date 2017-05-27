@@ -165,12 +165,14 @@ public class SyncLayer {
       String instName;
       String methName;
       String callId = null;
+      String paramSig;
       RemoteResult result;
 
-      SyncMethodCall(Object obj, String instName, String methName, Object...args) {
+      SyncMethodCall(Object obj, String instName, String methName, String paramSig, Object...args) {
          super(obj);
          this.instName = instName;
          this.methName = methName;
+         this.paramSig = paramSig;
          this.args = args;
       }
 
@@ -355,8 +357,8 @@ public class SyncLayer {
       return changeMap.get(propName);
    }
 
-   public RemoteResult invokeRemote(Object obj, String methName, Object[] args) {
-      SyncMethodCall change = new SyncMethodCall(obj, syncContext.findObjectName(obj), methName, args);
+   public RemoteResult invokeRemote(Object obj, String methName, String paramSig, Object[] args) {
+      SyncMethodCall change = new SyncMethodCall(obj, syncContext.findObjectName(obj), methName, paramSig, args);
       addSyncChange(change);
       RemoteResult res = new RemoteResult();
       res.callId = change.getCallId();

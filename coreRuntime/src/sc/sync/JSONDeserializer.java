@@ -227,21 +227,8 @@ public class JSONDeserializer {
                      // value and set the object property correctly.
                      if (propVal instanceof List) {
                         Object propType = DynUtil.getPropertyType(DynUtil.getType(curObj), nextNameStr);
-                        List propValList = (List) propVal;
                         if (propType != null) {
-                           if (propType instanceof Object[]) {
-                              propVal = propValList.toArray();
-                           }
-                           // Convert if necessary to get the correct array type - e.g. a String[] instead of just an Object[]
-                           else if (DynUtil.isArray(propType)) {
-                              propVal = propValList.toArray((Object[]) PTypeUtil.newArray((Class) DynUtil.getComponentType(propType), propValList.size()));
-                           }
-                           // Call the constructor to create the right type of collection, i.e. Collection((Collection a))
-                           else {
-                              if (propType == List.class) // TODO: need to handle more of these - use the SyncHandler interface here?
-                                 propType = ArrayList.class;
-                              propVal = DynUtil.createInstance(propType, null, propVal);
-                           }
+                           propVal = convertRemoteType(propVal, propType);
                         }
                      }
                      if (curObj instanceof Map) // TODO - it's possible for a map to have regular properties too... we should perhaps be keying off of whether we created a Map before calling parseSubs
@@ -261,18 +248,52 @@ public class JSONDeserializer {
       }
    }
 
-   public void invokeMethod(CharSequence methName, List args, CharSequence callIdSeq) {
+   public Object convertRemoteType(Object value, Object type) {
+      if (value instanceof List) {
+         List propValList = (List) value;
+         if (type instanceof Object[]) {
+            value = propValList.toArray();
+         }
+         // Convert if necessary to get the correct array type - e.g. a String[] instead of just an Object[]
+         else if (DynUtil.isArray(type)) {
+            value = propValList.toArray((Object[]) PTypeUtil.newArray((Class) DynUtil.getComponentType(type), propValList.size()));
+         }
+         // Call the constructor to create the right type of collection, i.e. Collection((Collection a))
+         else {
+            if (type == List.class) // TODO: need to handle more of these - use the SyncHandler interface here?
+               type = ArrayList.class;
+            // TODO - security: validate this type is allowed to be deserialized
+            value = DynUtil.createInstance(type, null, value);
+         }
+      }
+      return value;
+   }
+
+   public void invokeMethod(CharSequence methName, CharSequence typeSig, List args, CharSequence callIdSeq) {
       Object curObj = getCurObj();
       Object curType = DynUtil.isSType(curObj) ? curObj : DynUtil.getSType(curObj);
       String callId = callIdSeq.toString();
-      Object meth = DynUtil.resolveMethod(curType, methName.toString(), null);
+      Object meth = DynUtil.resolveMethod(curType, methName.toString(), typeSig == null ? null : typeSig.toString());
       if (meth == null) {
-         System.err.println("No method: " + methName + " in type: " + DynUtil.getTypeName(curType, false));
+         System.err.println("No method: " + methName + " in type: " + DynUtil.getTypeName(curType, false) + " with param signature: " + typeSig);
       }
       else {
          // TODO: security: need to validate that this method is authorized for remote access
          boolean flushQueue = SyncManager.beginSyncQueue();
          try {
+            if (args.size() > 0) {
+               Object[] paramTypes = DynUtil.getParameterTypes(meth);
+               if (paramTypes != null) {
+                  for (int i = 0; i < args.size(); i++) {
+                     Object arg = args.get(i);
+                     Object paramType = paramTypes.length > i ? paramTypes[i] : paramTypes[paramTypes.length-1];
+                     // TODO: handle varargs here!
+                     Object newArg = convertRemoteType(arg, paramType);
+                     if (newArg != arg)
+                        args.set(i, newArg);
+                  }
+               }
+            }
             // See FieldDefinition for the same code using SC layers
             Object returnVal = DynUtil.invokeMethod(curObj, meth, args.toArray());
 
@@ -293,7 +314,9 @@ public class JSONDeserializer {
       }
    }
 
-   public void applyMethodResult(String callId, Object returnValue) {
+   public void applyMethodResult(String callId, Object returnValue, Object retType) {
+      if (retType != null)
+         returnValue = convertRemoteType(returnValue, retType);
       SyncManager.processMethodReturn(callId, returnValue);
    }
 

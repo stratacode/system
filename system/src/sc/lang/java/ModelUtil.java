@@ -7083,6 +7083,7 @@ public class ModelUtil {
          throw new UnsupportedOperationException();
    }
 
+   /** Returns the type signature for the parameters for a method - NOTE: does not include the return type like the Java method signature that's in the class file.  */
    public static String getTypeSignature(Object obj) {
       if (obj == null)
          return null;

@@ -267,7 +267,7 @@ public class SyncSerializer {
          preBlock.append("_lt");
          preBlock.append(uniqueId);
          preBlock.append(".add(");
-         syncContext.formatExpression(preBlockCode, out, val, currentObjNames, currentPackageName, preBlockCode, postBlockCode, null, true, uniqueId + "_" + i, depChanges, syncLayer);
+         syncContext.formatExpression(preBlockCode, preBlock, val, currentObjNames, currentPackageName, preBlockCode, postBlockCode, null, true, uniqueId + "_" + i, depChanges, syncLayer);
          preBlock.append(");\n");
       }
       if (!inBlock) {
@@ -298,7 +298,7 @@ public class SyncSerializer {
       SyncSerializer postBlockCode = createTempSerializer(false, indentSize);
       SyncSerializer statement = createTempSerializer(false, indentSize);
 
-      StringBuilder statementSB = new StringBuilder();
+      StringBuilder statementSB = statement.sb;
 
       statementSB.append(Bind.indent(indentSize));
 

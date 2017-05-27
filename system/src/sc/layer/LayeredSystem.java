@@ -3071,6 +3071,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return ModelUtil.getMethodName(method);
    }
 
+   public String getMethodTypeSignature(Object method) {
+      return ModelUtil.getTypeSignature(method);
+   }
+
    public Object evalCast(Object type, Object value) {
       return ModelUtil.evalCast(type, value);
    }

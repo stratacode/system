@@ -34,6 +34,8 @@ public interface IDynamicSystem {
 
    String getMethodName(Object method);
 
+   String getMethodTypeSignature(Object method);
+
    Object evalCast(Object type, Object value);
 
    boolean isNonCompiledType(Object obj);

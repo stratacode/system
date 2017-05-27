@@ -228,7 +228,7 @@ public class DynUtil {
    }
 
    public static RemoteResult invokeRemote(Object obj, Object method, Object... paramValues) {
-      return SyncManager.invokeRemote(obj, DynUtil.getMethodName(method), paramValues);
+      return SyncManager.invokeRemote(obj, DynUtil.getMethodName(method), DynUtil.getTypeSignature(method), paramValues);
    }
 
    /** In Java this is the same method but in Javascript they are different */
@@ -271,6 +271,15 @@ public class DynUtil {
          return dynamicSystem.getMethodName(method);
       else
          return PTypeUtil.getMethodName(method);
+   }
+
+   public static String getTypeSignature(Object method) {
+      if (method instanceof DynRemoteMethod)
+         return ((DynRemoteMethod) method).paramSig;
+      if (dynamicSystem != null)
+         return dynamicSystem.getMethodTypeSignature(method);
+      else
+         return null;
    }
 
    public static Object evalCast(Object o, Object value) {

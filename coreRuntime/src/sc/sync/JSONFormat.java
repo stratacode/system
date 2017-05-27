@@ -87,12 +87,14 @@ public class JSONFormat extends SerializerFormat {
          // { "meth": "methName", "callId": "callId", "args": [ .... ] }
          public void apply(JSONDeserializer dser, boolean topLevel) {
             CharSequence methName = dser.parseMethName();
+            dser.parser.expectNextName(MethodArgs.typeSig.name());
+            CharSequence typeSig = dser.parser.parseString();
             dser.parser.expectNextName(MethodArgs.callId.name());
             CharSequence callIdVal = dser.parser.parseString();
             dser.parser.expectNextName(MethodArgs.args.name());
             List args = dser.parser.parseArray();
             if (methName != null && callIdVal != null) {
-               dser.invokeMethod(methName, args, callIdVal);
+               dser.invokeMethod(methName, typeSig, args, callIdVal);
             }
             else
                throw new IllegalArgumentException("Invalid remote method call in JSON: " + dser.parser);
@@ -102,10 +104,12 @@ public class JSONFormat extends SerializerFormat {
          public void apply(JSONDeserializer dser, boolean topLevel) {
             // Method return value comes first
             Object returnValue = dser.parser.parseJSONValue();
-            dser.parser.expectNextName(MethodArgs.callId.name());
+            dser.parser.expectNextName(JSONSerializer.MethodReturnArgs.callId.name());
             CharSequence callIdVal = dser.parser.parseString();
+            dser.parser.expectNextName(JSONSerializer.MethodReturnArgs.retType.name());
+            CharSequence retTypeName = dser.parser.parseString();
             if (callIdVal != null) {
-               dser.applyMethodResult(callIdVal.toString(), returnValue);
+               dser.applyMethodResult(callIdVal.toString(), returnValue, retTypeName == null ? null : DynUtil.findType(retTypeName.toString()));
             }
             else
                throw new IllegalArgumentException("Invalid remote method result in JSON: " + dser.parser);
@@ -188,7 +192,7 @@ public class JSONFormat extends SerializerFormat {
    }
 
    enum MethodArgs {
-      callId, args
+      callId, args, typeSig
    }
 
 }

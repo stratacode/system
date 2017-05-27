@@ -161,9 +161,12 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          Object initType = initializer.getGenericType();
          if (initType != null && varType != null && !ModelUtil.isAssignableFrom(varType, initType, true, null, getLayeredSystem()) && (bindingDirection == null || bindingDirection.doForward())) {
             if (!ModelUtil.hasUnboundTypeParameters(initType)) {
-               displayTypeError("Type mismatch - assignment to variable with type: " + ModelUtil.getTypeName(varType, true, true) + " does not match expression type: " + ModelUtil.getTypeName(initType, true, true) + " for: ");
-               boolean xx = initType != null && varType != null && !ModelUtil.isAssignableFrom(varType, initType, true, null, getLayeredSystem()) && (bindingDirection == null || bindingDirection.doForward());
-               initType = initializer.getGenericType();
+               // Weird case - if this is a synchronization operation involving a remote method that is a 'void' return - we don't know that on the client and so create a field/variable assignment
+               if (initType != Void.TYPE || getJavaModel().mergeDeclaration) {
+                  displayTypeError("Type mismatch - assignment to variable with type: " + ModelUtil.getTypeName(varType, true, true) + " does not match expression type: " + ModelUtil.getTypeName(initType, true, true) + " for: ");
+                  boolean xx = initType != null && varType != null && !ModelUtil.isAssignableFrom(varType, initType, true, null, getLayeredSystem()) && (bindingDirection == null || bindingDirection.doForward());
+                  initType = initializer.getGenericType();
+               }
             }
          }
          else if (initType != varType) {
