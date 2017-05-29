@@ -1723,7 +1723,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (types == null)
          return;
 
-      ExecutionContext ctx = new ExecutionContext(this);
+      SyncExecutionContext ctx = new SyncExecutionContext(this, syncCtx);
 
       // Currently the grammar lets you put more than one type in a model so it's only the package that separates the model
       // definitions.  Seems like this is not a problem?

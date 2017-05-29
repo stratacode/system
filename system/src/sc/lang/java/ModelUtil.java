@@ -8449,4 +8449,40 @@ public class ModelUtil {
       }
       return res;
    }
+
+   static boolean isRemoteMethod(LayeredSystem sys, Object methObj) {
+      Object remoteAnnot = getAnnotation(methObj, "sc.obj.Remote");
+      if (remoteAnnot != null) {
+         String remoteRts = (String) getAnnotationValue(remoteAnnot, "remoteRuntimes");
+         String localRts = (String) getAnnotationValue(remoteAnnot, "localRuntimes");
+         boolean remote = true;
+         String runtimeName = sys.getRuntimeName();
+         boolean alreadyMatched = false;
+         if (!StringUtil.isEmpty(remoteRts)) {
+            remote = false;
+            String[] remoteArr = StringUtil.split(remoteRts, ',');
+            for (int i = 0; i < remoteArr.length; i++) {
+               if (remoteArr[i].equals(runtimeName)) {
+                  alreadyMatched = true;
+                  remote = true;
+                  break;
+               }
+            }
+         }
+         if (!StringUtil.isEmpty(localRts)) {
+            String[] remoteArr = StringUtil.split(remoteRts, ',');
+            for (int i = 0; i < remoteArr.length; i++) {
+               if (remoteArr[i].equals(runtimeName)) {
+                  if (alreadyMatched)
+                     System.out.println("Warning: method " + methObj + " has conflicting definitions in remoteRuntime and localRuntime for: " + runtimeName + " - ignoring @Remote definition");
+                  remote = false;
+                  break;
+               }
+            }
+         }
+         return remote;
+      }
+      else
+         return false;
+   }
 }

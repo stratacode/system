@@ -66,6 +66,9 @@ public class ModelStream extends SemanticNode implements ICustomResolver {
    /** This is called to apply the model stream to the system using the supplied default scope. */
    public void updateRuntime(String destName, String defaultScope, boolean resetSync) {
       syncCtx = SyncManager.getSyncContext(destName, defaultScope, true);
+      if (syncCtx == null) {
+         throw new IllegalArgumentException("Failed to find a sync context for destination: " + destName + " scope: " + defaultScope);
+      }
 
       ParseUtil.initAndStartComponent(this);
 

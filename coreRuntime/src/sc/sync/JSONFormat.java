@@ -70,9 +70,11 @@ public class JSONFormat extends SerializerFormat {
          }
 
       },
-      // TODO: remove this?  Is it used?
+      // TODO: remove this?  It's referenced but we override the method it's referenced from from JSON
       eval {
          public void apply(JSONDeserializer dser, boolean topLevel) {
+            throw new UnsupportedOperationException();
+            /*
             CharSequence code = dser.parser.parseString(false);
             if (code != null) {
                if (dser.allowCodeEval) {
@@ -82,6 +84,7 @@ public class JSONFormat extends SerializerFormat {
                   throw new IllegalArgumentException("Security warning: attempt to eval code on destination with allowCodeEval = false: " + dser.parser);
                }
             }
+            */
          }
       },
       meth {

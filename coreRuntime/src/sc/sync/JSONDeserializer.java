@@ -223,18 +223,32 @@ public class JSONDeserializer {
             if (isProp) {
                if (curObj != null) {
                   try {
-                     // For array or collection properties, we need to have the property metadata in order to deserialize the
-                     // value and set the object property correctly.
-                     if (propVal instanceof List) {
-                        Object propType = DynUtil.getPropertyType(DynUtil.getType(curObj), nextNameStr);
-                        if (propType != null) {
-                           propVal = convertRemoteType(propVal, propType);
+                     SyncManager mgr = syncCtx.getSyncManager();
+                     Object objType = null;
+                     boolean skipSet = false;
+                     if (!mgr.syncDestination.clientDestination) {
+                        objType = DynUtil.getSType(curObj);
+                        if (!mgr.isSynced(objType, nextNameStr)) {
+                           System.err.println("Not allowed to set unsynchronized property from json: " + DynUtil.getTypeName(objType, true) + "." + nextNameStr);
+                           skipSet = true;
                         }
                      }
-                     if (curObj instanceof Map) // TODO - it's possible for a map to have regular properties too... we should perhaps be keying off of whether we created a Map before calling parseSubs
-                        ((Map) curObj).put(nextNameStr, propVal);
-                     else
-                        DynUtil.setPropertyValue(curObj, nextNameStr, propVal);
+                     if (!skipSet) {
+                        // For array or collection properties, we need to have the property metadata in order to deserialize the
+                        // value and set the object property correctly.
+                        if (propVal instanceof List) {
+                           if (objType == null)
+                              objType = DynUtil.getSType(curObj);
+                           Object propType = DynUtil.getPropertyType(objType, nextNameStr);
+                           if (propType != null) {
+                              propVal = convertRemoteType(propVal, propType);
+                           }
+                        }
+                        if (curObj instanceof Map) // TODO - it's possible for a map to have regular properties too... we should perhaps be keying off of whether we created a Map before calling parseSubs
+                           ((Map) curObj).put(nextNameStr, propVal);
+                        else
+                           DynUtil.setPropertyValue(curObj, nextNameStr, propVal);
+                     }
                   }
                   catch (IllegalArgumentException exc) {
                      System.err.println("No property: " + curObj + "." + nextNameStr + ": " + exc);
@@ -278,6 +292,11 @@ public class JSONDeserializer {
          System.err.println("No method: " + methName + " in type: " + DynUtil.getTypeName(curType, false) + " with param signature: " + typeSig);
       }
       else {
+         SyncManager mgr = syncCtx.getSyncManager();
+         if (!mgr.allowInvoke(meth)) {
+            System.err.println("Remote call to method: " + methName + " not allowed - missing sc.obj.Remote annotation or remoteRuntimes is missing: " + mgr.syncDestination.remoteRuntimeName);
+            return;
+         }
          // TODO: security: need to validate that this method is authorized for remote access
          boolean flushQueue = SyncManager.beginSyncQueue();
          try {

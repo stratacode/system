@@ -20,6 +20,9 @@ public class SyncProperties {
    /** Then sync properties of a base type we are chained from */
    public SyncProperties chainedProps;
 
+   /** True if this an instance of this object is allowed to be created from the client */
+   public boolean allowCreate = true;
+
    // The default value for initDefault for those cases where you do not call addSyncInst explicitly
    public boolean initDefault = true;
 

@@ -3915,8 +3915,6 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
    */
 
-   // TODO: SECURITY ALERT! For client/server security, we need to validate that all properties etc access are marked with the @Sync annotation.  In other words, don't
-   // let the sync system update any properties in the model - only those which are authorized to be set by the programmer.
    private void updateInstFromBody(Object inst, SyncManager.SyncContext syncCtx, ExecutionContext ctx, SemanticNodeList<Statement> toUpdate) {
       if (toUpdate == null)
          return;
@@ -3928,11 +3926,18 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
          else if (st instanceof PropertyAssignment) {
             String propName = ((PropertyAssignment) st).propertyName;
-            if (st.isStatic()) {
-               updateStaticProperty(st, ctx);
+            Object instType = DynUtil.getSType(inst);
+            // Do a security check to be sure we're allowed to update this property
+            if (syncCtx != null && ctx.allowSetProperty(instType, propName)) {
+               if (st.isStatic()) {
+                  updateStaticProperty(st, ctx);
+               }
+               else {
+                  initInstance(st, inst, ctx, InitInstanceType.Init);
+               }
             }
             else {
-               initInstance(st, inst, ctx, InitInstanceType.Init);
+               System.err.println("Not allowed to set unsynchronized property from scn: " + DynUtil.getTypeName(instType, true) + "." + propName);
             }
          }
          else if (st instanceof BodyTypeDeclaration) {
@@ -8661,11 +8666,17 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             else {
                flushQueue = SyncManager.beginSyncQueue();
 
-               // TODO: deal with outer type here?  If extType is an inner instance, get the parent object by resolving it, if it matches the expected parent type of extType, then use that, otherwise keep going up.
-               if (outer != null)
-                  inst = DynUtil.createInnerInstance(extType, outer, null);
-               else
-                  inst = DynUtil.createInstance(extType, null);
+               if (syncCtx == null || !syncCtx.getSyncManager().allowCreate(extType)) {
+                  System.err.println("*** Not allowed to create instance: " + typeName + " - based type: " + extType + " not synchronized or does not have allowCreate flag set to true");
+                  return;
+               }
+               else {
+                  // TODO: deal with outer type here?  If extType is an inner instance, get the parent object by resolving it, if it matches the expected parent type of extType, then use that, otherwise keep going up.
+                  if (outer != null)
+                     inst = DynUtil.createInnerInstance(extType, outer, null);
+                  else
+                     inst = DynUtil.createInstance(extType, null);
+               }
             }
 
             /*

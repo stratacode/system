@@ -82,6 +82,8 @@ public class SyncManager {
    // Records the sync instances etc. that are registered in a global context.
    Map<String,SyncContext> rootContexts = new HashMap<String,SyncContext>();
 
+   public SyncDestination syncDestination;
+
    public SyncContext getRootSyncContext() {
       String ctxId = "global";
       SyncContext rootCtx = rootContexts.get(ctxId);
@@ -1950,11 +1952,17 @@ public class SyncManager {
             }
          }
          if (inst != null) {
+            /* TODO: security: also would need to check if there are any remote methods on this type... but does it matter?   We will
+               check if the property or method itself is synchronized so maybe it's ok to allow the object to be resolved?  It does potentially give away
+               internal information if we don't do this though.
+            if (!syncDestination.clientDestination && getSyncPropertiesForInst(inst) == null) {
+               System.err.println("Resolve instance not allowed for: " + inst + " type: " + DynUtil.getSType(inst) + " for sync context: " + this);
+            }
+            */
             return inst;
          }
          return null;
       }
-
 
       /** Returns the object instance with the given name - for runtime lookup. */
       public Object resolveOrCreateObject(String currentPackage, Object outerObj, String name, String typeName, boolean unwrap, String sig, Object...args) {
@@ -1980,7 +1988,12 @@ public class SyncManager {
                return null;
             }
             inst = DynUtil.newInnerInstance(type, outerObj, sig, args);
-            registerObjName(inst, name, getSyncManager().syncDestination.clientDestination, true);
+            boolean isClient = getSyncManager().syncDestination.clientDestination;
+            if (!isClient && !allowCreate(type)) {
+               System.err.println("Create type not allowed for: " + typeName + " for sync context: " + this);
+               return null;
+            }
+            registerObjName(inst, name, isClient, true);
          }
          finally {
             if (flushSyncQueue)
@@ -1990,11 +2003,27 @@ public class SyncManager {
       }
    }
 
+   public boolean allowCreate(Object type) {
+      SyncProperties syncProps = getSyncProperties(type);
+      return syncProps == null || syncProps.allowCreate;
+   }
+
+   public boolean allowInvoke(Object method) {
+      if (!syncDestination.clientDestination) {
+         String remoteRuntimes = (String) DynUtil.getAnnotationValue(method, "sc.obj.Remote", "remoteRuntimes");
+         if (remoteRuntimes == null)
+            return false;
+         String[] remoteRuntimeArr = remoteRuntimes.split(",");
+         for (String remoteRuntime:remoteRuntimeArr)
+            if (remoteRuntime.equals(syncDestination.remoteRuntimeName))
+               return true;
+      }
+      return false;
+   }
+
    static class SyncListenerInfo {
       TreeMap<String,PropertyValueListener> valList = new TreeMap<String,PropertyValueListener>();
    }
-
-   public SyncDestination syncDestination;
 
    public SyncManager(SyncDestination dest) {
       syncDestination = dest;
@@ -2021,10 +2050,16 @@ public class SyncManager {
 
    public static boolean isSyncedProperty(Object type, String propName) {
       for (SyncManager mgr:syncManagersByDest.values()) {
-         SyncProperties props = mgr.getSyncProperties(type);
-         if (props != null && props.isSynced(propName)) {
+         if (mgr.isSynced(type, propName))
             return true;
-         }
+      }
+      return false;
+   }
+
+   public boolean isSynced(Object type, String propName) {
+      SyncProperties props = getSyncProperties(type);
+      if (props != null && props.isSynced(propName)) {
+         return true;
       }
       return false;
    }

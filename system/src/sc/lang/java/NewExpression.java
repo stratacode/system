@@ -432,6 +432,8 @@ public class NewExpression extends IdentifierExpression {
       if (boundType == null) {
          throw new IllegalArgumentException("No type for " + toDefinitionString());
       }
+      if (!ctx.allowCreate(boundType))
+         throw new IllegalArgumentException("Not allowed to create new instance of type for " + toDefinitionString());
       if (arguments != null) {
          Object typeToCreate = classBody != null ? getAnonymousType(false) : boundType;
          boolean isDynamic = ModelUtil.isDynamicType(typeToCreate);

@@ -1356,6 +1356,9 @@ public class IdentifierExpression extends ArgumentsExpression {
          if (meth != null) {
             boundTypes[ix] = meth;
             idTypes[ix] = IdentifierType.RemoteMethodInvocation;
+            if (meth instanceof AbstractMethodDefinition) {
+               ((AbstractMethodDefinition) meth).addRemoteRuntime(sys.getRuntimeName());
+            }
             return meth;
          }
       }
@@ -1813,8 +1816,12 @@ public class IdentifierExpression extends ArgumentsExpression {
                      BodyTypeDeclaration enclType = getEnclosingType();
                      if (ModelUtil.sameTypes(enclType, type)) {
                         Object baseConstr = ModelUtil.declaresConstructor(getLayeredSystem(), type, arguments, null);
-                        if (baseConstr != null)
-                           ModelUtil.invokeMethod(ctx.getCurrentObject(), baseConstr, arguments, null, ctx, false, false, null);
+                        if (baseConstr != null) {
+                           if (ctx.allowInvoke(baseConstr))
+                              ModelUtil.invokeMethod(ctx.getCurrentObject(), baseConstr, arguments, null, ctx, false, false, null);
+                           else
+                              throw new IllegalArgumentException(("Not allowed to invoke base constructor: " + baseConstr));
+                        }
                      }
                      // when the super refers to the base class which is a compiled type, we'll have already executed the super in the DynamicStub.  The statement in the ConstructorDefinition can be ignored since it was run first thing in the stub.
                      return null;
@@ -1895,22 +1902,31 @@ public class IdentifierExpression extends ArgumentsExpression {
             case GetObjectMethodInvocation:
             case MethodInvocation:
                Object methThis;
-               if (boundTypes[0] == null)
+               Object methToInvoke = boundTypes[0];
+               if (methToInvoke == null)
                   throw new NullPointerException("Eval unresolved method: " + idents.get(0).toString());
-               if (!ModelUtil.hasModifier(boundTypes[0], "static")) {
-                  methThis = getRootFieldThis(this, boundTypes[0], ctx, false);
+               if (!ModelUtil.hasModifier(methToInvoke, "static")) {
+                  methThis = getRootFieldThis(this, methToInvoke, ctx, false);
                   methThis = checkNullThis(methThis, idents.get(0).toString());
                }
               else
                   methThis = null;
-               return ModelUtil.invokeMethod(methThis, boundTypes[0], arguments, expectedType, ctx, true, true, null);
+               if (!ctx.allowInvoke(methToInvoke))
+                  throw new IllegalArgumentException("Not allowed to invoke method: " + methToInvoke);
+
+               return ModelUtil.invokeMethod(methThis, methToInvoke, arguments, expectedType, ctx, true, true, null);
 
             case RemoteMethodInvocation:
                System.err.println("*** Remote method in dynamic code not yet supported");
                return null;
 
             case UnboundMethodName:
-               Object method = ModelUtil.getMethod(ctx.getCurrentObject(), idents.get(0).toString());
+               String methName = idents.get(0).toString();
+               Object method = ModelUtil.getMethod(ctx.getCurrentObject(), methName);
+               if (method == null)
+                  throw new IllegalArgumentException("No method to invoke: " + methName);
+               if (!ctx.allowInvoke(method))
+                  throw new IllegalArgumentException("Not allowed to invoke method: " + method);
                return ModelUtil.invokeMethod(ctx.getCurrentObject(), method, arguments, expectedType, ctx, true, false, null);
 
             case ResolvedObjectName: {

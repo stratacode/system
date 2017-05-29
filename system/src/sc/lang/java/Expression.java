@@ -18,7 +18,6 @@ import sc.type.TypeUtil;
 import sc.bind.BindingDirection;
 import sc.bind.Bind;
 import sc.bind.IBinding;
-import sc.util.StringUtil;
 
 import java.lang.reflect.Method;
 import java.util.*;
@@ -651,7 +650,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
          needsClass = true;
       }
       /** Check for the @Remote annotation - it can turn remoting on for this runtime even if the method is local. */
-      if (!isRemote && isRemoteMethod(sys, methObj))
+      if (!isRemote && ModelUtil.isRemoteMethod(sys, methObj))
          isRemote = true;
       String remote = isRemote ? "Remote" : "";
       // resolveMethod, resolveStaticMethod, resolveRemoteMethod, etc are formed here
@@ -666,42 +665,6 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       getMethodArgs.add(StringLiteral.create(ModelUtil.getTypeSignature(methObj)));
       getMethod.setProperty("arguments",getMethodArgs);
       return getMethod;
-   }
-
-   boolean isRemoteMethod(LayeredSystem sys, Object methObj) {
-      Object remoteAnnot = ModelUtil.getAnnotation(methObj, "sc.obj.Remote");
-      if (remoteAnnot != null) {
-         String remoteRts = (String) ModelUtil.getAnnotationValue(remoteAnnot, "remoteRuntimes");
-         String localRts = (String) ModelUtil.getAnnotationValue(remoteAnnot, "localRuntimes");
-         boolean remote = true;
-         String runtimeName = sys.getRuntimeName();
-         boolean alreadyMatched = false;
-         if (!StringUtil.isEmpty(remoteRts)) {
-            remote = false;
-            String[] remoteArr = StringUtil.split(remoteRts, ',');
-            for (int i = 0; i < remoteArr.length; i++) {
-               if (remoteArr[i].equals(runtimeName)) {
-                  alreadyMatched = true;
-                  remote = true;
-                  break;
-               }
-            }
-         }
-         if (!StringUtil.isEmpty(localRts)) {
-            String[] remoteArr = StringUtil.split(remoteRts, ',');
-            for (int i = 0; i < remoteArr.length; i++) {
-               if (remoteArr[i].equals(runtimeName)) {
-                  if (alreadyMatched)
-                     System.out.println("Warning: method " + methObj + " has conflicting definitions in remoteRuntime and localRuntime for: " + runtimeName + " - ignoring @Remote definition");
-                  remote = false;
-                  break;
-               }
-            }
-         }
-         return remote;
-      }
-      else
-         return false;
    }
 
    Expression createChildMethodBinding(Object typeObj, String methodName, Object methObj, SemanticNodeList<Expression> arguments, boolean isRemote) {

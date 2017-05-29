@@ -5,13 +5,11 @@
 package sc.lang.java;
 
 import sc.dyn.DynUtil;
-import sc.lang.INamedNode;
-import sc.lang.ISrcStatement;
-import sc.lang.SCLanguage;
-import sc.lang.SemanticNodeList;
+import sc.lang.*;
 import sc.lang.template.GlueStatement;
 import sc.layer.Layer;
 import sc.parser.ParseUtil;
+import sc.util.StringUtil;
 
 import java.util.*;
 
@@ -40,6 +38,9 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
    transient String origName;
    private transient boolean templateBody;
 
+   /** If this method is used from a remote runtime and does not have the sc.obj.Remote annotation set explicitly, we'll add this annotation so we know it's safe to call this method during deserialization  */
+   private transient ArrayList<String> remoteRuntimes;
+
    public static final String METHOD_TYPE_PREFIX = "_M__";
 
    private transient int anonMethodId = 0;
@@ -50,6 +51,15 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       origName = name;
       templateBody = body != null && body.statements != null && body.statements.size() == 1 &&
                      body.statements.get(0) instanceof GlueStatement;
+   }
+
+   public boolean transform(ILanguageModel.RuntimeType type) {
+      if (remoteRuntimes != null) {
+         // Mark this method so it's accessible from the remote runtime
+         addModifier(Annotation.create("sc.obj.Remote", "remoteRuntimes", String.join(",",remoteRuntimes)));
+      }
+      boolean res = super.transform(type);
+      return res;
    }
 
    public AbstractMethodDefinition resolve(boolean modified) {
@@ -722,6 +732,7 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
 
          res.origName = origName;
          res.templateBody = templateBody;
+         res.remoteRuntimes = remoteRuntimes;
       }
       return res;
    }
@@ -821,5 +832,18 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       fromStatement = from;
       if (body != null)
          body.setFromStatement(from);
+   }
+
+   public void addRemoteRuntime(String remoteRuntimeName) {
+      if (transformed) {
+         System.err.println("*** Unable to add remote runtime to transformed method");
+         return;
+      }
+      if (!ModelUtil.isRemoteMethod(getLayeredSystem(), this)) {
+         if (remoteRuntimes == null)
+            remoteRuntimes = new ArrayList<String>();
+         if (!remoteRuntimes.contains(remoteRuntimeName))
+            remoteRuntimes.add(remoteRuntimeName);
+      }
    }
 }

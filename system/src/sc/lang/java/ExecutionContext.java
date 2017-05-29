@@ -16,6 +16,10 @@ import java.lang.reflect.Array;
 import java.util.List;
 import java.util.Stack;
 
+/**
+ * Used for executing dynamic code - holds the virtual machine state which affects code execution: the stack, local variables.
+ * Customizable for resolving references to names and for allowing operations to take place.
+ */
 public class ExecutionContext {
    
    private static ThreadLocal<JavaSemanticNode> executingModelObject = new ThreadLocal<JavaSemanticNode>();
@@ -284,4 +288,15 @@ public class ExecutionContext {
    }
 
 
+   public boolean allowCreate(Object type) {
+      return true;
+   }
+
+   public boolean allowSetProperty(Object type, String propName) {
+      return true;
+   }
+
+   public boolean allowInvoke(Object method) {
+      return true;
+   }
 }

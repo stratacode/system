@@ -38,6 +38,9 @@ public abstract class SyncDestination {
    /** Is this a server or client destination?  Object's received by the client destination are not pushed back to the server on a reset. */
    public boolean clientDestination = false;
 
+   /** Stores the runtime name used for determining what methods are exposed for this runtime. */ // TODO: would we ever want to use one destination for more than one runtime context?  Maybe this belongs in the Context object?
+   public String remoteRuntimeName = "java";
+
    /** Set by components like ServletSyncDestination via the initOnStartup hook */
    public static SyncDestination defaultDestination;
 

@@ -18,8 +18,8 @@ import java.lang.annotation.Target;
 @Target({METHOD}) // TODO: should we support this at the layer, type, or field level?
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Remote {
-   /** The list of runtimes in which this method should be treated as a remote call when used in a data binding expression. */
+   /** The comma separated list of runtimes in which this method should be treated as a remote call when used in a data binding expression. */
    String remoteRuntimes() default "";
-   /** The list of runtimes in which this method should be treated as a local call */
+   /** The comma separated list of runtimes in which this method should be treated as a local call */
    String localRuntimes() default "";
 }
