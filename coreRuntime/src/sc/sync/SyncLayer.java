@@ -630,10 +630,12 @@ public class SyncLayer {
                int numLevels = DynUtil.getNumInnerTypeLevels(newObjType);
                if (numLevels > 0)
                   newObjName = CTypeUtil.getPackageName(objTypeName);
-               // Creating a new top level object with new args.  Use the class as the context for the static variable
                else {
+                  /*  Creating a new top level object with new args.  Use the class as the context for the static variable
                   newObjName = CTypeUtil.getClassName(DynUtil.getTypeName(newObjType, false));
                   useObjNameForPackage = false;
+                  */
+                  newObjName = ""; // TODO: is this right?
                }
             }
             objName = syncHandler.getObjectBaseName(depChanges, this);

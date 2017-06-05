@@ -1161,7 +1161,7 @@ public class SyncManager {
          }
          Object oldInst;
          if ((oldInst = objectIndex.put(objName, inst)) != null && oldInst != inst && verbose) {
-            System.err.println("*** Warning: replacing instance of: " + objName + " with different instance");
+            System.out.println("*** Warning: replacing instance of: " + objName + " with different instance");
          }
 
          if (verbose) {
@@ -1180,7 +1180,7 @@ public class SyncManager {
             }
             else // TODO: any other cases other than remote here?
                message = "Synchronizing remote instance: ";
-            System.out.println(message + objName + syncType + (scopeId != 0 ? "scope: " + ScopeDefinition.getScopeDefinition(scopeId).name : "global scope") + ", " + syncProps);
+            System.out.println(message + objName + syncType + (scopeId != 0 ? "scope: " + ScopeDefinition.getScopeDefinition(scopeId).name : "global scope"));
          }
       }
 

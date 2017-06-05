@@ -124,6 +124,11 @@ public class BeanMapper extends AbstractBeanMapper {
             System.err.println("*** Error setting: " + setSelector + " on: " + parent + " value: " + value + " threw: " + exc);
          throw exc;
       }
+      catch (ClassCastException exc) {
+         if (TypeUtil.trace)
+            System.err.println("*** Error setting: " + setSelector + " on: " + parent + " value: " + value + " threw: " + exc);
+         throw exc;
+      }
    }
 
    public Field getField() {

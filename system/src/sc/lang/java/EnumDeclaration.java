@@ -69,6 +69,7 @@ public class EnumDeclaration extends TypeDeclaration {
          valueOfMethod.name = "valueOf";
          valueOfMethod.setProperty("type", ClassType.create(getFullTypeName()));
          valueOfMethod.addModifier("static");
+         valueOfMethod.addModifier(Annotation.create("sc.js.JSMethodSettings", "replaceWith", "_valueOf"));
          addToHiddenBody(valueOfMethod);
       }
    }
@@ -277,7 +278,7 @@ public class EnumDeclaration extends TypeDeclaration {
                }
 
                constr.setProperty("parameters", Parameter.create(getLayeredSystem(), newTypes.toArray(new Object[newTypes.size()]), newNames.toArray(new String[newNames.size()]), null, this));
-               addEnumSuperCall(constr);
+               addEnumSuperCall(constr, defaultConstrParamNames);
                enumCl.addBodyStatement(constr);
 
                ParseUtil.restartComponent(constr);
@@ -285,7 +286,7 @@ public class EnumDeclaration extends TypeDeclaration {
          }
       }
       else {
-         ConstructorDefinition constr = newEnumConstructor(getLayeredSystem(), typeName, this);
+         ConstructorDefinition constr = newEnumConstructor(getLayeredSystem(), typeName, this, this, null);
          enumCl.addBodyStatement(constr);
       }
 
@@ -300,17 +301,39 @@ public class EnumDeclaration extends TypeDeclaration {
       return enumCl;
    }
 
-   static ConstructorDefinition newEnumConstructor(LayeredSystem sys, String typeName, ITypeDeclaration definedInType) {
+   static ConstructorDefinition newEnumConstructor(LayeredSystem sys, String typeName, ITypeDeclaration definedInType, ITypeDeclaration enumDecl, List<Expression> arguments) {
+      Object[] paramTypes = defaultConstrParamTypes;
+      String[] paramNames = defaultConstrParamNames;
+      if (arguments != null && enumDecl != null) {
+         Object args = enumDecl.definesConstructor(arguments, null, true);
+         if (args instanceof ConstructorDefinition) {
+            ConstructorDefinition enumConstr = (ConstructorDefinition) args;
+            if (enumConstr.parameters != null) {
+               ArrayList<Object> newParamTypes = new ArrayList<Object>(Arrays.asList(paramTypes));
+               ArrayList<String> newParamNames = new ArrayList<String>(Arrays.asList(paramNames));
+               Object[] extraParamTypes = enumConstr.parameters.getParameterTypes();
+               if (extraParamTypes != null)
+                  newParamTypes.addAll(Arrays.asList(extraParamTypes));
+               String[] extraParamNames = enumConstr.parameters.getParameterNames();
+               if (extraParamNames != null)
+                  newParamNames.addAll(Arrays.asList(extraParamNames));
+               paramTypes = newParamTypes.toArray(new Object[newParamTypes.size()]);
+               paramNames = newParamNames.toArray(new String[newParamNames.size()]);
+            }
+         }
+      }
+      // Find constructor that matches 'arguments'
+      // Prepend 'defaultConstrParamTypes/Names' to that constructor's parameter types/names
       ConstructorDefinition constr = new ConstructorDefinition();
       constr.name = typeName;
-      constr.setProperty("parameters", Parameter.create(sys, defaultConstrParamTypes, defaultConstrParamNames, null, definedInType));
-      addEnumSuperCall(constr);
+      constr.setProperty("parameters", Parameter.create(sys, paramTypes, paramNames, null, definedInType));
+      addEnumSuperCall(constr, paramNames);
       return constr;
    }
 
-   static void addEnumSuperCall(ConstructorDefinition constr) {
+   static void addEnumSuperCall(ConstructorDefinition constr, String[] paramNames) {
       SemanticNodeList<Expression> args = new SemanticNodeList<Expression>();
-      for (String pname:defaultConstrParamNames) {
+      for (String pname:paramNames) {
          args.add(IdentifierExpression.create(pname));
       }
       constr.addStatementAt(0, IdentifierExpression.createMethodCall(args, "super"));

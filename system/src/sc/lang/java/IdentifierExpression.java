@@ -229,8 +229,10 @@ public class IdentifierExpression extends ArgumentsExpression {
                      }
                      else {
                         Object constr = ModelUtil.declaresConstructor(getLayeredSystem(), superType, arguments, null);
-                        // When transforming to JS, we need to resolve the super(name, ordinal) constructor which is part of the base type in JS only
-                        if (constr == null && superType instanceof EnumDeclaration && arguments.size() == 2) {
+                        // When transforming to JS, we need to resolve the super(name, ordinal, ...) constructors which are part of the base type in JS only
+                        // TODO: we should really be taking away the first two args and matching the proper constructor here but it's not that important we match
+                        // the right constructor for the JS conversion
+                        if (constr == null && superType instanceof EnumDeclaration && arguments.size() >= 2) {
                            constr = superType;
                         }
                         if (constr == null) {

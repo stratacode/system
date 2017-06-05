@@ -174,14 +174,8 @@ public abstract class ScopeDefinition {
                         // TODO: the precedence here seems off.  We should be testing for an inner type, enum etc. before
                         // we look for a lower case property that does not exist.
                         propName = CTypeUtil.decapitalizePropertyName(propName);
-                        try {
-                           //if (DynUtil.hasProperty(value, propName)) - not working for some reason
-                           value = DynUtil.getPropertyValue(value, propName);
-                        }
-                        catch (IllegalArgumentException exc) {
-                           // This can happen since there may not be a property of that name.  Just return null.  Maybe use a hasProperty method to avoid the exception here?
-                           value = null;
-                        }
+                        // Will get back null here if the property does not exist
+                        value = DynUtil.getPropertyValue(value, propName, true);
                      }
                      else {
                         value = null;

@@ -942,7 +942,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
                }
             }
             if (outputMethod == null)
-               System.out.println("***");
+               System.out.println("*** Error - template initialization problem - no output method for template - template not initialized?");
             ct = addTemplateDeclToOutputMethod((TypeDeclaration) rootType, outputMethod.body, decl, true, "", ct, null, lastSrcSt, true, false);
          }
       }

@@ -84,21 +84,22 @@ public class SyncHandler {
       Class cl = changedObj.getClass();
       if (PTypeUtil.isArray(cl) || changedObj instanceof Collection) {
          StringBuilder sb = new StringBuilder();
-         if (varName == null) {
-            // We already have registered a global id for this object so we can just use that id.
-            String objName = syncContext.getObjectName(changedObj, null, false, false, null, syncLayer);
-            if (objName != null) {
-               ser.formatReference(out, objName, currentPackageName);
-            }
-            // We have to create the array - i.e. new Type[] { val1, val2, ...} or x = new ArrayList(); x.add(val1), ...
-            else {
+         // We already have registered a global id for this object so we can just use that id.
+         String objName = syncContext.getObjectName(changedObj, null, false, false, null, syncLayer);
+         if (objName != null) {
+            // TODO: for some reason if varName == null we used to not check for an existing reference but that broke the JSON for the 'converters' object
+            ser.formatReference(out, objName, currentPackageName);
+         }
+         else {
+            if (varName == null) {
+               // We have to create the array - i.e. new Type[] { val1, val2, ...} or x = new ArrayList(); x.add(val1), ...
                String typeName = DynUtil.getTypeName(cl, true);
                ser.formatNewArrayDef(out, syncContext, changedObj, typeName, currentObjNames, currentPackageName, preBlockCode, postBlockCode, inBlock, uniqueId, depChanges, syncLayer);
             }
-         }
-         // In this case it is a simple variable definition so we can use array initializer syntax
-         else {
-            ser.formatArrayExpression(out, syncContext, changedObj, currentObjNames, currentPackageName, preBlockCode, postBlockCode, inBlock, uniqueId, depChanges, syncLayer);
+            // In this case it is a simple variable definition so we can use array initializer syntax
+            else {
+               ser.formatArrayExpression(out, syncContext, changedObj, currentObjNames, currentPackageName, preBlockCode, postBlockCode, inBlock, uniqueId, depChanges, syncLayer);
+            }
          }
       }
       else if (changedObj instanceof Map) {

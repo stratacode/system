@@ -777,6 +777,14 @@ public class Bind {
       sendEvent(IListener.VALUE_CHANGED, obj, propName == null ? null : DynUtil.getPropertyMapping(DynUtil.getType(obj), propName), val);
    }
 
+   public static void sendInvalidate(Object obj, String propName, Object val) {
+      sendEvent(IListener.VALUE_INVALIDATED, obj, propName == null ? null : DynUtil.getPropertyMapping(DynUtil.getType(obj), propName), val);
+   }
+
+   public static void sendValidate(Object obj, String propName, Object val) {
+      sendEvent(IListener.VALUE_VALIDATED, obj, propName == null ? null : DynUtil.getPropertyMapping(DynUtil.getType(obj), propName), val);
+   }
+
    public static void sendChange(Object obj, IBeanMapper prop, Object val) {
       sendEvent(IListener.VALUE_CHANGED, obj, prop, val);
    }

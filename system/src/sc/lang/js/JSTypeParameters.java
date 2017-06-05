@@ -326,10 +326,11 @@ public class JSTypeParameters extends ObjectTypeParameters {
 
          BlockStatement jsBody = jsDefaultMethod.body;
 
-         // Weird special case.  For methods like hashCode, equals, getName() which exist on the class as well as the instance,
+         // TODO: we need to check to be sure that the method signature matches the one that's defined on the class.
+         // Weird special case.  For instance methods like hashCode, equals, getName() which exist on the class as well as the instance,
          // we need to detect when we get called with the class and pass it off to the right method.  With JS there's one name space - the object and class
          // name spaces get merged which leads to this weird requirement.
-         if (defaultMethod != null && isClassMethod()) {
+         if (defaultMethod != null && !defaultMethod.isStatic() && isClassMethod()) {
             sb.append("   if (this.hasOwnProperty(\"$protoName\")) {\n");
             sb.append("      return jv_Class" + getJSRuntimeProcessor().typeNameSuffix + "." + defaultMethod.name + ".apply(this, arguments);\n");
             sb.append("   }\n");
@@ -543,11 +544,16 @@ public class JSTypeParameters extends ObjectTypeParameters {
          Object type = param.getTypeDeclaration();
          if (ModelUtil.isArray(type))
             return "sc_arrayInstanceOf";
+         if (ModelUtil.isCharacter(type))
+            return "sc_instanceOfChar";
          return ModelUtil.isPrimitive(type) ? "sc_instanceOf" : "sc_paramType";
       }
 
       public String getNumDimsStr() {
          int ndims = getNdims();
+         if (ndims > 0)
+            ndims = ndims - 1;
+         // TODO: Note: number of dimensions is 0 for a 1D array and 1 for a 2D array
          return ndims == -1 ? "" : ", " + ndims;
       }
    }

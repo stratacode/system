@@ -415,7 +415,7 @@ public class JSONSerializer extends SyncSerializer {
          cmd = "initLocal";
       else
          cmd = "init";
-      if (topLevel) {
+      if (topLevel || indent == 0) {
          appendObjStart(indent);
          appendName(Commands.syncState.cmd);
       }
@@ -424,7 +424,7 @@ public class JSONSerializer extends SyncSerializer {
       }
       appendString(cmd);
       isFirst = false;
-      if (topLevel)
+      if (topLevel || indent == 0)
          appendObjEnd();
    }
 }

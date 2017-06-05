@@ -232,7 +232,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          Object prev = getPreviousDefinition();
          if (prev instanceof MethodDefinition)
             return ((MethodDefinition) prev).getTypeDeclaration();
-         else
+         else if (prev != null)
             return ModelUtil.getReturnType(prev, true);
       }
       Object res = type == null ? null : type.getTypeDeclaration();
@@ -259,7 +259,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          Object prev = getPreviousDefinition();
          if (prev instanceof IMethodDefinition)
             return ((IMethodDefinition) prev).getTypeDeclaration(arguments, resolve);
-         else
+         else if (prev != null)
             return ModelUtil.getReturnType(prev, resolve);
       }
 

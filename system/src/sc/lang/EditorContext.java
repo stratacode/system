@@ -7,6 +7,7 @@ package sc.lang;
 import sc.bind.Bind;
 import sc.bind.Bindable;
 import sc.bind.IListener;
+import sc.dyn.DynUtil;
 import sc.lang.sc.PropertyAssignment;
 import sc.lang.sc.SCModel;
 import sc.layer.*;
@@ -105,16 +106,20 @@ public class EditorContext extends ClientEditorContext {
       int i = 0;
       // Add a null entry at the front to represent the <type> selection
       if (addNull)
-         ret.add(new InstanceWrapper(this, null));
-      while (i < max && it.hasNext())
-         ret.add(new InstanceWrapper(this, it.next()));
+         ret.add(new InstanceWrapper(this, null, typeName));
+      while (i < max && it.hasNext()) {
+         Object inst = it.next();
+         ret.add(new InstanceWrapper(this, inst, DynUtil.getTypeName(DynUtil.getType(inst), false)));
+      }
 
+      /*
       if (ret.size() == 1 && ModelUtil.getEnclosingType(type) == null && ModelUtil.isObjectType(type)) {
          ret.add(new InstanceWrapper(this, ModelUtil.getRuntimeType(type) != null, typeName)); // A dummy wrapper which creates the instance when it is selected
       }
+      */
 
       if (ModelUtil.isEnum(type)) {
-         ret.add(new InstanceWrapper(this, ModelUtil.getRuntimeEnum(type)));
+         ret.add(new InstanceWrapper(this, ModelUtil.getRuntimeEnum(type), typeName));
       }
       return ret;
    }

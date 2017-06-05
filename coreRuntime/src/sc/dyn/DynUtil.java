@@ -443,6 +443,17 @@ public class DynUtil {
       } while(true);
    }
 
+   public static Object getPropertyValue(Object object, String propertyName, boolean ignoreError) {
+      try {
+         return getPropertyValue(object, propertyName);
+      }
+      catch (IllegalArgumentException exc) {
+         if (!ignoreError)
+            throw exc;
+      }
+      return null;
+   }
+
    public static Object getPropertyValue(Object object, String propertyName) {
       if (object instanceof IDynObject)
          return ((IDynObject) object).getProperty(propertyName);

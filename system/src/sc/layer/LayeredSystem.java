@@ -440,9 +440,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    List<String> activatedLayerNames = null;
+   List<String> activatedDynLayerNames = null;
 
    public void clearActiveLayers() {
       activatedLayerNames = null;
+      activatedDynLayerNames = null;
 
       if (layers != null) {
          for (Layer layer : layers) {
@@ -541,23 +543,28 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    }
 
-   public void activateLayers(List<String> layerNames, List<String> dynLayers) {
+   /**
+    * Provides the complete list of layer names and a separate list of 'recursive dyn layers' - i.e. the subset of allLayerNames
+    * that should be explicitly made dynamic.
+    */
+   public void activateLayers(List<String> allLayerNames, List<String> dynLayers) {
       // TODO: if any of the layer names in the run configuration have changed, throw it all away and restart from scratch.
       // this is the simple approach.  It would not be too hard to figure out the differences, and peel-away unused layers, and
       // add in used ones.  That would make the builds a lot faster I think in some cases since you can save the compiled state of
       // the previous layers.  But maybe a good incremental compile will be fast enough?
-      if (activatedLayerNames == null || !activatedLayerNames.equals(layerNames)) {
+      if (activatedLayerNames == null || !activatedLayerNames.equals(allLayerNames) || !DynUtil.equalObjects(dynLayers, activatedDynLayerNames)) {
          if (activatedLayerNames != null) {
             clearActiveLayers();
          }
 
-         activatedLayerNames = new ArrayList<String>(layerNames);
-         initLayersWithNames(layerNames, false, false, dynLayers, true, false);
+         activatedLayerNames = new ArrayList<String>(allLayerNames);
+         activatedDynLayerNames = dynLayers == null ? null : new ArrayList<String>(dynLayers);
+         initLayersWithNames(allLayerNames, false, false, dynLayers, true, false);
          // First mark all layers that will be excluded
          removeExcludedLayers(true);
 
          // Init the runtimes, using the excluded layers as a guide
-         initRuntimes(null, true, false);
+         initRuntimes(dynLayers, true, false);
 
          // Now actually remove the excluded layers.
          removeExcludedLayers(false);
@@ -1374,17 +1381,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
             // Now create the new peer layeredSystem for this runtime.
             ArrayList<String> procLayerNames = new ArrayList<String>();
+            ArrayList<String> dynLayerNames = new ArrayList<String>();
 
             if (active) {
                // It includes any layers in this runtime which belong in the new one
-               addIncludedLayerNamesForProc(proc, procLayerNames, false);
+               addIncludedLayerNamesForProc(proc, procLayerNames, null, false);
                // We are adding a new runtime when we have existing runtimes.  This means that some layers in one of the existing peers
                // may also need to be in this runtime.  For any new layers, that have been added since the last initRuntimes call,
                // we have them in the core layered system at this stage, even if they do not belong there in the long term.
                if (peerSystems != null) {
                   for (LayeredSystem oldPeerSys : peerSystems) {
                      // As well as those layers in any peer runtimes that exist that as belong in the other runtime
-                     oldPeerSys.addIncludedLayerNamesForProc(proc, procLayerNames, false);
+                     oldPeerSys.addIncludedLayerNamesForProc(proc, procLayerNames, null, false);
                   }
                }
             }
@@ -1489,10 +1497,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       if (getNeedsProcess(peerSys.processDefinition)) {
          ArrayList<String> newPeerLayers = new ArrayList<String>();
+         ArrayList<String> dynLayers = new ArrayList<String>();
          // Here only include layers that are included by a specified layer
-         addIncludedLayerNamesForProc(peerSys.processDefinition, newPeerLayers, true);
+         addIncludedLayerNamesForProc(peerSys.processDefinition, newPeerLayers, dynLayers, true);
          if (newPeerLayers.size() > 0) {
-            peerSys.initLayersWithNames(newPeerLayers, false, false, null, true, true);
+            peerSys.initLayersWithNames(newPeerLayers, false, false, dynLayers, true, true);
          }
       }
    }
@@ -1510,12 +1519,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return false;
    }
 
-   private void addIncludedLayerNamesForProc(IProcessDefinition proc, List<String> procLayerNames, boolean specifiedLayers) {
+   private void addIncludedLayerNamesForProc(IProcessDefinition proc, List<String> procLayerNames, List<String> dynLayerNames, boolean specifiedLayers) {
       List<Layer> layersList = this.layers;
       for (int i = 0; i < layersList.size(); i++) {
          Layer layer = layersList.get(i);
-         if (layer.includeForProcess(proc) && (!specifiedLayers || layer.isSpecifiedLayer()))
+         if (layer.includeForProcess(proc) && (!specifiedLayers || layer.isSpecifiedLayer())) {
             procLayerNames.add(layer.getLayerName());
+            if (layer.dynamic && dynLayerNames != null)
+               dynLayerNames.add(layer.getLayerName());
+         }
       }
    }
 

@@ -51,7 +51,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    public static boolean traceSystemUpdates = false;
 
    /** Additional debug messages for JS  */
-   public boolean verboseJS = true;
+   public boolean verboseJS = false;
 
    /** Use _c (or typeNameSuffix) as a variable for each type def to avoid reusing the type name for every method and field (smaller JS files but this hurts stack traces and code readability) */
    public boolean useShortTypeNames = false;
@@ -299,7 +299,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       public HashSet<JSFileDep> typeDeps = new HashSet<JSFileDep>();
 
       public HashMap<String,String> prefixAliases = new HashMap<String,String>();
-      public HashMap<String,List<String>> aliasedPackages = new HashMap<String,List<String>>();
+
+      /** Used to implement mappings so you can replace one package source in the java/compiled world with another during the JS environment - e.g. how we substitute in the JS version of the binding code */
+      public HashMap<String,HashSet<String>> aliasedPackages = new HashMap<String,HashSet<String>>();
 
       public HashMap<String,String> replaceTypes = new HashMap<String,String>();
 
@@ -1000,19 +1002,19 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                   }
                   if (ModelUtil.isCompiledClass(depType)) {
                      if (!ModelUtil.isPrimitive(depType)) {
-                        if (hasAlias(depType))
-                           continue;
-
+                        depType = resolveSrcTypeDeclaration(depType);
                         String depModuleFile = getJSModuleFile(depType, false);
 
                         // The dependent type is in the same file with us.  When pulling pre-compiled files from the source
                         // path, which we are not transforming initially this is the first time we end up pulling in the source.
                         // If we get
                         if (depModuleFile != null && depModuleFile.equals(typeLibFile)) {
-                           depType = resolveSrcTypeDeclaration(depType);
                            if (!(depType instanceof BodyTypeDeclaration))
                               System.err.println("Warning: no source for type: " + ModelUtil.getTypeName(depType) + " to resolve dependency for type: " + type);
                         }
+
+                        if (hasAlias(depType))
+                           continue;
 
                         if (ModelUtil.isCompiledClass(depType)) {
                            if (addJSLibFiles(depType, true, typeLibFilesStr == null ? null : typeLibFiles[0], type, "uses") == null && !hasJSCompiled(type)) {
@@ -1185,8 +1187,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       // If we are rebuilding - (i.e. systemCompiled = true), we are just looking for changed models since the rebuild so we pass in a null layer.  Otherwise, we are looking for files that
       // have changed since the layer in which this type was initialized.
       if (!system.isChangedModel(fromType.getJavaModel(), system.currentBuildLayer, !system.buildLayer.getBuildAllFiles(), true)) {
-         if (verboseJS)
-            system.verbose("Reusing JS file: " + jsFile + " for unchanged type: " + fromType.getFullTypeName());
+         //if (verboseJS)
+         //   system.verbose("Reusing JS file: " + jsFile + " for unchanged type: " + fromType.getFullTypeName());
          return;
       }
       if (system.options.verbose && !changedJSFiles.contains(jsFile)) {
@@ -1577,22 +1579,27 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          return true;
 
       if (ModelUtil.isCompiledClass(type)) {
-         Object newType = ModelUtil.findTypeDeclaration(system, ModelUtil.getTypeName(type), null, false);
+         Object newType = ModelUtil.findTypeDeclaration(system, typeName, null, false);
          if (newType != null) {
             type = newType;
          }
-         //type = ModelUtil.resolveSrcTypeDeclaration(system, type);
+         type = ModelUtil.resolveSrcTypeDeclaration(system, type);
          if (ModelUtil.isCompiledClass(type)) {
             String pkgName = CTypeUtil.getPackageName(typeName);
             if (pkgName != null) {
                String className = CTypeUtil.getClassName(typeName);
                String prefix = jsBuildInfo.prefixAliases.get(pkgName);
                if (prefix != null) {
-                  List<String> aliasedPkgs = jsBuildInfo.aliasedPackages.get(prefix);
+                  HashSet<String> aliasedPkgs = jsBuildInfo.aliasedPackages.get(prefix);
                   if (aliasedPkgs != null) {
                      for (String aliasedPkg:aliasedPkgs) {
                         String testPath = CTypeUtil.prefixPath(aliasedPkg, className);
-                        if (system.getSrcTypeDeclaration(testPath, null, true) != null) {
+                        TypeDeclaration aliasedType = system.getSrcTypeDeclaration(testPath, null, true);
+                        if (aliasedType != null) {
+                           if (aliasedType.getFullTypeName().equals(typeName)) {
+                              System.err.println("*** Error - aliased type has same name as original");
+                              return false;
+                           }
                            return true;
                         }
                      }
@@ -1619,9 +1626,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             if (oldPrefix != null && !oldPrefix.equals(prefixStr)) {
                System.err.println("*** JSSettings.prefixAlias value on type: " + type + " set to: " + prefixStr + " which conflicts with the old prefixAlias for pkg: " + pkgName + " of: " + oldPrefix);
             }
-            List<String> pkgs = jsBuildInfo.aliasedPackages.get(prefixStr);
+            HashSet<String> pkgs = jsBuildInfo.aliasedPackages.get(prefixStr);
             if (pkgs == null) {
-               pkgs = new ArrayList<String>();
+               pkgs = new HashSet<String>();
                jsBuildInfo.aliasedPackages.put(prefixStr, pkgs);
             }
             pkgs.add(pkgName);

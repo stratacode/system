@@ -68,7 +68,6 @@ public class JSONFormat extends SerializerFormat {
             else
                throw new IllegalArgumentException("Expecting array with three elements for new command: " + dser.parser);
          }
-
       },
       // TODO: remove this?  It's referenced but we override the method it's referenced from from JSON
       eval {

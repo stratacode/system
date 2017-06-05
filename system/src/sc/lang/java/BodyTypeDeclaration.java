@@ -2175,10 +2175,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
       // TODO: we are not passing in fromLayer here because this method is used by methods and other types to retrieve the most specific type.  I think we might need
       // a mode flag in here so we can call it both ways as when we are refreshing a modified type, we need to get back the one in the same layer that we started with.
+      // Shouldn't we actually refresh the model and the find the type relative to the model?
       Object newBoundType = sys.getSrcTypeDeclaration(getFullTypeName(), null, model.getPrependPackage(), false, true, getLayer(), isLayerType);
       if (newBoundType == null) {
-         System.err.println("*** Can't find post compiled type for: " + getFullTypeName());
-         newBoundType = sys.getSrcTypeDeclaration(getFullTypeName(), null, model.getPrependPackage(), false, true, getLayer(), isLayerType);
+         // There are cases where we can only find the type when we pass in the from layer.  Not entirely sure why...
          if (getLayer() != null)
             newBoundType = sys.getSrcTypeDeclaration(getFullTypeName(), getLayer().getNextLayer(), model.getPrependPackage(), false, true, getLayer(), isLayerType);
       }
@@ -2186,7 +2186,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          System.out.println("*** Error expected source-based class and found compiled"); // Why are we resolving a CFClass here?
          newBoundType = sys.getTypeDeclaration(getFullTypeName(), true, getLayer(), isLayerType);
       }
-      return newBoundType;
+      return newBoundType != null ? newBoundType : boundType;
    }
 
    public boolean isDynamicType() {
@@ -9037,10 +9037,20 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return replacedByType.refreshNode();
       }
       JavaModel newModel = (JavaModel) myModel.getLayeredSystem().getAnnotatedModel(myModel.getSrcFile());
+      if (newModel == myModel)
+         return this;
       if (newModel == null)
          newModel = myModel;
+
+      // First see if we can find this new type as part of the new model since that's the most accurate way to refresh the type
+      String innerTypeName = getInnerTypeName();
+      Object res = newModel.getTypeDeclaration(innerTypeName);
+      if (res instanceof BodyTypeDeclaration)
+         return (BodyTypeDeclaration) res;
+
+      // Otherwise, we can try to find this type by name using the ref layer
       Layer newModelLayer = newModel.getLayer();
-      Object res = newModel.layeredSystem.getSrcTypeDeclaration(getFullTypeName(), newModelLayer == null ? null : newModelLayer.getNextLayer(), true, false, false, newModelLayer, newModel.isLayerModel);
+      res = newModel.layeredSystem.getSrcTypeDeclaration(getFullTypeName(), newModelLayer == null ? null : newModelLayer.getNextLayer(), true, false, false, newModelLayer, newModel.isLayerModel);
       if (res instanceof TypeDeclaration) {
          TypeDeclaration newType = (TypeDeclaration) res;
          // We might switch from an inactive layer to an active layer, or maybe the layers themselves were reloaded?

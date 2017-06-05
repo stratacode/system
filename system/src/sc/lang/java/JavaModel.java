@@ -2542,6 +2542,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
       transformedModel = null;
       transformedInLayer = null;
+      fileLineIndex = null;
 
       // Any models that modify this one in the layer stack also need to be re-transformed
       JavaModel modifiedByModel = getModifiedByModel();

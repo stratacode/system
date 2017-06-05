@@ -75,7 +75,11 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
 
    private transient TreeMap<String,Element[]> childrenById = null;
 
-   private transient boolean startTagValid = false, bodyValid = false;
+   /**
+    * Tags are rendered in two different phases - the start tag, which includes the attributes and the body.
+    * These flags indicate if the current rendered version is known to be stale for each of these two phases
+    */
+   public transient boolean startTagValid = false, bodyValid = false;
 
    private transient boolean needsSuper = false;
    private transient boolean needsBody = true;
@@ -3022,6 +3026,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       }
    }
 
+   // These methods are implemented for JS where they update the DOM.
    public void appendElement(Element elem) {
    }
 

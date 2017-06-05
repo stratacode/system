@@ -159,7 +159,7 @@ public class EnumConstant extends BodyTypeDeclaration {
          enumTD.setProperty("body", body.deepCopy(ISemanticNode.CopyNormal, null));
 
          // Need to create the enum constructor that takes the string and ordinal parameters
-         ConstructorDefinition ctor = EnumDeclaration.newEnumConstructor(getLayeredSystem(), typeName, enumTD);
+         ConstructorDefinition ctor = EnumDeclaration.newEnumConstructor(getLayeredSystem(), typeName, enumTD, enclType, arguments);
          enumTD.addBodyStatement(ctor);
 
          cl.addSubTypeDeclaration(enumTD);
