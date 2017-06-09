@@ -153,4 +153,6 @@ public interface IDynamicSystem {
    boolean isArray(Object type);
 
    Object getComponentType(Object arrayType);
+
+   Object getPropertyAnnotationValue(Object typeObj, String propName, String annotName, String attName);
 }

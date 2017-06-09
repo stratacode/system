@@ -43,7 +43,7 @@ public class RDynUtil {
       if (dynamicSystem != null)
          return dynamicSystem.getAnnotation(def, annotClass);
       else
-         return RTypeUtil.getAnnotation(def, annotClass);
+         return PTypeUtil.getAnnotation(def, annotClass);
    }
 
    public static Object getDeclaringClass(Object method) {

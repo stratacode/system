@@ -1300,6 +1300,22 @@ public class DynUtil {
       else throw new UnsupportedOperationException();
    }
 
+   public static Object getPropertyAnnotationValue(Object typeObj, String propName, String annotName, String attName) {
+      if (dynamicSystem != null) {
+         return dynamicSystem.getPropertyAnnotationValue(typeObj, propName, annotName, attName);
+      }
+      else if (typeObj instanceof Class) {
+         Object prop = DynUtil.getPropertyMapping(typeObj, propName);
+         if (prop != null) {
+            Object annot = PTypeUtil.getAnnotation(prop, annotName);
+            if (annot != null) {
+               return PTypeUtil.getValueFromAnnotation(annot, attName);
+            }
+         }
+      }
+      throw new UnsupportedOperationException();
+   }
+
    public static Object getInheritedAnnotationValue(Object typeObj, String annotName, String attName) {
       if (typeObj instanceof Class) {
          return PTypeUtil.getInheritedAnnotationValue((Class) typeObj, annotName, attName);

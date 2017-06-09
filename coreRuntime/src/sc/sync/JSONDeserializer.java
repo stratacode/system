@@ -265,11 +265,8 @@ public class JSONDeserializer {
    public Object convertRemoteType(Object value, Object type) {
       if (value instanceof List) {
          List propValList = (List) value;
-         if (type instanceof Object[]) {
-            value = propValList.toArray();
-         }
          // Convert if necessary to get the correct array type - e.g. a String[] instead of just an Object[]
-         else if (DynUtil.isArray(type)) {
+         if (DynUtil.isArray(type)) {
             value = propValList.toArray((Object[]) PTypeUtil.newArray((Class) DynUtil.getComponentType(type), propValList.size()));
          }
          // Call the constructor to create the right type of collection, i.e. Collection((Collection a))

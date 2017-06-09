@@ -738,12 +738,6 @@ public class RTypeUtil {
       return enumMap.get(name);
    }
 
-   public static Object getAnnotation(Object def, Class annotClass) {
-      if (def instanceof AnnotatedElement)
-         return ((AnnotatedElement) def).getAnnotation(annotClass);
-      throw new IllegalArgumentException("Unrecognized type to getAnnotation: " + def);
-   }
-
    public static Object getDeclaringClass(Object method) {
       if (method instanceof Method)
          return ((Method) method).getDeclaringClass();

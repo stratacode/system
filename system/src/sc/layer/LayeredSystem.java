@@ -3192,24 +3192,32 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return DynUtil.createInnerInstance(typeObj, outerObj, constrSig, params);
    }
 
-   @Override
    public boolean isComponentType(Object type) {
       return ModelUtil.isComponentType(type);
    }
 
-   @Override
    public boolean isArray(Object type) {
       if (type instanceof ArrayTypeDeclaration)
          return true;
       return PTypeUtil.isArray(type);
    }
 
-   @Override
    public Object getComponentType(Object arrayType) {
       if (arrayType instanceof ArrayTypeDeclaration) {
          return ((ArrayTypeDeclaration) arrayType).getComponentType();
       }
       return PTypeUtil.getComponentType(arrayType);
+   }
+
+   public Object getPropertyAnnotationValue(Object typeObj, String propName, String annotName, String attName) {
+      Object prop = ModelUtil.getPropertyMapping(typeObj, propName);
+      if (prop != null) {
+         Object annot = ModelUtil.getPropertyAnnotation(prop, annotName);
+         if (annot != null) {
+            return ModelUtil.getAnnotationValue(annot, attName);
+         }
+      }
+      return null;
    }
 
    public void removeTypeChangeListener(ITypeChangeListener type) {
@@ -4105,7 +4113,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          SyncManager.addSyncType(ClientTypeDeclaration.class, typeProps);
          SyncManager.addSyncHandler(ClientTypeDeclaration.class, LayerSyncHandler.class); // Need this so we can use restore to go back
 
-         SyncManager.addSyncType(VariableDefinition.class, new SyncProperties(null, null, new Object[] { "variableName" , "initializerExprStr" , "operatorStr" , "layer", "comment", "variableTypeName"}, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, globalScopeId));
+         SyncManager.addSyncType(VariableDefinition.class, new SyncProperties(null, null, new Object[] { "variableName" , "initializerExprStr" , "operatorStr" , "layer", "comment", "variableTypeName", "indexedProperty"}, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, globalScopeId));
          SyncManager.addSyncType(PropertyAssignment.class, new SyncProperties(null, null, new Object[] { "propertyName" , "operatorStr", "initializerExprStr", "layer" , "comment", "variableTypeName" }, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, globalScopeId));
 
          SyncProperties modelProps = new SyncProperties(null, null, new Object[] {"layer", "srcFile", "needsModelText", "cachedModelText", "needsGeneratedText", "cachedGeneratedText", "cachedGeneratedJSText", "cachedGeneratedSCText", "cachedGeneratedClientJavaText", "existsInJSRuntime", "layerTypeDeclaration"}, null, SyncOptions.SYNC_INIT_DEFAULT, globalScopeId);

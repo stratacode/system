@@ -918,52 +918,18 @@ public class JSTypeParameters extends ObjectTypeParameters {
          for (Object modifier:type.getComputedModifiers()) {
             if (modifier instanceof Annotation) {
                Annotation annot = (Annotation) modifier;
-               String annotTypeName = annot.getFullTypeName();
-               Object cl = sys.getTypeDeclaration(annotTypeName);
-               if (cl == null)
-                  System.err.println("*** JS cannot find annotation: " + annotTypeName);
-               else {
-                  // First look for a specific JS retention policy
-                  Boolean runtimePolicy = getRuntimeRetention(cl, "sc.js.JSRetention");
-                  if (runtimePolicy == null) // Default to Java's retention policy
-                     runtimePolicy = getRuntimeRetention(cl, "java.lang.annotation.Retention");
-                  if (runtimePolicy != null && runtimePolicy) {
-                     //sb.append(getStaticPrefix());
-                     sb.append(getShortJSTypeName());
-                     sb.append("._A_");
-                     sb.append(CTypeUtil.getClassName(annotTypeName));
-                     Object elementValue = annot.elementValue;
-                     if (elementValue != null) {
-                        sb.append(" = ");
-                        if (elementValue instanceof List) {
-                           List elementList = (List) elementValue;
-                           sb.append("{");
-                           int i = 0;
-                           for (Object annotObj:elementList) {
-                              if (i != 0)
-                                 sb.append(", ");
-                              AnnotationValue av = (AnnotationValue) annotObj;
-                              sb.append(av.identifier);
-                              sb.append(": ");
-                              if (av.elementValue instanceof AbstractLiteral)
-                                 sb.append(((AbstractLiteral)av.elementValue).getExprValue());
-                              else if (av.elementValue instanceof Expression) {
-                                 Expression attValExpr = (Expression) av.elementValue;
-
-                                 sb.append(JSUtil.convertAndFormatExpression(attValExpr));
-                              }
-                              else
-                                 sb.append(av.elementValue.toString());
-                              i++;
-                           }
-                           sb.append("}");
-                        }
-                        else {
-                           sb.append(elementValue.toString());
-                        }
-                     }
-                     sb.append(";\n");
+               if (isRuntimeJSAnnotation(annot)) {
+                  String annotTypeName = annot.getFullTypeName();
+                  //sb.append(getStaticPrefix());
+                  sb.append(getShortJSTypeName());
+                  sb.append("._A_");
+                  sb.append(CTypeUtil.getClassName(annotTypeName));
+                  Object elementValue = annot.elementValue;
+                  if (elementValue != null) {
+                     sb.append(" = ");
+                     appendAnnotValue(sb, elementValue);
                   }
+                  sb.append(";\n");
                }
             }
          }
@@ -971,6 +937,53 @@ public class JSTypeParameters extends ObjectTypeParameters {
             sb.append("\n");
       }
       return sb.toString();
+   }
+
+   private static void appendAnnotValue(StringBuilder sb, Object elementValue) {
+      if (elementValue instanceof List) {
+         List elementList = (List) elementValue;
+         sb.append("{");
+         int i = 0;
+         for (Object annotObj:elementList) {
+            if (i != 0)
+               sb.append(", ");
+            AnnotationValue av = (AnnotationValue) annotObj;
+            sb.append(av.identifier);
+            sb.append(": ");
+            if (av.elementValue instanceof AbstractLiteral)
+               sb.append(((AbstractLiteral)av.elementValue).getExprValue());
+            else if (av.elementValue instanceof Expression) {
+               Expression attValExpr = (Expression) av.elementValue;
+
+               sb.append(JSUtil.convertAndFormatExpression(attValExpr));
+            }
+            else
+               sb.append(av.elementValue.toString());
+            i++;
+         }
+         sb.append("}");
+      }
+      else {
+         sb.append(elementValue.toString());
+      }
+   }
+
+   private boolean isRuntimeJSAnnotation(Annotation annot) {
+      String annotTypeName = annot.getFullTypeName();
+      LayeredSystem sys = type.getLayeredSystem();
+      Object cl = sys.getTypeDeclaration(annotTypeName);
+      if (cl == null)
+         System.err.println("*** JS conversion - no annotation: " + annotTypeName);
+      else {
+         // First look for a specific JS retention policy
+         Boolean runtimePolicy = getRuntimeRetention(cl, "sc.js.JSRetention");
+         if (runtimePolicy == null) // Default to Java's retention policy
+            runtimePolicy = getRuntimeRetention(cl, "java.lang.annotation.Retention");
+         if (runtimePolicy != null && runtimePolicy) {
+            return true;
+         }
+      }
+      return false;
    }
 
    // When we replace one type with another in JS land, we may need to register the old type name as an alias so we know
@@ -1023,9 +1036,57 @@ public class JSTypeParameters extends ObjectTypeParameters {
                sb.append("\"");
             }
          }
+         if (sb != null)
+            sb.append("};\n");
+         StringBuilder asb = null;
+         visited = new TreeSet<String>();
+         for (Object prop:props) {
+            String propName = ModelUtil.getPropertyName(prop);
+            if (prop instanceof Definition) {
+               List<Object> modifiers = ((Definition) prop).getComputedModifiers();
+               if (modifiers != null) {
+                  boolean firstModifier = true;
+                  for (Object modifier:modifiers) {
+                     if (modifier instanceof Annotation) {
+                        Annotation annot = (Annotation) modifier;
+                        if (isRuntimeJSAnnotation(annot)) {
+                           if (asb == null) {
+                              asb = new StringBuilder();
+                              asb.append(getShortJSTypeName());
+                              asb.append("._PT = {");
+                           }
+                           else
+                              asb.append(", ");
+                           if (firstModifier) {
+                              firstModifier = false;
+                              asb.append(propName);
+                              asb.append(":{");
+                           }
+                           String annotTypeName = annot.getTypeName();
+                           asb.append(CTypeUtil.getClassName(annotTypeName));
+                           Object elementValue = annot.elementValue;
+                           if (elementValue != null) {
+                              asb.append(": ");
+                              appendAnnotValue(asb, elementValue);
+                           }
+                           else
+                              asb.append(": true");
+                        }
+                     }
+                  }
+                  if (!firstModifier)
+                     asb.append("}");
+               }
+            }
+         }
+         if (asb != null) {
+            asb.append("};\n");
+            if (sb != null)
+               sb.append(asb);
+            else
+               sb = asb;
+         }
       }
-      if (sb != null)
-         sb.append("};\n");
       return sb == null ? "" : sb.toString();
    }
 

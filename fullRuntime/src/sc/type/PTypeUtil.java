@@ -921,8 +921,16 @@ public class PTypeUtil {
       Annotation annotation = cl.getAnnotation(annotClass);
       if (annotation == null)
          return null;
-      Method method = RTypeUtil.getMethod(annotation.getClass(), annotValue);
-      return TypeUtil.invokeMethod(annotation, method, (Object[])null);
+      return getValueFromAnnotation(annotation, annotValue);
+   }
+
+   public static Object getValueFromAnnotation(Object annotation, String annotValue) {
+      if (annotation instanceof Annotation) {
+         Method method = RTypeUtil.getMethod(annotation.getClass(), annotValue);
+         return TypeUtil.invokeMethod(annotation, method, (Object[]) null);
+      }
+      else
+         throw new IllegalArgumentException("Invalid arg to getValueFromAnnotation");
    }
 
    public static Object getInheritedAnnotationValue(Class cl, String annotName, String annotValue) {
@@ -939,21 +947,34 @@ public class PTypeUtil {
 
       if (annotation == null)
          return null;
-
-      Method method = RTypeUtil.getMethod(annotation.getClass(), annotValue);
-      return TypeUtil.invokeMethod(annotation, method, (Object[])null);
+      return getValueFromAnnotation(annotation, annotValue);
    }
 
-   public static Object getAnnotation(Class cl, String annotName) {
-      Class annotClass = RDynUtil.loadClass(annotName);
-      Annotation annotation = null;
-      do {
-         annotation = cl.getAnnotation(annotClass);
-         if (annotation != null)
-            break;
-         cl = cl.getSuperclass();
-      } while (cl != null);
+   // Takes a def - either a Class, Method, Field and the annotNameOrType - either the String type name of the annot class itself.
+   public static Object getAnnotation(Object def, Object annotNameOrType) {
+      Class annotClass;
+      if (annotNameOrType instanceof String) {
+         annotClass = RDynUtil.loadClass((String) annotNameOrType);
+      }
+      else if (annotNameOrType instanceof Class) {
+         annotClass = (Class) annotNameOrType;
+      }
+      else
+         throw new IllegalArgumentException("Invalid type to getAnnotation");
 
+      Annotation annotation = null;
+      if (def instanceof Class) {
+         Class cl = (Class) def;
+         do {
+            annotation = cl.getAnnotation(annotClass);
+            if (annotation != null)
+               break;
+            cl = cl.getSuperclass();
+         } while (cl != null);
+      }
+      else if (def instanceof AnnotatedElement) {
+         return ((AnnotatedElement) def).getAnnotation(annotClass);
+      }
       return annotation;
    }
 
@@ -982,4 +1003,5 @@ public class PTypeUtil {
       Object meth = resolveMethod(o.getClass(), "clone", null);
       return invokeMethod(o, meth);
    }
+
 }

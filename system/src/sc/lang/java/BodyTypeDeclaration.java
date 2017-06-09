@@ -4283,6 +4283,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       else {
          LayerUtil.removeInheritFile(newFile);
          LayerUtil.removeFileAndClasses(newFile);
+         if (!bd.equals(buildSrcDir)) {
+            String newBuildFile = FileUtil.concat(bd, stubRelName);
+            LayerUtil.removeFileAndClasses(newBuildFile);
+         }
       }
 
       if (toCompileEnts.size() > 0) {
@@ -6076,10 +6080,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public void execBlockStatement(BlockStatement bs, ExecutionContext ctx) {
-      if (bs.isStatic())
-         bs.exec(ctx);
-      else
-         updateInstBlockStatement(bs, ctx);
+      // From the IDE at least, we get here with ctx = null and we need a frame to run the code
+      if (ctx != null) {
+         if (bs.isStatic())
+            bs.exec(ctx);
+         else
+            updateInstBlockStatement(bs, ctx);
+      }
    }
 
    private BlockStatement findBlockStatement(BlockStatement bs) {

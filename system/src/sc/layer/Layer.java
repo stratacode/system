@@ -2896,6 +2896,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    public Object getClass(String classFileName, String className, boolean external) {
+      if (layeredSystem == null) {
+         System.err.println("*** No layered system for layer!");
+         return null;
+      }
       if (!external && !layeredSystem.options.crossCompile) {
          return RTypeUtil.loadClass(layeredSystem.getSysClassLoader(), className, false);
       }

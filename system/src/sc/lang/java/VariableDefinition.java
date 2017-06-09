@@ -49,6 +49,10 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
 
    public transient ISrcStatement fromStatement;
 
+   // Used in the client/server synchronization - In LayerSyncHandler, VariableDefinition is created from a getX method which can
+   // be a representation for an indexed property.  It's never an indexed property when it's a field.
+   public transient boolean indexedProperty = false;
+
    private static boolean wasBound = false;
 
    public void init() {

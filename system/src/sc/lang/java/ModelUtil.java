@@ -6558,6 +6558,8 @@ public class ModelUtil {
    public static void suggestTypes(JavaModel model, String prefix, String lastIdent, Set<String> candidates, boolean includeGlobals) {
       if (prefix == null)
          prefix = "";
+      if (model == null)
+         return;
       Set<String> files = model.layeredSystem.getFilesInPackage(prefix);
       if (files != null) {
          for (String file:files) {

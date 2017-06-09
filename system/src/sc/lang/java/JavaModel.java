@@ -1447,7 +1447,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    // If necessary, perform any transformations and return the source files to compile.
    // If nothing changed, just return the source files for this model.
-   private List<SrcEntry> getComputedProcessedFiles(Layer buildLayer, String buildDir, boolean generate) {
+   private List<SrcEntry> getComputedProcessedFiles(Layer buildLayer, String buildSrcDir, boolean generate) {
       // TODO: If we generate additional classes during the transformation, they need to get returned here
       assert getSrcFiles().size() == 1;
 
@@ -1479,15 +1479,19 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          // Save this as a dynamic type in this layer so we know to not load it as a regular class in an incremental build
          buildLayer.markDynamicType(modelType.getFullTypeName());
 
-         innerObjStubs = modelType.getInnerDynStubs(buildDir, buildLayer, generate);
+         innerObjStubs = modelType.getInnerDynStubs(buildSrcDir, buildLayer, generate);
          // No code to generate when the type is dynamic unless we are extending a compiled class for the first
          // time.  We need some class to act as the barrier between weak/strong types and so generate a stub
          // in that case.
          if (!modelType.isDynamicStub(false)) {
             if (modelType.replacedByType == null && generate) { // only remove if we are the last layer and supposed to be saving models
-               String procName = getProcessedFileName(buildDir);
+               String procName = getProcessedFileName(buildSrcDir);
                LayerUtil.removeFileAndClasses(procName); // make sure a previous compiled version is not there
                LayerUtil.removeInheritFile(procName);
+               if (!buildLayer.buildDir.equals(buildSrcDir)) {
+                  String buildDirName = getProcessedFileName(buildLayer.buildClassesDir);
+                  LayerUtil.removeFileAndClasses(buildDirName); // remove the classes from the buildDir if it's different
+               }
             }
             return innerObjStubs == null ? emptySrcEntriesList : innerObjStubs;
          }
@@ -1511,7 +1515,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       else {
          if (transformedResult == null && generate)
             transformedResult = getTransformedResult();
-         String newFile = getProcessedFileName(buildDir);
+         String newFile = getProcessedFileName(buildSrcDir);
          File newFileFile = new File(newFile);
 
          // The layered system processes hidden layer files backwards.  So generate will be true the for the
@@ -1532,7 +1536,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                   FileUtil.saveStringAsReadOnlyFile(newFile, transformedResult, true);
 
                   if (layeredSystem.options.genDebugInfo)
-                     updateFileLineIndex(transformedResult, buildDir);
+                     updateFileLineIndex(transformedResult, buildSrcDir);
                   // TODO: else - remove the the file if it does not exist?
                }
                else {
@@ -2682,7 +2686,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public void stop() {
-      if (modifiedModel != null) {
+      stop(true);
+   }
+
+   public void stop(boolean stopModified) {
+      if (stopModified && modifiedModel != null) {
          modifiedModel.stop();
          // This gets reset lazily from the modified type, but during a rebuild if we leave this value around, it could be stale
          modifiedModel = null;

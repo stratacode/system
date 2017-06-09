@@ -445,11 +445,15 @@ public class PTypeUtil {
       return null;
    }
 
+   public static Object getValueFromAnnotation(Object annotation, String annotValue) {
+      return null;
+   }
+
    public static Object getAnnotationValue(Class cl, String annotName, String annotValue) {
       return null;
    }
 
-   public static Object getAnnotation(Class cl, String annotName) {
+   public static Object getAnnotation(Object cl, Object annotNameOrType) {
       return null;
    }
 

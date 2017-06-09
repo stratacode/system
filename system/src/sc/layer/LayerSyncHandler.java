@@ -42,6 +42,7 @@ public class LayerSyncHandler extends SyncHandler {
          VariableDefinition varDef = new VariableDefinition();
          varDef.variableName = ModelUtil.getPropertyName(inst);
          varDef.frozenTypeDecl = ModelUtil.getPropertyType(inst);
+         varDef.indexedProperty = ModelUtil.isGetIndexMethod(inst);
          return varDef;
       }
 

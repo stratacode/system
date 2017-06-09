@@ -1139,7 +1139,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                Object setMethod = referenceTD.definesMethod(setName, Collections.singletonList(typeForIdentifier), null, null, referenceTD.isTransformedType(), false, null, null);
                if (setMethod != null) {
                   // Do dynamic access only if the property is marked as manually bindable.
-                  referenceTD.addPropertyToMakeBindable(propertyName, boundType, expr.getJavaModel(), ModelUtil.isManualBindable(setMethod));
+                  referenceTD.addPropertyToMakeBindable(propertyName, boundType, expr.getJavaModel(), referenceOnly || ModelUtil.isManualBindable(setMethod));
                }
             }
             else if (encType instanceof CFClass) {
@@ -2505,7 +2505,11 @@ public class IdentifierExpression extends ArgumentsExpression {
                   switch (idTypes[j]) {
                      case GetVariable:
                      case IsVariable:
-                        if (convertToGetMethod(idents.get(j).toString(), j, sz, incr, idTypes[i] == IdentifierType.IsVariable)) {
+                        // If we are in getFoo() don't rename 'this.foo" to this.getFoo() as that's always an infinite loop
+                        String nextIdent = idents.get(j).toString();
+                        if (inNamedPropertyMethod(nextIdent))
+                           break;
+                        if (convertToGetMethod(nextIdent, j, sz, incr, idTypes[i] == IdentifierType.IsVariable)) {
                            return true;
                         }
                         break;

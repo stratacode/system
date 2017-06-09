@@ -58,7 +58,7 @@ public class Parameter extends AbstractVariable implements IVariable {
       if (type.contains(MemberType.Variable)) {
          if (nextParameter != null && (res = nextParameter.definesMember(name, type, refType, ctx, skipIfaces, isTransformed)) != null)
             return res;
-         if (variableName.equals(name))
+         if (variableName != null && variableName.equals(name))
             return this;
       }
       return super.definesMember(name, type, refType, ctx, skipIfaces, isTransformed);

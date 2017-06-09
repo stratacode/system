@@ -1099,8 +1099,12 @@ public class ParseUtil  {
 
       // Stop all of the nodes before we reparse to ensure we can cleanly start them up afterwards.
       Object oldModel = pnode.getSemanticValue();
-      if (oldModel != null)
-         ParseUtil.stopComponent(oldModel);
+      if (oldModel != null) {
+         if (oldModel instanceof JavaModel)
+            ((JavaModel) oldModel).stop(false); // faster to skip stopping the modified models
+         else
+            ParseUtil.stopComponent(oldModel);
+      }
 
       // First we make a pass over the parse node tree to find two mark points in the file - where the changes
       // start and where the text becomes the same again.  We are optimizing for the "single edit" case - global
