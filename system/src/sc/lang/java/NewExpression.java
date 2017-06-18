@@ -1082,4 +1082,11 @@ public class NewExpression extends IdentifierExpression {
    public List<Statement> getBodyStatements() {
       return classBody;
    }
+
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
+      // TODO: for some reason this results in the completion including the 'new' keyword - e.g. "new Foo" rather than just "Foo".  Not sure how to remove that but it's better than it not completing at all.
+      if (extMatchPrefix.startsWith("new "))
+         extMatchPrefix = extMatchPrefix.substring(4);
+      return addStatementNodeCompletions(origModel, origNode, extMatchPrefix, offset, dummyIdentifier, candidates);
+   }
 }

@@ -7,6 +7,7 @@ package sc.lang.java;
 import sc.lang.ISemanticNode;
 import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
+import sc.type.CTypeUtil;
 
 import java.util.EnumSet;
 import java.util.IdentityHashMap;
@@ -417,4 +418,5 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
             st.setFromStatement(from);
       }
    }
+
 }

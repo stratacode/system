@@ -8,6 +8,7 @@ import sc.js.JSSettings;
 import sc.lang.java.*;
 import sc.layer.SrcEntry;
 import sc.lifecycle.ILifecycle;
+import sc.obj.EditorSettings;
 import sc.type.*;
 import sc.util.FileUtil;
 import sc.util.PerfMon;
@@ -36,6 +37,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
    transient public IParseNode parseNode;
    transient public boolean parseNodeInvalid = false;
 
+   @EditorSettings(visible=false)
    transient public ISemanticNode parentNode;
 
    // TODO performance: turn these into bitfields

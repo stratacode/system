@@ -2585,22 +2585,15 @@ public class ModelUtil {
          return ((IDefinition) definition).getAnnotation(annotationName);
       }
       else {
-         // TODO: fix annotation names
-         Class annotationClass;
-         if (annotationName.equals("Bindable")) // TODO remove me
-            System.err.println("*** Old Bindable annotation");
-         if (annotationName.equals("Bindable") || annotationName.equals("sc.bind.Bindable"))
-            annotationClass = Bindable.class;
-         else if (annotationName.equals("BindSettings"))
-            annotationClass = BindSettings.class;
-         else
-            annotationClass = RDynUtil.loadClass(annotationName);
+         Class annotationClass = RDynUtil.loadClass(annotationName);
          if (annotationClass == null) {
             annotationClass = RDynUtil.loadClass("sc.obj." + annotationName);
             if (annotationClass == null) {
                // NOTE: assuming that the layers are defined properly, compiled classes can't have non-compiled annotations so just return null, e.g. searching for a JSSettings or MainInit annotation on a compiled class.
                return null;
             }
+            else
+               System.err.println("*** Using auto-imported sc.obj annoatation: " + annotationName);
          }
 
          java.lang.annotation.Annotation jlannot;
@@ -8486,5 +8479,58 @@ public class ModelUtil {
       }
       else
          return false;
+   }
+
+   public static Map<String, Object> getAnnotations(Object def) {
+      if (def instanceof ParamTypedMember) {
+         return getAnnotations(((ParamTypedMember) def).getMemberObject());
+      }
+      if (def instanceof Definition)
+         return ((Definition) def).getAnnotations();
+      else if (def instanceof AnnotatedElement) {
+         java.lang.annotation.Annotation[] annots = ((AnnotatedElement) def).getAnnotations();
+         return createAnnotationsMap(annots);
+      }
+      else if (def instanceof IBeanMapper) {
+         // TODO: For get/set methods, do we have to combine annotations here?
+         IBeanMapper mapper = (IBeanMapper) def;
+         Object gsel = mapper.getGetSelector();
+         Map<String,Object> res = null;
+         if (gsel != null)
+            res = getAnnotations(gsel);
+         Object ssel = mapper.getSetSelector();
+         if (ssel != null && ssel != gsel) {
+            Map<String,Object> nres = getAnnotations(ssel);
+            if (nres != null && res != null)
+               res.putAll(nres);
+            else if (res == null)
+               res = nres;
+         }
+         Object fsel = mapper.getField();
+         if (fsel != null && fsel != ssel) {
+            Map<String,Object> nres = getAnnotations(fsel);
+            if (nres != null && res != null)
+               res.putAll(nres);
+            else if (res == null)
+               res = nres;
+         }
+         return res;
+      }
+      else if (def instanceof VariableDefinition)
+         return ((VariableDefinition)def).getDefinition().getAnnotations();
+      else
+         throw new UnsupportedOperationException();
+   }
+
+   public static Map<String, Object> createAnnotationsMap(java.lang.annotation.Annotation[] annotations) {
+      if (annotations != null) {
+         TreeMap<String,Object> res = new TreeMap<String,Object>();
+         for (java.lang.annotation.Annotation annot:annotations) {
+            Annotation myAnnot = Annotation.createFromElement(annot);
+            myAnnot.addToAnnotationsMap(res);
+         }
+         return res;
+      }
+      return null;
    }
 }

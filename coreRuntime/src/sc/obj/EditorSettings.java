@@ -14,12 +14,12 @@ import static java.lang.annotation.ElementType.*;
  * operate on the properties, or objects in a model.
  */
 @Target({TYPE,METHOD,FIELD})
-@Retention(RetentionPolicy.SOURCE)
+@Retention(RetentionPolicy.RUNTIME)
 public @interface EditorSettings {
    /** Is this class/property visible in the editor */
    boolean visible() default true;
    /** A substitute for the object/property name */
-   String displayName();
+   String displayName() default "";
    /** The name of a type to specialize the selection of the editor */  // TODO: should this be a list of classes or maybe we need a more flexible way to associate name/value pairs with a type used in selecting the editor?
-   String editorType();
+   String editorType() default "";
 }

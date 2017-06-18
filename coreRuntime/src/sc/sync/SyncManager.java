@@ -379,7 +379,6 @@ public class SyncManager {
       }
 
       public void addNewObj(Object obj, String syncGroup, Object...args) {
-
          SyncState state = getSyncState();
          if (state == SyncState.CopyingPrevious)
             return;

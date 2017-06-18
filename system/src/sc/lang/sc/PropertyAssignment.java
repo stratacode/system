@@ -1021,4 +1021,17 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
    public boolean isReverseOnlyExpression() {
       return bindingDirection != null && !bindingDirection.doForward();
    }
+
+   public Map<String,Object> getAnnotations() {
+      Map<String,Object> props = super.getAnnotations();
+      Map<String,Object> propMap = null;
+      if (assignedProperty != null) {
+         propMap = ModelUtil.getAnnotations(assignedProperty);
+      }
+      if (props != null && propMap != null)
+         props.putAll(propMap);
+      if (props == null)
+         return propMap;
+      return props;
+   }
 }

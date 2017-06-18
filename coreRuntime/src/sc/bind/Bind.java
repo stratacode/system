@@ -31,7 +31,7 @@ import java.util.Map;
  * most commonly in reverse-only bindings to perform an assignment when the binding is fired.
  * </p>
  * <p>
- * SC developers note: When you add new code to the core runtime (i.e. used by GWT), you must add the package name to the jarPackages.
+ * SC developers note: When you add new code to the core runtime (i.e. used by GWT or other non-reflective runtimes), you must add the package name to the jarPackages.
  * You also must change the Bind's CompilerSettings in the full runtime and the StrataCode.gwt.xml file in the
  * core src root folder.
  * </p>

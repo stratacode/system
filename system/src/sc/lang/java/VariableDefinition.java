@@ -21,10 +21,7 @@ import sc.type.Type;
 import sc.util.StringUtil;
 
 import java.lang.reflect.Field;
-import java.util.Collection;
-import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public class VariableDefinition extends AbstractVariable implements IVariableInitializer, ISrcStatement {
    public Expression initializer;
@@ -52,6 +49,9 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
    // Used in the client/server synchronization - In LayerSyncHandler, VariableDefinition is created from a getX method which can
    // be a representation for an indexed property.  It's never an indexed property when it's a field.
    public transient boolean indexedProperty = false;
+
+   // Used for serializing VariableDefinition metadata
+   public transient Map<String,Object> annotations = null;
 
    private static boolean wasBound = false;
 
@@ -689,6 +689,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       VariableDefinition varDef = new VariableDefinition();
       varDef.variableName = field.getName();
       varDef.frozenTypeDecl = field.getType();
+      varDef.annotations = ModelUtil.createAnnotationsMap(field.getAnnotations());
       return varDef;
    }
 

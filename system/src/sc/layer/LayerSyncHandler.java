@@ -5,6 +5,7 @@
 package sc.layer;
 
 import sc.lang.java.*;
+import sc.lang.pattern.VariableDef;
 import sc.sync.SyncHandler;
 import sc.sync.SyncManager;
 import sc.type.IBeanMapper;
@@ -26,6 +27,13 @@ public class LayerSyncHandler extends SyncHandler {
       if (inst instanceof ParamTypedMember)
          return replaceInstance(((ParamTypedMember) inst).getMemberObject());
 
+      if (inst instanceof VariableDefinition) {
+         VariableDefinition varDef = (VariableDefinition) inst;
+         Definition def = varDef.getDefinition();
+         if (def != null)
+            varDef.annotations = def.getAnnotations();
+      }
+
       if (inst instanceof Field) {
          return VariableDefinition.createFromField((Field) inst);
       }
@@ -43,6 +51,7 @@ public class LayerSyncHandler extends SyncHandler {
          varDef.variableName = ModelUtil.getPropertyName(inst);
          varDef.frozenTypeDecl = ModelUtil.getPropertyType(inst);
          varDef.indexedProperty = ModelUtil.isGetIndexMethod(inst);
+         varDef.annotations = ModelUtil.getAnnotations(inst);
          return varDef;
       }
 

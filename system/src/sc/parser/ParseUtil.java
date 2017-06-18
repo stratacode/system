@@ -1060,6 +1060,7 @@ public class ParseUtil  {
             }
             else {
                System.err.println("*** Failed to find new parse node in model");
+               newNode = newModel.getParseNode().findParseNode(startIx, origParseNode.getParselet());
             }
          }
       }

@@ -2744,6 +2744,22 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       }
    }
 
+   static void addMatchingAttributeNames(String tagName, String prefix, Set<String> candidates) {
+      Set<String> attList = getPossibleAttributesForTag(tagName);
+      for (String att:attList) {
+         if (prefix == null || att.startsWith(prefix))
+            candidates.add(att);
+      }
+      for (String att:behaviorAttributes) {
+         if (prefix == null || att.startsWith(prefix))
+            candidates.add(att);
+      }
+      for (String att:notInheritedAttributes) {
+         if (prefix == null || att.startsWith(prefix))
+            candidates.add(att);
+      }
+   }
+
    static HashSet<String> notInheritedAttributes = new HashSet<String>();
    {
       notInheritedAttributes.add("abstract");
@@ -2902,8 +2918,13 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       return -1;
    }
 
+   /** A hook for tag objects to override to be notified when the repeat tags have has been updated */
+   public void repeatTagsChanged() {
+   }
+
    public void syncRepeatTags(Object repeatVal) {
       int sz = repeatVal == null ? 0 : DynUtil.getArrayLength(repeatVal);
+      boolean anyChanges = false;
 
       // TODO: remove this?  We can't disable sync entirely.  We need to turn it on before we call "output" since there can be side-effect changes
       // in there which need to be synchronized.  Now that we do not sync the page objects, this should not be needed anyway.
@@ -2923,6 +2944,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                }
                Element arrayElem = createRepeatElement(arrayVal, i, null);
                tags.add(arrayElem);
+               anyChanges = true;
             }
          }
          else {
@@ -2944,6 +2966,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                   Object oldArrayVal = oldElem.repeatVar;
                   // The guy in this spot is not our guy.
                   if (oldArrayVal != arrayVal && (oldArrayVal == null || !oldArrayVal.equals(arrayVal))) {
+                     anyChanges = true;
                      // The current guy is new to the list
                      if (curIx == -1) {
                         // Either replace or insert a row
@@ -2999,6 +3022,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                   }
                }
                else {
+                  anyChanges = true;
                   if (curIx == -1) {
                      Element arrayElem = createRepeatElement(arrayVal, i, null);
                      tags.add(arrayElem);
@@ -3018,12 +3042,15 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                int ix = tags.size() - 1;
                Element toRem = tags.remove(ix);
                removeElement(toRem, ix);
+               anyChanges = true;
             }
          }
       }
       finally {
          //SyncManager.setSyncState(oldSyncState);
       }
+      if (anyChanges)
+         repeatTagsChanged();
    }
 
    // These methods are implemented for JS where they update the DOM.
@@ -3497,6 +3524,8 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
    }
 
 
+   // In the source this is called 'class' so use that name in the editor
+   @sc.obj.EditorSettings(displayName="class")
    public String HTMLClass;
 
    public String getHTMLClass() {
@@ -3643,6 +3672,28 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          return 0;
       }
       return -1;
+   }
+
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
+      if (tagName == null)
+         return null;
+
+      String matchPrefix = null;
+      int ix = tagName.indexOf(dummyIdentifier);
+      if (ix != -1) {
+         matchPrefix = tagName.substring(0, ix);
+         addMatchingTagNames(matchPrefix, candidates);
+      }
+      else {
+         if (attributeList != null) {
+            for (Attr att:attributeList) {
+               String res = att.addNodeCompletions(origModel, origNode, extMatchPrefix, offset, dummyIdentifier, candidates);
+               if (res != null)
+                  return res;
+            }
+         }
+      }
+      return matchPrefix;
    }
 
    public void setNodeName(String newName) {

@@ -11,6 +11,7 @@ import sc.lang.js.JSTypeParameters;
 import sc.lang.template.Template;
 import sc.layer.SrcEntry;
 import sc.parser.*;
+import sc.type.CTypeUtil;
 import sc.type.DynType;
 import sc.type.IBeanMapper;
 import sc.type.TypeUtil;
@@ -544,4 +545,27 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       }
    }
 
+   public static String addStatementNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
+      String packagePrefix;
+      boolean isQualifiedType = false;
+      if (matchPrefix.contains(".")) {
+         packagePrefix = CTypeUtil.getPackageName(matchPrefix);
+         matchPrefix = CTypeUtil.getClassName(matchPrefix);
+         isQualifiedType = true;
+      }
+      else {
+         packagePrefix = origModel == null ? null : origModel.getPackagePrefix();
+      }
+      ModelUtil.suggestTypes(origModel, packagePrefix, matchPrefix, candidates, true);
+      if (origModel != null && !isQualifiedType) {
+         Object currentType = origNode == null ? origModel.getModelTypeDeclaration() : origNode.getEnclosingType();
+         if (currentType != null)
+            ModelUtil.suggestMembers(origModel, currentType, matchPrefix, candidates, true, true, true, true);
+      }
+      return matchPrefix;
+   }
+
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
+      return addStatementNodeCompletions(origModel, origNode, matchPrefix, offset, dummyIdentifier, candidates);
+   }
 }

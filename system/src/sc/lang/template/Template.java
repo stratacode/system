@@ -610,9 +610,9 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
       return null;
    }
 
-   public void stop() {
+   public void stop(boolean stopModified) {
       // Need to stop each of the 'types' in the super here before we reset types = null later
-      super.stop();
+      super.stop(stopModified);
       if (outputMethod != null && generateOutputMethod && rootType instanceof BodyTypeDeclaration) {
          BodyTypeDeclaration td = (BodyTypeDeclaration) rootType;
          td.removeStatement(outputMethod);

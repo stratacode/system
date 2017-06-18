@@ -13,10 +13,7 @@ import sc.obj.ScopeDefinition;
 
 import java.lang.annotation.ElementType;
 import java.lang.reflect.AnnotatedElement;
-import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.IdentityHashMap;
-import java.util.List;
+import java.util.*;
 
 public abstract class Definition extends JavaSemanticNode implements IDefinition {
    // String or Annotation
@@ -687,4 +684,32 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
       }
       return res;
    }
+
+   // Here to make this synchronizable from dynamic runtime to clients but so far no need to have it sync the other way
+   public void setAnnotations(Map<String,Object> res) {
+      throw new UnsupportedOperationException();
+   }
+
+   public Map<String,Object> getAnnotations() {
+      if (modifiers == null)
+         return null;
+      TreeMap<String,Object> res = null;
+      for (Object modifier:modifiers) {
+         if (modifier instanceof Annotation) {
+            if (res == null) {
+               res = new TreeMap<String,Object>();
+            }
+            Annotation annot = (Annotation) modifier;
+            annot.addToAnnotationsMap(res);
+         }
+      }
+      return res;
+   }
+
+   // Mirrors a method in the client side library - used for the accessing keys in the combined "getAnnotations" map we use for speed in serializing this info
+   // to the client.
+   public static String getAnnotationValueKey(String typeName, String ident) {
+      return typeName + "__" + ident;
+   }
+
 }

@@ -12,6 +12,7 @@ import sc.lang.SemanticNodeList;
 import java.lang.reflect.Array;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.TreeMap;
 
 public class Annotation extends ErrorSemanticNode implements IAnnotation {
    public String typeName;
@@ -199,7 +200,7 @@ public class Annotation extends ErrorSemanticNode implements IAnnotation {
 
    public static Annotation createFromElement(java.lang.annotation.Annotation elem) {
       Annotation newAnnot = new Annotation();
-      newAnnot.typeName = elem.getClass().getName();
+      newAnnot.typeName = elem.annotationType().getTypeName();
       if (ModelUtil.isComplexAnnotation(elem)) {
           newAnnot.setProperty("elementValue", ModelUtil.getAnnotationComplexValues(elem));
       }
@@ -318,5 +319,39 @@ public class Annotation extends ErrorSemanticNode implements IAnnotation {
    public void stop() {
       super.stop();
       boundType = null;
+   }
+
+   String getAnnotationValueKey(AnnotationValue val) {
+      return Definition.getAnnotationValueKey(getFullTypeName(), val.identifier);
+   }
+
+   public void addToAnnotationsMap(TreeMap<String, Object> res) {
+      Object annotVal = elementValue;
+      if (annotVal instanceof List) {
+         List elemVals = (List) annotVal;
+         boolean arrayVal = false;
+         for (Object elemValObj:elemVals) {
+            if (elemValObj instanceof AnnotationValue) {
+               AnnotationValue elemVal = (AnnotationValue) elemValObj;
+               res.put(getAnnotationValueKey(elemVal), elemVal.getPrimitiveValue());
+            }
+            else {
+               arrayVal = true;
+               break;
+            }
+         }
+         if (arrayVal) // TODO: need to convert elemVals to extract the values from the expressions?
+            res.put(getFullTypeName(), elemVals);
+      }
+      else if (annotVal instanceof AnnotationValue) {
+         AnnotationValue elemVal = (AnnotationValue) annotVal;
+         res.put(getAnnotationValueKey(elemVal), elemVal.getPrimitiveValue());
+      }
+      else if (annotVal == null) {
+         res.put(getFullTypeName(), Boolean.TRUE);
+      }
+      else if (annotVal instanceof Expression) {
+         res.put(getFullTypeName(), AnnotationValue.elemValToPrimitiveValue(annotVal));
+      }
    }
 }

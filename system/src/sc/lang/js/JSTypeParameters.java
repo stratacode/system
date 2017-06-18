@@ -925,10 +925,12 @@ public class JSTypeParameters extends ObjectTypeParameters {
                   sb.append("._A_");
                   sb.append(CTypeUtil.getClassName(annotTypeName));
                   Object elementValue = annot.elementValue;
+                  sb.append(" = ");
                   if (elementValue != null) {
-                     sb.append(" = ");
                      appendAnnotValue(sb, elementValue);
                   }
+                  else
+                     sb.append("null");
                   sb.append(";\n");
                }
             }

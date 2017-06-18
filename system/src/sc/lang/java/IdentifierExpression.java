@@ -543,6 +543,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                      else {
                         if (ident != null && ident.indexOf(".") == -1) {
                            displayRangeError(0, 0, "No type: " + ident + " in ");
+                           Object x =  findType(firstIdentifier, enclType, null);
                            break;
                         }
                         else {

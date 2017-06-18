@@ -2258,7 +2258,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          else
             return scRuntimePath;
       }
-      return "Error - sourcePath is not set in: " + getStrataCodeConfDir(SC_SOURCE_PATH);
+      System.err.println("Error - sourcePath is not set in: " + getStrataCodeConfDir(SC_SOURCE_PATH));
+      return null;
    }
 
    private static String getSystemBuildLayer(String buildDirName) {
@@ -3209,8 +3210,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return PTypeUtil.getComponentType(arrayType);
    }
 
-   public Object getPropertyAnnotationValue(Object typeObj, String propName, String annotName, String attName) {
-      Object prop = ModelUtil.getPropertyMapping(typeObj, propName);
+   public Object getPropertyAnnotationValue(Object type, String propName, String annotName, String attName) {
+      if (type instanceof ClientTypeDeclaration)
+         type = ((ClientTypeDeclaration) type).getOriginal();
+      Object prop = ModelUtil.getPropertyMapping(type, propName);
       if (prop != null) {
          Object annot = ModelUtil.getPropertyAnnotation(prop, annotName);
          if (annot != null) {
@@ -4074,14 +4077,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       } while (true);
    }
 
-   // Called by any clients who need to use the LayeredSystem as a sync object
+   // Called by any clients who need to use the LayeredSystem as a sync object.  Because this class is not compiled by StrataCode, we define the sync mappings
+   // explicitly through the apis.
    public void initSync() {
       syncInited = true;
       SyncManager.SyncState old = SyncManager.getOldSyncState();
       try {
          SyncManager.setInitialSync("jsHttp", null, 0, true);
          // This part was originally copied from the code generated from the js version of LayeredSystem.  Yes, we could add the meta-data here and introduce a dependency so SC is required to build SC but still not willing to take that leap of tooling complexity yet :)
-         // See also the lines in the class Options innner class.
+         // See also the lines in the class Options inner class.
          int globalScopeId = GlobalScopeDefinition.getGlobalScopeDefinition().scopeId;
          SyncManager.addSyncType(LayeredSystem.class, new SyncProperties(null, null, new Object[] { "options" , "staleCompiledModel"}, null, SyncOptions.SYNC_INIT_DEFAULT, globalScopeId));
          SyncManager.addSyncType(LayeredSystem.Options.class, new SyncProperties(null, null,
@@ -4089,7 +4093,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                                  "createNewLayer" , "dynamicLayers" , "allDynamic" , "liveDynamicTypes" , "useCommonBuildDir" , "buildDir" , "buildSrcDir" ,
                                   "recordFile" , "restartArgsFile" , "compileOnly" }, null, SyncOptions.SYNC_INIT_DEFAULT, globalScopeId));
          SyncProperties typeProps = new SyncProperties(null, null, new Object[] { "typeName" , "fullTypeName", "layer", "packageName" , "dynamicType" , "isLayerType" ,
-                                                                                  "declaredProperties", "declarationType", "comment" , "clientModifiers", "existsInJSRuntime"},
+                                                                                  "declaredProperties", "declarationType", "comment" , "clientModifiers", "existsInJSRuntime", "annotations"},
                                                        null, SyncOptions.SYNC_INIT_DEFAULT, globalScopeId);
 
          SyncManager.addSyncType(ModifyDeclaration.class, typeProps);
@@ -4113,8 +4117,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          SyncManager.addSyncType(ClientTypeDeclaration.class, typeProps);
          SyncManager.addSyncHandler(ClientTypeDeclaration.class, LayerSyncHandler.class); // Need this so we can use restore to go back
 
-         SyncManager.addSyncType(VariableDefinition.class, new SyncProperties(null, null, new Object[] { "variableName" , "initializerExprStr" , "operatorStr" , "layer", "comment", "variableTypeName", "indexedProperty"}, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, globalScopeId));
-         SyncManager.addSyncType(PropertyAssignment.class, new SyncProperties(null, null, new Object[] { "propertyName" , "operatorStr", "initializerExprStr", "layer" , "comment", "variableTypeName" }, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, globalScopeId));
+         SyncManager.addSyncType(VariableDefinition.class, new SyncProperties(null, null, new Object[] { "variableName" , "initializerExprStr" , "operatorStr" , "layer", "comment", "variableTypeName", "indexedProperty", "annotations"}, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, globalScopeId));
+         SyncManager.addSyncType(PropertyAssignment.class, new SyncProperties(null, null, new Object[] { "propertyName" , "operatorStr", "initializerExprStr", "layer" , "comment", "variableTypeName", "annotations" }, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, globalScopeId));
 
          SyncProperties modelProps = new SyncProperties(null, null, new Object[] {"layer", "srcFile", "needsModelText", "cachedModelText", "needsGeneratedText", "cachedGeneratedText", "cachedGeneratedJSText", "cachedGeneratedSCText", "cachedGeneratedClientJavaText", "existsInJSRuntime", "layerTypeDeclaration"}, null, SyncOptions.SYNC_INIT_DEFAULT, globalScopeId);
          SyncManager.addSyncType(JavaModel.class, modelProps);

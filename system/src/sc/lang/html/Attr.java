@@ -17,7 +17,7 @@ import java.util.Set;
 
 public class Attr extends Node implements ISrcStatement {
    public String name;
-   // Can be either a String, TemplateExpression, or AttrExpr - which holds the op and expression
+   // Can be either an IString, TemplateExpression, or AttrExpr - which holds the op and expression
    public Object value;
 
    // The expression which should be used to compute the attribute's value
@@ -258,6 +258,38 @@ public class Attr extends Node implements ISrcStatement {
          return 0;
       }
       return -1;
+   }
+
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
+      String matchPrefix = null;
+      if (name != null) {
+         int ix = name.indexOf(dummyIdentifier);
+         if (ix != -1) {
+            matchPrefix = name.substring(0, ix);
+            Element parent = getEnclosingTag();
+            String tagName = "html";
+            if (parent != null && parent.tagName != null) {
+               tagName = parent.tagName;
+            }
+            Element.addMatchingAttributeNames(tagName, matchPrefix, candidates);
+         }
+         else {
+            if (value != null && isString()) {
+               String valStr = value.toString();
+               ix = valStr.indexOf(dummyIdentifier);
+               if (ix != -1) {
+                  matchPrefix = valStr.substring(0, ix);
+                  if (name.equals("extends") || name.equals("implements")) {
+                     ModelUtil.suggestTypes(origModel, origModel.getPackagePrefix(), matchPrefix, candidates, true);
+                  }
+                  else if (name.equals("tagMerge")) {
+                     MergeMode.addMatchingModes(matchPrefix, candidates);
+                  }
+               }
+            }
+         }
+      }
+      return matchPrefix;
    }
 
    /** This handles breakpoints at the tag level.  To find the matching source statement, need to check our attributes and sub-tags */

@@ -390,10 +390,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public Object declaresMemberInternal(String name, EnumSet<MemberType> mtype, Object refType, TypeContext ctx) {
-      if (membersByName == null) {
+      if (membersByName == null && initialized) {
          initMembersByName();
       }
-      List<Statement> sts = membersByName.get(name);
+      // We don't use the membersByName cache until we are initialized.  One problem that could be fixed is that a getX MethodDefinition's will not have it's propertyName set until it's been initialized
+      List<Statement> sts = !initialized ? body : membersByName.get(name);
       Object obj = findMemberInBody(sts, name, mtype, refType, ctx);
 
       if (obj != null)
@@ -471,6 +472,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (bodyList == null)
          return;
       for (Statement st:bodyList) {
+         if (!st.isInitialized())
+            System.out.println("*** Warning - statement not initialized being put into member cached"); // In particular we need propertyName to be set in the method to add it here which is right now only set during initialize
          // This logic models the logic in findMemberInBody - each inner type can be a member - enum constant, object, etc. depending on the type
          if (st instanceof ITypeDeclaration) {
             ITypeDeclaration it = (ITypeDeclaration) st;
@@ -1123,12 +1126,16 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       s.parseNode = null;
       JavaModel m = getJavaModel();
 
+      boolean oldTE = false;
       // If we are getting syntax errors due to a missing type or whatever, we'll see them repeated here
       // but with no source location it is wrong.
-      boolean oldTE = m.disableTypeErrors;
-      m.disableTypeErrors = true;
+      if (m != null) {
+         oldTE = m.disableTypeErrors;
+         m.disableTypeErrors = true;
+      }
       hiddenBody.add(s);
-      m.disableTypeErrors = oldTE;
+      if (m != null)
+         m.disableTypeErrors = oldTE;
       if (isInitialized())
          ParseUtil.initComponent(s);
       if (isStarted())
@@ -4460,9 +4467,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    transient private static String dynStubTemplateStr = "<%= emptyString(packageName) ? \"\" : \"package \" + packageName + \";\"%>\n\n" +
            "/**\n" +
-           " * This is a dynamic stub class for a dynamic type which is used by compiled code.  This class presents\n" +
-           " * a strongly typed interface but lets you add fields, override methods etc. as long as you don't try to\n" +
-           " * modify any compiled features that have not been stubbed out here.\n" +
+           " * Generated 'stub class' for the dynamic type: <%= typeName %>.  Normally dynamic types are interpreted, requiring no generated file\n" +
+           " * but this stub was generated for this type because it extends or overrides features of a compiled type.  The stub lets you\n" +
+           " * add new fields, change methods or any feature of this type which is not exposed here in the stub.\n" +
            " */\n" +
            "<%= typeModifiers %>class <%= typeName %><%= typeParams%><% if (baseClassName != null) { %> extends <%= baseClassName %><% } %> implements sc.dyn.IDynObject<%=otherInterfaces%> {\n" +
            "<% if (!extendsDynamicStub) {%>" +
@@ -8792,9 +8799,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          ctd.setDynamicType(isDynamicType());
          ctd.setLayer(getLayer());
          ctd.setComment(getComment());
+         ctd.setAnnotations(getAnnotations());
          if (modifiers != null) {
             ArrayList<String> clientMods = new ArrayList<String>(modifiers.size());
-            // Only sending the normal modifiers, no annotations right now
+            // Only sending the normal modifiers in clientModifiers - annotations are sent separately
             for (int i = 0; i < modifiers.size(); i++) {
                Object mod = modifiers.get(i);
                if (mod instanceof String)

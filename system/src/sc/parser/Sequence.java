@@ -182,7 +182,7 @@ public class Sequence extends NestedParselet  {
                               if (!backChild.optional || backChild.getLookahead())
                                  break;
 
-                              if (value.children != null) {
+                              if (value.children != null && nextIx < value.children.size()) {
                                  Object nextSlotVal = value.children.get(nextIx);
                                  // Can't retry this slot as we already parsed it - an error can be parsed but a pre-error cannot because it's an error followed by a matched result
                                  if (nextSlotVal != null && (!(nextSlotVal instanceof ErrorParseNode) || nextSlotVal instanceof PreErrorParseNode))

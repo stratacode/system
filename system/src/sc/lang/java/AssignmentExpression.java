@@ -409,6 +409,13 @@ public class AssignmentExpression extends TwoOperatorExpression {
       return rhs.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
    }
 
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
+      if (rhs != null) {
+         return rhs.addNodeCompletions(origModel, origNode, matchPrefix, offset, dummyIdentifier, candidates);
+      }
+      return super.addNodeCompletions(origModel, origNode, matchPrefix, offset, dummyIdentifier, candidates);
+   }
+
    public boolean applyPartialValue(Object partial) {
       return rhs != null && rhs.applyPartialValue(partial);
    }
@@ -464,5 +471,6 @@ public class AssignmentExpression extends TwoOperatorExpression {
    public boolean propagatesInferredType(Expression child) {
       return true;
    }
+
 }
 

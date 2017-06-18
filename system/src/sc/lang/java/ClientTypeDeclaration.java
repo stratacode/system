@@ -5,6 +5,7 @@
 package sc.lang.java;
 
 import java.util.List;
+import java.util.Map;
 
 import sc.bind.Bind;
 import sc.bind.IChangeable;
@@ -143,4 +144,14 @@ public class ClientTypeDeclaration extends TypeDeclaration implements IChangeabl
          return orig.getExtendsTypeDeclaration();
       return super.getExtendsTypeDeclaration();
    }
+
+   private Map<String,Object> annotations;
+   @Constant
+   public void setAnnotations(Map<String,Object> an) {
+      annotations = an;
+   }
+   public Map<String, Object> getAnnotations() {
+      return annotations;
+   }
+
 }
