@@ -41,14 +41,13 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
    // Set to true if there's a method of the same name.  This is used in the Javascript conversion, which unlike Java has one namespace shared by fields and methods.
    public transient boolean shadowedByMethod = false;
 
+   // Used only for serialization purposes because we use this class in the meta-data model for the client
+   public transient boolean indexedProperty = false;
+
    // When doing conversions to other languages, may need to freeze the type
    public transient Object frozenTypeDecl;
 
    public transient ISrcStatement fromStatement;
-
-   // Used in the client/server synchronization - In LayerSyncHandler, VariableDefinition is created from a getX method which can
-   // be a representation for an indexed property.  It's never an indexed property when it's a field.
-   public transient boolean indexedProperty = false;
 
    // Used for serializing VariableDefinition metadata
    public transient Map<String,Object> annotations = null;
@@ -671,6 +670,14 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
    // Here for the client api
    public void setOperatorStr(String s) {
       throw new UnsupportedOperationException();
+   }
+
+   public boolean getIndexedProperty() {
+      return indexedProperty;
+   }
+
+   public void setIndexedProperty(boolean v) {
+      indexedProperty = v;
    }
 
    public String getOperatorStr() {

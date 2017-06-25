@@ -168,6 +168,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    /** Caches the line index for the generated file for this src model */
    private transient GenFileLineIndex fileLineIndex = null;
 
+   /** Set to true during the stop operation so we can tell if someone tries to init or start us while being stopped */
+   private transient boolean beingStopped = false;
+
    public void setLayeredSystem(LayeredSystem system) {
       layeredSystem = system;
    }
@@ -265,6 +268,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    public void init() {
       if (initialized)
          return;
+
+      if (beingStopped) {
+         System.err.println("*** Attempting to init model that's being stopped");
+         return;
+      }
 
       //initializedInLayer = layer != null ? layer.layeredSystem.lastModelsStartedLayer : null;
       // Used for setting fromPosition in the type cache - we want to mark which layers are included in the search
@@ -2690,6 +2698,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public void stop(boolean stopModified) {
+      if (beingStopped) {
+         System.err.println("*** Stopping a model that's beingStopped");
+         return;
+      }
+      beingStopped = true;
       if (stopModified && modifiedModel != null) {
          modifiedModel.stop();
          // This gets reset lazily from the modified type, but during a rebuild if we leave this value around, it could be stale
@@ -2715,6 +2728,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       definedTypesByName.clear();
       needsRestart = false;
       clearTransformed();
+      beingStopped = false;
    }
 
    @Bindable(manual=true)

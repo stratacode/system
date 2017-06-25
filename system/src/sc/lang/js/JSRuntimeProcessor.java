@@ -1393,7 +1393,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
       String typeName = td.getFullTypeName();
 
-      removeTypesInFile(td);
+      // We have problems here trying to seamlessly remove all of the types in a type hierarchy.  To fix this, I think we need to call the stop method on the runtime processor
+      // before we've actually stopped the type itself.  Otherwise, we will try to init a type when we are stopping it.
+      //removeTypesInFile(td);
       jsBuildInfo.jsModuleNames.remove(typeName);
       if (queuedEntryPoints != null)
          queuedEntryPoints.remove(typeName);

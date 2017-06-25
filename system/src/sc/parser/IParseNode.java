@@ -129,6 +129,9 @@ public interface IParseNode extends CharSequence, IParseResult {
    int getNumSemanticValues();
 
    void diffParseNode(IParseNode other, StringBuilder diffs);
+
+   /** Returns true for error parse-nodes which are partial-parses - i.e. did not parse required chunks */
+   boolean isIncomplete();
 }
 
 

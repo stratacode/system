@@ -239,9 +239,8 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    }
 
    public void stop() {
-      if (!started) return;
-
-      unregister();
+      if (started)
+         unregister();
 
       super.stop();
 

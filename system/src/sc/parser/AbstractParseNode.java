@@ -225,4 +225,8 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
          diffs.append("Difference classes for node: " + this.getClass() + " and " + other.getClass());
       }
    }
+
+   public boolean isIncomplete() {
+      return errorNode;
+   }
 }

@@ -7,11 +7,12 @@ package sc.lang.java;
 import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
 
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
-public class VariableStatement extends TypedDefinition {
+public class VariableStatement extends TypedDefinition implements IClassBodyStatement {
    public SemanticNodeList<Object> variableModifiers;
    public List<VariableDefinition> definitions;
 
@@ -164,5 +165,25 @@ public class VariableStatement extends TypedDefinition {
                return true;
       }
       return false;
+   }
+
+   // TODO: code cleanup: this method (and probably some other methods) could be put into a new base class shared with FieldDefinition if we renamed variableDefinitions and definitions
+   public List<Statement> getBodyStatements() {
+      List<Statement> res = null;
+      if (definitions != null) {
+         for (VariableDefinition varDef:definitions) {
+            Expression initExpr = varDef.getInitializerExpr();
+            if (initExpr != null && !initExpr.isLeafStatement()) {
+               if (res == null)
+                  res = new ArrayList<Statement>();
+               res.add(initExpr);
+            }
+         }
+      }
+      return res;
+   }
+
+   public boolean isLeafStatement() {
+      return getBodyStatements() == null;
    }
 }

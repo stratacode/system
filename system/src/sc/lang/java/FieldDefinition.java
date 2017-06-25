@@ -23,12 +23,9 @@ import sc.type.TypeUtil;
 import sc.util.LineCountStringBuilder;
 import sc.util.StringUtil;
 
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
-public class FieldDefinition extends TypedDefinition {
+public class FieldDefinition extends TypedDefinition implements IClassBodyStatement {
    public SemanticNodeList<VariableDefinition> variableDefinitions;
 
    private transient boolean frozenStatic;
@@ -740,5 +737,25 @@ public class FieldDefinition extends TypedDefinition {
          }
       }
       return false;
+   }
+
+   @Override
+   public List<Statement> getBodyStatements() {
+      List<Statement> res = null;
+      if (variableDefinitions != null) {
+         for (VariableDefinition varDef:variableDefinitions) {
+            Expression initExpr = varDef.getInitializerExpr();
+            if (initExpr != null && !initExpr.isLeafStatement()) {
+               if (res == null)
+                  res = new ArrayList<Statement>();
+               res.add(initExpr);
+            }
+         }
+      }
+      return res;
+   }
+
+   public boolean isLeafStatement() {
+      return getBodyStatements() == null;
    }
 }

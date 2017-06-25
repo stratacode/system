@@ -573,6 +573,10 @@ public class Bind {
                else
                   newListeners = oldListeners;
 
+               if (propPos >= newListeners.length) {
+                  System.err.println("*** addListener - invalid property index!");
+                  return;
+               }
                BindingListener cur = newListeners[propPos];
                // Increment the number of properties which have a binding the first time we add a binding
                if (cur == null)

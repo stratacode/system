@@ -145,10 +145,8 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
    }
 
    public void stop() {
-      if (!started)
-         return;
-      started = false;
       initialized = false;
+      started = false;
       validated = false;
       processed = false;
 

@@ -109,7 +109,7 @@ public class EditorContext extends ClientEditorContext {
          ret.add(new InstanceWrapper(this, null, typeName));
       while (i < max && it.hasNext()) {
          Object inst = it.next();
-         ret.add(new InstanceWrapper(this, inst, DynUtil.getTypeName(DynUtil.getType(inst), false)));
+         ret.add(new InstanceWrapper(this, inst, typeName));
       }
 
       /*

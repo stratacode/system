@@ -1054,6 +1054,7 @@ public class ParentParseNode extends AbstractParseNode {
          return;
       }
       int sz = children.size();
+      IParseNode lastChildError = null;
       for (int i = 0; i < sz; i++) {
          Object child = children.get(i);
          if (child != null) {
@@ -1064,14 +1065,23 @@ public class ParentParseNode extends AbstractParseNode {
                childNode.findStartDiff(ctx, last, getSemanticValue(), this, i);
                if (ctx.firstDiffNode != null) {
                   ctx.addChangedParent(this);
+                  // If the child we processed right before the node which started the change was an error we may need to reparse the
+                  // error node in case it needs to expand over the error region here.  See re75 for a test case.   The 'isIncomplete' method
+                  // is used to avoid the reparse of a parent node which itself contains an error, but is not the end of the error.  See re57.9
+                  if (lastChildError != null && lastChildError.isIncomplete())
+                     ctx.beforeFirstNode = lastChildError;
                   return;
                }
                // ARG - this doesn't work because we don't have a way to tease apart the boundary at the edge.  In some cases we want to include
                // an entire parent parse-node with it's children
                //if (!last || !endsWithError)
                //if (i == 0 || !(childNode instanceof ErrorParseNode))
-               if (!childNode.isErrorNode())
+               if (!childNode.isErrorNode()) {
                   ctx.lastVisitedNode = childNode;
+                  lastChildError = null;
+               }
+               else if (lastChildError == null) // pick the first error in a string of errors leading up to the change
+                  lastChildError = childNode;
                // else - this node ends with an error so don't mark it as visited
             }
             else if (child instanceof CharSequence) {
@@ -1254,6 +1264,31 @@ public class ParentParseNode extends AbstractParseNode {
          return offset;
       }
       return -1;
+   }
+
+   public boolean isIncomplete() {
+      if (!isErrorNode())
+         return false;
+      if (children == null)
+         return true;
+      int sz = children.size();
+      NestedParselet parentParselet = (NestedParselet) getParselet();
+      for (int i = sz - 1; i >= 0; i--) {
+         Object child = children.get(i);
+         if (child instanceof ErrorParseNode)
+            return true;
+         if (child == null) {
+            Parselet childParselet = parentParselet.getChildParselet(child, i);
+            if (childParselet == null || !childParselet.optional)
+               return true;
+         }
+         else if (child instanceof IParseNode) {
+            return ((IParseNode) child).isIncomplete();
+         }
+         else
+            return false;
+      }
+      return false;
    }
 }
 

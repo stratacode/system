@@ -2651,6 +2651,11 @@ public class IdentifierExpression extends ArgumentsExpression {
     * the set method itself, we need to be transformed into a setX expression.
     */
    public boolean needsSetMethod() {
+      if (idTypes == null) {
+         System.err.println("*** needsSetMethod called on unstarted expression");
+         return false;
+      }
+
       int last = idTypes.length-1;
       IdentifierType idType = idTypes[last];
       // If the type started out as a set, or it started out as a field but needs conversion and we are not

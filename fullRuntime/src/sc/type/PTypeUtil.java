@@ -885,7 +885,7 @@ public class PTypeUtil {
       return false;
    }
 
-   // Implemented in Javascript
+   // Implemented in Javascript only - TODO: shouldn't we replace this with the IScheduler interface and DynUtil.invokeLater?
    public static void invokeLater(Runnable toRun, long delay) {
       throw new UnsupportedOperationException();
    }
