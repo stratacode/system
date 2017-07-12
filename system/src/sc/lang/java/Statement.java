@@ -393,7 +393,7 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
    }
 
    public boolean isLeafStatement() {
-      return !(this instanceof IBlockStatement);
+      return !(this instanceof IBlockStatement) && !(this instanceof IStatementWrapper);
    }
 
    public boolean isLineStatement() {

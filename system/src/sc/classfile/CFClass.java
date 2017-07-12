@@ -761,7 +761,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       }
 
       if (extendsType != null) {
-         res = ModelUtil.definesMember(extendsType, name, mtype, refType, ctx, skipIfaces, isTransformed);
+         res = ModelUtil.definesMember(extendsType, name, mtype, refType, ctx, skipIfaces, isTransformed, system);
          if (res != null)
             return res;
       }
@@ -770,7 +770,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          for (int i = 0; i < numInterfaces; i++) {
             Object implType = implementsTypes.get(i);
             if (implType != null) {
-               res = ModelUtil.definesMember(implType, name, mtype, refType, ctx, skipIfaces, isTransformed);
+               res = ModelUtil.definesMember(implType, name, mtype, refType, ctx, skipIfaces, isTransformed, system);
                if (res != null)
                   return res;
             }

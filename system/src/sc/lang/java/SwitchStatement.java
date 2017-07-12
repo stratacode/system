@@ -111,7 +111,7 @@ public class SwitchStatement extends Statement implements IBlockStatement {
       // Resolving the expression should not check for exposed variables in the switch itself
       if (fromChild != expression) {
          if (isEnum && mtype.contains(MemberType.Enum) && isFromSwitchLabel(fromChild)) {
-            v = ModelUtil.definesMember(expressionType, name, MemberType.EnumOnlySet, refType, ctx, skipIfaces, false);
+            v = ModelUtil.definesMember(expressionType, name, MemberType.EnumOnlySet, refType, ctx, skipIfaces, false, getLayeredSystem());
             if (v != null)
                return v;
          }
@@ -249,6 +249,10 @@ public class SwitchStatement extends Statement implements IBlockStatement {
 
    public boolean isLeafStatement() {
       return false;
+   }
+
+   public String getStartBlockToken() {
+      return "switch";
    }
 
    public String getStartBlockString() {

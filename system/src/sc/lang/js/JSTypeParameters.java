@@ -553,7 +553,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
          int ndims = getNdims();
          if (ndims > 0)
             ndims = ndims - 1;
-         // TODO: Note: number of dimensions is 0 for a 1D array and 1 for a 2D array
+         // TODO: Note: number of dimensions is 0 for a 1D array and 1 for a 2D array.  See also change to BinaryExpression, sccore.js
          return ndims == -1 ? "" : ", " + ndims;
       }
    }

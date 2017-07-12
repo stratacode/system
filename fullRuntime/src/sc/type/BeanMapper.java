@@ -8,6 +8,7 @@ import sc.dyn.DynUtil;
 import sc.dyn.IDynObject;
 
 import java.lang.reflect.*;
+import java.lang.reflect.Modifier;
 
 public class BeanMapper extends AbstractBeanMapper {
    /** if the bean has both get/set and fields, this is set to the field */

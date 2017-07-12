@@ -406,7 +406,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return obj;
 
       if (isTransformedType() && isAutoComponent() && !isTransformed()) {
-         obj = ModelUtil.definesMember(ComponentImpl.class, name, mtype, refType, ctx);
+         obj = ModelUtil.definesMember(ComponentImpl.class, name, mtype, refType, ctx, getLayeredSystem());
          if (obj != null)
             return obj;
       }
@@ -492,7 +492,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (extType != null) {
          //if (extType instanceof BodyTypeDeclaration)
          //   extType = ((BodyTypeDeclaration) extType).resolve(true);
-         return ModelUtil.definesMember(extType, name, mtype, refType, ctx, skipIfaces, isTransformed);
+         return ModelUtil.definesMember(extType, name, mtype, refType, ctx, skipIfaces, isTransformed, getLayeredSystem());
       }
       return null;
    }
@@ -664,7 +664,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       Object objDecl;
       if (extendsType != null) {
-         res = ModelUtil.definesMember(extendsType, name, mtype, refType, ctx, skipIfaces, isTransformed);
+         res = ModelUtil.definesMember(extendsType, name, mtype, refType, ctx, skipIfaces, isTransformed, getLayeredSystem());
       }
       else {
          String extendsTypeName = getDerivedTypeName();
@@ -674,7 +674,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                  // findType and definesMemberInternal?   This should only be true when the definesMemberInternal originates from a node within the
                  // current model.
                  (objDecl = model.resolveName(extendsTypeName, false, true)) != null)
-            res = ModelUtil.definesMember(objDecl.getClass(), name, mtype, refType, ctx, skipIfaces, isTransformed);
+            res = ModelUtil.definesMember(objDecl.getClass(), name, mtype, refType, ctx, skipIfaces, isTransformed, getLayeredSystem());
       }
       if (res != null)
          return res;
@@ -915,6 +915,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public Object getInheritedAnnotation(String annotationName) {
       return getInheritedAnnotation(annotationName, false, getLayer(), isLayerType || isLayerComponent());
+   }
+
+   public List<Object> getAllInheritedAnnotations(String annotationName) {
+      return getAllInheritedAnnotations(annotationName, false, getLayer(), isLayerType || isLayerComponent());
    }
 
    // Either a compiled java annotation or a parsed Annotation
@@ -1911,7 +1915,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (outer != null && getDeclarationType() == DeclarationType.OBJECT) {
          // Jump to the implementation class.  Otherwise, the "stop searching sentinel" is hit due to the object tag and we never find the object.
          Object accessClass = outer.getClassDeclarationForType();
-         Object overrideDef = ModelUtil.definesMember(accessClass, typeName, MemberType.SetMethodSet, null, null);
+         Object overrideDef = ModelUtil.definesMember(accessClass, typeName, MemberType.SetMethodSet, null, null, getLayeredSystem());
          if (overrideDef != null && ModelUtil.hasSetMethod(overrideDef)) {
             if (overrideDef instanceof CFMethod)
                return ((CFMethod) overrideDef).getRuntimeMethod();
@@ -5470,7 +5474,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
               newType.getAllFields(null, false, false, true, true, false);
       tctx.numNewFields = tctx.newFields == null ? 0 : tctx.newFields.size();
       tctx.oldFieldIndex = new CoalescedHashMap<String,List<Object>>(tctx.numOldFields);
-      // Keep a list of fields for each name to deal with reverse only bindingins.  Those do not replace/override the previous definition.
+      // Keep a list of fields for each name to deal with reverse only bindings.  Those do not replace/override the previous definition.
       for (int i = 0; i < tctx.numOldFields; i++) {
          Object varDef = tctx.oldFields.get(i);
          addFieldToIndex(tctx.oldFieldIndex, varDef);
@@ -7438,6 +7442,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public Object[] getEnumValues() {
       if (!isEnumeratedType())
          return null;
+      if (!isDynamicType()) {
+         return DynUtil.getEnumConstants(getRuntimeType());
+      }
       Object[] svs = getStaticValues();
       if (svs == null)
          return new Object[0];
@@ -7888,13 +7895,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // Use accessBase here because the object in accessClass will shadow the get method in the derived class - in other words, we should not be able to resolve
       // the getX method from accessClass because it is hidden.
       Object accessBase = accessClass.getDerivedTypeDeclaration();
-      Object overrideDef = accessBase == null ? null : ModelUtil.definesMember(accessBase, typeName, MemberType.GetMethodSet, null, null);
+      Object overrideDef = accessBase == null ? null : ModelUtil.definesMember(accessBase, typeName, MemberType.GetMethodSet, null, null, getLayeredSystem());
       // For modify types, it might inherit the property from its extends as well
       if (overrideDef == null) {
          // TODO: do we want to support this feature with layers?  If so, need to use getExtendsTypeDeclarations here
          Object extType = accessClass.isLayerType ? null : accessClass.getExtendsTypeDeclaration();
          if (extType != null && extType != accessBase)
-            overrideDef = ModelUtil.definesMember(extType, typeName, MemberType.GetMethodSet, null, null);
+            overrideDef = ModelUtil.definesMember(extType, typeName, MemberType.GetMethodSet, null, null, getLayeredSystem());
       }
       return overrideDef != null && ModelUtil.hasSetMethod(overrideDef);
    }
@@ -7952,9 +7959,16 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          getJavaModel().addDynMethod((TypeDeclaration) this, name, typeSig, fromModel.getModelTypeDeclaration());
    }
 
-   public Template findTemplate(Object compilerSettings, String templateName, Class paramClass) {
-      String templatePath = (String) ModelUtil.getAnnotationValue(compilerSettings, templateName);
-      return findTemplatePath(templatePath, templateName, paramClass);
+   public Template findTemplate(List<Object> compilerSettings, String templateName, Class paramClass) {
+      if (compilerSettings != null) {
+         for (Object compilerAnnot : compilerSettings) {
+            String templatePath = (String) ModelUtil.getAnnotationValue(compilerAnnot, templateName);
+            if (templatePath != null) {
+               return findTemplatePath(templatePath, templateName, paramClass);
+            }
+         }
+      }
+      return null;
    }
 
    public Template findTemplatePath(String templatePath, String templateName, Class paramClass) {
@@ -8556,8 +8570,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                      syncProps.add(propName);
                   else
                      syncProps.add(new SyncPropOptions(propName, propFlags));
-                  if (ModelUtil.isWritableProperty(prop) && ModelUtil.isReadableProperty(prop) && this instanceof TypeDeclaration)
+                  if (ModelUtil.isWritableProperty(prop) && ModelUtil.isReadableProperty(prop) && this instanceof TypeDeclaration) {
                      ModelUtil.makeBindable((TypeDeclaration) this, propName, true);
+                     // Need to record this as a bindable property in the reverse dependencies so that we know to make this property bindable on an incremental compile.
+                     if (this instanceof TypeDeclaration)
+                        model.addBindDependency((TypeDeclaration) this, propName, (TypeDeclaration) this, false);
+                  }
                }
             }
          }
@@ -8800,6 +8818,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          ctd.setLayer(getLayer());
          ctd.setComment(getComment());
          ctd.setAnnotations(getAnnotations());
+         ctd.setModifierFlags(getModifierFlags());
+         /*
          if (modifiers != null) {
             ArrayList<String> clientMods = new ArrayList<String>(modifiers.size());
             // Only sending the normal modifiers in clientModifiers - annotations are sent separately
@@ -8810,6 +8830,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             }
             ctd.setClientModifiers(clientMods);
          }
+         */
          ctd.markChanged();
       }
 
@@ -8892,7 +8913,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          res.syncPropertiesInited = syncPropertiesInited;
          res.autoComponent = autoComponent;
          res.anonIdsAllocated = anonIdsAllocated;
-         res.clientModifiers = clientModifiers;
+         //res.clientModifiers = clientModifiers;
       }
 
       if ((options & CopyTransformed) != 0) {
@@ -8928,6 +8949,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return layer != null && layer.finalLayer;
    }
 
+   /*
    transient ArrayList<String> clientModifiers;
    public ArrayList<String> getClientModifiers() {
       return clientModifiers;
@@ -8935,6 +8957,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public void setClientModifiers(ArrayList<String> newMods) {
       clientModifiers = newMods;
    }
+   */
 
    public boolean needsTypeChange() {
       if (body == null)

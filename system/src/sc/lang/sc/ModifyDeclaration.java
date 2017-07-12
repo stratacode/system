@@ -829,19 +829,19 @@ public class ModifyDeclaration extends TypeDeclaration {
          // After we've been transformed, objects should not prevent us from finding a getX method in the base type
          // At this point, really the modify type is not used - it has been merged into the base type
          if (v == STOP_SEARCHING_SENTINEL && transformed && modifyTypeDecl != null)
-            return ModelUtil.definesMember(modifyTypeDecl, name, mtype, refType, ctx, skipIfaces, isTransformed);
+            return ModelUtil.definesMember(modifyTypeDecl, name, mtype, refType, ctx, skipIfaces, isTransformed, getLayeredSystem());
          return v;
       }
 
       if (extendsBoundTypes != null) {
          for (Object impl:extendsBoundTypes) {
-            if (impl != null && (v = ModelUtil.definesMember(impl, name, mtype, refType, ctx, skipIfaces, isTransformed)) != null)
+            if (impl != null && (v = ModelUtil.definesMember(impl, name, mtype, refType, ctx, skipIfaces, isTransformed, getLayeredSystem())) != null)
                return v;
          }
       }
       if (impliedRoots != null) {
          for (Object impl:impliedRoots) {
-            if (impl != null && (v = ModelUtil.definesMember(impl, name, mtype, refType, ctx, skipIfaces, isTransformed)) != null)
+            if (impl != null && (v = ModelUtil.definesMember(impl, name, mtype, refType, ctx, skipIfaces, isTransformed, getLayeredSystem())) != null)
                return v;
          }
       }

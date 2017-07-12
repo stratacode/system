@@ -581,9 +581,10 @@ public class IdentifierExpression extends ArgumentsExpression {
                bindNextIdentifier(this, currentType, nextName, i, idTypes, boundTypes, setLast, isMethod, arguments, methodTypeArgs,
                        bindingDirection, i == 1 && isStaticContext(i-1), inferredType);
 
-               // If we resolved the last entry as an object but its a static member, treat that as a class, not an object
+               // If we resolved the last entry as an object but its a static member, treat that as a class, not an object.
+               // It's also a type if it's an unbound method name at that spot - i.e. ObjectType.getObjectType() where getObjectType() won't exist as a method
                int last;
-               if (i > 0 && idTypes[last = (i - 1)] == IdentifierType.BoundObjectName && isStaticTarget(i)) {
+               if (i > 0 && idTypes[last = (i - 1)] == IdentifierType.BoundObjectName && (isStaticTarget(i) || idTypes[i] == IdentifierType.UnboundMethodName)) {
                   idTypes[last] = IdentifierType.BoundTypeName;
                }
             }
@@ -890,7 +891,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                Object parentType = getTypeForIdentifier(ix-1);
                if (parentType == null)
                   return null;
-               return ModelUtil.definesMember(parentType, pname, MemberType.PropertyAssignmentSet, getEnclosingIType(), ctx);
+               return ModelUtil.definesMember(parentType, pname, MemberType.PropertyAssignmentSet, getEnclosingIType(), ctx, getLayeredSystem());
             }
             else {
                return findMember(pname, MemberType.PropertyAssignmentSet, this, getEnclosingIType(), ctx, false);
@@ -947,6 +948,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          return false;
 
       switch (idTypes[ix]) {
+         case UnboundMethodName:
          case FieldName:
          case MethodInvocation:
          case RemoteMethodInvocation:
@@ -983,6 +985,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          return false;
 
       switch (idTypes[ix]) {
+         case UnboundMethodName:
          case FieldName:
          case MethodInvocation:
          case RemoteMethodInvocation:
@@ -1614,6 +1617,11 @@ public class IdentifierExpression extends ArgumentsExpression {
 
    private static String getOtherMethodsMessage(Object currentType, String nextName) {
       Object[] otherMethods = ModelUtil.getMethods(currentType, nextName, null);
+      if (otherMethods == null || otherMethods.length == 0) {
+         Object enclType = ModelUtil.getEnclosingType(currentType);
+         if (enclType != null)
+            otherMethods = ModelUtil.getMethods(enclType, nextName, null);
+      }
       StringBuilder otherMessage = null;
       if (otherMethods != null && otherMethods.length > 0) {
          otherMessage = new StringBuilder();
@@ -1630,8 +1638,12 @@ public class IdentifierExpression extends ArgumentsExpression {
    /** For error checking, return a method of the same name which has the fewest mismatching arguments */
    public static Object findClosestMethod(Object currentType, String nextName, List<Expression> args) {
       Object[] otherMethods = ModelUtil.getMethods(currentType, nextName, null);
-      if (otherMethods == null)
+      if (otherMethods == null) {
+         Object enclType = ModelUtil.getEnclosingType(currentType);
+         if (enclType != null)
+            return findClosestMethod(enclType, nextName, args);
          return null;
+      }
       int numParams = args == null ? 0 : args.size();
       Object bestMatch = null;
       int bestMatchNum = -1;
@@ -2156,6 +2168,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             return false;
 
          // Make sure to skip up to an enclosing class if necessary
+         case UnboundMethodName:
          case MethodInvocation:
          case RemoteMethodInvocation:
             return false;
@@ -3159,6 +3172,9 @@ public class IdentifierExpression extends ArgumentsExpression {
             case GetSetMethodInvocation:
             case GetObjectMethodInvocation:
                return resolveType(ModelUtil.getVariableGenericTypeDeclaration(boundTypes[ix], model), ix, idTypes);
+            case UnboundMethodName:
+               if (boundTypes[ix] == null)
+                  return null;
             case RemoteMethodInvocation:
             case MethodInvocation:
                Object smt = getSpecialMethodType(ix, idTypes, boundTypes, model, rootType, definedInType);
@@ -3330,6 +3346,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          case GetSetMethodInvocation:
          case GetObjectMethodInvocation:
          case MethodInvocation:
+         case UnboundMethodName:
          case RemoteMethodInvocation:
             return boundTypes[ix-1];// Super
          // SuperExpression at least should not go here.
@@ -3378,6 +3395,11 @@ public class IdentifierExpression extends ArgumentsExpression {
       // Need to complete the full stop() on this node and our base type checks 'started'
       if (!started)
          started = true;
+
+      if (arguments != null && arguments.contains(this)) {
+         System.err.println("*** ERROR - invalid model - recursive identifier expression!");
+         return;
+      }
       super.stop();
       
       boundTypes = null;
@@ -4684,12 +4706,6 @@ public class IdentifierExpression extends ArgumentsExpression {
       }
       List<IString> idents = getAllIdentifiers();
       int sz = idents.size();
-
-      /* TODO: probably just remove.  this was an ilfated attempted to re-transform types but didn't solve any problems
-      if (isUnbound()) {
-         resolveTypeReference();
-      }
-      */
 
       if (jsTransformed) { // TODO: not sure why these are getting transformed twice... maybe through binary expressions?  One more boolean per identifier exprsssion could add up!
          return this;

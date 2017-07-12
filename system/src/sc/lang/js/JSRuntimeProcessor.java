@@ -2744,7 +2744,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    Template getJSTypeTemplate(BodyTypeDeclaration td) {
-      Object settingsObj = td.getInheritedAnnotation(("sc.js.JSSettings"));
+      List<Object> settingsObj = td.getAllInheritedAnnotations("sc.js.JSSettings");
       if (typeTemplate == null) {
          if (typeTemplateName == null) {
             System.err.println("*** typeTemplateName property on JSRuntimeProcessor not set");

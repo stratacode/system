@@ -561,7 +561,7 @@ public class EditorContext extends ClientEditorContext {
 
          return addStatement(currentType, field, true);
       }
-      else if (ModelUtil.definesMember(currentType, propName, JavaSemanticNode.MemberType.PropertyAnySet, null, null) != null) {
+      else if (ModelUtil.definesMember(currentType, propName, JavaSemanticNode.MemberType.PropertyAnySet, null, null, null) != null) {
          PropertyAssignment pa = initializer == null ? OverrideAssignment.create(propName) : PropertyAssignment.create(propName, initializer, op);
          return addStatement(currentType, pa, true);
       }

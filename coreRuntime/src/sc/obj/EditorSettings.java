@@ -22,4 +22,6 @@ public @interface EditorSettings {
    String displayName() default "";
    /** The name of a type to specialize the selection of the editor */  // TODO: should this be a list of classes or maybe we need a more flexible way to associate name/value pairs with a type used in selecting the editor?
    String editorType() default "";
+   /** Include static properties and types */
+   boolean includeStatic() default false;
 }

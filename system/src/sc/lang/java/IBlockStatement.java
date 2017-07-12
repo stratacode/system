@@ -17,6 +17,10 @@ public interface IBlockStatement {
 
    IBlockStatement getEnclosingBlockStatement();
 
+   /** Returns the first token to look for when starting the block in a parsed text - for static, try, etc. should not include the open brace */
+   String getStartBlockToken();
+
+   /** Returns the whole start string for toString or formatting purposes but will include the open brace */
    String getStartBlockString();
 
    String getEndBlockString();

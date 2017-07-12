@@ -390,34 +390,34 @@ public class ClassDeclaration extends TypeDeclaration {
       transformIFields();
 
       // First we process the set of inherited compiler settings
-      Object compilerSettings = getInheritedAnnotation("sc.obj.CompilerSettings");
+      List<Object> compilerSettingsList = getAllInheritedAnnotations("sc.obj.CompilerSettings");
 
-      if (compilerSettings != null) {
-         customTemplate = findTemplate(compilerSettings, isObject && !useNewTemplate ? "objectTemplate" : "newTemplate",
+      if (compilerSettingsList != null && compilerSettingsList.size() > 0) {
+         customTemplate = findTemplate(compilerSettingsList, isObject && !useNewTemplate ? "objectTemplate" : "newTemplate",
                                        ObjectDefinitionParameters.class);
-         Template mixinTemplate = findTemplate(compilerSettings, "mixinTemplate", ObjectDefinitionParameters.class);
+         Template mixinTemplate = findTemplate(compilerSettingsList, "mixinTemplate", ObjectDefinitionParameters.class);
          if (mixinTemplate != null) {
             mixinTemplates = new ArrayList<Template>();
             mixinTemplates.add(mixinTemplate);
          }
 
-         Template staticMixinTemplate = findTemplate(compilerSettings, "staticMixinTemplate", ObjectDefinitionParameters.class);
+         Template staticMixinTemplate = findTemplate(compilerSettingsList, "staticMixinTemplate", ObjectDefinitionParameters.class);
          if (staticMixinTemplate != null) {
             staticMixinTemplates = new ArrayList<Template>();
             staticMixinTemplates.add(staticMixinTemplate);
          }
 
          String childTypeParameter;
-         childTypeParameter = (String) ModelUtil.getAnnotationValue(compilerSettings, "childTypeParameter");
+         childTypeParameter = (String) ModelUtil.getAnnotationValueFromList(compilerSettingsList, "childTypeParameter");
          if (childTypeParameter != null && childTypeParameter.length() > 0)
             childTypeName = mapTypeParameterNameToTypeName(childTypeParameter);
-         onInitMethodName = (String) ModelUtil.getAnnotationValue(compilerSettings, "onInitMethod");
+         onInitMethodName = (String) ModelUtil.getAnnotationValueFromList(compilerSettingsList, "onInitMethod");
          Boolean bv;
-         useAltComponent = (bv = (Boolean) ModelUtil.getAnnotationValue(compilerSettings, "useAltComponent")) != null && bv;
-         overrideStartName = (String) ModelUtil.getAnnotationValue(compilerSettings, "overrideStartName");
+         useAltComponent = (bv = (Boolean) ModelUtil.getAnnotationValueFromList(compilerSettingsList, "useAltComponent")) != null && bv;
+         overrideStartName = (String) ModelUtil.getAnnotationValueFromList(compilerSettingsList, "overrideStartName");
          if (overrideStartName == null || overrideStartName.length() == 0)
             overrideStartName = useAltComponent ? "_start" : "start";
-         String pConstructor = (String) ModelUtil.getAnnotationValue(compilerSettings, "propagateConstructor");
+         String pConstructor = (String) ModelUtil.getAnnotationValueFromList(compilerSettingsList, "propagateConstructor");
          if (pConstructor != null && pConstructor.length() > 0) {
             String[] argTypeNames = StringUtil.split(pConstructor, ',');
             propagateConstructorArgs = new Object[argTypeNames.length];
@@ -429,8 +429,8 @@ public class ClassDeclaration extends TypeDeclaration {
             }
          }
          Boolean boolObj;
-         constructorInit = (boolObj = (Boolean) ModelUtil.getAnnotationValue(compilerSettings, "constructorInit")) != null && boolObj.booleanValue();
-         automaticConstructor = (boolObj = (Boolean) ModelUtil.getAnnotationValue(compilerSettings, "automaticConstructor")) != null && boolObj.booleanValue();
+         constructorInit = (boolObj = (Boolean) ModelUtil.getAnnotationValueFromList(compilerSettingsList, "constructorInit")) != null && boolObj.booleanValue();
+         automaticConstructor = (boolObj = (Boolean) ModelUtil.getAnnotationValueFromList(compilerSettingsList, "automaticConstructor")) != null && boolObj.booleanValue();
       }
 
       // Need to do this before we retrieve CompilerSettings so we can inherit settings via the interface we add below.
@@ -497,17 +497,17 @@ public class ClassDeclaration extends TypeDeclaration {
       }
 
       // Don't inherit this set of compiler settings
-      compilerSettings = getAnnotation("sc.obj.CompilerSettings");
-      if (compilerSettings != null) {
-         String jarFile = (String) ModelUtil.getAnnotationValue(compilerSettings, "jarFileName");
-         Boolean includeDeps = (Boolean) ModelUtil.getAnnotationValue(compilerSettings, "includeDepsInJar");
+      Object myCompilerSettings = getAnnotation("sc.obj.CompilerSettings");
+      if (myCompilerSettings != null) {
+         String jarFile = (String) ModelUtil.getAnnotationValue(myCompilerSettings, "jarFileName");
+         Boolean includeDeps = (Boolean) ModelUtil.getAnnotationValue(myCompilerSettings, "includeDepsInJar");
          if (jarFile != null && jarFile.length() > 0) {
-            String [] jarPackages = (String[]) ModelUtil.getAnnotationValue(compilerSettings, "jarPackages");
+            String [] jarPackages = (String[]) ModelUtil.getAnnotationValue(myCompilerSettings, "jarPackages");
             lsys.buildInfo.addModelJar(model, null, jarFile, jarPackages == null ? null : jarPackages.length > 0 ? jarPackages : null, false, includeDeps == null || includeDeps);
          }
-         jarFile = (String) ModelUtil.getAnnotationValue(compilerSettings, "srcJarFileName");
+         jarFile = (String) ModelUtil.getAnnotationValue(myCompilerSettings, "srcJarFileName");
          if (jarFile != null && jarFile.length() > 0) {
-            String [] jarPackages = (String[]) ModelUtil.getAnnotationValue(compilerSettings, "jarPackages");
+            String [] jarPackages = (String[]) ModelUtil.getAnnotationValue(myCompilerSettings, "jarPackages");
             lsys.buildInfo.addModelJar(model, null, jarFile, jarPackages == null ? null : jarPackages.length > 0 ? jarPackages : null, true, false);
          }
       }
@@ -575,7 +575,7 @@ public class ClassDeclaration extends TypeDeclaration {
             // Use accessBase here because the object in accessClass will shadow the get method in the derived class - in other words, we should not be able to resolve
             // the getX method from accessClass because it is hidden.
             Object accessBase = accessClass.getDerivedTypeDeclaration();
-            Object overrideDef = accessBase == null ? null : ModelUtil.definesMember(accessBase, typeName, MemberType.GetMethodSet, null, null, false, true);
+            Object overrideDef = accessBase == null ? null : ModelUtil.definesMember(accessBase, typeName, MemberType.GetMethodSet, null, null, false, true, getLayeredSystem());
             if (overrideDef != null) {
                mergeModifiers(overrideDef, false, true);
 
@@ -609,7 +609,7 @@ public class ClassDeclaration extends TypeDeclaration {
                if (overrideDef == null) {
                   Object extType = accessClass.getExtendsTypeDeclaration();
                   if (extType != null) {
-                     overrideDef = ModelUtil.definesMember(extType, typeName, MemberType.ObjectTypeSet, this, null, false, true);
+                     overrideDef = ModelUtil.definesMember(extType, typeName, MemberType.ObjectTypeSet, this, null, false, true, getLayeredSystem());
                      if (overrideDef != null) {
                         if (ModelUtil.isAssignableFrom(overrideDef, this)) {
                            isOverrideField = true;

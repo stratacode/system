@@ -119,7 +119,7 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
    }
 
    public Object definesMember(String name, EnumSet<JavaSemanticNode.MemberType> types, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {
-      return ModelUtil.definesMember(baseType, name, types, refType, ctx, skipIfaces, isTransformed);
+      return ModelUtil.definesMember(baseType, name, types, refType, ctx, skipIfaces, isTransformed, getLayeredSystem());
    }
 
    public Object getInnerType(String name, TypeContext ctx) {

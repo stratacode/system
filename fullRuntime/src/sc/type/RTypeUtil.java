@@ -10,6 +10,7 @@ import sc.util.PerfMon;
 import sc.util.StringUtil;
 
 import java.lang.reflect.*;
+import java.lang.reflect.Modifier;
 import java.util.*;
 
 public class RTypeUtil {
@@ -1111,9 +1112,11 @@ public class RTypeUtil {
             Class[] ptypes = m.getParameterTypes();
             if (ptypes.length == argValues.length) {
                int i = 0;
-               for (Class pt:ptypes)
-                  if (!pt.isInstance(argValues[i++]))
+               for (Class pt:ptypes) {
+                  Object argValue = argValues[i++];
+                  if (argValue != null && !pt.isInstance(argValue))
                      break;
+               }
                if (i == ptypes.length) {
                   method = m;
                   break;
@@ -1185,6 +1188,8 @@ public class RTypeUtil {
       else if (srcMember instanceof Class) {
          return ((Class) srcMember).getDeclaringClass();
       }
+      else if (srcMember instanceof IBeanMapper)
+         return getEnclosingType(((IBeanMapper) srcMember).getPropertyMember());
       throw new UnsupportedOperationException();
    }
 

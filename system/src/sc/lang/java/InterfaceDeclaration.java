@@ -131,12 +131,12 @@ public class InterfaceDeclaration extends TypeDeclaration {
 
       if (extendsBoundTypes != null) {
          for (Object impl:extendsBoundTypes) {
-            if (impl != null && (v = ModelUtil.definesMember(impl, name, mtype, refType, ctx, skipIfaces, isTransformed)) != null)
+            if (impl != null && (v = ModelUtil.definesMember(impl, name, mtype, refType, ctx, skipIfaces, isTransformed, getLayeredSystem())) != null)
                return v;
          }
       }
       else
-         return ModelUtil.definesMember(Object.class, name, mtype, refType, ctx, skipIfaces, isTransformed);
+         return ModelUtil.definesMember(Object.class, name, mtype, refType, ctx, skipIfaces, isTransformed, getLayeredSystem());
       return null;
    }
 

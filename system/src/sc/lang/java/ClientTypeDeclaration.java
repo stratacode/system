@@ -154,4 +154,12 @@ public class ClientTypeDeclaration extends TypeDeclaration implements IChangeabl
       return annotations;
    }
 
+   private int modifierFlags;
+   public void setModifierFlags(int val) {
+      modifierFlags = val;
+   }
+   public int getModifierFlags() {
+      return modifierFlags;
+   }
+
 }

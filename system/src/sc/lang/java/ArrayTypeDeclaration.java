@@ -190,7 +190,7 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
    public Object definesMember(String name, EnumSet<JavaSemanticNode.MemberType> type, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {
       if (type.contains(JavaSemanticNode.MemberType.Field) && name.equals("length"))  // TODO: Java won't let us get at the real field.  This is to avoid compile errors but maybe we need to build a FieldDef
          return LENGTH_FIELD;
-      return ModelUtil.definesMember(OBJECT_ARRAY_CLASS, name, type, refType, ctx, skipIfaces, isTransformed);
+      return ModelUtil.definesMember(OBJECT_ARRAY_CLASS, name, type, refType, ctx, skipIfaces, isTransformed, system);
    }
 
    public Object definesMember(String name, EnumSet<JavaSemanticNode.MemberType> type, Object refType, TypeContext ctx) {

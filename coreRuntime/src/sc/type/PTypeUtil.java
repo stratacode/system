@@ -329,8 +329,16 @@ public class PTypeUtil {
    }
 
    public static boolean isPrimitive(Class type) {
-      // TODO: anyway to identify primitive types in GWT?  Used by DynUtil.getInstanceName
-      return false;
+      return Type.get(type).primitiveClass != null;
+   }
+
+   public static boolean isANumber(Class type) {
+      return Type.get(type).isANumber();
+   }
+
+   public static boolean isStringOrChar(Class type) {
+      Type t = Type.get(type);
+      return t == Type.String || t == Type.Character;
    }
 
    public static Object getDefaultObjectValue(Class type) {

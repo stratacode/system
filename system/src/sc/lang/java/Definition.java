@@ -10,6 +10,7 @@ import sc.lang.sc.ScopeModifier;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.obj.ScopeDefinition;
+import sc.parser.PString;
 
 import java.lang.annotation.ElementType;
 import java.lang.reflect.AnnotatedElement;
@@ -471,6 +472,10 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
       return null;
    }
 
+   public boolean hasAnnotation(String annotName) {
+      return getAnnotation(annotName) != null;
+   }
+
    public void removeAnnotation(String annotationName) {
       if (modifiers == null)
          return;
@@ -710,6 +715,27 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
    // to the client.
    public static String getAnnotationValueKey(String typeName, String ident) {
       return typeName + "__" + ident;
+   }
+
+   // Here for synchronization - should never be set by the client
+   public void setModifierFlags(int val) {
+      throw new UnsupportedOperationException();
+   }
+
+   /** Used to extract just the important modifiers into a single integer for client/server meta-data synchronization */
+   public int getModifierFlags() {
+      List<Object> allMods = getComputedModifiers();
+      int modFlags = 0;
+      if (allMods != null) {
+         for (Object mod:allMods) {
+            if (PString.isString(mod)) {
+               int flag = sc.type.Modifier.getFlag(mod.toString());
+               if (flag != -1)
+                  modFlags |= flag;
+            }
+         }
+      }
+      return modFlags;
    }
 
 }

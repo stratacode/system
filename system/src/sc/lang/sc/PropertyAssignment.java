@@ -682,7 +682,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       ParseUtil.styleString(adapter, "member", pnode.children.get(0).toString(), false);
       for (int i = 1; i < pnode.children.size(); i++) {
          Object childNode = pnode.children.get(i);
-         if (childNode instanceof IParseNode && ((IParseNode) childNode).getSemanticValue() == initializer)
+         if (childNode instanceof IParseNode && ((IParseNode) childNode).getSemanticValue() == initializer && initializer != null)
             initializer.styleNode(adapter);
          else
             ParseUtil.toStyledString(adapter, pnode.children.get(i));

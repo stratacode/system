@@ -132,6 +132,8 @@ public interface IDynamicSystem {
 
    boolean isEnumConstant(Object obj);
 
+   boolean isEnumType(Object type);
+
    Object getEnumConstant(Object typeObj, String enumConstName);
 
    Object getExtendsType(Object type);
@@ -155,4 +157,5 @@ public interface IDynamicSystem {
    Object getComponentType(Object arrayType);
 
    Object getPropertyAnnotationValue(Object typeObj, String propName, String annotName, String attName);
+
 }

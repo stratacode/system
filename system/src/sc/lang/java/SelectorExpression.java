@@ -73,6 +73,11 @@ public class SelectorExpression extends ChainedExpression {
                   if (nextName.equals("this")) {
                      idTypes[i] = IdentifierExpression.IdentifierType.ThisExpression;
                      boundTypes[i] = currentType;
+
+                     TypeDeclaration exprEnclType = getEnclosingType();
+                     if (!ModelUtil.isOuterType(exprEnclType, currentType)) {
+                        expression.displayError("Type: " + ModelUtil.getClassName(currentType) + " not an enclosing type of: " + ModelUtil.getClassName(exprEnclType) + " for: ");
+                     }
                   }
                   else if (nextName.equals("super")) {
                      idTypes[i] = IdentifierExpression.IdentifierType.SuperExpression;
@@ -780,8 +785,8 @@ public class SelectorExpression extends ChainedExpression {
                if (dummyIx != -1) {
                   String matchPrefix = ident.substring(0, dummyIx);
 
-                  Object curType = i == 0 ? (expression == null ? null :expression.getTypeDeclaration()) :
-                                            (useTypes == null ? null : useTypes[i-1]);
+                  Object curType = i == 0 ? (expression == null ? null :expression.getTypeDeclaration()) : getTypeDeclaration(i-1);
+                                            //(useTypes == null ? null : useTypes[i-1]);
 
                   if (curType != null)
                      ModelUtil.suggestMembers(origModel, curType, matchPrefix, candidates, false, true, true, false);

@@ -202,7 +202,7 @@ public class TypeUtil  {
          if (PTypeUtil.hasModifier(props[i].getPropertyMember(), modifier))
             newProps[ct++] = props[i];
       }
-      if (ct != props.length)
+      if (ct != newProps.length)
          System.err.println("*** Internal error retrieving properties for: " + beanClass);
       return newProps;
    }

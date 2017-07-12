@@ -220,7 +220,8 @@ public abstract class SyncDestination {
          }
          else {
             completeSync(true);
-            applySyncLayer((String) error, null, false);
+            if (errorCode != 500)
+               applySyncLayer((String) error, null, false);
          }
       }
    }

@@ -499,7 +499,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
       if (implementsBoundTypes != null && !skipIfaces) {
          for (Object impl:implementsBoundTypes) {
-            if (impl != null && (v = ModelUtil.definesMember(impl, name, mtype, refType, ctx, skipIfaces, isTransformed)) != null)
+            if (impl != null && (v = ModelUtil.definesMember(impl, name, mtype, refType, ctx, skipIfaces, isTransformed, getLayeredSystem())) != null)
                return v;
          }
       }
@@ -650,10 +650,17 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       }
 
       Object extType = getDerivedTypeDeclaration();
-      if (extType instanceof ITypeDeclaration)
-         return ((ITypeDeclaration) extType).isAssignableTo(other);
-      else if (extType != null)
-         return ModelUtil.isAssignableFrom(other, extType);
+      if (extType instanceof ITypeDeclaration) {
+         if (((ITypeDeclaration) extType).isAssignableTo(other))
+            return true;
+      }
+      else if (extType != null && ModelUtil.isAssignableFrom(other, extType))
+         return true;
+
+      // NOTE: this test is replicated in implementsType
+      if (isAutoComponent() && other.getFullTypeName().equals("sc.obj.ComponentImpl"))
+         return true;
+
       return false;
    }
 
@@ -750,7 +757,9 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
             return true;
       }
 
-      // We use the ComponentImpl's _initState field so this test ensures that we recognize the ownership of that field.  Even if the type is transformed, we might have resolved a reference before it was.
+      // We use the ComponentImpl's _initState field to resolve _initState references on untransformed components.
+      // This test is needed because that field is protected and we need to be 'assignable' to ComponentImpl to access it.
+      // NOTE: this test is replicated in isAssignableTo.
       if (isAutoComponent() && fullTypeName.equals("sc.obj.ComponentImpl"))
          return true;
 

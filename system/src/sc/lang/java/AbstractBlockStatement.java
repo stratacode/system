@@ -368,25 +368,25 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
       String start = getStartBlockString();
       String end = getEndBlockString();
       if (statements == null) {
-         return start + end;
+         return (staticEnabled ? "static " : "") + start + end;
       }
       StringBuilder sb = new StringBuilder();
       if (staticEnabled)
          sb.append("static ");
       sb.append(start);
       sb.append("\n");
-      boolean printElipsis = false;
+      boolean printEllipsis = false;
       for (int i = 0; i < Math.min(statements.size(), MAX_STATEMENTS_IN_TOSTRING); i++) {
          Statement st = statements.get(i);
          sb.append("   ");
          sb.append(st);
          // In case we have long statements we should trim it earlier
          if (sb.length() > 60) {
-            printElipsis = true;
+            printEllipsis = true;
             break;
          }
       }
-      if (printElipsis || statements.size() > MAX_STATEMENTS_IN_TOSTRING)
+      if (printEllipsis || statements.size() > MAX_STATEMENTS_IN_TOSTRING)
          sb.append("   ...\n");
       sb.append(end);
       sb.append("\n");

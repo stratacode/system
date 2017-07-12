@@ -245,7 +245,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
    }
 
    public Object definesMember(String name, EnumSet<JavaSemanticNode.MemberType> types, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {
-      Object member = ModelUtil.definesMember(baseType, name, types, refType, ctx, skipIfaces, isTransformed);
+      Object member = ModelUtil.definesMember(baseType, name, types, refType, ctx, skipIfaces, isTransformed, system);
       if (member != null) {
          JavaSemanticNode.MemberType type = JavaSemanticNode.MemberType.getMemberType(member, types);
          if (type != null && ModelUtil.hasParameterizedType(member, type))

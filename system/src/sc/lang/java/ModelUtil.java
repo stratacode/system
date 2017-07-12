@@ -19,10 +19,7 @@ import sc.lang.sc.OverrideAssignment;
 import sc.lang.template.Template;
 import sc.lang.template.TemplateStatement;
 import sc.layer.*;
-import sc.obj.GlobalScopeDefinition;
-import sc.obj.IAltComponent;
-import sc.obj.IComponent;
-import sc.obj.ScopeDefinition;
+import sc.obj.*;
 import sc.type.*;
 import sc.util.*;
 import sc.bind.BindingDirection;
@@ -35,6 +32,7 @@ import java.io.File;
 import java.io.StringReader;
 import java.lang.annotation.ElementType;
 import java.lang.reflect.*;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.*;
 
@@ -2578,6 +2576,11 @@ public class ModelUtil {
       return null;
    }
 
+   /** This method is available in the Javascript runtime so we have it here so the APIs stay in sync */
+   public static boolean hasAnnotation(Object definition, String annotationName) {
+      return getAnnotation(definition, annotationName) != null;
+   }
+
    public static Object getAnnotation(Object definition, String annotationName) {
       PerfMon.start("getAnnotation");
       try {
@@ -2650,6 +2653,21 @@ public class ModelUtil {
       targetAnnot = ModelUtil.getAnnotationSingleValue(targetAnnot);
       if (targetAnnot instanceof java.lang.annotation.ElementType[]) {
          return EnumSet.copyOf(Arrays.asList((ElementType[]) targetAnnot));
+      }
+      return null;
+   }
+
+   public static Object getAnnotationValueFromList(List<Object> annotations, String s) {
+      for (Object annotation:annotations) {
+         Object val;
+         if (annotation instanceof IAnnotation)
+            val = ((IAnnotation) annotation).getAnnotationValue(s);
+         else if (annotation instanceof java.lang.annotation.Annotation)
+            val = TypeUtil.invokeMethod(annotation, RTypeUtil.getMethod(annotation.getClass(), s), (Object[]) null);
+         else
+            throw new UnsupportedOperationException();
+         if (val != null)
+            return val;
       }
       return null;
    }
@@ -5107,11 +5125,17 @@ public class ModelUtil {
          throw new IllegalArgumentException();
    }
 
-   public static Object definesMember(Object type, String name, EnumSet<JavaSemanticNode.MemberType> mtypes, Object refType, TypeContext ctx) {
-      return definesMember(type, name, mtypes, refType, ctx, false, false);
+   /**
+    * Looks for a member - field, method, enum with the given name on the given type.  The refType specifies a type used for access control checks - if you're not allowed, null is returned.
+    * Pass in a LayeredSystem if you want to find a src reference for an annotation layer that's applied to a compiled type.  For example, you might have a compiled type Foo that extends Bar which
+    * has an annotation layer.  If we find a member in 'Bar', we need to check if the 'Bar' src type has a version of that member.  If so we return that instead since it's more specific.
+    * This is the one of the ways we can attach meta-data onto types that are delivered in a compiled format.  If you don't care about that, pass in null for the sys and that check is not performed.
+    */
+   public static Object definesMember(Object type, String name, EnumSet<JavaSemanticNode.MemberType> mtypes, Object refType, TypeContext ctx, LayeredSystem sys) {
+      return definesMember(type, name, mtypes, refType, ctx, false, false, sys);
    }
 
-   public static Object definesMember(Object type, String name, EnumSet<JavaSemanticNode.MemberType> mtypes, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {
+   public static Object definesMember(Object type, String name, EnumSet<JavaSemanticNode.MemberType> mtypes, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed, LayeredSystem sys) {
       Object res;
       if (type instanceof ITypeDeclaration) {
          if ((res = ((ITypeDeclaration) type).definesMember(name, mtypes, refType, ctx, skipIfaces, isTransformed)) != null)
@@ -5128,8 +5152,8 @@ public class ModelUtil {
             return null;
 
          Class classDecl = (Class) type;
-         IBeanMapper mapper;
-         IBeanMapper rm;
+         IBeanMapper mapper = null;
+         boolean found = false;
          for (JavaSemanticNode.MemberType mtype:mtypes) {
             switch (mtype) {
                case Field:
@@ -5139,7 +5163,9 @@ public class ModelUtil {
                      return ArrayTypeDeclaration.LENGTH_FIELD;
                   if ((mapper = PTypeUtil.getPropertyMapping(classDecl, name)) != null && mapper.getField() != null &&
                        (refType == null || checkAccess(refType, mapper.getField())))
-                     return mapper;
+                     found = true;
+                  else
+                     mapper = null;
 
                   //Object theField;
 
@@ -5158,15 +5184,18 @@ public class ModelUtil {
 
                   break;
                case GetMethod:
-                  if ((res = TypeUtil.getPropertyMapping(classDecl, name, null, null)) != null &&
-                       res instanceof IBeanMapper && (rm = (IBeanMapper) res).hasAccessorMethod() &&
-                     (refType == null || checkAccess(refType, rm.getPropertyMember())))
-                     return res;
+                  if ((mapper = TypeUtil.getPropertyMapping(classDecl, name, null, null)) != null &&
+                      mapper.hasAccessorMethod() && (refType == null || checkAccess(refType, mapper.getPropertyMember())))
+                     found = true;
+                  else
+                     mapper = null;
                   break;
                case SetMethod:
                   if ((mapper = PTypeUtil.getPropertyMapping(classDecl, name)) != null &&
                        mapper.hasSetterMethod() && (refType == null || checkAccess(refType, mapper.getPropertyMember())))
-                     return mapper;
+                     found = true;
+                  else
+                     mapper = null;
                   break;
                case Enum:
                   if ((res = RTypeUtil.getEnum(classDecl, name)) != null)
@@ -5174,20 +5203,46 @@ public class ModelUtil {
                   break;
                case GetIndexed:
                   IBeanIndexMapper im;
-                  if ((res = TypeUtil.getPropertyMapping(classDecl, name, null, null)) != null &&
-                          res instanceof IBeanIndexMapper && (im = (IBeanIndexMapper) res).hasIndexedAccessorMethod() &&
+                  if ((mapper = TypeUtil.getPropertyMapping(classDecl, name, null, null)) != null &&
+                          mapper instanceof IBeanIndexMapper && (im = (IBeanIndexMapper) mapper).hasIndexedAccessorMethod() &&
                           (refType == null || checkAccess(refType, im.getPropertyMember())))
-                     return res;
+                     found = true;
+                  else
+                     mapper = null;
                   break;
                case SetIndexed:
                   if ((mapper = PTypeUtil.getPropertyMapping(classDecl, name)) != null && mapper instanceof IBeanIndexMapper &&
                           ((IBeanIndexMapper) mapper).hasIndexedSetterMethod() && (refType == null || checkAccess(refType, mapper.getPropertyMember())))
-                     return mapper;
+                     found = true;
+                  else
+                     mapper = null;
                   break;
+            }
+            if (found && mapper != null) {
+               return convertMapperToSrc(type, mapper, name, mtypes, refType, ctx, sys);
             }
          }
       }
       return null;
+   }
+
+   public static Object convertMapperToSrc(Object origType, IBeanMapper mapper, String name, EnumSet<JavaSemanticNode.MemberType> mtypes, Object refType, TypeContext ctx, LayeredSystem sys) {
+      if (sys == null)
+         return mapper;
+      Object enclType = getEnclosingType(mapper.getPropertyMember());
+      // Skipping ComponentImpl here because it's a special class used to hold the _initState field... if we resolve it here during transform, it might load it after it's been started and at least
+      if (enclType != null && enclType != ComponentImpl.class) {
+         Object srcClass = resolveSrcTypeDeclaration(sys, enclType);
+         if (srcClass instanceof BodyTypeDeclaration && srcClass != enclType && srcClass != origType) {
+            BodyTypeDeclaration srcType = (BodyTypeDeclaration) srcClass;
+            // We found the member on a compiled class and there's a src type that's annotating that class.  See if the class declares a non-compiled member for the one we found and if so return that instead.
+            Object newMember = srcType.declaresMember(name, mtypes, refType, ctx);
+            if (newMember != null && newMember != mapper) {
+               return newMember;
+            }
+         }
+      }
+      return mapper;
    }
 
    public static boolean isTypeInLayer(Object type, Layer layer) {
@@ -5418,6 +5473,11 @@ public class ModelUtil {
          throw new UnsupportedOperationException();
    }
 
+   public static String getExtendsTypeName(Object type) {
+      Object ext = getExtendsClass(type);
+      return ext == null ? null : ModelUtil.getTypeName(ext);
+   }
+
    public static Object getExtendsJavaType(Object type) {
       if (type instanceof Class)
          return ((Class) type).getGenericSuperclass();
@@ -5614,6 +5674,14 @@ public class ModelUtil {
              ((varObj instanceof CFClass) && ((CFClass) varObj).isEnum()) || (varObj instanceof ModifyDeclaration && isEnumType(((ModifyDeclaration) varObj).getModifiedType()));
    }
 
+   public static Object[] getEnumConstants(Object enumType) {
+      if (enumType instanceof ClientTypeDeclaration)
+         enumType = ((ClientTypeDeclaration) enumType).getOriginal();
+      if (enumType instanceof BodyTypeDeclaration)
+         return ((BodyTypeDeclaration) enumType).getEnumValues();
+      return DynUtil.getEnumConstants(enumType);
+   }
+
    public static Object getEnumTypeFromEnum(Object enumObj) {
       if (enumObj instanceof EnumConstant) {
          // The type of the EnumConstant is the enum itself, not the constant
@@ -5697,7 +5765,7 @@ public class ModelUtil {
       return mergeTypesAndProperties(type, types, props);
    }
 
-   public static Object[] getMergedPropertiesAndTypes(Object type, String modifier) {
+   public static Object[] getMergedPropertiesAndTypes(Object type, String modifier, LayeredSystem sys) {
       Object[] types = getAllInnerTypes(type, modifier, false);
       Object[] props = getMergedProperties(type, modifier);
       return mergeTypesAndProperties(type, types, props);
@@ -5744,10 +5812,10 @@ public class ModelUtil {
          Object prop = props[i];
          if (prop != null) {
             String propName = ModelUtil.getPropertyName(prop);
-            Object def = ModelUtil.definesMember(type, propName, JavaSemanticNode.MemberType.AllSet, null, null);
+            Object def = ModelUtil.definesMember(type, propName, JavaSemanticNode.MemberType.AllSet, null, null, null);
             if (def == null) {
                System.err.println("*** Can't resolve merged property");
-               def = ModelUtil.definesMember(type, propName, JavaSemanticNode.MemberType.AllSet, null, null);
+               def = ModelUtil.definesMember(type, propName, JavaSemanticNode.MemberType.AllSet, null, null, null);
             }
             // Reverse bindings do not replace the previous definition so don't let them do that here
             else if (!ModelUtil.isReverseBinding(def))
@@ -5772,10 +5840,10 @@ public class ModelUtil {
             Object prop = props[i];
             if (prop != null) {
                String propName = ModelUtil.getPropertyName(prop);
-               Object def = ModelUtil.definesMember(type, propName, JavaSemanticNode.MemberType.AllSet, null, null);
+               Object def = ModelUtil.definesMember(type, propName, JavaSemanticNode.MemberType.AllSet, null, null, null);
                if (def == null) {
                   System.err.println("*** Can't resolve merged property: " + propName + " in type: " + ModelUtil.getTypeName(type));
-                  def = ModelUtil.definesMember(type, propName, JavaSemanticNode.MemberType.AllSet, null, null);
+                  def = ModelUtil.definesMember(type, propName, JavaSemanticNode.MemberType.AllSet, null, null, null);
                }
                else if (!ModelUtil.isReverseBinding(def))
                   props[i] = def;
@@ -5811,22 +5879,31 @@ public class ModelUtil {
       throw new UnsupportedOperationException();
    }
 
-   public static Object[] getDeclaredPropertiesAndTypes(Object typeObj, String modifier) {
+   public static Object[] getDeclaredPropertiesAndTypes(Object typeObj, String modifier, LayeredSystem sys) {
+      if (ModelUtil.hasTypeParameters(typeObj))
+         typeObj = getParamTypeBaseType(typeObj);
+      if (ModelUtil.isGenericArray(typeObj) || typeObj instanceof ArrayTypeDeclaration)
+         typeObj = ModelUtil.getGenericComponentType(typeObj);
+
       Object[] types = ModelUtil.getAllInnerTypes(typeObj, modifier, true);
-      ArrayList<Object> res = new ArrayList();
+      ArrayList<Object> res = new ArrayList<Object>();
       if (typeObj instanceof Class) {
-         Object[] props = RTypeUtil.getDeclaredProperties((Class) typeObj, null);
+         Object[] props = RTypeUtil.getDeclaredProperties((Class) typeObj, modifier);
          if (props != null) {
             for (int i = 0; i < props.length; i++) {
                Object prop = props[i];
                if (prop instanceof Class)
                   continue;
+               if (sys != null && prop instanceof IBeanMapper) {
+                  IBeanMapper mapper = (IBeanMapper) prop;
+                  prop = convertMapperToSrc(typeObj, mapper, mapper.getPropertyName(), JavaSemanticNode.MemberType.PropertyAnySet, null, null, sys);
+               }
                res.add(prop);
             }
          }
       }
       else if (typeObj instanceof BodyTypeDeclaration) {
-         List<Object> props = ((BodyTypeDeclaration) typeObj).getDeclaredProperties(null, true, false);
+         List<Object> props = ((BodyTypeDeclaration) typeObj).getDeclaredProperties(modifier, true, false);
          if (props != null) {
             for (int i = 0; i < props.size(); i++) {
                Object prop = props.get(i);
@@ -6755,7 +6832,7 @@ public class ModelUtil {
       else if (def instanceof IMethodDefinition && ((IMethodDefinition) def).getPropertyName() != null) {
          propName = ((IMethodDefinition) def).getPropertyName();
          if (propName != null) {
-            res = ModelUtil.definesMember(specEncType, ModelUtil.getPropertyName(def), JavaSemanticNode.MemberType.PropertyAssignmentSet, null, null);
+            res = ModelUtil.definesMember(specEncType, ModelUtil.getPropertyName(def), JavaSemanticNode.MemberType.PropertyAssignmentSet, null, null, model.layeredSystem);
             if (res == null) {
                System.out.println("*** no member in specEncType");
                res = def;
@@ -6765,7 +6842,7 @@ public class ModelUtil {
             res = def;
       }
       else if (ModelUtil.isField(def)) {
-         res = ModelUtil.definesMember(specEncType, ModelUtil.getPropertyName(def), JavaSemanticNode.MemberType.PropertyAssignmentSet, null, null);
+         res = ModelUtil.definesMember(specEncType, ModelUtil.getPropertyName(def), JavaSemanticNode.MemberType.PropertyAssignmentSet, null, null, model.layeredSystem);
          if (res == null) {
             System.out.println("*** no field in specEncType");
             res = def;
@@ -7317,7 +7394,7 @@ public class ModelUtil {
       if (field == ArrayTypeDeclaration.LENGTH_FIELD)
          return field;
       Object enclType = refreshBoundClass(sys, field.getDeclaringClass());
-      Object res = ModelUtil.definesMember(enclType, ModelUtil.getPropertyName(field), JavaSemanticNode.MemberType.FieldSet, null, null);
+      Object res = ModelUtil.definesMember(enclType, ModelUtil.getPropertyName(field), JavaSemanticNode.MemberType.FieldSet, null, null, sys);
       if (res == null)
          System.out.println("*** Unable to refreshBoundField");
       return res;
@@ -7534,7 +7611,7 @@ public class ModelUtil {
          return ((ITypeDeclaration) impl).isCompiledProperty(name, fieldMode, interfaceMode);
       else {
          // Assume the rest are all compiled types
-         return ModelUtil.definesMember(impl, name, JavaSemanticNode.MemberType.PropertyGetSetObj, null, null) != null;
+         return ModelUtil.definesMember(impl, name, JavaSemanticNode.MemberType.PropertyGetSetObj, null, null, null) != null;
       }
    }
 

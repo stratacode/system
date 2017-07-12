@@ -234,6 +234,10 @@ public class TryStatement extends Statement implements IBlockStatement {
       return "{";
    }
 
+   public String getStartBlockToken() {
+      return "try";
+   }
+
    public String getEndBlockString() {
       return "}";
    }

@@ -750,6 +750,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    public void updateTypeIndex(TypeIndexEntry typeIndexEntry, long lastModified) {
+      if (typeIndexEntry == null)
+         return;
       String typeName = typeIndexEntry.typeName;
       if (typeName != null) {
          if (layerTypeIndex == null) {
@@ -1220,10 +1222,12 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
       // Don't initialize the core build layer - it has no indexed types anyway and this causes us to init the
       // per-process index before we've defined the process.
-      if (hasSrc)
-         initTypeIndex();
-      else
-         layerTypeIndex = new LayerTypeIndex();
+      if (layeredSystem.typeIndexEnabled) {
+         if (hasSrc)
+            initTypeIndex();
+         else
+            layerTypeIndex = new LayerTypeIndex();
+      }
 
       if (baseLayers != null && !activated) {
          for (Layer baseLayer:baseLayers)
@@ -1604,7 +1608,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             dirIndex.add(FileUtil.removeExtension(fn));
 
             // If the file is excluded but is a source file, we'll need to mark it as excluded in the type index so we do not think it's a new file.
-            if (excludedFile(fn, prefix)) {
+            if (layerTypeIndex != null && excludedFile(fn, prefix)) {
                layerTypeIndex.fileIndex.put(FileUtil.concat(rootPath, srcPath), TypeIndexEntry.EXCLUDED_SENTINEL);
             }
          }
@@ -1812,11 +1816,13 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (topLevelSrcDirs == null)
          initSrcDirs();
 
-      if (layerTypeIndex == null)
-         layerTypeIndex = new LayerTypeIndex();
-      layerTypeIndex.layerPathName = getLayerPathName();
-      if (layerTypeIndex.layerPathName == null)
-         System.err.println("*** Missing layer path name for type index");
+      if (layeredSystem.typeIndexEnabled) {
+         if (layerTypeIndex == null)
+            layerTypeIndex = new LayerTypeIndex();
+         layerTypeIndex.layerPathName = getLayerPathName();
+         if (layerTypeIndex.layerPathName == null)
+            System.err.println("*** Missing layer path name for type index");
+      }
 
       if (excludedFiles != null) {
          excludedPatterns = new ArrayList<Pattern>(excludedFiles.size());
@@ -1858,7 +1864,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       initSrcCache(replacedTypes);
 
       // Need to save the filtered list of topLevelSrcDirs in the index so we know when this particular index is out of date.
-      layerTypeIndex.topLevelSrcDirs = topLevelSrcDirs.toArray(new String[topLevelSrcDirs.size()]);
+      if (layerTypeIndex != null)
+         layerTypeIndex.topLevelSrcDirs = topLevelSrcDirs.toArray(new String[topLevelSrcDirs.size()]);
 
       if (isBuildLayer())
          makeBuildLayer();
@@ -2220,8 +2227,22 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    public void initTypeIndex() {
       File typeIndexFile = new File(layeredSystem.getTypeIndexFileName(getLayerName()));
+      SysTypeIndex sysIndex = layeredSystem.typeIndex;
+      if (sysIndex == null)
+         sysIndex = layeredSystem.typeIndex = new SysTypeIndex(layeredSystem, layeredSystem.getTypeIndexIdent());
+      LayerListTypeIndex useTypeIndex = activated ? sysIndex.activeTypeIndex : sysIndex.inactiveTypeIndex;
+      String layerName = getLayerName();
+
+      // In case we're in the midst of reading the type index for this layer, use that one instead of reading a duplicate and getting out of sync.
+      layerTypeIndex = useTypeIndex.typeIndex.get(layerName);
+      boolean addIndexEntry = true;
+      if (layerTypeIndex != null) {
+         typeIndexRestored = true;
+         addIndexEntry = false;
+      }
+
       // A clean build of everything will reset the layerTypeIndex
-      if (typeIndexFile.canRead() && (!activated || !getBuildAllFiles())) {
+      if (layerTypeIndex == null && typeIndexFile.canRead() && (!activated || !getBuildAllFiles())) {
          layerTypeIndex = layeredSystem.readTypeIndexFile(getLayerName());
          typeIndexRestored = true;
          typeIndexFileLastModified = new File(getTypeIndexFileName()).lastModified();
@@ -2237,18 +2258,13 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          TypeDeclaration modelType = model.getModelTypeDeclaration();
          modelType.initTypeIndex();
       }
-      SysTypeIndex sysIndex = layeredSystem.typeIndex;
-      if (sysIndex == null)
-         sysIndex = layeredSystem.typeIndex = new SysTypeIndex(layeredSystem, layeredSystem.getTypeIndexIdent());
-      LayerListTypeIndex useTypeIndex = activated ? sysIndex.activeTypeIndex : sysIndex.inactiveTypeIndex;
       // The core build layer is created in the constructor so don't do this test for it.
       if (this != layeredSystem.coreBuildLayer && layeredSystem.writeLocked == 0) {
          System.err.println("Updating type index without write lock: ");
          new Throwable().printStackTrace();;
       }
 
-      String layerName = getLayerName();
-      if (layerName != null) {
+      if (layerName != null && addIndexEntry) {
          useTypeIndex.typeIndex.put(layerName, layerTypeIndex);
       }
       layerTypeIndex.baseLayerNames = baseLayerNames == null ? null : baseLayerNames.toArray(new String[baseLayerNames.size()]);
@@ -2443,9 +2459,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                      addStaticImportType(memberName, typeObj);
                      added = true;
                   }
-                  Object property = ModelUtil.definesMember(typeObj, memberName, JavaSemanticNode.MemberType.PropertyGetSet, null, null);
+                  Object property = ModelUtil.definesMember(typeObj, memberName, JavaSemanticNode.MemberType.PropertyGetSet, null, null, null);
                   if (property == null)
-                     property = ModelUtil.definesMember(typeObj, memberName, JavaSemanticNode.MemberType.PropertySetSet, null, null);
+                     property = ModelUtil.definesMember(typeObj, memberName, JavaSemanticNode.MemberType.PropertySetSet, null, null, null);
                   if (property != null && ModelUtil.hasModifier(property, "static")) {
                      addStaticImportType(memberName, typeObj);
                      added = true;

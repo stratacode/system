@@ -49,7 +49,11 @@ public class BlockStatement extends AbstractBlockStatement {
    }
 
    public String getStartBlockString() {
-      return "{";
+      return (staticEnabled ? "static " : "") + "{";
+   }
+
+   public String getStartBlockToken() {
+      return staticEnabled ? "static" : "{";
    }
 
    public String getEndBlockString() {

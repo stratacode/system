@@ -36,10 +36,14 @@ public enum Type {
 
       public boolean evalConditional(String operator, Object lhsObj, Object rhsObj) {
          boolean result;
-         boolean lhsBool = ((Boolean) lhsObj);
-         boolean rhsBool = ((Boolean) rhsObj);
 
          char c = operator.charAt(0);
+
+         if (c == 'i')
+             return DynUtil.instanceOf(lhsObj, rhsObj);
+
+         boolean lhsBool = ((Boolean) lhsObj);
+         boolean rhsBool = ((Boolean) rhsObj);
 
          switch (c) {
             case '=':
@@ -53,9 +57,6 @@ public enum Type {
                break;
             case '|':
                result = lhsBool || rhsBool;
-               break;
-            case 'i':
-               result = DynUtil.instanceOf(lhsObj, rhsObj);
                break;
             case '>':
             case '<':

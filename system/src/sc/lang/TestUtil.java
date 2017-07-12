@@ -555,13 +555,13 @@ public class TestUtil {
                   }
                   // 218 - is where we change from forVar to forControl
                   // 250 - is where it should parse
-                  if (reparseFile.contains("33")) {
+                  if (reparseFile.contains("10")) {
                      //HTMLLanguage.getHTMLLanguage().blockStatements.trace = true;
-                     //SCLanguage.getSCLanguage().normalClassDeclaration.trace = true;
+                     //SCLanguage.getSCLanguage().compilationUnit.trace = true;
                      //JavaLanguage.getJavaLanguage().classBodyDeclarations.trace = true;
-                     //HTMLLanguage.getHTMLLanguage().tagAttributes.trace = true;
+                     //HTMLLanguage.getHTMLLanguage().templateBodyDeclarations.trace = true;
                      // Let's you set breakpoints easily for semantic nodes that don't match
-                     SemanticNode.debugDiffTrace = true;
+                     //SemanticNode.debugDiffTrace = true;
                      // Enables breakpoints for finding the diffs in the old and new versions
                      //DiffContext.debugDiffContext = true;
                   }

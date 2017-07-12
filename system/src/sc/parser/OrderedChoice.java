@@ -699,7 +699,13 @@ public class OrderedChoice extends NestedParselet  {
 
       if (value == null) {
          if (optional) {
-            if (parser.enablePartialValues && bestError != null && bestError.partialValue != null && bestError.eof) {
+            // Lots of problems with this test.   Note that for reparse we still have bestError.eof but for parseExtendedErrors it has been removed.  Also this code path only added
+            // the 'extendErrors' clause.   The case that required that extendErrors clause is re76
+            // where a block comment is not closed.  If we return the partial value - i.e. the entire file hidden in an unclosed comment we do not parse it the same was as the
+            // partial values parse - to ignore the open comment characters in the typeDeclarations and parse the rest normally.
+            // re53 became less effective at reparsing when extendErrors was added but only because we fail to suck up the < as part of a binary expression partial error and so
+            // we try to parse the rest as a template statement
+            if (parser.enablePartialValues && bestError != null && bestError.partialValue != null && bestError.eof && extendErrors) {
                Object oldChildParseNode = oldParent == null || oldParent.children.size() <= newChildCount ? null : oldParent.children.get(newChildCount);
                return reparsePartialErrorValue(parser, bestError, lastMatchStart, newChildCount, bestErrorSlotIx, oldChildParseNode, dctx);
             }

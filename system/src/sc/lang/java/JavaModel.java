@@ -465,10 +465,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                   added = true;
                }
                Object property = enableExtensions() ?
-                       ModelUtil.definesMember(importedType, memberName, MemberType.PropertyGetSet, null, null) :
-                       ModelUtil.definesMember(importedType, memberName, MemberType.FieldEnumSet, null, null);
+                       ModelUtil.definesMember(importedType, memberName, MemberType.PropertyGetSet, null, null, layeredSystem) :
+                       ModelUtil.definesMember(importedType, memberName, MemberType.FieldEnumSet, null, null, layeredSystem);
                if (property == null && enableExtensions())
-                  property = ModelUtil.definesMember(importedType, memberName, MemberType.PropertySetSet, null, null);
+                  property = ModelUtil.definesMember(importedType, memberName, MemberType.PropertySetSet, null, null, layeredSystem);
                // You can also import static classes apparently
                if (property == null) {
                   property = ModelUtil.getInnerType(importedType, memberName, null);
@@ -2110,7 +2110,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             layeredSystem.addAutoImport(getLayer(), getModelTypeName(), ImportDeclaration.createStatic(CTypeUtil.prefixPath(ModelUtil.getTypeName(type), name)));
 
             // Now convert it to the member itself.
-            type = ModelUtil.definesMember(type, name, mtype, refType, ctx, skipIfaces, isTransformed);
+            type = ModelUtil.definesMember(type, name, mtype, refType, ctx, skipIfaces, isTransformed, layeredSystem);
 
             assert type != null;
          }

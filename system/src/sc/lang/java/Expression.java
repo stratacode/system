@@ -550,7 +550,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       type = ModelUtil.getVariableTypeDeclaration(type);
       // Need the dynamic type of the actual runtime type declaration - but cannot use getCompiledClass at this stage
       boolean dynamicType = ModelUtil.isDynamicType(ModelUtil.getRuntimeTypeDeclaration(type));
-      Object prop = ModelUtil.definesMember(type, identifier, MemberType.PropertyGetObj, null, null, false, true);
+      Object prop = ModelUtil.definesMember(type, identifier, MemberType.PropertyGetObj, null, null, false, true, getLayeredSystem());
       if (prop == null) {
          System.err.println("*** Can't resolve property for get property mapping: " + identifier);
          //prop = ModelUtil.definesMember(type, identifier, MemberType.PropertyGetSet, null, null);

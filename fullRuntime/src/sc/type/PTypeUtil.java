@@ -13,6 +13,7 @@ import sc.dyn.RDynUtil;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
+import java.lang.reflect.Modifier;
 import java.util.*;
 
 /** This is the version of the PTypeUtil utilities that is used in the full runtime, with Java reflection etc.  */
@@ -484,6 +485,16 @@ public class PTypeUtil {
    public static boolean isPrimitive(Class type) {
       sc.type.Type t = sc.type.Type.get(type);
       return t.primitiveClass == type;
+   }
+
+   public static boolean isANumber(Class type) {
+      sc.type.Type t = sc.type.Type.get(type);
+      return t.isANumber();
+   }
+
+   public static boolean isStringOrChar(Class type) {
+      Type t = Type.get(type);
+      return t == Type.String || t == Type.Character;
    }
 
    public static Object getReturnType(Object method) {

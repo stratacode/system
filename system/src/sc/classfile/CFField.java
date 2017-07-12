@@ -66,6 +66,6 @@ public class CFField extends ClassFile.FieldMethodInfo implements IVariable, IFi
       Object rtType = ownerClass.getRuntimeType();
       if (rtType == null)
          return null;
-      return ModelUtil.definesMember(rtType, name, MemberType.FieldEnumSet, null, null);
+      return ModelUtil.definesMember(rtType, name, MemberType.FieldEnumSet, null, null, getLayeredSystem());
    }
 }

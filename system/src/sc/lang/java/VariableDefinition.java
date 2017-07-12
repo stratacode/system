@@ -828,5 +828,12 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          res.add(fromSt);
    }
 
+   // Here only for meta-data serialization purposes
+   public int getModifierFlags() {
+      return getDefinition().getModifierFlags();
+   }
+   public void setModifierFlags() {
+      throw new UnsupportedOperationException();
+   }
 }
 

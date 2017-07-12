@@ -211,7 +211,7 @@ public class NewExpression extends IdentifierExpression {
             return v;
 
          if (boundType != null) {
-            v = ModelUtil.definesMember(boundType, name, mtype, refType, ctx, skipIfaces, false);
+            v = ModelUtil.definesMember(boundType, name, mtype, refType, ctx, skipIfaces, false, getLayeredSystem());
             if (v != null)
                return v;
          }

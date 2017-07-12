@@ -21,6 +21,7 @@ public class ErrorParseNode extends AbstractParseNode {
       error = err;
       startIndex = err == null ? -1 : err.startIndex;
       errorText = errText;
+      errorNode = true;
    }
 
    public Object getSemanticValue() {
@@ -166,5 +167,9 @@ public class ErrorParseNode extends AbstractParseNode {
          if (!StringUtil.equalStrings(otherErr.errorText, errorText))
             diffs.append("Error text does not match: " + errorText + " != " + otherErr.errorText);
       }
+   }
+
+   public boolean isIncomplete() {
+      return true;
    }
 }

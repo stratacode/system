@@ -720,19 +720,27 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
    }
 
    public String getElementId() {
-      if (id != null) // Explicitly named id - for example, the template file will rename the root element to match the file name if there's only one element in some cases
-         return id;
       Attr idAttr = getAttribute("id");
       Attr nameAttr = getAttribute("name");
+      if (id != null) { // Explicitly named id - for example, the template file will rename the root element to match the file name if there's only one element in some cases
+         if (idAttr != null || nameAttr != null) {
+            Attr attr = idAttr != null ? idAttr : nameAttr;
+            if (PString.isString(attr.value)) {
+               if (!attr.value.toString().equals(id))
+                  attr.displayError("Tag " + tagName + " has id/name: " + attr.value + " but a value of: " + id + " is expected for: ");
+            }
+         }
+         return id;
+      }
       if (idAttr != null && nameAttr != null)
-         displayError("Invalid tag definition: use only one of id or name");
+         nameAttr.displayError("Invalid tag definition: use only one of id or name: " + idAttr.value + " and " + nameAttr.value);
       else if (idAttr != null || nameAttr != null) {
          Attr useAttr = idAttr != null ? idAttr : nameAttr;
          Object val = useAttr.value;
          if (PString.isString(val))
             return CTypeUtil.escapeIdentifierString(val.toString());
          else
-            displayError("Dynamic name/id attributes not supported");
+            useAttr.displayError("Expression for name/id attributes not supported: " + val);
       }
       return null;
    }
@@ -1175,7 +1183,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          if (!needsObject && (visAtt = getAttribute("visible")) != null) {
             Expression outExpr = visAtt.getOutputExpr();
             if (outExpr == null) {
-               displayError("Tag visible attribute must be a valid expression: ");
+               visAtt.displayError("Tag visible attribute must be a valid expression: ");
             }
             else
                tagExpr = QuestionMarkExpression.create(outExpr, tagExpr, StringLiteral.create(""));
@@ -2746,18 +2754,31 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
 
    static void addMatchingAttributeNames(String tagName, String prefix, Set<String> candidates) {
       Set<String> attList = getPossibleAttributesForTag(tagName);
-      for (String att:attList) {
+      addMatchingNamesFromSet(attList, prefix, candidates);
+      addMatchingNamesFromSet(behaviorAttributes, prefix, candidates);
+      addMatchingNamesFromSet(notInheritedAttributes, prefix, candidates);
+      addMatchingNamesFromSet(domAttributes, prefix, candidates);
+   }
+
+   private static void addMatchingNamesFromSet(Set<String> attributes, String prefix, Set<String> candidates) {
+      for (String att:attributes) {
          if (prefix == null || att.startsWith(prefix))
             candidates.add(att);
       }
-      for (String att:behaviorAttributes) {
-         if (prefix == null || att.startsWith(prefix))
-            candidates.add(att);
-      }
-      for (String att:notInheritedAttributes) {
-         if (prefix == null || att.startsWith(prefix))
-            candidates.add(att);
-      }
+   }
+
+   static HashSet<String> domAttributes = new HashSet<String>();
+   {
+      domAttributes.add("clickEvent");
+      domAttributes.add("dblClickEvent");
+      domAttributes.add("mouseDownEvent");
+      domAttributes.add("mouseOutEvent");
+      domAttributes.add("mouseUpEvent");
+      domAttributes.add("keyDownEvent");
+      domAttributes.add("keyPressEvent");
+      domAttributes.add("keyUpEvent");
+      domAttributes.add("focusEvent");
+      domAttributes.add("blurEvent");
    }
 
    static HashSet<String> notInheritedAttributes = new HashSet<String>();
@@ -3420,7 +3441,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          return o;
       if (tagObject == null) {
          Object extType = getExtendsTypeDeclaration();
-         o = ModelUtil.definesMember(extType, name, mtype, refType, ctx, skipIfaces, isTransformed);
+         o = ModelUtil.definesMember(extType, name, mtype, refType, ctx, skipIfaces, isTransformed, getLayeredSystem());
          if (o != null)
             return o;
       }

@@ -865,7 +865,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
             SemanticNodeList decls = null;
             if (types != null && types.size() != 0) {
                TypeDeclaration rootType = types.get(0);
-               Object compilerSettings = rootType.getInheritedAnnotation("sc.obj.CompilerSettings");
+               List<Object> compilerSettings = rootType.getAllInheritedAnnotations("sc.obj.CompilerSettings");
                if (compilerSettings != null) {
                   Template outputMethodTemplate = rootType.findTemplate(compilerSettings, "outputMethodTemplate", null);
                   if (outputMethodTemplate != null) {

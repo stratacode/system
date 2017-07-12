@@ -136,29 +136,29 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
    
    public boolean hasGetMethod() {
       return isGetMethod() ||
-              ModelUtil.definesMember(ownerClass, propertyName, JavaSemanticNode.MemberType.GetMethodSet, null, null) != null;
+              ModelUtil.definesMember(ownerClass, propertyName, JavaSemanticNode.MemberType.GetMethodSet, null, null, null) != null;
    }
 
    public boolean hasSetMethod() {
       return isSetMethod() ||
-              ModelUtil.definesMember(ownerClass, propertyName, JavaSemanticNode.MemberType.SetMethodSet, null, null) != null;
+              ModelUtil.definesMember(ownerClass, propertyName, JavaSemanticNode.MemberType.SetMethodSet, null, null, null) != null;
    }
 
    public Object getSetMethodFromGet() {
       if (isGetMethod())
-        return ModelUtil.definesMember(ownerClass, propertyName, JavaSemanticNode.MemberType.SetMethodSet, null, null);
+        return ModelUtil.definesMember(ownerClass, propertyName, JavaSemanticNode.MemberType.SetMethodSet, null, null, getLayeredSystem());
       return null;
    }
 
    public Object getGetMethodFromSet() {
       if (isSetMethod())
-        return ModelUtil.definesMember(ownerClass, propertyName, JavaSemanticNode.MemberType.GetMethodSet, null, null);
+        return ModelUtil.definesMember(ownerClass, propertyName, JavaSemanticNode.MemberType.GetMethodSet, null, null, getLayeredSystem());
       return null;
    }
 
    public Object getFieldFromGetSetMethod() {
       if (isSetMethod() || isGetMethod())
-         return ModelUtil.definesMember(ownerClass, propertyName, JavaSemanticNode.MemberType.FieldSet, null, null);
+         return ModelUtil.definesMember(ownerClass, propertyName, JavaSemanticNode.MemberType.FieldSet, null, null, getLayeredSystem());
       return null;
    }
 

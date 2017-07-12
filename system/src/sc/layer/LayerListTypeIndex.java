@@ -43,6 +43,7 @@ public class LayerListTypeIndex {
    public void clearReverseTypeIndex() {
       subTypeIndex.clear();
       modifyTypeIndex.clear();
+      reverseIndexBuilt = false;
    }
 
    public void clearTypeIndex() {

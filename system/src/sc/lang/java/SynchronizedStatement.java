@@ -73,6 +73,10 @@ public class SynchronizedStatement extends Statement implements IStatementWrappe
       return statement;
    }
 
+   public boolean isLeafStatement() {
+      return false;
+   }
+
    public String getFunctionEndString() {
       return ")";
    }

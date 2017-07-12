@@ -816,6 +816,7 @@ public class DynUtil {
          else {
             Class objClass = obj.getClass();
             Type theType;
+            String res;
             if (PTypeUtil.isPrimitive(objClass) || (theType = Type.get(objClass)).isANumber() || theType.primitiveClass != null || objClass == Date.class)
                return obj.toString();
             else if (objClass == String.class)
@@ -823,12 +824,13 @@ public class DynUtil {
             else if (obj.getClass().isArray()) {
                return TypeUtil.getArrayName(obj);
             }
+            else if (isObject(obj) && (res = getObjectName(obj)) != null)
+               return res;
             else {
                String toStr = obj.toString();
                if (!PTypeUtil.useInstanceName(toStr))
                   return toStr;
             }
-
             typeName = cleanClassName(obj.getClass());
          }
          return CTypeUtil.getClassName(typeName).replace('$', '.') + "__" + getTraceId(obj);
@@ -1232,6 +1234,21 @@ public class DynUtil {
          return obj instanceof java.lang.Enum;
    }
 
+   public static boolean isEnumType(Object type) {
+      if (type instanceof Class)
+         return ((Class<?>) type).isAssignableFrom(Enum.class);
+      if (dynamicSystem != null)
+         return dynamicSystem.isEnumType(type);
+      return false;
+   }
+
+   public static Object[] getEnumConstants(Object enumType) {
+      if (enumType instanceof Class)
+         return ((Class) enumType).getEnumConstants();
+      else
+         throw new UnsupportedOperationException();
+   }
+
    public static Object getEnumConstant(Object typeObj, String enumConstName) {
       if (dynamicSystem != null)
          return dynamicSystem.getEnumConstant(typeObj, enumConstName);
@@ -1278,6 +1295,10 @@ public class DynUtil {
       if (dynamicSystem != null)
          return dynamicSystem.getPackageName(type);
       throw new UnsupportedOperationException();
+   }
+
+   public static boolean hasAnnotation(Object typeObj, String annotName) {
+      return getAnnotation(typeObj, annotName) != null;
    }
 
    public static Object getAnnotation(Object typeObj, String annotName) {

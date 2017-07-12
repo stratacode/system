@@ -166,8 +166,13 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       for (int i = 0; i < semanticProps.length; i++) {
          IBeanMapper mapper = semanticProps[i];
          Object val = PTypeUtil.getProperty(this, mapper.getField());
-         if (val instanceof ILifecycle)
+         if (val instanceof ILifecycle) {
+            if (val == this) {
+               System.err.println("*** Recursive element tree - child: " + mapper.getPropertyName() + " refers to parent in stop method");
+               return;
+            }
             ((ILifecycle) val).stop();
+         }
       }
    }
 

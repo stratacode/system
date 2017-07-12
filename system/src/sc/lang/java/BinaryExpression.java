@@ -728,7 +728,7 @@ public class BinaryExpression extends Expression {
                   }
                   snl.add(IdentifierExpression.create(rhsType.getFullBaseTypeName()));
                   if (ndim != -1)
-                     snl.add(IntegerLiteral.create(ndim));
+                     snl.add(IntegerLiteral.create(ndim-1)); // TODO: NOTE ndim here is 0 based but probably should be 1 based - see also changes in scccore.js and JSTypeParameters
                   iexpr.setProperty("arguments", snl);
 
                   // For a simple binary expr, we replace it entirely

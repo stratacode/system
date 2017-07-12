@@ -15,9 +15,9 @@ import java.util.HashSet;
 
 /** The base class for all HTML elements.
  *
- * Sync is disabled for HTML elements now (as set in Element. Instead, by default synchronize the model itself.  This is because
- * we can always re-render the HTML page and so not have to record it's state as changes are made.  The UI tends to react reliably to the
- * model so if we save just the model, we save things in one place unambiguously.   We want model changes to occur on the client and for
+ * Sync is disabled for HTML elements now (as set in Element. Instead, it's best to synchronize the view model and attach the view model to the
+ * HTML view.  This is because we can always re-render the HTML page and so do not have to record the low-level dom state as changes are made.  If the UI is going to
+ * work properly, it should be reactive to the view model anyway, so we can just save the model in one place unambiguously.   We want model changes to occur on the client and for
  * the UI to react immediately for interactivity as the default behavior.
  * <p>Some frameworks might want to sync some values of the UI to the server and then process clicks and stuff on the server. </p>
  *

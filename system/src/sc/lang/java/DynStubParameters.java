@@ -539,7 +539,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
 
    private Object getPropertyByName(String propName) {
       // This gets called with objType as a class so make sure it works for any type.
-      return ModelUtil.definesMember(objType, propName, JavaSemanticNode.MemberType.PropertyAnySet, null, null);
+      return ModelUtil.definesMember(objType, propName, JavaSemanticNode.MemberType.PropertyAnySet, null, null, sys);
    }
 
    public DynMethod[] getCompMethods() {

@@ -242,7 +242,7 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
             for (Statement st:statements) {
                if (st instanceof TypeDeclaration) {
                   TypeDeclaration td = (TypeDeclaration) st;
-                  if (td.typeName.equals(name))
+                  if (td.typeName != null && td.typeName.equals(name))
                      return td;
                }
             }

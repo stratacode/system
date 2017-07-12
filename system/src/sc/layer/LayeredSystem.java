@@ -44,8 +44,6 @@ import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-//import java.util.concurrent.locks.ReentrantReadWriteLock;
-
 /**
  * The layered system manages the collection of layers which make up the system.  Each layer contains a slice
  * of application code - a single tree organized in a hierarchical name space of definitions.  Definitions
@@ -348,6 +346,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    SysTypeIndex typeIndex;
 
+   /**
+    * The type index is enabled by calling initTypeIndex on the LayeredSystem right after constructing it.  It's used for tools like the IDE to maintain
+    * the set of layers, types, base-classes, etc. in files that are loaded much more quickly than by parsing all of the source code.
+    */
+   boolean typeIndexEnabled = false;
+
    String typeIndexDirName = null;
 
    public List<VMParameter> vmParameters;
@@ -368,19 +372,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** When restoring serialized layered components, we need to lookup a thread-local layered system and be able to know we are doing layerResolves - to swap the name space to that of the layer. */
    public boolean layerResolveContext = false;
 
-   private void clearReverseTypeIndex() {
-      typeIndex.clearReverseTypeIndex();
-   }
 
-   private void buildReverseTypeIndex() {
+   public void buildReverseTypeIndex(boolean clear) {
       try {
          acquireDynLock(false);
+
+         if (clear)
+            typeIndex.clearReverseTypeIndex();
 
          typeIndex.buildReverseTypeIndex(this);
 
          if (!peerMode && peerSystems != null) {
             for (LayeredSystem peerSys: peerSystems) {
-               peerSys.buildReverseTypeIndex();
+               peerSys.buildReverseTypeIndex(clear);
             }
 
             // If we've already created a layered system for these type indexes, this will just return without
@@ -1129,6 +1133,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          disabledRuntimes = parentSystem.disabledRuntimes;
          strataCodeMainDir = parentSystem.strataCodeMainDir;
          isStrataCodeDir = parentSystem.isStrataCodeDir;
+         typeIndexEnabled = parentSystem.typeIndexEnabled;
       }
 
       IRuntimeProcessor useRuntimeProcessor = useProcessDefinition == null ? null : useProcessDefinition.getRuntimeProcessor();
@@ -4093,7 +4098,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                                  "createNewLayer" , "dynamicLayers" , "allDynamic" , "liveDynamicTypes" , "useCommonBuildDir" , "buildDir" , "buildSrcDir" ,
                                   "recordFile" , "restartArgsFile" , "compileOnly" }, null, SyncOptions.SYNC_INIT_DEFAULT, globalScopeId));
          SyncProperties typeProps = new SyncProperties(null, null, new Object[] { "typeName" , "fullTypeName", "layer", "packageName" , "dynamicType" , "isLayerType" ,
-                                                                                  "declaredProperties", "declarationType", "comment" , "clientModifiers", "existsInJSRuntime", "annotations"},
+                                                                                  "declaredProperties", "declarationType", "comment" , "existsInJSRuntime", "annotations", "modifierFlags"},
                                                        null, SyncOptions.SYNC_INIT_DEFAULT, globalScopeId);
 
          SyncManager.addSyncType(ModifyDeclaration.class, typeProps);
@@ -4117,8 +4122,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          SyncManager.addSyncType(ClientTypeDeclaration.class, typeProps);
          SyncManager.addSyncHandler(ClientTypeDeclaration.class, LayerSyncHandler.class); // Need this so we can use restore to go back
 
-         SyncManager.addSyncType(VariableDefinition.class, new SyncProperties(null, null, new Object[] { "variableName" , "initializerExprStr" , "operatorStr" , "layer", "comment", "variableTypeName", "indexedProperty", "annotations"}, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, globalScopeId));
-         SyncManager.addSyncType(PropertyAssignment.class, new SyncProperties(null, null, new Object[] { "propertyName" , "operatorStr", "initializerExprStr", "layer" , "comment", "variableTypeName", "annotations" }, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, globalScopeId));
+         SyncManager.addSyncType(VariableDefinition.class, new SyncProperties(null, null, new Object[] { "variableName" , "initializerExprStr" , "operatorStr" , "layer", "comment", "variableTypeName", "indexedProperty", "annotations", "modifierFlags"}, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, globalScopeId));
+         SyncManager.addSyncType(PropertyAssignment.class, new SyncProperties(null, null, new Object[] { "propertyName" , "operatorStr", "initializerExprStr", "layer" , "comment", "variableTypeName", "annotations", "modifierFlags" }, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, globalScopeId));
 
          SyncProperties modelProps = new SyncProperties(null, null, new Object[] {"layer", "srcFile", "needsModelText", "cachedModelText", "needsGeneratedText", "cachedGeneratedText", "cachedGeneratedJSText", "cachedGeneratedSCText", "cachedGeneratedClientJavaText", "existsInJSRuntime", "layerTypeDeclaration"}, null, SyncOptions.SYNC_INIT_DEFAULT, globalScopeId);
          SyncManager.addSyncType(JavaModel.class, modelProps);
@@ -6921,6 +6926,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       } else {
          switch (options.typeIndexMode) {
             case Refresh:
+               // need to put this here because we might initialize some layers during this process and need to make this index available to avoid a duplicate
+               refreshCtx.curTypeIndex.inactiveTypeIndex.typeIndex.put(layerName, layerTypeIndex);
                layerTypeIndex = layerTypeIndex.refreshLayerTypeIndex(this, layerName, new File(FileUtil.concat(refreshCtx.typeIndexDir.getPath(), indexFileName)).lastModified(), refreshCtx);
                refreshCtx.refreshedLayers.add(layerName);
                break;
@@ -6974,13 +6981,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    /** This is called on the main layered system.  It will enable the type index on all peer systems.  */
    public void initTypeIndex() {
+      typeIndexEnabled = true;
+      if (peerSystems != null) {
+         for (LayeredSystem peerSys:peerSystems)
+            peerSys.typeIndexEnabled = true;
+      }
+
       Set<String> refreshedLayers = new TreeSet<String>();
 
       loadTypeIndex(refreshedLayers);
 
       refreshTypeIndex(refreshedLayers);
 
-      buildReverseTypeIndex();
+      buildReverseTypeIndex(false);
 
       saveTypeIndexFiles();
 
@@ -7002,7 +7015,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          if (typeIndex != null && typeIndex.needsSave)
             typeIndex.saveToDir(getTypeIndexDir());
-         // Save the list of layers here too
+
+         // Save type index for peers here as well
+         if (!peerMode && peerSystems != null) {
+            for (LayeredSystem peerSys: peerSystems) {
+               peerSys.saveTypeIndexChanges();
+            }
+         }
       }
       finally {
          releaseDynLock(false);
@@ -12575,6 +12594,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public boolean isEnumConstant(Object obj) {
       return obj instanceof java.lang.Enum || obj instanceof DynEnumConstant;
+   }
+
+   public boolean isEnumType(Object type) {
+      return ModelUtil.isEnumType(type);
    }
 
    public Object getEnumConstant(Object typeObj, String enumConstName) {
