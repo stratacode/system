@@ -2576,6 +2576,30 @@ public class ModelUtil {
       return null;
    }
 
+   public static Map<String,Object> getPropertyAnnotations(Object property) {
+      Map<String,Object> res = getAnnotations(property);
+      Map<String,Object> newRes = null;
+      if (ModelUtil.isGetMethod(property)) {
+         Object setMethod = ModelUtil.getSetMethodFromGet(property);
+         if (setMethod != null) {
+            newRes = ModelUtil.getAnnotations(setMethod);
+         }
+      }
+      else if (ModelUtil.isSetMethod(property)) {
+         Object getMethod = ModelUtil.getGetMethodFromSet(property);
+         if (getMethod != null)
+            newRes = ModelUtil.getAnnotations(getMethod);
+      }
+      if (res == null)
+         return newRes;
+      if (newRes == null)
+         return res;
+      HashMap<String,Object> combined = new HashMap<String,Object>();
+      combined.putAll(res);
+      combined.putAll(newRes);
+      return combined;
+   }
+
    /** This method is available in the Javascript runtime so we have it here so the APIs stay in sync */
    public static boolean hasAnnotation(Object definition, String annotationName) {
       return getAnnotation(definition, annotationName) != null;
@@ -3241,15 +3265,25 @@ public class ModelUtil {
    }
 
    public static Object getPropertyType(Object prop) {
+      return getPropertyType(prop, null);
+   }
+
+   /** For compiled properties, if you pass in a layered system, you will get the annotated version of the type, not the compiled type */
+   public static Object getPropertyType(Object prop, LayeredSystem sys) {
       if (prop instanceof ParamTypedMember)
          prop = ((ParamTypedMember) prop).getMemberObject();
-      if (prop instanceof IBeanMapper)
-         return ((IBeanMapper) prop).getPropertyType();
+      if (prop instanceof IBeanMapper) {
+         IBeanMapper mapper = (IBeanMapper) prop;
+         Object propType = mapper.getPropertyType();
+         if (sys != null)
+            return resolveSrcTypeDeclaration(sys, propType);
+         return propType;
+      }
       else if (prop instanceof PropertyAssignment) {
          Object propType = ((PropertyAssignment) prop).getPropertyDefinition();
          if (propType == null)
             return Object.class; // Unresolved property - for lookupUIIcon just return something generic here
-         return getPropertyType(propType);
+         return getPropertyType(propType, sys);
       }
       else if (ModelUtil.isField(prop))
          return getFieldType(prop);
@@ -5396,6 +5430,14 @@ public class ModelUtil {
          }
       }
       return null;
+   }
+
+   /** Similar to DynUtil.findType, but if there are any source type declarations availble, that is returned first */
+   public static Object findType(LayeredSystem sys, String typeName) {
+      Object res = findTypeDeclaration(sys, typeName, null, false);
+      if (res != null)
+         return res;
+      return DynUtil.findType(typeName);
    }
 
    public static Object findTypeDeclaration(LayeredSystem sys, String typeName, Layer refLayer, boolean layerResolve) {
@@ -7980,8 +8022,9 @@ public class ModelUtil {
 
       Object enclType = ModelUtil.getEnclosingType(meth);
       enclType = ModelUtil.resolveSrcTypeDeclaration(sys, enclType, cachedOnly, srcOnly);
+      // TODO performance: should have a way to do 'declaresMethod' here to avoid the 'sameTypes' call on the enclosing type.
       Object newMeth = ModelUtil.getMethod(sys, enclType, ModelUtil.getMethodName(meth), null, null, null, false, null, null, ModelUtil.getParameterTypes(meth));
-      if (newMeth != null)
+      if (newMeth != null && ModelUtil.sameTypes(ModelUtil.getEnclosingType(newMeth), enclType))
          return newMeth;
       return meth;
    }
@@ -8562,8 +8605,8 @@ public class ModelUtil {
       if (def instanceof ParamTypedMember) {
          return getAnnotations(((ParamTypedMember) def).getMemberObject());
       }
-      if (def instanceof Definition)
-         return ((Definition) def).getAnnotations();
+      if (def instanceof IDefinition)
+         return ((IDefinition) def).getAnnotations();
       else if (def instanceof AnnotatedElement) {
          java.lang.annotation.Annotation[] annots = ((AnnotatedElement) def).getAnnotations();
          return createAnnotationsMap(annots);
@@ -8604,7 +8647,7 @@ public class ModelUtil {
          TreeMap<String,Object> res = new TreeMap<String,Object>();
          for (java.lang.annotation.Annotation annot:annotations) {
             Annotation myAnnot = Annotation.createFromElement(annot);
-            myAnnot.addToAnnotationsMap(res);
+            Annotation.addToAnnotationsMap(res, myAnnot);
          }
          return res;
       }

@@ -9,6 +9,7 @@ import sc.dyn.DynUtil;
 import sc.lang.ISrcStatement;
 import sc.lang.JavaLanguage;
 import sc.lang.ILanguageModel;
+import sc.lang.sc.PropertyAssignment;
 import sc.parser.*;
 import sc.type.CTypeUtil;
 import sc.type.RTypeUtil;
@@ -1073,8 +1074,10 @@ public class SelectorExpression extends ChainedExpression {
       return inferredFinal;
    }
 
-   // We propagate to arguments in VariableSelectors but not to the root expression
+   // We propagate to arguments in VariableSelectors but not to the root expression and not when a direct child of a PropertyAssignment that's a reverse only binding
    public boolean propagatesInferredType(Expression child) {
+      if (!hasInferredType())
+         return false;
       return child != expression;
    }
 

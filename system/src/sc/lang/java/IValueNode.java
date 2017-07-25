@@ -7,4 +7,6 @@ package sc.lang.java;
 public interface IValueNode {
    Object eval(Class expectedType, ExecutionContext ctx);
 
+   Object getPrimitiveValue();
+
 }

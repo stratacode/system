@@ -705,7 +705,7 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
                res = new TreeMap<String,Object>();
             }
             Annotation annot = (Annotation) modifier;
-            annot.addToAnnotationsMap(res);
+            Annotation.addToAnnotationsMap(res, annot);
          }
       }
       return res;

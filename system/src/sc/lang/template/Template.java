@@ -1696,4 +1696,8 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
    public String getTemplateDeclEndString() {
       return "";
    }
+
+   public Object getPrimitiveValue() {
+      return eval(null, new ExecutionContext());
+   }
 }

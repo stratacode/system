@@ -484,4 +484,8 @@ public class SyncSerializer {
       sb.append("\n");
       appendEvalSC(sb, indent);
    }
+
+   public boolean needsObjectForTopLevelNew() {
+      return true;
+   }
 }

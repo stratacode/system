@@ -37,7 +37,6 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
    transient public IParseNode parseNode;
    transient public boolean parseNodeInvalid = false;
 
-   @EditorSettings(visible=false)
    transient public ISemanticNode parentNode;
 
    // TODO performance: turn these into bitfields
@@ -222,6 +221,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       parseNode = pn;
    }
 
+   @EditorSettings(visible=false)
    public ISemanticNode getParentNode() {
       return parentNode;
    }

@@ -8579,7 +8579,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                }
             }
          }
-         if (syncProps.size() > 0) {
+         if (syncProps.size() > 0 || syncMode == SyncMode.Enabled) {
             if (syncProperties == null)
                syncProperties = new ArrayList<SyncProperties>();
             String remoteDestName = syncSystems.size() == 1 || rt == null ? null : rt.getDestinationName();
@@ -8621,6 +8621,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             }
          }
       }
+
       PerfMon.end("initSyncProperties");
    }
 
@@ -8812,6 +8813,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          ctd.setFullTypeName(getFullTypeName());
          ctd.setDeclarationType(getDeclarationType());
          ctd.setDeclaredProperties(getDeclaredProperties());
+         ctd.setExtendsTypeName(getExtendsTypeName());
          ctd.setPackageName(getPackageName());
          ctd.setScopeName(getScopeName());
          ctd.setDynamicType(isDynamicType());

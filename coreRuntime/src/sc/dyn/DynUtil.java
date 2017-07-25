@@ -1493,4 +1493,8 @@ public class DynUtil {
           return false;
       return getPropertyMapping(getType(obj), propName) != null;
    }
+
+   public static Object getTypeOfObj(Object changedObj) {
+      return DynUtil.isType(changedObj) ? changedObj.getClass() : DynUtil.getType(changedObj);
+   }
 }

@@ -263,6 +263,8 @@ public class JSONDeserializer {
    }
 
    public Object convertRemoteType(Object value, Object type) {
+      if (type == Object.class)
+         return value;
       if (value instanceof List) {
          List propValList = (List) value;
          // Convert if necessary to get the correct array type - e.g. a String[] instead of just an Object[]

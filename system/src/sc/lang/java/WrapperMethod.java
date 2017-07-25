@@ -7,6 +7,7 @@ package sc.lang.java;
 import sc.layer.LayeredSystem;
 
 import java.util.List;
+import java.util.Map;
 
 public abstract class WrapperMethod implements IMethodDefinition {
    Object wrapped;
@@ -87,6 +88,10 @@ public abstract class WrapperMethod implements IMethodDefinition {
 
    public Object getAnnotation(String annotName) {
       return ModelUtil.getAnnotation(wrapped, annotName);
+   }
+
+   public Map<String,Object> getAnnotations() {
+      return ModelUtil.getAnnotations(wrapped);
    }
 
    public boolean hasModifier(String modifierName) {

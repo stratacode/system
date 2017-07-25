@@ -21,6 +21,7 @@ import sc.obj.*;
 import sc.parser.*;
 import sc.repos.RepositoryStore;
 import sc.repos.RepositorySystem;
+import sc.sync.ClassSyncWrapper;
 import sc.sync.SyncManager;
 import sc.sync.SyncOptions;
 import sc.sync.SyncProperties;
@@ -3523,13 +3524,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                case 'm':
                   if (opt.equals("me")) {
                      if (args.length < i + 1)
-                        usage("Missing arg to me (maxErrors) option: ", args);
+                        usage("Missing arg to -me (maxErrors) option: ", args);
                      else {
                         try {
                            options.maxErrors = Integer.parseInt(args[++i]);
                         }
                         catch (NumberFormatException exc) {
-                           usage("Invalid integer arg to me (maxErrors) option: " + exc.toString(), args);
+                           usage("Invalid integer arg to -me (maxErrors) option: " + exc.toString(), args);
                         }
                      }
                   }
@@ -4098,7 +4099,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                                  "createNewLayer" , "dynamicLayers" , "allDynamic" , "liveDynamicTypes" , "useCommonBuildDir" , "buildDir" , "buildSrcDir" ,
                                   "recordFile" , "restartArgsFile" , "compileOnly" }, null, SyncOptions.SYNC_INIT_DEFAULT, globalScopeId));
          SyncProperties typeProps = new SyncProperties(null, null, new Object[] { "typeName" , "fullTypeName", "layer", "packageName" , "dynamicType" , "isLayerType" ,
-                                                                                  "declaredProperties", "declarationType", "comment" , "existsInJSRuntime", "annotations", "modifierFlags"},
+                                                                                  "declaredProperties", "declarationType", "comment" , "existsInJSRuntime", "annotations", "modifierFlags", "extendsTypeName"},
                                                        null, SyncOptions.SYNC_INIT_DEFAULT, globalScopeId);
 
          SyncManager.addSyncType(ModifyDeclaration.class, typeProps);

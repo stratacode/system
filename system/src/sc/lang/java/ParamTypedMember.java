@@ -6,6 +6,8 @@ package sc.lang.java;
 
 import sc.dyn.DynUtil;
 
+import java.util.Map;
+
 public class ParamTypedMember implements ITypedObject, IDefinition {
    Object member;
    ITypeParamContext paramTypeDecl;
@@ -43,6 +45,10 @@ public class ParamTypedMember implements ITypedObject, IDefinition {
 
    public Object getAnnotation(String annotName) {
       return ModelUtil.getAnnotation(member, annotName);
+   }
+
+   public Map<String,Object> getAnnotations() {
+      return ModelUtil.getAnnotations(member);
    }
 
    public boolean hasModifier(String modifierName) {

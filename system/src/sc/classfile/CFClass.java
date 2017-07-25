@@ -878,17 +878,46 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       }
 
       Object superType = getDerivedTypeDeclaration();
-      ArrayList<Object> superRes = ModelUtil.getAllInheritedAnnotations(system, superType, annotationName, skipCompiled, refLayer, layerResolve);
-      if (superRes != null) {
-         res = ModelUtil.appendLists(res, superRes);
+      if (superType != null) {
+         ArrayList<Object> superRes = ModelUtil.getAllInheritedAnnotations(system, superType, annotationName, skipCompiled, refLayer, layerResolve);
+         if (superRes != null)
+            res = ModelUtil.appendLists(res, superRes);
+
+         String nextTypeName = ModelUtil.getTypeName(superType);
+         Object nextType = ModelUtil.findTypeDeclaration(system, nextTypeName, refLayer, layerResolve);
+         if (nextType != null && nextType instanceof TypeDeclaration && nextType != superType) {
+            if (nextType == superType) {
+               System.err.println("*** Loop in inheritance tree: " + nextTypeName);
+               return null;
+            }
+            ArrayList<Object> newRes = ((TypeDeclaration) nextType).getAllInheritedAnnotations(annotationName, skipCompiled, refLayer, layerResolve);
+            if (newRes != null)
+               res = ModelUtil.appendLists(res, newRes);
+         }
       }
 
       if (implementsTypes != null) {
          int numInterfaces = implementsTypes.size();
          for (int i = 0; i < numInterfaces; i++) {
             Object implType = implementsTypes.get(i);
-            if ((superRes = ModelUtil.getAllInheritedAnnotations(system, implType, annotationName, skipCompiled, refLayer, layerResolve)) != null)
-               res = ModelUtil.appendLists(res, superRes);
+            if (implType != null) {
+               ArrayList<Object> superRes;
+               if ((superRes = ModelUtil.getAllInheritedAnnotations(system, implType, annotationName, skipCompiled, refLayer, layerResolve)) != null) {
+                  res = ModelUtil.appendLists(res, superRes);
+               }
+
+               String nextTypeName = ModelUtil.getTypeName(implType);
+               Object nextType = ModelUtil.findTypeDeclaration(system, nextTypeName, refLayer, layerResolve);
+               if (nextType != null && nextType instanceof TypeDeclaration && nextType != implType) {
+                  if (nextType == superType) {
+                     System.err.println("*** Loop in interface inheritance tree: " + nextTypeName);
+                     return null;
+                  }
+                  ArrayList<Object> newRes = ((TypeDeclaration) nextType).getAllInheritedAnnotations(annotationName, skipCompiled, refLayer, layerResolve);
+                  if (newRes != null)
+                     res = ModelUtil.appendLists(res, newRes);
+               }
+            }
          }
       }
       return res;
@@ -1215,7 +1244,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       return classFile.getAnnotation(annotName);
    }
 
-   public Collection<IAnnotation> getAnnotations(){
+   public Collection<IAnnotation> getAnnotationsList(){
       if (classFile.attributes == null) {
          return Collections.emptyList();
       }
@@ -1224,6 +1253,18 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          return null;
       }
       return (Collection<IAnnotation>) (Collection) aa.annotations.values();
+   }
+
+   public Map<String,Object> getAnnotations() {
+      Collection<IAnnotation> annotList = getAnnotationsList();
+      if (annotList != null) {
+         HashMap<String,Object> res = new HashMap<String,Object>();
+         for (IAnnotation annot:annotList) {
+            res.put(annot.getTypeName(),annot);
+         }
+         return res;
+      }
+      return null;
    }
 
    public boolean hasModifier(String modifierName) {

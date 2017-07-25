@@ -13,9 +13,7 @@ import sc.util.*;
 
 import java.io.*;
 import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
+import java.util.*;
 
 public class ClassFile {
    DataInputStream input;
@@ -192,6 +190,13 @@ public class ClassFile {
          return aa.getAnnotation(annotName);
       }
 
+      public Map<String,Object> getAnnotations() {
+         AnnotationsAttribute aa = AnnotationsAttribute.getAttribute(attributes);
+         if (aa == null)
+            return null;
+         return aa.getAnnotations();
+      }
+
       public boolean hasModifier(String modifierName) {
          if (modifierName.equals("default")) {
             // Default methods are identified in the class file as non-abstract, non-static instance methods
@@ -341,6 +346,10 @@ public class ClassFile {
 
       @Override
       public Object eval(Class expectedType, ExecutionContext ctx) {
+         return getValue();
+      }
+
+      public Object getPrimitiveValue() {
          return getValue();
       }
    }
@@ -825,6 +834,16 @@ public class ClassFile {
          if (annotations == null)
             return null;
          return annotations.get(name);
+      }
+
+      public Map<String,Object> getAnnotations() {
+         if (annotations == null)
+            return null;
+         TreeMap<String,Object> res = new TreeMap<String,Object>();
+         for (CFAnnotation annot:annotations.values()) {
+            Annotation.addToAnnotationsMap(res, annot);
+         }
+         return res;
       }
    }
 

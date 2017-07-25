@@ -58,6 +58,9 @@ public class AnnotationValue extends JavaSemanticNode {
       }
       else if (elementValue instanceof String || elementValue instanceof Boolean || elementValue instanceof Number || elementValue instanceof Character)
          return elementValue;
+      else if (elementValue instanceof IValueNode) {
+         return ((IValueNode) elementValue).getPrimitiveValue();
+      }
       throw new UnsupportedOperationException();
    }
 

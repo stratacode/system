@@ -427,4 +427,8 @@ public class JSONSerializer extends SyncSerializer {
       if (topLevel || indent == 0)
          appendObjEnd();
    }
+
+   public boolean needsObjectForTopLevelNew() {
+      return false;
+   }
 }

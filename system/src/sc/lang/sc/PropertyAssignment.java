@@ -1026,7 +1026,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       Map<String,Object> props = super.getAnnotations();
       Map<String,Object> propMap = null;
       if (assignedProperty != null) {
-         propMap = ModelUtil.getAnnotations(assignedProperty);
+         propMap = ModelUtil.getPropertyAnnotations(assignedProperty);
       }
       if (props != null && propMap != null)
          props.putAll(propMap);

@@ -6,14 +6,21 @@ package sc.lang;
 
 import sc.dyn.DynUtil;
 import sc.obj.IObjectId;
+import sc.obj.Sync;
 import sc.sync.SyncManager;
 import sc.type.CTypeUtil;
+import sc.obj.SyncMode;
 
-@sc.obj.Sync(onDemand=true)
+
+@Sync(onDemand=true)
 public class InstanceWrapper implements IObjectId {
+   @Sync(syncMode=SyncMode.Disabled)
    EditorContext ctx;
+   @Sync(syncMode=SyncMode.Disabled)
    public Object theInstance;
+   @Sync(syncMode=SyncMode.Disabled)
    boolean canCreate = false;
+   @Sync(syncMode=SyncMode.Disabled)
    public String typeName;
    /*
    public InstanceWrapper(EditorContext ctx, boolean canCreate, String typeName) {

@@ -113,6 +113,14 @@ public class ClientTypeDeclaration extends TypeDeclaration implements IChangeabl
       fullTypeName = ftn;
    }
 
+   String extendsTypeName;
+   @Constant
+   public String getExtendsTypeName() {
+      return extendsTypeName;
+   }
+   public void setExtendsTypeName(String ftn) {
+      extendsTypeName = ftn;
+   }
 
    public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified) {
       if (orig != null)

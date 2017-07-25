@@ -27,6 +27,11 @@ public class SyncHandler {
    /** Hook for subclasses to substitute a new instance for the one in the model.  Given the original instance, return
     the instance that is to be used to synchronize against the client. */
    protected Object replaceInstance(Object inst) {
+      if (inst instanceof Class) {
+         ClassSyncWrapper classWrap = new ClassSyncWrapper(((Class) inst).getName());
+         SyncManager.addSyncInst(classWrap, true, false, null, classWrap.className);
+         return classWrap;
+      }
       return inst;
    }
 
@@ -35,6 +40,13 @@ public class SyncHandler {
     * deserialized and before it's used in the application, for a property set or method call.
     */
    protected Object restoreInstance(Object inst) {
+      if (inst instanceof ClassSyncWrapper) {
+         String remoteClassName = ((ClassSyncWrapper) inst).className;
+         Object remoteClass = DynUtil.findType(remoteClassName);
+         if (remoteClass == null)
+            System.err.println("*** Unable to restore reference to class: " + remoteClassName);
+         return remoteClass;
+      }
       return inst;
    }
 

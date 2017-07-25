@@ -12,7 +12,9 @@ import sc.type.PTypeUtil;
 import sc.type.RTypeUtil;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 public class CFAnnotation implements IAnnotation {
    ClassFile classFile;

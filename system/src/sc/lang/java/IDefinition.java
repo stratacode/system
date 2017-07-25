@@ -4,8 +4,11 @@
 
 package sc.lang.java;
 
+import java.util.Map;
+
 public interface IDefinition {
    Object getAnnotation(String annotName);
+   Map<String,Object> getAnnotations();
    boolean hasModifier(String modifierName);
    AccessLevel getAccessLevel(boolean explicitOnly);
    Object getEnclosingIType();

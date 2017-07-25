@@ -993,4 +993,8 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       return null;
    }
 
+   public Object getPrimitiveValue() {
+      return eval(null, new ExecutionContext());
+   }
+
 }

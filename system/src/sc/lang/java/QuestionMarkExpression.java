@@ -7,6 +7,7 @@ package sc.lang.java;
 import sc.bind.BindingDirection;
 import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
+import sc.lang.sc.PropertyAssignment;
 
 import java.util.List;
 import java.util.Set;
@@ -34,6 +35,8 @@ public class QuestionMarkExpression extends Expression {
    }
 
    public boolean propagatesInferredType(Expression child) {
+      if (!hasInferredType())
+         return false;
       return child == trueChoice || child == falseChoice;
    }
 

@@ -525,6 +525,10 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return ModelUtil.getAnnotation(baseType, annotName);
    }
 
+   public Map<String,Object> getAnnotations() {
+      return ModelUtil.getAnnotations(baseType);
+   }
+
    public boolean hasModifier(String modifierName) {
       return ModelUtil.hasModifier(baseType, modifierName);
    }

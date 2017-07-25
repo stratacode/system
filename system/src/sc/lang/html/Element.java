@@ -3545,14 +3545,14 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
    }
 
 
-   // In the source this is called 'class' so use that name in the editor
-   @sc.obj.EditorSettings(displayName="class")
    public String HTMLClass;
 
    public String getHTMLClass() {
       return HTMLClass;
    }
 
+   // In the source this is called 'class' so use that name in the editor
+   @sc.obj.EditorSettings(displayName="class")
    public void setHTMLClass(String cl) {
       HTMLClass = cl;
       Bind.sendChangedEvent(this, "HTMLClass");

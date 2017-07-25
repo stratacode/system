@@ -14,6 +14,7 @@ import java.lang.reflect.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeParamContext {
    public Object method;
@@ -809,6 +810,10 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
 
    public Object getAnnotation(String annotName) {
       return ModelUtil.getAnnotation(method, annotName);
+   }
+
+   public Map<String,Object> getAnnotations() {
+      return ModelUtil.getAnnotations(method);
    }
 
    public boolean hasModifier(String modifierName) {

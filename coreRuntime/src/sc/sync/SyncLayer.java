@@ -273,11 +273,7 @@ public class SyncLayer {
       addChangedValue(obj, propName, val, false);
    }
 
-   /**
-    * Records a property change in the SyncLayer for the given object, property, and value.
-    * Use remote = true for changes which originated on the other side
-    */
-   public void addChangedValue(Object obj, String propName, Object val, boolean remote) {
+   private void updateChangedValue(Object obj, String propName, Object val) {
       HashMap<String,Object> changeMap = changedValues.get(obj);
       if (changeMap == null) {
          changeMap = new HashMap<String,Object>();
@@ -287,9 +283,22 @@ public class SyncLayer {
       // TODO: should we remove the old one if changedBefore is true?  There could be data dependencies so maybe we need to apply them in order, ala a transaction log
       // boolean changedBefore = changeMap.containsKey(propName);
       changeMap.put(propName, val);
+   }
+
+   /**
+    * Records a property change in the SyncLayer for the given object, property, and value.
+    * Use remote = true for changes which originated on the other side
+    */
+   public void addChangedValue(Object obj, String propName, Object val, boolean remote) {
+      updateChangedValue(obj, propName, val);
 
       SyncChange change = new SyncPropChange(obj, propName, val, remote);
       addSyncChange(change);
+   }
+
+   public void addDepChangedValue(List<SyncChange> depChanges, Object obj, String propName, Object val, boolean remote) {
+      updateChangedValue(obj, propName, val);
+      depChanges.add(new SyncPropChange(obj, propName, val, remote));
    }
 
    /** Records a 'new object' sync change, including the optional parameters passed to the new object. */
@@ -631,11 +640,15 @@ public class SyncLayer {
                if (numLevels > 0)
                   newObjName = CTypeUtil.getPackageName(objTypeName);
                else {
-                  /*  Creating a new top level object with new args.  Use the class as the context for the static variable
-                  newObjName = CTypeUtil.getClassName(DynUtil.getTypeName(newObjType, false));
-                  useObjNameForPackage = false;
-                  */
-                  newObjName = ""; // TODO: is this right?
+                  // For SC serialization format, because it's like Java we can't omit the top-level name so we use the new obj type name but for JSON and other formats
+                  // we don't want this top-level thing
+                  if (ser.needsObjectForTopLevelNew()) {
+                     newObjName = CTypeUtil.getClassName(DynUtil.getTypeName(newObjType, false));
+                     useObjNameForPackage = false;
+                  }
+                  else {
+                     newObjName = "";
+                  }
                }
             }
             objName = syncHandler.getObjectBaseName(depChanges, this);
@@ -838,6 +851,7 @@ public class SyncLayer {
          newSB.appendFetchProperty(fetchProp.propName, indentSize);
       }
 
+      // Before we add the newSB, insert any dependencies that need to be before
       if (depChanges.size() != 0) {
          String origPackage = newLastPackageName;
          int dix = 0;
@@ -971,6 +985,16 @@ public class SyncLayer {
 
    public void dump() {
       System.out.println(getChangeList());
+   }
+
+   public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append("syncLayer for: ");
+      if (syncContext != null)
+         sb.append(syncContext);
+      if (initialLayer)
+         sb.append(" - initial layer");
+      return sb.toString();
    }
 
 }
