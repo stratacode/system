@@ -6,11 +6,7 @@ package sc.util;
 
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -24,10 +20,12 @@ public class WeakIdentityHashMap<K, V> implements Map<K, V> {
    private Map<IdentityWeakRef, V> map;
 
    public WeakIdentityHashMap(int initialCapacity) {
-      // Using concurrent hashmap here becausae the LayeredSystem properties like objectNameIndex, dynInnerToOuterIndex
+      // Originally used concurrent hashmap here because the LayeredSystem properties like objectNameIndex, dynInnerToOuterIndex
       // all can be accessed by multiple threads.  We could synchronize LayeredSystem itself but that's probably more
       // expensive and more code so taking this short cut.
-      map = new ConcurrentHashMap<IdentityWeakRef, V>(initialCapacity);
+      //map = new ConcurrentHashMap<IdentityWeakRef, V>(initialCapacity);
+      // Now we also need ordering so we can retrieve instances in the order in which they were created so just going to synchronize on the map itself
+      map = Collections.synchronizedMap(new LinkedHashMap<IdentityWeakRef, V>(initialCapacity));
    }
 
    public WeakIdentityHashMap() {

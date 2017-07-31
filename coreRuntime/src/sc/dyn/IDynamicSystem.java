@@ -158,4 +158,5 @@ public interface IDynamicSystem {
 
    Object getPropertyAnnotationValue(Object typeObj, String propName, String annotName, String attName);
 
+   void addDynListener(IDynListener listener);
 }

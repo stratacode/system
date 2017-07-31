@@ -215,9 +215,6 @@ public class SyncManager {
 
       IdentityHashMap<Object, SyncListenerInfo> syncListenerInfo = new IdentityHashMap<Object, SyncListenerInfo>();
 
-      // A table for each type name which lists the current unique integer for that type that we use to automatically generate semi-unique ids for each instance
-      Map<String,Integer> typeIdCounts;
-
       // A table which stores the automatically assigned id for a given object instance.
       //static Map<Object,String> objectIds = (Map<Object,String>) PTypeUtil.getWeakHashMap();
       Map<Object,String> objectIds;
@@ -580,6 +577,7 @@ public class SyncManager {
          Object oldInst = objectIndex.put(objName, inst);
          if (verbose && oldInst != null && oldInst != inst)
             System.out.println("*** Warning: replacing old instance for: " + objName);
+         DynUtil.setObjectId(inst, objName); // Register this instance so we use this one name for logging, management etc. to refer to this instance
 
          // When registering names if the other side used a type-id larger than in our current cache, we need to adjust ours to use larger ids to avoid conflicts
          // TODO: there is a race condition here - where the client and server could be allocating ids and so conflict.  This is only for the default naming system - use IObjectId
@@ -590,13 +588,9 @@ public class SyncManager {
             String ctStr = objName.substring(usix + ID_INDEX_SEPARATOR.length());
             try {
                int ct = Integer.parseInt(ctStr);
-               if (typeIdCounts == null)
-                  typeIdCounts = new HashMap<String, Integer>();
-               Integer val = typeIdCounts.get(typeName);
-               if (val == null)
-                  val = 0;
+               int val = DynUtil.getTypeIdCount(typeName);
                if (val <= ct)
-                  typeIdCounts.put(typeName, ct + 1);
+                  DynUtil.updateTypeIdCount(typeName, ct + 1);
             }
             catch (NumberFormatException exc) {}
          }
@@ -878,31 +872,7 @@ public class SyncManager {
       private final static String ID_INDEX_SEPARATOR = "__";
 
       public String findObjectId(Object obj, String typeName) {
-         if (objectIds == null)
-            objectIds = new HashMap<Object,String>();
-
-         String objId = objectIds.get(new IdentityWrapper(obj));
-         if (objId != null)
-            return objId;
-
-         String typeIdStr = ID_INDEX_SEPARATOR + getTypeIdCount(typeName);
-         String id = DynUtil.cleanTypeName(typeName) + typeIdStr;
-         objectIds.put(new IdentityWrapper(obj), id);
-         return id;
-      }
-
-      public Integer getTypeIdCount(String typeName) {
-         if (typeIdCounts == null)
-            typeIdCounts = new HashMap<String,Integer>();
-         Integer typeId = typeIdCounts.get(typeName);
-         if (typeId == null) {
-            typeIdCounts.put(typeName, 1);
-            typeId = 0;
-         }
-         else {
-            typeIdCounts.put(typeName, typeId + 1);
-         }
-         return typeId;
+         return DynUtil.getObjectId(obj, null, typeName);
       }
 
       // After a successful sync, everything is registered.  Don't touch the parent context since it is shared with other clients

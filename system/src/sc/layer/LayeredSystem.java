@@ -890,6 +890,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    private List<IModelListener> modelListeners = new ArrayList<IModelListener>();
    private List<ITypeChangeListener> typeChangeListeners = new ArrayList<ITypeChangeListener>();
+   private List<IDynListener> dynListeners = null;
 
    EditorContext editorContext;
 
@@ -13498,6 +13499,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       instMap.put(inst, Boolean.TRUE);
+
+      if (dynListeners != null) {
+         for (IDynListener listener:dynListeners)
+            listener.instanceAdded(inst);
+      }
    }
 
    public boolean removeDynInstance(String typeName, Object inst) {
@@ -13507,8 +13513,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             Object res = instMap.remove(inst);
             if (res == null)
                warning("*** Can't find dyn instance to remove for type: " + typeName);
-            else if (instMap.size() == 0)
-               instancesByType.remove(typeName);
+            else {
+               if (instMap.size() == 0)
+                  instancesByType.remove(typeName);
+
+               if (dynListeners != null) {
+                  for (IDynListener listener:dynListeners)
+                     listener.instanceRemoved(inst);
+               }
+            }
             return res != null;
          }
          // else - we do not add the dynInstance for regular classes that are not components so this happens a lot
@@ -15021,6 +15034,17 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return buildDir;
       }
       return null;
+   }
+
+   public void addDynListener(IDynListener listener) {
+      if (dynListeners == null)
+         dynListeners = new ArrayList<IDynListener>();
+      dynListeners.add(listener);
+   }
+
+   public void removeDynListener(IDynListener listener) {
+      if (dynListeners == null || !dynListeners.remove(listener))
+         error("No dyn listener to remove");
    }
 }
 

@@ -42,7 +42,9 @@ public class DynUtil {
 
    // A table which stores the automatically assigned id for a given object instance.
    //static Map<Object,String> objectIds = (Map<Object,String>) PTypeUtil.getWeakHashMap();
-   static Map<Object,String> objectIds = new WeakHashMap<Object,String>();
+   // This used to be WeakHashMap but we use IdentityWrapper as a key most of the time which causes this to get gc'd too quickly
+   // TODO: Can we use the WeakIdentityHashMap in sc.util?  It would need to be moved into coreRuntime  Right now, this is a memory leak unless we restrict it's use to objects that use dispose
+   static Map<Object,String> objectIds = new HashMap<Object,String>();
 
    public static void clearObjectIds() {
       objectIds.clear();
@@ -593,6 +595,11 @@ public class DynUtil {
          dynamicSystem.addDynInstance(typeName, instObj);
    }
 
+   public static void addDynListener(IDynListener listener) {
+      if (dynamicSystem != null) {
+         dynamicSystem.addDynListener(listener);
+      }
+   }
    public static void addDynInnerInstance(String typeName, Object innerObj, Object outerObj) {
       if (dynamicSystem != null)
          dynamicSystem.addDynInnerInstance(typeName, innerObj, outerObj);
@@ -705,15 +712,17 @@ public class DynUtil {
       return castType.evalCast(theClass, value);
    }
 
-   /** Returns a small but consistent id for each object under the microscope */
+   /** Returns a small but consistent id for each object - using the objectId if it's set just for consistency and ease of debugging */
    public static String getTraceId(Object obj) {
       Integer id;
-      if ((id = traceIds.get(new IdentityWrapper(obj))) == null)
-         traceIds.put(new IdentityWrapper(obj), id = new Integer(traceCt++));
+      IdentityWrapper wrap = new IdentityWrapper(obj);
+      if ((id = traceIds.get(wrap)) == null)
+         traceIds.put(wrap, id = new Integer(traceCt++));
 
       return String.valueOf(id);
    }
 
+   /** Gets the trace id without the identity wrapper, for things like session ids which should use 'equals' to find the same thing */
    public static String getTraceObjId(Object obj) {
       Integer id;
       if ((id = traceIds.get(obj)) == null)
@@ -781,6 +790,10 @@ public class DynUtil {
       return id;
    }
 
+   public static void setObjectId(Object obj, String name) {
+      objectIds.put(new IdentityWrapper(obj), name);
+   }
+
    public static Integer getTypeIdCount(String typeName) {
       Integer typeId = typeIdCounts.get(typeName);
       if (typeId == null) {
@@ -791,6 +804,10 @@ public class DynUtil {
          typeIdCounts.put(typeName, typeId + 1);
       }
       return typeId;
+   }
+
+   public static void updateTypeIdCount(String typeName, int val) {
+      typeIdCounts.put(typeName, val);
    }
 
    /**
@@ -826,6 +843,11 @@ public class DynUtil {
             }
             else if (isObject(obj) && (res = getObjectName(obj)) != null)
                return res;
+
+            String objId = objectIds.get(new IdentityWrapper(obj));
+            if (objId != null)
+               return objId;
+
             else {
                String toStr = obj.toString();
                if (!PTypeUtil.useInstanceName(toStr))
@@ -1122,6 +1144,8 @@ public class DynUtil {
             }
          }
       }
+
+      objectIds.remove(new IdentityWrapper(obj));
    }
 
    public static void initComponent(Object comp) {
@@ -1497,4 +1521,5 @@ public class DynUtil {
    public static Object getTypeOfObj(Object changedObj) {
       return DynUtil.isType(changedObj) ? changedObj.getClass() : DynUtil.getType(changedObj);
    }
+
 }
