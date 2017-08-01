@@ -1076,9 +1076,28 @@ public class SelectorExpression extends ChainedExpression {
 
    // We propagate to arguments in VariableSelectors but not to the root expression and not when a direct child of a PropertyAssignment that's a reverse only binding
    public boolean propagatesInferredType(Expression child) {
+      if (child == expression)
+         return false;
+      // Since child can be any descendant, if it's an argument to a method it has an inferred type
+      if (isSelectorArg(child))
+         return true;
+      // TODO: Not sure what other expression children a selector expression can have but there's a case where we are a child of a PropertyAssignment, reverse-only binding which might get here?
       if (!hasInferredType())
          return false;
-      return child != expression;
+      return true;
+   }
+
+   private boolean isSelectorArg(Expression child) {
+      if (selectors == null)
+         return false;
+      for (Selector sel:selectors) {
+         if (sel instanceof VariableSelector) {
+            VariableSelector vsel = (VariableSelector) sel;
+            if (vsel.arguments != null && vsel.arguments.contains(child))
+               return true;
+         }
+      }
+      return false;
    }
 
    /* For Selector expressions, styling is done in the Selector sub-classes.
