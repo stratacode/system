@@ -11,6 +11,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Implementation of a weak hash map that always uses object identity, not equals/hashCode.
+ * Also preserves the insertion order, so when we iterate over lists of instances, we get them
+ * in the order in which they were registered.
+ *
  * Useful to associate data structures with any user defined class without requiring them
  * to adhere to a contract.
  */
@@ -49,7 +52,7 @@ public class WeakIdentityHashMap<K, V> implements Map<K, V> {
 
     public Set<Map.Entry<K, V>> entrySet() {
        cleanup();
-       Set<Map.Entry<K, V>> ret = new HashSet<Map.Entry<K, V>>();
+       Set<Map.Entry<K, V>> ret = new LinkedHashSet<Map.Entry<K, V>>();
        for (Map.Entry<IdentityWeakRef, V> ref : map.entrySet()) {
           final K key = ref.getKey().get();
           final V value = ref.getValue();
@@ -71,7 +74,7 @@ public class WeakIdentityHashMap<K, V> implements Map<K, V> {
 
     public Set<K> keySet() {
         cleanup();
-        Set<K> ret = new HashSet<K>();
+        Set<K> ret = new LinkedHashSet<K>();
         for (IdentityWeakRef ref:map.keySet()) {
             ret.add(ref.get());
         }

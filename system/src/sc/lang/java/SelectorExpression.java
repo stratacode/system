@@ -1096,6 +1096,11 @@ public class SelectorExpression extends ChainedExpression {
             if (vsel.arguments != null && vsel.arguments.contains(child))
                return true;
          }
+         if (sel instanceof ArraySelector) {
+            ArraySelector asel = (ArraySelector) sel;
+            if (asel.expression == child)
+               return true;
+         }
       }
       return false;
    }

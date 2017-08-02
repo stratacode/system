@@ -13649,11 +13649,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   insts = subInsts;
                else {
                   if (res == null) {
-                     res = new HashSet<Object>();
+                     res = new LinkedHashSet<Object>();
                      res.addAll(insts.keySet());
                   }
                   else if (!(res instanceof HashSet)) {
-                     HashSet<Object> newRes = new HashSet<Object>();
+                     LinkedHashSet<Object> newRes = new LinkedHashSet<Object>();
                      newRes.addAll(res);
                      newRes.addAll(insts.keySet());
                      res = newRes;
