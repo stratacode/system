@@ -491,7 +491,7 @@ public class Sequence extends NestedParselet  {
             if (parser.enablePartialValues) {
                Object pv = err.partialValue;
 
-               // If we failed to complete this sequence, and we are in "error handling" mode, try to re-parse the previous sequence by extending it.
+               // If we failed to complete the current child in the sequence, and we are in "error handling" mode, try to re-parse the previous child by extending it.
                // Some sequences collapse all values into a single child (e.g. blockComment).  For those, we can't support this optimization.
                if (i > 0 && value != null && value.children != null && value.children.size() >= i) {
                   int prevIx = i - 1;
@@ -507,6 +507,9 @@ public class Sequence extends NestedParselet  {
                   if (oldValue instanceof IParseNode) {
                      ctxState = dctx.resetCurrentIndex(parser, ((IParseNode) oldValue).getStartIndex());
                   }
+                  // TODO: remove this call since we do reparsing of extended errors during the main reparse now.  partial values still does it in two passes but this will always just return null now.
+                  // One problem we had is that we don't reset the currentErrors when we reset the start position.  So getting an accurate 'partial value' from extendPartialValues won't work during the
+                  // reparse.  Probably this same algorithm should be used for the normal parse method with enablePartialValues.
                   Object newPrevValue = prevParselet.reparseExtendedErrors(parser, childParselet, origOldChild, dctx, forceReparse || prevChildReparse);
                   if (newPrevValue != null && !(newPrevValue instanceof ParseError)) {
                      Object oldPrevValue = value.children == null || prevIx >= value.children.size() ? null : value.children.get(prevIx);
@@ -724,6 +727,7 @@ public class Sequence extends NestedParselet  {
 
                         // Now see if this computed value extends any of our most specific errors.  If so, this error
                         // can be used to itself extend other errors based on the EOF parsing.
+                        // TODO: warning - this relies on currentErrors which during reparse might have advanced beyond the point we are parsing.  This used happened when we used reparseExtendedErrors but that's been disabled now
                         if ((extendsPartialValue(parser, childParselet, value, anyContent, startIndex, err) && anyContent) || err.eof || pv != null || isBetterError) {
                            if (!err.eof || !value.isEmpty()) {
                               if (optional && value.isEmpty())

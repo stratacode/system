@@ -555,9 +555,10 @@ public class TestUtil {
                   }
                   // 218 - is where we change from forVar to forControl
                   // 250 - is where it should parse
-                  if (reparseFile.contains("10")) {
+                  if (reparseFile.contains("9")) {
                      //HTMLLanguage.getHTMLLanguage().blockStatements.trace = true;
-                     //SCLanguage.getSCLanguage().compilationUnit.trace = true;
+                     //SCLanguage.getSCLanguage().classBody.trace = true;
+                     //SCLanguage.getSCLanguage().blockStatements.trace = true;
                      //JavaLanguage.getJavaLanguage().classBodyDeclarations.trace = true;
                      //HTMLLanguage.getHTMLLanguage().templateBodyDeclarations.trace = true;
                      // Let's you set breakpoints easily for semantic nodes that don't match

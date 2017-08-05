@@ -684,8 +684,13 @@ public class OrderedChoice extends NestedParselet  {
                   if (errorRes instanceof ErrorParseNode) {
                      newErrorRes = (ErrorParseNode) errorRes;
                   }
-                  else
+                  else {
                      newErrorRes = new ErrorParseNode(new ParseError(skipOnErrorParselet, "Expected {0}", new Object[]{this}, errorStart, parser.currentIndex), errorRes.toString());
+                     // This error's startIndex is in the new parse-tree since we are reparsing.   In the event that we try to reparse this again, need to avoid removing the node in clearOldParseNodes
+                     newErrorRes.newStartIndex = newErrorRes.startIndex;
+                     // There are places where we directly check startIndex field
+                     //newErrorRes.startIndex = -1;
+                  }
 
                   svCount += value.addForReparse(newErrorRes, skipOnErrorParselet, svCount, newChildCount++, bestErrorSlotIx, true, parser, nextChildParseNode, dctx, true, true);
                   matched = true;
@@ -918,9 +923,11 @@ public class OrderedChoice extends NestedParselet  {
       }
    }
 
+   /*
    public Object reparseExtendedErrors(Parser parser, Parselet exitParselet, Object oldChildNode, DiffContext dctx, boolean forceReparse) {
       return reparseRepeatingChoice(parser, exitParselet, oldChildNode, dctx, forceReparse, true, true);
    }
+   */
 
    private Object parsePartialErrorValue(Parser parser, ParseError bestError, int lastMatchStart, int bestErrorSlotIx) {
       ParentParseNode value = (ParentParseNode) newParseNode(lastMatchStart);
