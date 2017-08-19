@@ -1257,6 +1257,8 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
 
    private static HashSet<String> verboseBaseTypeNames = null;
 
+   private static HashMap<String,String> classNameToTagNameIndex = new HashMap<String,String>();
+
    public Object getDefaultExtendsTypeDeclaration(boolean processable) {
       if (defaultExtendsType != null)
          return defaultExtendsType;
@@ -1292,6 +1294,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          // Only match against tag packages which we directly extend
          if (tagPackageLayer == null || modelLayer == null || modelLayer.extendsLayer(tagPackageLayer) || modelLayer == tagPackageLayer) {
             String tagName = lowerTagName();
+            String origTagName = tagName;
             Template enclTemplate = getEnclosingTemplate();
             if (tagName.equals("html") && enclTemplate.singleElementType)
                tagName = "htmlPage";
@@ -1307,6 +1310,9 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
                res = sys.getTypeDeclaration(typeName, false, modelLayer, model != null && model.isLayerModel);
 
             if (res != null && (!processable || ModelUtil.isProcessableType(res))) {
+               String oldTagName = classNameToTagNameIndex.put(typeName, origTagName);
+               if (oldTagName != null && !oldTagName.equals(origTagName))
+                  System.err.println("*** Error - registered same typeName: " + typeName + " for two different tag names: " + tagName + " and " + oldTagName);
                if (res instanceof TypeDeclaration) {
                   TypeDeclaration resTD = (TypeDeclaration) res;
                   if (modelLayer == null || resTD.getLayer() == null || (resTD.getLayer() != null && resTD.getLayer().activated != modelLayer.activated))
@@ -2421,7 +2427,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       }
       if (tagName != null) {
          // If either we are the first class to extend HTMLElement or we are derived indirectly from Page (and so may not have assigned a tag name)
-         if (extTypeDecl == HTMLElement.class || ModelUtil.isAssignableFrom(Page.class, extTypeDecl)) {
+         if (extTypeDecl == HTMLElement.class || ModelUtil.isAssignableFrom(Page.class, extTypeDecl) || !tagName.equals(getExtendsDefaultTagNameForType(tagType))) {
             addTagTypeBodyStatement(tagType, PropertyAssignment.create("tagName", StringLiteral.create(tagName), "="));
          }
       }
@@ -2627,6 +2633,63 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
 
       // Generate the outputBody method
       return tagType;
+   }
+
+   private String getTagNameForExplicitType(Object type) {
+      if (ModelUtil.hasTypeParameters(type))
+         type = ModelUtil.getParamTypeBaseType(type);
+      String typeName = ModelUtil.getTypeName(type);
+      String defaultTagName = classNameToTagNameIndex.get(typeName);
+      if (type instanceof TypeDeclaration) {
+         TypeDeclaration extBodyType = (TypeDeclaration) type;
+         if (extBodyType.element != null) {
+            String bodyElemTagName = extBodyType.element.tagName;
+            if (bodyElemTagName != null && defaultTagName != null && !bodyElemTagName.equals(defaultTagName))
+               System.err.println("*** Tag name conflict: " + bodyElemTagName + " and " + defaultTagName + " for: " + typeName);
+            return extBodyType.element.tagName;
+         }
+      }
+      if (defaultTagName != null)
+         return defaultTagName;
+      return null;
+   }
+
+   private String getDefaultTagNameForType(Object tagType) {
+      String tagName = getTagNameForExplicitType(tagType);
+      if (tagName != null)
+         return tagName;
+      String res = getNextExtendsDefaultTagNameForType(tagType);
+      return res;
+   }
+
+   private String getExtendsDefaultTagNameForType(Object tagType) {
+      String res = getNextExtendsDefaultTagNameForType(tagType);
+      if (res == null) {
+         System.err.println("*** No default tag name for extends type for: " + tagType);
+         res = "";
+      }
+      return res;
+   }
+
+   private String getNextExtendsDefaultTagNameForType(Object tagType) {
+      Object nextTypeDecl = tagType;
+      Object extTypeDecl = ModelUtil.getExtendsClass(nextTypeDecl);
+      if (extTypeDecl != null && extTypeDecl != tagType) {
+         String tagName = getTagNameForExplicitType(extTypeDecl);
+         if (tagName != null)
+            return tagName;
+         tagName = getDefaultTagNameForType(extTypeDecl);
+         if (tagName != null)
+            return tagName;
+      }
+      Object modTypeDecl = ModelUtil.getSuperclass(nextTypeDecl);
+      if (modTypeDecl != null && modTypeDecl != extTypeDecl) {
+         String tagName = getTagNameForExplicitType(modTypeDecl);
+         if (tagName != null)
+            return tagName;
+         return getDefaultTagNameForType(modTypeDecl);
+      }
+      return null;
    }
 
    private void addTagTypeBodyStatement(BodyTypeDeclaration tagType, Statement st) {

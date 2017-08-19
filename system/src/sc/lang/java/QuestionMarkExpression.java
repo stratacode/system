@@ -200,9 +200,15 @@ public class QuestionMarkExpression extends Expression {
       if (!condStr.endsWith(" "))
          sb.append(" ");
       sb.append("? ");
-      sb.append(trueChoice.toGenerateString());
+      if (trueChoice != null)
+         sb.append(trueChoice.toGenerateString());
+      else
+         sb.append("null");
       sb.append(" : ");
-      sb.append(falseChoice.toGenerateString());
+      if (falseChoice != null)
+         sb.append(falseChoice.toGenerateString());
+      else
+         sb.append("null");
       return sb.toString();
    }
 

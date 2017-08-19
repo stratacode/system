@@ -372,10 +372,10 @@ public class ClassDeclaration extends TypeDeclaration {
          return super.transform(runtime);
       }
 
-      /* Should we try to ensure all extended types are transformed, so that for example setX methods are created and thusable resolvable
+      /* Should we try to ensure all extended types are transformed, so that for example setX methods are created and resolvable
         * immediately by this class during transform?   That seems too challenging to guarantee.   The transform of a parent type
         * expects to transform each child-type in order during it's transform.  We could fix that by making that process more involved.
-        * I'm not sure that just fixing that fixes everything though.  An alternative is to dactivate each node, then have the JS layer
+        * I'm not sure that just fixing that fixes everything though.  An alternative is to deactivate each node, then have the JS layer
         * (which needs the resolve) reactivate the nodes, re-resolving them if necessary.   Instead we ignore errors during transform
         * and re-resolve during the JS conversion process.  During the copy, if we detect a conflict - i.e. that after restarting the node
         * it did not map to the setX method we would expect, it's on the copier to detect that and fix the reference, or we could rewrite all of the

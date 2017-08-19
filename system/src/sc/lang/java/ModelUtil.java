@@ -4417,6 +4417,8 @@ public class ModelUtil {
     * method for the native Class/Method etc. as they do not store the type param stuff in the same place.
     */
    public static Object getParameterizedType(Object member, JavaSemanticNode.MemberType type) {
+      if (member instanceof ParamTypedMember)
+         return ((ParamTypedMember) member).paramTypeDecl;
       if (type == JavaSemanticNode.MemberType.SetMethod) {
          if (member instanceof IMethodDefinition) {
             Object[] paramTypes = ((IMethodDefinition) member).getParameterTypes(false);

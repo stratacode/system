@@ -498,7 +498,7 @@ public class Sequence extends NestedParselet  {
                   Parselet prevParselet = parselets.get(prevIx);
                   Object oldValue = value.children.get(prevIx);
                   Object origOldChild = value == origOldParseNode ? oldValue : null;
-                  if (savedOrigChildren != null) {
+                  if (savedOrigChildren != null && prevIx < savedOrigChildren.length) {
                      origOldChild = savedOrigChildren[prevIx];
                   }
                   boolean prevChildReparse = !oldChildMatches(origOldChild, prevParselet, dctx);

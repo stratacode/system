@@ -3410,6 +3410,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       /** Should we generate the debugging line number mappings for generated source */
       @Constant public boolean genDebugInfo = true;
+
+      /** Treat warnings as errors - to stop builds and exit with error status - use true for most test and even production scenarios */
+      @Constant public boolean treatWarningsAsErrors = true;
    }
 
    @MainSettings(produceJar = true, produceScript = true, produceBAT = true, execName = "bin/scc", jarFileName="bin/sc.jar", debug = false, maxMemory = 2048, defaultArgs = "-restartArgsFile <%= getTempDir(\"restart\", \"tmp\") %>")
@@ -6528,9 +6531,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Set<String> getFilesInPackage(String packageName) {
-      if (packageName == null)
-         packageName = "";
-      packageName = packageName.replace('.', FileUtil.FILE_SEPARATOR_CHAR);
+      if (packageName != null) {
+         if (packageName.length() == 0)
+            packageName = null;
+         else
+            packageName = packageName.replace('.', FileUtil.FILE_SEPARATOR_CHAR);
+      }
       HashMap<String,PackageEntry> pkgEnt = packageIndex.get(packageName);
       if (pkgEnt == null)
          return null;
@@ -15045,6 +15051,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public void removeDynListener(IDynListener listener) {
       if (dynListeners == null || !dynListeners.remove(listener))
          error("No dyn listener to remove");
+   }
+
+   public void fetchRemoteTypeDeclaration(String typeName, IResponseListener resp) {
+      // Ignore this call on the server - we'll already have called resolveSrcTypeDeclaration which will synchronously fetch the type there
+   }
+
+   @sc.obj.Remote(remoteRuntimes="js")
+   public BodyTypeDeclaration getSrcTypeDeclaration(String typeName) {
+      return getSrcTypeDeclaration(typeName, null, true);
    }
 }
 

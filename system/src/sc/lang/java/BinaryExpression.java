@@ -115,8 +115,14 @@ public class BinaryExpression extends Expression {
                }
 
                if (TypeUtil.operatorPrecedes(op.operator, newParent.operator)) {
-                  newExpr = createExpression((Expression) newParent.rhs, op);
-                  newParent.setProperty("rhs", newExpr, false, false);
+                  if (newParent.rhs instanceof Expression) {
+                     newExpr = createExpression((Expression) newParent.rhs, op);
+                     newParent.setProperty("rhs", newExpr, false, false);
+                  }
+                  else if (newParent.rhs instanceof ClassType) {
+                     ClassType newClassType = ((ClassType) newParent.rhs).deepCopy(ISemanticNode.CopyNormal, null);
+                     newParent.setProperty("rhs", newClassType, false, false);
+                  }
                }
                else {
                   newExpr = createExpression(newParent,  op);

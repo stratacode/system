@@ -366,7 +366,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                      IVariable var = (IVariable) varObj;
                      Object varTypeObj = ModelUtil.getVariableTypeDeclaration(var);
                      if (varTypeObj != null && !ModelUtil.isAssignableFrom(varTypeObj, typeObj) && !inNamedPropertyMethod(firstIdentifier))
-                        displayError("Ambiguous object expression - variable: " + ModelUtil.toDefinitionString(var) + " and object: " + ModelUtil.toDefinitionString(typeObj) + " from: ");
+                        displayError("Object/variable name conflict for: " + firstIdentifier + " variable: " + ModelUtil.toDefinitionString(var) + " and object: " + ModelUtil.toDefinitionString(typeObj) + " from: ");
                   }
                }
                else if (typeObj instanceof Class || typeObj instanceof CFClass) {
@@ -5085,9 +5085,14 @@ public class IdentifierExpression extends ArgumentsExpression {
          // Constructor super
          else {
             superType = getTypeForIdentifier(0);
+            enclType = getEnclosingType();
+            if (superType == null) {
+               // If we are using propagateConstructor, we may not have transformed the super-type yet.  In that case, assume it's the extends type so we can generate the code.
+               // TODO: we should be processing propagateConstructor in some way during start so we know it's there by the time we transform?
+               superType = enclType == null ? null : ModelUtil.getExtendsClass(enclType);
+            }
             if (superType == null)
                superType = getTypeForIdentifier(0);
-            enclType = getEnclosingType();
             if (ModelUtil.getEnclosingInstType(superType) != null && ModelUtil.getEnclosingInstType(enclType) != null) {
                int curCt = ModelUtil.getOuterInstCount(enclType);
                int superCt = ModelUtil.getOuterInstCount(superType);
@@ -5101,7 +5106,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                addOuter = true;
             }
             // convert from super.x(..) to JSType.call(this, ..)
-            setIdentifier(0, JSUtil.convertTypeName(getLayeredSystem(), ModelUtil.getTypeName(getTypeForIdentifier(0))), IdentifierType.BoundTypeName, boundTypes[0]);
+            setIdentifier(0, JSUtil.convertTypeName(getLayeredSystem(), ModelUtil.getTypeName(superType)), IdentifierType.BoundTypeName, boundTypes[0]);
          }
          addIdentifier(sz, "call", idType, boundTypes[sz-1]);
          arguments.add(0, IdentifierExpression.create(new NonKeywordString("this")));

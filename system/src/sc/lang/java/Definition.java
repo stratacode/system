@@ -416,16 +416,24 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
    private boolean includeForType(Annotation annot, MemberType type) {
       JavaModel model = getJavaModel();
       Layer layer = model == null ? null : model.getLayer();
-      IAnnotationProcessor p = getLayeredSystem().getAnnotationProcessor(layer, annot.getFullTypeName());
+      String annotTypeName = annot.getFullTypeName();
+      IAnnotationProcessor p = getLayeredSystem().getAnnotationProcessor(layer, annotTypeName);
       if (p == null) {
          // Right now for the Bindable annotation, we'll move it from the field to the Get/Set during conversion since
          // those become the public contract for the property.
-         if (annot.getTypeName().equals("Bindable") || annot.getTypeName().equals("sc.bind.Bindable")) {
-           if (type == MemberType.Field)
+         if (annotTypeName.equals("sc.bind.Bindable")) {
+            if (type == MemberType.Field)
               return false;
             else if (type == MemberType.SetMethod || type == MemberType.GetMethod)
               return true;
          }
+         // TODO: should we have a hook to make it easier to remove other annotations during transformation - maybe an annotation on the annotation type like the Retention one we customize for JS?
+
+         // This annotation gets stripped off during transformation.  If we don't remove it, the field can be transformed twice since we typically will transform newly added members a second time in case they
+         // use additional extensions.
+         if (annotTypeName.equals("sc.obj.GetSet"))
+            return false;
+
          EnumSet<ElementType> targets = ModelUtil.getAnnotationTargets(annot);
          if (targets != null) {
             switch (type) {

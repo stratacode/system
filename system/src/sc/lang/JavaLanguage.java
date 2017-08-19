@@ -521,7 +521,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
             variableModifiers, type, catchParameterExtraTypes, variableDeclaratorId, closeParenSkipOnError);
 
    // Exposed as part of the language api using this name
-   public Sequence parameters = formalParameterDecls;
+   public Sequence parameters = formalParameters;
 
    // Forward declarations
    public OrderedChoice variableInitializer = new OrderedChoice("<variableInitializer>");

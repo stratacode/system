@@ -950,7 +950,7 @@ public class TransformUtil {
          PerfMon.end("parsePropTemplate");
 
          if (staticResult instanceof ParseError)
-            System.err.println("*** error parsing property template: " + ((ParseError) staticResult).errorStringWithLineNumbers(codeToInsert));
+            System.err.println("*** error parsing static property template: " + ((ParseError) staticResult).errorStringWithLineNumbers(codeToInsert));
          else {
             PerfMon.start("resolvePropTemplate");
             IParseNode staticNode = (IParseNode) staticResult;
@@ -985,7 +985,7 @@ public class TransformUtil {
       Object result = SCLanguage.INSTANCE.parseString(codeToInsert, SCLanguage.INSTANCE.classBodySnippet);
       PerfMon.end("reparsePropTemplate");
       if (result instanceof ParseError)
-         System.err.println("*** error parsing property template: " + ((ParseError) result).errorStringWithLineNumbers(codeToInsert));
+         System.err.println("*** error reparsing property template: " + ((ParseError) result).errorStringWithLineNumbers(codeToInsert));
       else {
          PerfMon.start("restartPropTemplate");
          IParseNode node = (IParseNode) result;

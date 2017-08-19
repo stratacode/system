@@ -2523,22 +2523,35 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public void reportWarning(String error, ISemanticNode source) {
+      boolean treatWarningsAsErrors = layeredSystem != null && layeredSystem.options.treatWarningsAsErrors;
+      if (treatWarningsAsErrors)
+         hasErrors = true;
+
       if (errorHandler != null) {
          LayerUtil.reportMessageToHandler(errorHandler, error, getSrcFile(), source, MessageType.Warning);
       }
       else {
-         if (warningMessages == null)
-            warningMessages = new StringBuilder();
-         warningMessages.append(error);
+         if (treatWarningsAsErrors) {
+            if (errorMessages == null)
+               errorMessages = new StringBuilder();
+            errorMessages.append(error);
+         }
+         else {
+            if (warningMessages == null)
+               warningMessages = new StringBuilder();
+            warningMessages.append(error);
+         }
       }
-      hasErrors = true;
       if (layeredSystem != null) {
          // Already seen this error in this build
          if (layeredSystem.isWarningViewed(error, getSrcFile(), source)) {
             return;
          }
       }
-      System.out.println(error);
+      if (!treatWarningsAsErrors)
+         System.out.println(error);
+      else
+         System.err.println(error);
    }
 
    public void clearTransformed() {
