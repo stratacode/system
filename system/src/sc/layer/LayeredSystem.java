@@ -8931,7 +8931,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                               // which contains the most specific type.  Not sure it's necessary but this ensures we
                               // generate these files at a consistent spot when traversing the directory hierarchy by
                               // just adding it to the modelsToTransform in the right directory.
-                              String parentPath = FileUtil.getParentPath(dep.relFileName);
+                              String parentPath = FileUtil.getParentPath(depModel.getSrcFile().absFileName);
                               if (parentPath == null)
                                  parentPath = "";
                               ArrayList<SrcDirEntry> depDirs = bd.srcDirsByPath.get(parentPath);
