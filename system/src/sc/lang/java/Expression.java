@@ -600,6 +600,8 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       // IBinding: new IBinding[] { <arguments }
       NewExpression boundExpr = new NewExpression();
       ArrayInitializer boundProps = new ArrayInitializer();
+      if (sys == null) // Something failed to resolve properly?
+         return this;
       // When usePropertyMappers is false and this is potentially a property, it could be a String, not an IBeanMappoer so we need to use Object
       boundExpr.typeIdentifier = sys.usePropertyMappers || !includesProps ? "sc.bind.IBinding" : "Object";
       boundExpr.setProperty("arrayDimensions", new SemanticNodeList(0));
@@ -650,7 +652,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
          needsClass = true;
       }
       /** Check for the @Remote annotation - it can turn remoting on for this runtime even if the method is local. */
-      if (!isRemote && ModelUtil.isRemoteMethod(sys, methObj))
+      if (!isRemote && methObj != null && ModelUtil.isRemoteMethod(sys, methObj))
          isRemote = true;
       String remote = isRemote ? "Remote" : "";
       // resolveMethod, resolveStaticMethod, resolveRemoteMethod, etc are formed here
@@ -669,6 +671,8 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
 
    Expression createChildMethodBinding(Object typeObj, String methodName, Object methObj, SemanticNodeList<Expression> arguments, boolean isRemote) {
       LayeredSystem sys = getLayeredSystem();
+      if (methObj == null)
+         return this;
       if (sys.runtimeProcessor != null)
          methodName = sys.runtimeProcessor.replaceMethodName(sys, methObj, methodName);
       IdentifierExpression methBindExpr = IdentifierExpression.create("sc", "bind", "Bind", "methodP");

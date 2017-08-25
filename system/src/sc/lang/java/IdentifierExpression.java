@@ -282,7 +282,8 @@ public class IdentifierExpression extends ArgumentsExpression {
          }
          else if (sz == offset()) {
             if (arguments != null && !(this instanceof NewExpression)) {
-               Object foundMeth = findMethod(firstIdentifier, arguments, this, enclType, isStatic(), inferredType);
+               boolean isStatic = isStatic();
+               Object foundMeth = findMethod(firstIdentifier, arguments, this, enclType, isStatic, inferredType);
                if (foundMeth != null) {
                   foundMeth = parameterizeMethod(this, foundMeth, null, inferredType, arguments, getMethodTypeArguments());
                   idTypes[0] = IdentifierType.MethodInvocation;
@@ -314,7 +315,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                // template hierarchy.  So when it does the findMethod inside of the Template it never checks the root type.  If the enclType is the Template
                // the template checks the root type.  So either we should do findMethod originally on encltype or maybe the encltype should be the template?
                if (boundTypes[0] == null && enclType instanceof BodyTypeDeclaration) {
-                  boundTypes[0] = ((BodyTypeDeclaration) enclType).findMethod(firstIdentifier, arguments, this, enclType, isStatic(), inferredType);
+                  boundTypes[0] = ((BodyTypeDeclaration) enclType).findMethod(firstIdentifier, arguments, this, enclType, isStatic, inferredType);
                }
                if (boundTypes[0] == null) {
                   checkRemoteMethod(this, null, firstIdentifier, 0, idTypes, boundTypes, arguments, false, inferredType);
@@ -322,9 +323,10 @@ public class IdentifierExpression extends ArgumentsExpression {
                if (boundTypes[0] == null && model != null && !model.disableTypeErrors && isInferredSet() && isInferredFinal()) {
                   // For the IDE - might as well point to something close for reference checking etc.
                   boundTypes[0] = findClosestMethod(enclType, firstIdentifier, arguments);
-                  String otherMethods = enclType == null ? "" : getOtherMethodsMessage(enclType, firstIdentifier);
-                  displayRangeError(0, 0, "No method named: ", firstIdentifier, ModelUtil.argumentsToString(arguments), otherMethods, " for: ");
-                  foundMeth = findMethod(firstIdentifier, arguments, this, enclType, isStatic(), inferredType);
+                  String otherMethods = enclType == null ? "" : getOtherMethodsMessage(enclType, firstIdentifier, false);
+                  String message = isStatic ? "No static method named: " : "No method named: ";
+                  displayRangeError(0, 0, message, firstIdentifier, ModelUtil.argumentsToString(arguments), otherMethods, " for: ");
+                  foundMeth = findMethod(firstIdentifier, arguments, this, enclType, isStatic, inferredType);
                }
                if (idTypes[0] == null) {
                   idTypes[0] = IdentifierType.MethodInvocation;
@@ -1071,7 +1073,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             referenceTD = (TypeDeclaration) referenceTD.resolve(true);
 
             if (addBindable) {
-               referenceTD.addPropertyToMakeBindable(propertyName, boundType, fromExpr.getJavaModel(), referenceOnly);
+               referenceTD.addPropertyToMakeBindable(propertyName, boundType, fromExpr.getJavaModel(), referenceOnly, fromExpr);
             }
          }
          // TODO: else read-only property?
@@ -1143,7 +1145,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                Object setMethod = referenceTD.definesMethod(setName, Collections.singletonList(typeForIdentifier), null, null, referenceTD.isTransformedType(), false, null, null);
                if (setMethod != null) {
                   // Do dynamic access only if the property is marked as manually bindable.
-                  referenceTD.addPropertyToMakeBindable(propertyName, boundType, expr.getJavaModel(), referenceOnly || ModelUtil.isManualBindable(setMethod));
+                  referenceTD.addPropertyToMakeBindable(propertyName, boundType, expr.getJavaModel(), referenceOnly || ModelUtil.isManualBindable(setMethod), expr);
                }
             }
             else if (encType instanceof CFClass) {
@@ -1430,8 +1432,9 @@ public class IdentifierExpression extends ArgumentsExpression {
                   idTypes[i] = IdentifierType.UnboundMethodName;
                   if (model != null && !model.disableTypeErrors && expr.isInferredSet() && expr.isInferredFinal()) {
                      boundTypes[i] = findClosestMethod(currentType, nextName, arguments); // For the IDE - map to something at least
-                     String otherMessage = getOtherMethodsMessage(currentType, nextName);
-                     expr.displayRangeError(i, i, "No method: ", nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentTypeDecl),otherMessage == null ? "" : otherMessage.toString(),  " for ");
+                     String otherMessage = getOtherMethodsMessage(currentType, nextName, isStatic);
+                     String message = isStatic ? "No static method: " : "No method: ";
+                     expr.displayRangeError(i, i, message, nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentTypeDecl),otherMessage == null ? "" : otherMessage.toString(),  " for ");
                      methVar = currentTypeDecl.definesMethod(nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs);
                   }
                }
@@ -1521,8 +1524,9 @@ public class IdentifierExpression extends ArgumentsExpression {
                   idTypes[i] = IdentifierType.UnboundMethodName;
                   if (model != null && !model.disableTypeErrors && expr.isInferredFinal() && expr.isInferredSet()) {
                      boundTypes[i] = findClosestMethod(currentClass, nextName, arguments); // For the IDE - map to something at least
-                     String otherMethods = getOtherMethodsMessage(currentClass, nextName);
-                     expr.displayRangeError(i, i, "No method: ", nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentClass), otherMethods, " for ");
+                     String otherMethods = getOtherMethodsMessage(currentClass, nextName, isStatic);
+                     String message = isStatic ? "No static method: " : "No method: ";
+                     expr.displayRangeError(i, i, message, nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentClass), otherMethods, " for ");
                      methObj = ModelUtil.definesMethod(currentClass, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs, sys); // TODO: remove - for debugging only
                   }
                }
@@ -1615,7 +1619,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       return otherMessage == null ? "" : otherMessage.toString();
    }
 
-   private static String getOtherMethodsMessage(Object currentType, String nextName) {
+   private static String getOtherMethodsMessage(Object currentType, String nextName, boolean refIsStatic) {
       Object[] otherMethods = ModelUtil.getMethods(currentType, nextName, null);
       if (otherMethods == null || otherMethods.length == 0) {
          Object enclType = ModelUtil.getEnclosingType(currentType);
@@ -1628,6 +1632,8 @@ public class IdentifierExpression extends ArgumentsExpression {
          otherMessage.append("\n   Did you mean:\n");
          for (Object otherMeth:otherMethods) {
             otherMessage.append("      ");
+            if (refIsStatic && !ModelUtil.hasModifier(otherMeth, "static"))
+               otherMessage.append(" instance method: ");
             otherMessage.append(ModelUtil.elementToString(otherMeth, false));
             otherMessage.append("\n");
          }

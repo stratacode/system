@@ -8133,7 +8133,7 @@ public class ModelUtil {
          member = type.definesMember(propName, JavaSemanticNode.MemberType.PropertyAnySet, null, null);
          if (member != null) {
             if (!ModelUtil.isBindable(member))
-               type.addPropertyToMakeBindable(propName, null, null, !needsBindable);
+               type.addPropertyToMakeBindable(propName, null, null, !needsBindable, null);
          }
       }
    }

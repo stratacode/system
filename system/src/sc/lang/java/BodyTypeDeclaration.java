@@ -809,6 +809,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    // Returns the MethodDefinition, omitting the compiled types we might inherit from ComponentImpl
    AbstractMethodDefinition declaresMethodDef(String name, List<? extends Object> types) {
       Object res = declaresMethod(name, types, null, null, false, null, null, false);
+      if (res instanceof ParamTypedMethod)
+         res = ((ParamTypedMethod) res).method;
       if (res instanceof AbstractMethodDefinition)
          return (AbstractMethodDefinition) res;
       return null;
@@ -5615,17 +5617,19 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             }
             else if (oldBodyDef instanceof AbstractMethodDefinition) {
                AbstractMethodDefinition oldMeth = (AbstractMethodDefinition) oldBodyDef;
-               Object methObj = newType.definesMethod(oldMeth.name, oldMeth.getParameterList(), null, null, false, false, null, null);
-               if (methObj instanceof AbstractMethodDefinition) {
-                  AbstractMethodDefinition newMeth = (AbstractMethodDefinition) methObj;
-                  oldMeth.replaced = true;
-                  if (newMeth != null) {
-                     if (oldMeth == newMeth)
-                        System.out.println("*** REPLACING A METHOD WITH ITSELF!");
-                     oldMeth.replacedByMethod = newMeth;
-                     // Stripping away this layered on method so now the newMeth is the method
-                     if (updateMode == TypeUpdateMode.Remove && newMeth.replacedByMethod == oldMeth)
-                        newMeth.replacedByMethod = null;
+               if (oldMeth.name != null) {
+                  Object methObj = newType.definesMethod(oldMeth.name, oldMeth.getParameterList(), null, null, false, false, null, null);
+                  if (methObj instanceof AbstractMethodDefinition) {
+                     AbstractMethodDefinition newMeth = (AbstractMethodDefinition) methObj;
+                     oldMeth.replaced = true;
+                     if (newMeth != null) {
+                        if (oldMeth == newMeth)
+                           System.out.println("*** REPLACING A METHOD WITH ITSELF!");
+                        oldMeth.replacedByMethod = newMeth;
+                        // Stripping away this layered on method so now the newMeth is the method
+                        if (updateMode == TypeUpdateMode.Remove && newMeth.replacedByMethod == oldMeth)
+                           newMeth.replacedByMethod = null;
+                     }
                   }
                }
             }

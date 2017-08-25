@@ -189,7 +189,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             // When we are in the midst of doing the transform, we will add getX and setX methods.  Those do not need to be
             // added as properties at the type level.
             if (!enclType.isTransformedType())
-               enclType.addPropertyToMakeBindable(propertyName, this, null);
+               enclType.addPropertyToMakeBindable(propertyName, this, null, false, this);
          }
       }
       // TODO: shouldn't this be moved to the start method?

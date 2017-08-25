@@ -8609,8 +8609,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   // If we failed to generate this time, do not leave around any trash we might have generated
                   // last time.  You can end up with a false successful build.
                   if (fileError) {
-                     bd.anyError = true;
-                     anyErrors = true;
                      List<IString> generatedFiles = deps.getGeneratedFiles(toGenEnt.baseFileName);
                      deps.addErrorDependency(toGenEnt.baseFileName);
                      depsChanged = true;
@@ -8620,8 +8618,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                            gf.delete();
                         }
                      }
-                     bd.errorFiles.add(toGenEnt);
-                     bd.fileErrorsReported = false;
+                     anyErrors = true;
+                     bd.addErrorFile(toGenEnt);
                   }
                }
             }
@@ -8774,6 +8772,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             SrcEntry toGenEnt = mtt.toGenEnt;
 
             startModelForBuild(model, toGenEnt, genLayer, doIncrCompileForFile(toGenEnt), bd, phase);
+            if (model.hasErrors()) {
+               bd.addErrorFile(toGenEnt);
+               anyErrors = true;
+            }
          }
       }
       if (startPeerChangedModels(genLayer, includeFiles, phase, separateOnly) == GenerateCodeStatus.Error)
@@ -9016,9 +9018,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
                if (model.hasErrors()) {
                   // If this happens we should clean out the generated files
-                  bd.anyError = true;
-                  bd.errorFiles.add(toGenEnt);
-                  bd.fileErrorsReported = false;
+                  bd.addErrorFile(toGenEnt);
                   anyErrors = true;
                }
                else {
@@ -9187,10 +9187,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (runtimeProcessor != null) {
          List<SrcEntry> errorFiles = runtimeProcessor.buildCompleted();
          if (errorFiles != null) {
-            bd.anyError = true;
             for (SrcEntry jsError:errorFiles)
-               if (!bd.errorFiles.contains(jsError))
-                  bd.errorFiles.add(jsError);
+               bd.addErrorFile(jsError);
          }
       }
 
@@ -9241,7 +9239,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                                  JavaModel model = td.getJavaModel();
                                  SrcEntry srcEnt = model.getSrcFile();
                                  if (srcEnt != null)
-                                    bd.errorFiles.add(srcEnt);
+                                    bd.addErrorFile(srcEnt);
                               }
                            }
                         }
@@ -10041,9 +10039,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
                   if (currentBuildLayer != null && currentBuildLayer.buildState != null) {
                      BuildState bd = currentBuildLayer.buildState;
-                     bd.anyError = true;
                      anyErrors = true;
-                     bd.errorFiles.add(srcEnt);
+                     bd.addErrorFile(srcEnt);
                   }
                }
                return result;

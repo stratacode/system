@@ -45,6 +45,13 @@ class BuildState {
       }
    }
 
+   void addErrorFile(SrcEntry ent) {
+      anyError = true;
+      if (!errorFiles.contains(ent))
+         errorFiles.add(ent);
+      fileErrorsReported = false;
+   }
+
    ArrayList<Layer> startedLayers;
 
    String getDependentNamesString() {

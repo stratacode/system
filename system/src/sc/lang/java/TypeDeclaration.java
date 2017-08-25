@@ -766,16 +766,27 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return false;
    }
 
-
-   public void addPropertyToMakeBindable(String propertyName, Object propType, JavaModel fromModel) {
-      addPropertyToMakeBindable(propertyName, propType, fromModel, false);
-   }
-
-   public void addPropertyToMakeBindable(String propertyName, Object propType, JavaModel fromModel, boolean referenceOnly) {
+   public void addPropertyToMakeBindable(String propertyName, Object propType, JavaModel fromModel, boolean referenceOnly, JavaSemanticNode fromNode) {
       assert isClassOrObjectType();
 
       Layer lyr = getLayer();
       LayeredSystem sys = lyr != null ? lyr.getLayeredSystem() : null;
+
+      if (lyr != null && lyr.annotationLayer) {
+         if (fromNode != null && fromNode instanceof Expression) {
+            Expression fromExpr = (Expression) fromNode;
+            Statement fromSt = fromExpr.bindingStatement;
+
+            if (fromSt != null && ModelUtil.getAnnotation(fromSt, "sc.bind.NoBindWarn") != null)
+               return;
+         }
+
+         if (fromNode == null)
+            fromNode = this;
+
+         fromNode.displayWarning("Unable to make property: " + propertyName + " bindable on annotation type: " + typeName + " for: ");
+         return;
+      }
       if (sys != null && sys.buildLayer != null && sys.buildLayer.compiled && !referenceOnly) {
          Object field;
          // First check if the model has a known bindable property.  If this is a dynamic type, all sets should throw the property change even through the wrapper.  Not entirely sure

@@ -185,8 +185,10 @@ public class BinaryExpression extends Expression {
       lhs.start();
       rhs.start();
 
+      /* Used to return here for nested exprs but would miss errors on nested expressions - eg. list + int - int
       if (isNestedExpr)
          return;
+      */
 
       OperatorType type = getOperatorType(operator);
 
