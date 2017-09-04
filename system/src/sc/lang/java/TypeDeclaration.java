@@ -784,7 +784,8 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
          if (fromNode == null)
             fromNode = this;
 
-         fromNode.displayWarning("Unable to make property: " + propertyName + " bindable on annotation type: " + typeName + " for: ");
+         if (!fromModel.disableTypeErrors)
+            fromNode.displayWarning("Unable to make property: " + propertyName + " bindable on annotation type: " + typeName + " for: ");
          return;
       }
       if (sys != null && sys.buildLayer != null && sys.buildLayer.compiled && !referenceOnly) {
