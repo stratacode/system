@@ -472,8 +472,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (bodyList == null)
          return;
       for (Statement st:bodyList) {
-         if (!st.isInitialized())
-            System.out.println("*** Warning - statement not initialized being put into member cached"); // In particular we need propertyName to be set in the method to add it here which is right now only set during initialize
+         // When we are in the midst of initializing the type, we may be trying to find a member as part of the findType method to determine
+         // but we don't actually return the member in this case... so no harm in ignoring this warning.
+         //if (!st.isInitialized())
+         //   System.out.println("*** Warning - statement not initialized being put into member cache"); // In particular we need propertyName to be set in the method to add it here which is right now only set during initialize
          // This logic models the logic in findMemberInBody - each inner type can be a member - enum constant, object, etc. depending on the type
          if (st instanceof ITypeDeclaration) {
             ITypeDeclaration it = (ITypeDeclaration) st;
