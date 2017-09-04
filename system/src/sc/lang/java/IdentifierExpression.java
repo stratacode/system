@@ -3236,7 +3236,11 @@ public class IdentifierExpression extends ArgumentsExpression {
 
          ArrayList<Object> typeDefs = new ArrayList<Object>(1);
          typeDefs.add(classType);
-         return new ParamTypeDeclaration(model.getLayeredSystem(), definedInType, ModelUtil.getTypeParameters(Class.class), typeDefs, Class.class);
+         // During the deepCopy operation, we may not yet have set some parentNode up in the tree so we can't get the model.   Instead,
+         // use the type we copied as the result.
+         if (model != null)
+            return new ParamTypeDeclaration(model.getLayeredSystem(), definedInType, ModelUtil.getTypeParameters(Class.class), typeDefs, Class.class);
+         return bt;
       }
       else if (bt == cloneMethod || (bt instanceof ParamTypedMethod) && ((ParamTypedMethod) bt).method == cloneMethod) {
          // Like the ArrayCloneMethod class, here we are implementing the rule that int[] src; int[] res = src.clone() macthes typewise

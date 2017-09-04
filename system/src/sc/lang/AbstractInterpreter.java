@@ -350,7 +350,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                   type.parentNode = currentDef.parentNode;
                   // We're going to throw this away so this tells the system not to consider it part of the type
                   // system.
-                  modType.temporaryType = true;
+                  modType.markAsTemporary();
                   ParseUtil.initAndStartComponent(type);
                   if (modType.mergeDefinitionsInto(currentDef, false))
                      addChangedModel(currentDef.getJavaModel());

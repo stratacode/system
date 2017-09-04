@@ -729,7 +729,7 @@ public class ParseUtil  {
             model.setLayeredSystem(sys);
          if (model instanceof JavaModel) {
             ((JavaModel) model).isLayerModel = isLayer;
-            ((JavaModel) model).temporary = true;
+            model.markAsTemporary();
          }
          if (fileName != null) {
             model.setLayer(layer);

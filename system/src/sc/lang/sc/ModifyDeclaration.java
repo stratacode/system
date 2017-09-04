@@ -31,7 +31,6 @@ public class ModifyDeclaration extends TypeDeclaration {
    transient private Object modifyClass;
    transient Object[] extendsBoundTypes;
    transient private boolean typeInitialized = false;
-   transient public boolean temporaryType;
    // ModifyInherited = true when you use a modify in an inner type where the modified type is actually in a base class,
    // not the same type that the parent type is modifying.  If your outer class extends "OuterExtends", this modifyInherited case is a shortcut for:
    //      class innerName extends OuterExtends.innerName
@@ -417,7 +416,11 @@ public class ModifyDeclaration extends TypeDeclaration {
       String fullTypeName = getFullTypeName();
       if (isLayerType || thisModel == null)
          return null;
-      return temporaryType ? thisModel.layeredSystem.getSrcTypeDeclaration(fullTypeName, null, true) : thisModel.getPreviousDeclaration(fullTypeName);
+      TypeDeclaration res = null;
+      if (temporaryType)
+         res = thisModel.layeredSystem.getSrcTypeDeclaration(fullTypeName, null, true);
+
+      return res == null ? thisModel.getPreviousDeclaration(fullTypeName) : res;
    }
 
    private void checkModify() {
@@ -515,6 +518,19 @@ public class ModifyDeclaration extends TypeDeclaration {
                else {
                   if (enclType != null && enclType.isEnumeratedType()) {
                      enumConstant = true;
+                  }
+                  // A special case for temporary models which use modifyInherited.  They need to be able to resolve the
+                  // inner types of the ext-type of the temporary type.
+                  else if (enclType != null && temporaryType) {
+                     Object enclExtType = ModelUtil.getExtendsClass(enclType);
+                     if (enclExtType != null) {
+                        Object inheritedType = ModelUtil.getInnerType(enclExtType, typeName, null);
+                        if (inheritedType instanceof BodyTypeDeclaration)
+                           modifyTypeDecl = (BodyTypeDeclaration) inheritedType;
+                        else if (inheritedType != null)
+                           modifyClass = inheritedType;
+                        modifyInherited = true;
+                     }
                   }
                }
             }
@@ -2741,4 +2757,5 @@ public class ModifyDeclaration extends TypeDeclaration {
    public String getOperatorString() {
       return "<modify>";
    }
+
 }

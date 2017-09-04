@@ -2370,6 +2370,9 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          tagType.addModifier(Annotation.create("sc.obj.Component"));
       }
 
+      if (template.temporary)
+         tagType.markAsTemporary();
+
       tagObject = tagType;
       tagType.element = this;
       tagType.layer = tagLayer;

@@ -585,6 +585,8 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
          // Added in convertToObject for singleElementTypes to set the parent
          if (!singleElementType)
             types.add(rootDecl);
+         if (temporary)
+            rootDecl.markAsTemporary();
       }
       if (outputMethod != null)
          ParseUtil.initComponent(outputMethod);

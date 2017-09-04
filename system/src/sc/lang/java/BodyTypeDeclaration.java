@@ -197,6 +197,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    // Debug flag - keep track of whether this model has ever been stopped
    public transient boolean hasBeenStopped = false;
 
+   transient public boolean temporaryType;
+
    public Layer getLayer() {
       return layer;
    }
@@ -9316,5 +9318,21 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public boolean isAnonymousType() {
       return false;
+   }
+
+   public void markAsTemporary() {
+      temporaryType = true;
+      if (body != null) {
+         markChildrenAsTemporary(body);
+      }
+      if (hiddenBody != null) {
+         markChildrenAsTemporary(body);
+      }
+   }
+
+   private void markChildrenAsTemporary(List<Statement> childList) {
+      for (Statement child:childList)
+         if (child instanceof BodyTypeDeclaration)
+            ((BodyTypeDeclaration) child).markAsTemporary();
    }
 }

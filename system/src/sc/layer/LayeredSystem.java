@@ -9959,7 +9959,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (!dummy)
                markBeingLoadedModel(srcEnt, newModel);
             else
-               newModel.setTemporary(true);
+               newModel.markAsTemporary();
 
             // We want to immediate clone and update the model in the other systems as well - reduces parsing
             // overhead but also the types in the other layered systems need to be updated eventually

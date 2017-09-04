@@ -80,7 +80,7 @@ public interface ILanguageModel extends IFileProcessorResult {
 
    boolean isAdded();
 
-   void setTemporary(boolean temp);
+   void markAsTemporary();
 
    Object getUserData();
 

@@ -2967,8 +2967,17 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       added = v;
    }
 
-   public void setTemporary(boolean v) {
-      temporary = v;
+   /**
+    * Called for models which are not part of the type system for the runtime
+    * (e.g. documentation files, temporary nodes created by the interpreter or those created during the editing process to apply a batch of changes)
+    * Sets temporaryType = true on all children types
+    */
+   public void markAsTemporary() {
+      temporary = true;
+      if (types != null) {
+         for (TypeDeclaration type:types)
+            type.markAsTemporary();
+      }
    }
 
    public boolean isAdded() {
