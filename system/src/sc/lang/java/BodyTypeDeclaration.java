@@ -6,29 +6,80 @@ package sc.lang.java;
 
 import sc.classfile.CFClass;
 import sc.classfile.CFMethod;
+import sc.dyn.DynUtil;
+import sc.dyn.IDynChildManager;
 import sc.dyn.IDynObjManager;
 import sc.dyn.IDynObject;
-import sc.lang.*;
+import sc.lang.DynObject;
+import sc.lang.IAnnotationProcessor;
+import sc.lang.IDefinitionProcessor;
+import sc.lang.ILanguageModel;
+import sc.lang.INamedNode;
+import sc.lang.ISemanticNode;
+import sc.lang.ISrcStatement;
+import sc.lang.JavaLanguage;
+import sc.lang.SemanticNodeList;
+import sc.lang.SyncAnnotationProcessor;
 import sc.lang.html.Element;
 import sc.lang.js.JSRuntimeProcessor;
-import sc.lang.sc.*;
+import sc.lang.sc.BasicScopeProcessor;
+import sc.lang.sc.IScopeProcessor;
+import sc.lang.sc.ModifyDeclaration;
+import sc.lang.sc.OverrideAssignment;
+import sc.lang.sc.PropertyAssignment;
 import sc.lang.template.Template;
-import sc.lang.template.TemplateStatement;
-import sc.layer.*;
-import sc.obj.*;
+import sc.layer.BuildInfo;
+import sc.layer.IRuntimeProcessor;
+import sc.layer.Layer;
+import sc.layer.LayerConstants;
+import sc.layer.LayerUtil;
+import sc.layer.LayeredSystem;
+import sc.layer.SrcEntry;
+import sc.layer.SrcIndexEntry;
+import sc.layer.TrackingClassLoader;
+import sc.layer.TypeIndexEntry;
+import sc.obj.ComponentImpl;
+import sc.obj.Constant;
+import sc.obj.GlobalScopeDefinition;
+import sc.obj.ScopeContext;
+import sc.obj.ScopeDefinition;
+import sc.obj.SyncMode;
 import sc.parser.ParseUtil;
 import sc.sync.SyncManager;
 import sc.sync.SyncOptions;
 import sc.sync.SyncPropOptions;
 import sc.sync.SyncProperties;
-import sc.type.*;
-import sc.util.*;
-import sc.dyn.DynUtil;
-import sc.dyn.IDynChildManager;
+import sc.type.CTypeUtil;
+import sc.type.DynType;
+import sc.type.IBeanMapper;
+import sc.type.PTypeUtil;
+import sc.type.PropertyMethodType;
+import sc.type.RTypeUtil;
+import sc.type.TypeUtil;
+import sc.util.CoalescedHashMap;
+import sc.util.FileUtil;
+import sc.util.IntCoalescedHashMap;
+import sc.util.LinkedIdentityHashSet;
+import sc.util.PerfMon;
+import sc.util.StringUtil;
 
 import java.io.File;
 import java.io.Serializable;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.BitSet;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 /**
  * The base type of TypeDeclaration and EnumConstant.  Because EnumConstants have the bulk of the functionality of a class, this class maintains most of the core functionality of a type.
@@ -940,7 +991,6 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
       JavaModel model = getJavaModel();
       if (model == null) {
-         System.err.println("*** No model for getInheritedAnnotation");
          return null;
       }
 
@@ -974,7 +1024,6 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
       JavaModel model = getJavaModel();
       if (model == null) {
-         System.err.println("*** No model for getInheritedAnnotation");
          return res;
       }
 

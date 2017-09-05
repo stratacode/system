@@ -5382,7 +5382,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
          }
 
-         if (options.info)
+         if (options.debug)
             System.out.println("Adding layer: " + layer.layerDirName + (baseLayers != null ? " extends: " + baseLayers : ""));
 
          // No need to build this layer but if we dragged in any base layers, we might need to build this one just to deal with them.
