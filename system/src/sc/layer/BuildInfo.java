@@ -151,7 +151,9 @@ public class BuildInfo {
       for (int i = 0; i < mainMethods.size(); i++) {
          MainMethod m = mainMethods.get(i);
          if (p.matcher(m.typeName).matches()) {
-            system.runMainMethod(m.typeName, m.args == null ? runClassArgs : m.args, lowestLayer);
+            String err = system.runMainMethod(m.typeName, m.args == null ? runClassArgs : m.args, lowestLayer);
+            if (err != null)
+               system.error(err);
             any = true;
          }
       }
