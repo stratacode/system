@@ -4,6 +4,8 @@
 
 package sc.parser;
 
+import sc.util.StringUtil;
+
 import java.util.IdentityHashMap;
 
 /**
@@ -19,6 +21,7 @@ public class ErrorParseNode extends AbstractParseNode {
       error = err;
       startIndex = err == null ? -1 : err.startIndex;
       errorText = errText;
+      errorNode = true;
    }
 
    public Object getSemanticValue() {
@@ -45,6 +48,14 @@ public class ErrorParseNode extends AbstractParseNode {
 
    public int firstChar() {
       return 0;
+   }
+
+   public void setStartIndex(int ix) {
+      super.setStartIndex(ix);
+      // We are updating both of these because during the reparse we may pull the error out of the parse node and
+      // create a new PreErrorParseNode with the old error - which would have a stale startIndex unless we update it here.
+      if (error != null)
+         error.startIndex = ix;
    }
 
    public void updateSemanticValue(IdentityHashMap<Object, Object> oldNewMap) {
@@ -86,8 +97,10 @@ public class ErrorParseNode extends AbstractParseNode {
       }
       if (atEnd && textLen > ctx.startChangeOffset) {
          IParseNode last = ctx.lastVisitedNode;
-         ctx.firstDiffNode = last.getParselet().getBeforeFirstNode(last);
-         ctx.beforeFirstNode = ctx.firstDiffNode;
+         if (last != null) {
+            ctx.firstDiffNode = last.getParselet().getBeforeFirstNode(last);
+            ctx.beforeFirstNode = ctx.firstDiffNode;
+         }
       }
    }
 
@@ -98,6 +111,10 @@ public class ErrorParseNode extends AbstractParseNode {
       String text = ctx.text;
       int len = errorText.length();
       for (int i = len - 1; i >= 0; i--) {
+         // We did not find any differences at the end - this is the case where there are extra chars in the old
+         // file and so going from the back, we hit the end of the new file before seeing any changes
+         if (ctx.endChangeNewOffset == -1)
+            return;
          if (errorText.charAt(i) != text.charAt(ctx.endChangeNewOffset)) {
             ctx.lastDiffNode = this;
             ctx.afterLastNode = ctx.lastVisitedNode;
@@ -136,6 +153,23 @@ public class ErrorParseNode extends AbstractParseNode {
    }
 
    public boolean isErrorNode() {
+      return true;
+   }
+
+   public boolean isGeneratedTree() {
+      return false;
+   }
+
+   public void diffParseNode(IParseNode other, StringBuilder diffs) {
+      super.diffParseNode(other, diffs);
+      if (other instanceof ErrorParseNode) {
+         ErrorParseNode otherErr = (ErrorParseNode) other;
+         if (!StringUtil.equalStrings(otherErr.errorText, errorText))
+            diffs.append("Error text does not match: " + errorText + " != " + otherErr.errorText);
+      }
+   }
+
+   public boolean isIncomplete() {
       return true;
    }
 }

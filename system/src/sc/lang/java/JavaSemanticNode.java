@@ -305,6 +305,13 @@ public abstract class JavaSemanticNode extends SemanticNode {
             else
                return td.getEnclosingType();
          }
+         else if (pnode instanceof Element) {
+            Element elem = (Element) pnode;
+            TypeDeclaration res = elem.getElementTypeDeclaration();
+            if (res == null)
+               return elem.getEnclosingType();
+            return res;
+         }
          if (pnode instanceof NewExpression) {
             NewExpression newEx = (NewExpression) pnode;
             if (newEx.classBody != null && !newEx.lambdaExpression)
@@ -447,15 +454,19 @@ public abstract class JavaSemanticNode extends SemanticNode {
     * Parameters:
     * prefix is the starting sequence of chars in the identifier to complete.  All candidates returned will start with the prefix if it's provided.
     * currentType provides a context for the current type if the node is not embedded in a model - i.e. an identifier expression on its own but known to live in a specific type
-    * If ctx is not null, it's an executation context we can use to evaluate the "root value" - i.e. in a.b the value of the variable 'a' is evaluated and the returned instance
+    * If ctx is not null, it's an execution context we can use to evaluate the "root value" - i.e. in a.b the value of the variable 'a' is evaluated and the returned instance
     * can be used to suggest candidates.  This is useful in live-programming situations.
     * The command String parameter is used to determine the offset returned for where the completion starts for the case where the parseNode tree is not available.
     */
-
    public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
       return -1;
    }
 
+   /**
+    * This works like suggestCompletions but designed to conform to the requirements of IntelliJ.  We don't support the live programming use case in this version
+    * and have access (possibly) to the original model and original node which most closely approximates this node which is being parsed (so we can use more context to do a better
+    * job of matching because those values are all resolved).
+    */
    public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
       return null;
    }
@@ -615,6 +626,10 @@ public abstract class JavaSemanticNode extends SemanticNode {
          String disabledLayerName = model.layer.getDisabledLayerName();
          return "Layer: " + disabledLayerName + " is disabled";
       }
+      return null;
+   }
+
+   public Statement findStatement(Statement in) {
       return null;
    }
 }

@@ -18,9 +18,11 @@ import java.util.*;
  * coercing into one.
  * */
 public class WrappedTypeDeclaration implements ITypeDeclaration {
-   Object baseType; 
+   Object baseType;
+   LayeredSystem system;
 
-   public WrappedTypeDeclaration(Object it) {
+   public WrappedTypeDeclaration(LayeredSystem sys, Object it) {
+      this.system = sys;
       baseType = it;
    }
 
@@ -48,7 +50,7 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
    }
 
    public boolean isAssignableTo(ITypeDeclaration other) {
-      if (other == this || other == baseType)
+      if (other == this || other == baseType || ModelUtil.sameTypes(other, baseType) || ModelUtil.isAssignableFrom(other, baseType))
          return true;
       return false;
    }
@@ -101,15 +103,15 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
    }
 
    public Object definesMethod(String name, List<? extends Object> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
-      return ModelUtil.definesMethod(baseType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
+      return ModelUtil.definesMethod(baseType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, getLayeredSystem());
    }
 
    public Object declaresConstructor(List<?> parametersOrExpressions, ITypeParamContext ctx) {
-      return ModelUtil.declaresConstructor(baseType, parametersOrExpressions, ctx);
+      return ModelUtil.declaresConstructor(system, baseType, parametersOrExpressions, ctx);
    }
 
    public Object definesConstructor(List<?> parametersOrExpressions, ITypeParamContext ctx, boolean isTransformed) {
-      return ModelUtil.definesConstructor(baseType, parametersOrExpressions, ctx, null, isTransformed);
+      return ModelUtil.definesConstructor(system, baseType, parametersOrExpressions, ctx, null, isTransformed);
    }
 
    public Object definesMember(String name, EnumSet<JavaSemanticNode.MemberType> types, Object refType, TypeContext ctx) {
@@ -117,7 +119,7 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
    }
 
    public Object definesMember(String name, EnumSet<JavaSemanticNode.MemberType> types, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {
-      return ModelUtil.definesMember(baseType, name, types, refType, ctx, skipIfaces, isTransformed);
+      return ModelUtil.definesMember(baseType, name, types, refType, ctx, skipIfaces, isTransformed, getLayeredSystem());
    }
 
    public Object getInnerType(String name, TypeContext ctx) {
@@ -222,7 +224,7 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
    }
 
    public LayeredSystem getLayeredSystem() {
-      throw new UnsupportedOperationException();
+      return system;
    }
 
    public List<?> getClassTypeParameters() {
@@ -337,6 +339,16 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
       if (baseType != null)
          return ModelUtil.getArrayComponentType(baseType);
       return null;
+   }
+
+   @Override
+   public ITypeDeclaration resolve(boolean modified) {
+      if (baseType instanceof ITypeDeclaration) {
+         Object newType = ((ITypeDeclaration) baseType).resolve(modified);
+         if (newType != null)
+            baseType = newType;
+      }
+      return this;
    }
 
    public boolean isLayerType() {

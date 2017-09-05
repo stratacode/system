@@ -446,6 +446,26 @@ public class Parser implements IString {
          System.out.println(indent(inProgressCount) + "Next: " + getLookahead(8) + " testing rule: " + parselet.toString());
       */
 
+      if (parselet.cacheResults || ENABLE_STATS) {
+         doCache = true;
+         if (resultCache != null) {
+            ParseletState state = resultCache.get(currentIndex);
+            if (state != null) {
+               ParseletState res = findMatchingState(state, parselet);
+               if (res != null) {
+                  if (parselet.cacheResults) {
+                     if (parselet.accept(semanticContext, res.value, currentIndex, res.endIx) == null) {
+                        currentIndex = res.endIx;
+                        parselet.updateCachedResult(res.value);
+                        return res.value;
+                     }
+                  }
+                  res.cacheHits++;
+               }
+            }
+         }
+      }
+
       boolean disableDebug = false;
       if (parselet.negated)
          negatedCt++;
@@ -543,6 +563,10 @@ public class Parser implements IString {
       currentIndex = ix;
    }
 
+   /**
+    * Reset is used when we encounter an error and need to revert back to a previous index. Use restoreCurrentIndex when
+    * you are peeking into the stream, or need to move the semantic context backwards to reparse for errors
+    */
    public final Object resetCurrentIndex(int ix) {
       Object res = null;
       if (semanticContext != null)
@@ -551,6 +575,10 @@ public class Parser implements IString {
       return res;
    }
 
+   /**
+    * Like reset, but will save semantic context info.  For example, if we peek ahead an HTML close tag, we remove it from
+    * the semantic context.  When we restore the current index, we put the tag back again so we can match it again in the close tag.
+    */
    public final void restoreCurrentIndex(int ix, Object res) {
       if (semanticContext != null)
          semanticContext.restoreToIndex(ix, res);
@@ -570,11 +598,23 @@ public class Parser implements IString {
       return parseError(currentParselet, null, null, errorCode, currentIndex, currentIndex, (Object[])null);
    }
 
-   public static boolean isBetterError(int currentStart, int currentEnd, int newStart, int newEnd, boolean replace) {
+   public static boolean isBetterError(int currentStart, int currentEnd, int newStart, int newEnd, boolean replaceIfEqual) {
       if (currentStart == -1)
          return true;
 
-      if (replace)
+      int newLen = newEnd - newStart;
+      int currentLen = currentEnd - currentStart;
+
+      // There's a case where we might have a parse-error that represents a small fragment in the middle of the document.
+      // Rather than using that, we'd rather use the error chunk that comes before it, as long as is parses more of the
+      // document.
+      if (newLen < currentLen && currentLen > 2 && currentStart == 0 && newEnd > currentEnd && newStart >= currentEnd)
+         return false;
+
+      if (currentLen < newLen && newLen > 2 && newStart == 0 && currentEnd > newEnd && currentStart >= newEnd)
+         return true;
+
+      if (replaceIfEqual)
          return newEnd > currentEnd || (newEnd == currentEnd && newStart <= currentStart);
       else
          return newEnd > currentEnd || (newEnd == currentEnd && newStart < currentStart);

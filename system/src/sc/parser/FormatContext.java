@@ -35,7 +35,9 @@ public class FormatContext {
    boolean replaceFormatting = false;
 
    public IntStack savedIndentLevels = new IntStack(16);
-   public int lastIndent;
+   //public int lastIndent;
+
+   public int currentStartIndex = 0;
 
    private Object nextValue;
 

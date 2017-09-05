@@ -6,6 +6,7 @@ package sc.parser;
 
 import sc.lang.ISemanticNode;
 import sc.util.PerfMon;
+import sc.util.StringUtil;
 
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
@@ -57,7 +58,7 @@ public class ParentParseNode extends AbstractParseNode {
          ((ISemanticNode) value).setParseNode(this);
    }
 
-   public boolean addForReparse(Object node, Parselet p, int svIndex, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, Object oldChildParseNode, DiffContext dctx,
+   public int addForReparse(Object node, Parselet p, int svIndex, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, Object oldChildParseNode, DiffContext dctx,
                                 boolean removeExtraNodes, boolean parseArray) {
       // If there's no old value or we are inserting off the end, we must be inserting a new value
       if (children == null || childIndex >= children.size())
@@ -70,8 +71,10 @@ public class ParentParseNode extends AbstractParseNode {
             Parselet childParselet = pnode.getParselet();
 
             if (!childParselet.addReparseResultToParent(pnode, this, svIndex, childIndex, slotIndex, parser, oldChildParseNode, dctx, removeExtraNodes, parseArray))
-               return false;
+               return 0;
          }
+
+         Object replacedValue = null;
 
          if (node != oldChildParseNode) {
             Object oldNode = children.get(childIndex);
@@ -91,7 +94,7 @@ public class ParentParseNode extends AbstractParseNode {
             }
             if (!insert) {
                if (node != children.get(childIndex)) {
-                  Object replaced = children.set(childIndex, node);
+                  replacedValue = children.set(childIndex, node);
                }
             }
             else {
@@ -100,17 +103,17 @@ public class ParentParseNode extends AbstractParseNode {
          }
 
          if (removeExtraNodes) {
-            clearParsedOldNodes(parser, childIndex + 1, dctx);
+            clearParsedOldNodes(parser, svIndex, childIndex + 1, dctx);
          }
 
          // Need to call this even if the parse node did not change.  A child of the parse-node might have changed.  This will
          // cause some properties to be changed to the same value but it may be good to signal the model that something underneath
          // has changed.
-         return parselet.setSemanticValue(this, node, svIndex, slotIndex, skipSemanticValue, parser, false, true);
+         return parselet.setSemanticValue(this, node, svIndex, slotIndex, skipSemanticValue, parser, false, true, replacedValue);
       }
    }
 
-   public void cullUnparsedNodes(Parser parser, int startChild, DiffContext dctx) {
+   public void cullUnparsedNodes(Parser parser, int svCount, int startChild, DiffContext dctx) {
       int sz = children.size();
       for (int c = startChild; c < sz; c++) {
          Object oldChild = children.get(c);
@@ -124,7 +127,7 @@ public class ParentParseNode extends AbstractParseNode {
             int oldStartOld = oldPN.getOrigStartIndex();
             int oldStartNew = oldStartOld + dctx.getNewOffsetForOldPos(oldStartOld + oldChildLen);
             if (oldStartNew >= parser.currentIndex) {
-               parselet.removeForReparse(parser, this, c);
+               parselet.removeForReparse(parser, this, svCount, c);
                int newSz = children.size();
                // If we removed one readjust...
                if (newSz != sz) {
@@ -139,7 +142,7 @@ public class ParentParseNode extends AbstractParseNode {
       }
    }
 
-   public void clearParsedOldNodes(Parser parser, int startIx, DiffContext dctx) {
+   public void clearParsedOldNodes(Parser parser, int svCount, int startIx, DiffContext dctx) {
       int sz = children.size();
       for (int c = startIx; c < sz; c++) {
          Object oldChild = children.get(c);
@@ -165,7 +168,7 @@ public class ParentParseNode extends AbstractParseNode {
                   //break;
                }
                */
-               parselet.removeForReparse(parser, this, c);
+               parselet.removeForReparse(parser, this, svCount, c);
                int newSz = children.size();
                // If we removed one readjust...
                if (newSz != sz) {
@@ -180,7 +183,7 @@ public class ParentParseNode extends AbstractParseNode {
       }
    }
 
-   public boolean removeForReparse(int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser) {
+;  public boolean removeForReparse(int svIndex, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser) {
       // If there's no old value or we are inserting off the end, we must be inserting a new value
       if (children == null || childIndex >= children.size()) {
          System.err.println("*** Unable to remove parse node - no children");
@@ -188,7 +191,7 @@ public class ParentParseNode extends AbstractParseNode {
       }
       else {
          Object node = children.remove(childIndex);
-         return parselet.removeFromSemanticValue(this, node, childIndex, slotIndex, skipSemanticValue, parser, false, true);
+         return parselet.removeFromSemanticValue(this, node, svIndex, childIndex, slotIndex, skipSemanticValue, parser, false, true);
       }
    }
 
@@ -198,7 +201,7 @@ public class ParentParseNode extends AbstractParseNode {
     * The index specifies the slot index of the parselet 'p' in the parent.  If skipSemanticValue is true, the parse node is
     * added without updating the semantic value.
     */
-   public boolean add(Object node, Parselet p, int svIndex, int index, boolean skipSemanticValue, Parser parser) {
+   public int add(Object node, Parselet p, int svIndex, int index, boolean skipSemanticValue, Parser parser) {
       if (children == null)
          children = new ArrayList<Object>(parselet.parselets.size());
 
@@ -211,7 +214,7 @@ public class ParentParseNode extends AbstractParseNode {
       if (node instanceof StringToken || node == null) {
          if (p.getDiscard() || p.getLookahead()) {
             if (node != null)
-               return false;
+               return 0;
             // TODO: else - is this the right code path here?
          }
          if (p.skip && !(parselet.needsChildren())) {
@@ -228,7 +231,7 @@ public class ParentParseNode extends AbstractParseNode {
       }
       else if (node instanceof String) {
          if (p.discard || p.lookahead)
-            return false;
+            return 0;
          if (p.skip && !(parselet.needsChildren())) {
             if (children.size() == 1) {
                Object child = children.get(0);
@@ -245,14 +248,14 @@ public class ParentParseNode extends AbstractParseNode {
          Parselet childParselet = pnode.getParselet();
 
          if (!childParselet.addResultToParent(pnode, this, index, parser))
-            return false;
+            return 0;
       }
 
       if (addChild)
          children.add(node);
 
       // Only nested parselets should be using the ParentParseNode
-      return parselet.setSemanticValue(this, node, svIndex, index, skipSemanticValue, parser, false, false);
+      return parselet.setSemanticValue(this, node, svIndex, index, skipSemanticValue, parser, false, false, null);
    }
 
    public void addOrSet(Object node, Parselet p, int svIndex, int index, boolean skipSemanticValue, Parser parser) {
@@ -309,7 +312,7 @@ public class ParentParseNode extends AbstractParseNode {
          children.set(index, node);
 
       // Only nested parselets should be using the ParentParseNode
-      parselet.setSemanticValue(this, node, -1, index, skipSemanticValue, parser, true, false);
+      parselet.setSemanticValue(this, node, -1, index, skipSemanticValue, parser, true, false, null);
    }
 
    public void addGeneratedNode(Object node) {
@@ -482,10 +485,6 @@ public class ParentParseNode extends AbstractParseNode {
       }
    }
 
-   public void addParent(ParentParseNode par, int currentChildIndex) {
-
-   }
-
    private FormatContext.Entry visitForFormat(FormatContext ctx) {
       FormatContext.Entry ent = new FormatContext.Entry();
       List<FormatContext.Entry> pp = ctx.pendingParents;
@@ -516,9 +515,9 @@ public class ParentParseNode extends AbstractParseNode {
                   node.format(ctx);
                else {
                   parselet.format(ctx, node);
-                  if (ctx.replaceNode == node)
-                     children.set(i, ctx.createReplaceNode());
                }
+               if (ctx.replaceNode == node)
+                  children.set(i, ctx.createReplaceNode());
             }
             else if (p != null) {
                ctx.append((CharSequence) p);
@@ -904,20 +903,25 @@ public class ParentParseNode extends AbstractParseNode {
                if (parselet == null || parselet.parselets == null)
                   System.err.println("*** parselet not initialized in getNodeAtLine");
                int parseletIndex = childIx % parselet.parselets.size();
-               if (parseletIndex == 0 && listVal.size() > listIx) {
+               NestedParselet.ParameterMapping paramMapping = parselet.parameterMapping == null ? NestedParselet.ParameterMapping.ARRAY : parselet.parameterMapping[parseletIndex];
+               boolean producesArrayValue = paramMapping == NestedParselet.ParameterMapping.ARRAY || (parseletIndex == 0 && paramMapping != NestedParselet.ParameterMapping.SKIP);
+               if (producesArrayValue && listVal.size() > listIx) {
                   // We have a child of a parselet which produces a list.  For this current slot mapping:
                   // SKIP corresponds to whitespace which should not match the node.  PROPAGATE and ARRAY slots which support the appropriate semantic value that's tied into the tree do match.
-                  if (parselet.parameterMapping == null || parselet.parameterMapping[parseletIndex] != NestedParselet.ParameterMapping.SKIP) {
-                     if (childNode instanceof IParseNode) {
-                        Object elemObj = listVal.get(listIx++);
-                        if (elemObj instanceof ISemanticNode) {
-                           ISemanticNode node = (ISemanticNode) elemObj;
-                           if (node.getParentNode() != null) {
-                              ctx.lastVal = node;
-                           }
+                  // TODO: templateBodyDeclarations uses [] for each parselet mapping so we need to consider those as lines as long as they are not string-tokens.
+                  // The original code here only counted a line for parseletIndex == 0 so kept that part the same but not sure why.
+
+                  if (childNode instanceof IParseNode) {
+                     Object elemObj = listVal.get(listIx++);
+                     if (elemObj instanceof ISemanticNode) {
+                        ISemanticNode node = (ISemanticNode) elemObj;
+                        if (node.getParentNode() != null) {
+                           ctx.lastVal = node;
                         }
                      }
                   }
+                  else
+                     listIx++;
                }
             }
             if (PString.isString(childNode)) {
@@ -928,7 +932,7 @@ public class ParentParseNode extends AbstractParseNode {
                   // This is the case where we have a token which includes a newline - say }\n that's a child parselet for a block statement.  In this case, we need to match with the block statement as the semantic value.
                   // Specifically for the block statement note that we match the parent value as a node to match the end brace.  This is a little odd... should we really match the semicolonEOL parselet?
                   // for IntelliJ at least, the block statement uses the navigation element to point to the close brace so it fixes that oddity but if that becomes a problem for another framework we can fix this another way.
-                  if (value instanceof ISemanticNode && value != ctx.lastVal)
+                  if (!isList && value instanceof ISemanticNode && value != ctx.lastVal)
                      ctx.lastVal = (ISemanticNode) value;
                   return ctx.lastVal;
                }
@@ -995,7 +999,7 @@ public class ParentParseNode extends AbstractParseNode {
          int sz = children.size();
          for (int i = 0; i < sz; i++) {
             Object node = children.get(i);
-            if (node instanceof ParentParseNode && ((ParentParseNode) node).isGeneratedTree())
+            if (node instanceof IParseNode && ((IParseNode) node).isGeneratedTree())
                return true;
          }
       }
@@ -1050,6 +1054,7 @@ public class ParentParseNode extends AbstractParseNode {
          return;
       }
       int sz = children.size();
+      IParseNode lastChildError = null;
       for (int i = 0; i < sz; i++) {
          Object child = children.get(i);
          if (child != null) {
@@ -1060,14 +1065,23 @@ public class ParentParseNode extends AbstractParseNode {
                childNode.findStartDiff(ctx, last, getSemanticValue(), this, i);
                if (ctx.firstDiffNode != null) {
                   ctx.addChangedParent(this);
+                  // If the child we processed right before the node which started the change was an error we may need to reparse the
+                  // error node in case it needs to expand over the error region here.  See re75 for a test case.   The 'isIncomplete' method
+                  // is used to avoid the reparse of a parent node which itself contains an error, but is not the end of the error.  See re57.9
+                  if (lastChildError != null && lastChildError.isIncomplete())
+                     ctx.beforeFirstNode = lastChildError;
                   return;
                }
                // ARG - this doesn't work because we don't have a way to tease apart the boundary at the edge.  In some cases we want to include
                // an entire parent parse-node with it's children
                //if (!last || !endsWithError)
                //if (i == 0 || !(childNode instanceof ErrorParseNode))
-               if (!childNode.isErrorNode())
+               if (!childNode.isErrorNode()) {
                   ctx.lastVisitedNode = childNode;
+                  lastChildError = null;
+               }
+               else if (lastChildError == null) // pick the first error in a string of errors leading up to the change
+                  lastChildError = childNode;
                // else - this node ends with an error so don't mark it as visited
             }
             else if (child instanceof CharSequence) {
@@ -1175,6 +1189,106 @@ public class ParentParseNode extends AbstractParseNode {
             if (child instanceof IParseNode)
                ((IParseNode) child).setErrorNode(val);
       }
+   }
+
+   public int getNumSemanticValues() {
+      if (parselet.getSemanticValueIsArray() && children != null) {
+         int sz = children.size();
+         int ct = 0;
+         for (int i = 0; i < sz; i++) {
+            Object child = children.get(i);
+            // TODO: how do we accurately determine if each child node here contributes an array element
+            if (child instanceof IParseNode && ((IParseNode) child).getSemanticValue() != null)
+               ct++;
+         }
+         return ct;
+      }
+      else {
+         return 1;
+      }
+   }
+
+   public void diffParseNode(IParseNode other, StringBuilder diffs) {
+      super.diffParseNode(other, diffs);
+      if (other instanceof ParentParseNode) {
+         ParentParseNode otherPN = (ParentParseNode) other;
+         if (children == null) {
+            if (otherPN.children != null)
+               diffs.append("Other has children and this does not");
+         }
+         else if (otherPN.children == null) {
+            diffs.append("This has children and other does not");
+         }
+         else {
+            if (children.size() != otherPN.children.size()) {
+               diffs.append("This has: " + children.size() + " other has: " + otherPN.children.size());
+            }
+            else {
+               for (int i = 0; i < children.size(); i++) {
+                  Object thisChild = children.get(i);
+                  Object otherChild = otherPN.children.get(i);
+                  if (thisChild instanceof IParseNode) {
+                     if (!(otherChild instanceof IParseNode)) {
+                        diffs.append("Child: " + i + " is a different type than other");
+                     }
+                     else {
+                        ((IParseNode) thisChild).diffParseNode((IParseNode) otherChild, diffs);
+                     }
+                  }
+                  else if (otherChild instanceof IParseNode) {
+                     diffs.append("Child: " + i + " for other is a parse node and not for this");
+                  }
+                  else {
+                     if (!StringUtil.equalStrings(thisChild == null ? null : thisChild.toString(),
+                                                  otherChild == null ? null : otherChild.toString())) {
+                        diffs.append("Children have different string values");
+                     }
+                  }
+               }
+            }
+         }
+      }
+   }
+
+   public int getChildStartOffset(Parselet matchParselet) {
+      int childIx = parselet.parselets.indexOf(matchParselet);
+      if (childIx == -1)
+         return -1;
+      if (children != null && children.size() > childIx) {
+         int offset = 0;
+         for (int i = 0; i < childIx; i++) {
+            Object child = children.get(i);
+            if (child instanceof CharSequence)
+               offset += ((CharSequence) child).length();
+         }
+         return offset;
+      }
+      return -1;
+   }
+
+   public boolean isIncomplete() {
+      if (!isErrorNode())
+         return false;
+      if (children == null)
+         return true;
+      int sz = children.size();
+      NestedParselet parentParselet = (NestedParselet) getParselet();
+      for (int i = sz - 1; i >= 0; i--) {
+         Object child = children.get(i);
+         if (child instanceof ErrorParseNode)
+            return true;
+         if (child == null) {
+            Parselet childParselet = parentParselet.getChildParselet(child, i);
+            if (childParselet == null || !childParselet.optional)
+               return true;
+         }
+         else if (child instanceof IParseNode) {
+            return ((IParseNode) child).isIncomplete();
+         }
+         else
+            return false;
+      }
+      return false;
    }
 }
 

@@ -30,7 +30,7 @@ public class StringLiteral extends AbstractLiteral {
       if (initialized) return;
       super.init();
       if (value != null)
-         stringValue = ModelUtil.unescapeJavaString(value);
+         stringValue = CTypeUtil.unescapeJavaString(value);
    }
 
    public Object getTypeDeclaration() {

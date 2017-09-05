@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -44,4 +45,35 @@ public class AnnotationValue extends JavaSemanticNode {
    public String toString() {
       return toSafeLanguageString();
    }
+
+   public static Object elemValToPrimitiveValue(Object elementValue) {
+      if (elementValue instanceof Expression)
+         return ((Expression) elementValue).eval(null, null);
+      else if (elementValue instanceof List)
+         return listToPrimitiveValue((List) elementValue);
+      else if (elementValue == null)
+         return Boolean.TRUE;
+      else if (elementValue instanceof Annotation) {
+         return null; // TODO: not sure what to do here?
+      }
+      else if (elementValue instanceof String || elementValue instanceof Boolean || elementValue instanceof Number || elementValue instanceof Character)
+         return elementValue;
+      else if (elementValue instanceof IValueNode) {
+         return ((IValueNode) elementValue).getPrimitiveValue();
+      }
+      throw new UnsupportedOperationException();
+   }
+
+   public Object getPrimitiveValue() {
+      return elemValToPrimitiveValue(elementValue);
+   }
+
+   public static ArrayList<Object> listToPrimitiveValue(List elemVal) {
+      ArrayList<Object> res = new ArrayList(elemVal.size());
+      for (int i = 0; i < elemVal.size(); i++) {
+         res.add(elemValToPrimitiveValue(elemVal.get(i)));
+      }
+      return res;
+   }
+
 }

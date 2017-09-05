@@ -263,7 +263,6 @@ public class DynStubParameters extends AbstractTemplateParameters {
       if (componentDef && ModelUtil.getEnclosingType(objType) != null && objTypeDecl.isComponentType() && objTypeDecl.needsDynInnerStub)
          return new DynConstructor[0];
 
-
      // Before we were always getting the constructors on the base type.  Why?  Maybe Java SHOULD work that way but it doesn't... we need the constructors on this type
      // so we do the proper parameters and can create the "superArgs" - which get propagated through.
      // Object extTypeDecl = ModelUtil.getExtendsClass(objType);
@@ -445,7 +444,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
    public List<BodyTypeDeclaration> getInnerDynStubs() {
       List<Object> myIts = objTypeDecl.getAllInnerTypes(null, false);
       if (myIts == null)
-         return null;
+         return Collections.emptyList();
 
       ArrayList<BodyTypeDeclaration> defs = new ArrayList<BodyTypeDeclaration>();
 
@@ -540,7 +539,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
 
    private Object getPropertyByName(String propName) {
       // This gets called with objType as a class so make sure it works for any type.
-      return ModelUtil.definesMember(objType, propName, JavaSemanticNode.MemberType.PropertyAnySet, null, null);
+      return ModelUtil.definesMember(objType, propName, JavaSemanticNode.MemberType.PropertyAnySet, null, null, sys);
    }
 
    public DynMethod[] getCompMethods() {
@@ -1011,7 +1010,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
       }
 
       Object findSuperMethod(Object type, List<Object> paramList) {
-         return ModelUtil.definesMethod(type, ModelUtil.getMethodName(method), paramList, null, null, false, false, null, null);
+         return ModelUtil.definesMethod(type, ModelUtil.getMethodName(method), paramList, null, null, false, false, null, null, sys);
       }
 
       public MethodBindSettings getBindSettings() {
@@ -1168,7 +1167,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
       }
 
       Object findSuperMethod(Object type, List<Object> paramList) {
-         return ModelUtil.definesConstructor(type, paramList, null, null, false);
+         return ModelUtil.definesConstructor(sys, type, paramList, null, null, false);
       }
 
       public String getSuperExpression() {

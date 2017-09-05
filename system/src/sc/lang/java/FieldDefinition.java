@@ -10,6 +10,7 @@ import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
 import sc.lang.js.JSFormatMode;
 import sc.lang.js.JSRuntimeProcessor;
+import sc.lang.js.JSTypeParameters;
 import sc.lang.js.JSUtil;
 import sc.layer.LayeredSystem;
 import sc.obj.ScopeDefinition;
@@ -19,25 +20,23 @@ import sc.sync.SyncManager;
 import sc.type.CTypeUtil;
 import sc.type.Type;
 import sc.type.TypeUtil;
+import sc.util.LineCountStringBuilder;
 import sc.util.StringUtil;
 
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
-public class FieldDefinition extends TypedDefinition {
+public class FieldDefinition extends TypedDefinition implements IClassBodyStatement {
    public SemanticNodeList<VariableDefinition> variableDefinitions;
 
    private transient boolean frozenStatic;
    //private transient Object frozenType;
 
-   public static FieldDefinition create(Object type, String fieldName, String op, Expression init) {
-      return createFromJavaType(JavaType.createJavaType(type), fieldName, op, init);
+   public static FieldDefinition create(LayeredSystem sys, Object type, String fieldName, String op, Expression init) {
+      return createFromJavaType(JavaType.createJavaType(sys, type), fieldName, op, init);
    }
 
-   public static FieldDefinition create(Object type, String fieldName) {
-      return createFromJavaType(JavaType.createJavaType(type), fieldName);
+   public static FieldDefinition create(LayeredSystem sys, Object type, String fieldName) {
+      return createFromJavaType(JavaType.createJavaType(sys, type), fieldName);
    }
 
    public static FieldDefinition createFromJavaType(JavaType type, String fieldName) {
@@ -209,7 +208,7 @@ public class FieldDefinition extends TypedDefinition {
 
             Expression initializer = v.initializer;
             Object newValue;
-            // Note: we already cleared prim nums to zero so do not set things to null here
+
             if (initializer != null) {
                newValue = initializer.eval(rtClass, ctx);
 
@@ -247,10 +246,10 @@ public class FieldDefinition extends TypedDefinition {
 
                // Also need to register the name with the sync system so it uses the same name for the object.  This has to happen after the addSyncInst call
                // but we have enabled the sync queue so we know this will happen before we actually add the sync inst itself, so it will get the right name.
-               // Since this reference comes from the client, when the client refreshes, we do need to send the register inst the next time (hence false for the last arg)
+               // Since this reference comes from the client, when the client refreshes, we do need to send the register inst the next time (hence false for the fixedName when
+               // we are on the server but true if we ever run this )
                if (newValue != null) {
-                  syncCtx.registerObjName(newValue, objName, false, false);
-
+                  syncCtx.registerObjName(newValue, objName, syncCtx.getSyncManager().syncDestination.clientDestination, false);
                }
 
                if (flushQueue) {
@@ -288,7 +287,7 @@ public class FieldDefinition extends TypedDefinition {
       for (int i = 0; i < variableDefinitions.size(); i++) {
          VariableDefinition v = variableDefinitions.get(i);
          Object oldVar;
-         if ((oldVar = base.definesMember(v.variableName, MemberType.FieldSet, refType, null)) != null) {
+         if ((oldVar = base.declaresMember(v.variableName, MemberType.FieldSet, refType, null)) != null) {
             if (oldVar == v) {
                System.out.println("*** error: base type returns same field as modified type!");
                break;
@@ -307,11 +306,16 @@ public class FieldDefinition extends TypedDefinition {
 
             overrides = oldFieldDef;
 
-            if (oldFieldDef.variableDefinitions.size() == 1)
-               oldFieldDef.parentNode.removeChild(oldFieldDef);
+            if (ModelUtil.sameTypes(oldFieldDef.getEnclosingType(), refType)) {
+               if (oldFieldDef.variableDefinitions.size() == 1)
+                  oldFieldDef.parentNode.removeChild(oldFieldDef);
+               else {
+                  int ix = oldFieldDef.variableDefinitions.indexOf(oldVarDef);
+                  oldFieldDef.variableDefinitions.remove(ix);
+               }
+            }
             else {
-               int ix = oldFieldDef.variableDefinitions.indexOf(oldVarDef);
-               oldFieldDef.variableDefinitions.remove(ix);
+               System.err.println("*** Shadowed field - not in the same type?");
             }
          }
       }
@@ -518,10 +522,10 @@ public class FieldDefinition extends TypedDefinition {
       return nullInit;
    }
 
-   public CharSequence formatToJS(JSFormatMode mode) {
+   public CharSequence formatToJS(JSFormatMode mode, JSTypeParameters params, int extraLines) {
       JavaModel model = getJavaModel();
       int sz = variableDefinitions.size();
-      StringBuilder res = new StringBuilder();
+      LineCountStringBuilder res = new LineCountStringBuilder();
       for (int i = 0; i < sz; i++) {
          VariableDefinition varDef = variableDefinitions.get(i);
          String nullInit = getNullInit(varDef);
@@ -530,6 +534,7 @@ public class FieldDefinition extends TypedDefinition {
             if (mode == JSFormatMode.InstInit)
                continue;
          }
+
          if (i != 0)
             res.append(" ");
          else
@@ -568,7 +573,7 @@ public class FieldDefinition extends TypedDefinition {
                   String regInstTypeName = CTypeUtil.getPackageName(regInstName);
                   String jsName = JSUtil.convertTypeName(sys, regInstTypeName);
                   res.append(jsName);
-                  res.append(((JSRuntimeProcessor) model.layeredSystem.runtimeProcessor).prototypeSuffix);
+                  res.append(((JSRuntimeProcessor) model.layeredSystem.runtimeProcessor).typeNameSuffix);
                   res.append(".");
                   res.append(CTypeUtil.getClassName(regInstName));
                   res.append("(");
@@ -592,7 +597,7 @@ public class FieldDefinition extends TypedDefinition {
                   String regInstTypeName = CTypeUtil.getPackageName(regInstName);
                   String jsName = JSUtil.convertTypeName(sys, regInstTypeName);
                   res.append(jsName);
-                  res.append(((JSRuntimeProcessor) model.layeredSystem.runtimeProcessor).prototypeSuffix);
+                  res.append(((JSRuntimeProcessor) model.layeredSystem.runtimeProcessor).typeNameSuffix);
                   res.append(".");
                   res.append(CTypeUtil.getClassName(regInstName));
                   res.append("(\"");
@@ -638,13 +643,15 @@ public class FieldDefinition extends TypedDefinition {
                res.append(nullInit);
             }
             else
-               res.append(varDef.initializer.formatToJS(mode));
+               res.append(varDef.initializer.formatToJS(mode, params, extraLines + res.lineCount));
          }
          else
             res.append(nullInit);
 
          res.append(";\n");
       }
+      // TODO: do we need this?
+      //params.addGenLineMapping(this, res.toString(), extraLines);
       return res;
    }
 
@@ -730,5 +737,25 @@ public class FieldDefinition extends TypedDefinition {
          }
       }
       return false;
+   }
+
+   @Override
+   public List<Statement> getBodyStatements() {
+      List<Statement> res = null;
+      if (variableDefinitions != null) {
+         for (VariableDefinition varDef:variableDefinitions) {
+            Expression initExpr = varDef.getInitializerExpr();
+            if (initExpr != null && !initExpr.isLeafStatement()) {
+               if (res == null)
+                  res = new ArrayList<Statement>();
+               res.add(initExpr);
+            }
+         }
+      }
+      return res;
+   }
+
+   public boolean isLeafStatement() {
+      return getBodyStatements() == null;
    }
 }

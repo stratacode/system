@@ -39,6 +39,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       // Need to make sure both types share the same pomCache and repositories
       if (managerName.equals("mvn")) {
          pomCache = new HashMap<String,POMFile>();
+         metadataFileCache = new HashMap<String,MvnMetadataFile>();
          repositories = new ArrayList<MvnRepository>();
 
          for (String defPath:defaultRepositories) {
@@ -48,6 +49,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       else {
          MvnRepositoryManager mvnMgr = (MvnRepositoryManager) sys.getRepositoryManager("mvn");
          pomCache = mvnMgr.pomCache;
+         metadataFileCache = mvnMgr.metadataFileCache;
          repositories = mvnMgr.repositories;
       }
 
@@ -61,6 +63,8 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
    ArrayList<MvnRepository> repositories;
 
    public HashMap<String,POMFile> pomCache;
+
+   public HashMap<String,MvnMetadataFile> metadataFileCache;
 
    @Override
    public String doInstall(RepositorySource src, DependencyContext ctx, DependencyCollection deps) {
@@ -126,7 +130,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
             if (!pkg.buildFromSrc) {
                // When a repository is not downloaded in src form (i.e. from 'git') these types will have classes.  The type 'pom' usually does not but we still need to
                // check for a jar file since it may be there.
-               if (pomFile.packaging.equals("jar") || pomFile.packaging.equals("bundle") || pomFile.packaging.equals("pom") | pomFile.packaging.equals("war")) {
+               if (pomFile.packaging.equals("jar") || pomFile.packaging.equals("bundle") || pomFile.packaging.equals("pom") || pomFile.packaging.equals("war") || pomFile.packaging.equals("maven-plugin")) {
                   pkg.definesClasses = true;
                   pkg.definesSrc = false;
                }
@@ -391,38 +395,6 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       return pomFile;
    }
 
-   private boolean mvnFileExists(MvnDescriptor desc, String resFileName, String remoteSuffix, String remoteExt) {
-      boolean found = false;
-      if (!system.reinstallSystem && new File(resFileName).canRead()) {
-         info("File already downloaded: " + resFileName);
-         return true;
-      }
-      if (useLocalRepository) {
-         String localPkgDir = FileUtil.concat(mvnRepositoryDir, desc.groupId.replace(".", FileUtil.FILE_SEPARATOR), desc.artifactId, desc.version);
-         if (new File(localPkgDir).isDirectory()) {
-            String fileName = FileUtil.concat(localPkgDir, FileUtil.addExtension(desc.artifactId + "-" + desc.version + remoteSuffix, remoteExt));
-            if (new File(fileName).canRead()) {
-               if (FileUtil.copyFile(fileName, resFileName, true))
-                  return true;
-               else
-                  info("Failed to copy from local repository: " + fileName + " to: " + resFileName);
-            }
-         }
-      }
-      for (MvnRepository repo:repositories) {
-         String pomURL = repo.getFileURL(desc.groupId, desc.artifactId, desc.modulePath, desc.version, desc.classifier, remoteSuffix, remoteExt);
-         String resDir = FileUtil.getParentPath(resFileName);
-         new File(resDir).mkdirs();
-         String res = URLUtil.saveURLToFile(pomURL, resFileName, false, msg);
-         if (res == null) { // If success we break
-            found = true;
-            break;
-         }
-      }
-      return found;
-
-   }
-
    private boolean needsClassifierSuffix(String ext) {
       if (ext.equals("jar"))
          return true;
@@ -461,7 +433,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          }
       }
       for (MvnRepository repo:repositories) {
-         String remoteURL = repo.getFileURL(desc.groupId, desc.artifactId, desc.modulePath, desc.version, useClassifier ? desc.classifier : null, remoteSuffix, remoteExt);
+         String remoteURL = repo.getFileURL(desc.groupId, desc.artifactId, desc.modulePath, desc.version, desc.version, useClassifier ? desc.classifier : null, remoteSuffix, remoteExt);
          String resDir = FileUtil.getParentPath(resFileName);
          new File(resDir).mkdirs();
          String res = URLUtil.saveURLToFile(remoteURL, resFileName, false, msg);
@@ -469,9 +441,34 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
             found = true;
             break;
          }
+         // There was no file with the specific file name but when the version is snapshot, we need to look into the
+         // maven-metadata.xml file to figure out the current version and download the file of the right name.
+         else if (desc.version != null && desc.version.endsWith("-SNAPSHOT")) {
+            String mavenMetadataURL = repo.getMetadataURL(desc.groupId, desc.artifactId, desc.modulePath, desc.version);
+            String resDirName = FileUtil.getParentPath(resFileName);
+            String metadataResName = FileUtil.concat(resDirName, "maven-metadata.xml");
+            String metadataRes = saveURLToFile(mavenMetadataURL, metadataResName);
+            // We have a metadata file - look and see if we need to map the -SNAPSHOT to a specific timestamp/buildnumber for downloading
+            if (metadataRes == null) {
+               MvnMetadataFile metaFile = getMvnMetadataFile(metadataResName);
+               String metadataVersion = desc.version.substring(0, desc.version.length() - "-SNAPSHOT".length()) + "-" + metaFile.getSnapshotVersion();
+
+               remoteURL = repo.getFileURL(desc.groupId, desc.artifactId, desc.modulePath, desc.version, metadataVersion, useClassifier ? desc.classifier : null, remoteSuffix, remoteExt);
+               res = saveURLToFile(remoteURL, resFileName);
+               if (res == null) {
+                  found = true;
+                  break;
+               }
+            }
+         }
       }
       return found;
+   }
 
+   private String saveURLToFile(String remoteURL, String resFileName) {
+      String resDir = FileUtil.getParentPath(resFileName);
+      new File(resDir).mkdirs();
+      return URLUtil.saveURLToFile(remoteURL, resFileName, false, msg);
    }
 
    public RepositoryPackage getOrCreatePackage(String url, RepositoryPackage parent, boolean install) {
@@ -512,6 +509,18 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
          return null;
       }
       return (POMFile) pomRes;
+   }
+
+   public MvnMetadataFile getMvnMetadataFile(String metaFileName) {
+      MvnMetadataFile res = metadataFileCache.get(metaFileName);
+      if (res != null) {
+         if (res == MvnMetadataFile.NULL_SENTINEL)
+            return null;
+         return res;
+      }
+      res = new MvnMetadataFile(metaFileName, msg);
+      metadataFileCache.put(metaFileName, res);
+      return res;
    }
 
    public RepositorySource createRepositorySource(String url, boolean unzip, RepositoryPackage parentPkg) {

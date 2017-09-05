@@ -24,4 +24,14 @@ public class ArrayUtil {
    public static Object[] listToArray(List l) {
       return l.toArray();
    }
+
+   public static String argsToString(Object[] args) {
+      StringBuilder sb = new StringBuilder();
+      for (int i = 0; i < args.length; i++) {
+         if (i != 0)
+            sb.append(", ");
+         sb.append(args[i]);
+      }
+      return sb.toString();
+   }
 }

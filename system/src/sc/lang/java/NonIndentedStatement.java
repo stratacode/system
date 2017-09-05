@@ -12,4 +12,8 @@ public abstract class NonIndentedStatement extends Statement {
          return parentNode.getChildNestingDepth();
       return 0;
    }
+
+   public boolean isLeafStatement() {
+      return false;
+   }
 }

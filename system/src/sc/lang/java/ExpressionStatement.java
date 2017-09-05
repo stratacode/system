@@ -5,6 +5,7 @@
 package sc.lang.java;
 
 import sc.lang.ISrcStatement;
+import sc.parser.ParseUtil;
 
 import java.util.Set;
 
@@ -53,5 +54,9 @@ public abstract class ExpressionStatement extends Statement {
       if (expression != null)
          return expression.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
       return -1;
+   }
+
+   public boolean isLineStatement() {
+      return true;
    }
 }

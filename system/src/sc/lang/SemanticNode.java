@@ -8,6 +8,7 @@ import sc.js.JSSettings;
 import sc.lang.java.*;
 import sc.layer.SrcEntry;
 import sc.lifecycle.ILifecycle;
+import sc.obj.EditorSettings;
 import sc.type.*;
 import sc.util.FileUtil;
 import sc.util.PerfMon;
@@ -41,9 +42,9 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
    // TODO performance: turn these into bitfields
    transient protected boolean initialized;
    transient protected boolean started;
-   transient protected boolean transformed;
    transient protected boolean validated;
    transient protected boolean processed;
+   transient protected boolean transformed;
 
    public boolean isInitialized() {
       return initialized;
@@ -153,10 +154,8 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
    }
 
    public void stop() {
-      if (!started)
-         return;
-      started = false;
       initialized = false;
+      started = false;
       validated = false;
       processed = false;
 
@@ -166,8 +165,13 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       for (int i = 0; i < semanticProps.length; i++) {
          IBeanMapper mapper = semanticProps[i];
          Object val = PTypeUtil.getProperty(this, mapper.getField());
-         if (val instanceof ILifecycle)
+         if (val instanceof ILifecycle) {
+            if (val == this) {
+               System.err.println("*** Recursive element tree - child: " + mapper.getPropertyName() + " refers to parent in stop method");
+               return;
+            }
             ((ILifecycle) val).stop();
+         }
       }
    }
 
@@ -217,6 +221,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       parseNode = pn;
    }
 
+   @EditorSettings(visible=false)
    public ISemanticNode getParentNode() {
       return parentNode;
    }
@@ -502,7 +507,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
 
    static void diffAppend(StringBuilder diffs, Object val) {
       if (debugDiffTrace)
-         diffs = diffs;
+         diffs = diffs; // set breakpoint here
       diffs.append(val);
    }
 

@@ -91,7 +91,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
            notLineTerminators,
            new OrderedChoice(lineTerminator, new Symbol(Symbol.EOF)));
    {
-      //EOLComment.styleName = "comment";
+      EOLComment.styleName = "comment";
    }
 
    public IndexedChoice commentBody = new IndexedChoice("<commentBody>", OPTIONAL | REPEAT | NOERROR);
@@ -103,7 +103,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
    public Sequence blockComment = new Sequence("<blockComment>", NOERROR);
    { blockComment.add(new Symbol("/*"), commentBody, new Symbol("*/")); }
    {
-      //blockComment.styleName = "comment";
+      blockComment.styleName = "comment";
    }
 
    public IndexedChoice spacing = new IndexedChoice("<spacing>", REPEAT | OPTIONAL | NOERROR);
@@ -126,7 +126,11 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
       spacingEOL.generateParseNode = new SpacingParseNode(spacingEOL, true);
    }
 
-   public SymbolSpace periodSpace = new SymbolSpace(".");
+   public SymbolChoiceSpace periodSpace = new SymbolChoiceSpace(".");
+   {
+      // We want to match '.' but not '...' in the partial values case so excluding '..'
+      periodSpace.addExcludedValues("..");
+   }
    public Symbol period = new Symbol(".");
    public SymbolSpace semicolonEOL = new SymbolSpace(";", SKIP_ON_ERROR);
    {
@@ -270,8 +274,11 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
    Sequence alphaNumString = new Sequence("<anyName>('','',)", alphaNumChar,
            new Sequence("('')", REPEAT | OPTIONAL, alphaNumChar), spacing);
 
-   /** Use this to create a parselet for your repeating parselets skipOnError parselet.  It's used to consume the next error token while trying to skip out
-    * of the body of something which is incomplete.  It must consume all text except for the text which would ordinarily complete the parent. */
+   /**
+    * Use this to create a parselet for your repeating parselets skipOnError parselet.  It's used to consume the next error token while trying to skip out
+    * of the body of something which is incomplete.  It consumes text which is safe to skip when we encounter an error parsing
+    * the main parselet.  It must not match text which would ordinarily complete the parent.
+    */
    public Parselet createSkipOnErrorParselet(String name, String... exitSymbols) {
       return new OrderedChoice(name + "(.,.)", alphaNumString, new Sequence(new SymbolChoice(NOT, exitSymbols), spacing));
    }
@@ -348,6 +355,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
    }
 
    public class SymbolSpace extends Sequence {
+      Symbol symbolParselet;
       /**
        * Creates a symbol space token with a deliminator for output purposes.  This
        * deliminator is appended to the symbol on output.
@@ -359,11 +367,13 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
       public SymbolSpace(String symbol, String delim, int options) {
          // We used to include NOERROR here but need errors for ; and in general these seem to be important parselets
          super("('',):(.," + delim + ")", options);
-         add(new Symbol(NOERROR, symbol), spacing);
+         symbolParselet = new Symbol(NOERROR, symbol);
+         add(symbolParselet, spacing);
       }
       public SymbolSpace(String symbol, int options) {
          super("('',)", options);
-         add(new Symbol(NOERROR, symbol), spacing);
+         symbolParselet = new Symbol(NOERROR, symbol);
+         add(symbolParselet, spacing);
       }
 
       public SymbolSpace(String symbol, String delim) {
@@ -376,6 +386,28 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
 
       public String toString() {
          return "Symbol: '" + ((Symbol) parselets.get(0)).expectedValue + "'";
+      }
+
+      public void addExcludedValues(String... excludedValues) {
+         symbolParselet.addExcludedValues(excludedValues);
+      }
+
+      public void setSymbolStyleName(String styleName) {
+         symbolParselet.styleName = styleName;
+      }
+   }
+
+   /** Like SymbolSpace but styled as a keyword */
+   public class KeywordSymbolSpace extends SymbolSpace {
+      public KeywordSymbolSpace(String symbol) {
+         super(symbol);
+         symbolParselet.styleName = "keyword";
+      }
+   }
+
+   public class KeywordSymbol extends Symbol {
+      public KeywordSymbol(String ev) {
+         super(ev);
       }
    }
 
@@ -439,7 +471,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
       }
 
       SymbolChoiceSpace(String symbol) {
-         this(symbol, 0);
+         this(0, symbol);
       }
 
       public void add(String...choices) {

@@ -15,23 +15,7 @@ import java.util.LinkedHashMap;
 @sc.js.JSSettings(jsModuleFile="js/scgen.js", prefixAlias="sc_")
 public class GlobalScopeDefinition extends ScopeDefinition {
 
-   public class GlobalScopeContext extends ScopeContext {
-      LinkedHashMap<String, Object> globalTable;
-
-      @Override
-      public void setValue(String name, Object value) {
-         if (globalTable == null)
-            globalTable = new LinkedHashMap<String,Object>();
-         globalTable.put(name, value);
-      }
-
-      @Override
-      public Object getValue(String name) {
-         if (globalTable == null)
-            return null;
-         return globalTable.get(name);
-      }
-
+   public class GlobalScopeContext extends BaseScopeContext {
       @Override
       public ScopeDefinition getScopeDefinition() {
          return GlobalScopeDefinition.this;
@@ -61,8 +45,10 @@ public class GlobalScopeDefinition extends ScopeDefinition {
       super(0); // global scope is always id 0
    }
 
-   @Override
-   public ScopeContext getScopeContext() {
+   public ScopeContext getScopeContext(boolean create) {
+      ScopeContext tempCtx = super.getScopeContext(create);
+      if (tempCtx != null)
+         return tempCtx;
       return globalContext;
    }
 

@@ -14,7 +14,7 @@ public class MvnRepository {
       this.baseURL = baseURL;
    }
 
-   public String getFileURL(String groupId, String artifactId, String modulePath, String version, String classifier, String suffix, String extension) {
+   public String getFileURL(String groupId, String artifactId, String modulePath, String pathVersion, String fileVersion, String classifier, String suffix, String extension) {
       if (groupId == null) {
          groupId = "null";
       }
@@ -24,7 +24,11 @@ public class MvnRepository {
       if (artifactId == null || artifactId.equals("null"))
          artifactId = modulePath;
       String classifierExt = classifier == null ? "" : "-" + classifier;
-      return baseURL + URLUtil.concat(groupId.replace('.', '/'), artifactId, version, FileUtil.addExtension(artifactId + "-" + version + classifierExt + suffix, extension));
+      return URLUtil.concat(baseURL, URLUtil.concat(groupId.replace('.', '/'), artifactId, pathVersion, FileUtil.addExtension(artifactId + "-" + fileVersion + classifierExt + suffix, extension)));
+   }
+
+   public String getMetadataURL(String groupId, String artifactId, String modulePath, String version) {
+      return URLUtil.concat(baseURL, URLUtil.concat(groupId.replace('.', '/'), artifactId, version, "maven-metadata.xml"));
    }
 
    public String toString() {

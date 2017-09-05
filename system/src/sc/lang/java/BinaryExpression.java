@@ -31,6 +31,7 @@ public class BinaryExpression extends Expression {
    // These are the source properties when isTreeNode=true, computed otherwise
    public transient Expression lhs;
    public transient String operator;
+   /** The rhs is an Expression for most binary expressions but for instanceof it's a JavaType */
    public transient JavaSemanticNode rhs;
    public transient BinaryExpression rootExpression;
 
@@ -114,8 +115,14 @@ public class BinaryExpression extends Expression {
                }
 
                if (TypeUtil.operatorPrecedes(op.operator, newParent.operator)) {
-                  newExpr = createExpression((Expression) newParent.rhs, op);
-                  newParent.setProperty("rhs", newExpr, false, false);
+                  if (newParent.rhs instanceof Expression) {
+                     newExpr = createExpression((Expression) newParent.rhs, op);
+                     newParent.setProperty("rhs", newExpr, false, false);
+                  }
+                  else if (newParent.rhs instanceof ClassType) {
+                     ClassType newClassType = ((ClassType) newParent.rhs).deepCopy(ISemanticNode.CopyNormal, null);
+                     newParent.setProperty("rhs", newClassType, false, false);
+                  }
                }
                else {
                   newExpr = createExpression(newParent,  op);
@@ -159,29 +166,29 @@ public class BinaryExpression extends Expression {
       //if (isNestedExpr) {
       //   return;
       //}
-      boolean alreadyStarted = lhs != null && lhs.isStarted();
-
       super.start();
 
       if (lhs == null || rhs == null)
          return; // Partial values might not be initialized during fragment parsing
 
       // If we do this in the deepCopy it ends up breaking because we have not set the parentNode.
-      if (!alreadyStarted && getJavaModel() != null) {
+      if (getJavaModel() != null) {
          Class inferredType = getInferredType();
          if (inferredType != null) {
-            lhs.setInferredType(inferredType);
+            lhs.setInferredType(inferredType, true);
             Expression rhsExpr = getRhsExpr();
             if (rhsExpr != null)
-               rhsExpr.setInferredType(inferredType);
+               rhsExpr.setInferredType(inferredType, true);
          }
       }
 
       lhs.start();
       rhs.start();
 
+      /* Used to return here for nested exprs but would miss errors on nested expressions - eg. list + int - int
       if (isNestedExpr)
          return;
+      */
 
       OperatorType type = getOperatorType(operator);
 
@@ -191,7 +198,7 @@ public class BinaryExpression extends Expression {
             break;
          case BooleanArithmetic:
             lhsType = lhs.getTypeDeclaration();
-            rhsType = rhsType = getRhsExpr().getTypeDeclaration();
+            rhsType = getRhsExpr().getTypeDeclaration();
 
             if (lhsType != null && rhsType != null) {
                boolean lhsIsBoolean = ModelUtil.isBoolean(lhsType);
@@ -715,8 +722,11 @@ public class BinaryExpression extends Expression {
 
                int ndim = rhsType.getNdims();
                Object rhsTypeDecl = rhsType.getTypeDeclaration();
-               if (ndim != -1 || ModelUtil.isInterface(rhsTypeDecl) || ModelUtil.isNumber(rhsTypeDecl) || ModelUtil.isAssignableFrom(String.class, rhsTypeDecl) || ModelUtil.isAssignableFrom(Boolean.class, rhsTypeDecl)) {
-                  IdentifierExpression iexpr = IdentifierExpression.create(ndim == -1 ? "sc_instanceOf" : "sc_arrayInstanceOf");
+               // Special case for instanceof Class - we use an internal function because Number, String etc. should match here and they do not extend jv_Object
+               boolean isClassType = ModelUtil.sameTypes(rhsTypeDecl, Class.class);
+               if (ndim != -1 || ModelUtil.isInterface(rhsTypeDecl) || ModelUtil.isNumber(rhsTypeDecl) ||
+                   ModelUtil.isAssignableFrom(String.class, rhsTypeDecl) || ModelUtil.isAssignableFrom(Boolean.class, rhsTypeDecl) || isClassType) {
+                  IdentifierExpression iexpr = IdentifierExpression.create(isClassType ? "sc_instanceOfClass" : ndim == -1 ? "sc_instanceOf" : "sc_arrayInstanceOf");
                   SemanticNodeList<Object> snl = new SemanticNodeList<Object>();
                   if (i == 0) {
                      snl.add(firstExpr);
@@ -726,7 +736,7 @@ public class BinaryExpression extends Expression {
                   }
                   snl.add(IdentifierExpression.create(rhsType.getFullBaseTypeName()));
                   if (ndim != -1)
-                     snl.add(IntegerLiteral.create(ndim));
+                     snl.add(IntegerLiteral.create(ndim-1)); // TODO: NOTE ndim here is 0 based but probably should be 1 based - see also changes in scccore.js and JSTypeParameters
                   iexpr.setProperty("arguments", snl);
 
                   // For a simple binary expr, we replace it entirely
@@ -938,9 +948,14 @@ public class BinaryExpression extends Expression {
       if (lhs != null) {
          lhs.addBreakpointNodes(res, srcStatement);
       }
-      Expression rhsExpr = getRhsExpr();
-      if (rhsExpr != null)
-         rhsExpr.addBreakpointNodes(res, srcStatement);
+      if (rhs instanceof Expression) {
+         Expression rhsExpr = getRhsExpr();
+         if (rhsExpr != null)
+            rhsExpr.addBreakpointNodes(res, srcStatement);
+      }
+      else if (rhs instanceof JavaType) {
+         //...
+      }
    }
 
    public boolean needsEnclosingClass() {
@@ -953,6 +968,10 @@ public class BinaryExpression extends Expression {
    }
 
    private Class getInferredType() {
+      if (operator == null) {
+         System.out.println("*** Uninitialized binary expression!");
+         return null;
+      }
       switch (getOperatorType(operator)) {
          case Conditional:
             return Boolean.class;

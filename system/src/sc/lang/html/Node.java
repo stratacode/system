@@ -52,8 +52,9 @@ public abstract class Node extends JavaSemanticNode implements IDynObject, ISrcS
    public void setProperty(String propName, Object value, boolean setField) {
       if (dynObj == null)
          TypeUtil.setPropertyFromName(this, propName, value);
-      else
+      else {
          dynObj.setPropertyFromWrapper(this, propName, value, setField);
+      }
    }
    public void setProperty(int propIndex, Object value, boolean setField) {
       if (dynObj == null) {
@@ -77,7 +78,8 @@ public abstract class Node extends JavaSemanticNode implements IDynObject, ISrcS
       return dynObj == null ? getClass() : dynObj.getDynType();
    }
    public void setDynType(Object typeObj) {
-      dynObj.setTypeFromWrapper(this, typeObj);
+      if (dynObj != null)
+         dynObj.setTypeFromWrapper(this, typeObj);
    }
    public <_TPROP> _TPROP getTypedProperty(String propName, Class<_TPROP> propType) {
       if (dynObj == null)
@@ -141,4 +143,9 @@ public abstract class Node extends JavaSemanticNode implements IDynObject, ISrcS
       return false;
    }
 
+
+   public void stop() {
+      super.stop();
+      errorArgs = null;
+   }
 }

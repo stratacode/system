@@ -9,7 +9,7 @@ import sc.lang.ISrcStatement;
 import java.util.List;
 import java.util.Set;
 
-public class ForStatement extends Statement {
+public class ForStatement extends Statement implements IStatementWrapper {
    public Statement statement;
 
    public boolean spaceAfterParen() {
@@ -60,7 +60,33 @@ public class ForStatement extends Statement {
       return child == statement;
    }
 
-   public void addReturnStatements(List<Statement> res) {
-      statement.addReturnStatements(res);
+   public void addReturnStatements(List<Statement> res, boolean incThrow) {
+      if (statement != null) statement.addReturnStatements(res, incThrow);
+   }
+
+   public Statement findStatement(Statement in) {
+      if (statement != null) {
+         Statement out = statement.findStatement(in);
+         if (out != null)
+            return out;
+      }
+      return super.findStatement(in);
+   }
+
+   public boolean isLeafStatement() {
+      return false;
+   }
+
+   public boolean isLineStatement() {
+      return true;
+   }
+
+   public Statement getWrappedStatement() {
+      return statement;
+   }
+
+   @Override
+   public String getFunctionEndString() {
+      return ")";
    }
 }

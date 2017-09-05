@@ -96,4 +96,12 @@ public class BasicScopeProcessor extends DefinitionProcessor implements IScopePr
       return contextParams;
    }
 
+   private boolean temporaryScope = false;
+   public void setTemporaryScope(boolean cp) {
+      temporaryScope = cp;
+   }
+   public boolean isTemporaryScope() {
+      return temporaryScope;
+   }
+
 }

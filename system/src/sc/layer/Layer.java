@@ -13,16 +13,10 @@ import sc.lang.sc.PropertyAssignment;
 import sc.lifecycle.ILifecycle;
 import sc.lang.sc.ModifyDeclaration;
 import sc.lang.java.*;
-import sc.obj.CompilerSettings;
-import sc.obj.Constant;
-import sc.obj.GlobalScopeDefinition;
-import sc.obj.SyncMode;
+import sc.obj.*;
 import sc.parser.Language;
 import sc.parser.ParseUtil;
-import sc.repos.IRepositoryManager;
-import sc.repos.RepositoryPackage;
-import sc.repos.RepositorySource;
-import sc.repos.RepositorySystem;
+import sc.repos.*;
 import sc.sync.SyncManager;
 import sc.type.CTypeUtil;
 import sc.type.RTypeUtil;
@@ -200,11 +194,11 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    /** Normalized paths relative to the layer directory that are excluded from processing */
    public List<String> excludedPaths = new ArrayList<String>(Arrays.asList(LayerConstants.DYN_BUILD_DIRECTORY, LayerConstants.BUILD_DIRECTORY, LayerConstants.SC_DIR, "out", "bin", "lib", "build-save"));
 
-   /** Set of paths to which are included in the src cache but not processed */
+   /** Set of src-file pathnames to which are included in the src cache but not processed */
    public List<String> skipStartPaths = new ArrayList<String>();
 
    /** Set of patterns to ignore in any layer src or class directory, using Java's regex language */
-   public List<String> skipStartFiles = new ArrayList<String>(Arrays.asList(".*.sctd"));
+   public List<String> skipStartFiles; // = new ArrayList<String>(Arrays.asList(".*.sctd"));  TODO: Remove all of the skipStart stuff - pretty sure it's not used anymore
 
    private List<Pattern> skipStartPatterns; // Computed from the above
 
@@ -264,7 +258,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    public boolean finalLayer = false;
 
    // For build layers, while the layer is being build this stores the build state - changed files, etc.
-   LayeredSystem.BuildState buildState;
+   BuildState buildState, lastBuildState;
 
    /** Set to true when this layer has had all changed files detected.  If it's not changed, we will load it as source */
    public boolean changedModelsDetected = false;
@@ -373,6 +367,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    private boolean buildSrcIndexNeedsSave = false; // TODO: performance - this gets saved way too often now right - need to implement this flag
 
    public HashMap<String, IScopeProcessor> scopeProcessors = null;
+
+   private TreeMap<String,String> scopeAliases = null;
 
    public HashMap<String,IAnnotationProcessor> annotationProcessors = null;
 
@@ -663,11 +659,36 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          if (proc != null)
             return proc;
       }
+      if (scopeAliases != null && annotName != null) {
+         String aliasName = scopeAliases.get(annotName);
+         if (aliasName != null) {
+            proc = layeredSystem.getScopeProcessor(this, aliasName);
+            if (proc != null)
+               return proc;
+         }
+      }
       if (baseLayers != null && checkBaseLayers) {
          for (Layer baseLayer:baseLayers) {
             proc = baseLayer.getScopeProcessor(annotName, true);
             if (proc != null)
                return proc;
+         }
+      }
+      return null;
+   }
+
+   public String getScopeAlias(String scopeName, boolean checkBaseLayers) {
+      if (scopeAliases != null) {
+         String aliasName = scopeAliases.get(scopeName);
+         if (aliasName != null) {
+            return aliasName;
+         }
+      }
+      if (baseLayers != null && checkBaseLayers) {
+         for (Layer baseLayer:baseLayers) {
+            String alias = baseLayer.getScopeAlias(scopeName, true);
+            if (alias != null)
+               return alias;
          }
       }
       return null;
@@ -729,6 +750,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    public void updateTypeIndex(TypeIndexEntry typeIndexEntry, long lastModified) {
+      if (typeIndexEntry == null)
+         return;
       String typeName = typeIndexEntry.typeName;
       if (typeName != null) {
          if (layerTypeIndex == null) {
@@ -796,7 +819,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    /** Adds the top level src directories for  */
-   public void addBuildDirs(LayeredSystem.BuildState bd) {
+   public void addBuildDirs(BuildState bd) {
       if (topLevelSrcDirs == null || topLevelSrcDirs.size() == 0) {
          warn("No srcPath entries for layer: ", this.toString());
       }
@@ -1151,8 +1174,17 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             baseLayer.ensureValidated(true);
       }
 
-      initImportCache();
+      if (scopeAliases != null) {
+         for (Map.Entry<String,String> aliasEnt:scopeAliases.entrySet()) {
+            String scopeName = aliasEnt.getValue();
+            // It might be a custom scope or global or appGobal
+            if (layeredSystem.getScopeProcessor(this, scopeName) == null && ScopeDefinition.getScopeByName(scopeName) == null) {
+               error("No definition for scope: " + aliasEnt.getValue() + " to register alias: " + aliasEnt.getKey());
+            }
+         }
+      }
 
+      initImportCache();
       callLayerMethod("validate");
    }
 
@@ -1190,10 +1222,12 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
       // Don't initialize the core build layer - it has no indexed types anyway and this causes us to init the
       // per-process index before we've defined the process.
-      if (hasSrc)
-         initTypeIndex();
-      else
-         layerTypeIndex = new LayerTypeIndex();
+      if (layeredSystem.typeIndexEnabled) {
+         if (hasSrc)
+            initTypeIndex();
+         else
+            layerTypeIndex = new LayerTypeIndex();
+      }
 
       if (baseLayers != null && !activated) {
          for (Layer baseLayer:baseLayers)
@@ -1250,6 +1284,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       excluded = !includeForProcess(layeredSystem.processDefinition);
       if (oldExcluded != excluded) {
          System.err.println("*** Not processing exclusion change for layer: " + this + " restart - required");
+         if (!excluded)
+            markExcluded();
          /*
          if (excluded) {
             layeredSystem.removeExcludedLayers(true);
@@ -1260,6 +1296,13 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          }
          */
       }
+   }
+
+   public void markExcluded() {
+      if (excluded)
+         return;
+      excluded = true;
+      removeFromTypeIndex();
    }
 
    public static boolean getBaseIsDynamic(List<Layer> baseLayers) {
@@ -1565,7 +1608,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             dirIndex.add(FileUtil.removeExtension(fn));
 
             // If the file is excluded but is a source file, we'll need to mark it as excluded in the type index so we do not think it's a new file.
-            if (excludedFile(fn, prefix)) {
+            if (layerTypeIndex != null && excludedFile(fn, prefix)) {
                layerTypeIndex.fileIndex.put(FileUtil.concat(rootPath, srcPath), TypeIndexEntry.EXCLUDED_SENTINEL);
             }
          }
@@ -1600,6 +1643,20 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       String absPrefix = FileUtil.concat(packagePrefix.replace('.', FileUtil.FILE_SEPARATOR_CHAR), relDir);
       layeredSystem.addToPackageIndex(FileUtil.normalize(layerPathName), this, false, true, FileUtil.normalize(absPrefix), srcEnt.baseFileName);
       dirIndex.add(FileUtil.removeExtension(srcEnt.baseFileName));
+      // If there's an import packageName.* for this type, make sure we add the import
+      if (globalPackages != null) {
+         String typeName = srcEnt.getTypeName();
+         if (typeName != null) {
+            String packageName = CTypeUtil.getPackageName(typeName);
+            String className = CTypeUtil.getClassName(typeName);
+            for (String globalPackage : globalPackages) {
+               if (globalPackage.equals(packageName)) {
+                  importsByName.put(className, ImportDeclaration.create(typeName));
+                  break;
+               }
+            }
+         }
+      }
       if (checkPeers && layeredSystem.peerSystems != null) {
          for (LayeredSystem peerSys:layeredSystem.peerSystems) {
             Layer peerLayer = activated ? peerSys.getLayerByName(getLayerUniqueName()) : peerSys.lookupInactiveLayer(getLayerName(), false, true);
@@ -1616,7 +1673,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       srcDirCache.remove(relFileName);
       String absPrefix = FileUtil.concat(packagePrefix.replace('.', '/'), srcEnt.getRelDir());
       layeredSystem.removeFromPackageIndex(layerPathName, this, false, true, absPrefix, srcEnt.baseFileName);
-      // TODO: any reason to remove the dirIndex entry?
+      // TODO: any reason to remove the dirIndex entry?  and the globalPackages entry if there's an import packageName.* which matches this class?  We should validate each entry still exists before returning it
    }
 
    /**
@@ -1686,7 +1743,11 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
       if (repositoryPackages != null && !disabled) {
          for (RepositoryPackage pkg:repositoryPackages) {
-            layeredSystem.repositorySystem.installPackage(pkg, null);
+            DependencyContext pkgCtx = new DependencyContext(pkg, "Layer: " + toString() + " package tree");
+            layeredSystem.repositorySystem.installPackage(pkg, pkgCtx);
+            if (layeredSystem.options.verbose) {
+               verbose(pkgCtx.dumpContextTree().toString());
+            }
          }
          installPackages(repositoryPackages.toArray(new RepositoryPackage[repositoryPackages.size()]));
       }
@@ -1755,11 +1816,13 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (topLevelSrcDirs == null)
          initSrcDirs();
 
-      if (layerTypeIndex == null)
-         layerTypeIndex = new LayerTypeIndex();
-      layerTypeIndex.layerPathName = getLayerPathName();
-      if (layerTypeIndex.layerPathName == null)
-         System.err.println("*** Missing layer path name for type index");
+      if (layeredSystem.typeIndexEnabled) {
+         if (layerTypeIndex == null)
+            layerTypeIndex = new LayerTypeIndex();
+         layerTypeIndex.layerPathName = getLayerPathName();
+         if (layerTypeIndex.layerPathName == null)
+            System.err.println("*** Missing layer path name for type index");
+      }
 
       if (excludedFiles != null) {
          excludedPatterns = new ArrayList<Pattern>(excludedFiles.size());
@@ -1801,7 +1864,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       initSrcCache(replacedTypes);
 
       // Need to save the filtered list of topLevelSrcDirs in the index so we know when this particular index is out of date.
-      layerTypeIndex.topLevelSrcDirs = topLevelSrcDirs.toArray(new String[topLevelSrcDirs.size()]);
+      if (layerTypeIndex != null)
+         layerTypeIndex.topLevelSrcDirs = topLevelSrcDirs.toArray(new String[topLevelSrcDirs.size()]);
 
       if (isBuildLayer())
          makeBuildLayer();
@@ -2163,8 +2227,22 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    public void initTypeIndex() {
       File typeIndexFile = new File(layeredSystem.getTypeIndexFileName(getLayerName()));
+      SysTypeIndex sysIndex = layeredSystem.typeIndex;
+      if (sysIndex == null)
+         sysIndex = layeredSystem.typeIndex = new SysTypeIndex(layeredSystem, layeredSystem.getTypeIndexIdent());
+      LayerListTypeIndex useTypeIndex = activated ? sysIndex.activeTypeIndex : sysIndex.inactiveTypeIndex;
+      String layerName = getLayerName();
+
+      // In case we're in the midst of reading the type index for this layer, use that one instead of reading a duplicate and getting out of sync.
+      layerTypeIndex = useTypeIndex.typeIndex.get(layerName);
+      boolean addIndexEntry = true;
+      if (layerTypeIndex != null) {
+         typeIndexRestored = true;
+         addIndexEntry = false;
+      }
+
       // A clean build of everything will reset the layerTypeIndex
-      if (typeIndexFile.canRead() && (!activated || !getBuildAllFiles())) {
+      if (layerTypeIndex == null && typeIndexFile.canRead() && (!activated || !getBuildAllFiles())) {
          layerTypeIndex = layeredSystem.readTypeIndexFile(getLayerName());
          typeIndexRestored = true;
          typeIndexFileLastModified = new File(getTypeIndexFileName()).lastModified();
@@ -2180,20 +2258,25 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          TypeDeclaration modelType = model.getModelTypeDeclaration();
          modelType.initTypeIndex();
       }
-      SysTypeIndex sysIndex = layeredSystem.typeIndex;
-      if (sysIndex == null)
-         sysIndex = layeredSystem.typeIndex = new SysTypeIndex(layeredSystem);
-      LayerListTypeIndex useTypeIndex = activated ? sysIndex.activeTypeIndex : sysIndex.inactiveTypeIndex;
       // The core build layer is created in the constructor so don't do this test for it.
       if (this != layeredSystem.coreBuildLayer && layeredSystem.writeLocked == 0) {
          System.err.println("Updating type index without write lock: ");
          new Throwable().printStackTrace();;
       }
 
-      String layerName = getLayerName();
-      if (layerName != null)
+      if (layerName != null && addIndexEntry) {
          useTypeIndex.typeIndex.put(layerName, layerTypeIndex);
+      }
       layerTypeIndex.baseLayerNames = baseLayerNames == null ? null : baseLayerNames.toArray(new String[baseLayerNames.size()]);
+   }
+
+   public void removeFromTypeIndex() {
+      SysTypeIndex sysIndex = layeredSystem.typeIndex;
+      if (sysIndex != null) {
+         LayerListTypeIndex useTypeIndex = activated ? sysIndex.activeTypeIndex : sysIndex.inactiveTypeIndex;
+         String layerName = getLayerName();
+         useTypeIndex.typeIndex.remove(layerName);
+      }
    }
 
    private String getTypeIndexFileName() {
@@ -2376,9 +2459,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                      addStaticImportType(memberName, typeObj);
                      added = true;
                   }
-                  Object property = ModelUtil.definesMember(typeObj, memberName, JavaSemanticNode.MemberType.PropertyGetSet, null, null);
+                  Object property = ModelUtil.definesMember(typeObj, memberName, JavaSemanticNode.MemberType.PropertyGetSet, null, null, null);
                   if (property == null)
-                     property = ModelUtil.definesMember(typeObj, memberName, JavaSemanticNode.MemberType.PropertySetSet, null, null);
+                     property = ModelUtil.definesMember(typeObj, memberName, JavaSemanticNode.MemberType.PropertySetSet, null, null, null);
                   if (property != null && ModelUtil.hasModifier(property, "static")) {
                      addStaticImportType(memberName, typeObj);
                      added = true;
@@ -2610,7 +2693,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                String fullTypeName = CTypeUtil.prefixPath(depProc.getPrependLayerPackage() ? packagePrefix : null, FileUtil.removeExtension(srcFile).replace(FileUtil.FILE_SEPARATOR_CHAR, '.'));
                TypeDeclaration td = (TypeDeclaration) layeredSystem.getSrcTypeDeclaration(fullTypeName, this.getNextLayer(), depProc.getPrependLayerPackage(), false, true, this, false);
                if (td != null) {
-                  ParseUtil.initAndStartComponent(td);
+                  // We always need to begin the start process at the model level
+                  JavaModel model = td.getJavaModel();
+                  ParseUtil.initAndStartComponent(model);
                } else {
                   String subPath = fullTypeName.replace(".", FileUtil.FILE_SEPARATOR);
                   SrcEntry srcEnt = getSrcFileFromTypeName(fullTypeName, true, depProc.getPrependLayerPackage(), subPath, false);
@@ -2827,6 +2912,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    public Object getClass(String classFileName, String className, boolean external) {
+      if (layeredSystem == null) {
+         System.err.println("*** No layered system for layer!");
+         return null;
+      }
       if (!external && !layeredSystem.options.crossCompile) {
          return RTypeUtil.loadClass(layeredSystem.getSysClassLoader(), className, false);
       }
@@ -2841,6 +2930,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       return res;
    }
 
+   // TODO: Performance - can we use the package index to avoid this search through all of the jar files?
    public Object getCFClass(String classFileName, boolean external) {
       List<String> cdirs = external ? externalClassDirs : classDirs;
       ZipFile[] zfiles = external ? externalZipFiles : zipFiles;
@@ -3079,7 +3169,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       model = m;
    }
 
-   public void refresh(long lastRefreshTime, ExecutionContext ctx, List<ModelUpdate> changedModels, UpdateInstanceInfo updateInfo) {
+   public void refresh(long lastRefreshTime, ExecutionContext ctx, List<ModelUpdate> changedModels, UpdateInstanceInfo updateInfo, boolean active) {
       for (int i = 0; i < srcDirs.size(); i++) {
          String srcDir = srcDirs.get(i);
          String relDir = null;
@@ -3087,14 +3177,14 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          if (srcDir.startsWith(layerPathName) && (pathLen = layerPathName.length()) + 1 < srcDir.length()) {
             relDir = srcDir.substring(pathLen+1);
          }
-         refreshDir(srcDir, relDir, lastRefreshTime, ctx, changedModels, updateInfo);
+         refreshDir(srcDir, relDir, lastRefreshTime, ctx, changedModels, updateInfo, active);
       }
-      lastRefreshTime = System.currentTimeMillis();
    }
 
    public static class ModelUpdate {
       public ILanguageModel oldModel;
       public Object changedModel;
+      public boolean removed;
 
       public ModelUpdate(ILanguageModel oldM, Object newM) {
          oldModel = oldM;
@@ -3102,17 +3192,22 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
 
       public String toString() {
-         return changedModel.toString();
+         if (removed && oldModel != null)
+            return "removed: " + oldModel.toString();
+         if (changedModel != null)
+            return changedModel.toString();
+         return "<null>";
       }
    }
 
-   public void refreshDir(String srcDir, String relDir, long lastRefreshTime, ExecutionContext ctx, List<ModelUpdate> changedModels, UpdateInstanceInfo updateInfo) {
+   public void refreshDir(String srcDir, String relDir, long lastRefreshTime, ExecutionContext ctx, List<ModelUpdate> changedModels, UpdateInstanceInfo updateInfo, boolean active) {
       File f = new File(srcDir);
       long newTime = -1;
       String prefix = relDir == null ? "" : relDir;
       if (lastRefreshTime == -1 || (newTime = f.lastModified()) > lastRefreshTime) {
          // First update the src cache to pick up any new files, refresh any models we find in there when ctx is not null
          addSrcFilesToCache(f, prefix, null);
+         findRemovedFiles(changedModels);
       }
 
       if (!f.isDirectory()) {
@@ -3128,12 +3223,12 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          if (subF.isDirectory()) {
             if (!excludedFile(subF.getName(), prefix)) {
                // Refresh anything that might have changed
-               refreshDir(path, FileUtil.concat(relDir, subF.getName()), lastRefreshTime, ctx, changedModels, updateInfo);
+               refreshDir(path, FileUtil.concat(relDir, subF.getName()), lastRefreshTime, ctx, changedModels, updateInfo, active);
             }
          }
          else if (Language.isParseable(path) || (proc = layeredSystem.getFileProcessorForFileName(path, this, BuildPhase.Process)) != null) {
             SrcEntry srcEnt = new SrcEntry(this, srcDir, relDir == null ? "" : relDir, subF.getName(), proc == null || proc.getPrependLayerPackage());
-            ILanguageModel oldModel = layeredSystem.getLanguageModel(srcEnt, false, null);
+            ILanguageModel oldModel = layeredSystem.getLanguageModel(srcEnt, active, null, active);
             long newLastModTime = new File(srcEnt.absFileName).lastModified();
             if (oldModel == null) {
                // The processedFileIndex only holds entries we processed.  If this file did not change from when we did the build, we just have to
@@ -3143,14 +3238,16 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                        layeredSystem.lastRefreshTime == -1 ? layeredSystem.buildStartTime : layeredSystem.lastRefreshTime :
                        oldFile.getLastModifiedTime();
                if (lastTime == -1 || newLastModTime > lastTime) {
-                  layeredSystem.refreshFile(srcEnt, this); // For non parseableable files - do the file copy since the source file changed
+                  if (model.isUnsavedModel())
+                     System.out.println("*** Should we be refreshing an unsaved model?");
+                  layeredSystem.refreshFile(srcEnt, this, active); // For non parseableable files - do the file copy since the source file changed
                }
             }
 
             // We are refreshing any models which have changed on disk or had errors last time.  Technically for the error models, we could just restart them perhaps
             // but we need to clear old all of the references to anything else which has changed.  Seems like this might be more reliable now though obviously a bit slower.
-            if (newLastModTime > lastRefreshTime || (oldModel != null && oldModel.hasErrors())) {
-               Object res = layeredSystem.refresh(srcEnt, ctx, updateInfo);
+            if ((lastRefreshTime != -1 && newLastModTime > lastRefreshTime) || (oldModel != null && (oldModel.hasErrors() || (newLastModTime > oldModel.getLastModifiedTime() && oldModel.getLastModifiedTime() != 0)))) {
+               Object res = layeredSystem.refresh(srcEnt, ctx, updateInfo, active);
                if (res != null)
                   changedModels.add(new ModelUpdate(oldModel, res));
             }
@@ -3239,6 +3336,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             return true;
       }
       return false;
+   }
+
+   public boolean extendsOrIsLayer(Layer other) {
+      return this == other || this.extendsLayer(other);
    }
 
    void initReplacedLayers() {
@@ -3752,9 +3853,12 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    public RepositoryPackage addRepositoryPackage(String url) {
       RepositorySystem repoSys = layeredSystem.repositorySystem;
-      RepositoryPackage pkg = repoSys.addPackage(url, !disabled);
+      DependencyContext rootCtx = new DependencyContext(null, "Layer: " + toString() + " package tree");
+      RepositoryPackage pkg = repoSys.addPackage(url, !disabled, rootCtx);
       if (repositoryPackages == null)
          repositoryPackages = new ArrayList<RepositoryPackage>();
+      if (rootCtx.fromPkg != null && layeredSystem.options.verbose)
+         verbose(rootCtx.dumpContextTree().toString());
       repositoryPackages.add(pkg);
       pkg.definedInLayer = this;
       return pkg;
@@ -3926,6 +4030,12 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
    }
 
+   public void registerScopeAlias(String newScopeName, String aliasedToName) {
+      if (scopeAliases == null)
+         scopeAliases = new TreeMap<String,String>();
+      scopeAliases.put(newScopeName, aliasedToName);
+   }
+
    public void registerFileProcessor(IFileProcessor proc, String ext) {
       layeredSystem.registerFileProcessor(ext, proc, this);
    }
@@ -3971,8 +4081,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       saveTypeIndex();
       LayerListTypeIndex listTypeIndex = activated ? layeredSystem.typeIndex.activeTypeIndex : layeredSystem.typeIndex.inactiveTypeIndex;
       String name = getLayerName();
-      if (name != null)
+      if (name != null) {
          listTypeIndex.typeIndex.put(name, layerTypeIndex);
+      }
    }
 
    public boolean hasDefinitionForType(String typeName) {
@@ -4018,8 +4129,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    /**
-    *  Adds a new src path with srcPathType.  The srcPathType specifies the nature of the files under this
-    * directory - e.g. for web/** the srcPathType is 'web'.   The default type for normal source files is null.
+    * Adds a new src path directory using the supplied srcPathType.  The srcPathType specifies rules for processing src files found there.
+    * For example for src files in the web directory, the srcPathType is 'web'.  If you want your files to be treated as ordinary source files
+    * use null for the srcPathType.  Each type can have an optional buildPrefix
     */
    public void addSrcPath(String srcPath, String srcPathType, String buildPrefix) {
       boolean abs;
@@ -4072,6 +4184,23 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
       if (baseLayers != null) {
          for (Layer baseLayer : baseLayers) {
+            SrcPathType res = baseLayer.getSrcPathTypeByName(pathTypeName, buildPrefix);
+            if (res != null)
+               return res;
+         }
+      }
+      // If we are the final build layer, we are built with all of the layers in the stack and so
+      // need to be able to recognize the path types
+      if (activated && buildLayer && this == layeredSystem.buildLayer) {
+         List<Layer> layers = layeredSystem.layers;
+         if (layerPosition != layers.size() - 1)
+            System.out.println("*** Warning - build layer is not the last layer");
+         if (layerPosition >= layers.size())
+            return null;
+         for (int i = layerPosition - 1; i >= 0; i--) {
+            Layer baseLayer = layers.get(i);
+            if (baseLayer == this)
+               continue;
             SrcPathType res = baseLayer.getSrcPathTypeByName(pathTypeName, buildPrefix);
             if (res != null)
                return res;
@@ -4164,8 +4293,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    void appendBuildURLs(ArrayList<URL> urls) {
+      // Add the main build dir for this layer
       urls.add(FileUtil.newFileURL(LayerUtil.appendSlashIfNecessary(getBuildClassesDir())));
       compiledInClassPath = true;
+      // Add the buildSrcDir to the classPath if the framework requires it (e.g. gwt)
       if (!buildDir.equals(buildSrcDir) && layeredSystem.includeSrcInClassPath)
          urls.add(FileUtil.newFileURL(LayerUtil.appendSlashIfNecessary(buildSrcDir)));
    }
@@ -4212,7 +4343,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
    }
 
-   void refreshBoundTypes(int flags) {
+   void refreshBoundTypes(int flags, HashSet<Layer> visited) {
+      if (visited.contains(this))
+         return;
+      visited.add(this);
       if (layerModels != null) {
          // Need to refresh all layerModels currently cached.  As we refresh them, we might add to this list so
          // we make a copy of the list upfront.
@@ -4224,12 +4358,15 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
       if (baseLayers != null) {
          for (Layer baseLayer:baseLayers) {
-            baseLayer.refreshBoundTypes(flags);
+            baseLayer.refreshBoundTypes(flags, visited);
          }
       }
    }
 
-   void flushTypeCache() {
+   void flushTypeCache(HashSet<Layer> visited) {
+      if (visited.contains(this))
+         return;
+      visited.add(this);
       if (layerModels != null) {
          for (IdentityWrapper<ILanguageModel> wrap:layerModels) {
             wrap.wrapped.flushTypeCache();
@@ -4237,11 +4374,53 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
       if (baseLayers != null) {
          for (Layer baseLayer:baseLayers) {
-            baseLayer.flushTypeCache();
+            baseLayer.flushTypeCache(visited);
          }
       }
    }
+
+   public void fileRenamed(SrcEntry oldFile, SrcEntry newFile) {
+      File ent = srcDirCache.remove(oldFile.relFileName);
+      if (ent != null) {
+         srcDirCache.remove(FileUtil.removeExtension(oldFile.relFileName));
+         File newFileRef = new File(newFile.absFileName);
+         srcDirCache.put(newFile.relFileName, newFileRef);
+         srcDirCache.put(FileUtil.removeExtension(newFile.relFileName), newFileRef);
+      }
+   }
+
+   void findRemovedFiles(List<ModelUpdate> changedModels) {
+      for (IdentityWrapper<ILanguageModel> layerWrapper:layerModels) {
+         ILanguageModel model = layerWrapper.wrapped;
+         SrcEntry srcFile = model.getSrcFile();
+         if (srcFile != null && !srcFile.canRead() && !model.isUnsavedModel()) {
+            ModelUpdate removedModel = new ModelUpdate(model, null);
+            removedModel.removed = true;
+            changedModels.add(removedModel);
+
+            verbose("Model file removed: " + srcFile);
+         }
+      }
+   }
+
+   boolean cacheForRefLayer() {
+      return this != Layer.ANY_LAYER && this != Layer.ANY_INACTIVE_LAYER && this != Layer.ANY_OPEN_INACTIVE_LAYER && this.activated;
+   }
+
+   public void addTypeGroupDependency(String relFileName, String typeName, String typeGroupName) {
+      if (activated) {
+         layeredSystem.addTypeGroupDependency(this, relFileName, typeName, typeGroupName);
+      }
+   }
+
+   /**
+    * In case there's a file which generates an error that's not part of the project - i.e. gets included via a src-path
+    * entry like scrt-core-src.jar for Javascript code gen, we still need to report that file as one having a syntax error
+    */
+   public void addErrorFile(SrcEntry srcEnt) {
+      if (buildState != null && !buildState.errorFiles.contains(srcEnt))
+         buildState.errorFiles.add(srcEnt);
+   }
+
 }
-
-
 

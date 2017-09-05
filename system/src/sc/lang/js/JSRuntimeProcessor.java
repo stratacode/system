@@ -4,6 +4,7 @@
 
 package sc.lang.js;
 
+import com.sun.org.apache.bcel.internal.generic.JSR;
 import sc.bind.Bind;
 import sc.dyn.DynUtil;
 import sc.lang.*;
@@ -16,10 +17,12 @@ import sc.lang.template.Template;
 import sc.layer.*;
 import sc.obj.ComponentImpl;
 import sc.obj.IComponent;
+import sc.parser.GenFileLineIndex;
 import sc.parser.ParseUtil;
 import sc.sync.SyncManager;
 import sc.type.CTypeUtil;
 import sc.type.RTypeUtil;
+import sc.type.Type;
 import sc.util.FileUtil;
 import sc.util.PerfMon;
 import sc.util.StringUtil;
@@ -35,8 +38,8 @@ import java.util.*;
  *    - the start method is called for each type.  It computes the list of jsFiles - the javascript files we are either generating (jsGenFiles) or js library files (jsLibFiles).
  *    It also builds up the set of entryPoints.  These are types with MainInit or MainSettings annotations that are created when the application is loaded.   jsModuleFile types
  *    are also added to this list.  Essentially it is the set of types which are mapped as 'required' for a given jsFile.
- *    - the getProcessedFiles method is called by the build system.  It generates a .js snippet for each Java class which is stored in the web/js/types directory of the build dir.
- *    Each of these .js snippets is a direct conversion of the Java code for that class only.  It does not contain any dependency info and is not intended to be loaded directly.  Instead those files are
+ *    - the getProcessedFiles method is called by the build system.  It generates the javascript code for each Java class - (these files are stored in the web/js/types directory of the build dir for debugging).
+ *    Each of these js type files is a direct conversion of the Java code for that class only.  It does not contain any dependency info and is not intended to be loaded directly.  Instead those files are
  *    rolled up in the postProcess method into the files to be loaded by the browser.
  *    - the postProcess method is called after all types have been processed.  It generates the jsGenFiles by rolling up the individual .js files in the proper order..  For each changed gen file, it iterates over all of the entrypoints
  *    that are defined to be in that file.  Each entry point first makes sure all of the extends classes which are in the same file get added to the file first.   A base class must be defined before the sub-class is defined.
@@ -47,15 +50,22 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
    public static boolean traceSystemUpdates = false;
 
+   /** Additional debug messages for JS  */
+   public boolean verboseJS = false;
+
+   /** Use _c (or typeNameSuffix) as a variable for each type def to avoid reusing the type name for every method and field (smaller JS files but this hurts stack traces and code readability) */
+   public boolean useShortTypeNames = false;
+
    public String templatePrefix;
    public String srcPathType;
    /** The prefix for generated individual .js files like Java "one-class-per-file".  This is a normalized path name for portability */
    public String genJSPrefix;
 
+   /** Stores the JS build info we preserve from build-to-build.  This gets serialized and restored and provides the info needed for incremental builds */
    public transient JSBuildInfo jsBuildInfo;
 
    private transient boolean entryPointsFrozen = false;
-   private transient ArrayList<EntryPoint> queuedEntryPoints;
+   private transient LinkedHashMap<String,EntryPoint> queuedEntryPoints;
 
    public String typeTemplateName;
    public Template typeTemplate;
@@ -73,36 +83,49 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    public String scLib = "js/sc.js";
    public String jsCoreLib = "js/sccore.js";
 
-   public String prototypeSuffix = "_c";
+   public String typeNameSuffix = "_c";
 
+   /** For a given build, the list of JS files that have changed since the previous build - either the build of the previous buildLayer or a previous incremental build of this layer. */
    private transient HashSet<String> changedJSFiles = new LinkedHashSet<String>();
 
    private transient boolean changedDefaultType = false;
 
+   /** When generating JS files, keeps track of which types have already been appended - to avoid duplicates in the JS files we generate */
    private transient HashSet<String> processedTypes = new HashSet<String>();
 
    private transient HashMap<String,LinkedHashMap<JSFileEntry,Boolean>> typesInFileMap = new HashMap<String,LinkedHashMap<JSFileEntry,Boolean>>();
 
-   private transient HashMap<String,StringBuilder> jsFileBodyStore = new HashMap<String, StringBuilder>();
+   static class JSFileBodyCache {
+      StringBuilder jsFileBody = new StringBuilder();
+      GenFileLineIndex lineIndex = null;
+   }
+
+   private transient HashMap<String,GenFileLineIndex> lineIndexCache = new HashMap<String, GenFileLineIndex>();
+
+   private transient HashMap<String,JSFileBodyCache> jsFileBodyStore = new HashMap<String, JSFileBodyCache>();
 
    /** Set to true in the post start phase - after that phase, any other start models are not part of the build process (e.g. we might load the type declarations because they are init types when generating the page dispatcher)  */
    private transient boolean postStarted = false;
+
+   private transient boolean anyErrors = false;
+
+   private ArrayList<SrcEntry> errorFiles = new ArrayList<SrcEntry>();
 
    // For Javascript, we sync against the default runtime
    { syncRuntimes.add(null); }
 
    /** Used to generate the JS code snippet to prefix all class-based type references */
-   public String classPrefix = "<%= typeName %>" + prototypeSuffix;
+   public String classPrefix = "<%= typeName %>" + typeNameSuffix;
 
    /** Used to generate the JS code snippet to instantiate a type, to implement MainInit */
    public String instanceTemplate =
           "<%= needsSync ? \"sc_SyncManager_c.beginSyncQueue();\\n\" : \"\" %>" + // The sync queue is here because we need the children sync-insts to be registered with their parent's names.
           "<% if (objectType) { %>" +
-             "var _inst = <%= accessorTypeName %>" + prototypeSuffix + ".get<%= upperBaseTypeName %>();\n<% " +
+             "var _inst = <%= accessorTypeName %>" + typeNameSuffix + ".get<%= upperBaseTypeName %>();\n<% " +
           "} " +
           "else if (componentType) { " +
              "%>var _inst;\n" +
-             "sc_DynUtil_c.addDynObject(\"<%= javaTypeName %>\", _inst = <%= accessorTypeName %>" + prototypeSuffix + ".new<%= className %>());\n<% " +
+             "sc_DynUtil_c.addDynObject(\"<%= javaTypeName %>\", _inst = <%= accessorTypeName %>" + typeNameSuffix + ".new<%= className %>());\n<% " +
           "} " +
           "else { " +
              "%>var _inst;\n" +
@@ -113,7 +136,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
              "sc_SyncManager_c.initChildren(_inst);\n" +
           "<% } %>\n";
 
-   public String mainTemplate = "<%= typeName %>" + prototypeSuffix + ".main([]);\n";
+   public String mainTemplate = "<%= typeName %>" + typeNameSuffix + ".main([]);\n";
 
    private transient ArrayList<SystemUpdate> systemUpdates = new ArrayList<SystemUpdate>();
 
@@ -147,12 +170,15 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       SystemUpdate update = new SystemUpdate();
       update.jsUpdate = jsUpdate;
       update.updateTime = System.currentTimeMillis();
+      // Because this is transient, we might have been restored and need to recreate this
+      if (systemUpdates == null)
+         systemUpdates = new ArrayList<SystemUpdate>();
       systemUpdates.add(update);
    }
 
    /** Returns the system updates that have occurred since the fromTime */
    public StringBuilder getSystemUpdates(long fromTime) {
-      if (systemUpdates.size() == 0)
+      if (systemUpdates == null || systemUpdates.size() == 0)
          return null;
       String fromTimeStr = null;
       if (traceSystemUpdates)
@@ -269,14 +295,24 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       /** All javascript files - both libraries and generated */
       public ArrayList<String> jsFiles = new ArrayList<String>();
 
+      /** Maintains the dependencies between the JS files.  Used to figure out when we have cyclic references and to order the includes */
       public HashSet<JSFileDep> typeDeps = new HashSet<JSFileDep>();
 
       public HashMap<String,String> prefixAliases = new HashMap<String,String>();
-      public HashMap<String,List<String>> aliasedPackages = new HashMap<String,List<String>>();
+
+      /** Used to implement mappings so you can replace one package source in the java/compiled world with another during the JS environment - e.g. how we substitute in the JS version of the binding code */
+      public HashMap<String,HashSet<String>> aliasedPackages = new HashMap<String,HashSet<String>>();
 
       public HashMap<String,String> replaceTypes = new HashMap<String,String>();
 
+      /** The inverse of replaceTypes - the list of Java types registered for a given JS type */
+      public HashMap<String,List<String>> typeAliases = new HashMap<String,List<String>>();
+
+      /** Cached jsModuleFile for a given type name */
       public HashMap<String,String> jsModuleNames = new HashMap<String,String>();
+
+      /** Cached jsLibFiles for a given type name */
+      public HashMap<String,String> jsLibFilesForType = new HashMap<String,String>();
 
       /** Map from Java type names to JSTypeInfo for that type */
       public HashMap<String,JSTypeInfo> jsTypeInfo = new HashMap<String,JSTypeInfo>();
@@ -303,15 +339,27 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          replaceTypes.put("long", "Number");
          replaceTypes.put("short", "Number");
          replaceTypes.put("java.lang.Class", "jv_Object"); // TODO
-         replaceTypes.put("sc.lang.JLineInterpreter", "sc_EditorContext");
+         addReplaceType("sc.lang.JLineInterpreter", "sc_EditorContext");
 
          prefixAliases.put("java.util", "jv_");
       }
 
+      public void addReplaceType(String javaType, String jsType) {
+         replaceTypes.put(javaType, jsType);
+         List<String> aliases = typeAliases.get(jsType);
+         if (aliases == null) {
+            aliases = new ArrayList<String>(2);
+            typeAliases.put(jsType, aliases);
+         }
+         aliases.add(javaType);
+      }
+
       /**
        * Entry points are used to gather only the necessary types for a JS mainInit type, standard Java main method, or a jsModuleFile annotation.
-       * Each of these types bootstraps the code generation process... all of them are added to each of their files.
-       * Since each type then recursively adds its dependent types as needed each file is generated in the right order.
+       * Each of these types bootstraps the code generation process. Each is added to the JS file specified for that entry point (via
+       * annotations or using defaults)
+       * Since each type then recursively adds its dependent types as needed each file is generated in the right order - so dependent
+       * types are defined before they are used.
        *
        * Dependencies are collected and the list of files sorted.  Any conflicts detected are displayed.
        */
@@ -499,6 +547,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             finally {
                PerfMon.end("transformJS");
             }
+
          }
          return javaFiles;
       }
@@ -573,7 +622,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       }
 
       String resultStr = null;
-      // The theory here is that we tranform all of the types that should have changed and so if this type is not
+      // The theory here is that we transform all of the types that should have changed and so if this type is not
       // transformed, it hasn't changed so there's no need to save it.
       // TODO: Unfortunately we are not always transforming the Anon classes and those that come from the external source path.
       // Those types won't get updated on an incremental build as it stands now.   We should replace this with a more reliable change
@@ -585,13 +634,22 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       }
 
       if (resultStr == null) {
-         if (appendJSType(td, result)) {
+         GenFileLineIndex lineIndex = system.options.genDebugInfo ? new GenFileLineIndex(resEnt.absFileName) : null;
+         // convert the type declaration into JS and append it to result
+         if (appendJSType(td, result, lineIndex)) {
             resultStr = result.toString();
             FileUtil.saveStringAsFile(resEnt.absFileName, resultStr, true);
+
+            if (lineIndex != null) {
+               File lineIndexFile = GenFileLineIndex.getLineIndexFile(resEnt.absFileName);
+               lineIndexCache.put(resEnt.absFileName, lineIndex);
+               lineIndex.numLines = ParseUtil.countLinesInNode(resultStr) + 1;
+               lineIndex.saveLineIndexFile(lineIndexFile);
+            }
          }
       }
       else if (resEnt != srcEnt) {
-         FileUtil.copyFile(srcEnt.absFileName, resEnt.absFileName, true);
+         copyFileAndIndex(srcEnt.absFileName, resEnt.absFileName);
       }
 
       if (resultStr != null) {
@@ -616,6 +674,25 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             }
          }
       }
+
+      JavaModel javaModel = td.getJavaModel();
+      // For Java types specified in a final/compiled layer, we will never transform - need to set this here to enable incremental JS builds.
+      if (javaModel.transformedInLayer == null)
+         javaModel.transformedInLayer = system.currentBuildLayer;
+   }
+
+   private void copyFileAndIndex(String srcFileName, String dstFileName) {
+      FileUtil.copyFile(srcFileName, dstFileName, true);
+      String srcIndexFileName = GenFileLineIndex.getLineIndexFileName(srcFileName);
+      if (new File(srcIndexFileName).canRead())
+         FileUtil.copyFile(srcIndexFileName, GenFileLineIndex.getLineIndexFileName(dstFileName), true);
+   }
+
+   private void copyFileAndMap(String srcFileName, String dstFileName) {
+      FileUtil.copyFile(srcFileName, dstFileName, true);
+      String srcMapFileName = srcFileName + ".map";
+      if (new File(srcMapFileName).canRead())
+         FileUtil.copyFile(srcMapFileName, dstFileName + ".map", true);
    }
 
    public SrcEntry findJSSrcEntry(Layer startLayer, BodyTypeDeclaration type) {
@@ -685,13 +762,22 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return srcEnt;
    }
 
-   public void start(BodyTypeDeclaration td) {
+   private boolean skipTypeInJS(BodyTypeDeclaration td) {
       // Don't start for model streams, i.e. where there's a custom resolver
       JavaModel model = td.getJavaModel();
 
       if (td.isLayerType || model.customResolver != null || model.temporary || !model.mergeDeclaration)
-         return;
+         return true;
       if (td.typeName != null && td.typeName.equals("BuildInfo") && td.getDerivedTypeDeclaration() == BuildInfo.class)
+         return true;
+      return false;
+   }
+
+   public void start(BodyTypeDeclaration td) {
+      // Don't start for model streams, i.e. where there's a custom resolver
+      JavaModel model = td.getJavaModel();
+
+      if (skipTypeInJS(td))
          return;
 
       // We are not compiling and so should not be doing any JS processing.  If we load the models after build we are at least doing extra work here and might mess up the jsBuildInfo.  It needs to stay in sync with the compiled result.
@@ -712,21 +798,11 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       PerfMon.start("startJS", false);
 
       if (td.getEnclosingType() == null) {
-         String prefixStr = (String) ModelUtil.getTypeOrLayerAnnotationValue(system, td, "ls.js.JSSettings", "prefixAlias");
-         if (prefixStr != null && prefixStr.length() > 0) {
-            String pkgName = CTypeUtil.getPackageName(ModelUtil.getTypeName(td));
-            String oldPrefix = jsBuildInfo.prefixAliases.put(pkgName, prefixStr);
-            if (oldPrefix != null && !oldPrefix.equals(prefixStr)) {
-               System.err.println("*** JSSettings.prefixAlias value on type: " + td + " set to: " + prefixStr + " which conflicts with the old prefixAlias for pkg: " + pkgName + " of: " + oldPrefix);
-            }
-            List<String> pkgs = jsBuildInfo.aliasedPackages.get(prefixStr);
-            if (pkgs == null) {
-               pkgs = new ArrayList<String>();
-               jsBuildInfo.aliasedPackages.put(prefixStr, pkgs);
-            }
-            pkgs.add(pkgName);
-         }
+         registerPrefixAlias(td);
       }
+
+      //if (verboseJS && td.getEnclosingType() == null)
+      //   system.verbose("Starting for JS: " + td.getFullTypeName());
 
       // Need to figure out what JS libraries are needed so that it can be used to generate the HTML template to include them
       //LinkedHashMap<JSFileEntry,Boolean> typesInFile = new LinkedHashMap<JSFileEntry,Boolean>();
@@ -735,7 +811,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       PerfMon.end("startJS");
    }
 
-   public LinkedHashMap<JSFileEntry,Boolean> getTypesInFile(BodyTypeDeclaration type) {
+   private String getTypeLibFile(BodyTypeDeclaration type) {
       String typeLibFilesStr = getJSLibFiles(type);
       String typeLibFile;
       if (typeLibFilesStr == null) {
@@ -745,8 +821,11 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          String[] typeLibFiles = StringUtil.split(typeLibFilesStr,',');
          typeLibFile = typeLibFiles[0];
       }
-      if (typeLibFile == null)
-         typeLibFile = null;
+      return typeLibFile;
+   }
+
+   public LinkedHashMap<JSFileEntry,Boolean> getTypesInFile(BodyTypeDeclaration type) {
+      String typeLibFile = getTypeLibFile(type);
 
       LinkedHashMap<JSFileEntry,Boolean> typesInFile = typesInFileMap.get(typeLibFile);
       if (typesInFile == null) {
@@ -754,6 +833,16 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          typesInFileMap.put(typeLibFile, typesInFile);
       }
       return typesInFile;
+   }
+
+   private void removeTypesInFile(BodyTypeDeclaration type) {
+      String typeLibFile = getTypeLibFile(type);
+      LinkedHashMap<JSFileEntry,Boolean> typesInFile = typesInFileMap.get(typeLibFile);
+      if (typesInFile != null) {
+         JSFileEntry jsEnt = new JSFileEntry();
+         jsEnt.fullTypeName = type.getFullTypeName();
+         typesInFile.remove(jsEnt);
+      }
    }
 
    public void postStart(LayeredSystem sys, Layer genLayer) {
@@ -780,12 +869,13 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             }
          }
          if (queuedEntryPoints != null) {
-            for (EntryPoint ent: queuedEntryPoints)
+            for (EntryPoint ent: queuedEntryPoints.values())
                jsBuildInfo.entryPoints.put(ent, ent);
             queuedEntryPoints = null;
          }
       // Keep going as long as this process added any new JS files
       } while (changedJSFiles.size() != numOrigChangedJSFiles);
+      entryPointsFrozen = false;
 
       if (genLayer == system.buildLayer)
          postStarted = true;
@@ -793,6 +883,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       if (jsDebug) {
          System.out.println("Sorted jsFiles: " + jsBuildInfo.jsFiles + " using dependencies:\n" + jsBuildInfo.typeDeps);
       }
+   }
+
+   public void postStop(LayeredSystem sys, Layer genLayer) {
+      flushTypeCache();
    }
 
    private final static HashSet<String> warnedCompiledTypes = new HashSet<String>();
@@ -812,6 +906,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       jsEnt.fullTypeName = type.getFullTypeName();
       Boolean state = typesInFile.get(jsEnt);
       String jsModuleFile = null;
+
       if (state == null) {
          String fullTypeName = type.getFullTypeName();
 
@@ -845,6 +940,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             // Also register this type info using the JS type name, so we can detect different Java classes that map
             // to the same JS type (e.g. sc.js.bind and sc.bind
             jsBuildInfo.jsTypeInfoByJS.put(getJSTypeName(fullTypeName), jti);
+
          }
          else if (!DynUtil.equalObjects(jsModuleFile, jti.jsModuleFile)) {
             jti.expandToLayer(type.layer);
@@ -874,7 +970,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          if (!hasLibFile) {
 
             if (typeLibFile != null) {
-               changedJSFiles.add(typeLibFile);
+               addChangedJSFile(type, typeLibFile);
             }
             else if (type.getEnclosingType() == null) {
                // Need to mark the fact that we changed a type which lives in the default module.  Any file which has a dependency from the <default> file will need to be changed since it may include this type.
@@ -882,7 +978,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                changedDefaultType = true;
 
                String modLibFile = getJSDefaultModuleFile(type);
-               changedJSFiles.add(modLibFile);
+               addChangedJSFile(type, modLibFile);
+
+               if (verboseJS)
+                  system.verbose("Converting to JS: " + jsEnt.fullTypeName);
             }
 
             addExtendsTypeLibsToFile(type, typesInFile, typeLibFile);
@@ -903,19 +1002,19 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                   }
                   if (ModelUtil.isCompiledClass(depType)) {
                      if (!ModelUtil.isPrimitive(depType)) {
-                        if (hasAlias(depType))
-                           continue;
-
+                        depType = resolveSrcTypeDeclaration(depType);
                         String depModuleFile = getJSModuleFile(depType, false);
 
                         // The dependent type is in the same file with us.  When pulling pre-compiled files from the source
                         // path, which we are not transforming initially this is the first time we end up pulling in the source.
                         // If we get
                         if (depModuleFile != null && depModuleFile.equals(typeLibFile)) {
-                           depType = resolveSrcTypeDeclaration(depType);
                            if (!(depType instanceof BodyTypeDeclaration))
                               System.err.println("Warning: no source for type: " + ModelUtil.getTypeName(depType) + " to resolve dependency for type: " + type);
                         }
+
+                        if (hasAlias(depType))
+                           continue;
 
                         if (ModelUtil.isCompiledClass(depType)) {
                            if (addJSLibFiles(depType, true, typeLibFilesStr == null ? null : typeLibFiles[0], type, "uses") == null && !hasJSCompiled(type)) {
@@ -928,7 +1027,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                         }
                      }
                   }
-                  else if (!isCompiledInType(depType))
+                  else if (!isCompiledInType(depType)) // Note: if there is a bug we don't match a source method but do match the compiled method, we can see this error even when there's source available.  In this case, the source method should match (or the compiled one should not)
                      System.err.println("*** Warning: unrecognized js type: " + type.typeName + " depends on compiled thing: " + depType);
                }
 
@@ -939,7 +1038,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                   ParseUtil.startComponent(depTD);
 
                   // If depTD extends type, do not add it here.  Instead, we need to add type before depTD in this case
-                  if (!type.isAssignableFrom(depTD, false) && depTD != type.getEnclosingType())
+                  if (!type.isAssignableFrom(depTD, false) && !ModelUtil.isOuterType(type.getEnclosingType(), depTD))
                      addTypeLibsToFile(depTD, typesInFile, typeLibFile, type, "uses");
                }
 
@@ -958,6 +1057,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          else {
             String depJSFilesStr = getDependentJSLibFiles(type);
             if (depJSFilesStr != null) {
+               if (verboseJS)
+                  system.verbose("JS native type: " + jsEnt.fullTypeName + " defined in lib files: " + depJSFilesStr);
+
                String[] depJSFiles = StringUtil.split(depJSFilesStr, ',');
 
                for (String depFile:depJSFiles)
@@ -972,13 +1074,16 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          if (mainInit != null && !type.hasModifier("abstract")) {
             Boolean subTypesOnly = (Boolean) ModelUtil.getAnnotationValue(mainInit, "subTypesOnly");
             if (subTypesOnly == null || !subTypesOnly || type.getAnnotation("sc.html.MainInit") == null) {
+               if (verboseJS)
+                  system.verbose("JS @MainInit entry point: " + jsEnt.fullTypeName);
+
                String jsFile = (String) ModelUtil.getAnnotationValue(mainInit, "jsFile");
                EntryPoint ent = new EntryPoint();
                ent.jsFile = jsFile == null || jsFile.isEmpty() ? getJSDefaultModuleFile(type) : jsFile;
                ent.type = type;
                ent.typeName = fullTypeName;
 
-               EntryPoint oldEnt = jsBuildInfo.entryPoints.get(ent);
+               EntryPoint oldEnt = getEntryPoint(ent);
                if (oldEnt != null) {
                   ent = oldEnt;
                   // TODO: should we expand the layer range for this entry point by keeping a from and to layer?
@@ -1010,7 +1115,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                      ent.jsFile = jsModuleFile == null ? scLib : jsModuleFile;
                      ent.type = type;
                      ent.typeName = fullTypeName;
-                     EntryPoint oldEnt = jsBuildInfo.entryPoints.get(ent);
+                     EntryPoint oldEnt = getEntryPoint(ent);
                      if (oldEnt != null) {
                         ent = oldEnt;
                      }
@@ -1019,6 +1124,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                         if (ent.layer != null)
                            ent.layerName = ent.layer.getLayerUniqueName();
                         addEntryPoint(ent);
+
+                        if (verboseJS)
+                           system.verbose("JS main method entry point: " + jsEnt.fullTypeName);
                      }
                      ent.isMain = true;
                      ent.isDefault = jsModuleFile == null;
@@ -1036,7 +1144,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             ent.jsFile = jsModuleFile;
             ent.type = type;
             ent.typeName = fullTypeName;
-            EntryPoint oldEnt = jsBuildInfo.entryPoints.get(ent);
+            EntryPoint oldEnt = getEntryPoint(ent);
             if (oldEnt != null) {
                ent = oldEnt;
             }
@@ -1065,15 +1173,74 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             }
          }
       }
+      // We need to catch errors on files that Javascript pulls in that are not part of the project - otherwise, the build keeps going
+      if (javaModel.hasErrors()) {
+         SrcEntry errorSrc = javaModel.getSrcFile();
+         if (!errorFiles.contains(errorSrc))
+            errorFiles.add(errorSrc);
+         anyErrors = true;
+      }
+   }
+
+   private void addChangedJSFile(BodyTypeDeclaration fromType, String jsFile) {
+      // TODO: maybe we can remove this buildAllFiles check and use isChangedModel even in that case?  Might reduce layered builds - so we don't process JS files if we've already processed them and no types changed
+      // If we are rebuilding - (i.e. systemCompiled = true), we are just looking for changed models since the rebuild so we pass in a null layer.  Otherwise, we are looking for files that
+      // have changed since the layer in which this type was initialized.
+      if (!system.isChangedModel(fromType.getJavaModel(), system.currentBuildLayer, !system.buildLayer.getBuildAllFiles(), true)) {
+         //if (verboseJS)
+         //   system.verbose("Reusing JS file: " + jsFile + " for unchanged type: " + fromType.getFullTypeName());
+         return;
+      }
+      if (system.options.verbose && !changedJSFiles.contains(jsFile)) {
+         system.verbose("JS file: " + jsFile + " changed by changed type: " + fromType.getFullTypeName());
+      }
+      changedJSFiles.add(jsFile);
+   }
+
+   private EntryPoint getEntryPoint(EntryPoint ent) {
+      boolean isEnt = true;
+      EntryPoint cur = jsBuildInfo.entryPoints.get(ent);
+      if (cur == null && queuedEntryPoints != null) {
+         isEnt = false;
+         cur = queuedEntryPoints.get(ent.typeName);
+      }
+      if (cur != null && ent.type != null && (cur.type == null || !cur.type.isStarted())) {
+         if (isEnt) {
+            // Don't remove the ent here - we might be inside of postStart which is iterating over them
+            cur.type = ent.type;
+         }
+         else
+            queuedEntryPoints.remove(ent.typeName);
+         cur = null;
+      }
+      return cur;
    }
 
    private void addEntryPoint(EntryPoint ent) {
+      EntryPoint old = getEntryPoint(ent);
+      if (old != null)
+         return;
       if (!entryPointsFrozen)
          jsBuildInfo.entryPoints.put(ent, ent);
       else {
          if (queuedEntryPoints == null)
-            queuedEntryPoints = new ArrayList<EntryPoint>();
-         queuedEntryPoints.add(ent);
+            queuedEntryPoints = new LinkedHashMap<String,EntryPoint>();
+         queuedEntryPoints.put(ent.typeName, ent);
+      }
+   }
+
+   // TODO: this entryPoints data structure uses typeName+jsFile of the info as the identity.  I'm not sure when we
+   // have more than one entryPoint for the same type but it makes this method slow and awkward.
+   private void removeEntryPoints(String typeName) {
+      if (entryPointsFrozen) {
+         return;
+      }
+      Iterator<Map.Entry<EntryPoint,EntryPoint>> eps = jsBuildInfo.entryPoints.entrySet().iterator();
+      while (eps.hasNext()) {
+         Map.Entry<EntryPoint,EntryPoint> ep = eps.next();
+         String epTypeName = ep.getValue().typeName;
+         if (epTypeName != null && epTypeName.equals(typeName))
+            eps.remove();
       }
    }
 
@@ -1099,9 +1266,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          ent.layerName = ent.layer.getLayerUniqueName();
       ent.needsInit = false;
       ent.isDefault = false;
-      if (jsBuildInfo.entryPoints.get(ent) == null) {
-         addEntryPoint(ent);
-      }
+      addEntryPoint(ent);
       if (type != null)
          jsBuildInfo.addJSGenFile(jsModuleStr, type);
    }
@@ -1124,14 +1289,19 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
    public String getCachedJSModuleFile(String typeName) {
       String res = jsBuildInfo.jsModuleNames.get(typeName);
+      if (res != null && res.equals(NULL_JS_MODULE_NAMES_SENTINEL))
+         res = null;
       return res;
    }
 
    public String getJSModuleFile(Object type, boolean resolveSrc) {
       String typeName = ModelUtil.getTypeName(type);
       String res = jsBuildInfo.jsModuleNames.get(typeName);
-      if (res != null)
+      if (res != null) {
+         if (res.equals(NULL_JS_MODULE_NAMES_SENTINEL))
+            res = null;
          return res;
+      }
       PerfMon.start("getJSModuleFile");
 
       try {
@@ -1152,8 +1322,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          Object enclType = ModelUtil.getEnclosingType(type);
          if (enclType != null) {
             jsModuleStr = getJSModuleFile(enclType, resolveSrc);
-            if (jsModuleStr != null)
+            if (jsModuleStr != null) {
+               jsBuildInfo.jsModuleNames.put(typeName, jsModuleStr);
                return jsModuleStr;
+            }
          }
 
          Layer lyr = ModelUtil.getLayerForType(system, type);
@@ -1181,6 +1353,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                if (type instanceof TypeDeclaration && (elem = ((TypeDeclaration) type).element) != null && elem.isAbstract())
                   return null;
 
+               // Need to do this here because it might impact the type name used in the file - and we may not have hit this type due to the weird way we start from bottom up
+               registerPrefixAlias(type);
+
                Object typeParams = new ObjectTypeParameters(system, type);
                String jsModuleRes = TransformUtil.evalTemplate(typeParams, jsModuleStr, true); // TODO: preparse these strings for speed
                addModuleEntryPoint(type, jsModuleRes);
@@ -1190,7 +1365,14 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          }
 
          if (ModelUtil.isCompiledClass(type)) {
-            return jsBuildInfo.jsModuleNames.get(typeName);
+            // I'm not sure why we are getting this again since we tried getting it above, but just in case adding the null sentinel processing here
+            res = jsBuildInfo.jsModuleNames.get(typeName);
+            if (res == null) {
+               jsBuildInfo.jsModuleNames.put(typeName, NULL_JS_MODULE_NAMES_SENTINEL);
+            }
+            else if (res.equals(NULL_JS_MODULE_NAMES_SENTINEL))
+               res = null;
+            return res;
          }
       }
       finally {
@@ -1200,19 +1382,36 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    public void process(BodyTypeDeclaration td) {
-      if (td.isLayerType)
+      if (skipTypeInJS(td))
          return;
-      JavaModel model = td.getJavaModel();
-      if (model.temporary)
+
+   }
+
+   public void stop(BodyTypeDeclaration td) {
+      if (skipTypeInJS(td))
          return;
-      if (td.typeName != null && td.typeName.equals("BuildInfo") && td.getDerivedTypeDeclaration() == BuildInfo.class)
-         return;
+
+      String typeName = td.getFullTypeName();
+
+      // We have problems here trying to seamlessly remove all of the types in a type hierarchy.  To fix this, I think we need to call the stop method on the runtime processor
+      // before we've actually stopped the type itself.  Otherwise, we will try to init a type when we are stopping it.
+      //removeTypesInFile(td);
+      jsBuildInfo.jsModuleNames.remove(typeName);
+      if (queuedEntryPoints != null)
+         queuedEntryPoints.remove(typeName);
+
+      jsBuildInfo.jsTypeInfo.remove(typeName);
+      // Also register this type info using the JS type name, so we can detect different Java classes that map
+      // to the same JS type (e.g. sc.js.bind and sc.bind
+      jsBuildInfo.jsTypeInfoByJS.remove(getJSTypeName(typeName));
+      removeEntryPoints(typeName);
+      jsBuildInfo.jsLibFilesForType.remove(typeName);
    }
 
    void addLibFile(String libFile, String beforeLib, Object type, Object depType, String relation) {
       if (beforeLib != null && !beforeLib.equals(libFile)) {
          String depFile = libFile;
-         // When adding a dependcy from a type with no module file on a type which does have a module file, substitute in the default dependency
+         // When adding a dependency from a type with no module file on a type which does have a module file, substitute in the default dependency
          if (depFile == null)
             depFile = defaultLib;
          addDependency(beforeLib, depFile, depType, type, relation);
@@ -1276,6 +1475,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return null;
    }
 
+   private final static String NULL_JS_LIB_FILES_SENTINEL = "<no-js-lib-files>";
+   private final static String NULL_JS_MODULE_NAMES_SENTINEL = "<no-js-module-names-files>";
+   private final static String HAS_ALIAS_SENTINEL = "<class-is-aliases-for-js>";
+
    String getDependentJSLibFiles(Object type) {
       if (!(type instanceof PrimitiveType)) {
          return getJSSettingsStringValue(type, "dependentJSFiles", false, true);
@@ -1284,27 +1487,54 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    String getJSLibFiles(Object type) {
-      if (!(type instanceof PrimitiveType)) {
-         return getJSSettingsStringValue(type, "jsLibFiles", false, true);
+      String typeName = ModelUtil.getTypeName(type);
+      String res = jsBuildInfo.jsLibFilesForType.get(typeName);
+      if (res != null) {
+         if (res.equals(NULL_JS_LIB_FILES_SENTINEL))
+            return null;
+         if (res.equals(HAS_ALIAS_SENTINEL))
+            return null;
+         return res;
       }
-      String alias = getAlias(type);
-      if (alias != null)
-         return null;
+      if (!(type instanceof PrimitiveType)) {
+         res = getJSSettingsStringValue(type, "jsLibFiles", false, true);
+         if (res != null) {
+            jsBuildInfo.jsLibFilesForType.put(typeName, res);
+         }
+         else {
+            if (getAlias(type) != null)
+               jsBuildInfo.jsLibFilesForType.put(typeName, HAS_ALIAS_SENTINEL);
+            else
+               jsBuildInfo.jsLibFilesForType.put(typeName, NULL_JS_LIB_FILES_SENTINEL);
+         }
+         return res;
+      }
       return null;
    }
 
    boolean hasJSLibFiles(Object type) {
+      String res = null;
       if (!(type instanceof PrimitiveType)) {
-         // Make sure we get the most specific type for this type.  We might have a dependency on java.lang.Object
-         // for example when there's an annotation set on the annotation layer for java.lang.Object.
-         type = ModelUtil.resolveSrcTypeDeclaration(system, type, false, false);
-         Object settingsObj = ModelUtil.getAnnotation(type, "sc.js.JSSettings");
-         if (settingsObj != null) {
-            String jsFilesStr = (String) ModelUtil.getAnnotationValue(settingsObj, "jsLibFiles");
-            return jsFilesStr != null && jsFilesStr.length() > 0;
+         String typeName = ModelUtil.getTypeName(type);
+         res = jsBuildInfo.jsLibFilesForType.get(typeName);
+         if (res != null) {
+            // If we have a cached that we have an alias or a js lib files just return
+            if (!res.equals(NULL_JS_LIB_FILES_SENTINEL))
+               return true;
+            // else - try the parent type
+         }
+         else {
+            // Make sure we get the most specific type for this type.  We might have a dependency on java.lang.Object
+            // for example when there's an annotation set on the annotation layer for java.lang.Object.
+            type = ModelUtil.resolveSrcTypeDeclaration(system, type, false, false);
+            Object settingsObj = ModelUtil.getAnnotation(type, "sc.js.JSSettings");
+            if (settingsObj != null) {
+               String jsFilesStr = (String) ModelUtil.getAnnotationValue(settingsObj, "jsLibFiles");
+               return jsFilesStr != null && jsFilesStr.length() > 0;
+            }
          }
       }
-      if (hasAlias(type))
+      if (res == null && hasAlias(type))
          return true;
       Object parentType = ModelUtil.getEnclosingType(type);
       if (parentType != null)
@@ -1351,22 +1581,27 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          return true;
 
       if (ModelUtil.isCompiledClass(type)) {
-         Object newType = ModelUtil.findTypeDeclaration(system, ModelUtil.getTypeName(type), null, false);
+         Object newType = ModelUtil.findTypeDeclaration(system, typeName, null, false);
          if (newType != null) {
             type = newType;
          }
-         //type = ModelUtil.resolveSrcTypeDeclaration(system, type);
+         type = ModelUtil.resolveSrcTypeDeclaration(system, type);
          if (ModelUtil.isCompiledClass(type)) {
             String pkgName = CTypeUtil.getPackageName(typeName);
             if (pkgName != null) {
                String className = CTypeUtil.getClassName(typeName);
                String prefix = jsBuildInfo.prefixAliases.get(pkgName);
                if (prefix != null) {
-                  List<String> aliasedPkgs = jsBuildInfo.aliasedPackages.get(prefix);
+                  HashSet<String> aliasedPkgs = jsBuildInfo.aliasedPackages.get(prefix);
                   if (aliasedPkgs != null) {
                      for (String aliasedPkg:aliasedPkgs) {
                         String testPath = CTypeUtil.prefixPath(aliasedPkg, className);
-                        if (system.getSrcTypeDeclaration(testPath, null, true) != null) {
+                        TypeDeclaration aliasedType = system.getSrcTypeDeclaration(testPath, null, true);
+                        if (aliasedType != null) {
+                           if (aliasedType.getFullTypeName().equals(typeName)) {
+                              System.err.println("*** Error - aliased type has same name as original");
+                              return false;
+                           }
                            return true;
                         }
                      }
@@ -1378,29 +1613,50 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return false;
    }
 
-   /** This gets called in two modes - during start to collect the jsLibFiles for each type and populate the jsLibFiles in the build info.  This is with (append=true).
-    * It is also called from the getProcessedFiles method (append=false) to copy the files for a given type. */
-   String[] addJSLibFiles(Object type, boolean append, String rootTypeLibFile, Object depType, String relation) {
+   /**
+    * This must be called on the type before we try to use the js type name.
+    * TODO - performance: we are calling this more often than necessary... need to check each type in each layer but maybe we can remove one or two of the calls to it?
+    */
+   private void registerPrefixAlias(Object type) {
       // This prefix alias attribute does not work for inner classes.
       if (ModelUtil.getEnclosingType(type) == null) {
+         String typeName = ModelUtil.getTypeName(type);
          String prefixStr = (String) ModelUtil.getTypeOrLayerAnnotationValue(system, type, "sc.js.JSSettings", "prefixAlias");
-         if (append && prefixStr != null && prefixStr.length() > 0) {
+         if (prefixStr != null && prefixStr.length() > 0) {
             String pkgName = CTypeUtil.getPackageName(ModelUtil.getTypeName(type));
             String oldPrefix = jsBuildInfo.prefixAliases.put(pkgName, prefixStr);
             if (oldPrefix != null && !oldPrefix.equals(prefixStr)) {
                System.err.println("*** JSSettings.prefixAlias value on type: " + type + " set to: " + prefixStr + " which conflicts with the old prefixAlias for pkg: " + pkgName + " of: " + oldPrefix);
             }
+            HashSet<String> pkgs = jsBuildInfo.aliasedPackages.get(prefixStr);
+            if (pkgs == null) {
+               pkgs = new HashSet<String>();
+               jsBuildInfo.aliasedPackages.put(prefixStr, pkgs);
+            }
+            pkgs.add(pkgName);
          }
+      }
+   }
+
+   /** This gets called in two modes - during start to collect the jsLibFiles for each type and populate the jsLibFiles in the build info.  This is with (append=true).
+    * It is also called from the getProcessedFiles method (append=false) to copy the files for a given type. */
+   String[] addJSLibFiles(Object type, boolean append, String rootTypeLibFile, Object depType, String relation) {
+      // This prefix alias attribute does not work for inner classes.
+      if (ModelUtil.getEnclosingType(type) == null && append) {
+         registerPrefixAlias(type);
       }
 
       Object settingsObj = ModelUtil.getAnnotation(type, "sc.js.JSSettings");
       boolean handled = false;
       if (settingsObj != null) {
 
+         String typeName = ModelUtil.getTypeName(type);
          String replaceWith = (String) ModelUtil.getAnnotationValue(settingsObj, "replaceWith");
          if (replaceWith != null && replaceWith.length() > 0) {
-            jsBuildInfo.replaceTypes.put(ModelUtil.getTypeName(type), replaceWith);
+            jsBuildInfo.addReplaceType(typeName, replaceWith);
             handled = true;
+            if (jsBuildInfo.jsLibFilesForType.get(typeName) == null)
+               jsBuildInfo.jsLibFilesForType.put(typeName, HAS_ALIAS_SENTINEL);
          }
 
          String jsFilesStr = (String) ModelUtil.getAnnotationValue(settingsObj, "jsLibFiles");
@@ -1413,6 +1669,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                else if (!jsBuildInfo.jsFiles.contains(newJsFiles[i]))
                   System.err.println("*** jsFiles for type: " + type + " not added during process phase");
             }
+            jsBuildInfo.jsLibFilesForType.put(typeName, jsFilesStr);
+
             return newJsFiles;
          }
 
@@ -1552,7 +1810,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       */
    }
 
-   void appendJSTypeTemplate(BodyTypeDeclaration td, StringBuilder result) {
+   void appendJSTypeTemplate(BodyTypeDeclaration td, StringBuilder result, GenFileLineIndex lineIndex) {
       /*
       ParseUtil.initAndStartComponent(td);
       if (td instanceof EnumDeclaration) {
@@ -1568,7 +1826,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          return;
       }
 
-      Object typeParams = new JSTypeParameters(td);
+      JSTypeParameters typeParams = new JSTypeParameters(td);
+
+      typeParams.lineIndex = lineIndex;
 
       String templatePath = getJSTypeTemplatePath(td);
       String rootTypeResult = system.evalTemplate(typeParams, templatePath, JSTypeParameters.class, td.getLayer(), td.isLayerType);
@@ -1600,7 +1860,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       }
       if (!(typeObj instanceof BodyTypeDeclaration)) {
          // TODO: convert JSTypeParameters to use Object types just for this?
-         return JSUtil.convertTypeName(system, ModelUtil.getTypeName(typeObj)) + prototypeSuffix;
+         return JSUtil.convertTypeName(system, ModelUtil.getTypeName(typeObj)) + typeNameSuffix;
       }
 
       BodyTypeDeclaration td = (BodyTypeDeclaration) typeObj;
@@ -1715,7 +1975,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          String absFilePath = FileUtil.concat(genLayer.buildDir, getJSPathPrefix(genLayer), FileUtil.unnormalize(jsFile));
 
          // This gen file has not been added yet in the layer stack so no processing for it.
-         if (jsg.fromLayer.getLayerPosition() > genLayer.getLayerPosition() || (genLayer != sys.buildLayer && !genLayer.extendsLayer(jsg.fromLayer) && !genLayer.extendsLayer(jsg.toLayer)))
+         if (jsg.fromLayer.getLayerPosition() > genLayer.getLayerPosition() || (genLayer != sys.buildLayer && !genLayer.extendsOrIsLayer(jsg.fromLayer) && !genLayer.extendsOrIsLayer(jsg.toLayer)))
             continue;
 
          boolean changed = isJSFileChanged(jsFile);
@@ -1752,7 +2012,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
                         // Track the min and max layers for each gen file.  If we find the layer for the file and it includes the last type, just copy from there to here.
                         // If not, our version must be more up to date if it's not changed so do not copy.
-                        FileUtil.copyFile(baseSrc.absFileName, absFilePath, true);
+                        copyFileAndMap(baseSrc.absFileName, absFilePath);
                      }
                   }
                }
@@ -1766,8 +2026,13 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          if (sys.options.verbose)
             System.out.println("Generating js file: " + jsFile + " for build layer: " + genLayer);
 
-         StringBuilder jsFileBody = new StringBuilder();
-         jsFileBodyStore.put(jsFile, jsFileBody);
+         JSFileBodyCache jsFileBodyCache = new JSFileBodyCache();
+         jsFileBodyStore.put(jsFile, jsFileBodyCache);
+         StringBuilder jsFileBody = jsFileBodyCache.jsFileBody;
+         GenFileLineIndex jsLineIndex = null;
+         if (system.options.genDebugInfo)
+            jsLineIndex = jsFileBodyCache.lineIndex = new GenFileLineIndex(jsFile);
+
          entryPointsFrozen = true;
          try {
             // First define the types for each entry point that goes in this file
@@ -1795,30 +2060,61 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             }
          }
 
+         /**
+          * Now add code for each entryPoint that is run during initialization - i.e. main methods or objects marked to be created on startup
+          */
          boolean needsSync = hasDependency(jsFile, "js/sync.js");
-         StringBuilder initBody = new StringBuilder();
+         ArrayList<InitCodeInfo> initCodeInfos = new ArrayList<InitCodeInfo>();
          for (EntryPoint e:jsBuildInfo.entryPoints.values()) {
             if (e.jsFile.equals(jsFile)) {
                if (e.needsInit) {
                   BodyTypeDeclaration initType = e.getResolvedType(sys);
+                  InitCodeInfo initCodeInfo = new InitCodeInfo(initType);
+                  initCodeInfos.add(initCodeInfo);
                   if (sys.options.verbose)
-                     initBody.append("console.log(\"Init type: " + initType.typeName + "\");\n");
+                     initCodeInfo.initBody.append("console.log(\"Init type: " + initType.typeName + "\");\n");
 
                   if (!e.isMain)
-                     initBody.append(getInstanceTemplate(initType));
+                     initCodeInfo.initBody.append(getInstanceTemplate(initType));
                   else
-                     initBody.append(evalMainTemplate(initType));
+                     initCodeInfo.initBody.append(evalMainTemplate(initType));
                }
             }
          }
-         if (needsSync && initBody.length() > 0) {
-            // Now generate the main object/method call to kick things off, wrapped around a start/end sync call.
-            jsFileBody.append(JSRuntimeProcessor.SyncBeginCode);
-            jsFileBody.append(initBody);
-            jsFileBody.append(JSRuntimeProcessor.SyncEndCode);
+         // Now generate the main object/method call to kick things off, wrapped around a start/end sync call.
+         if (initCodeInfos.size() > 0) {
+            if (needsSync) {
+               if (jsLineIndex != null)
+                  jsLineIndex.numLines += ParseUtil.countLinesInNode(JSRuntimeProcessor.SyncBeginCode);
+               // TODO: register a debug line mapping for this code?
+               jsFileBody.append(JSRuntimeProcessor.SyncBeginCode);
+            }
+            for (InitCodeInfo initCodeInfo:initCodeInfos) {
+               if (jsLineIndex != null) {
+                  BodyTypeDeclaration bodyType = initCodeInfo.type;
+                  ISrcStatement srcSt;
+                  // The type here is typically already the src type unless we are generating it from a template in which case we need to resolve the source statement
+                  if (bodyType.fromStatement != null)
+                     srcSt = bodyType.getSrcStatement(null);
+                  else
+                     srcSt = bodyType;
+                  Statement.addMappingForSrcStatement(jsLineIndex, srcSt, jsLineIndex.numLines, initCodeInfo.initBody);
+                  jsLineIndex.numLines += ParseUtil.countLinesInNode(initCodeInfo.initBody);
+               }
+               jsFileBody.append(initCodeInfo.initBody);
+            }
+            if (needsSync) {
+               jsFileBody.append(JSRuntimeProcessor.SyncEndCode);
+               if (jsLineIndex != null)
+                  jsLineIndex.numLines += ParseUtil.countLinesInNode(JSRuntimeProcessor.SyncEndCode);
+            }
          }
-         else
-            jsFileBody.append(initBody);
+
+         if (jsLineIndex != null) {
+            String sourceMapName = absFilePath + ".map";
+            jsFileBody.append("\n//# sourceMappingURL=" + FileUtil.getFileName(sourceMapName) + "\n");
+            FileUtil.saveStringAsFile(sourceMapName, jsLineIndex.getSourceMappingJSON(), true);
+         }
          FileUtil.saveStringAsFile(absFilePath, jsFileBody.toString(), true);
       }
 
@@ -1833,23 +2129,50 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       PerfMon.end("postProcessJS");
    }
 
+   private static class InitCodeInfo {
+      StringBuilder initBody = new StringBuilder();
+      BodyTypeDeclaration type;
+      InitCodeInfo(BodyTypeDeclaration type) {
+         this.type = type;
+      }
+   }
+
    public void resetBuildLayerState() {
       if (processedTypes != null)
          processedTypes.clear();
       if (typesInFileMap != null)
          typesInFileMap.clear();
+      // Only regenerate these if any types change in the next layer
+      changedJSFiles.clear();
+   }
+
+   public void flushTypeCache() {
+      // In case any types have been stopped and recreated, we'll reset the cached type here
+      for (Iterator<EntryPoint> it = jsBuildInfo.entryPoints.values().iterator(); it.hasNext(); ) {
+         EntryPoint ent = it.next();
+         if (ent.type != null)
+            ent.type = null;
+      }
+   }
+
+   /** Need to reset this always in between builds - even if no files changed */
+   public List<SrcEntry> buildCompleted() {
+      postStarted = false;
+      if (anyErrors)
+         return errorFiles;
+      return null;
    }
 
    public void resetBuild() {
       resetBuildLayerState();
+      if (system.options.verbose)
+         system.verbose("Resetting JS build");
       changedJSFiles.clear();
       changedDefaultType = false;
       jsFileBodyStore.clear();
       postStarted = false;
-
-      if (system.options.buildAllFiles) {
-         // TODO: should we reset anything in the JSBuildInfo?  Since we don't reliably run the start process, I don't think so
-      }
+      anyErrors = false;
+      errorFiles.clear();
    }
 
    public boolean getCompiledOnly() {
@@ -1860,11 +2183,11 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return true;
    }
 
-   public CharSequence processModelStream(ModelStream stream) {
+   public StringBuilder processModelStream(ModelStream stream) {
       StringBuilder sb = new StringBuilder();
 
       if (stream.modelList == null)
-         return "";
+         return sb;
 
       stream.setLayeredSystem(system);
 
@@ -1992,9 +2315,20 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       if (depType instanceof BodyTypeDeclaration)
          depType = ((BodyTypeDeclaration) depType).resolve(false);
 
-      ParseUtil.realInitAndStartComponent(depType);
+      initAndStartType(depType);
 
       return depType;
+   }
+
+   private void initAndStartType(Object depType) {
+      if (depType instanceof BodyTypeDeclaration) {
+         JavaModel model = ((BodyTypeDeclaration) depType).getJavaModel();
+         if (!model.isStarted()) {
+            ParseUtil.realInitAndStartComponent(model);
+            return;
+         }
+      }
+      ParseUtil.realInitAndStartComponent(depType);
    }
 
    Object resolveSrcTypeDeclaration(Object typeObj) {
@@ -2163,7 +2497,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          notInParentFile = hasAlias(type);
 
       //addLibFile(typeLibFile, rootLibFile);
-      StringBuilder jsFileBody = jsFileBodyStore.get(typeLibFile);
+      JSFileBodyCache jsFileBodyCache = jsFileBodyStore.get(typeLibFile);
+      StringBuilder jsFileBody = jsFileBodyCache == null ? null : jsFileBodyCache.jsFileBody;
+      GenFileLineIndex lineIndex = jsFileBodyCache == null ? null : jsFileBodyCache.lineIndex;
 
       String fullTypeName = type.getFullTypeName();
       JSFileEntry jsEnt = new JSFileEntry();
@@ -2209,8 +2545,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             }
 
             try {
-               String fileBody = FileUtil.getFileAsString(srcEnt.absFileName);
-               jsFileBody.append(fileBody);
+               appendJSFileBody(srcEnt, jsFileBody, lineIndex);
             }
             catch (IllegalArgumentException exc) {
                System.err.println("*** No dependent js file: " + srcEnt.absFileName);
@@ -2222,7 +2557,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             // When we have not transformed the type and we've cached the type to file membership, we can take a faster path and just gather up the files.
             // We can't use the untransformed model to reliably get the list of inner types cause it mises the __Anon classes and anything which is generated.
             // The order is also messed up.
-            if (needsSave || (enclType == null && typeInfo.typesInSameFile == null) || processedTypes.contains(fullTypeName)) {
+            if (needsSave || (enclType == null && typeInfo != null && typeInfo.typesInSameFile == null) || processedTypes.contains(fullTypeName)) {
                if (enclType == null) {
                   // Preserve the order in which we add them but make it quick to reject duplicates
                   typesInSameFile = new LinkedHashSet<String>();
@@ -2258,9 +2593,11 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                               String depTypeName = ModelUtil.getTypeName(depType);
                               JSTypeInfo depJTI = getJSTypeInfo(depTypeName, false);
                               if (depJTI != null) {
+                                 if (depJTI.hasLibFile)
+                                    continue;
                                  // If it's an unassigned class it's in the same file, or if the files match.
                                  if (depJTI.jsModuleFile == null || (typeLibFile != null && depJTI.jsModuleFile.equals(typeLibFile))) {
-                                    addCompiledTypesToFile(depTypeName, typesInFile, parentLibFile, genLayer, jsFileBody, typesInSameFile);
+                                    addCompiledTypesToFile(depTypeName, typesInFile, parentLibFile, genLayer, jsFileBody, lineIndex, typesInSameFile);
                                  }
                                  continue;
                               }
@@ -2292,9 +2629,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                }
             }
             else if (enclType == null) {
-               if (typeInfo.typesInSameFile != null) {
+               if (typeInfo != null && typeInfo.typesInSameFile != null) {
                   for (String subTypeName:typeInfo.typesInSameFile) {
-                     addCompiledTypesToFile(subTypeName, typesInFile, rootLibFile, genLayer, jsFileBody, typeInfo.typesInSameFile);
+                     addCompiledTypesToFile(subTypeName, typesInFile, rootLibFile, genLayer, jsFileBody, lineIndex, typeInfo.typesInSameFile);
                   }
                }
             }
@@ -2303,11 +2640,33 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       }
    }
 
+   private void appendJSFileBody(SrcEntry srcEnt, StringBuilder jsFileBody, GenFileLineIndex lineIndex) {
+      String fileBody = FileUtil.getFileAsString(srcEnt.absFileName);
+      jsFileBody.append(fileBody);
+      if (lineIndex != null) {
+         GenFileLineIndex newLineIndex = getFileLineIndex(srcEnt.absFileName);
+         if (newLineIndex != null)
+            lineIndex.appendIndex(newLineIndex);
+         else
+            System.err.println("*** Missing generated file line index: "+ srcEnt.absFileName);
+      }
+   }
+
    private boolean isCompiledInType(Object depType) {
       return ((depType instanceof PrimitiveType) || (depType instanceof TypeVariable) || (ModelUtil.isWildcardType(depType)) || ModelUtil.isUnboundSuper(depType));
    }
 
-   private void addCompiledTypesToFile(String typeName, Map<JSFileEntry,Boolean> typesInFile, String rootLibFile, Layer genLayer, StringBuilder jsFileBody, Set<String> typesInSameFile) {
+   private GenFileLineIndex getFileLineIndex(String genSrcName) {
+      GenFileLineIndex res = lineIndexCache.get(genSrcName);
+      if (res == null) {
+         res = GenFileLineIndex.readFileLineIndexFile(GenFileLineIndex.getLineIndexFileName(genSrcName));
+         if (res != null)
+            lineIndexCache.put(genSrcName, res);
+      }
+      return res;
+   }
+
+   private void addCompiledTypesToFile(String typeName, Map<JSFileEntry,Boolean> typesInFile, String rootLibFile, Layer genLayer, StringBuilder jsFileBody, GenFileLineIndex lineIndex, Set<String> typesInSameFile) {
       JSTypeInfo subTypeInfo = jsBuildInfo.jsTypeInfo.get(typeName);
       if (subTypeInfo != null && !subTypeInfo.presentInLayer(genLayer))
          return;
@@ -2328,8 +2687,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             return;
          }
          try {
-            String fileBody = FileUtil.getFileAsString(subSrcEnt.absFileName);
-            jsFileBody.append(fileBody);
+            appendJSFileBody(subSrcEnt, jsFileBody, lineIndex);
 
             if (subTypeInfo == null)
                System.err.println("*** Missing JS type info");
@@ -2339,7 +2697,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                      System.err.println("*** Invalid sub-type name - same as main type: " + subTypeName);
                      continue;
                   }
-                  addCompiledTypesToFile(subTypeName, typesInFile, rootLibFile, genLayer, jsFileBody, subTypeInfo.typesInSameFile);
+                  addCompiledTypesToFile(subTypeName, typesInFile, rootLibFile, genLayer, jsFileBody, lineIndex, subTypeInfo.typesInSameFile);
                }
             }
 
@@ -2386,7 +2744,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    Template getJSTypeTemplate(BodyTypeDeclaration td) {
-      Object settingsObj = td.getInheritedAnnotation(("sc.js.JSSettings"));
+      List<Object> settingsObj = td.getAllInheritedAnnotations("sc.js.JSSettings");
       if (typeTemplate == null) {
          if (typeTemplateName == null) {
             System.err.println("*** typeTemplateName property on JSRuntimeProcessor not set");
@@ -2412,15 +2770,17 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return td;
    }
 
-   boolean appendJSType(BodyTypeDeclaration td, StringBuilder result) {
+   /** Makes sure the type has been transformed and converts it to JS */
+   boolean appendJSType(BodyTypeDeclaration td, StringBuilder result, GenFileLineIndex lineIndex) {
       td = ensureTransformedResult(td);
       if (td == null) {
-         System.err.println("*** No trnasformed result in appendJSType: ");
+         System.err.println("*** No transformed result in appendJSType: ");
+         td = ensureTransformedResult(td);
          return false;
       }
       if (!processedTypes.contains(td.getFullTypeName()) && !hasJSLibFiles(td)) {
          td.getJavaModel().disableTypeErrors = true;
-         appendJSTypeTemplate(td, result);
+         appendJSTypeTemplate(td, result, lineIndex);
          //appendInnerJSTypes(td, result);
          return true;
       }
@@ -2428,10 +2788,16 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    void addInnerTypesToFile(BodyTypeDeclaration td, Map<JSFileEntry,Boolean> typesInFile, String rootLibFile, Layer genLayer, Set<String> typesInSameFile) {
+      BodyTypeDeclaration origtd = td;
       td = ensureTransformedResult(td);
       if (td instanceof EnumDeclaration) {
          EnumDeclaration ed = (EnumDeclaration) td;
          td = ed.transformEnumToJS();
+      }
+      if (td == null) {
+         System.out.println("*** Error - null transformed result from addInnerTypes");
+         td = ensureTransformedResult(origtd);
+         return;
       }
       List<Object> innerTypes = td.getAllInnerTypes(null, true);
       if (innerTypes != null) {
@@ -2470,6 +2836,33 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          }
       }
       return name;
+   }
+
+   public Object[] getJSParameterTypes(Object methObj, Layer refLayer) {
+      Object jsMethSettings = ModelUtil.getAnnotation(methObj, "sc.js.JSMethodSettings");
+      if (jsMethSettings != null) {
+         String paramTypesStr = (String) ModelUtil.getAnnotationValue(jsMethSettings, "parameterTypes");
+         if (paramTypesStr != null) {
+            String[] typeNames = paramTypesStr.split(",");
+            Object[] res = new Object[typeNames.length];
+            int i = 0;
+            for (String typeName:typeNames) {
+               Object type = system.getTypeDeclaration(typeName, false, refLayer, false);
+               if (type == null) {
+                  Type prim = Type.getPrimitiveType(typeName);
+                  if (prim != null)
+                     type = prim.primitiveClass;
+               }
+               if (type == null) {
+                  System.err.println("*** Invalid JSMethodSettings paramTypes value for method: " + methObj + " type: " + typeName + " not found");
+                  return null;
+               }
+               res[i++] = type;
+            }
+            return res;
+         }
+      }
+      return null;
    }
 
    public void setLayeredSystem(LayeredSystem sys) {
@@ -2610,8 +3003,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    public void initAfterRestore() {
       processedTypes = new HashSet<String>();
       typesInFileMap = new HashMap<String,LinkedHashMap<JSFileEntry,Boolean>>();
-      jsFileBodyStore = new HashMap<String, StringBuilder>();
+      jsFileBodyStore = new HashMap<String, JSFileBodyCache>();
       changedJSFiles = new LinkedHashSet<String>();
+      lineIndexCache = new HashMap<String,GenFileLineIndex>();
    }
 
    /** Called after we clear all of the layers to reset the JSBuildInfo state */
@@ -2662,11 +3056,11 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       }
 
       public class JSExecBlock extends ExecBlock {
-         public void doAction(ExecutionContext ctx) {
-            super.doAction(ctx);
+         public void updateInstances(ExecutionContext ctx) {
+            super.updateInstances(ctx);
 
-            JavaModel model = baseType.getJavaModel();
-            TypeDeclaration modifyType = getOrCreateModifyDeclaration(baseType.getFullTypeName(), model.getModelTypeName(), model.getPackagePrefix());
+            JavaModel model = newType.getJavaModel();
+            TypeDeclaration modifyType = getOrCreateModifyDeclaration(newType.getFullTypeName(), model.getModelTypeName(), model.getPackagePrefix());
             modifyType.addBodyStatement(blockStatement.deepCopy(ISemanticNode.CopyNormal | ISemanticNode.CopyInitLevels, null));
          }
       }
@@ -2676,11 +3070,11 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       }
 
       public class JSUpdateProperty extends UpdateProperty {
-         public void doAction(ExecutionContext ctx) {
-            super.doAction(ctx);
+         public void updateInstances(ExecutionContext ctx) {
+            super.updateInstances(ctx);
 
-            JavaModel model = baseType.getJavaModel();
-            TypeDeclaration modifyType = getOrCreateModifyDeclaration(baseType.getFullTypeName(), model.getModelTypeName(), model.getPackagePrefix());
+            JavaModel model = newType.getJavaModel();
+            TypeDeclaration modifyType = getOrCreateModifyDeclaration(newType.getFullTypeName(), model.getModelTypeName(), model.getPackagePrefix());
 
             if (overriddenAssign instanceof VariableDefinition || overriddenAssign instanceof PropertyAssignment) {
                IVariableInitializer assign = (IVariableInitializer) overriddenAssign;
@@ -2692,12 +3086,12 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
                modifyType.addBodyStatement(pa);
 
-               if (baseType.changedMethods == null)
-                  baseType.changedMethods = new TreeSet<String>();
+               if (newType.changedMethods == null)
+                  newType.changedMethods = new TreeSet<String>();
                String upperPropName = CTypeUtil.capitalizePropertyName(propName);
                // TODO: should probably validate this VarDef has get set but this is not the definitive list, it just specifies matching methods get put into the output
-               baseType.changedMethods.add("get" + upperPropName);
-               baseType.changedMethods.add("set" + upperPropName);
+               newType.changedMethods.add("get" + upperPropName);
+               newType.changedMethods.add("set" + upperPropName);
             }
             else if (overriddenAssign instanceof TypeDeclaration) {
                String opName = "add";
@@ -2716,7 +3110,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                      newType = (TypeDeclaration) overriddenAssign;
                      SemanticNodeList addArgs = new SemanticNodeList();
                      if (opName.equals("add")) {
-                        Object[] children = baseType.getObjChildrenTypes(null, false, false, false);
+                        Object[] children = newType.getObjChildrenTypes(null, false, false, false);
                         if (children != null) {
                            int ix = Arrays.asList(children).indexOf(newType);
                            if (ix != -1)
@@ -2768,9 +3162,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    /*
-   public CharSequence refreshSystem() {
+   public CharSequence refreshChangedModels() {
       JSUpdateInstanceInfo info = new JSUpdateInstanceInfo();
-      system.refreshSystem(info);
+      system.refreshChangedModels(info);
       system.completeRefreshSystem(info);
       return info.convertToJS();
    }

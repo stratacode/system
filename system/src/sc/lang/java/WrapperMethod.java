@@ -4,11 +4,15 @@
 
 package sc.lang.java;
 
+import sc.layer.LayeredSystem;
+
 import java.util.List;
+import java.util.Map;
 
 public abstract class WrapperMethod implements IMethodDefinition {
    Object wrapped;
-   JavaModel javaModel;
+   LayeredSystem system;
+   JavaModel model;
 
    public String getMethodName() {
       return ModelUtil.getMethodName(wrapped);
@@ -35,7 +39,7 @@ public abstract class WrapperMethod implements IMethodDefinition {
    }
 
    public Object getTypeDeclaration(List<? extends ITypedObject> args, boolean resolve) {
-      return ModelUtil.getMethodTypeDeclaration(null, wrapped, (List<Expression>) args, javaModel, null, null);
+      return ModelUtil.getMethodTypeDeclaration(null, wrapped, (List<Expression>) args, system, model, null, null);
    }
 
    public String getPropertyName() {
@@ -86,6 +90,10 @@ public abstract class WrapperMethod implements IMethodDefinition {
       return ModelUtil.getAnnotation(wrapped, annotName);
    }
 
+   public Map<String,Object> getAnnotations() {
+      return ModelUtil.getAnnotations(wrapped);
+   }
+
    public boolean hasModifier(String modifierName) {
       return ModelUtil.hasModifier(wrapped, modifierName);
    }
@@ -108,6 +116,10 @@ public abstract class WrapperMethod implements IMethodDefinition {
 
    public Object getSetMethodFromGet() {
       return ModelUtil.getSetMethodFromGet(wrapped);
+   }
+
+   public Object getFieldFromGetSetMethod() {
+      return ModelUtil.getFieldFromGetSetMethod(wrapped);
    }
 
    public Object[] getMethodTypeParameters() {

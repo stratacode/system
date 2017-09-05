@@ -7,7 +7,7 @@ package sc.util;
 import java.io.Serializable;
 
 /**
- * This is a faster implementation of the basic operations for a table whose
+ * This should be a faster implementation of the basic operations for a table whose
  * size is known roughly before populating, elements are never removed, hash functions
  * are relatively good.  No hash-table entries are created for adding a new item.
  * Items are put into a slot based on their hash code.  If that spot is filled, we
@@ -15,7 +15,12 @@ import java.io.Serializable;
  * can have O(N) insert and O(N) lookup.  Resizing is expensive so avoid using this if
  * you do not have a good estimate of the size when you create the object.
  *
- * TODO: adjust these tuning parameters for table size and pad amount
+ * TODO: adjust these tuning parameters for table size and pad amount, compare to existing implementations for speed and space efficiency
+ *
+ * TODO: performance suggestion: when inserting a new entry, into a populated slot, swap the entry
+ * with the existing one, choosing the one with the shortest probe size (i.e. delta between key % tabSize and the index of the slot).
+ * When looking for an entry that's not in the table, if we pass an element whose probe-size is longer than the element we are looking for, we can be sure it's not
+ * in the table.
  */
 public class CoalescedHashMap<K,T> implements Cloneable, Serializable {
    public Object[] keyTable;

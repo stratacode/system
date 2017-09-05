@@ -12,8 +12,9 @@ import sc.lang.ILanguageModel;
  * that ie needs to parse and load for resolving dependencies.
  */
 public interface IExternalModelIndex {
-   /** If you have your own cache of ILanguageModel objects, return your cached model.  If not, return null from this method and StrataCode will use it's own cache. */
-   public ILanguageModel lookupJavaModel(SrcEntry srcEnt);
+   /** If you have your own cache of ILanguageModel objects, return your cached model.  If not, return null from this method and StrataCode will use it's own cache.
+    * If the loadIfUnloaded flag is true, parse the model if it has not yet been parsed.  IF it's false, do not parse it - return null instead. */
+   public ILanguageModel lookupJavaModel(SrcEntry srcEnt, boolean loadIfUnloaded);
 
    /** A notification hook when a given model has been replaced - i.e. someone changed the file on disk and it was refreshed. */
    public void replaceModel(ILanguageModel oldModel, ILanguageModel newModel);

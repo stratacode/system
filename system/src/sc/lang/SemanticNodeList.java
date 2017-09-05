@@ -145,10 +145,10 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
    }
 
    public void stop() {
-      if (!started)
-         return;
-      started = false;
       initialized = false;
+      started = false;
+      validated = false;
+      processed = false;
 
       int sz = size();
       for (int i = 0; i < sz; i++) {
@@ -428,7 +428,10 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
             System.err.println("*** Error generating code for parselet: " + parselet + " language: " + parselet.getLanguage() + " and model: " + this);
             return "Error translating";
          }
-         return result.toString();
+         else if (result instanceof IParseNode)
+            return ((IParseNode) result).formatString(null, null, -1, true).toString();
+         else
+            return result.toString();
       }
    }
 
@@ -674,7 +677,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
 
    private static void diffAppend(StringBuilder diffs, Object val) {
       if (SemanticNode.debugDiffTrace)
-         diffs = diffs;
+         diffs = diffs; // set breakpoint here
       diffs.append(val);
    }
 

@@ -4,10 +4,9 @@
 
 package sc.lang;
 
+import jline.console.ConsoleReader;
+import jline.console.completer.Completer;
 import sc.layer.LayeredSystem;
-import jline.Completor;
-import jline.ConsoleReader;
-import jline.Terminal;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -15,7 +14,7 @@ import java.util.List;
 
 // WARNING: this JSSetting is not picked up cause we do not compile this with SC so it is replicated in JSRuntimeProcessor manually.
 @sc.js.JSSettings(replaceWith="sc_EditorContext")
-public class JLineInterpreter extends AbstractInterpreter implements Runnable, Completor {
+public class JLineInterpreter extends AbstractInterpreter implements Runnable, Completer {
    ConsoleReader input;
 
    public JLineInterpreter(LayeredSystem sys) {
@@ -37,7 +36,7 @@ public class JLineInterpreter extends AbstractInterpreter implements Runnable, C
    private void reset() {
       try {
          input = new ConsoleReader();
-         input.addCompletor(this);
+         input.addCompleter(this);
       }
       catch (EOFException exc) {
          System.exit(1);
@@ -49,6 +48,7 @@ public class JLineInterpreter extends AbstractInterpreter implements Runnable, C
    }
 
    public boolean readParseLoop() {
+      initReadThread();
       do {
          try {
             String nextLine;
@@ -85,6 +85,8 @@ public class JLineInterpreter extends AbstractInterpreter implements Runnable, C
                   pendingInput = new StringBuffer();
                }
                else {
+                  execLaterJobs();
+
                   nextPrompt = prompt();
                }
             }
@@ -105,12 +107,15 @@ public class JLineInterpreter extends AbstractInterpreter implements Runnable, C
             if (!exc.getMessage().contains("Interrupted"))
                System.err.println("Error reading command input: " + exc);
             else {
-               Terminal.resetTerminal();
                try {
+                  input.getTerminal().reset();
                   reset();
                }
                // Shutdown in progress...
                catch (IllegalStateException ise) {
+               }
+               catch (Exception termExc) {
+                  system.verbose("Exception in terminal reset: " + termExc);
                }
             }
          }
@@ -134,6 +139,6 @@ public class JLineInterpreter extends AbstractInterpreter implements Runnable, C
    }
 
    public int getTermWidth() {
-      return input.getTermwidth();
+      return input.getTerminal().getWidth();
    }
 }

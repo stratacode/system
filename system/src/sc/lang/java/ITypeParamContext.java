@@ -22,5 +22,5 @@ public interface ITypeParamContext {
 
    public Layer getRefLayer();
 
-   public ITypeDeclaration getDefinedInType();
+   public Object getDefinedInType();
 }

@@ -10,6 +10,7 @@ import sc.classfile.CFClass;
 import sc.dyn.DynUtil;
 import sc.dyn.IDynObject;
 import sc.lang.*;
+import sc.lang.html.Body;
 import sc.lang.js.JSRuntimeProcessor;
 import sc.lang.js.JSUtil;
 import sc.lang.sc.PropertyAssignment;
@@ -71,6 +72,7 @@ public class IdentifierExpression extends ArgumentsExpression {
    transient boolean jsTransformed = false;
 
    transient Object inferredType;
+   transient boolean inferredFinal = true;
 
    public static IdentifierExpression create(IString... args) {
       IdentifierExpression ie = new IdentifierExpression();
@@ -183,15 +185,16 @@ public class IdentifierExpression extends ArgumentsExpression {
                   displayTypeError("this() must be inside of a constructor: ");
                }
                else {
-                  Object constr = ModelUtil.declaresConstructor(enclType, arguments, null);
+                  Object constr = ModelUtil.declaresConstructor(getLayeredSystem(), enclType, arguments, null);
                   if (constr == null) {
-                     if (model != null && !model.disableTypeErrors) {
-                        String othersMessage = getOtherConstructorsMessage(enclType);
+                     if (model != null && !model.disableTypeErrors && isInferredFinal() && isInferredSet()) {
+                        String othersMessage = getOtherConstructorsMessage(enclType, "\n   Did you mean:\n");
                         displayTypeError("No constructor matching: ", ModelUtil.argumentsToString(arguments), othersMessage, " for: ");
                      }
                   }
                   else if (constr == enclMeth) {
                      displayTypeError("Illegal recursive this", ModelUtil.argumentsToString(arguments), " method call for: ");
+                     constr = ModelUtil.declaresConstructor(getLayeredSystem(), enclType, arguments, null);
                   }
                   else
                      boundTypes[0] = constr;
@@ -208,6 +211,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             }
             else {
                Object superType = thisType.getDerivedTypeDeclaration();
+               Object extendsType = thisType.getExtendsTypeDeclaration();
 
                if (sz == 1) {
                   if (arguments == null) {
@@ -224,21 +228,38 @@ public class IdentifierExpression extends ArgumentsExpression {
                         displayTypeError("super() must be inside of a constructor: ");
                      }
                      else {
-                        Object constr = ModelUtil.declaresConstructor(superType, arguments, null);
-                        // When transforming to JS, we need to resolve the super(name, ordinal) constructor which is part of the base type in JS only
-                        if (constr == null && superType instanceof EnumDeclaration && arguments.size() == 2) {
+                        Object constr = ModelUtil.declaresConstructor(getLayeredSystem(), superType, arguments, null);
+                        // When transforming to JS, we need to resolve the super(name, ordinal, ...) constructors which are part of the base type in JS only
+                        // TODO: we should really be taking away the first two args and matching the proper constructor here but it's not that important we match
+                        // the right constructor for the JS conversion
+                        if (constr == null && superType instanceof EnumDeclaration && arguments.size() >= 2) {
                            constr = superType;
                         }
                         if (constr == null) {
-                           Object[] constructors = ModelUtil.getConstructors(superType, null);
-                           if (arguments.size() > 0 || (constructors != null && constructors.length > 0)) {
-                              if (model != null && !model.disableTypeErrors) {
-                                 String othersMessage = getOtherConstructorsMessage(enclType);
-                                 displayTypeError("No constructor matching: ", ModelUtil.argumentsToString(arguments), othersMessage, " for: ");
-                              }
+                           if (extendsType != superType && extendsType != null) {
+                              constr = ModelUtil.declaresConstructor(getLayeredSystem(), extendsType, arguments, null);
+                              if (constr != null)
+                                 boundTypes[0] = constr;
                            }
-                           else {
-                              boundTypes[0] = superType; // The zero arg constructor case
+                           if (constr == null) {
+                              Object[] constructors = ModelUtil.getConstructors(superType, null);
+                              if (arguments.size() > 0 || (constructors != null && constructors.length > 0)) {
+                                 if (model != null && !model.disableTypeErrors && isInferredSet() && isInferredFinal()) {
+                                    String typeMessage = superType == extendsType || extendsType == null ?
+                                                      " super type: " + ModelUtil.getTypeName(superType) :
+                                                      " modified/super types: " + ModelUtil.getTypeName(superType) + "/" + ModelUtil.getTypeName(extendsType);
+                                    String othersMessage = getOtherConstructorsMessage(superType, "\n   Did you mean:\n");
+                                    if (extendsType != superType && extendsType != null)
+                                       othersMessage += getOtherConstructorsMessage(extendsType, "\n   Or one of the super type's constructors:\n");
+                                    displayTypeError("No constructor matching: ", ModelUtil.argumentsToString(arguments), othersMessage, " for " + typeMessage + " in: ");
+                                    constr = ModelUtil.declaresConstructor(getLayeredSystem(), superType, arguments, null);
+                                    if (superType != extendsType && extendsType != null)
+                                       constr = ModelUtil.declaresConstructor(getLayeredSystem(), extendsType, arguments, null);
+                                 }
+                              }
+                              else {
+                                 boundTypes[0] = superType; // The zero arg constructor case
+                              }
                            }
                         }
                         else
@@ -261,7 +282,8 @@ public class IdentifierExpression extends ArgumentsExpression {
          }
          else if (sz == offset()) {
             if (arguments != null && !(this instanceof NewExpression)) {
-               Object foundMeth = findMethod(firstIdentifier, arguments, this, enclType, isStatic(), inferredType);
+               boolean isStatic = isStatic();
+               Object foundMeth = findMethod(firstIdentifier, arguments, this, enclType, isStatic, inferredType);
                if (foundMeth != null) {
                   foundMeth = parameterizeMethod(this, foundMeth, null, inferredType, arguments, getMethodTypeArguments());
                   idTypes[0] = IdentifierType.MethodInvocation;
@@ -293,15 +315,18 @@ public class IdentifierExpression extends ArgumentsExpression {
                // template hierarchy.  So when it does the findMethod inside of the Template it never checks the root type.  If the enclType is the Template
                // the template checks the root type.  So either we should do findMethod originally on encltype or maybe the encltype should be the template?
                if (boundTypes[0] == null && enclType instanceof BodyTypeDeclaration) {
-                  boundTypes[0] = ((BodyTypeDeclaration) enclType).findMethod(firstIdentifier, arguments, this, enclType, isStatic(), inferredType);
+                  boundTypes[0] = ((BodyTypeDeclaration) enclType).findMethod(firstIdentifier, arguments, this, enclType, isStatic, inferredType);
                }
                if (boundTypes[0] == null) {
                   checkRemoteMethod(this, null, firstIdentifier, 0, idTypes, boundTypes, arguments, false, inferredType);
                }
-               if (boundTypes[0] == null && model != null && !model.disableTypeErrors) {
-                  String otherMethods = enclType == null ? "" : getOtherMethodsMessage(enclType, firstIdentifier);
-                  displayRangeError(0, 0, "No method named: ", firstIdentifier, ModelUtil.argumentsToString(arguments), otherMethods, " for: ");
-                  foundMeth = findMethod(firstIdentifier, arguments, this, enclType, isStatic(), inferredType);
+               if (boundTypes[0] == null && model != null && !model.disableTypeErrors && isInferredSet() && isInferredFinal()) {
+                  // For the IDE - might as well point to something close for reference checking etc.
+                  boundTypes[0] = findClosestMethod(enclType, firstIdentifier, arguments);
+                  String otherMethods = enclType == null ? "" : getOtherMethodsMessage(enclType, firstIdentifier, false);
+                  String message = isStatic ? "No static method named: " : "No method named: ";
+                  displayRangeError(0, 0, message, firstIdentifier, ModelUtil.argumentsToString(arguments), otherMethods, " for: ");
+                  foundMeth = findMethod(firstIdentifier, arguments, this, enclType, isStatic, inferredType);
                }
                if (idTypes[0] == null) {
                   idTypes[0] = IdentifierType.MethodInvocation;
@@ -343,7 +368,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                      IVariable var = (IVariable) varObj;
                      Object varTypeObj = ModelUtil.getVariableTypeDeclaration(var);
                      if (varTypeObj != null && !ModelUtil.isAssignableFrom(varTypeObj, typeObj) && !inNamedPropertyMethod(firstIdentifier))
-                        displayError("Ambiguous object expression - variable: " + ModelUtil.toDefinitionString(var) + " and object: " + ModelUtil.toDefinitionString(typeObj) + " from: ");
+                        displayError("Object/variable name conflict for: " + firstIdentifier + " variable: " + ModelUtil.toDefinitionString(var) + " and object: " + ModelUtil.toDefinitionString(typeObj) + " from: ");
                   }
                }
                else if (typeObj instanceof Class || typeObj instanceof CFClass) {
@@ -378,6 +403,10 @@ public class IdentifierExpression extends ArgumentsExpression {
                   boundTypes[0] = typeObj;
                }
                else {
+                  if (idTypes == null) {
+                     System.out.println("*** Invalid identifier expression!");
+                     return;
+                  }
                   idTypes[0] = IdentifierType.UnboundName;
                }
 
@@ -390,11 +419,17 @@ public class IdentifierExpression extends ArgumentsExpression {
                         idTypes[0] = IdentifierType.BoundObjectName;
                      else {
                         boolean needsGetSet = isAssignment ? ModelUtil.hasSetMethod(propObj) : ModelUtil.isPropertyGetSet(propObj);
-                        idTypes[0] = needsGetSet ?
-                                (isAssignment ? IdentifierType.SetVariable :
-                                        ModelUtil.isPropertyIs(propObj) ? IdentifierType.IsVariable : IdentifierType.GetVariable) :
-                                ModelUtil.isField(varObj) || ModelUtil.hasField(varObj) ? IdentifierType.FieldName : ModelUtil.isEnum(varObj) ?
-                                        IdentifierType.EnumName : IdentifierType.VariableName;
+                        if (!useExtensions) {
+                           idTypes[0] = ModelUtil.isField(varObj) || ModelUtil.hasField(varObj) ? IdentifierType.FieldName : ModelUtil.isEnum(varObj) ?
+                                   IdentifierType.EnumName : IdentifierType.VariableName;
+                        }
+                        else {
+                           idTypes[0] = needsGetSet ?
+                                   (isAssignment ? IdentifierType.SetVariable :
+                                           ModelUtil.isPropertyIs(propObj) ? IdentifierType.IsVariable : IdentifierType.GetVariable) :
+                                   ModelUtil.isField(varObj) || ModelUtil.hasField(varObj) ? IdentifierType.FieldName : ModelUtil.isEnum(varObj) ?
+                                           IdentifierType.EnumName : IdentifierType.VariableName;
+                        }
                      }
                   }
                }
@@ -510,6 +545,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                      else {
                         if (ident != null && ident.indexOf(".") == -1) {
                            displayRangeError(0, 0, "No type: " + ident + " in ");
+                           Object x =  findType(firstIdentifier, enclType, null);
                            break;
                         }
                         else {
@@ -547,9 +583,10 @@ public class IdentifierExpression extends ArgumentsExpression {
                bindNextIdentifier(this, currentType, nextName, i, idTypes, boundTypes, setLast, isMethod, arguments, methodTypeArgs,
                        bindingDirection, i == 1 && isStaticContext(i-1), inferredType);
 
-               // If we resolved the last entry as an object but its a static member, treat that as a class, not an object
+               // If we resolved the last entry as an object but its a static member, treat that as a class, not an object.
+               // It's also a type if it's an unbound method name at that spot - i.e. ObjectType.getObjectType() where getObjectType() won't exist as a method
                int last;
-               if (i > 0 && idTypes[last = (i - 1)] == IdentifierType.BoundObjectName && isStaticTarget(i)) {
+               if (i > 0 && idTypes[last = (i - 1)] == IdentifierType.BoundObjectName && (isStaticTarget(i) || idTypes[i] == IdentifierType.UnboundMethodName)) {
                   idTypes[last] = IdentifierType.BoundTypeName;
                }
             }
@@ -561,7 +598,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          if (bindingDirection != null && bindingDirection.doReverse() && arguments != null) {
             int last = sz-1;
             // Bi-directional bindings work differently...
-            if (bindingDirection.doForward() && boundTypes[last] != null && (ModelUtil.getAnnotation(boundTypes[last], "BindSettings") == null))
+            if (bindingDirection.doForward() && boundTypes[last] != null && (ModelUtil.getAnnotation(boundTypes[last], "sc.bind.BindSettings") == null))
                displayTypeError("Reverse binding defined for method expression where the method: " + idents.get(last).toString() + " does not have BindSettings(reverseMethod) set on it");
          }
 
@@ -575,16 +612,16 @@ public class IdentifierExpression extends ArgumentsExpression {
 
    static Object parameterizeMethod(Expression rootExpr, Object foundMeth, Object currentType, Object inferredType, List<Expression> arguments, List<JavaType> methodTypeArgs) {
       if (foundMeth != null) {
-         if (!(foundMeth instanceof ParamTypedMethod) && ModelUtil.isMethod(foundMeth) && (ModelUtil.hasMethodUnboundTypeParameters(foundMeth) || currentType instanceof ITypeParamContext) || methodTypeArgs != null) {
-            TypeDeclaration definedInType = rootExpr.getEnclosingType();
+         if (!(foundMeth instanceof ParamTypedMethod) && (ModelUtil.isMethod(foundMeth) || ModelUtil.isConstructor(foundMeth)) && (ModelUtil.hasMethodUnboundTypeParameters(foundMeth) || currentType instanceof ITypeParamContext || methodTypeArgs != null)) {
+            Object definedInType = rootExpr.getEnclosingType();
             if (definedInType == null) {
                // This happens for the tag expressions inside of Element objects.  We really just need a layered system and a layer
                // to resolve this reference so no need to find the accurate tag object.
-               definedInType = rootExpr.getJavaModel().getModelTypeDeclaration();
-               if (definedInType == null)
+               definedInType = rootExpr.getJavaModel().getModelType();
+               if (definedInType == null) // Use getModelType for parsing templates which use a class
                   System.err.println("*** Unable to parameterize reference - no enclosing type");
             }
-            ParamTypedMethod ptm = new ParamTypedMethod(foundMeth, currentType instanceof ITypeParamContext ? (ITypeParamContext) currentType : null, definedInType, arguments, inferredType, methodTypeArgs);
+            ParamTypedMethod ptm = new ParamTypedMethod(rootExpr.getLayeredSystem(), foundMeth, currentType instanceof ITypeParamContext ? (ITypeParamContext) currentType : null, definedInType, arguments, inferredType, methodTypeArgs);
             foundMeth = ptm;
          }
          if (inferredType != null) {
@@ -641,14 +678,14 @@ public class IdentifierExpression extends ArgumentsExpression {
          }
          if (ModelUtil.isTypeVariable(useType))
             useType = ModelUtil.getTypeParameterDefault(useType);
-         boolean changed = arg.setInferredType(useType);
+         boolean changed = arg.setInferredType(useType, rootExpr.isInferredFinal());
 
          if (meth instanceof ParamTypedMethod && changed) {
             ParamTypedMethod pmeth = (ParamTypedMethod) meth;
 
             // The subsequent parameter types might need to change.
             // TODO: we should probably also go and update 0 through i-1 as well.
-            paramTypes = pmeth.resolveParameterTypes(true, pmeth.boundTypes, i+1, true);
+            paramTypes = pmeth.resolveParameterTypes(true, pmeth.boundTypes, i+1, true, false);
          }
          i++;
       }
@@ -711,7 +748,14 @@ public class IdentifierExpression extends ArgumentsExpression {
          if (idTypes[i] == IdentifierType.RemoteMethodInvocation) {
             // When we validate the expressions inside of the tag itself, we won't have set up binding so just defer this error to the other version which is in the tag object.
             if (bindingDirection == null && getEnclosingTag() == null) {
-               displayTypeError("Method call to remote method only allowed in binding expression: ");
+               LayeredSystem sys = getLayeredSystem();
+               Layer remoteLayer = boundTypes == null ? null : ModelUtil.getLayerForMember(sys, boundTypes[i]);
+               String remoteIdent;
+               if (remoteLayer == null)
+                  remoteIdent = "<compiled class>";
+               else
+                  remoteIdent = remoteLayer.getLayeredSystem().getProcessIdent();
+               displayTypeError("Method call to remote method - from: " + sys.getProcessIdent() + " to: " + remoteIdent + " - only allowed in binding expression: ");
             }
          }
 
@@ -720,7 +764,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          // To determine if a property is bindable, we need to be able to walk backwards in the type tree to
          // look for bindable annotations.  This means we cant' do this in the start process cause things back
          // there are still starting up.
-         checkForBindableField(this, ident, idTypes, boundTypes, arguments, bindingDirection, i, inferredType);
+         checkForBindableField(this, ident, idTypes, boundTypes, arguments, bindingDirection, i, null, inferredType);
       }
    }
 
@@ -849,7 +893,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                Object parentType = getTypeForIdentifier(ix-1);
                if (parentType == null)
                   return null;
-               return ModelUtil.definesMember(parentType, pname, MemberType.PropertyAssignmentSet, getEnclosingIType(), ctx);
+               return ModelUtil.definesMember(parentType, pname, MemberType.PropertyAssignmentSet, getEnclosingIType(), ctx, getLayeredSystem());
             }
             else {
                return findMember(pname, MemberType.PropertyAssignmentSet, this, getEnclosingIType(), ctx, false);
@@ -885,12 +929,28 @@ public class IdentifierExpression extends ArgumentsExpression {
       return boundTypes == null || boundTypes.length <= ix ? null : boundTypes[ix];
    }
 
+   public Object getBoundTypeNoParamType(int ix) {
+      Object boundType = getBoundType(ix);
+      // First, need to unwrap any parameterization that has been wrapped onto the real type.
+      if (boundType instanceof ParamTypedMember)
+         boundType = ((ParamTypedMember) boundType).getMemberObject();
+      if (boundType instanceof ParamTypedMethod)
+         boundType = ((ParamTypedMethod) boundType).method;
+      if (boundType instanceof ParamTypeDeclaration)
+         boundType = ((ParamTypeDeclaration) boundType).getBaseType();
+      if (boundType instanceof JavaSemanticNode) {
+         boundType = ((JavaSemanticNode) boundType).refreshNode();
+      }
+      return boundType;
+   }
+
    /** Returns true for a static field or method at the specific location in the indentifiers list */
    private boolean isStaticTarget(int ix) {
       if (idTypes == null || idTypes[ix] == null)
          return false;
 
       switch (idTypes[ix]) {
+         case UnboundMethodName:
          case FieldName:
          case MethodInvocation:
          case RemoteMethodInvocation:
@@ -900,6 +960,8 @@ public class IdentifierExpression extends ArgumentsExpression {
          case GetSetMethodInvocation:
          case GetObjectMethodInvocation:
             Object type = boundTypes[ix];
+            if (type == ArrayTypeDeclaration.LENGTH_FIELD) // We use this special case object since this length method is not available via reflection
+               return false;
             if (type instanceof PropertyAssignment)
                type = ((PropertyAssignment) type).getPropertyDefinition();
             return type != null && ModelUtil.hasModifier(type, "static");
@@ -925,6 +987,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          return false;
 
       switch (idTypes[ix]) {
+         case UnboundMethodName:
          case FieldName:
          case MethodInvocation:
          case RemoteMethodInvocation:
@@ -949,7 +1012,7 @@ public class IdentifierExpression extends ArgumentsExpression {
 
    /**
     * Checks if the given property is bindable already.  If not, it will add the property to the list of those to inject bindability to during class transformation.  If "makeBindable" is true
-    * this is called from the makeBindable method which has already deteremined we need to make it bindable.  If not, we look for any bindable annotation in the chain and abort the binding.
+    * this is called from the makeBindable method which has already determined we need to make it bindable.  If not, we look for any bindable annotation in the chain and abort the binding.
     */
    static private void checkForBindableCompiledField(String propertyName, Object boundType, Object annotType, Object referenceType, Statement fromExpr, boolean referenceOnly, boolean checkAnnotations) {
       TypeDeclaration referenceTD;
@@ -978,14 +1041,13 @@ public class IdentifierExpression extends ArgumentsExpression {
             if (checkAnnotations && member != null && ModelUtil.getAnnotation(member, "sc.bind.Bindable") != null)
                 return;
 
+            Layer nextTDLayer = null;
             // Find the most specific class/object type which defines this property skipping annotation layers which are
             // not generated
             while ((nextType = referenceTD.getDerivedTypeDeclaration()) instanceof TypeDeclaration &&
-                    (nextTD = (TypeDeclaration) nextType).isClassOrObjectType() && !nextTD.getLayer().annotationLayer) {
+                    (nextTD = (TypeDeclaration) nextType).isClassOrObjectType() && ((nextTDLayer = nextTD.getLayer()) == null || !nextTDLayer.annotationLayer)) {
 
-               TypeDeclaration nextTypeTD = (TypeDeclaration) nextType;
-
-               member = nextTypeTD.definesMember(propertyName, MemberType.PropertyAnySet, null, null);
+               member = nextTD.definesMember(propertyName, MemberType.PropertyAnySet, null, null);
                // Make sure this next type actually defines the property before we try to make it bindable
                if (member == null)
                   break;
@@ -995,7 +1057,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   addBindable = false;
                   break;
                }
-               referenceTD = nextTypeTD;
+               referenceTD = nextTD;
             }
 
             if (!(nextType instanceof TypeDeclaration)) {
@@ -1004,14 +1066,14 @@ public class IdentifierExpression extends ArgumentsExpression {
                }
             }
 
-            if (member != null && ModelUtil.isConstant(member))
+            if (member != null && (ModelUtil.isConstant(member) || (boundType != member && ModelUtil.isConstant(boundType))))
                addBindable = false;
 
             // But then need to resolve it back to the most specific modified type
             referenceTD = (TypeDeclaration) referenceTD.resolve(true);
 
             if (addBindable) {
-               referenceTD.addPropertyToMakeBindable(propertyName, boundType, fromExpr.getJavaModel(), referenceOnly);
+               referenceTD.addPropertyToMakeBindable(propertyName, boundType, fromExpr.getJavaModel(), referenceOnly, fromExpr);
             }
          }
          // TODO: else read-only property?
@@ -1083,7 +1145,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                Object setMethod = referenceTD.definesMethod(setName, Collections.singletonList(typeForIdentifier), null, null, referenceTD.isTransformedType(), false, null, null);
                if (setMethod != null) {
                   // Do dynamic access only if the property is marked as manually bindable.
-                  referenceTD.addPropertyToMakeBindable(propertyName, boundType, expr.getJavaModel(), ModelUtil.isManualBindable(setMethod));
+                  referenceTD.addPropertyToMakeBindable(propertyName, boundType, expr.getJavaModel(), referenceOnly || ModelUtil.isManualBindable(setMethod), expr);
                }
             }
             else if (encType instanceof CFClass) {
@@ -1114,21 +1176,21 @@ public class IdentifierExpression extends ArgumentsExpression {
     * that type to where the field/get-set are defined and add the proper get set as needed.
     */
    static private void checkForBindableField(Expression expr, String propertyName, IdentifierType[] idTypes, Object[] boundTypes,
-                                             List<Expression> arguments, BindingDirection bindingDirection, int ix, Object inferredType) {
+                                             List<Expression> arguments, BindingDirection bindingDirection, int ix, Object rootType, Object inferredType) {
 
       if (bindingDirection != null) {
          Object referenceType;
          if (ix == 0)
             referenceType = expr.findMemberOwner(propertyName, MemberType.PropertyGetSet);
          else
-            referenceType = getTypeForIdentifier(idTypes, boundTypes, arguments, ix-1, expr.getJavaModel(), inferredType, expr.getEnclosingType());
+            referenceType = getTypeForIdentifier(idTypes, boundTypes, arguments, ix-1, expr.getJavaModel(), rootType, inferredType, expr.getEnclosingType());
 
          if (expr.getJavaModel() == null) {
             // Happens for partial expression parsing and completion constructs in the editor
             return;
          }
          // Any binding requires dynamic access to the member but if it's a forward binding, its a real binding, not referenceOnly=true
-         makeBindable(expr, propertyName, idTypes[ix], boundTypes[ix], getTypeForIdentifier(idTypes, boundTypes, arguments, ix, expr.getJavaModel(), inferredType, expr.getEnclosingType()),
+         makeBindable(expr, propertyName, idTypes[ix], boundTypes[ix], getTypeForIdentifier(idTypes, boundTypes, arguments, ix, expr.getJavaModel(), null, inferredType, expr.getEnclosingType()),
                       referenceType, !bindingDirection.doForward(), true);
       }
    }
@@ -1175,7 +1237,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (last == -1)
          return findMemberOwner(idents.get(0).toString(), MemberType.PropertyGetSet);
       else
-         return getTypeForIdentifier(idTypes, boundTypes, arguments, last, getJavaModel(), inferredType, getEnclosingType());
+         return getTypeForIdentifier(idTypes, boundTypes, arguments, last, getJavaModel(), null, inferredType, getEnclosingType());
    }
 
    /** Returns the type which is referring to the value of this expression */
@@ -1185,7 +1247,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (idents == null || sz == 1)
          return null;
       int last = sz - 2;
-      return getTypeForIdentifier(idTypes, boundTypes, arguments, last, getJavaModel(), inferredType, getEnclosingType());
+      return getTypeForIdentifier(idTypes, boundTypes, arguments, last, getJavaModel(), null, inferredType, getEnclosingType());
    }
 
    /** For "a.b.c", returns an expression which evaluates "a.b" */
@@ -1298,10 +1360,13 @@ public class IdentifierExpression extends ArgumentsExpression {
             meth = ((BodyTypeDeclaration) peerType).findMethod(methodName, arguments, expr, peerType, isStatic, inferredType);
          }
          else
-            meth = ModelUtil.definesMethod(peerType, methodName, arguments, null, enclPeerType, false, isStatic, inferredType, expr.getMethodTypeArguments());
+            meth = ModelUtil.definesMethod(peerType, methodName, arguments, null, enclPeerType, false, isStatic, inferredType, expr.getMethodTypeArguments(), expr.getLayeredSystem());
          if (meth != null) {
             boundTypes[ix] = meth;
             idTypes[ix] = IdentifierType.RemoteMethodInvocation;
+            if (meth instanceof AbstractMethodDefinition) {
+               ((AbstractMethodDefinition) meth).addRemoteRuntime(sys.getRuntimeName());
+            }
             return meth;
          }
       }
@@ -1351,7 +1416,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                if (i > 0 && idTypes[i-1] == IdentifierType.SuperExpression && enclosingType != null) {
                   Object newCurrentType = ModelUtil.getExtendsClass(enclosingType);
                   if (newCurrentType != null && newCurrentType != currentType) {
-                     methVar = ModelUtil.definesMethod(newCurrentType, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs);
+                     methVar = ModelUtil.definesMethod(newCurrentType, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs, enclosingType.getLayeredSystem());
                      if (methVar != null) {
                         idTypes[i] = methVar instanceof ITypeDeclaration ? IdentifierType.BoundObjectName : IdentifierType.MethodInvocation;
                         boundTypes[i] = methVar;
@@ -1365,9 +1430,11 @@ public class IdentifierExpression extends ArgumentsExpression {
                }
                if (methVar == null) {
                   idTypes[i] = IdentifierType.UnboundMethodName;
-                  if (model != null && !model.disableTypeErrors) {
-                     String otherMessage = getOtherMethodsMessage(currentType, nextName);
-                     expr.displayRangeError(i, i, "No method: ", nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentTypeDecl),otherMessage == null ? "" : otherMessage.toString(),  " for ");
+                  if (model != null && !model.disableTypeErrors && expr.isInferredSet() && expr.isInferredFinal()) {
+                     boundTypes[i] = findClosestMethod(currentType, nextName, arguments); // For the IDE - map to something at least
+                     String otherMessage = getOtherMethodsMessage(currentType, nextName, isStatic);
+                     String message = isStatic ? "No static method: " : "No method: ";
+                     expr.displayRangeError(i, i, message, nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentTypeDecl),otherMessage == null ? "" : otherMessage.toString(),  " for ");
                      methVar = currentTypeDecl.definesMethod(nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs);
                   }
                }
@@ -1375,13 +1442,13 @@ public class IdentifierExpression extends ArgumentsExpression {
          }
          else {
             // The parser won't generate these where 'this' is not in the first position but we do
-            // sometimes create them programatically since it is easier than doing the selector expression
+            // sometimes create them in code since it is easier than doing the selector expression and generates to the same thing
             if (nextName.equals("this"))
                idTypes[i] = IdentifierType.ThisExpression;
             else if (nextName.equals("super"))
                idTypes[i] = IdentifierType.SuperExpression;
             else {
-               Object var = currentTypeDecl.definesMember(nextName, MemberType.VariableSet, null, null);
+               Object var = currentTypeDecl.definesMember(nextName, MemberType.VariableSet, enclosingType, null);
                if (var != null) {
                   idTypes[i] = IdentifierType.VariableName;
                   boundTypes[i] = var;
@@ -1390,7 +1457,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   EnumSet<MemberType> toFind = model != null && model.enableExtensions() ?
                           (setLast ? MemberType.PropertySetSet : MemberType.PropertyAssignmentSet) :
                           MemberType.FieldEnumSet;
-                  Object methPropVar = currentTypeDecl.definesMember(nextName, toFind, null, null);
+                  Object methPropVar = currentTypeDecl.definesMember(nextName, toFind, enclosingType, null);
                   if (methPropVar != null) {
                      boundTypes[i] = methPropVar;
                      // If we are in an assignment, only look for the setX method.  If reading the value, look for a getX method
@@ -1414,7 +1481,27 @@ public class IdentifierExpression extends ArgumentsExpression {
                      }
                      else {
                         idTypes[i] = IdentifierType.UnboundName;
-                        expr.displayRangeError(i, i, "No nested property: ", nextName, " in type: ", ModelUtil.getTypeName(currentTypeDecl), " for ");
+
+                        String message = "No nested property: ";
+                        String append = "";
+                        // Check again but without a refType in case there's a member which is private
+                        Object privRes = currentTypeDecl.definesMember(nextName, toFind, null, null);
+                        if (privRes != null) {
+                           String modStr = ModelUtil.modifiersToString(privRes, false, true, false, false, true, null);
+                           if (modStr.trim().length() == 0)
+                              modStr = "package-private";
+                           String kindStr = ModelUtil.getDebugName(privRes);
+                           message = "No access to: " + modStr + " " + kindStr + ": ";
+                           append = " referenced from type: " + ModelUtil.getTypeName(enclosingType);
+
+                           boundTypes[i] = privRes; // For IDE navigation we will just bind to this value even after printing the error
+                        }
+                        else {
+                           // If we are missing the setX method, provide a more accurate message
+                           if (setLast && model != null && model.enableExtensions() && currentTypeDecl.definesMember(nextName, MemberType.PropertyAssignmentSet, null, null) != null)
+                              message = "Unable to assign read-only property: ";
+                        }
+                        expr.displayRangeError(i, i, message, nextName, " in type: ", ModelUtil.getTypeName(currentTypeDecl), append, " for ");
                      }
                   }
                }
@@ -1424,7 +1511,8 @@ public class IdentifierExpression extends ArgumentsExpression {
       else if (currentType instanceof Class) {
          Class currentClass = (Class) currentType;
          if (isMethod) {
-            Method methObj = (Method) ModelUtil.definesMethod(currentClass, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs);
+            LayeredSystem sys = expr.getLayeredSystem();
+            Object methObj = ModelUtil.definesMethod(currentClass, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs, sys);
             if (methObj != null) {
                Object meth = parameterizeMethod(expr, methObj, currentClass, inferredType, arguments, methodTypeArgs);
                idTypes[i] = IdentifierType.MethodInvocation;
@@ -1434,10 +1522,12 @@ public class IdentifierExpression extends ArgumentsExpression {
                Object remoteMeth = checkRemoteMethod(expr, currentType, nextName, i, idTypes, boundTypes, arguments, isStatic, inferredType);
                if (methObj == null && remoteMeth == null) {
                   idTypes[i] = IdentifierType.UnboundMethodName;
-                  if (model != null && !model.disableTypeErrors) {
-                     String otherMethods = getOtherMethodsMessage(currentClass, nextName);
-                     expr.displayRangeError(i, i, "No method: ", nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentClass), otherMethods, " for ");
-                     methObj = (Method) ModelUtil.definesMethod(currentClass, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs); // TODO: remove - for debugging only
+                  if (model != null && !model.disableTypeErrors && expr.isInferredFinal() && expr.isInferredSet()) {
+                     boundTypes[i] = findClosestMethod(currentClass, nextName, arguments); // For the IDE - map to something at least
+                     String otherMethods = getOtherMethodsMessage(currentClass, nextName, isStatic);
+                     String message = isStatic ? "No static method: " : "No method: ";
+                     expr.displayRangeError(i, i, message, nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentClass), otherMethods, " for ");
+                     methObj = ModelUtil.definesMethod(currentClass, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs, sys); // TODO: remove - for debugging only
                   }
                }
             }
@@ -1514,12 +1604,12 @@ public class IdentifierExpression extends ArgumentsExpression {
       return boundType;
    }
 
-   private static String getOtherConstructorsMessage(Object currentType) {
+   private static String getOtherConstructorsMessage(Object currentType, String prefix) {
       Object[] otherMethods = ModelUtil.getConstructors(currentType, null);
       StringBuilder otherMessage = null;
       if (otherMethods != null && otherMethods.length > 0) {
          otherMessage = new StringBuilder();
-         otherMessage.append("\n   Did you mean:\n");
+         otherMessage.append(prefix);
          for (Object otherMeth:otherMethods) {
             otherMessage.append("      ");
             otherMessage.append(ModelUtil.elementToString(otherMeth, false));
@@ -1529,19 +1619,62 @@ public class IdentifierExpression extends ArgumentsExpression {
       return otherMessage == null ? "" : otherMessage.toString();
    }
 
-   private static String getOtherMethodsMessage(Object currentType, String nextName) {
+   private static String getOtherMethodsMessage(Object currentType, String nextName, boolean refIsStatic) {
       Object[] otherMethods = ModelUtil.getMethods(currentType, nextName, null);
+      if (otherMethods == null || otherMethods.length == 0) {
+         Object enclType = ModelUtil.getEnclosingType(currentType);
+         if (enclType != null)
+            otherMethods = ModelUtil.getMethods(enclType, nextName, null);
+      }
       StringBuilder otherMessage = null;
       if (otherMethods != null && otherMethods.length > 0) {
          otherMessage = new StringBuilder();
          otherMessage.append("\n   Did you mean:\n");
          for (Object otherMeth:otherMethods) {
             otherMessage.append("      ");
+            if (refIsStatic && !ModelUtil.hasModifier(otherMeth, "static"))
+               otherMessage.append(" instance method: ");
             otherMessage.append(ModelUtil.elementToString(otherMeth, false));
             otherMessage.append("\n");
          }
       }
       return otherMessage == null ? "" : otherMessage.toString();
+   }
+
+   /** For error checking, return a method of the same name which has the fewest mismatching arguments */
+   public static Object findClosestMethod(Object currentType, String nextName, List<Expression> args) {
+      Object[] otherMethods = ModelUtil.getMethods(currentType, nextName, null);
+      if (otherMethods == null) {
+         Object enclType = ModelUtil.getEnclosingType(currentType);
+         if (enclType != null)
+            return findClosestMethod(enclType, nextName, args);
+         return null;
+      }
+      int numParams = args == null ? 0 : args.size();
+      Object bestMatch = null;
+      int bestMatchNum = -1;
+      Object[] ps = ModelUtil.getTypesFromExpressions(args);
+      for (Object other:otherMethods) {
+         Object[] ops = ModelUtil.getParameterTypes(other);
+         int numOtherParams = ops == null ? 0 : ops.length;
+         if (numOtherParams == numParams) {
+            if (bestMatchNum == -1) {
+               bestMatchNum = 0;
+               bestMatch = other;
+            }
+            int matchNum = 0;
+            for (int i = 0; i < numParams; i++) {
+               if (ModelUtil.sameTypes(ops[i], ps[i]))
+                  matchNum++;
+            }
+            if (matchNum > bestMatchNum) {
+               bestMatch = other;
+            }
+         }
+         if (bestMatch == null)
+            bestMatch = other;
+      }
+      return bestMatch;
    }
 
    protected int offset() {
@@ -1611,6 +1744,18 @@ public class IdentifierExpression extends ArgumentsExpression {
       return value;
    }
 
+   private Object resolveCustomObj(JavaModel jmodel, int ix) {
+      Object boundType = boundTypes[ix];
+      if (boundType instanceof BodyTypeDeclaration && !((BodyTypeDeclaration) boundType).isStarted()) {
+         ModelUtil.ensureStarted(boundType, true);
+      }
+      Object customObj = null;
+      if (jmodel != null && jmodel.customResolver != null) {
+         return jmodel.customResolver.resolveObject(jmodel.getPackagePrefix(), getIdentifierPathName(ix+1), true, true);
+      }
+      return null;
+   }
+
    public Object eval(Class expectedType, ExecutionContext ctx) {
       String methodName = null;
       boolean superMethod = false;
@@ -1635,8 +1780,16 @@ public class IdentifierExpression extends ArgumentsExpression {
                while (idTypes[nextIx] == IdentifierType.PackageName)
                   nextIx++;
                isType = true;
-               if (idTypes[nextIx] == IdentifierType.BoundTypeName)
-                  value = ModelUtil.getRuntimeType(boundTypes[nextIx++]);
+               if (idTypes[nextIx] == IdentifierType.BoundTypeName) {
+                  value = resolveCustomObj(jmodel, nextIx);
+                  if (value == null) {
+                     value = ModelUtil.getRuntimeType(boundTypes[nextIx]);
+                     isType = true;
+                  }
+                  else
+                     isType = false;
+                  nextIx++;
+               }
                else if (idTypes[nextIx] == IdentifierType.ResolvedObjectName) {
                   jmodel = getJavaModel();
                   value = jmodel.customResolver.resolveObject(jmodel.getPackagePrefix(), getIdentifierPathName(sz), true, true);
@@ -1683,9 +1836,13 @@ public class IdentifierExpression extends ArgumentsExpression {
                      // When the super refers to the same type - i.e. it's a constructor modifying the base layer's constructor, we need to invoke the base layer's constructor here.
                      BodyTypeDeclaration enclType = getEnclosingType();
                      if (ModelUtil.sameTypes(enclType, type)) {
-                        Object baseConstr = ModelUtil.declaresConstructor(type, arguments, null);
-                        if (baseConstr != null)
-                           ModelUtil.invokeMethod(ctx.getCurrentObject(), baseConstr, arguments, null, ctx, false, false, null);
+                        Object baseConstr = ModelUtil.declaresConstructor(getLayeredSystem(), type, arguments, null);
+                        if (baseConstr != null) {
+                           if (ctx.allowInvoke(baseConstr))
+                              ModelUtil.invokeMethod(ctx.getCurrentObject(), baseConstr, arguments, null, ctx, false, false, null);
+                           else
+                              throw new IllegalArgumentException(("Not allowed to invoke base constructor: " + baseConstr));
+                        }
                      }
                      // when the super refers to the base class which is a compiled type, we'll have already executed the super in the DynamicStub.  The statement in the ConstructorDefinition can be ignored since it was run first thing in the stub.
                      return null;
@@ -1707,15 +1864,24 @@ public class IdentifierExpression extends ArgumentsExpression {
                break;
 
             case UnboundName:
-               value = ctx.resolveUnboundName(idents.get(0).toString());
+               // If it's not bound, check if the entire identifier expression maps to a name - if so, we are done just
+               // return the customObj.
+               Object customObj = resolveCustomObj(jmodel, sz-1);
+               if (customObj == null) {
+                  value = ctx.resolveUnboundName(idents.get(0).toString());
+               }
+               else
+                  return customObj;
                break;
 
             case BoundTypeName:
-               if (boundTypes[0] instanceof BodyTypeDeclaration && !((BodyTypeDeclaration) boundTypes[0]).isStarted()) {
-                  ModelUtil.ensureStarted(boundTypes[0], true);
+               customObj = resolveCustomObj(jmodel, 0);
+               if (customObj == null) {
+                  value = ModelUtil.getRuntimeType(boundTypes[0]);
+                  isType = true;
                }
-               value = ModelUtil.getRuntimeType(boundTypes[0]);
-               isType = true;
+               else
+                  isType = false;
                break;
 
             case EnumName:
@@ -1757,22 +1923,31 @@ public class IdentifierExpression extends ArgumentsExpression {
             case GetObjectMethodInvocation:
             case MethodInvocation:
                Object methThis;
-               if (boundTypes[0] == null)
+               Object methToInvoke = boundTypes[0];
+               if (methToInvoke == null)
                   throw new NullPointerException("Eval unresolved method: " + idents.get(0).toString());
-               if (!ModelUtil.hasModifier(boundTypes[0], "static")) {
-                  methThis = getRootFieldThis(this, boundTypes[0], ctx, false);
+               if (!ModelUtil.hasModifier(methToInvoke, "static")) {
+                  methThis = getRootFieldThis(this, methToInvoke, ctx, false);
                   methThis = checkNullThis(methThis, idents.get(0).toString());
                }
               else
                   methThis = null;
-               return ModelUtil.invokeMethod(methThis, boundTypes[0], arguments, expectedType, ctx, true, true, null);
+               if (!ctx.allowInvoke(methToInvoke))
+                  throw new IllegalArgumentException("Not allowed to invoke method: " + methToInvoke);
+
+               return ModelUtil.invokeMethod(methThis, methToInvoke, arguments, expectedType, ctx, true, true, null);
 
             case RemoteMethodInvocation:
                System.err.println("*** Remote method in dynamic code not yet supported");
                return null;
 
             case UnboundMethodName:
-               Object method = ModelUtil.getMethod(ctx.getCurrentObject(), idents.get(0).toString());
+               String methName = idents.get(0).toString();
+               Object method = ModelUtil.getMethod(ctx.getCurrentObject(), methName);
+               if (method == null)
+                  throw new IllegalArgumentException("No method to invoke: " + methName);
+               if (!ctx.allowInvoke(method))
+                  throw new IllegalArgumentException("Not allowed to invoke method: " + method);
                return ModelUtil.invokeMethod(ctx.getCurrentObject(), method, arguments, expectedType, ctx, true, false, null);
 
             case ResolvedObjectName: {
@@ -1811,17 +1986,29 @@ public class IdentifierExpression extends ArgumentsExpression {
                   case GetVariable:
                   case IsVariable:
                   case GetSetMethodInvocation:
-                     if (isType)
-                        value = DynUtil.getStaticProperty(value, id);
+                     // The entire path name for the identifier expression may be the object path name - e.g. like when created as
+                     // outerTypeName.objectId.  In this case, the field name is not a property of the parent type or instance
+                     Object customObj = resolveCustomObj(jmodel, i);
+                     if (customObj != null)
+                        value = customObj;
                      else {
-                        //value = DynUtil.getPropertyValue(value, id);
-                        value = getPropertyValueForType(value, i);
+                        if (isType)
+                           value = DynUtil.getStaticProperty(value, id);
+                        else {
+                           //value = DynUtil.getPropertyValue(value, id);
+                           value = getPropertyValueForType(value, i);
+                        }
                      }
                      isType = false;
                      break;
                   case BoundTypeName:
-                     value = ModelUtil.getRuntimeType(boundTypes[i]);
-                     isType = true;
+                     customObj = resolveCustomObj(jmodel, i);
+                     if (customObj == null) {
+                        value = ModelUtil.getRuntimeType(boundTypes[i]);
+                        isType = true;
+                     }
+                     else
+                        isType = false;
                      break;
                   case ThisExpression:
                      value = ctx.findThisType(value);
@@ -1877,16 +2064,17 @@ public class IdentifierExpression extends ArgumentsExpression {
             }
             // Need to use the compiled class to resolve the _super_x method
             else if (superMethod) {
-               method = ModelUtil.definesMethod(ModelUtil.getCompiledClass(DynUtil.getType(value)), methodName, arguments, null, null, false, false, null, getMethodTypeArguments());
+               LayeredSystem sys = getLayeredSystem();
+               method = ModelUtil.definesMethod(ModelUtil.getCompiledClass(DynUtil.getType(value)), methodName, arguments, null, null, false, false, null, getMethodTypeArguments(), sys);
                // Stub did not generate an _super method so just get the method itself.  Maybe the super.x() should force method x to be
                // included as a dynamic method in the stub?  Is there a case here where we will not get the real super method?
                if (method == null && methodName.startsWith("_super")) {
                   methodName = methodName.substring("_super_".length());
-                  method = ModelUtil.definesMethod(ModelUtil.getCompiledClass(DynUtil.getType(value)), methodName, arguments, null, null, false, false, null, getMethodTypeArguments());
+                  method = ModelUtil.definesMethod(ModelUtil.getCompiledClass(DynUtil.getType(value)), methodName, arguments, null, null, false, false, null, getMethodTypeArguments(), sys);
                }
             }
             else
-               method = ModelUtil.definesMethod(DynUtil.getType(value), methodName, arguments, null, null, false, false, null, getMethodTypeArguments());
+               method = ModelUtil.definesMethod(DynUtil.getType(value), methodName, arguments, null, null, false, false, null, getMethodTypeArguments(), getLayeredSystem());
 
             /*
               Java ignores anyway?
@@ -1986,6 +2174,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             return false;
 
          // Make sure to skip up to an enclosing class if necessary
+         case UnboundMethodName:
          case MethodInvocation:
          case RemoteMethodInvocation:
             return false;
@@ -2122,7 +2311,7 @@ public class IdentifierExpression extends ArgumentsExpression {
 
    void checkNull(Object value, String name) {
       if (value == null)
-         throw new NullPointerException("Null value encountered deferencing: " + name + " in: " + toDefinitionString());
+         throw new NullPointerException("Null value encountered referencing: " + name + " in: " + toDefinitionString());
    }
 
    private Object checkNullThis(Object value, String name) {
@@ -2148,7 +2337,19 @@ public class IdentifierExpression extends ArgumentsExpression {
       List<IString> idents = getAllIdentifiers();
       int sz = idents.size();
       String identifier = idents.get(i).toString();
-      return (sz == 1 && inNamedPropertyMethod(identifier)) || isThisExpression() || isSuperExpression() || !getJavaModel().enableExtensions() || (isAssignment && i == sz-1);
+      return (sz == 1 && inNamedPropertyMethod(identifier)) || isThisExpression() || isSuperExpression() || !getJavaModel().enableExtensions() || isManualGetSet() || (isAssignment && i == sz-1);
+   }
+
+   private boolean isManualGetSet() {
+      AbstractMethodDefinition enclMeth = getEnclosingMethod();
+      if (enclMeth != null) {
+         Object annotObj = enclMeth.getAnnotation("sc.obj.ManualGetSet");
+         if (annotObj != null) {
+            Object manualObj = ModelUtil.getAnnotationValue(annotObj, "value");
+            return manualObj == null || !(manualObj instanceof Boolean) || ((Boolean) manualObj);
+         }
+      }
+      return false;
    }
 
    public boolean needsTransform() {
@@ -2162,6 +2363,10 @@ public class IdentifierExpression extends ArgumentsExpression {
 
       int sz = idents.size();
       for (int i = 0; i < sz; i++) {
+         if (idTypes == null) {
+            System.out.println("*** Uninitialized expression during transform - expression was not started");
+            return false;
+         }
          switch (idTypes[i]) {
             case BoundObjectName:
             case ResolvedObjectName:
@@ -2320,7 +2525,11 @@ public class IdentifierExpression extends ArgumentsExpression {
                   switch (idTypes[j]) {
                      case GetVariable:
                      case IsVariable:
-                        if (convertToGetMethod(idents.get(j).toString(), j, sz, incr, idTypes[i] == IdentifierType.IsVariable)) {
+                        // If we are in getFoo() don't rename 'this.foo" to this.getFoo() as that's always an infinite loop
+                        String nextIdent = idents.get(j).toString();
+                        if (inNamedPropertyMethod(nextIdent))
+                           break;
+                        if (convertToGetMethod(nextIdent, j, sz, incr, idTypes[i] == IdentifierType.IsVariable)) {
                            return true;
                         }
                         break;
@@ -2461,13 +2670,18 @@ public class IdentifierExpression extends ArgumentsExpression {
     * the set method itself, we need to be transformed into a setX expression.
     */
    public boolean needsSetMethod() {
+      if (idTypes == null) {
+         System.err.println("*** needsSetMethod called on unstarted expression");
+         return false;
+      }
+
       int last = idTypes.length-1;
       IdentifierType idType = idTypes[last];
       // If the type started out as a set, or it started out as a field but needs conversion and we are not
       // in a property method we do the set conversion.
       return (idType == IdentifierType.SetVariable ||
              (idType == IdentifierType.FieldName && ModelUtil.needsSet(boundTypes[last]))) &&
-             !inPropertyMethodForDef(boundTypes[last]);
+             !inPropertyMethodForDef(boundTypes[last]) && !isManualGetSet();
    }
 
    public boolean needsGetMethod(int ix) {
@@ -2847,8 +3061,10 @@ public class IdentifierExpression extends ArgumentsExpression {
                else
                   se.selectors.add(addIx++, ArraySelector.create(arrSel));
             }
-            if (isAssignment)
+            if (isAssignment) {
                se.setAssignment(true);
+               setAssignment(false);
+            }
             IdentifierExpression nx = IdentifierExpression.create(idents.subList(0,i+1).toArray(new IString[1]));
             nx.setProperty("arguments", args);
             ParseUtil.stopComponent(this);
@@ -2870,8 +3086,11 @@ public class IdentifierExpression extends ArgumentsExpression {
                se.setProperty("expression", thisExpr);
             }
 
-            if (isAssignment)
-              se.setAssignment(true);
+            if (isAssignment) {
+               // This expression is no longer part of the assignment, but the selector expression is instead
+               setAssignment(false);
+               se.setAssignment(true);
+            }
 
          }
 
@@ -2910,7 +3129,7 @@ public class IdentifierExpression extends ArgumentsExpression {
    }
 
    public Object getTypeForIdentifier(int ix) {
-      Object type = getTypeForIdentifier(idTypes, boundTypes, arguments, ix, getJavaModel(), inferredType, getEnclosingType());
+      Object type = getTypeForIdentifier(idTypes, boundTypes, arguments, ix, getJavaModel(), null, inferredType, getEnclosingType());
       // TODO: Change ComponentImpl below to some private class cause this is now a sentinel and will not work if it's an actual class people use.
       // It's used to workaround the fact that we resolve the @Component methods before the base class is transformed.  They get resolved to this
       // special class.  Now we need to map it back in these special cases.  Perhaps the preInit, etc. methods should be generated and put
@@ -2959,14 +3178,17 @@ public class IdentifierExpression extends ArgumentsExpression {
             case GetSetMethodInvocation:
             case GetObjectMethodInvocation:
                return resolveType(ModelUtil.getVariableGenericTypeDeclaration(boundTypes[ix], model), ix, idTypes);
+            case UnboundMethodName:
+               if (boundTypes[ix] == null)
+                  return null;
             case RemoteMethodInvocation:
             case MethodInvocation:
-               Object smt = getSpecialMethodType(ix, idTypes, boundTypes, model, definedInType);
+               Object smt = getSpecialMethodType(ix, idTypes, boundTypes, model, rootType, definedInType);
                if (smt != null)
                   return resolveType(smt, ix, idTypes);
                // If ix > 0 and ix - 1's type has type parameters (either a field like List<X> or a method List<X> get(...).
                // need to apply the method's type parameters against the ones in the previous type.
-               return resolveType(ModelUtil.getMethodTypeDeclaration(rootType != null ? rootType : getTypeContext(idTypes, boundTypes, ix), boundTypes[ix], arguments, model, inferredType, definedInType), ix, idTypes);
+               return resolveType(ModelUtil.getMethodTypeDeclaration(rootType != null ? rootType : getTypeContext(idTypes, boundTypes, ix), boundTypes[ix], arguments, model == null ? null : model.getLayeredSystem(), model, inferredType, definedInType), ix, idTypes);
             case SetVariable:
                return resolveType(ModelUtil.getSetMethodPropertyType(boundTypes[ix], model), ix, idTypes);
             case EnumName:
@@ -2983,29 +3205,57 @@ public class IdentifierExpression extends ArgumentsExpression {
       return type;
    }
 
-   static Method getClassMethod;
+   static Object getClassMethod, cloneMethod;
 
-   /** Implements the special rule for Class<?> getClass() - the type parameter is bound to the owner class */
-   static Object getSpecialMethodType(int ix, IdentifierType[] idTypes, Object[] boundTypes, JavaModel model, ITypeDeclaration definedInType) {
-      if (getClassMethod == null)
-         getClassMethod = (Method) ModelUtil.getMethod(null, Class.class, "getClass", null, null, null, false, (Object[]) null);
-      if (boundTypes[ix] == getClassMethod) {
-         Object classType;
+   private static Object getRootType(int ix, IdentifierType[] idTypes, Object[] boundTypes, JavaModel model, Object rootType, ITypeDeclaration definedInType) {
+      Object classType;
+      if (rootType != null)
+         classType = rootType;
+      else {
          if (ix > 0)
             classType = getGenericTypeForIdentifier(idTypes, boundTypes, null, ix - 1, model, null, null, definedInType);
          else
             classType = definedInType;
+      }
+      return classType;
+   }
+
+   /** Implements the special rule for Class<?> getClass() - the type parameter is bound to the owner class */
+   static Object getSpecialMethodType(int ix, IdentifierType[] idTypes, Object[] boundTypes, JavaModel model, Object rootType, ITypeDeclaration definedInType) {
+      if (getClassMethod == null) {
+         getClassMethod = ModelUtil.getMethod(model.getLayeredSystem(), Class.class, "getClass", null, null, null, false, null, null, (Object[]) null);
+         if (getClassMethod instanceof ParamTypedMethod)
+            getClassMethod = ((ParamTypedMethod) getClassMethod).method;
+         cloneMethod = ModelUtil.getMethod(model.getLayeredSystem(), Class.class, "clone", null, null, null, false, null, null, (Object[]) null);
+         if (cloneMethod instanceof ParamTypedMethod)
+            cloneMethod = ((ParamTypedMethod) cloneMethod).method;
+      }
+      Object bt = boundTypes[ix];
+      if (bt == getClassMethod || (bt instanceof ParamTypedMethod) && ((ParamTypedMethod) bt).method == getClassMethod) {
+         Object classType = getRootType(ix, idTypes, boundTypes, model, rootType, definedInType);
 
          ArrayList<Object> typeDefs = new ArrayList<Object>(1);
          typeDefs.add(classType);
-         return new ParamTypeDeclaration(definedInType, ModelUtil.getTypeParameters(Class.class), typeDefs, Class.class);
+         // During the deepCopy operation, we may not yet have set some parentNode up in the tree so we can't get the model.   Instead,
+         // use the type we copied as the result.
+         if (model != null)
+            return new ParamTypeDeclaration(model.getLayeredSystem(), definedInType, ModelUtil.getTypeParameters(Class.class), typeDefs, Class.class);
+         return bt;
+      }
+      else if (bt == cloneMethod || (bt instanceof ParamTypedMethod) && ((ParamTypedMethod) bt).method == cloneMethod) {
+         // Like the ArrayCloneMethod class, here we are implementing the rule that int[] src; int[] res = src.clone() macthes typewise
+         Object classType = getRootType(ix, idTypes, boundTypes, model, rootType, definedInType);
+         if (ModelUtil.isArray(classType))
+            return classType;
       }
       return null;
    }
 
-   static Object getTypeForIdentifier(IdentifierType[] idTypes, Object[] boundTypes, List<Expression> arguments, int ix, JavaModel model, Object inferredType, ITypeDeclaration definedInType) {
+   static Object getTypeForIdentifier(IdentifierType[] idTypes, Object[] boundTypes, List<Expression> arguments, int ix, JavaModel model, Object rootType, Object inferredType, ITypeDeclaration definedInType) {
       if (boundTypes == null)
          return null;
+      if (rootType != null && ModelUtil.isTypeVariable(rootType))
+         rootType = ModelUtil.getTypeParameterDefault(rootType);
       if (idTypes[ix] != null) {
          switch (idTypes[ix]) {
             case FieldName:
@@ -3023,14 +3273,18 @@ public class IdentifierExpression extends ArgumentsExpression {
             case GetSetMethodInvocation:
             case GetObjectMethodInvocation:
                return resolveType(ModelUtil.getVariableTypeDeclaration(boundTypes[ix], model), ix, idTypes);
+            case UnboundMethodName:
+               if (boundTypes[ix] == null)
+                  return null;
+               // else - fall through - when a method is overloaded, we bind to the closest approximate method so treat it like a regular method call
             case MethodInvocation:
             case RemoteMethodInvocation:
-               Object smt = getSpecialMethodType(ix, idTypes, boundTypes, model, definedInType);
+               Object smt = getSpecialMethodType(ix, idTypes, boundTypes, model, rootType, definedInType);
                if (smt != null)
                   return resolveType(smt, ix, idTypes);
                // If ix > 0 and ix - 1's type has type parameters (either a field like List<X> or a method List<X> get(...).
                // need to apply the method's type parameters against the ones in the previous type.
-               return resolveType(ModelUtil.getMethodTypeDeclaration(getTypeContext(idTypes, boundTypes, ix), boundTypes[ix], arguments, model, inferredType, definedInType), ix, idTypes);
+               return resolveType(ModelUtil.getMethodTypeDeclaration(rootType != null ? rootType : getTypeContext(idTypes, boundTypes, ix), boundTypes[ix], arguments, model == null ? null : model.getLayeredSystem(), model, inferredType, definedInType), ix, idTypes);
             case SetVariable:
                return resolveType(ModelUtil.getSetMethodPropertyType(boundTypes[ix], model), ix, idTypes);
             case EnumName:
@@ -3075,13 +3329,18 @@ public class IdentifierExpression extends ArgumentsExpression {
     * super exprs.  In that case, only skip deleted types.
     */
    static Object resolveType(Object type, int ix, IdentifierType[] idTypes) {
-      if (type instanceof BodyTypeDeclaration) {
-         BodyTypeDeclaration btype = (BodyTypeDeclaration) type;
+      if (type instanceof ITypeDeclaration) {
          boolean isSuper = idTypes[ix] == IdentifierType.SuperExpression;
-         // Don't use modified replacedBy's here when we have a super expression - we mapped to a specific type
-         // in that case.  We do still have to skip replaced types of course so we pass false when isSuper=true
-         if (btype.replacedByType != null && (btype.replaced || isSuper))
-            return btype.resolve(!isSuper);
+         ITypeDeclaration itype = (ITypeDeclaration) type;
+         if (itype instanceof BodyTypeDeclaration) {
+            BodyTypeDeclaration btype = (BodyTypeDeclaration) itype;
+            // Don't use modified replacedBy's here when we have a super expression - we mapped to a specific type
+            // in that case.  We do still have to skip replaced types of course so we pass false when isSuper=true
+            if (btype.replacedByType != null && (btype.replaced || isSuper))
+               return btype.resolve(!isSuper);
+         }
+         else
+            return itype.resolve(!isSuper);
       }
       return type;
    }
@@ -3097,6 +3356,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          case GetSetMethodInvocation:
          case GetObjectMethodInvocation:
          case MethodInvocation:
+         case UnboundMethodName:
          case RemoteMethodInvocation:
             return boundTypes[ix-1];// Super
          // SuperExpression at least should not go here.
@@ -3139,7 +3399,17 @@ public class IdentifierExpression extends ArgumentsExpression {
    }
 
    public void stop() {
-      if (!started) return;
+      // If we have not been officially started but our type reference has been assigned, we need to clear it here anyway
+      //if (boundTypes == null && idTypes == null) return;
+
+      // Need to complete the full stop() on this node and our base type checks 'started'
+      if (!started)
+         started = true;
+
+      if (arguments != null && arguments.contains(this)) {
+         System.err.println("*** ERROR - invalid model - recursive identifier expression!");
+         return;
+      }
       super.stop();
       
       boundTypes = null;
@@ -3297,7 +3567,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          // Do we start out here with the current object's type or the current expression's enclosing type?
          Object pType = DynUtil.getType(srcObj);
 
-         // First check if the object's type is the same as identiier's type.  If so we just return the object.
+         // First check if the object's type is the same as identifier's type.  If so we just return the object.
          if (ModelUtil.isAssignableFrom(srcType, pType))
             return srcObj;
 
@@ -3656,7 +3926,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                  typeIx++;
             // Type.Type.Enum - do an IdentifierExpression for that enum.
             if (typeIx < idents.size() && idTypes[typeIx] == IdentifierType.EnumName) {
-               if (boundTypes[typeIx] instanceof Field || boundTypes[typeIx] instanceof IBeanMapper)
+               if (ModelUtil.isField(boundTypes[typeIx]))
                   srcObj = IdentifierExpression.create(ModelUtil.getRuntimeTypeName(boundTypes[0]) + "." + ModelUtil.getPropertyName(boundTypes[typeIx]));
                else
                   srcObj = IdentifierExpression.create(ModelUtil.getRuntimeTypeName(boundTypes[typeIx]));
@@ -3947,6 +4217,9 @@ public class IdentifierExpression extends ArgumentsExpression {
          return null;
 
       IdentifierExpression origIdent = origNode instanceof IdentifierExpression ? (IdentifierExpression) origNode : null;
+      // The origIdent inside of an Element tag will not have been started, but the replacedByStatement which represents in the objects is started
+      if (origIdent != null && origIdent.replacedByStatement instanceof IdentifierExpression)
+         origIdent = (IdentifierExpression) origIdent.replacedByStatement;
 
       int i = 0;
       for (IString ident:idents) {
@@ -3955,7 +4228,14 @@ public class IdentifierExpression extends ArgumentsExpression {
          if (dummyIx != -1) {
             String matchPrefix = identStr.substring(0, dummyIx);
 
-            Object curType = origNode == null ? origModel.getModelTypeDeclaration() : origNode.getEnclosingType();
+            Object curType = origNode == null ? origModel == null ? null : origModel.getModelTypeDeclaration() : origNode.getEnclosingType();
+            if (origNode != null && curType == null)
+               curType = origModel == null ? origModel.getModelTypeDeclaration() : null;
+            else if (origNode == null && replacedByStatement instanceof IdentifierExpression)
+               origIdent = (IdentifierExpression) replacedByStatement;
+
+            if (origIdent != null && !origIdent.isStarted())
+               ParseUtil.initAndStartComponent(origIdent);
 
             if (origIdent != null && i > 0 && origIdent.boundTypes != null && origIdent.boundTypes.length >= i) {
                curType = origIdent.getTypeForIdentifier(i-1);
@@ -3964,10 +4244,15 @@ public class IdentifierExpression extends ArgumentsExpression {
             }
 
             boolean includeGlobals = idents.size() == 1;
-            if (curType != null)
-               ModelUtil.suggestMembers(origModel, curType, matchPrefix, candidates, includeGlobals, true, true, false);
-            else if (origModel != null) {
-               ModelUtil.suggestTypes(origModel, origModel.getPackagePrefix(), matchPrefix, candidates, includeGlobals);
+            if (origModel != null) {
+               if (curType != null) {
+                  ModelUtil.suggestMembers(origModel, curType, matchPrefix, candidates, includeGlobals, true, true, false);
+                  //System.out.println("*** SuggestMembers returns: " + candidates + " for type: " + curType);
+               }
+               else if (origModel != null) {
+                  ModelUtil.suggestTypes(origModel, origModel.getPackagePrefix(), matchPrefix, candidates, includeGlobals);
+                  //System.out.println("*** SuggestTypes returns: " + candidates);
+               }
             }
 
             IBlockStatement enclBlock = getEnclosingBlockStatement();
@@ -4187,6 +4472,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       ParentParseNode pp = (ParentParseNode) parseNode;
       Parselet topParselet = pp.getParselet();
       ArrayList<Object> remaining = null;
+      int remainingIx = -1;
 
       List<IString> idents = getAllIdentifiers();
       int sz = idents.size();
@@ -4197,28 +4483,40 @@ public class IdentifierExpression extends ArgumentsExpression {
       // and we have the ; we need to handle in 'remaining'  This could be handled more generically in the grammar.
       // See comment for this method.
       if (topParselet != idExParselet) {
+         boolean foundIdx = false;
          for (int i = 0; i < pp.children.size(); i++) {
             Object child = pp.children.get(i);
             if (child instanceof ParentParseNode && ((ParentParseNode) child).getParselet() == idExParselet) {
                remaining = new ArrayList<Object>();
+               remainingIx = i + 1;
                while (++i < pp.children.size()) {
                   Object remainingNode = pp.children.get(i);
                   if (remainingNode != null)
                      remaining.add(remainingNode);
                }
                pp = (ParentParseNode) child;
+               foundIdx = true;
                break;
             }
-            else
-               ParseUtil.toStyledString(adapter, child);
+            else {
+               ParseUtil.toStyledChild(adapter, pp, child, i);
+            }
          }
+         // If parent is <annotationValue.0> the identifierExpression is in side of child.get(1) inside of a ParseNode
+         if (!foundIdx)
+            return;
       }
       ParentParseNode identsNode = (ParentParseNode) pp.children.get(0);
-      ParentParseNode argsNode;
-      if (pp.children.size() > 1)
-         argsNode = (ParentParseNode) pp.children.get(1);
-      else
-         argsNode = null;
+      ParentParseNode argsNode = null;
+      if (pp.children.size() > 1) {
+         Object secondChild = pp.children.get(1);
+         if (secondChild instanceof ParentParseNode)
+            argsNode = (ParentParseNode) secondChild;
+         else if (secondChild instanceof ParseNode) {
+            System.out.println("*** Untested case in styleExpression");
+            ParseUtil.toStyledChild(adapter, pp, secondChild, 1);
+         }
+      }
 
       if (identsNode == null) {
          super.styleNode(adapter);
@@ -4228,18 +4526,32 @@ public class IdentifierExpression extends ArgumentsExpression {
       for (int i = 0; i < sz; i++) {
          IParseNode child;
          // TODO: Here we are unwrapping the grammar rule for creating the identifiers property - this could be solved in parselets more generically (see comment above)
-         if (i == 0)
-            child = (IParseNode) identsNode.children.get(0);
+         if (i == 0) {
+            Object firstChild = identsNode.children.get(0);
+            if (firstChild instanceof IParseNode)
+               child = (IParseNode) firstChild;
+            else {
+               ParseUtil.toStyledChild(adapter, identsNode, firstChild, 0);
+               continue;
+            }
+         }
          else {
-            ParentParseNode nextChildren = (ParentParseNode) identsNode.children.get(1);
-            int childIx = (i - 1) * 2;
-            if (nextChildren != null && nextChildren.children.size() > childIx) {
-               // First do the '.'
-               ParseUtil.toStyledString(adapter, nextChildren.children.get(childIx));
-               // Then the next identifier
-               child = (IParseNode) nextChildren.children.get(childIx+1);
+            Object nextChildObj = identsNode.children.get(1);
+            if (nextChildObj instanceof ParentParseNode) {
+               ParentParseNode nextChildren = (ParentParseNode) nextChildObj;
+               int childIx = (i - 1) * 2;
+               if (nextChildren.children.size() > childIx) {
+                  // First do the '.'
+                  ParseUtil.toStyledString(adapter, nextChildren.children.get(childIx));
+                  // Then the next identifier
+                  child = (IParseNode) nextChildren.children.get(childIx + 1);
+               }
+               else {
+                  continue;
+               }
             }
             else {
+               ParseUtil.toStyledString(adapter, nextChildObj);
                continue;
             }
          }
@@ -4249,27 +4561,36 @@ public class IdentifierExpression extends ArgumentsExpression {
             System.err.println("*** styling identifier expression that has not been initializd?");
          }
 
+         String styleName = null;
          if (idTypes != null && idTypes[i] != null) {
             switch (idTypes[i]) {
                case SetVariable:
-                  if (!ModelUtil.isField(boundTypes[i]))
-                     break;
+                  // If we have "var = ..." and this maps to setVar(..) we should treat it as a field for styling
+                  //if (!ModelUtil.isField(boundTypes[i]))
+                  //   break;
                case FieldName:
-               case EnumName:
                case GetVariable:
                case BoundObjectName:
-                  String styleName = isStaticTarget(i) ? "staticMember" : "member";
-                  adapter.styleStart(styleName);
-                  child.styleNode(adapter, null, null, -1);
-                  adapter.styleEnd(styleName);
-                  handled = true;
+                  styleName = isStaticTarget(i) ? "staticMember" : "member";
+                  break;
+               case EnumName:
+                  styleName = "constant";
+                  break;
+               case ThisExpression:
+               case SuperExpression:
+                  styleName = "keyword";
                   break;
                default:
                   break;
             }
          }
-         if (!handled) {
+         if (styleName == null) {
             child.styleNode(adapter, null, null, -1);
+         }
+         else {
+            adapter.styleStart(styleName);
+            child.styleNode(adapter, null, null, -1);
+            adapter.styleEnd(styleName);
          }
       }
       if (argsNode != null)
@@ -4277,10 +4598,9 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (remaining != null) {
          for (Object node:remaining) {
             if (node != argsNode)
-               ParseUtil.toStyledString(adapter, node);
+               ParseUtil.toStyledChild(adapter, parseNode, node, remainingIx++);
          }
       }
-
    }
 
 
@@ -4364,10 +4684,11 @@ public class IdentifierExpression extends ArgumentsExpression {
    }
 
 
-   private boolean needsClassInitConversion(Object srcType) {
+   private boolean needsClassInitConversion(Object srcType, boolean methodsType) {
       // The children of AssignmentExpressions used to be excluded here as well but for an enum variable reference
       // we definitely need this.
-      return arguments == null && !(parentNode instanceof SelectorExpression) && ModelUtil.needsClassInit(srcType) && !ModelUtil.isAssignableFrom(srcType, getEnclosingType()) && !(parentNode instanceof SwitchLabel);
+      // If we are at srcType.methodName(..) we do not need the classInit but if we have srcType.field.methodName() we do.
+      return (!methodsType || arguments == null) && !(parentNode instanceof SelectorExpression) && ModelUtil.needsClassInit(srcType) && !ModelUtil.isAssignableFrom(srcType, getEnclosingType()) && !(parentNode instanceof SwitchLabel);
    }
 
    /*
@@ -4396,18 +4717,14 @@ public class IdentifierExpression extends ArgumentsExpression {
       List<IString> idents = getAllIdentifiers();
       int sz = idents.size();
 
-      /* TODO: probably just remove.  this was an ilfated attempted to re-transform types but didn't solve any problems
-      if (isUnbound()) {
-         resolveTypeReference();
-      }
-      */
-
       if (jsTransformed) { // TODO: not sure why these are getting transformed twice... maybe through binary expressions?  One more boolean per identifier exprsssion could add up!
          return this;
       }
       jsTransformed = true;
 
       Statement result = this;
+
+      int origSz = sz;
 
       int start = 0;
       for (int i = 1; i < sz; i++) {
@@ -4434,24 +4751,29 @@ public class IdentifierExpression extends ArgumentsExpression {
             start = i;
       }
 
+      LayeredSystem sys = getLayeredSystem();
       boolean retried = false;
       for (int i = start; i < sz; i++) {
          if (idTypes[i] == IdentifierType.UnboundName && !retried && !specialJSIdentifier(i)) {
             retried = true;
             resolveTypeReference();
          }
-         String str = idents.get(i).toString();
-         if (JSUtil.jsKeywords.contains(str))
-            idents.set(i, new PString("_" + str));
+         String ident = idents.get(i).toString();
+         if (JSUtil.jsKeywords.contains(ident))
+            idents.set(i, new PString("_" + ident));
 
          if (idTypes[i] == IdentifierType.EnumName) {
-            if (boundTypes[i] instanceof EnumConstant && ((EnumConstant) boundTypes[i]).body != null) {
+            if (boundTypes[i] instanceof EnumConstant) { // just like fields, enums need to be renamed
                EnumConstant enumConst = (EnumConstant) boundTypes[i];
-               EnumDeclaration enumDecl = (EnumDeclaration) enumConst.getEnclosingType();
-               LayeredSystem sys = getLayeredSystem();
-               String prefix = sys.runtimeProcessor.getStaticPrefix(enumDecl, this);
+               if (enumConst.shadowedByMethod) {
+                  idents.set(i, new PString(JSUtil.ShadowedPropertyPrefix + ident));
+               }
+               if (((EnumConstant) boundTypes[i]).body != null) {
+                  EnumDeclaration enumDecl = (EnumDeclaration) enumConst.getEnclosingType();
+                  String prefix = sys.runtimeProcessor.getStaticPrefix(enumDecl, this);
 
-               addIdentifier(0, prefix, IdentifierType.BoundTypeName, enumDecl);
+                  addIdentifier(0, prefix, IdentifierType.BoundTypeName, enumDecl);
+               }
             }
 
             // When there's a body we create an actual type for each enum constant.  We need to transform the
@@ -4470,8 +4792,8 @@ public class IdentifierExpression extends ArgumentsExpression {
          }
 
          if (idTypes[i] == IdentifierType.FieldName && ModelUtil.isFieldShadowedByMethod(boundTypes[i])) {
-            if (!str.startsWith(JSUtil.ShadowedPropertyPrefix))
-               idents.set(i, new PString(JSUtil.ShadowedPropertyPrefix + str));
+            if (!ident.startsWith(JSUtil.ShadowedPropertyPrefix))
+               idents.set(i, new PString(JSUtil.ShadowedPropertyPrefix + ident));
          }
 
          if (idTypes[i] == IdentifierType.MethodInvocation || idTypes[i] == IdentifierType.RemoteMethodInvocation) {
@@ -4479,9 +4801,11 @@ public class IdentifierExpression extends ArgumentsExpression {
             // Meth here is TypeDeclaration when we have a newX method that we could not resolve
             if (meth != null && !(meth instanceof TypeDeclaration)) {
                JavaModel model = getJavaModel();
-               if (model.customResolver == null || !model.customResolver.useRuntimeResolution())
+               if (model == null) {
+                  System.out.println("*** No java model for transformToJS of: " + this);
+               }
+               else if (model.customResolver == null || !model.customResolver.useRuntimeResolution())
                   meth = ModelUtil.resolveSrcMethod(getLayeredSystem(), meth, true, false);
-
                Object jsMethSettings = ModelUtil.getAnnotation(meth, "sc.js.JSMethodSettings");
                if (jsMethSettings != null) {
                   String replaceWith = (String) ModelUtil.getAnnotationValue(jsMethSettings, "replaceWith");
@@ -4497,6 +4821,15 @@ public class IdentifierExpression extends ArgumentsExpression {
                   int aix = 0;
                   Object[] paramTypes = ModelUtil.getParameterTypes(meth);
                   if (paramTypes != null) {
+                     // Let the JS annotation override the conversion for this parameter - e.g. disable the char to int conversion for indexOf(int ch)
+                     Object[] jsParamTypes = ((JSRuntimeProcessor) sys.runtimeProcessor).getJSParameterTypes(meth, model.getLayer());
+                     if (jsParamTypes != null) {
+                        if (jsParamTypes.length != paramTypes.length)
+                           System.err.println("*** Warning - ignoring invalid JSMethodSettings(paramTypes=..) for method: " + meth + " num params: " + jsParamTypes.length + " != " + paramTypes.length);
+                        else
+                           paramTypes = jsParamTypes;
+                     }
+                     // NOTE: varArgs stuff is handled in Javascript, not here.  This makes the JS apis more like the Java ones and it seems like we can just as accurately do it there.
                      for (Expression arg:args) {
                         if (aix < paramTypes.length) { // Skip repeat args for now
                            Expression newExpr = arg.applyJSConversion(paramTypes[aix]);
@@ -4509,9 +4842,6 @@ public class IdentifierExpression extends ArgumentsExpression {
                }
             }
          }
-
-
-
       }
 
       if (idTypes.length > start) {
@@ -4556,7 +4886,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   prefix =  getLayeredSystem().runtimeProcessor.getStaticPrefix(srcType, this);
 
                   // Do we need to inject the classInit call for this type first?  Optimize out the case where we are in a method of the same type.
-                  if (needsClassInitConversion(srcType)) {
+                  if (needsClassInitConversion(srcType, start == origSz - 2)) {
                      SemanticNodeList<Expression> clInitArgs = new SemanticNodeList<Expression>();
                      clInitArgs.add(IdentifierExpression.create(prefix));
                      IdentifierExpression baseExpr = IdentifierExpression.createMethodCall(clInitArgs, "sc_clInit");
@@ -4640,7 +4970,6 @@ public class IdentifierExpression extends ArgumentsExpression {
                   if (idTypes != null && i >= idTypes.length)
                      System.out.println("*** Error - unresolved identifier expression");
                   Object boundType = getTypeForIdentifier(i);
-                  LayeredSystem sys = getLayeredSystem();
                   JavaModel model = getJavaModel();
                   if (model.customResolver == null || !model.customResolver.useRuntimeResolution())
                      boundType = ModelUtil.resolveSrcTypeDeclaration(sys, boundType, false, false);
@@ -4651,7 +4980,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                      sz--;
                   }
 
-                  if (needsClassInitConversion(boundType)) {
+                  if (needsClassInitConversion(boundType, i == origSz - 2)) {
                      SemanticNodeList<Expression> clInitArgs = new SemanticNodeList<Expression>();
                      clInitArgs.add(IdentifierExpression.create(prefix));
 
@@ -4703,7 +5032,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                String resolverTypeName = CTypeUtil.getPackageName(resolverName);
                String methodName = CTypeUtil.getClassName(resolverName);
                String jsName = JSUtil.convertTypeName(model.layeredSystem, resolverTypeName);
-               jsName += ((JSRuntimeProcessor) model.layeredSystem.runtimeProcessor).prototypeSuffix;
+               jsName += ((JSRuntimeProcessor) model.layeredSystem.runtimeProcessor).typeNameSuffix;
                String typeName = getIdentifierPathName(sz);
                String pkgName = model.getPackagePrefix();
                String typeTypeName = ModelUtil.getTypeName(boundTypes[sz-1]);
@@ -4767,6 +5096,13 @@ public class IdentifierExpression extends ArgumentsExpression {
          else {
             superType = getTypeForIdentifier(0);
             enclType = getEnclosingType();
+            if (superType == null) {
+               // If we are using propagateConstructor, we may not have transformed the super-type yet.  In that case, assume it's the extends type so we can generate the code.
+               // TODO: we should be processing propagateConstructor in some way during start so we know it's there by the time we transform?
+               superType = enclType == null ? null : ModelUtil.getExtendsClass(enclType);
+            }
+            if (superType == null)
+               superType = getTypeForIdentifier(0);
             if (ModelUtil.getEnclosingInstType(superType) != null && ModelUtil.getEnclosingInstType(enclType) != null) {
                int curCt = ModelUtil.getOuterInstCount(enclType);
                int superCt = ModelUtil.getOuterInstCount(superType);
@@ -4780,7 +5116,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                addOuter = true;
             }
             // convert from super.x(..) to JSType.call(this, ..)
-            setIdentifier(0, JSUtil.convertTypeName(getLayeredSystem(), ModelUtil.getTypeName(getTypeForIdentifier(0))), IdentifierType.BoundTypeName, boundTypes[0]);
+            setIdentifier(0, JSUtil.convertTypeName(getLayeredSystem(), ModelUtil.getTypeName(superType)), IdentifierType.BoundTypeName, boundTypes[0]);
          }
          addIdentifier(sz, "call", idType, boundTypes[sz-1]);
          arguments.add(0, IdentifierExpression.create(new NonKeywordString("this")));
@@ -5064,13 +5400,35 @@ public class IdentifierExpression extends ArgumentsExpression {
       return false;
    }
 
-   public boolean setInferredType(Object inferredType) {
+   public boolean setInferredType(Object inferredType, boolean finalType) {
       this.inferredType = inferredType;
+      this.inferredFinal = finalType;
 
       // TODO: do we need to re-resolve all type references now?
-      reresolveTypeReference();
+      // TODO: performance: if we haven't changed inferredType can we skip the re-resolve
+      JavaModel model;
+      if (!finalType && (model = getJavaModel()) != null) {
+         boolean oldTypeErrors = model.disableTypeErrors;
+         try {
+            model.setDisableTypeErrors(true);
+            reresolveTypeReference();
+         }
+         finally {
+            model.setDisableTypeErrors(oldTypeErrors);
+         }
+      }
+      else
+         reresolveTypeReference();
       //propagateInferredTypes();
       return false;
+   }
+
+   public boolean isInferredSet() {
+      return inferredType != null || !hasInferredType();
+   }
+
+   public boolean isInferredFinal() {
+      return inferredFinal;
    }
 
    public boolean propagatesInferredType(Expression child) {

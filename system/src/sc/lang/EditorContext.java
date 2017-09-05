@@ -7,6 +7,7 @@ package sc.lang;
 import sc.bind.Bind;
 import sc.bind.Bindable;
 import sc.bind.IListener;
+import sc.dyn.DynUtil;
 import sc.lang.sc.PropertyAssignment;
 import sc.lang.sc.SCModel;
 import sc.layer.*;
@@ -105,16 +106,20 @@ public class EditorContext extends ClientEditorContext {
       int i = 0;
       // Add a null entry at the front to represent the <type> selection
       if (addNull)
-         ret.add(new InstanceWrapper(this, null));
-      while (i < max && it.hasNext())
-         ret.add(new InstanceWrapper(this, it.next()));
+         ret.add(new InstanceWrapper(this, null, typeName));
+      while (i < max && it.hasNext()) {
+         Object inst = it.next();
+         ret.add(new InstanceWrapper(this, inst, typeName));
+      }
 
+      /*
       if (ret.size() == 1 && ModelUtil.getEnclosingType(type) == null && ModelUtil.isObjectType(type)) {
          ret.add(new InstanceWrapper(this, ModelUtil.getRuntimeType(type) != null, typeName)); // A dummy wrapper which creates the instance when it is selected
       }
+      */
 
       if (ModelUtil.isEnum(type)) {
-         ret.add(new InstanceWrapper(this, ModelUtil.getRuntimeEnum(type)));
+         ret.add(new InstanceWrapper(this, ModelUtil.getRuntimeEnum(type), typeName));
       }
       return ret;
    }
@@ -152,6 +157,7 @@ public class EditorContext extends ClientEditorContext {
 
       if (!changedModels.contains(model)) {
          changedModels.add(model);
+         model.unsavedModel = true;
          if (changedModels.size() == 1)
             Bind.sendEvent(IListener.VALUE_CHANGED, this, needsSaveProperty);
       }
@@ -163,6 +169,7 @@ public class EditorContext extends ClientEditorContext {
          if (model.getSrcFile() != null) {
             model.saveModel();
             model.layer.addNewSrcFile(model.getSrcFile(), true);
+            model.unsavedModel = false;
          }
       }
       changedModels.clear();
@@ -554,7 +561,7 @@ public class EditorContext extends ClientEditorContext {
 
          return addStatement(currentType, field, true);
       }
-      else if (ModelUtil.definesMember(currentType, propName, JavaSemanticNode.MemberType.PropertyAnySet, null, null) != null) {
+      else if (ModelUtil.definesMember(currentType, propName, JavaSemanticNode.MemberType.PropertyAnySet, null, null, null) != null) {
          PropertyAssignment pa = initializer == null ? OverrideAssignment.create(propName) : PropertyAssignment.create(propName, initializer, op);
          return addStatement(currentType, pa, true);
       }
@@ -854,11 +861,12 @@ public class EditorContext extends ClientEditorContext {
          SrcEntry srcEnt = model.getSrcFile();
          if (srcEnt == null) {
             // The pending model has not been assigned a type yet
-            system.refreshRuntimes();
+            system.refreshRuntimes(true);
             return;
          }
          changedModels.remove(model);
          JavaModel origModel = model;
+         model.unsavedModel = false;
          SrcEntry srcFile = model.getSrcFile();
          if (srcFile.canRead()) {
             // TODO: we are using execContext here even if model != pendingModel?   Shouldn't we be building an execContext from model
@@ -906,7 +914,7 @@ public class EditorContext extends ClientEditorContext {
    }
 
    public LayeredSystem.SystemRefreshInfo refresh() {
-      return system.refreshRuntimes();
+      return system.refreshRuntimes(true);
    }
 
    void updateCurrentModelStale() {
@@ -1039,6 +1047,9 @@ public class EditorContext extends ClientEditorContext {
                   }
                }
                setErrorsChanged(errorsChanged + 1);
+            }
+            else if (modelUpdate.removed) {
+
             }
          }
       }
@@ -1504,24 +1515,28 @@ public class EditorContext extends ClientEditorContext {
          if (!nextCommandRest.equals(pathName))
             pos += dirName.length() + 1;
       }
-      String newLayerDir = system.getNewLayerDir();
-      if (dirName == null)
-         dirName = newLayerDir;
-      else
-         dirName = FileUtil.concat(newLayerDir, dirName);
 
-      // If we are inside of a layer directory, it's an invalid path for a layer so don't complete it
-      for (String parentName = nextCommandRest.length() == 0 ? dirName : FileUtil.getParentPath(dirName); parentName != null; parentName = FileUtil.getParentPath(parentName)) {
-         if (LayerUtil.isLayerDir(parentName))
-            return pos;
-      }
 
-      File dir = new File(dirName);
-      String[] files = dir.list();
-      if (files != null) {
-         for (String file:files)
-            if (nextCommandRest.length() == 0 || file.startsWith(nextCommandRest))
-               candidates.add(file);
+      List<File> layerDirs = system.layerPathDirs;
+      for (File layerDir:layerDirs) {
+         String layerDirName;
+         if (dirName == null)
+            layerDirName = layerDir.getPath();
+         else
+            layerDirName = FileUtil.concat(layerDir.getPath(), dirName);
+
+         // If we are inside of a layer directory, it's an invalid path for a layer so don't complete it
+         for (String parentName = nextCommandRest.length() == 0 ? layerDirName : FileUtil.getParentPath(layerDirName); parentName != null; parentName = FileUtil.getParentPath(parentName)) {
+            if (LayerUtil.isLayerDir(parentName))
+               continue;
+         }
+
+         String[] files = new File(layerDirName).list();
+         if (files != null) {
+            for (String file : files)
+               if (nextCommandRest.length() == 0 || file.startsWith(nextCommandRest))
+                  candidates.add(file);
+         }
       }
       return pos;
    }

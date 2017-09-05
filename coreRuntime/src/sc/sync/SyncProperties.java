@@ -10,12 +10,18 @@ import sc.util.IntCoalescedHashMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+/** Represents a set of properties which are synchronized to a specific destination. */
 @sc.js.JSSettings(jsModuleFile="js/sync.js", prefixAlias="sc_")
 public class SyncProperties {
-   String destName;
-   String syncGroup;
-   Object[] classProps;
-   SyncProperties chainedProps;
+   public String destName;
+   public String syncGroup;
+   /** Array of either property names or SyncPropOption instances to control which properties are to be synchronized */
+   public Object[] classProps;
+   /** Then sync properties of a base type we are chained from */
+   public SyncProperties chainedProps;
+
+   /** True if this an instance of this object is allowed to be created from the client */
+   public boolean allowCreate = true;
 
    // The default value for initDefault for those cases where you do not call addSyncInst explicitly
    public boolean initDefault = true;

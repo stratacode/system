@@ -16,28 +16,34 @@ import java.util.*;
 
 /**
  * This is the manager class for synchronization.  A SyncManager is registered for a given destination name.  The
- * destinations are added at startup - they might be client, server, or the name of a peer process.
+ * destinations are added at startup and identified by names like client, server, or the name of a peer process.
  * <p>
- * The SyncManager collects the type and subset of the properties of those types
- * which are to be synchronized.
- * It manages a set of SyncContext's, one for each scope.  On the client, there will only be one sync context, but
- * on the server, the system has to track changes to objects based on their lifecycle.  So global objects will broadcast
+ * The SyncManager collects the list of types and subset of the properties of those types which are to be synchronized.
+ * Synchronized instances are stored in a SyncContext which is stored inside of a scope.  Scopes are organized into
+ * a directed acyclic graph according to their lifecycle: global, appGlobal, session, appSession, window, request.
+ * <p>
+ * On the client, there will only be one sync context, but
+ * on the server, the system tracks changes to objects based on their lifecycle.  So global objects will broadcast
  * out changes.  Session scoped objects are only visible in the current user's session and request scoped objects last only
- * for the given request.  Each SyncContext stores the set of objects that belong in that context.
+ * for the given request.  Each SyncContext stores the set of objects that belong in that context.  SyncContexts may have
+ * a parent context - e.g. window scope's parent is a session and session scope's parent is the global scope.
  * <p>
- * For the sync operation, the request, session, and global sync contexts are rolled up into a single layer of objects definitions
+ * For the sync operation, the request, window, session, and global sync contexts are rolled up into a single layer of objects definitions
  * and modify definitions.  When the server is replying to the client, the layer gets translated to Javascript before it is sent.
  * Once on the remote side, the layer is applied.  After applying the changes, any response layer that results from the previous layer is packages up
  * and put into the reply.
- * </p>
- * The syncManager operates in two modes.  When you are updating the objects, syncInProgress is true, no changes are recorded.  Instead, we are updating the
+ * <p>
+ * SyncContexts are further separated in some cases by an application id ("appId").  For server applications the appId is the URL of the page so different
+ * pages have different state contexts for a given session.
+ * <p>
+ * The syncManager operates in two modes.  When you are updating the objects from changes that occurred in the remote process,
+ * the flag syncInProgress is set to true and no changes are recorded.  Instead, we are updating the
  * previous values stored for all synchronized objects (used to revert, and know the difference between old and new).
  * <p>
  * At other times, live changes made to the objects are recorded.  We store the new values for each change by listening to the property change events.
- * </p>
  * <p>During initialization, the initial property values are synchronized to the other side if the "init" flag is true.  If it's false, we assume the
- * client was initialized with the same values.  With the automatic sync mode, this flag is set automatically by looking at the initialiers.  If both sides
- * are initialized, it's not set.
+ * client was initialized with the same values.  With the automatic sync mode, this flag is set automatically by looking at how a given property is initialized.  If both sides
+ * are initialized, the init flag is set to false.  Otherwise, it's set to true.
  * </p>
  */
 @sc.js.JSSettings(jsModuleFile="js/sync.js", prefixAlias="sc_")
@@ -51,12 +57,16 @@ public class SyncManager {
    /** Traces synchronization layers between client and server for understanding and debugging client/server issues */
    public static boolean trace = false;
 
-   /** More detailed debugging of the synchronization system - i.e. all sync types, all sync insts, all properties create or updated etc. */
+   /** More detailed debugging of the synchronization system - i.e. all sync types, all sync insts */
    public static boolean verbose = false;
+   /** Like verbose above but includes individual property changes */
+   public static boolean verboseValues = false;
 
    /** When false, the trace buffer is truncated at 'logSize' for each layer */
    public static boolean traceAll = false;
-   public static int logSize = 512; // limit to the size of layer defs etc. that are logged - ellipsis are inserted for characters over that amount.
+   public static int logSize = 128; // limit to the size of layer defs etc. that are logged - ellipsis are inserted for characters over that amount.
+
+   public static String defaultLanguage = "json";
 
    /**
     * Set this to true for the server or the sync manager which manages the initialization.  It is set to false for the client or the one who receives the initial state.
@@ -65,16 +75,17 @@ public class SyncManager {
     */
    public boolean recordInitial = true;
 
+   public String destinationName;
+
    private Map<Object, SyncProperties> syncTypes = new IdentityHashMap<Object, SyncProperties>();
 
    // Records the sync instances etc. that are registered in a global context.
    Map<String,SyncContext> rootContexts = new HashMap<String,SyncContext>();
 
-   public SyncContext getRootSyncContext(String appId) {
-      if (appId == null) {
-         appId = "defaultSyncAppId";
-      }
-      String ctxId = "global"; // appId
+   public SyncDestination syncDestination;
+
+   public SyncContext getRootSyncContext() {
+      String ctxId = "global";
       SyncContext rootCtx = rootContexts.get(ctxId);
       if (rootCtx == null) {
          //rootCtx = newSyncContext("global:" + appId);
@@ -82,37 +93,42 @@ public class SyncManager {
          // TODO: we have global objects stored in a per-page object variable e.g. index.body.editorMixin.editorModel and the dirEnts.  If we do not share the global context, the global object
          // state is not sent down.  The page objects which are not global, provide an indexing into the global name space when an inner object extends a global base class.
          rootCtx = newSyncContext(ctxId);
-         rootCtx.scope = GlobalScopeDefinition.getGlobalScopeDefinition().getScopeContext();
+         rootCtx.scope = GlobalScopeDefinition.getGlobalScopeDefinition().getScopeContext(true);
          rootContexts.put(ctxId, rootCtx);
       }
       return rootCtx;
    }
 
    public SyncContext getCurrentRootSyncContext() {
-      return getRootSyncContext(getSyncAppId());
+      return getRootSyncContext();
    }
 
    /** Specify to sync calls for the sync group name which synchronizes all sync groups. */
    public final static String SYNC_ALL = "syncAll";
 
-   static class InstInfo {
-      Object[] args;
-      boolean initDefault;
-      String name;
-      boolean registered;  // Has this object's name been sent to the client
-      boolean nameQueued;  // Has this object's name been at least queued to send to he client
-      boolean onDemand;
-      boolean fixedObject;
-      boolean initialized;
-      boolean inherited; // Set to true when the instance in this SyncContext is inherited from the parentContext.
-      SyncProperties props;
-      TreeMap<String,Boolean> onDemandProps; // The list of on-demand properties which have been fetched for this instance - stores true when the prop has been initialized, false for when it's been requested before the object has been initialized.
+   /** This is the primary sync data structure we use for storing data for each synchronized object instance */
+   public static class InstInfo {
+      // NOTE: these are public for the debugging package only - not intended to be manipulated in user code
+      public Object[] args;       // Any argument values used in the constructor to construct this instance?
+      public boolean initDefault;
+      public String name;
+      // TODO: turn this into bitflags for efficiency (or better yet, build an SC plugin that can do that transformation automatically in code-gen!)
+      public boolean registered;  // Has this object's name been sent to the client
+      public boolean nameQueued;  // Has this object's name been at least queued to send to he client
+      public boolean onDemand;
+      public boolean fixedObject; // True if this is an object with a fixed name in the global name-space
+      public boolean initialized;
+      public boolean inherited; // Set to true when the instance in this SyncContext is inherited from the parentContext.
+      public SyncProperties props;
+      public TreeMap<String,Boolean> onDemandProps; // The list of on-demand properties which have been fetched for this instance - stores true when the prop has been initialized, false for when it's been requested before the object has been initialized.
 
-      HashMap<String,Object> previousValues;
-      HashMap<String,Object> initialValues;  // TODO: REMOVE THIS - it's not used!
+      public HashMap<String,Object> previousValues;
+      public HashMap<String,Object> initialValues;  // TODO: REMOVE THIS - it's not used!
       //int refcnt = 1;
 
       DefaultValueListener valueListener;
+
+      SyncHandler syncHandler; // Caching the sync handler for this instance so we don't create them over and over again
 
       InstInfo(Object[] args, boolean initDef, boolean onDemand) {
          this.args = args;
@@ -140,18 +156,36 @@ public class SyncManager {
          else
             return super.toString();
       }
+
+      public void setName(String name) {
+         this.name = name;
+      }
    }
 
    public SyncProperties getSyncPropertiesForInst(Object changedObj) {
       // Work around weird behavior of DynUtil.getType for TypeDeclarations - since we will be serializing them over and need to treat them like objects, not types here
-      Object syncType = DynUtil.isType(changedObj) ? changedObj.getClass() : DynUtil.getType(changedObj);
+      // And in Javascript, if we're given changedObj which is the class object, calling getClass() on the class does not return the jv_Class object - it just returns the changedObj
+      // which means we get the sync properties not for the type object (maybe just class name?), but for the instance of that type.
+      Object syncType = DynUtil.getTypeOfObj(changedObj);
       return getSyncProperties(syncType);
    }
 
+   /**
+    * The SyncContext stores the set of synchronized instances.  It listens for changes to synchronized
+    * properties of these instances and stores the changes it collects in a SyncLayer identified by the
+    * sync-group (if any) the property is apart of.  Sync-groups allow you to synchronize different groups of
+    * properties at different times but is not a feature we use commonly.
+    * <p>
+    * The SyncContext also stores a SyncLayer which represents the changed state from when the syncContext was created.
+    * In other words, all objects created (and not destroyed) and the current value of all properties.
+    * If the client drops and reconnects, it can use this SyncLayer to bring it back up-to-date via the reset
+    * operation (i.e. if you refresh the page in a client/server application).
+    * </p>
+    */
    @Sync(syncMode= SyncMode.Disabled)
-   public class SyncContext implements ScopeDestroyListener {
+   public class SyncContext implements ScopeDestroyListener, Comparable {
       String name;
-      SyncContext parentContext;
+      ArrayList<SyncContext> parentContexts;
       ScopeContext scope;
 
       protected boolean initialSync = false;  // Before we've sent our context remotely we're in the initial sync
@@ -181,9 +215,6 @@ public class SyncManager {
 
       IdentityHashMap<Object, SyncListenerInfo> syncListenerInfo = new IdentityHashMap<Object, SyncListenerInfo>();
 
-      // A table for each type name which lists the current unique integer for that type that we use to automatically generate semi-unique ids for each instance
-      Map<String,Integer> typeIdCounts;
-
       // A table which stores the automatically assigned id for a given object instance.
       //static Map<Object,String> objectIds = (Map<Object,String>) PTypeUtil.getWeakHashMap();
       Map<Object,String> objectIds;
@@ -198,6 +229,12 @@ public class SyncManager {
 
       public SyncContext(String name) {
          this.name = name;
+      }
+
+      public void addParentContext(SyncContext parent) {
+         if (parentContexts == null)
+            parentContexts = new ArrayList<SyncContext>();
+         parentContexts.add(parent);
       }
 
       private SyncChangeListener getSyncListenerForGroup(String syncGroup) {
@@ -226,7 +263,7 @@ public class SyncManager {
                ii.initialValues = prevMap;
          }
          Object old = prevMap.put(prop,curVal);
-         if (verbose && (curVal != null || old != null)) {
+         if (verboseValues && (curVal != null || old != null)) {
             if (old == null) {
                // Filter out boolean=false to minimize message trafic.
                if (!(curVal instanceof Boolean) || ((Boolean) curVal))
@@ -264,15 +301,15 @@ public class SyncManager {
                if (val instanceof int[])
                   return ((int[]) val).clone();
                else
-                  System.err.println("*** unsupported array type in copyMutableValue");
+                  return PTypeUtil.clone(val);
             }
             else
-               System.err.println("*** Unrecognized type for synchronized property: " + val);
+               return PTypeUtil.clone(val);
          }
          finally {
             setSyncState(origState);
          }
-         return val;
+         //return val;
       }
 
       public void addPreviousValue(Object obj, String propName, Object val) {
@@ -302,7 +339,7 @@ public class SyncManager {
                ii.initialValues = prevMap;
          }
          Object old = prevMap.put(propName,savedVal);
-         if (verbose) {
+         if (verboseValues) {
             String updateType = prevMap == initMap ? "initial" : "original";
             if (old == null)
                System.out.println("Sync " + updateType + " value: " + DynUtil.getInstanceName(obj) + "." + propName + " = " + DynUtil.getInstanceName(val));
@@ -343,7 +380,6 @@ public class SyncManager {
       }
 
       public void addNewObj(Object obj, String syncGroup, Object...args) {
-
          SyncState state = getSyncState();
          if (state == SyncState.CopyingPrevious)
             return;
@@ -360,21 +396,41 @@ public class SyncManager {
          }
       }
 
-      public void addChangedValue(Object obj, String propName, Object val, String syncGroup) {
-         SyncLayer changedLayer = getChangedSyncLayer(syncGroup);
+      public void addChangedValue(List<SyncLayer.SyncChange> depChanges, Object obj, String propName, Object val, String syncGroup, SyncLayer syncLayer) {
+         SyncLayer changedLayer = syncLayer == null ? getChangedSyncLayer(syncGroup) : syncLayer;
          if (!needsSync) {
             if (verbose)
-               System.out.println("needsSync=true");
+               System.out.println("Setting needsSync=true for " + DynUtil.getInstanceName(obj) + "." + propName);
             setNeedsSync(true);
          }
-         if (verbose) {
+         if (verboseValues) {
             System.out.println("Changed value: " + DynUtil.getInstanceName(obj) + "." + propName + " = " + DynUtil.getInstanceName(val));
          }
          // When we are processing the initial sync, we are not recording changes.
          // TODO: do we need to record separate versions when dealing with sync contexts shared by more than one client?
          // to track versions, so we can respond to sync requests from more than one client
-         if (!initialSync)
-            changedLayer.addChangedValue(obj, propName, val);
+         if (!initialSync) {
+            // For simple value properties, that cannot refer recursively, we add them to the dep changes which are put before the object which is referencing the
+            // object we are serializing.  If it's possibly a reference to an object either that's not yet serialized or is being serialized we do it after.  It might
+            // be nice to check if it's not being serialized cause we could then serialize it all before... rather than splitting up the object definition unnecessarily
+            // serialization buffer by adding a new change.  TODO: other value properties might be handled during the reference stage here
+            boolean safeDepChange = false;
+            if (depChanges != null) {
+               if (val == null)
+                  safeDepChange = true;
+               else {
+                  Class valcl = val.getClass();
+                  // TODO: we could find a faster way to do this logic, or switch it and only look for references which are being added to the stream since it's only 'forward references' we are trying to avoid here.
+                  // we also could just support deserializing forward references
+                  if (PTypeUtil.isStringOrChar(valcl) || PTypeUtil.isPrimitive(valcl) || PTypeUtil.isANumber(valcl) || valcl == Boolean.class || valcl == Boolean.TYPE || DynUtil.isEnumConstant(val))
+                     safeDepChange = true;
+               }
+            }
+            if (safeDepChange)
+               changedLayer.addDepChangedValue(depChanges, obj, propName, val, false);
+            else
+               changedLayer.addChangedValue(obj, propName, val);
+         }
          SyncState syncState = getSyncState();
          if (recordInitial || syncState != SyncState.Initializing) {
             // For the 'remote' parameter, we want it to be true only for those changes which definitively originated on the client.  The binding count test will
@@ -494,8 +550,8 @@ public class SyncManager {
             if (initInst) {
                SyncProperties props = getSyncPropertiesForInst(inst);
                if (props != null) {
-                  ii.name = objName;
-                  initOnDemandInst(inst, ii, false, false);
+                  ii.setName(objName);
+                  initOnDemandInst(null, inst, ii, false, false, null);
                }
             }
          }
@@ -508,17 +564,20 @@ public class SyncManager {
             if (ii.onDemand && !ii.initialized && initInst) {
                SyncProperties props = getSyncPropertiesForInst(inst);
                if (props != null) {
-                  ii.name = objName;
-                  initOnDemandInst(inst, ii, false, false);
+                  ii.setName(objName);
+                  initOnDemandInst(null, inst, ii, false, false, null);
                }
             }
          }
-         ii.name = objName;
+         ii.setName(objName);
          ii.fixedObject = fixedName; // when true the object name is not reset
          ii.registered = nameQueued;
          ii.nameQueued = nameQueued;
 
-         objectIndex.put(objName, inst);
+         Object oldInst = objectIndex.put(objName, inst);
+         if (verbose && oldInst != null && oldInst != inst)
+            System.out.println("*** Warning: replacing old instance for: " + objName);
+         DynUtil.setObjectId(inst, objName); // Register this instance so we use this one name for logging, management etc. to refer to this instance
 
          // When registering names if the other side used a type-id larger than in our current cache, we need to adjust ours to use larger ids to avoid conflicts
          // TODO: there is a race condition here - where the client and server could be allocating ids and so conflict.  This is only for the default naming system - use IObjectId
@@ -529,13 +588,9 @@ public class SyncManager {
             String ctStr = objName.substring(usix + ID_INDEX_SEPARATOR.length());
             try {
                int ct = Integer.parseInt(ctStr);
-               if (typeIdCounts == null)
-                  typeIdCounts = new HashMap<String, Integer>();
-               Integer val = typeIdCounts.get(typeName);
-               if (val == null)
-                  val = 0;
+               int val = DynUtil.getTypeIdCount(typeName);
                if (val <= ct)
-                  typeIdCounts.put(typeName, ct + 1);
+                  DynUtil.updateTypeIdCount(typeName, ct + 1);
             }
             catch (NumberFormatException exc) {}
          }
@@ -574,8 +629,13 @@ public class SyncManager {
 
       public Object getObjectByName(String name, boolean unwrap) {
          Object res = objectIndex.get(name);
-         if (res == null && parentContext != null)
-            res = parentContext.getObjectByName(name, false);
+         if (res == null && parentContexts != null) {
+            for (SyncContext parCtx:parentContexts) {  // TODO: there should not be conflicts but should we go in reverse order in case - to pick the most specific instance
+               res = parCtx.getObjectByName(name, false);
+               if (res != null)
+                  break;
+            }
+         }
          if (unwrap && res != null)
             res = getSyncHandler(res).restoreInstance(res);
          return res;
@@ -585,11 +645,13 @@ public class SyncManager {
          return getObjectByName(name, false);
       }
 
-      public CharSequence expressionToString(Object value, ArrayList<String> currentObjNames, String currentPackageName, StringBuilder preBlockCode, StringBuilder postBlockCode, String varName, boolean inBlock, String uniqueId, List<SyncLayer.SyncChange> depChanges, SyncLayer syncLayer) {
-         if (value == null)
-            return "null";
+      public void formatExpression(SyncSerializer ser, StringBuilder out, Object value, ArrayList<String> currentObjNames, String currentPackageName, SyncSerializer preBlockCode, SyncSerializer postBlockCode, String varName, boolean inBlock, String uniqueId, List<SyncLayer.SyncChange> depChanges, SyncLayer syncLayer) {
+         if (value == null) {
+            ser.formatNullValue(out);
+            return;
+         }
          SyncHandler syncHandler = getSyncHandler(value);
-         return syncHandler.expressionToString(currentObjNames, currentPackageName, preBlockCode, postBlockCode, varName, inBlock, uniqueId, depChanges, syncLayer);
+         syncHandler.formatExpression(ser, out, currentObjNames, currentPackageName, preBlockCode, postBlockCode, varName, inBlock, uniqueId, depChanges, syncLayer);
       }
 
       public String getObjectName(Object changedObj, List<SyncLayer.SyncChange> depChanges, SyncLayer syncLayer) {
@@ -617,15 +679,21 @@ public class SyncManager {
             return true;
          if (isRootedObject(outer))
             return true;
-         if (parentContext != null)
-            if (parentContext.isRootedObject(obj))
-               return true;
+         if (parentContexts != null) {
+            for (SyncContext parentContext:parentContexts)
+               if (parentContext.isRootedObject(obj))
+                  return true;
+         }
          return false;
       }
 
-      /** The SyncManager maintains the name space for the client/server interaction.  The names spaces themselves need to be synchronized.
+      /**
+       * The SyncManager maintains the name space for the client/server interaction.
        * Since objects have different lifecycle - scope, and can be stored in different SyncContext objects, that are layered (i.e. request, session, global scope)
        * the name search must go across those scopes.
+       * This method looks up the object name, creating one if 'create' is true.  It takes the syncLayer for which we want this name and an optional list of 'dependent changes'
+       * i.e. objects which have been lazily instantiated during a given serialization.  We may find the name of the object in that list possibly add new dependencies during this
+       * method.
        */
       public String getObjectName(Object changedObj, String propName, boolean create, boolean unregisteredNames, List<SyncLayer.SyncChange> depChanges, SyncLayer syncLayer) {
          InstInfo ii = syncInsts.get(changedObj);
@@ -637,7 +705,7 @@ public class SyncManager {
                }
                else if (create) {
                   if (!ii.inherited)
-                     initOnDemandInst(changedObj, ii, false, false);
+                     initOnDemandInst(depChanges, changedObj, ii, false, false, syncLayer);
                }
             }
             if (!ii.fixedObject && !ii.nameQueued) {
@@ -656,23 +724,17 @@ public class SyncManager {
             return findObjectName(changedObj);
          }
 
-         String parentName = null;
-         SyncContext parCtx = parentContext;
-         while (parCtx != null && parentName == null) {
-            // Here we don't want to create the object in the underlying context but do want to return even unregistered instances
-            parentName = parCtx.getObjectName(changedObj, propName, false, true, null, syncLayer);
-            if (parentName == null)
-               parCtx = parCtx.parentContext;
-         }
+         // Does this object already have a name in a parent SyncContext?
+         String parentName = getParentObjectName(changedObj, propName, false, true, null, syncLayer);
 
          // Doing this again because this might have caused us to be added indirectly and do not want to be added twice.
          ii = syncInsts.get(changedObj);
          if (ii != null && ii.name != null)
             return ii.name;
 
-         if ((ii == null || ii.name == null) && create) {
+         if (create) {
             if (depChanges != null) {
-               // If the parent has already registered this instance, we'll just add it to this sync context as an inherited object
+               // If the parent sync context has already registered this instance, we'll just add it to this sync context as an inherited object
                if (parentName != null) {
                   return registerInheritedInst(changedObj, parentName, ii);
                }
@@ -685,11 +747,11 @@ public class SyncManager {
             else {
                String objName = findObjectName(changedObj);
                if (ii == null) {
-                  if (verbose)
-                     System.out.println("*** No instance for: " + objName);
+                  //if (verbose)  don't log this at least in the case where the instance exists in a parent context but has not been inherited yet
+                  //   System.out.println("No sync instance for: " + objName);
                }
                else
-                  ii.name = objName;
+                  ii.setName(objName);
                return objName;
             }
          }
@@ -701,27 +763,70 @@ public class SyncManager {
          return null;
       }
 
+      private String getParentObjectName(Object changedObj, String propName, boolean create, boolean unregisteredNames, Object o, SyncLayer syncLayer) {
+         String parentName;
+         if (parentContexts != null) {
+            for (SyncContext parCtx : parentContexts) {
+               // Here we don't want to create the object in the underlying context but do want to return even unregistered instances
+               parentName = parCtx.getObjectName(changedObj, propName, create, unregisteredNames, null, syncLayer);
+               if (parentName != null)
+                  return parentName;
+            }
+         }
+         return null;
+      }
+
+      private InstInfo getParentInheritedInstInfo(Object changedObj, SyncContextHolder resCtxHolder) {
+         if (parentContexts != null) {
+            for (SyncContext parentContext:parentContexts) {
+               // Is this an immediate instance of this context - if so, initialize it (and return the specific context it's in
+               InstInfo parentII = parentContext.getInstInfo(changedObj);
+               if (parentII != null) {
+                  if (!parentII.initialized)
+                     parentContext.initOnDemandInst(null, changedObj, parentII, false, false, null);
+                  if (resCtxHolder != null)
+                     resCtxHolder.ctx = parentContext;
+                  return parentII;
+               }
+               // Still need to check the parents of the parent but by then resCtxHolder is already filled in
+               parentII = parentContext.getParentInheritedInstInfo(changedObj, resCtxHolder);
+               if (parentII != null)
+                  return parentII;
+            }
+         }
+         return null;
+      }
+
       private String registerInheritedInst(Object changedObj, String parentName, InstInfo ii) {
          if (ii == null) {
-            InstInfo parentII = parentContext.getInheritedInstInfo(changedObj);
+            InstInfo parentII = getParentInheritedInstInfo(changedObj, null);
             if (parentII != null) {
-               if (!parentII.initialized)
-                  parentContext.initOnDemandInst(changedObj, parentII, false, false);
                ii = createInheritedInstInfo(parentII);
             }
             else {
                ii = new InstInfo(null, false, false);
             }
-            ii.name = parentName;
+            ii.setName(parentName);
             syncInsts.put(changedObj, ii);
             objectIndex.put(parentName, changedObj);
          }
          else {
-            ii.name = parentName;
+            ii.setName(parentName);
          }
          ii.inherited = true;
          ii.nameQueued = true;
          return parentName;
+      }
+
+      private String getParentExistingName(Object obj) {
+         if (parentContexts != null) {
+            for (SyncContext parentContext:parentContexts) {
+               String outerName = parentContext.findExistingName(obj);
+               if (outerName != null)
+                  return outerName;
+            }
+         }
+         return null;
       }
 
       public String findObjectName(Object obj) {
@@ -731,7 +836,7 @@ public class SyncManager {
 
          Object outer = DynUtil.getOuterObject(obj);
          if (outer == null) {
-            String outerName = parentContext != null ? parentContext.findExistingName(obj) : null;
+            String outerName = getParentExistingName(obj);
             if (outerName != null)
                return outerName;
             return DynUtil.getObjectName(obj);
@@ -767,31 +872,7 @@ public class SyncManager {
       private final static String ID_INDEX_SEPARATOR = "__";
 
       public String findObjectId(Object obj, String typeName) {
-         if (objectIds == null)
-            objectIds = new HashMap<Object,String>();
-
-         String objId = objectIds.get(new IdentityWrapper(obj));
-         if (objId != null)
-            return objId;
-
-         String typeIdStr = ID_INDEX_SEPARATOR + getTypeIdCount(typeName);
-         String id = DynUtil.cleanTypeName(typeName) + typeIdStr;
-         objectIds.put(new IdentityWrapper(obj), id);
-         return id;
-      }
-
-      public Integer getTypeIdCount(String typeName) {
-         if (typeIdCounts == null)
-            typeIdCounts = new HashMap<String,Integer>();
-         Integer typeId = typeIdCounts.get(typeName);
-         if (typeId == null) {
-            typeIdCounts.put(typeName, 1);
-            typeId = 0;
-         }
-         else {
-            typeIdCounts.put(typeName, typeId + 1);
-         }
-         return typeId;
+         return DynUtil.getObjectId(obj, null, typeName);
       }
 
       // After a successful sync, everything is registered.  Don't touch the parent context since it is shared with other clients
@@ -812,6 +893,13 @@ public class SyncManager {
          if (obj instanceof String)
             return new SyncHandler(obj, this);
 
+         InstInfo instInfo = syncInsts.get(obj);
+         if (instInfo != null) {
+            if (instInfo.syncHandler != null)
+               return instInfo.syncHandler;
+         }
+
+
          boolean isType = DynUtil.isType(obj);
          Object type = isType ? obj.getClass() : DynUtil.getType(obj);
          Class handlerClass = syncHandlerRegistry.get(type);
@@ -820,11 +908,15 @@ public class SyncManager {
             handlerClass = syncHandlerRegistry.get(obj.getClass());
          }
 
+         SyncHandler res;
          if (handlerClass == null) {
-            return new SyncHandler(obj, this);
+            res = new SyncHandler(obj, this);
          }
          else
-            return (SyncHandler) DynUtil.createInstance(handlerClass, "Ljava/lang/Object;Lsc/sync/SyncManager$SyncContext;", obj, this);
+            res = (SyncHandler) DynUtil.createInstance(handlerClass, "Ljava/lang/Object;Lsc/sync/SyncManager$SyncContext;", obj, this);
+         if (instInfo != null)
+            instInfo.syncHandler = res;
+         return res;
       }
 
       boolean needsSync = false;
@@ -936,11 +1028,22 @@ public class SyncManager {
          */
       }
 
+      private boolean isParentNewInstance(Object changedObj) {
+         if (parentContexts != null) {
+            for (SyncContext parentContext:parentContexts) {
+               if (parentContext.isNewInstance(changedObj))
+                  return true;
+
+            }
+         }
+         return false;
+      }
+
       public boolean isNewInstance(Object changedObj) {
          InstInfo ii = syncInsts.get(changedObj);
          if (ii != null)
             return !ii.registered && !ii.fixedObject;
-         if (parentContext != null && parentContext.isNewInstance(changedObj))
+         if (isParentNewInstance(changedObj))
             return true;
 
          // For calling remote methods, we need to support objects which are not synhronized - at least calls to rooted objects.  Those are never new anyway.
@@ -955,23 +1058,35 @@ public class SyncManager {
          return syncInsts.get(inst) != null;
       }
 
+      private void clearParentSyncInst(Object inst, SyncProperties syncProps) {
+         if (parentContexts != null) {
+            for (SyncContext parentContext : parentContexts) {
+               parentContext.clearSyncInst(inst, syncProps);
+            }
+         }
+      }
+
       void clearSyncInst(Object inst, SyncProperties syncProps) {
          if (syncInsts.get(inst) != null) {
             removeSyncInst(inst, syncProps);
          }
-         if (parentContext != null)
-            parentContext.clearSyncInst(inst, syncProps);
+         clearParentSyncInst(inst, syncProps);
       }
 
       /**
-       * This method is called with the ScopeContext selected already for scopeId.
-       * It's possible the parent context has already registered this instance due to a super-type call to addSyncInst (when queeuing is disabled).
+       * This is a lower-level method to add a new sync inst with the most flexibility.  Since it's defined on ScopeContext, it's called after you have selected the scope to manage
+       * the lifecycle of this instance.
+       * If depChanges is not null, any changes recorded to initialize this instance are put into the changes list.  Otherwise, they are recorded at the end of the SyncLayer
+       * If initInst is false, we'll register the instance but won't initialize it with the sync system yet.
+       * If onDemand is false, the instance is added explicitly to all sync contexts - they will be pushed to listeners on the scope involved
+       * If queueNewObj is true, a 'new' or create object is added with this change.  Otherwise, it's assumed the remote client will already have created the object, or a new obj has already been queued
+       * for this instance (or will be later).
+       * Note that it's possible the parent context has already registered this instance due to a super-type call to addSyncInst (when queuing is disabled).
        * We'll add the instance to this sync context, then unless it's on-demand, we initialize it in all child-contexts so they sync it as well.
        */
-      public void addSyncInst(Object inst, boolean initInst, boolean onDemand, boolean initDefault, boolean queueNewObj, boolean addPropChanges, int scopeId, SyncProperties syncProps, Object...args) {
+      public void addSyncInst(List<SyncLayer.SyncChange> depChanges, Object inst, boolean initInst, boolean onDemand, boolean initDefault, boolean queueNewObj, boolean addPropChanges, int scopeId, SyncProperties syncProps, Object...args) {
          // We may have already registered this object with a parent scope cause the outer instance was not set when the object was created.
-         if (parentContext != null)
-            parentContext.clearSyncInst(inst, syncProps);
+         clearParentSyncInst(inst, syncProps);
 
          InstInfo ii = syncInsts.get(inst);
          if (ii == null) {
@@ -979,7 +1094,6 @@ public class SyncManager {
             syncInsts.put(inst, ii);
          }
          else {
-            ii = new InstInfo(args, initDefault, onDemand);
             if (ii.args == null && args != null && args.length > 0)
                ii.args = args;
             ii.initDefault = ii.initDefault || initDefault;
@@ -990,12 +1104,12 @@ public class SyncManager {
 
          if (!ii.initialized) {
             if (initInst) {
-               initSyncInst(inst, ii, initDefault, scopeId, syncProps, args, queueNewObj, false, addPropChanges, true);
+               initSyncInst(depChanges, inst, ii, initDefault, scopeId, syncProps, args, queueNewObj, false, addPropChanges, true, null);
             }
             // On-demand objects still need to have their names registered.  When the client needs to resync, it will try to set on-demand objects
             // which it has loaded but the server has not yet initialized.  We need the name at least to be able to find the instance and then create it on the fly.
             else if (ii.name == null && onDemand && needsInitialSync) {
-               registerSyncInstName(inst, ii, scopeId, syncProps, false);
+               registerSyncInstName(depChanges, inst, ii, scopeId, syncProps, false);
             }
          }
 
@@ -1022,7 +1136,7 @@ public class SyncManager {
          }
       }
 
-      private void registerSyncInstName(Object inst,  InstInfo ii, int scopeId, SyncProperties syncProps, boolean queueNewObj) {
+      private void registerSyncInstName(List<SyncLayer.SyncChange> depChanges, Object inst,  InstInfo ii, int scopeId, SyncProperties syncProps, boolean queueNewObj) {
          String syncType = null;
          String objName = null;
          objName = ii.name == null ? findObjectName(inst) : ii.name;
@@ -1034,7 +1148,7 @@ public class SyncManager {
             return;
 
          if (!isRootedObject(inst)) {
-            ii.name = objName;
+            ii.setName(objName);
             // States disabled, or applying changes any new instances are automatically registered.  When initializing, it's registered only if it's the direct initializer, not part of a binding (that might not run on the other side)
             // SyncState state = getSyncState();
             //if (state != SyncState.RecordingChanges && (state != SyncState.Initializing || Bind.getNestedBindingCount() <= 1)) {
@@ -1045,7 +1159,12 @@ public class SyncManager {
                syncType = " new class, ";
             //}
             if (queueNewObj) {
-               addNewObj(inst, syncProps.syncGroup, ii.args);
+               /*
+               if (depChanges != null)
+                  SyncLayer.addDepNewObj(depChanges, inst, syncProps.syncGroup, ii.args);
+               else
+               */
+                  addNewObj(inst, syncProps.syncGroup, ii.args);
                ii.nameQueued = true;
             }
          }
@@ -1053,13 +1172,31 @@ public class SyncManager {
             ii.registered = true;
             ii.nameQueued = true;
             ii.fixedObject = true;
-            ii.name = objName;
+            ii.setName(objName);
             syncType = " object ";
          }
-         objectIndex.put(objName, inst);
+         Object oldInst;
+         if ((oldInst = objectIndex.put(objName, inst)) != null && oldInst != inst && verbose) {
+            System.out.println("*** Warning: replacing instance of: " + objName + " with different instance");
+         }
 
          if (verbose) {
-            System.out.println("Synchronizing instance: " + objName + syncType + (scopeId != 0 ? "scope: " + ScopeDefinition.getScopeDefinition(scopeId).name : "global scope") + ", properties: " + syncProps);
+            String message;
+            if (ii.registered || ii.nameQueued) {
+               if (ii.onDemand)
+                  message = "Synchronizing on-demand instance: ";
+               else
+                  message = "Synchronizing instance: ";
+            }
+            else if (ii.onDemand) {
+               if (!ii.initialized)
+                  message = "Adding on-demand instance: ";
+               else
+                  message = "Initializing on-demand instance: ";
+            }
+            else // TODO: any other cases other than remote here?
+               message = "Synchronizing remote instance: ";
+            System.out.println(message + objName + syncType + (scopeId != 0 ? "scope: " + ScopeDefinition.getScopeDefinition(scopeId).name : "global scope"));
          }
       }
 
@@ -1074,13 +1211,13 @@ public class SyncManager {
 
       /** Initializes the instance.  If inherited is true, this instance is stored in a lower-level scope (e.g. we are initializing an instance for a session that's inited already at the global level)
        *   If queueNewObj is true, we add  */
-      public void initSyncInst(Object inst, InstInfo ii, boolean initDefault, int scopeId, SyncProperties syncProps, Object[] args, boolean queueNewObj, boolean inherited, boolean addPropChanges, boolean initial) {
+      public void initSyncInst(List<SyncLayer.SyncChange> depChanges, Object inst, InstInfo ii, boolean initDefault, int scopeId, SyncProperties syncProps, Object[] args, boolean queueNewObj, boolean inherited, boolean addPropChanges, boolean initial, SyncLayer syncLayer) {
          Object[] props = syncProps == null ? null : syncProps.getSyncProperties();
 
          if (initial) {
             if (!inherited) {
                ii.initialized = true;
-               registerSyncInstName(inst, ii, scopeId, syncProps, queueNewObj);
+               registerSyncInstName(depChanges, inst, ii, scopeId, syncProps, queueNewObj);
             }
             else {
                InstInfo curII = getInstInfo(inst);
@@ -1129,7 +1266,7 @@ public class SyncManager {
                }
 
                if ((flags & SyncPropOptions.SYNC_ON_DEMAND) == 0 || ii.isFetchedOnDemand(propName)) {
-                  initProperty(inst, ii, propName, flags, inherited, syncProps, addPropChanges, syncListener, initial);
+                  initProperty(depChanges, inst, ii, propName, flags, inherited, syncProps, addPropChanges, syncListener, initial, syncLayer);
                }
             }
          }
@@ -1164,9 +1301,13 @@ public class SyncManager {
       }
 
       /**
-       * This method lets you initialize a given property for synchronization on either the client or the server.
-       * For the server, it adds that property to the synchronized set.  For the client, it initiates a "fetchProperty"
-       * operator to get that property in the next sync.
+       * This method lets you start the synchronization of an on-demand property, marked with @Sync(onDemand=true).
+       * It can be called for either the client, the server, or both.  It's low cost to call it anytime you realize you
+       * need to start synchronizing a property, like when a tree-node is opened.
+       *
+       * For the server, it adds that property to the synchronized set, so it's value is pushed to the client on the
+       * next sync.  For the client, it initiates a "fetchProperty" operation.  The property will be set in processing
+       * the results of the next sync.
        */
       public void startSync(Object inst, String propName) {
          SyncProperties syncProps = getSyncPropertiesForInst(inst);
@@ -1218,7 +1359,7 @@ public class SyncManager {
             // The instance has to be initialized.  for us to init the property.  It may be an on-demand instance which we have not gotten to yet.
             // If this object is initialized and initProperty adds the change, we are also done.  Otherwise, we may need to record the update.
             if (ii.initialized) {
-               if (initProperty(inst, ii, propName, flags, false, syncProps, initOnly, getSyncListenerForGroup(syncProps.syncGroup), true))
+               if (initProperty(null, inst, ii, propName, flags, false, syncProps, initOnly, getSyncListenerForGroup(syncProps.syncGroup), true, null))
                   return;
             }
             else {
@@ -1234,10 +1375,10 @@ public class SyncManager {
          Object curValue = DynUtil.getPropertyValue(inst, propName);
 
          if (forceUpdate || !DynUtil.equalObjects(getPreviousValue(inst, propName),curValue))
-            addChangedValue(inst, propName, curValue, syncProps.syncGroup);
+            addChangedValue(null, inst, propName, curValue, syncProps.syncGroup, null);
       }
 
-      private boolean initProperty(Object inst, InstInfo ii, String propName, int flags, boolean inherited, SyncProperties syncProps, boolean addPropChanges, SyncChangeListener syncListener, boolean initial) {
+      private boolean initProperty(List<SyncLayer.SyncChange> depChanges, Object inst, InstInfo ii, String propName, int flags, boolean inherited, SyncProperties syncProps, boolean addPropChanges, SyncChangeListener syncListener, boolean initial, SyncLayer syncLayer) {
          boolean changeAdded = false;
 
          try {
@@ -1263,14 +1404,14 @@ public class SyncManager {
             if (initial)
                addInitialValue(inst, ii,  propName, curVal);
 
-            // On refresh, the inital sync layer will already have the change in the right order - if we re-add it, we mess up the order
+            // On refresh, the initial sync layer will already have the change in the right order - if we re-add it, we mess up the order
             if (addPropChanges && (flags & SyncPropOptions.SYNC_INIT) != 0 && curVal != null) {
                SyncLayer toUse = null;
 
                // On the server, on demand properties, when initialized act just like regular property changes - i.e. must go into the init layer and the change layer.
                // On the client though, we do not want to record these initial changes in any case.
-               if (initial && needsInitialSync && ((flags & SyncPropOptions.SYNC_ON_DEMAND) != 0 || ii.onDemand)) {
-                  addChangedValue(inst, propName, curVal, syncProps.syncGroup);
+               if (initial && ((flags & SyncPropOptions.SYNC_ON_DEMAND) != 0 || ii.onDemand)) {
+                  addChangedValue(depChanges, inst, propName, curVal, syncProps.syncGroup, syncLayer);
                }
                else {
                   if (initialSync && initial)
@@ -1281,7 +1422,12 @@ public class SyncManager {
                   }
 
                   if (toUse != null && !toUse.hasExactChangedValue(inst, propName, curVal)) {
-                     toUse.addChangedValue(inst, propName, curVal);
+                     /*
+                     if (depChanges != null)
+                        SyncLayer.addDepChangedValue(depChanges, inst, propName, curVal, false);
+                     else
+                     */
+                        toUse.addChangedValue(inst, propName, curVal);
                      changeAdded = true;
                   }
                }
@@ -1329,7 +1475,7 @@ public class SyncManager {
                addPreviousValue(syncObj, syncProp, value);
                break;
             case Value:
-               addChangedValue(syncObj, syncProp, value, syncGroup);
+               addChangedValue(null, syncObj, syncProp, value, syncGroup, null);
                break;
             case Ignore:
                break;
@@ -1373,12 +1519,28 @@ public class SyncManager {
          return ii;
       }
 
+      /** Looking for a scope that's either this scope or one that's reachable via it's parentContexts */
+      public SyncContext findSyncContextWithScope(int newScopeId) {
+         if (scope.getScopeDefinition().scopeId == newScopeId)
+            return this;
+         if (parentContexts != null) {
+            for (SyncContext parentContext:parentContexts) {
+               SyncContext res = parentContext.findSyncContextWithScope(newScopeId);
+               if (res != null)
+                  return res;
+            }
+         }
+         return null;
+      }
+
       public InstInfo findSyncInstInfo(Object changedObj) {
          InstInfo ii = syncInsts.get(changedObj);
          if (ii != null)
             return ii;
-         if (parentContext != null)
-            return parentContext.findSyncInstInfo(changedObj);
+         if (parentContexts != null) {
+            for (SyncContext parentContext:parentContexts)
+               return parentContext.findSyncInstInfo(changedObj);
+         }
          return null;
       }
 
@@ -1386,25 +1548,26 @@ public class SyncManager {
          InstInfo ii = syncInsts.get(changedObj);
          if (ii != null && ii.name != null)
             return ii.name;
-         if (parentContext != null)
-            return parentContext.findExistingName(changedObj);
+         if (parentContexts != null)
+            for (SyncContext parentContext:parentContexts)
+               return parentContext.findExistingName(changedObj);
          return null;
       }
 
-      public void addDepNewObj(List<SyncLayer.SyncChange> depChanges, Object changedObj, InstInfo instInfo, boolean inherited, boolean queueObj) {
+      public void addDepNewObj(List<SyncLayer.SyncChange> depChanges, Object changedObj, InstInfo instInfo, boolean inherited, boolean queueObj, SyncLayer syncLayer) {
          if (!instInfo.fixedObject) {
             if (queueObj)
                SyncLayer.addDepNewObj(depChanges, changedObj, instInfo.args);
          }
-         initOnDemandInst(changedObj, instInfo, inherited, true);
+         initOnDemandInst(depChanges, changedObj, instInfo, inherited, true, syncLayer);
       }
 
-      public void initOnDemandInst(Object changedObj, InstInfo instInfo, boolean inherited, boolean addPropChanges) {
+      public void initOnDemandInst(List<SyncLayer.SyncChange> depChanges, Object changedObj, InstInfo instInfo, boolean inherited, boolean addPropChanges, SyncLayer syncLayer) {
          SyncProperties props = getSyncPropertiesForInst(changedObj);
-         initSyncInst(changedObj, instInfo, instInfo == null ? props == null ? false : props.initDefault : instInfo.initDefault, scope == null ? 0 : scope.getScopeDefinition().scopeId, props, instInfo == null ? null : instInfo.args, false, inherited, addPropChanges, true);
+         initSyncInst(depChanges, changedObj, instInfo, instInfo == null ? props == null ? false : props.initDefault : instInfo.initDefault, scope == null ? 0 : scope.getScopeDefinition().scopeId, props, instInfo == null ? null : instInfo.args, false, inherited, addPropChanges, true, syncLayer);
       }
 
-      public RemoteResult invokeRemote(String syncGroup, Object obj, String methName, Object[] args) {
+      public RemoteResult invokeRemote(String syncGroup, Object obj, String methName, String paramSig, Object[] args) {
          SyncLayer changedLayer = getChangedSyncLayer(syncGroup);
          if (!needsSync) {
             setNeedsSync(true);
@@ -1412,7 +1575,7 @@ public class SyncManager {
          if (trace) {
             System.out.println("Remote method call: " + DynUtil.getInstanceName(obj) + "." + methName + "(" + DynUtil.arrayToInstanceName(args) + ")");
          }
-         return changedLayer.invokeRemote(obj, methName, args);
+         return changedLayer.invokeRemote(obj, methName,  paramSig, args);
       }
 
       public void addMethodResult(Object ctxObj, String objName, Object retValue) {
@@ -1424,27 +1587,32 @@ public class SyncManager {
          initialSync = value;
          // TODO: this is not thread-safe as we could be sharing this parent context.
          // I think in general it only affects the case where we are modifying either the session or global context from the request which is hopefully not a common case.  We should technically synchronize against writes though to the global context so we can update "the initial" global sync layer which all clients are updated with.  We also may need to init the global context in a synchronous way the first time, if this affects any on-demand objects?
-         if (parentContext != null)
-            parentContext.setInitialSync(value);
+         if (parentContexts != null)
+            for (SyncContext parentContext:parentContexts)
+               parentContext.setInitialSync(value);
+      }
+
+      private InstInfo lookupParentInheritedInstInfo(Object changedObj) {
+         if (parentContexts != null) {
+            for (SyncContext parentContext:parentContexts) {
+               InstInfo ii = parentContext.getInheritedInstInfo(changedObj);
+               if (ii != null)
+                  return ii;
+            }
+         }
+         return null;
       }
 
       public InstInfo getInheritedInstInfo(Object changedObj) {
          SyncManager.InstInfo ii = getInstInfo(changedObj);
-         SyncContext parCtx = parentContext;
-         // Need to find which context the referenced object is defined in.  Any dependent objects
-         // need to be added to that context so that we can resolve them in nice dependent order in that context's changed list.
-         while (ii == null && parCtx != null) {
-            ii = parCtx.getInstInfo(changedObj);
-            if (ii != null)
-               break;
-            parCtx = parCtx.parentContext;
-         }
+         if (ii == null)
+            ii = lookupParentInheritedInstInfo(changedObj);
          return ii;
       }
 
       private InstInfo createInheritedInstInfo(InstInfo ii) {
          InstInfo newInstInfo = new InstInfo(ii.args, ii.initDefault, ii.onDemand);
-         newInstInfo.name = ii.name;
+         newInstInfo.setName(ii.name);
          newInstInfo.fixedObject = ii.fixedObject;
          // TODO: Do we reuse the change maps or should we clone them so we can track the changes for each session, etc.
          newInstInfo.initialValues = ii.initialValues != null ? (HashMap<String,Object>) ii.initialValues.clone() : null;
@@ -1460,21 +1628,12 @@ public class SyncManager {
 
       public String createOnDemandInst(Object changedObj, List<SyncLayer.SyncChange> depChanges, String varName, SyncLayer syncLayer) {
          SyncManager.InstInfo ii = getInstInfo(changedObj);
-         SyncManager.SyncContext parent = this.parentContext;
          SyncManager.SyncContext curContext = this;
-         // Need to find which context the referenced object is defined in.  Any dependent objects
-         // need to be added to that context so that we can resolve them in nice dependent order in that context's changed list.
-         while (ii == null && parent != null) {
-            ii = parent.getInstInfo(changedObj);
-            if (ii != null) {
-               curContext = parent;
-
-               if (!ii.initialized)
-                  curContext.initOnDemandInst(changedObj, ii, false, false);
-
-               break;
-            }
-            parent = parent.parentContext;
+         if (ii == null) {
+            SyncContextHolder resHolder = new SyncContextHolder();
+            ii = getParentInheritedInstInfo(changedObj, resHolder);
+            if (ii != null)
+               curContext = resHolder.ctx;
          }
          if (ii != null) { // We have a declared on-demand instance - i.e. where addSyncInst was called in the code-generated for the class with onDemand=true
             SyncContext instCtx = syncLayer.initialLayer ? syncLayer.syncContext : this;
@@ -1488,7 +1647,7 @@ public class SyncManager {
             }
             else
                curInstInfo = ii;
-            addDepNewObj(depChanges, changedObj, ii, curContext != this || ii.inherited, curInstInfo == null || !curInstInfo.nameQueued);
+            addDepNewObj(depChanges, changedObj, ii, curContext != this || ii.inherited, curInstInfo == null || !curInstInfo.nameQueued, syncLayer); // Adds the statement to create the object on the other side for this sync layer
 
             if (curInstInfo == null) {
                curInstInfo = instCtx.getInstInfo(changedObj);
@@ -1515,23 +1674,17 @@ public class SyncManager {
             // TODO: add an option here to turn on or off the "on-demand" sync behavior during addSyncType
             if (props != null) {
                int newScopeId = props.defaultScopeId == -1 ? scope.getScopeDefinition().scopeId : props.defaultScopeId;
-               SyncContext newCtx;
-               if (newScopeId != curContext.scope.getScopeDefinition().scopeId) {
-                  newCtx = curContext;
-                  while (newCtx != null && newCtx.scope.getScopeDefinition().scopeId != newScopeId)
-                     newCtx = newCtx.parentContext;
-                  if (newCtx == null) {
-                     System.err.println("*** Unable to find SyncContext with scopeId: " + newScopeId + " for on-demand instance creation of: " + DynUtil.getInstanceName(changedObj));
-                     return null;
-                  }
+               SyncContext newCtx = curContext.findSyncContextWithScope(newScopeId);
+               if (newCtx == null) {
+                  System.err.println("*** Unable to find SyncContext with scopeId: " + newScopeId + " for on-demand instance creation of: " + DynUtil.getInstanceName(changedObj));
+                  return null;
                }
-               else
-                  newCtx = curContext;
-               newCtx.addSyncInst(changedObj, true, true, props.initDefault, false, newCtx == curContext, newScopeId, props);
+               newCtx.addSyncInst(depChanges, changedObj, true, true, props.initDefault, false, newCtx == curContext, newScopeId, props);
                // If we just added the object to a shared sync context, we still need to initialize it here as inherited.
+
                if (newCtx != this) {
                   ii = newCtx.getInstInfo(changedObj);
-                  addDepNewObj(depChanges, changedObj, ii, true, !ii.nameQueued);
+                  addDepNewObj(depChanges, changedObj, ii, true, !ii.nameQueued, syncLayer);
                   // Mark this as queued here in this context
                   InstInfo thisCtx = getInstInfo(changedObj);
                   thisCtx.nameQueued = true;
@@ -1546,7 +1699,7 @@ public class SyncManager {
                return getObjectName(changedObj, varName, false, false, null, syncLayer);
             }
             // Could handle this else case by just creating the sync properties on the fly.  That would need some limitation though
-            // since we don't want to accidentally serialize any types to the client.  Only those that are declarared to be shared via a
+            // since we don't want to accidentally serialize any types to the client.  Only those that are declared be shared via a
             // particular destination should go.
             else
                System.err.println("*** Error: unable to synchronize object reference to object: " + DynUtil.getInstanceId(changedObj) + ": value will be null on the other side");
@@ -1577,13 +1730,15 @@ public class SyncManager {
          }
 
 
-         if (parentContext != null)
-            parentContext.printAllSyncInsts();
+         if (parentContexts != null) {
+            for (SyncContext parentContext:parentContexts)
+               parentContext.printAllSyncInsts();
+         }
       }
 
       void removeSyncInstInternal(InstInfo toRemove, Object inst, SyncProperties syncProps, boolean listenersOnly) {
          if (trace)
-            System.out.println("Removing sync inst: " + DynUtil.getInstanceName(inst));
+            System.out.println("Removing sync inst: " + DynUtil.getInstanceName(inst) + " from scope: " + name);
 
          // We only add the listeners on the original instance subscription.  So when removing an inherited instance don't remove the listeners
          if (!toRemove.inherited && toRemove.initialized) {
@@ -1637,7 +1792,7 @@ public class SyncManager {
          // Remove just the listeners.  Keep the changes in place so we can detect changed values when we add the new instance
          removeSyncInstInternal(toRemove, fromInst, syncProps, true);
 
-         initSyncInst(toInst, toRemove, syncProps.initDefault, syncProps.defaultScopeId, syncProps, toRemove.args, false, toRemove.inherited, true, false);
+         initSyncInst(null, toInst, toRemove, syncProps.initDefault, syncProps.defaultScopeId, syncProps, toRemove.args, false, toRemove.inherited, true, false, null);
       }
 
       synchronized void addChildContext(SyncContext childCtx) {
@@ -1647,16 +1802,13 @@ public class SyncManager {
       }
 
       public synchronized void scopeDestroyed(ScopeContext scope) {
-         TreeMap<String,SyncContext> ctxMap = (TreeMap<String,SyncContext>) scope.getValue(SC_SYNC_CONTEXT);
-         if (ctxMap != null) {
-            for (Map.Entry<String,SyncContext> ctxEnt:ctxMap.entrySet()) {
-               SyncContext childSyncCtx = ctxEnt.getValue();
-               if (trace)
-                  System.out.println("Destroying scope : " + scope.getScopeDefinition().name + ":" + scope.getId() + " for app: " + ctxEnt.getKey());
-               childSyncCtx.disposeContext();
-            }
+         SyncContext childSyncCtx = (SyncContext) scope.getValue(SC_SYNC_CONTEXT_SCOPE_KEY);
+         if (childSyncCtx != null) {
+            if (trace)
+               System.out.println("Destroying scope : " + scope.getScopeDefinition().name + ":" + scope.getId());
+            childSyncCtx.disposeContext();
             // Need this to find and remove the sync insts so remove it after we are done.
-            scope.setValue(SC_SYNC_CONTEXT, null);
+            scope.setValue(SC_SYNC_CONTEXT_SCOPE_KEY, null);
          }
       }
 
@@ -1717,7 +1869,7 @@ public class SyncManager {
             if (refreshProperty(obj, propName, curValue, syncGroup, "Property change")) {
                Object remValue;
                if ((remValue = removeChangedValue(obj, propName, syncGroup)) != null) {
-                  if (verbose) {
+                  if (verboseValues) {
                      System.out.println("Removing synced changed value: " + remValue);
                   }
                }
@@ -1742,7 +1894,7 @@ public class SyncManager {
          Object prevValue = getPreviousValue(obj, propName);
          // Sometimes getPreviousValue returns arrays when we are comparing against a list so use array equal as well for that case
          if (DynUtil.equalObjects(prevValue, curValue) || arraysEqual(prevValue, curValue)) {
-            if (verbose) {
+            if (verboseValues) {
                Object change = getChangedValue(obj, propName, syncGroup);
                if (change != null)
                   System.out.println(opName + ": reset to original value: " + DynUtil.getInstanceName(obj) + "." + propName + " = " + DynUtil.getInstanceName(curValue) + " pending change: " + change);
@@ -1751,7 +1903,7 @@ public class SyncManager {
             }
             return true; // Still flagging this as a potential change since it may have changed from its most recent value.
          }
-         addChangedValue(obj, propName, curValue, syncGroup);
+         addChangedValue(null, obj, propName, curValue, syncGroup, null);
          return false;
       }
 
@@ -1772,7 +1924,7 @@ public class SyncManager {
                   }
                   Object value = DynUtil.getPropertyValue(syncObj, propName);
                   if (!refreshProperty(syncObj, propName, value, syncGroup, "Refresh")) {
-                     if (verbose)
+                     if (verboseValues)
                         System.out.println("Default event on object: " + DynUtil.getInstanceName(syncObj) + " syncing changed property: " + propName);
                   }
                }
@@ -1786,16 +1938,118 @@ public class SyncManager {
             return ii.args;
          return null;
       } public String toString() { return name == null ? super.toString() : name; } // FIXME!
+
+      public int compareTo(Object o) {
+         if (!(o instanceof SyncContext))
+            return -1;
+         return scope.getScopeDefinition().scopeId - ((SyncContext) o).scope.getScopeDefinition().scopeId;
+      }
+
+      private ArrayList<SyncContext> getSortedParentList() {
+
+         // List of all parents of the given scope ordered manually by the scopeId.  In general, this graph
+         // should not be too big and should be carefully crafted to define valid dependencies - e.g.
+         // appGlobal should be ahead of session state.
+         ArrayList<SyncContext> parCtxList = new ArrayList<SyncContext>();
+
+         ArrayList<SyncContext> parentCtxs = parentContexts;
+         if (parentCtxs != null) {
+            addAllParentContexts(parentCtxs, parCtxList);
+         }
+         Collections.sort(parCtxList);
+         removeDuplicateContexts(parCtxList);
+         return parCtxList;
+      }
+
+      /** Returns the object instance with the given name - for runtime lookup. */
+      public Object resolveObject(String currentPackage, String name, boolean create, boolean unwrap) {
+         Object inst = getObjectByName(name, unwrap);
+         String fullPathName = null;
+         if (inst == null && currentPackage != null)
+            inst = getObjectByName(fullPathName = CTypeUtil.prefixPath(currentPackage, name), unwrap);
+         if (inst == null) {
+            inst = ScopeDefinition.resolveName(name, true);
+            if (inst == null && fullPathName != null) {
+               inst = ScopeDefinition.resolveName(fullPathName, true);
+            }
+         }
+         if (inst != null) {
+            /* TODO: security: also would need to check if there are any remote methods on this type... but does it matter?   We will
+               check if the property or method itself is synchronized so maybe it's ok to allow the object to be resolved?  It does potentially give away
+               internal information if we don't do this though.
+            if (!syncDestination.clientDestination && getSyncPropertiesForInst(inst) == null) {
+               System.err.println("Resolve instance not allowed for: " + inst + " type: " + DynUtil.getSType(inst) + " for sync context: " + this);
+            }
+            */
+            return inst;
+         }
+         return null;
+      }
+
+      /** Returns the object instance with the given name - for runtime lookup. */
+      public Object resolveOrCreateObject(String currentPackage, Object outerObj, String name, String typeName, boolean unwrap, String sig, Object...args) {
+         Object inst = null;
+         boolean flushSyncQueue = beginSyncQueue();
+         try {
+            // For TodoList.TodoItem we do want the prefix here but for UIIcon - the type which contains static UIIcons we don't want UIIcon.UIIcon__0
+            if (outerObj != null && !DynUtil.isType(outerObj)) {
+               String outerName = findObjectName(outerObj);
+               if (outerName != null)
+                  name = outerName + '.' + name;
+            }
+            else
+               name = CTypeUtil.prefixPath(currentPackage, name);
+
+            // Passing null here for currentPackage because we already handled currentPackage right above
+            inst = resolveObject(null, name, false, unwrap);
+            if (inst != null)
+               return inst;
+            Object type = DynUtil.findType(typeName);
+            if (type == null) {
+               System.err.println("No type: " + typeName + " for new sync instance");
+               return null;
+            }
+            inst = DynUtil.newInnerInstance(type, outerObj, sig, args);
+            boolean isClient = getSyncManager().syncDestination.clientDestination;
+            if (!isClient && !allowCreate(type)) {
+               System.err.println("Create type not allowed for: " + typeName + " for sync context: " + this);
+               return null;
+            }
+            registerObjName(inst, name, isClient, true);
+         }
+         finally {
+            if (flushSyncQueue)
+               flushSyncQueue();
+         }
+         return inst;
+      }
+   }
+
+   public boolean allowCreate(Object type) {
+      SyncProperties syncProps = getSyncProperties(type);
+      return syncProps == null || syncProps.allowCreate;
+   }
+
+   public boolean allowInvoke(Object method) {
+      if (!syncDestination.clientDestination) {
+         String remoteRuntimes = (String) DynUtil.getAnnotationValue(method, "sc.obj.Remote", "remoteRuntimes");
+         if (remoteRuntimes == null)
+            return false;
+         String[] remoteRuntimeArr = remoteRuntimes.split(",");
+         for (String remoteRuntime:remoteRuntimeArr)
+            if (remoteRuntime.equals(syncDestination.remoteRuntimeName))
+               return true;
+      }
+      return false;
    }
 
    static class SyncListenerInfo {
       TreeMap<String,PropertyValueListener> valList = new TreeMap<String,PropertyValueListener>();
    }
 
-   public SyncDestination syncDestination;
-
    public SyncManager(SyncDestination dest) {
       syncDestination = dest;
+      destinationName = dest.name;
    }
 
    public static void addSyncDestination(SyncDestination syncDest) {
@@ -1818,10 +2072,16 @@ public class SyncManager {
 
    public static boolean isSyncedProperty(Object type, String propName) {
       for (SyncManager mgr:syncManagersByDest.values()) {
-         SyncProperties props = mgr.getSyncProperties(type);
-         if (props != null && props.isSynced(propName)) {
+         if (mgr.isSynced(type, propName))
             return true;
-         }
+      }
+      return false;
+   }
+
+   public boolean isSynced(Object type, String propName) {
+      SyncProperties props = getSyncProperties(type);
+      if (props != null && props.isSynced(propName)) {
+         return true;
       }
       return false;
    }
@@ -1856,12 +2116,17 @@ public class SyncManager {
     *  additional attributes for each property using: new SyncPropOptions(propName, options).
     *  When you just specify a string, if initDefault is false, the flags are set to 0 (properties not sent over on init by default).
     *  When you set initDefault to true, your default properties are all sent across the wire on the initial sync.  You can override that on a per property basis by specifying a SyncPropOption.
-    *  <p>
-    *  For objects which are populated on the server at startup, not available on the client, setting initDefault=true keeps the configuration simpler.
-    *  <p>Flags can be "0" for the default or OR together the values SyncOption.SYNC_INIT_DEFAULT and SyncOption.SYNC_CONSTANT.  INIT_DEFAULT specifies that all properties are sync'd on init unless overridden by specifying SyncPropOptions.  The CONSTANT value specifies that the state of the object is immutable.  No listeners will be added.  Instead the value is sync'd as a value object.</p>
+    *  <p>Flags can be "0" for the default or OR together the values SyncOption.SYNC_INIT_DEFAULT and SyncOption.SYNC_CONSTANT.
+    *  INIT_DEFAULT specifies that all properties are sync'd on init unless overridden by specifying SyncPropOptions.
+    *  The CONSTANT value specifies that the state of the object is immutable.  No listeners will be added.  Instead the value is sync'd as a value object.</p>
     */
    public static void addSyncType(Object type, String syncGroup, Object[] props, String destName, int flags) {
       addSyncType(type, new SyncProperties(destName, syncGroup, props, flags));
+   }
+
+   public static void initStandardTypes() {
+      // Allows serialization of references to java.lang.Class objects through synchronization
+      SyncManager.addSyncType(ClassSyncWrapper.class, new SyncProperties(null, null, new Object[] {}, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, 0));
    }
 
    public static void addSyncType(Object type, SyncProperties props) {
@@ -1968,7 +2233,7 @@ public class SyncManager {
       Initializing,
       /** We are initializing objects on the client but the changes that are being made are being sync'd back from the client, not originating from the server */
       InitializingLocal,
-      /** We are applying changes from the other side.  Nothing is recorded in this mode, unless we are a few levels removed from data binding */
+      /** We are applying changes from the other side.  Nothing is recorded in this mode, unless we are processing a side-effect change from a data binding expression needs recording */
       ApplyingChanges,
       /** Syncing is disabled.  We update the previous values  */
       Disabled,
@@ -2024,6 +2289,10 @@ public class SyncManager {
       setSyncState(null);
    }
 
+   /**
+    * Start queuing sync events on this thread - call flushSyncQueue to invoke them again.  This is particularly helpful
+    * when the state required to register sync insts is not available right when the instance is created.
+    */
    public static boolean beginSyncQueue() {
       if (PTypeUtil.getThreadLocal("syncAddQueue") != null)
          return false;
@@ -2031,6 +2300,7 @@ public class SyncManager {
       return true;
    }
 
+   /** Flushes sync events queued from beginSyncQueue */
    public static boolean flushSyncQueue() {
       LinkedHashSet<AddSyncInfo> queue = (LinkedHashSet<AddSyncInfo>) PTypeUtil.getThreadLocal("syncAddQueue");
       if (queue == null)
@@ -2061,7 +2331,26 @@ public class SyncManager {
       }
    }
 
+   /**
+    * Registers a new instance for synchronization.  You should have previously registered the type of
+    * object using addSyncType - to specify the properties to synchronize on this object.
+    * <p>
+    * This method is used often in code-generation or you can
+    * call it to manually implement synchronization without code-generation.
+    * <p>
+    * If a scopeName is not supplied, we look for the scopeName annotation
+    * on the instance or any outer objects to find the scope where this object should be registered.
+    * <p>
+    * If onDemand is true, this object is not immediately serialized to the other side - instead it's only serialized
+    * the first time it is fetched or referenced by another object which is serialized.
+    * <p>
+    * Any constructor args needed to rebuild the instance should be provided here and those objects must also
+    * be manageable by the sync system (e.g. primitives or that have called addSyncType).
+    */
    public static void addSyncInst(Object inst, boolean onDemand, boolean initDefault, String scopeName, Object ...args) {
+      // TODO: should we use a linked-map for the sync so we can replace a previous entry for the same instance.
+      // If a base class is synchronized on a different scope than the sub-class and a sync queue is enabled, this prevents
+      // us from temporarily initializing the instance in the wrong scope which is not a safe thing to do
       LinkedHashSet<AddSyncInfo> syncQueue = (LinkedHashSet<AddSyncInfo>) PTypeUtil.getThreadLocal("syncAddQueue");
       if (syncQueue != null) {
          syncQueue.add(new AddSyncInfo(inst, onDemand, initDefault, scopeName, args));
@@ -2079,11 +2368,17 @@ public class SyncManager {
    public static void addSyncInst(Object inst, boolean onDemand, boolean initDefault, int scopeId, Object...args) {
       Object type = DynUtil.getType(inst);
 
+      boolean found = false;
+
       for (SyncManager syncMgr:syncManagersByDest.values()) {
          SyncProperties syncProps = syncMgr.getSyncProperties(type);
-         if (syncProps != null)
+         if (syncProps != null) {
             syncMgr.addSyncInst(inst, onDemand, initDefault, scopeId, syncProps, args);
+            found = true;
+         }
       }
+      if (!found && verbose)
+         System.out.println("*** Warning: SyncManager.addSyncInst called with type not registered to any destination " + DynUtil.getTypeName(type, false));
    }
 
    public SyncContext newSyncContext(String name) {
@@ -2118,56 +2413,53 @@ public class SyncManager {
    }
 
    SyncContext getSyncContext(int scopeId, boolean create) {
-      String appId = getSyncAppId();
       if (scopeId == 0)
-         return getRootSyncContext(appId);
+         return getRootSyncContext();
       ScopeDefinition scopeDef = ScopeDefinition.getScopeDefinition(scopeId);
-      ScopeContext scopeCtx = scopeDef.getScopeContext();
-      if (appId == null) {
-         System.err.println("*** Attempt to retrieve a sync context for a specific scope with no app id in place - see SyncManager.setSyncAppId");
+      if (scopeDef == null) {
+         System.err.println("*** No scope defined for synchronized instance with scopeId: " + scopeId);
          return null;
       }
-
-      TreeMap<String, SyncContext> ctxMap = (TreeMap<String, SyncContext>) scopeCtx.getValue(SC_SYNC_CONTEXT);
-      SyncContext ctx;
-      if (ctxMap == null) {
-         if (create) {
-            ctxMap = new TreeMap<String,SyncContext>();
-            scopeCtx.setValue(SC_SYNC_CONTEXT, ctxMap);
+      ScopeContext scopeCtx = scopeDef.getScopeContext(create);
+      SyncContext syncCtx = scopeCtx == null ? null : (SyncContext) scopeCtx.getValue(SC_SYNC_CONTEXT_SCOPE_KEY);
+      if (syncCtx == null && create) {
+         if (scopeCtx == null) {
+            System.err.println("*** No scope: " + scopeDef.name + " to create sync context");
+            return null;
          }
-         ctx = null;
-      }
-      else {
-         ctx = ctxMap.get(appId);
-      }
-      if (ctx == null && create) {
-         ctx = newSyncContext(scopeDef.name);
-         ctx.scope = scopeCtx;
-         ScopeDefinition parentScope = scopeDef.getParentScope();
-         if (parentScope != null) {
-            ctx.parentContext = getSyncContext(parentScope.scopeId, true);
+         syncCtx = newSyncContext(scopeDef.name);
+         syncCtx.scope = scopeCtx;
+         scopeCtx.setValue(SC_SYNC_CONTEXT_SCOPE_KEY, syncCtx);
+         ArrayList<ScopeDefinition> parentScopes = scopeDef.getParentScopes();
+         if (parentScopes != null) {
+            for (ScopeDefinition parentScope : parentScopes) {
+               SyncContext parCtx;
+               if (parentScope != null) {
+                  parCtx = getSyncContext(parentScope.scopeId, true);
+                  if (parCtx != null)
+                     parCtx.addChildContext(syncCtx);
+                  syncCtx.addParentContext(parCtx);
+               }
+            }
          }
-         if (ctx.parentContext == null)
-            ctx.parentContext = getRootSyncContext(appId);
-         ctx.parentContext.addChildContext(ctx);
-         ctxMap.put(appId, ctx);
-         scopeCtx.setDestroyListener(getRootSyncContext(appId));
+         if (syncCtx.parentContexts == null || syncCtx.parentContexts.size() == 0) {
+            SyncContext parCtx = getRootSyncContext();
+            syncCtx.addParentContext(parCtx);
+            parCtx.addChildContext(syncCtx);
+         }
+         scopeCtx.setDestroyListener(getRootSyncContext());
       }
-      // Even if this context has not been created, we might have changed for us in the root contexst.
-      if (ctx == null)
-         return null;
-      return ctx;
+      return syncCtx;
    }
 
-   private final static String SC_SYNC_CONTEXT = "sc.SyncContext";
-
+   public final static String SC_SYNC_CONTEXT_SCOPE_KEY = "sc.SyncContext";
 
    private void addSyncInst(Object inst, boolean onDemand, boolean initDefault, int scopeId, SyncProperties syncProps, Object...args) {
       SyncContext ctx;
       ctx = getSyncContext(scopeId, true);
 
       if (ctx != null)
-         ctx.addSyncInst(inst, !onDemand, onDemand, initDefault, true, true, scopeId, syncProps, args);
+         ctx.addSyncInst(null, inst, !onDemand, onDemand, initDefault, true, true, scopeId, syncProps, args);
       else {
          if (trace)
             System.err.println("Ignoring addSyncInst - not in scope: " + ScopeDefinition.getScope(scopeId));
@@ -2184,7 +2476,7 @@ public class SyncManager {
       for (SyncManager syncMgr:syncManagersByDest.values()) {
          SyncContext ctx = syncMgr.getSyncContext(scopeId, true);
          if (ctx != null) {
-            // Here we've already been given thes cope for the syncInst so just put it into that one.
+            // Here we've already been given the scope for the syncInst so just put it into that one.
             ctx.registerObjNameOnScope(inst, instName, fixedName, initInst, true);
          }
       }
@@ -2198,7 +2490,7 @@ public class SyncManager {
    // Used by the JS code
    public static void registerSyncInst(Object inst, String instName) {
       SyncContext ctx = getDefaultSyncContext();
-      ctx.registerObjName(inst, instName, true, true);
+      ctx.registerObjName(inst, instName, ctx.getSyncManager().syncDestination.clientDestination, true);
    }
 
    /** Returns the SyncContext to use for a sync instance which has already been added to the system. */
@@ -2226,7 +2518,6 @@ public class SyncManager {
    }
 
    public static void removeSyncInst(Object inst) {
-
       List<ScopeDefinition> scopeDefs = ScopeDefinition.getActiveScopes();
       if (scopeDefs == null)
          return;
@@ -2235,16 +2526,13 @@ public class SyncManager {
       // We do not know the app ids which this instance is registered under right now so we have to do a bit of searching to find
       // the sync contexts (if any) which have it registered.
       for (ScopeDefinition scopeDef:scopeDefs) {
-         ScopeContext scopeCtx = scopeDef.getScopeContext();
-         TreeMap<String,SyncContext> ctxMap = (TreeMap<String,SyncContext>) scopeCtx.getValue(SC_SYNC_CONTEXT);
-         if (ctxMap != null) {
-            for (Map.Entry<String,SyncContext> ctxEnt:ctxMap.entrySet()) {
-               SyncContext syncCtx = ctxEnt.getValue();
-               if (syncCtx.hasSyncInst(inst)) {
-                  SyncProperties syncProps = syncCtx.getSyncManager().getSyncProperties(type);
-                  if (syncProps != null) {
-                     syncCtx.removeSyncInst(inst, syncProps);
-                  }
+         ScopeContext scopeCtx = scopeDef.getScopeContext(false);
+         if (scopeCtx != null) {
+            SyncContext syncCtx = (SyncContext) scopeCtx.getValue(SC_SYNC_CONTEXT_SCOPE_KEY);
+            if (syncCtx != null && syncCtx.hasSyncInst(inst)) {
+               SyncProperties syncProps = syncCtx.getSyncManager().getSyncProperties(type);
+               if (syncProps != null) {
+                  syncCtx.removeSyncInst(inst, syncProps);
                }
             }
          }
@@ -2261,22 +2549,19 @@ public class SyncManager {
       // We do not know the app ids which this instance is registered under right now so we have to do a bit of searching to find
       // the sync contexts (if any) which have it registered.
       for (ScopeDefinition scopeDef:scopeDefs) {
-         ScopeContext scopeCtx = scopeDef.getScopeContext();
-         TreeMap<String,SyncContext> ctxMap = (TreeMap<String,SyncContext>) scopeCtx.getValue(SC_SYNC_CONTEXT);
-         if (ctxMap != null) {
-            for (Map.Entry<String,SyncContext> ctxEnt:ctxMap.entrySet()) {
-               SyncContext syncCtx = ctxEnt.getValue();
-               if (syncCtx.hasSyncInst(fromInst)) {
-                  SyncProperties syncProps = syncCtx.getSyncManager().getSyncProperties(type);
-                  if (syncProps != null) {
-                     syncCtx.replaceSyncInst(fromInst, toInst, syncProps);
-                  }
-               }
+         ScopeContext scopeCtx = scopeDef.getScopeContext(false);
+         if (scopeCtx == null)
+            continue;
+         SyncContext syncCtx = (SyncContext) scopeCtx.getValue(SC_SYNC_CONTEXT_SCOPE_KEY);
+         if (syncCtx.hasSyncInst(fromInst)) {
+            SyncProperties syncProps = syncCtx.getSyncManager().getSyncProperties(type);
+            if (syncProps != null) {
+               syncCtx.replaceSyncInst(fromInst, toInst, syncProps);
             }
          }
          else if (scopeDef.isGlobal()) {
             for (SyncManager syncMgr:syncManagersByDest.values()) {
-               SyncContext syncCtx = syncMgr.getRootSyncContext(null);
+               syncCtx = syncMgr.getRootSyncContext();
                if (syncCtx != null && syncCtx.hasSyncInst(fromInst)) {
                   SyncProperties syncProps = syncCtx.getSyncManager().getSyncProperties(type);
                   syncCtx.replaceSyncInst(fromInst, toInst, syncProps);
@@ -2402,18 +2687,27 @@ public class SyncManager {
       }
    }
 
-   public static CharSequence getInitialSync(String destName, int scopeId, boolean resetSync) {
+   /** Used from the generated code for the browser to apply a sync layer to the default destination */
+   public static void applySyncLayer(String language, String data) {
+      for (String destName:syncManagersByDest.keySet()) {
+         SyncManager syncManager = syncManagersByDest.get(destName);
+         // TODO: compare language and syncDestination.receiveLanguage?
+         syncManager.syncDestination.applySyncLayer(data, language, false);
+      }
+   }
+
+   public static CharSequence getInitialSync(String destName, int scopeId, boolean resetSync, String outputLanguage) {
       SyncManager syncMgr = syncManagersByDest.get(destName);
 
-      return syncMgr.getInitialSync(scopeId, resetSync);
+      return syncMgr.getInitialSync(scopeId, resetSync, outputLanguage);
    }
 
    /**
     * Called when we retrieve the initial state of a set of components.  Both marks the current state as being initialized
     * and marks the specified sync context as being in the initial sync state.
     */
-   public void setInitialSync(String appId, int scopeId, boolean val) {
-      SyncManager.setSyncAppId(appId);
+   public void setInitialSync(String appId, int scopeId, boolean val) { // TODO: rename to setInitialSyncState
+      //SyncManager.setSyncAppId(appId);
       if (val)
          SyncManager.setSyncState(SyncManager.SyncState.Initializing);
       else
@@ -2422,41 +2716,87 @@ public class SyncManager {
       ctx.setInitialSync(val);
    }
 
-   public CharSequence getInitialSync(int scopeId, boolean resetSync) {
+   public CharSequence getInitialSync(int scopeId, boolean resetSync, String outputLanguage) { // TODO: comment: Returns the stratacode snippet that will initialize the provided scope from a clean state perspective.  Used for the first time page load, or if a client-session is disconnected and needs to refresh itself from the initial state.
       SyncContext ctx = getSyncContext(scopeId, true); // Need to create it here since the initial sync will record lazy obj names we have to clear on reload
       if (ctx == null)
          return null;
 
-      StringBuilder res = new StringBuilder();
+      SyncSerializer lastSer = null;
       if (!resetSync) {
          SyncLayer layer = ctx.getInitialSyncLayer();
          HashSet<String> createdTypes = new HashSet<String>();
 
-         ArrayList<SyncContext> parCtxList = new ArrayList<SyncContext>();
-         SyncContext parentCtx = ctx.parentContext;
-         while (parentCtx != null) {
-            parCtxList.add(parentCtx);
-            parentCtx = parentCtx.parentContext;
-         }
+         ArrayList<SyncContext> parCtxList = ctx.getSortedParentList();
 
          // Start at the root parent context and work down the chain
-         for (int i = parCtxList.size() - 1; i >= 0; i--) {
-            parentCtx = parCtxList.get(i);
-            CharSequence parentRes = parentCtx.getInitialSyncLayer().serialize(ctx, createdTypes, false);
-            if (parentRes != null) {
-               res.append(parentRes);
+         for (int i = 0; i < parCtxList.size(); i++) {
+            SyncContext parentCtx = parCtxList.get(i);
+            SyncSerializer parentSer = parentCtx.getInitialSyncLayer().serialize(ctx, createdTypes, false);
+            if (parentSer != null) {
+               if (lastSer == null)
+                  lastSer = parentSer;
+               else
+                  lastSer.appendSerializer(parentSer);
             }
          }
 
-         CharSequence thisRes = layer.serialize(ctx, createdTypes, false);
-         res.append(thisRes);
+         SyncSerializer thisSer = layer.serialize(ctx, createdTypes, false);
+         if (thisSer != null) {
+            if (lastSer == null)
+               lastSer = thisSer;
+            else
+               lastSer.appendSerializer(thisSer);
+         }
       }
 
       // Before we've finished the initial sync, there's no difference between the initial values and the previous values.
       ctx.setInitialSync(false);
       // Any new object names we generated during initialization are now 'registered' by that client
       ctx.commitNewObjNames(ctx);
+
+      StringBuilder res = lastSer == null ? new StringBuilder() : lastSer.getOutput();
+
+      if (trace) {
+         if (res.length() > 0)
+            System.out.println("Initial sync for: " + ctx + ":\n" + (lastSer == null ? "" :lastSer.getDebugOutput()));
+      }
+
+      if (outputLanguage == null || syncDestination.getSendLanguage().equals(outputLanguage))
+         return res;
+
+      // TODO: add this as a 'convert' method on SyncDestination so the logic is customizable for other formats that might need a conversion step
+      // Need to apply the format we were given using some JS code - if stratacode, it's converted to 'js' directly, otherwise ('json') it gets applied in the same language
+      if (outputLanguage.equals("js") && res.length() > 0) {
+         StringBuilder jsRes = new StringBuilder();
+         jsRes.append("sc_SyncManager_c.applySyncLayer(\"" + syncDestination.getOutputLanguage() + "\", \"");
+         jsRes.append(CTypeUtil.escapeJavaString(res.toString(), false));
+         jsRes.append("\");\n");
+         return jsRes;
+      }
       return res;
+   }
+
+   // Accumulate the list of all parent sync contexts.  We sort by scopeId and remove duplicates on this list but might as well get a rough sort
+   private static void addAllParentContexts(ArrayList<SyncContext> parentList, ArrayList<SyncContext> result) {
+      for (int i = 0; i < parentList.size(); i++) {
+         SyncContext parent = parentList.get(i);
+         if (parent.parentContexts != null)
+            addAllParentContexts(parent.parentContexts, result);
+      }
+      result.addAll(parentList);
+   }
+
+   // Since we sorted the list, duplicates will be next to each other
+   private static void removeDuplicateContexts(ArrayList<SyncContext> result) {
+      for (int i = 0; i < result.size(); i++) {
+         SyncContext cur = result.get(i);
+         for (int j = i+1; j < result.size(); j++) {
+            if (cur == result.get(j)) {
+               result.remove(j);
+               j--;
+            }
+         }
+      }
    }
 
    /**
@@ -2466,7 +2806,7 @@ public class SyncManager {
    public static boolean sendSync(String syncGroup, boolean resetSync) {
       boolean sentAnything = false;
       for (String destName:syncManagersByDest.keySet())
-         sentAnything = sendSync(destName, syncGroup, resetSync) || sentAnything;
+         sentAnything = sendSync(destName, syncGroup, resetSync, null) || sentAnything;
       return sentAnything;
    }
 
@@ -2484,25 +2824,51 @@ public class SyncManager {
       return syncScope;
    }
 
-   public static boolean sendSync(String destName, String syncGroup, boolean resetSync) {
+   public static boolean sendSync(String destName, String syncGroup, boolean resetSync, CharSequence codeUpdates) {
       ScopeDefinition syncScope = getDefaultScope();
       if (syncScope == null)
          throw new IllegalArgumentException("*** No active scopes to sync");
       else
-         return sendSync(destName, syncGroup, syncScope.scopeId, resetSync);
+         return sendSync(destName, syncGroup, syncScope.scopeId, resetSync, codeUpdates);
    }
 
-   public static boolean sendSync(String destName, String syncGroup, int scopeId, boolean resetSync) {
+   public static boolean sendSync(String destName, String syncGroup, int scopeId, boolean resetSync, CharSequence codeUpdates) {
       SyncManager syncMgr = syncManagersByDest.get(destName);
-      return syncMgr.sendSync(syncGroup, scopeId, resetSync);
+      return syncMgr.sendSync(syncGroup, scopeId, resetSync, codeUpdates);
    }
 
-   public boolean sendSync(String syncGroup, int scopeId, boolean resetSync) {
+   private SyncContext getFirstParentSyncContext(int scopeId, boolean create) {
+      ScopeDefinition scope = ScopeDefinition.getScopeDefinition(scopeId);
+      if (scope != null) {
+         List<ScopeDefinition> parentScopes = scope.getParentScopes();
+         if (parentScopes != null) {
+            for (ScopeDefinition parent:parentScopes) {
+               SyncContext ctx = getSyncContext(parent.scopeId, false);
+               if (ctx != null)
+                  return ctx;
+            }
+            for (ScopeDefinition parent:parentScopes) {
+               SyncContext ctx = getFirstParentSyncContext(parent.scopeId, false);
+               if (ctx != null)
+                  return ctx;
+            }
+         }
+      }
+      return null;
+   }
+
+   public boolean sendSync(String syncGroup, int scopeId, boolean resetSync, CharSequence codeUpdates) {
       SyncContext ctx = getSyncContext(scopeId, false);
+      if (ctx == null) {  // If the default scope does not have a context, check for a sync context on the parent scope
+         ctx = getFirstParentSyncContext(scopeId, false);
+      }
+
       if (ctx != null) {
+         ArrayList<SyncContext> ctxList = ctx.getSortedParentList();
+         ctxList.add(ctx);
          ArrayList<SyncLayer> toSend = new ArrayList<SyncLayer>();
-         SyncContext nextCtx = ctx;
-         do {
+         for (int i = 0; i < ctxList.size(); i++) {
+            SyncContext nextCtx = ctxList.get(i);
             if (syncGroup == SYNC_ALL) {
                for (String group:ctx.getSyncGroups()) {
                   SyncLayer changedLayer = nextCtx.getChangedSyncLayer(group);
@@ -2513,19 +2879,17 @@ public class SyncManager {
                SyncLayer changedLayer = nextCtx.getChangedSyncLayer(syncGroup);
                toSend.add(changedLayer);
             }
-            nextCtx = nextCtx.parentContext;
-         } while (nextCtx != null);
-
-         return syncDestination.sendSync(ctx, toSend, syncGroup, resetSync);
+         }
+         return syncDestination.sendSync(ctx, toSend, syncGroup, resetSync, codeUpdates);
       }
       else if (verbose) {
-         System.out.println("No changes to synchronize in scope: " + ScopeDefinition.getScope(scopeId));
+         System.out.println("No changes to synchronize for scope: " + ScopeDefinition.getScope(scopeId));
       }
       return true;
    }
 
-   public static RemoteResult invokeRemote(Object obj, String methName, Object...args) {
-      return invokeRemoteDest(SyncDestination.defaultDestination.name, null, obj, methName, args);
+   public static RemoteResult invokeRemote(Object obj, String methName, String paramSig, Object...args) {
+      return invokeRemoteDest(SyncDestination.defaultDestination.name, null, obj, methName, paramSig, args);
    }
 
    public static void setCurrentSyncLayers(ArrayList<SyncLayer> current) {
@@ -2551,13 +2915,13 @@ public class SyncManager {
          System.err.println("processMethodReturn called when no current sync layer is registered");
    }
 
-   public static RemoteResult invokeRemoteDest(String destName, String syncGroup, Object obj, String methName, Object...args) {
+   public static RemoteResult invokeRemoteDest(String destName, String syncGroup, Object obj, String methName, String paramSig, Object...args) {
       SyncManager mgr = getSyncManager(destName);
       int scopeId = getScopeIdForSyncInst(obj);
       if (scopeId == -1)
          scopeId = GlobalScopeDefinition.getGlobalScopeDefinition().scopeId;
       SyncContext ctx = obj == null ? mgr.getDefaultSyncContext() : mgr.getSyncContext(scopeId, true);
-      return ctx.invokeRemote(syncGroup, obj, methName, args);
+      return ctx.invokeRemote(syncGroup, obj, methName, paramSig, args);
    }
 
    public static SyncContext getDefaultSyncContext() {
@@ -2634,5 +2998,10 @@ public class SyncManager {
    public int getNumSendsInProgress() {
       return numSendsInProgress;
    }
+
+   static class SyncContextHolder {
+      SyncContext ctx;
+   }
+
 
 }

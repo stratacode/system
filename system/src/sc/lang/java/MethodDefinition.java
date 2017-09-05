@@ -7,6 +7,7 @@ package sc.lang.java;
 import sc.dyn.DynUtil;
 import sc.lang.ILanguageModel;
 import sc.lang.SemanticNodeList;
+import sc.lang.template.GlueStatement;
 import sc.lang.template.Template;
 import sc.layer.LayeredSystem;
 import sc.type.IBeanIndexMapper;
@@ -80,7 +81,37 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
    public void start() {
       if (started) return;
 
+      if (body != null) {
+         Object retType = getTypeDeclaration();
+         if (retType != null && !ModelUtil.typeIsVoid(retType)) {
+            Statement last = body.statements == null || body.statements.size() == 0 ? null : body.statements.get(body.statements.size() - 1);
+            ArrayList<Statement> ret = null;
+            if (last != null) {
+               ret = new ArrayList<Statement>();
+               // TODO: rather than gather up all return statements, we should only get the ones for 'exit paths' - i.e. nothing that's followed by another valid statement
+               last.addReturnStatements(ret, true);
+            }
+            // When you do have a glue statement as the method body, it stands in place of the return <string>
+            if (!(last instanceof GlueStatement)) {
+               if (ret == null || ret.size() == 0 || isEmptyReturn(ret.get(ret.size() - 1))) {
+                  // The start and end index here are just stored in the ErrorRangeInfo and used by the IDE to mark the end of the method, rather than the name of the method
+                  displayRangeError(1, 1, "Missing return statement: ");
+               }
+            }
+         }
+      }
       super.start();
+   }
+
+   private static boolean isEmptyReturn(Object retObj) {
+      // Not returning at all!
+      if (retObj instanceof ThrowStatement)
+         return false;
+      if (!(retObj instanceof ReturnStatement))
+         return true;
+
+      ReturnStatement ret = (ReturnStatement) retObj;
+      return ret.expression == null;
    }
 
    public void validate() {
@@ -90,6 +121,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
 
       // We are probably just a fragment so none of this stuff is required.
       if (methodType == null) {
+         super.validate();
          return;
       }
       // TODO: For the layer type itself, not sure how or whether we should inherit methods from downstream layers.  Right now, the derived type will be Layer.class which is the base at least.
@@ -97,7 +129,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       Object modType = methodType.getDerivedTypeDeclaration();
       if (extendsType == null)
          extendsType = Object.class;
-      Object overridden = ModelUtil.definesMethod(extendsType, name, getParameterList(), null, null, false, false, null, null);
+      Object overridden = ModelUtil.definesMethod(extendsType, name, getParameterList(), null, null, false, false, null, null, getLayeredSystem());
       superMethod = overridden;
 
       /* Dynamic methods need to find any overridden method and make sure calls to that one are also made dynamic.
@@ -131,8 +163,9 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          // need that interface in the dynamic stub of the enclosing type.
          if (overridden == null && methodType.implementsBoundTypes != null) {
             Object implMeth;
+            LayeredSystem sys = getLayeredSystem();
             for (Object impl:methodType.implementsBoundTypes) {
-               implMeth = ModelUtil.definesMethod(impl, name, getParameterList(), null, null, false, false, null, null);
+               implMeth = ModelUtil.definesMethod(impl, name, getParameterList(), null, null, false, false, null, null, sys);
                if (implMeth != null && ModelUtil.isCompiledMethod(implMeth)) {
                   methodType.setNeedsDynamicStub(true);
                   overridesCompiled = true;
@@ -156,12 +189,12 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             // When we are in the midst of doing the transform, we will add getX and setX methods.  Those do not need to be
             // added as properties at the type level.
             if (!enclType.isTransformedType())
-               enclType.addPropertyToMakeBindable(propertyName, this, null);
+               enclType.addPropertyToMakeBindable(propertyName, this, null, false, this);
          }
       }
       // TODO: shouldn't this be moved to the start method?
       if (modType != extendsType) {
-         overridden = ModelUtil.definesMethod(modType, name, getParameterList(), null, null, false, false, null, null);
+         overridden = ModelUtil.definesMethod(modType, name, getParameterList(), null, null, false, false, null, null, getLayeredSystem());
          if (overridden instanceof MethodDefinition) {
             MethodDefinition overMeth = (MethodDefinition) overridden;
             if (overMeth == this)
@@ -193,16 +226,20 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       return propertyName;
    }
 
-   /** The methods return type */
+   /** The method's return type */
    public Object getTypeDeclaration() {
       if (override && type == null) {
          Object prev = getPreviousDefinition();
          if (prev instanceof MethodDefinition)
             return ((MethodDefinition) prev).getTypeDeclaration();
-         else
+         else if (prev != null)
             return ModelUtil.getReturnType(prev, true);
       }
-      return type == null ? null : type.getTypeDeclaration();
+      Object res = type == null ? null : type.getTypeDeclaration();
+      if (res != null && arrayDimensions != null) {
+         res = new ArrayTypeDeclaration(getLayeredSystem(), getEnclosingType(), type, arrayDimensions);
+      }
+      return res;
    }
 
    public String getGenericTypeName(Object resultType, boolean includeDims) {
@@ -222,7 +259,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          Object prev = getPreviousDefinition();
          if (prev instanceof IMethodDefinition)
             return ((IMethodDefinition) prev).getTypeDeclaration(arguments, resolve);
-         else
+         else if (prev != null)
             return ModelUtil.getReturnType(prev, resolve);
       }
 
@@ -230,79 +267,6 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       if (typeParameters == null)
          return returnType;
 
-      // TODO: Can we remove this code?  The substitution of type parameters is now done in ModelUtil so we can
-      // share that logic with src and compiled types.
-      /*
-      if (returnType instanceof TypeParameter && arguments != null) {
-         TypeParameter rtParam = (TypeParameter) returnType;
-         if (parameters != null) {
-            List<Parameter> paramList = parameters.getParameterList();
-            for (int i = 0; i < paramList.size(); i++) {
-               Object paramType = paramList.get(i).getTypeDeclaration();
-               if (paramType != null && ModelUtil.isTypeVariable(paramType)) {
-                  String paramArgName = ModelUtil.getTypeParameterName(paramType);
-                  if (paramArgName != null && paramArgName.equals(rtParam.name)) {
-                     if (i >= arguments.size()) // No value for a repeating parameter?
-                        return null;
-                     return arguments.get(i).getTypeDeclaration();
-                  }
-               }
-            }
-         }
-      }
-      */
-      // The case for a method like:
-      //   public static <E extends Enum<E>> EnumSet<E> allOf(Class<E> type)
-      //
-      // Get the type of each parameter.  For each type parameter to the method.
-      // Take the current type for that parameter and compute the bound types for those type parameters.
-      //
-      /*
-      if (returnType instanceof ParamTypeDeclaration) {
-         ParamTypeDeclaration returnTypePT = (ParamTypeDeclaration) returnType;
-         ParamTypeDeclaration result = returnTypePT.copy();
-         for (TypeParameter tp:typeParameters) {
-            if (parameters != null) {
-               List<Parameter> paramList = parameters.getParameterList();
-               for (int i = 0; i < paramList.size(); i++) {
-                  Parameter nextParam = paramList.get(i);
-                  Object paramType = nextParam.getTypeDeclaration();
-                  List<?> typeParams = ModelUtil.getTypeParameters(paramType);
-                  if (typeParams != null) {
-                     for (int j = 0; j < typeParams.size(); j++) {
-                        Object typeParam = typeParams.get(j);
-                        int paramPos = ModelUtil.getTypeParameterPosition(typeParam);
-                        if (paramPos == tp.getPosition()) {
-                           // Special case to handle foo.class -> Class<T> construct.
-                           if (ModelUtil.getParamTypeBaseType(paramType) == Class.class) {
-                              Object paramExpr = arguments.get(i);
-                              // Need the actual class itself, not the type of the expression (which in this case is class)
-                              if (paramExpr instanceof ClassValueExpression) {
-                                 ClassValueExpression pe = (ClassValueExpression) paramExpr;
-                                 Object classType = pe.resolveClassType();
-                                 result.setTypeParamIndex(j, classType);
-                              }
-                              // else - a runtime class.  We don't get additional type info from that.
-                           }
-                           // If it's a type variable itself, it's not changing the return type.
-                           else if (!ModelUtil.isTypeVariable(typeParam)) {
-                              System.err.println("*** unhandled case with param type methods");
-                           }
-                        }
-                     }
-                  }
-                  else if (paramType instanceof ArrayTypeDeclaration) {
-                     Object componentType = ((ArrayTypeDeclaration) paramType).getComponentType();
-                     if (ModelUtil.isTypeVariable(componentType)) {
-
-                     }
-                  }
-               }
-            }
-         }
-         return result;
-      }
-      */
       return returnType;
    }
 
@@ -611,6 +575,12 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       return null;
    }
 
+   public Object getFieldFromGetSetMethod() {
+      if (isSetMethod() || isGetMethod())
+         return getEnclosingType().definesMember(propertyName, MemberType.FieldSet, null, null);
+      return null;
+   }
+
    public boolean isGetMethod() {
       return propertyName != null && ((name.startsWith("get") || name.startsWith("is")) || (origName != null && (origName.startsWith("get") || origName.startsWith("is"))));
    }
@@ -639,12 +609,12 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
 
       Object res;
       if (ext != null) {
-         res = ModelUtil.definesMethod(ext, name, getParameterList(), null, null, false, false, null, null);
+         res = ModelUtil.definesMethod(ext, name, getParameterList(), null, null, false, false, null, null, getLayeredSystem());
          if (res != null)
             return res;
       }
       if (ext != base && base != null) {
-         res = ModelUtil.definesMethod(base, name, getParameterList(), null, null, false, false, null, null);
+         res = ModelUtil.definesMethod(base, name, getParameterList(), null, null, false, false, null, null, getLayeredSystem());
          if (res != null)
             return res;
       }
@@ -733,14 +703,36 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       LayeredSystem sys = getLayeredSystem();
       List<?> parameterTypes = getParameterList();
 
+      HashSet<Object> visited = new HashSet<Object>();
+
       if (sys == null)
          return null;
-      addOverridingMethods(sys, enclType, res, parameterTypes);
+      addOverridingMethods(sys, enclType, res, parameterTypes, visited);
 
       return res;
    }
 
-   private void addOverridingMethods(LayeredSystem sys, TypeDeclaration enclType, ArrayList<Object> res, List<? extends Object> ptypes) {
+   private boolean resultListContainsMethod(ArrayList<Object> res, Object overMeth) {
+      for (int i = 0; i < res.size(); i++) {
+         if (ModelUtil.sameMethods(res.get(i), overMeth))
+            return true;
+      }
+      return false;
+   }
+
+   private void addOverridingMethods(LayeredSystem sys, TypeDeclaration enclType, ArrayList<Object> res, List<? extends Object> ptypes, HashSet<Object> visited) {
+      ArrayList<TypeDeclaration> modTypes = sys.getModifiedTypesOfType(enclType, false, false);
+      if (modTypes != null) {
+         for (TypeDeclaration modType:modTypes) {
+            if (visited.contains(modType))
+               continue;
+            visited.add(modType);
+            Object overMeth = ModelUtil.definesMethod(modType, name, getParameterList(), null, null, false, false, null, null, getLayeredSystem());
+            // Instead of overMeth != this it should be sameMethodsInLayers - i.e. where we compare the method's enclosing type's type-name and layer since we know the parameters and name match
+            if (overMeth != null && !resultListContainsMethod(res, overMeth) && overMeth != this && !ModelUtil.sameMethodInLayer(sys, overMeth, this))
+               res.add(overMeth);
+         }
+      }
       Iterator<TypeDeclaration> subTypes = sys.getSubTypesOfType(enclType, false, false, true, false, false);
       while (subTypes.hasNext()) {
          TypeDeclaration subType = subTypes.next();
@@ -749,9 +741,13 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             return;
          }
 
+         if (visited.contains(subType))
+            continue;
+         visited.add(subType);
+
          // In this case, we need to consider all overriding methods - including those in modified types
          Object result = subType.declaresMethod(name, ptypes, null, enclType, false, null, null, false);
-         if (result instanceof MethodDefinition) {
+         if (result instanceof MethodDefinition && !resultListContainsMethod(res, result)) {
             res.add(result);
          }
          BodyTypeDeclaration modType = subType.getModifiedType();
@@ -760,12 +756,12 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             if (modType == null || ModelUtil.sameTypes(modType, enclType) && modType.layer.getLayerName().equals(subType.layer.getLayerName()))
                break;
             result = modType.declaresMethod(name, ptypes, null, enclType, false, null, null, false);
-            if (result instanceof MethodDefinition)
+            if (result instanceof MethodDefinition && !resultListContainsMethod(res, result))
                res.add(result);
             modType = modType.getModifiedType();
          } while (true);
 
-         addOverridingMethods(sys, subType, res, ptypes);
+         addOverridingMethods(sys, subType, res, ptypes, visited);
       }
    }
 
@@ -773,31 +769,39 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       return body == null;
    }
 
-   public Object getInferredReturnType() {
+   public static final String UNRESOLVED_INFERRED_TYPE = new String("<unresolved-inferred-type>");
+
+   public Object getInferredReturnType(boolean bodyOnly) {
       Object infRetType = null;
       if (body != null) {
          ArrayList<Statement> returns = new ArrayList<Statement>();
-         body.addReturnStatements(returns);
+         body.addReturnStatements(returns, false);
          if (returns.size() > 0) {
             for (int i = 0; i < returns.size(); i++) {
                ReturnStatement ret = (ReturnStatement) returns.get(i);
                if (ret.expression != null) {
                   Object newRetType = ret.expression.getGenericType();
-                  if (newRetType != null && newRetType != NullLiteral.NULL_TYPE) {
+                  if (newRetType != null) {
                      if (infRetType == null) {
                         //infRetType = ModelUtil.findCommonSuperClass(newRetType, getTypeDeclaration());
                         infRetType = newRetType;
                      }
-                     else
-                        infRetType = ModelUtil.findCommonSuperClass(newRetType, infRetType);
+                     else if (!ModelUtil.isTypeVariable(newRetType))
+                        infRetType = ModelUtil.findCommonSuperClass(getLayeredSystem(), newRetType, infRetType);
                   }
+                  else
+                     return UNRESOLVED_INFERRED_TYPE;
                }
             }
          }
       }
+      // When matching for lambdas, we want to make sure the body's return type matches the method's so need to skip
+      // the logic to factor in the method's real return type.
+      if (bodyOnly)
+         return infRetType;
       Object retType = getTypeDeclaration();
       // Make sure the inferredType is more specific than the actual return type
-      if (retType == null || (infRetType != null && ModelUtil.isAssignableFrom(retType, infRetType)))
+      if (retType == null || (infRetType != null && infRetType != NullLiteral.NULL_TYPE && ModelUtil.isAssignableFrom(retType, infRetType)))
          return infRetType;
       return retType;
    }
@@ -828,5 +832,23 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          return thisAnnot;
       }
       return thisAnnot;
+   }
+
+   public Object[] getExtraModifiers() {
+      TypeDeclaration enclType = getEnclosingType();
+      // Methods that are part of an interface are implicitly public in Java
+      if (enclType != null && enclType.getDeclarationType() == DeclarationType.INTERFACE) {
+         return new Object[] {"public"};
+      }
+      return null;
+   }
+
+   public void stop() {
+      super.stop();
+      superMethod = null;
+      isMain = false;
+      dynamicType = false;
+      overridesCompiled = false;
+      needsDynAccess = false;
    }
 }

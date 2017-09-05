@@ -5,12 +5,13 @@
 package sc.lang.java;
 
 import sc.lang.ISrcStatement;
+import sc.parser.ParseUtil;
 
 import java.util.List;
 import java.util.Set;
 
 /** Do/While statement */
-public class WhileStatement extends ExpressionStatement {
+public class WhileStatement extends ExpressionStatement implements IStatementWrapper {
    public Statement statement;
 
    public ExecResult exec(ExecutionContext ctx) {
@@ -98,7 +99,35 @@ public class WhileStatement extends ExpressionStatement {
       return child == statement;
    }
 
-   public void addReturnStatements(List<Statement> res) {
-      statement.addReturnStatements(res);
+   public void addReturnStatements(List<Statement> res, boolean incThrow) {
+      statement.addReturnStatements(res, incThrow);
+   }
+
+   public Statement findStatement(Statement in) {
+      if (statement != null) {
+         Statement out = statement.findStatement(in);
+         if (out != null)
+            return out;
+      }
+      return super.findStatement(in);
+   }
+
+   public boolean isLeafStatement() {
+      return false;
+   }
+
+   public Statement getWrappedStatement() {
+      return statement;
+   }
+
+   public String getFunctionEndString() {
+      return ")";
+   }
+
+   /** For the while-statement, our breakpoints really are set on the while (expression) part */
+   public int getNumStatementLines() {
+      if (expression != null)
+         return ParseUtil.countLinesInNode(expression.getParseNode());
+      return super.getNumStatementLines();
    }
 }

@@ -4,6 +4,8 @@
 
 package sc.layer;
 
+import sc.util.FileUtil;
+
 import java.util.*;
 
 /**
@@ -25,15 +27,23 @@ public class LayerListTypeIndex {
 
    private boolean reverseIndexBuilt = false;
 
-   public LayerListTypeIndex(LayeredSystem sys, List<Layer> layers) {
+   LayerOrderIndex orderIndex;
+
+   String typeIndexIdent;
+
+   public LayerListTypeIndex(LayeredSystem sys, List<Layer> layers, String typeIndexIdent) {
       this.sys = sys;
       this.layersList = layers;
       this.typeIndex = new LinkedHashMap<String, LayerTypeIndex>();
+      this.typeIndexIdent = typeIndexIdent;
+      if (this.orderIndex == null)
+         this.orderIndex = new LayerOrderIndex();
    }
 
    public void clearReverseTypeIndex() {
       subTypeIndex.clear();
       modifyTypeIndex.clear();
+      reverseIndexBuilt = false;
    }
 
    public void clearTypeIndex() {
@@ -42,7 +52,18 @@ public class LayerListTypeIndex {
       // do not clear layersList here - it is the list managed by the LayeredSystems
    }
 
-   private void visitIndexEntry(String layerName, LayerTypeIndex lti, HashSet<String> visitedLayers) {
+   public boolean loadFromDir(String typeIndexDir) {
+      orderIndex = LayerOrderIndex.readFromFile(typeIndexDir, sys == null ? null : sys.messageHandler);
+      if (orderIndex == null)
+         return false;
+      return true;
+   }
+
+   public void saveToDir(String typeIndexDir) {
+      orderIndex.saveToDir(typeIndexDir);
+   }
+
+   private void visitIndexEntry(String layerName, LayerTypeIndex lti, HashSet<String> visitedLayers, LayeredSystem sys) {
       if (visitedLayers.contains(layerName))
          return;
 
@@ -80,8 +101,37 @@ public class LayerListTypeIndex {
             TypeIndexEntry tind = modifyTypes.get(ix);
             if (tind.layerName.equals(entry.layerName) && tind.typeName.equals(entry.typeName))
                break;
-            if (tind.layerPosition > entry.layerPosition && (curPos == -1 || tind.layerPosition < curPos)) {
-               curPos = tind.layerPosition;
+
+            // Update the layer positions if we've created the layered system.  If not, we'll use the order defined from when this type index was generated
+            /*
+            if (sys != null) {
+               Layer layer = sys.getInactiveLayer(tind.layerName, false, false, true, true);
+               if (layer != null) {
+                  if (layer.layerPosition != tind.layerPosition)
+                     System.out.println("***");
+                  tind.layerPosition = layer.layerPosition;
+               }
+               else
+                  System.out.println("***");
+               layer = sys.getInactiveLayer(entry.layerName, false, false, true, true);
+               if (layer != null) {
+                  if (layer.layerPosition != entry.layerPosition)
+                     System.out.println("***");
+                  entry.layerPosition = layer.layerPosition;
+               }
+               else
+                  System.out.println("***");
+            }
+            */
+            int tindPos = orderIndex.getLayerPosition(tind.layerName);
+            int entPos = orderIndex.getLayerPosition(entry.layerName);
+            if (tindPos == -1)
+               System.out.println("*** Missing layer index position for: " + tind.layerName);
+            if (entPos == -1)
+               System.out.println("*** Missing layer index position for: " + entry.layerName);
+
+            if (tindPos > entPos && (curPos == -1 || tindPos < curPos)) {
+               curPos = tindPos;
                insertIx = ix;
             }
          }
@@ -96,7 +146,8 @@ public class LayerListTypeIndex {
       }
    }
 
-   public void buildReverseTypeIndex() {
+   /** Optional layered system - used to determined the layer positions used for the type index if present */
+   public void buildReverseTypeIndex(LayeredSystem sys) {
       if (reverseIndexBuilt)
          return;
       reverseIndexBuilt = true;
@@ -109,11 +160,11 @@ public class LayerListTypeIndex {
             for (String baseLayerName: lti.baseLayerNames) {
                LayerTypeIndex baseLayerIndex = typeIndex.get(baseLayerName);
                if (baseLayerIndex != null)
-                  visitIndexEntry(baseLayerName, baseLayerIndex, visitedLayers);
+                  visitIndexEntry(baseLayerName, baseLayerIndex, visitedLayers, sys);
                // else - probably in another runtime's index...
             }
          }
-         visitIndexEntry(layerName, lti, visitedLayers);
+         visitIndexEntry(layerName, lti, visitedLayers, sys);
       }
    }
 
@@ -123,12 +174,20 @@ public class LayerListTypeIndex {
    }
 
    public void updateTypeName(String oldTypeName, String newTypeName) {
-      for (LayerTypeIndex ent:typeIndex.values()) {
-         ent.updateTypeName(oldTypeName, newTypeName);
+      TreeSet<String> layerNamesToSave = new TreeSet<String>();
+      for (Map.Entry<String, LayerTypeIndex> ent:typeIndex.entrySet()) {
+         LayerTypeIndex layerIndex = ent.getValue();
+         if (layerIndex.updateTypeName(oldTypeName, newTypeName)) {
+            layerNamesToSave.add(ent.getKey());
+         }
       }
       ArrayList<TypeIndexEntry> indexEntries = modifyTypeIndex.remove(oldTypeName);
-      if (indexEntries != null)
+      if (indexEntries != null) {
          modifyTypeIndex.put(newTypeName, indexEntries);
+         for (TypeIndexEntry ent:indexEntries) {
+            ent.typeName = newTypeName;
+         }
+      }
       LinkedHashMap<String,TypeIndexEntry> subTypes = subTypeIndex.remove(oldTypeName);
       if (subTypes != null)
          subTypeIndex.put(newTypeName, subTypes);
@@ -139,7 +198,27 @@ public class LayerListTypeIndex {
             subTypeMap.put(newTypeName, revEnt);
          }
       }
+      saveLayerTypeIndexes(layerNamesToSave);
+   }
 
+   public void updateFileName(String oldFileName, String newFileName) {
+      TreeSet<String> layerNamesToSave = new TreeSet<String>();
+      for (Map.Entry<String,LayerTypeIndex> ent:typeIndex.entrySet()) {
+         LayerTypeIndex layerIndex = ent.getValue();
+         if (layerIndex.updateFileName(oldFileName, newFileName)) {
+            layerNamesToSave.add(ent.getKey());
+         }
+      }
+      saveLayerTypeIndexes(layerNamesToSave);
+   }
+
+   private void saveLayerTypeIndexes(TreeSet<String> layerNamesToSave) {
+      for (String layerNameToSave:layerNamesToSave) {
+         Layer layerToSave = sys.lookupInactiveLayer(layerNameToSave, false, true);
+         if (layerToSave != null) {
+            layerToSave.saveTypeIndex();
+         }
+      }
    }
 
    public StringBuilder dumpCacheStats() {

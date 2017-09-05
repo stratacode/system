@@ -4,6 +4,8 @@
 
 package sc.lang.html;
 
+import java.util.Set;
+
 /**
  * The merge mode is used for three different settings, all involved in merging tags when this tag has a
  * matching tag in a previous template and the tagMerge mode is "merge" (the default).  The result is a flexible, declarative
@@ -49,8 +51,16 @@ public enum MergeMode {
 
    public static MergeMode fromString(String value) {
       for (MergeMode m:values())
-         if (m.toString().equalsIgnoreCase(value))
+         if (m.name().equalsIgnoreCase(value))
             return m;
       return null;
+   }
+
+   public static void addMatchingModes(String prefix, Set<String> candidates) {
+      for (MergeMode m:values()) {
+         String n = m.name().toLowerCase();
+         if (n.startsWith(prefix.toLowerCase()))
+            candidates.add(n);
+      }
    }
 }

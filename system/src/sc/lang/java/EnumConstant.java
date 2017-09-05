@@ -7,12 +7,17 @@ package sc.lang.java;
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
 import sc.lang.js.JSLanguage;
+import sc.layer.LayeredSystem;
 import sc.type.DynType;
+import sc.util.StringUtil;
 
 import java.util.List;
 
 public class EnumConstant extends BodyTypeDeclaration {
    public List<Expression> arguments;
+
+   // Set to true if there's a method of the same name.  This is used in the Javascript conversion, which unlike Java has one namespace shared by fields and methods (and the enum is converted to a field there)
+   public transient boolean shadowedByMethod = false;
 
    public DeclarationType getDeclarationType() {
       return DeclarationType.ENUMCONSTANT;
@@ -20,6 +25,15 @@ public class EnumConstant extends BodyTypeDeclaration {
 
    public void init() {
       super.init();
+   }
+
+   public void validate() {
+      super.validate();
+
+      LayeredSystem sys = getLayeredSystem();
+      TypeDeclaration enclType = getEnclosingType();
+      if (sys != null && enclType != null && StringUtil.equalStrings(sys.getRuntimeName(), "js") && enclType.getMethods(typeName, null) != null)
+         shadowedByMethod = true;
    }
 
    /** For this type only we add the enum constants as properties */
@@ -145,7 +159,7 @@ public class EnumConstant extends BodyTypeDeclaration {
          enumTD.setProperty("body", body.deepCopy(ISemanticNode.CopyNormal, null));
 
          // Need to create the enum constructor that takes the string and ordinal parameters
-         ConstructorDefinition ctor = EnumDeclaration.newEnumConstructor(typeName, enumTD);
+         ConstructorDefinition ctor = EnumDeclaration.newEnumConstructor(getLayeredSystem(), typeName, enumTD, enclType, arguments);
          enumTD.addBodyStatement(ctor);
 
          cl.addSubTypeDeclaration(enumTD);
@@ -179,5 +193,20 @@ public class EnumConstant extends BodyTypeDeclaration {
 
    public String getOperatorString() {
       return "<enum constant>";
+   }
+
+   public EnumConstant refreshNode() {
+      if (typeName == null)
+         return this;
+      TypeDeclaration enclType = getEnclosingType();
+      enclType = (TypeDeclaration) enclType.refreshNode();
+      if (enclType == null)
+         return this;
+      Object enumConst = enclType.definesMember(typeName, MemberType.EnumOnlySet, null, null);
+      if (enumConst == null || !(enumConst instanceof EnumConstant)) {
+         System.err.println("*** Unable to refresh enum constant");
+         return this;
+      }
+      return (EnumConstant) enumConst;
    }
 }

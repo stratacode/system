@@ -42,12 +42,12 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    transient HashMap<String,Object> importsByName = new HashMap<String,Object>();
 
    transient Map<String,Object> staticImportProperties;// Property name to beanmapper or Get/Set MethodDefinition
-   transient Map<String,Object> staticImportMethods;   // Method name, value is type object
+   transient Map<String,List<Object>> staticImportMethods;   // Method name, value is type object
 
    transient List<String> globalTypes = new ArrayList<String>();
 
    // Includes inner types as well as regular ones
-   transient Map<String,TypeDeclaration> definedTypesByName = new HashMap<String,TypeDeclaration>();
+   transient HashMap<String,TypeDeclaration> definedTypesByName = new HashMap<String,TypeDeclaration>();
 
    transient Map<String,Object> typeIndex = new HashMap<String,Object>();
 
@@ -104,12 +104,18 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    /** Set so we can keep do incremental refreshes */
    public transient long lastModifiedTime = 0;
 
+   /** Set to the timestamp of the time the model was last started */
+   public transient long lastStartedTime = -1;
+
+   /** Set to true during the build process if this model needs to stopped when it's reinitialized */
+   public transient boolean needsRestart = false;
+
    public transient JavaModel modifiedModel = null;
 
    /** If you want to parse and start a model but insert your own name resolver which runs before the normal system's type look, set this property. */
    public transient ICustomResolver customResolver = null;
 
-   private transient boolean initPackage = false;
+   protected transient boolean initPackage = false;
 
    // Set this to false for sync-layers and update-layers, i.e. which do not merge when they are transformed.
    public transient boolean mergeDeclaration = true;
@@ -156,6 +162,15 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    /** Has this model been added to the type system */
    public transient boolean added = false;
 
+   /** Is this a new model which has not yet been saved or a model whose memory representation is more recent than the file system */
+   public transient boolean unsavedModel = false;
+
+   /** Caches the line index for the generated file for this src model */
+   private transient GenFileLineIndex fileLineIndex = null;
+
+   /** Set to true during the stop operation so we can tell if someone tries to init or start us while being stopped */
+   private transient boolean beingStopped = false;
+
    public void setLayeredSystem(LayeredSystem system) {
       layeredSystem = system;
    }
@@ -165,6 +180,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public void setLayer(Layer l) {
+      if (l != null && l.layeredSystem != getLayeredSystem() && layeredSystem != null)
+         System.out.println("*** Error - mismatching runtime for setLayer in Java model!");
       layer = l;
    }
 
@@ -252,6 +269,14 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (initialized)
          return;
 
+      if (beingStopped) {
+         System.err.println("*** Attempting to init model that's being stopped");
+         return;
+      }
+
+      //initializedInLayer = layer != null ? layer.layeredSystem.lastModelsStartedLayer : null;
+      // Used for setting fromPosition in the type cache - we want to mark which layers are included in the search
+      // to know when the type cache need to be refreshed for a new layer
       initializedInLayer = layer != null ? layer.layeredSystem.lastStartedLayer : null;
 
       initPackageAndImports();
@@ -266,7 +291,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       }
       types.add(td);
       if (td.typeName != null)
-         typeIndex.put(td.typeName,td);
+         addTypeToIndex(td.typeName, td);
+   }
+
+   private void addTypeToIndex(String typeName, Object td) {
+      typeIndex.put(typeName,td);
    }
 
    private static class WildcardImport {
@@ -309,11 +338,21 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    public void start() {
       if (started) return;
 
+      if (layeredSystem != null)
+         lastStartedTime = layeredSystem.lastChangedModelTime;
+
       PerfMon.start("startJavaModel");
 
       // The layer model can't do this until the layer is started and its class path is set up.
       if (!isLayerModel)
          initTypeInfo();
+      else {
+         // When resolving a layer model in the IDE, we might start the layer modify type here and it does not resolve
+         // correctly unless it knows it's a layer type.
+         TypeDeclaration layerModelType = getLayerTypeDeclaration();
+         if (layerModelType != null)
+            layerModelType.isLayerType = true;
+      }
       super.start();
 
       // Propagate the resultSuffix to the leaf model
@@ -392,9 +431,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                if (methods != null) {
                   for (int i = 0; i < methods.length; i++) {
                      Object methObj = methods[i];
-                     if (staticImportMethods == null)
-                        staticImportMethods = new HashMap<String,Object>();
-                     staticImportMethods.put(ModelUtil.getMethodName(methObj), importedType);
+                     addStaticImportMethodType(ModelUtil.getMethodName(methObj), importedType);
                      addedAny = true;
                   }
                }
@@ -424,16 +461,14 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                boolean added = false;
                methods = ModelUtil.getMethods(importedType, memberName, "static");
                if (methods != null) {
-                  if (staticImportMethods == null)
-                     staticImportMethods = new HashMap<String,Object>();
-                  staticImportMethods.put(memberName, importedType);
+                  addStaticImportMethodType(memberName, importedType);
                   added = true;
                }
                Object property = enableExtensions() ?
-                       ModelUtil.definesMember(importedType, memberName, MemberType.PropertyGetSet, null, null) :
-                       ModelUtil.definesMember(importedType, memberName, MemberType.FieldEnumSet, null, null);
+                       ModelUtil.definesMember(importedType, memberName, MemberType.PropertyGetSet, null, null, layeredSystem) :
+                       ModelUtil.definesMember(importedType, memberName, MemberType.FieldEnumSet, null, null, layeredSystem);
                if (property == null && enableExtensions())
-                  property = ModelUtil.definesMember(importedType, memberName, MemberType.PropertySetSet, null, null);
+                  property = ModelUtil.definesMember(importedType, memberName, MemberType.PropertySetSet, null, null, layeredSystem);
                // You can also import static classes apparently
                if (property == null) {
                   property = ModelUtil.getInnerType(importedType, memberName, null);
@@ -452,6 +487,20 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       }
    }
 
+   void addStaticImportMethodType(String methodName, Object newType) {
+      if (staticImportMethods == null)
+         staticImportMethods = new HashMap<String, List<Object>>();
+      List<Object> staticImportTypes = staticImportMethods.get(methodName);
+      if (staticImportTypes == null) {
+         staticImportTypes = new ArrayList<Object>();
+         staticImportMethods.put(methodName, staticImportTypes);
+      }
+      // Performance - check for duplicates here?
+      //else {
+      //}
+      staticImportTypes.add(newType);
+   }
+
    void initTypeInfo() {
       if (typeInfoInited)
          return;
@@ -461,6 +510,31 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          }
       }
       typeInfoInited = true;
+
+      // For inactive types, when starting the model we need to make sure we've started the most specific type in the model
+      // so we don't rely on stale data.  We check by getting the current model type if it's in a layer after this one
+      // we need to start it.
+      if (layer != null && !layer.activated && !isLayerModel) {
+         TypeDeclaration layerType = getLayerTypeDeclaration();
+         if (layerType != null) {
+            String modelTypeName = layerType.getFullTypeName();
+            if (modelTypeName != null) {
+               TypeDeclaration modelType = (TypeDeclaration) layeredSystem.getSrcTypeDeclaration(modelTypeName, null, prependLayerPackage, false, true, layer, isLayerModel);
+               if (modelType != null && modelType.getLayer() != null && layerType.getLayer() != null) {
+                  if (modelType.getLayer().layerPosition > layerType.getLayer().layerPosition) {
+                     JavaModel modelTypeModel = modelType.getJavaModel();
+                     if (modelTypeModel == this)
+                        System.err.println("*** error in model type");
+                     else {
+                        if (!modelTypeModel.isStarted() && !typeInfoInited) {
+                           ParseUtil.realInitAndStartComponent(modelTypeModel);
+                        }
+                     }
+                  }
+               }
+            }
+         }
+      }
    }
 
    public String getImportedName(String name) {
@@ -476,6 +550,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       String imported;
       if (modifiedModel != null) {
          if (modifiedModel != this && modifiedModel.getUnresolvedModifiedModel() != this) {
+            if (modifiedModel.replacedByModel != null)
+               modifiedModel = modifiedModel.replacedByModel;
+
             imported = modifiedModel.getImportedName(name);
             if (imported != null)
                return imported;
@@ -630,7 +707,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    public Object findTypeDeclaration(String typeName, boolean addExternalReference, boolean srcOnly) {
       Object td = typeIndex.get(typeName);
-      if (td != null && (!(td instanceof ModifyDeclaration) || !((ModifyDeclaration) td).isLayerType))
+      if (td != null && (!(td instanceof ModifyDeclaration) || !((ModifyDeclaration) td).isLayerType) && (!srcOnly || !ModelUtil.isCompiledClass(td)))
          return td;
 
       String importedName = null;
@@ -656,7 +733,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       // Need to check relative references in this package before we do the imports cause that's
       // how Java does it.
       if (sys != null && !skipSrc) {
-         td = sys.getRelativeTypeDeclaration(typeName, getPackagePrefix(), null, prependLayerPackage, layer, isLayerModel);
+         td = sys.getRelativeTypeDeclaration(typeName, getPackagePrefix(), null, prependLayerPackage, layer, isLayerModel, srcOnly);
       }
 
       importedName = getImportedName(typeName);
@@ -706,7 +783,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (layeredSystem != null) {
          // Look for a name relative to this path prefix
          if (importedName != typeName && !skipSrc) // intending to use != here to avoid the equals method
-            td = layeredSystem.getRelativeTypeDeclaration(importedName, getPackagePrefix(), null, true, layer, isLayerModel);
+            td = layeredSystem.getRelativeTypeDeclaration(importedName, getPackagePrefix(), null, true, layer, isLayerModel, srcOnly);
          if (td == null) {
             if (!skipSrc) {
                // Look for an absolute name in both source and class form
@@ -748,11 +825,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                }
                // TODO:  Very likely simplify this inner class stuff with the
                // code in LayeredSystem as it seems like there is redundancy.
-               if (td == null)
+               if (td == null && !srcOnly)
                   td = getClass(importedName, false, layer, isLayerModel);
             }
             /* Only if we have not imported a class, try looking for a class in this package */
-            if (td == null && importedName == typeName) {
+            if (td == null && importedName == typeName && !srcOnly) {
                String pref = getPackagePrefix();
                if (pref != null) {
                   String prefTypeName = pref + "." + typeName;
@@ -762,8 +839,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          }
       }
       if (td != null) {
-         if (!skipSrc)
-            typeIndex.put(typeName, td);
+         if (!skipSrc) {
+            addTypeToIndex(typeName, td);
+         }
          
          // The system resolved absolute references of all kinds and so might have resolved one defined here.
          if (td instanceof TypeDeclaration) {
@@ -865,11 +943,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          if (getPackagePrefix() != null) {
             String fullTypeName = type.getFullTypeName();
             if (fullTypeName != null) {
-               typeIndex.put(fullTypeName, type);
+               addTypeToIndex(fullTypeName, type);
             }
          }
          // TODO: should we be adding this to the types member?  Not sure they always belong in the language model.
-         typeIndex.put(typeName, type);
+         addTypeToIndex(typeName, type);
       }
    }
 
@@ -976,14 +1054,16 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          return null;
       ArrayList<SrcEntry> res = new ArrayList<SrcEntry>();
       for (SrcEntry src:srcFiles) {
-         res.add(new SrcEntry(src.layer, src.absFileName, src.relFileName, src.prependPackage));
+         //res.add(new SrcEntry(src.layer, src.absFileName, src.relFileName, src.prependPackage));
+         res.add(src.clone());
       }
       return res;
    }
 
-   /** Here to convince the sync system this property can be synchronized to the client (without loading the JavaModel.sc file on the client) */
    public void setSrcFile(SrcEntry srcFile) {
-      throw new UnsupportedOperationException();
+      if (srcFiles != null)
+         srcFiles = null;
+      addSrcFile(srcFile);
    }
 
    /** Returns the main source file for this model */
@@ -1035,6 +1115,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (types == null || types.size() == 0)
          return null;
       return (TypeDeclaration) types.get(0).resolve(true);
+   }
+
+   public Object getModelType() {
+      return getModelTypeDeclaration();
    }
 
    public TypeDeclaration getImplicitTypeDeclaration() {
@@ -1140,12 +1224,12 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return layer != null && layer.annotationLayer;
    }
 
-   public boolean changedSinceLayer(Layer l) {
+   public boolean changedSinceLayer(Layer initLayer, Layer buildLayer) {
       TypeDeclaration modelType = getModelTypeDeclaration();
       if (modelType == null)
          return true;
 
-      if (modelType.changedSinceLayer(l, false, null, null))
+      if (modelType.changedSinceLayer(initLayer, buildLayer, false, null, null, false))
          return true;
       return false;
    }
@@ -1178,7 +1262,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                // reloaded, but the transformed model may be affected by other layers, unless it is final.
                // Sometimes we clone the transformed model without transforming.  In that case, we can just use that model.
                if (transformedModel == null || transformedInLayer == null ||
-                      (transformedModel.getTransformed() && transformedInLayer != layeredSystem.currentBuildLayer) && changedSinceLayer(transformedInLayer))
+                      (transformedModel.getTransformed() && transformedInLayer != layeredSystem.currentBuildLayer) && changedSinceLayer(transformedInLayer, layeredSystem.currentBuildLayer))
                   cloneTransformedModel();
 
                // Already transformed
@@ -1253,13 +1337,33 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return this;
    }
 
-   /** Hook to reinitiaze any state after one of your base types gets modified after this type has been processed. */
-   public void dependenciesChanged() {
-      // TODO: should this call reinitialize?  If one of your exstends types has changed, do you need to go back and restart this component?
+   /** Hook to reinitiualize any state after one of your base types gets modified after this type has been processed. */
+   public boolean dependenciesChanged() {
+      if (!isInitialized()) {
+         ParseUtil.initComponent(this);
+         return true;
+      }
+      /*
+      TypeDeclaration modelType = getUnresolvedModelTypeDeclaration();
+      if (modelType != null && initializedInLayer != null) {
+         if (modelType.changedSinceLayer(initializedInLayer, false, null, null))
+            return true;
+      }
+      */
+      /*
+      if (isStarted() && layeredSystem != null && (layeredSystem.lastChangedModelTime != lastStartedTime || needsRestart)) {
+         reinitialize();
+         return true;
+      }
+      */
+      return false;
    }
 
    public void reinitialize() {
       if (started) {
+         if (layeredSystem != null && layeredSystem.options.verbose && getSrcFile() != null)
+            layeredSystem.verbose("Reinitializing: " + getSrcFile());
+
          stop();
          initialized = false;
          started = false;
@@ -1267,8 +1371,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          processed = false;
          hasErrors = false;
          initPackage = false;
+         clearTransformed();
 
-         ParseUtil.initAndStartComponent(this);
+         ParseUtil.initComponent(this);
       }
    }
 
@@ -1309,10 +1414,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
     * any dynamic stubs for the main type or inner types, and any extra files added by extra features defined on this
     * model (e.g. the GWT module file)
     */
-   public List<SrcEntry> getProcessedFiles(Layer buildLayer, String buildDir, boolean generate) {
+   public List<SrcEntry> getProcessedFiles(Layer buildLayer, String buildSrcDir, boolean generate) {
       PerfMon.start("getProcessedFiles");
       try {
-         List<SrcEntry> computedFiles = getComputedProcessedFiles(buildLayer, buildDir, generate);
+         List<SrcEntry> computedFiles = getComputedProcessedFiles(buildLayer, buildSrcDir, generate);
          if (extraFiles == null)
             return computedFiles;
          if (computedFiles == null)
@@ -1321,7 +1426,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          // If any additional files were attached to this model, save them to the buildDir and buildLayer
          ArrayList<SrcEntry> result = new ArrayList<SrcEntry>(computedFiles);
          for (ExtraFile f:extraFiles) {
-            String absPath = FileUtil.concat(buildDir, f.relFilePath);
+            String absPath = FileUtil.concat(buildSrcDir, f.relFilePath);
             byte[] hash = StringUtil.computeHash(f.fileBody);
 
             SrcIndexEntry srcIndex = buildLayer.getSrcFileIndex(f.relFilePath);
@@ -1350,7 +1455,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    // If necessary, perform any transformations and return the source files to compile.
    // If nothing changed, just return the source files for this model.
-   private List<SrcEntry> getComputedProcessedFiles(Layer buildLayer, String buildDir, boolean generate) {
+   private List<SrcEntry> getComputedProcessedFiles(Layer buildLayer, String buildSrcDir, boolean generate) {
       // TODO: If we generate additional classes during the transformation, they need to get returned here
       assert getSrcFiles().size() == 1;
 
@@ -1382,15 +1487,19 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          // Save this as a dynamic type in this layer so we know to not load it as a regular class in an incremental build
          buildLayer.markDynamicType(modelType.getFullTypeName());
 
-         innerObjStubs = modelType.getInnerDynStubs(buildDir, buildLayer, generate);
+         innerObjStubs = modelType.getInnerDynStubs(buildSrcDir, buildLayer, generate);
          // No code to generate when the type is dynamic unless we are extending a compiled class for the first
          // time.  We need some class to act as the barrier between weak/strong types and so generate a stub
          // in that case.
          if (!modelType.isDynamicStub(false)) {
             if (modelType.replacedByType == null && generate) { // only remove if we are the last layer and supposed to be saving models
-               String procName = getProcessedFileName(buildDir);
+               String procName = getProcessedFileName(buildSrcDir);
                LayerUtil.removeFileAndClasses(procName); // make sure a previous compiled version is not there
                LayerUtil.removeInheritFile(procName);
+               if (!buildLayer.buildDir.equals(buildSrcDir)) {
+                  String buildDirName = getProcessedFileName(buildLayer.buildClassesDir);
+                  LayerUtil.removeFileAndClasses(buildDirName); // remove the classes from the buildDir if it's different
+               }
             }
             return innerObjStubs == null ? emptySrcEntriesList : innerObjStubs;
          }
@@ -1405,13 +1514,16 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          else
             didTransform = needsTransform();
       }
+
+      transformedInLayer = getLayeredSystem().currentBuildLayer;
+
       if (!didTransform && !layer.copyPlainJavaFiles) {
          return Collections.singletonList(src);
       }
       else {
          if (transformedResult == null && generate)
             transformedResult = getTransformedResult();
-         String newFile = getProcessedFileName(buildDir);
+         String newFile = getProcessedFileName(buildSrcDir);
          File newFileFile = new File(newFile);
 
          // The layered system processes hidden layer files backwards.  So generate will be true the for the
@@ -1428,8 +1540,13 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
             // If there's a previous entry which is the same, we'll skip saving altogether.
             if ((prevEntry == null || !Arrays.equals(prevEntry.hash, mainSrcEnt.hash))) {
-               if (isChanged)
+               if (isChanged) {
                   FileUtil.saveStringAsReadOnlyFile(newFile, transformedResult, true);
+
+                  if (layeredSystem.options.genDebugInfo)
+                     updateFileLineIndex(transformedResult, buildSrcDir);
+                  // TODO: else - remove the the file if it does not exist?
+               }
                else {
                   File classFile = LayerUtil.getClassFile(buildLayer, mainSrcEnt);
                   // As long as the class file is up to date before, we'll make sure it stays up to date after.
@@ -1548,19 +1665,22 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (updateMode == TypeUpdateMode.Remove || updateMode == TypeUpdateMode.Replace)
          removed = true;
 
-      // The type will have been started inside of updateType but the model also should be started for consistency
-      if (!newModel.isStarted()) {
+      // If we are batching updates (updateInfo != null), we might be updating more than one model so don't start it here.
+      if (!newModel.isStarted() && updateInfo == null) {
          ParseUtil.realInitAndStartComponent(newModel);
       }
    }
 
-   public void completeUpdateModel(JavaModel newModel) {
-      if (!newModel.isValidated()) {
-         ParseUtil.validateComponent(newModel);
-      }
-      newModel.readReverseDeps(layeredSystem.buildLayer);
-      if (!newModel.isProcessed()) {
-         ParseUtil.processComponent(newModel);
+   public void completeUpdateModel(JavaModel newModel, boolean updateRuntime) {
+      if (updateRuntime) {
+         if (!newModel.isValidated()) {
+            ParseUtil.validateComponent(newModel);
+         }
+         newModel.readReverseDeps(layeredSystem.buildLayer);
+         // We only process activated components
+         if (!newModel.isProcessed() && getLayer() != null && getLayer().activated) {
+            ParseUtil.processComponent(newModel);
+         }
       }
 
       newModel.setNeedsModelText(needsModelText);
@@ -1615,7 +1735,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (types == null)
          return;
 
-      ExecutionContext ctx = new ExecutionContext(this);
+      SyncExecutionContext ctx = new SyncExecutionContext(this, syncCtx);
 
       // Currently the grammar lets you put more than one type in a model so it's only the package that separates the model
       // definitions.  Seems like this is not a problem?
@@ -1675,7 +1795,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
       validateSavedModel(true);
 
-      return getParseNode().toString();
+      return getParseNode().formatString(null, null, -1, true).toString();
    }
 
    public void validateSavedModel(boolean finalGen) {
@@ -1716,6 +1836,13 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          if (type instanceof TypeDeclaration) {
             TypeDeclaration td = (TypeDeclaration) type;
             if (!td.isLayerType) {
+               if (ModelUtil.isObjectType(td)) {
+                  Object sysObj = layeredSystem != null ? layeredSystem.resolveName(name, create, getLayer(), isLayerModel) : null;
+                  if (sysObj != null)
+                     return sysObj;
+                  else
+                     System.err.println("*** Object type has no globally registered instance");
+               }
                Class cl = td.getCompiledClass();
                if (cl != null)
                   return cl;
@@ -1983,7 +2110,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             layeredSystem.addAutoImport(getLayer(), getModelTypeName(), ImportDeclaration.createStatic(CTypeUtil.prefixPath(ModelUtil.getTypeName(type), name)));
 
             // Now convert it to the member itself.
-            type = ModelUtil.definesMember(type, name, mtype, refType, ctx, skipIfaces, isTransformed);
+            type = ModelUtil.definesMember(type, name, mtype, refType, ctx, skipIfaces, isTransformed, layeredSystem);
 
             assert type != null;
          }
@@ -2020,24 +2147,31 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
       Object v;
-      Object type = null;
+      List<Object> importedMethodTypes = null;
 
       initTypeInfo();
 
       if (staticImportMethods != null) {
-         type = staticImportMethods.get(name);
+         importedMethodTypes = staticImportMethods.get(name);
       }
-      if (type == null) {
+      if (importedMethodTypes == null) {
          // TODO: shouldn't we restrict this layer arg to the "next layer" - same for getImportDecl
+         Object type = null;
          if (layeredSystem != null && (type = layeredSystem.getImportedStaticType(name, null, getLayer())) != null) {
             layeredSystem.addAutoImport(getLayer(), getModelTypeName(), ImportDeclaration.createStatic(CTypeUtil.prefixPath(ModelUtil.getTypeName(type), name)));
          }
+         if (type != null) {
+            v = ModelUtil.definesMethod(type, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, layeredSystem);
+            if (v != null && ModelUtil.hasModifier(v, "static"))
+               return v;
+         }
       }
-
-      if (type != null) {
-         v = ModelUtil.definesMethod(type, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
-         if (v != null && ModelUtil.hasModifier(v, "static"))
-            return v;
+      else {
+         for (Object importedType:importedMethodTypes) {
+            v = ModelUtil.definesMethod(importedType, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, layeredSystem);
+            if (v != null && ModelUtil.hasModifier(v, "static"))
+               return v;
+         }
       }
       return super.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
    }
@@ -2118,9 +2252,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       }
    }
 
-   public void cleanStaleEntries(HashMap<String,IFileProcessorResult> changedModels) {
+   public void cleanStaleEntries(HashSet<String> changedTypes) {
       if (reverseDeps != null) {
-         reverseDeps.cleanStaleEntries(changedModels);
+         reverseDeps.cleanStaleEntries(changedTypes);
       }
    }
 
@@ -2388,22 +2522,35 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public void reportWarning(String error, ISemanticNode source) {
+      boolean treatWarningsAsErrors = layeredSystem != null && layeredSystem.options.treatWarningsAsErrors;
+      if (treatWarningsAsErrors)
+         hasErrors = true;
+
       if (errorHandler != null) {
          LayerUtil.reportMessageToHandler(errorHandler, error, getSrcFile(), source, MessageType.Warning);
       }
       else {
-         if (warningMessages == null)
-            warningMessages = new StringBuilder();
-         warningMessages.append(error);
+         if (treatWarningsAsErrors) {
+            if (errorMessages == null)
+               errorMessages = new StringBuilder();
+            errorMessages.append(error);
+         }
+         else {
+            if (warningMessages == null)
+               warningMessages = new StringBuilder();
+            warningMessages.append(error);
+         }
       }
-      hasErrors = true;
       if (layeredSystem != null) {
          // Already seen this error in this build
          if (layeredSystem.isWarningViewed(error, getSrcFile(), source)) {
             return;
          }
       }
-      System.out.println(error);
+      if (!treatWarningsAsErrors)
+         System.out.println(error);
+      else
+         System.err.println(error);
    }
 
    public void clearTransformed() {
@@ -2419,6 +2566,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
       transformedModel = null;
       transformedInLayer = null;
+      fileLineIndex = null;
 
       // Any models that modify this one in the layer stack also need to be re-transformed
       JavaModel modifiedByModel = getModifiedByModel();
@@ -2506,7 +2654,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       }
    }
 
-   public Language getLanguage() {
+   public JavaLanguage getLanguage() {
       return JavaLanguage.getJavaLanguage();
    }
 
@@ -2526,7 +2674,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          // so we need to make a copy.
          copy.importsByName = (HashMap<String,Object>) importsByName.clone();
 
-         copy.definedTypesByName = definedTypesByName;
+         copy.definedTypesByName = (HashMap<String,TypeDeclaration>)definedTypesByName.clone();
          copy.typeIndex = typeIndex;
          copy.computedPackagePrefix = computedPackagePrefix;
          copy.temporary = true;
@@ -2558,6 +2706,26 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public void stop() {
+      stop(true);
+   }
+
+   public void stop(boolean stopModified) {
+      if (beingStopped) {
+         System.err.println("*** Stopping a model that's beingStopped");
+         return;
+      }
+      beingStopped = true;
+      if (stopModified && modifiedModel != null) {
+         modifiedModel.stop();
+         // This gets reset lazily from the modified type, but during a rebuild if we leave this value around, it could be stale
+         modifiedModel = null;
+      }
+
+      SrcEntry srcEnt = getSrcFile();
+
+      if (srcEnt != null)
+         layeredSystem.removeTypesByName(srcEnt.layer, getPackagePrefix(), getDefinedTypes(), getLayer());
+
       super.stop();
 
       typeInfoInited = false;
@@ -2569,6 +2737,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          staticImportProperties = null;
       if (staticImportMethods != null)
          staticImportMethods = null;
+      definedTypesByName.clear();
+      needsRestart = false;
+      clearTransformed();
+      beingStopped = false;
    }
 
    @Bindable(manual=true)
@@ -2764,9 +2936,12 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return cachedGeneratedJSText;
    }
 
-   public boolean getDependenciesChanged(Map<String,IFileProcessorResult> changedModels) {
+   public boolean getDependenciesChanged(Layer genLayer, Set<String> changedTypes, boolean processJava) {
+      if (needsRestart) {  // Has this model been explicitly marked for a 'restart' (e.g. during a second buildAll build) - if so, consider it as changed even if it has not actually changed.
+         return true;
+      }
       for (TypeDeclaration td:types) {
-         if (td.changedSinceLayer(initializedInLayer, false, null, changedModels))
+         if (td.changedSinceLayer(transformedInLayer, genLayer, false, null, changedTypes, processJava))
             return true;
       }
       return false;
@@ -2781,6 +2956,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public JavaModel refreshNode() {
+      if (layeredSystem == null)
+         return this;
       // Here we pick the latest annotated model
       return (JavaModel) layeredSystem.getAnnotatedModel(getSrcFile());
    }
@@ -2789,8 +2966,17 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       added = v;
    }
 
-   public void setTemporary(boolean v) {
-      temporary = v;
+   /**
+    * Called for models which are not part of the type system for the runtime
+    * (e.g. documentation files, temporary nodes created by the interpreter or those created during the editing process to apply a batch of changes)
+    * Sets temporaryType = true on all children types
+    */
+   public void markAsTemporary() {
+      temporary = true;
+      if (types != null) {
+         for (TypeDeclaration type:types)
+            type.markAsTemporary();
+      }
    }
 
    public boolean isAdded() {
@@ -2821,17 +3007,41 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (oldType != null)
          definedTypesByName.put(newTypeName, oldType);
       Object oldObj = typeIndex.remove(oldTypeName);
-      if (oldObj != null)
-         typeIndex.put(newTypeName, oldObj);
+      if (oldObj != null) {
+         addTypeToIndex(newTypeName, oldObj);
+      }
 
       String pkgName = getPackagePrefix();
       String oldFullName = CTypeUtil.prefixPath(pkgName, oldTypeName);
       String newFullName = CTypeUtil.prefixPath(pkgName, newTypeName);
       SrcEntry srcFile = getSrcFile();
-      if (srcFile != null)
+      if (srcFile != null) {
+         String oldFileName = srcFile.absFileName;
+         SrcEntry oldSrcEnt = srcFile.clone();
          srcFile.setTypeName(newTypeName, renameFile);
+         String newFileName = srcFile.absFileName;
+         if (layeredSystem != null)
+            layeredSystem.fileRenamed(oldSrcEnt, srcFile, true);
+      }
+      if (layeredSystem != null) {
+         layeredSystem.updateTypeName(oldFullName, newFullName, true);
+      }
+   }
+
+   /**
+    * Called when we detect that a source file has changed ffom outside the system.
+    * This handles updating the srcFile on this model and updating the indexes in teh layered system that
+    * depend on the file name.  NOTE: this does not change the type name of the model type which typically
+    * must correspond with the type but during the editing process, sometimes these become different so we need to
+    * handle the update independently.
+    */
+   public void fileRenamed(SrcEntry oldSrcEnt, SrcEntry newSrcEnt) {
+      if (srcFiles != null && srcFiles.size() > 0) {
+         srcFiles.remove(0);
+         srcFiles.add(0, newSrcEnt);
+      }
       if (layeredSystem != null)
-         layeredSystem.updateTypeName(oldFullName, newFullName);
+         layeredSystem.fileRenamed(oldSrcEnt, newSrcEnt, true);
    }
 
    public String getComment() {
@@ -2854,6 +3064,110 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          }
       }
       return res.toString();
+   }
+
+   public boolean isUnsavedModel() {
+      return unsavedModel;
+   }
+
+   public File getLineIndexFile(String buildSrcDir) {
+      return GenFileLineIndex.getLineIndexFile(getProcessedFileName(buildSrcDir));
+   }
+
+   public void updateFileLineIndex(String transformedResult, String buildSrcDir) {
+      if (transformedModel != null) {
+         // The generation process does not set these so we need to reset them before doing the line number processing
+         ParseUtil.resetStartIndexes(transformedModel);
+         GenFileLineIndex idx = transformedModel.generateFileLineIndex(transformedResult, buildSrcDir);
+
+         /* For debugging you can do something like this
+         if (idx.genFileName.contains("UnitConverter.java")) {
+            System.out.println(idx.dump(0, 100));
+         }
+         */
+
+         fileLineIndex = transformedModel.fileLineIndex = idx;
+
+         // Should this file have a '.' in front of it to hide it by default?
+         File lineIndexFile = getLineIndexFile(buildSrcDir);
+
+         idx.saveLineIndexFile(lineIndexFile);
+      }
+      else {
+         // TODO: remove an old file line index?
+      }
+   }
+
+
+   public GenFileLineIndex readFileLineIndex(String buildSrcDir) {
+      if (fileLineIndex != null && fileLineIndex.buildSrcDir.equals(buildSrcDir))
+         return fileLineIndex;
+      fileLineIndex = GenFileLineIndex.readFileLineIndexFile(getProcessedFileName(buildSrcDir));
+      return fileLineIndex;
+   }
+
+   public List<Integer> getGenLinesForSrcStatement(ISrcStatement st, String buildDir) {
+      GenFileLineIndex idx = readFileLineIndex(buildDir);
+      if (idx != null) {
+         return idx.getGenLinesForSrcLine(getSrcFile().absFileName, ParseUtil.getLineNumberForNode(getParseNode(), st.getParseNode()));
+      }
+      return null;
+   }
+
+   public ISrcStatement getSrcStatementForGenLine(int lineNum, String buildDir) {
+      GenFileLineIndex idx = readFileLineIndex(buildDir);
+      if (idx != null) {
+         FileRangeRef ref = idx.getSrcFileForGenLine(lineNum);
+         if (ref != null) {
+            LayeredSystem sys = getLayeredSystem();
+            // If there's already an inactive model, grab it.
+            ILanguageModel model = sys.getCachedModelByPath(ref.absFileName, true);
+            if (model == null) {
+               model = sys.getCachedModelByPath(ref.absFileName, false);
+               if (model == null) {
+                  SrcEntry srcEnt = sys.getSrcEntryForPath(ref.absFileName, false, true);
+                  if (srcEnt != null) {
+                     Object obj = sys.parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, true, false);
+                     if (obj instanceof ILanguageModel)
+                        model = (ILanguageModel) obj;
+                     else
+                        System.out.println("*** Errors in model to get src statement for line?");
+                  }
+               }
+            }
+            if (model != null) {
+               ISemanticNode res = ParseUtil.getNodeAtLine(model.getParseNode(), ref.startLine);
+               if (res instanceof ISrcStatement)
+                  return ((ISrcStatement) res);
+               else if (res != null)
+                  res = ModelUtil.getTopLevelStatement(res);
+               if (res instanceof ISrcStatement)
+                  return ((ISrcStatement) res);
+            }
+         }
+      }
+      return null;
+   }
+
+   public GenFileLineIndex generateFileLineIndex(String transformedResult, String buildSrcDir) {
+      String genFileName = getProcessedFileName(buildSrcDir);
+      GenFileLineIndex idx = new GenFileLineIndex(genFileName, transformedResult, buildSrcDir);
+      if (idx.verbose)
+         System.out.println("*** Starting genFileIndex for: " + getSrcFile() + " -> " + genFileName);
+      if (types != null) {
+         for (TypeDeclaration type:types) {
+            SemanticNodeList<Statement> body = type.body;
+            if (body != null) {
+               for (Statement st:body) {
+                  st.addToFileLineIndex(idx, -1);
+               }
+            }
+         }
+      }
+      if (idx.verbose)
+         System.out.println("*** Completed genFileIndex for: " + getSrcFile() + " index: " + idx);
+      idx.cleanUp();
+      return idx;
    }
 }
 

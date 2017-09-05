@@ -40,10 +40,20 @@ public class SyncLayer {
 
    private TreeMap<String, RemoteResult> pendingMethods = new TreeMap<String, RemoteResult>();
 
-   public static class SyncChange {
+   /** Each sync layer stores a list of changes made in that layer - each are a subclass of this abstract class */
+   public abstract static class SyncChange {
       Object obj;
       SyncChange next;
+      // True if there's another change that's overridden this change - i.e. set the same property
       boolean overridden = false;
+      /**
+       * True for changes that were created on the remote side (i.e. on the server for the client or the client for the server)
+       * More detail: When we are restoring a client from a previous version of that client on the server, we are actually restoring two types of state.
+       * Properties which were changed on the previous client, but cached in the server's session and changes which originated on the server in the first place.
+       * The distinction is important so we know what information the server needs on a 'reset' operation - i.e. when the server loses it's session.  In that case, we need to update the
+       * server but only for the changes which originated on the client.
+       * Each change is marked with a flag and as we record changes we switch back and forth, on a property-by-property basis or at the type level.
+       */
       boolean remoteChange = false;
 
       SyncChange(Object o) {
@@ -155,12 +165,14 @@ public class SyncLayer {
       String instName;
       String methName;
       String callId = null;
+      String paramSig;
       RemoteResult result;
 
-      SyncMethodCall(Object obj, String instName, String methName, Object...args) {
+      SyncMethodCall(Object obj, String instName, String methName, String paramSig, Object...args) {
          super(obj);
          this.instName = instName;
          this.methName = methName;
+         this.paramSig = paramSig;
          this.args = args;
       }
 
@@ -261,7 +273,7 @@ public class SyncLayer {
       addChangedValue(obj, propName, val, false);
    }
 
-   public void addChangedValue(Object obj, String propName, Object val, boolean remote) {
+   private void updateChangedValue(Object obj, String propName, Object val) {
       HashMap<String,Object> changeMap = changedValues.get(obj);
       if (changeMap == null) {
          changeMap = new HashMap<String,Object>();
@@ -271,11 +283,25 @@ public class SyncLayer {
       // TODO: should we remove the old one if changedBefore is true?  There could be data dependencies so maybe we need to apply them in order, ala a transaction log
       // boolean changedBefore = changeMap.containsKey(propName);
       changeMap.put(propName, val);
+   }
+
+   /**
+    * Records a property change in the SyncLayer for the given object, property, and value.
+    * Use remote = true for changes which originated on the other side
+    */
+   public void addChangedValue(Object obj, String propName, Object val, boolean remote) {
+      updateChangedValue(obj, propName, val);
 
       SyncChange change = new SyncPropChange(obj, propName, val, remote);
       addSyncChange(change);
    }
 
+   public void addDepChangedValue(List<SyncChange> depChanges, Object obj, String propName, Object val, boolean remote) {
+      updateChangedValue(obj, propName, val);
+      depChanges.add(new SyncPropChange(obj, propName, val, remote));
+   }
+
+   /** Records a 'new object' sync change, including the optional parameters passed to the new object. */
    public void addNewObj(Object obj, Object...args) {
       SyncNewObj change = new SyncNewObj(obj, args);
       addSyncChange(change);
@@ -340,8 +366,8 @@ public class SyncLayer {
       return changeMap.get(propName);
    }
 
-   public RemoteResult invokeRemote(Object obj, String methName, Object[] args) {
-      SyncMethodCall change = new SyncMethodCall(obj, syncContext.findObjectName(obj), methName, args);
+   public RemoteResult invokeRemote(Object obj, String methName, String paramSig, Object[] args) {
+      SyncMethodCall change = new SyncMethodCall(obj, syncContext.findObjectName(obj), methName, paramSig, args);
       addSyncChange(change);
       RemoteResult res = new RemoteResult();
       res.callId = change.getCallId();
@@ -483,19 +509,24 @@ public class SyncLayer {
       pendingChangeLast = null;
    }
 
-   public CharSequence serialize(SyncManager.SyncContext parentContext, HashSet<String> createdTypes, boolean fetchesOnly) {
-      StringBuilder sb = new StringBuilder();
+   private final String noPackageNameSentinel = "$no-package-name";
+
+   public SyncSerializer serialize(SyncManager.SyncContext parentContext, HashSet<String> createdTypes, boolean fetchesOnly) {
       SyncManager syncManager = syncContext.getSyncManager();
+      SyncSerializer ser = syncManager.syncDestination.createSerializer();
 
       SyncChange change = syncChangeList;
       SyncChange prevChange = null;
 
       SyncChangeContext changeCtx = new SyncChangeContext();
-      changeCtx.lastPackageName = null;
+      // init this so that even if the first package is null that we add the package ; statement.
+      // If not, joining together sync layers from different contexts will break when the last component has a non-null
+      // package and the first one here does not.
+      changeCtx.lastPackageName = noPackageNameSentinel;
       changeCtx.currentObjNames = new ArrayList<String>();
 
       while (change != null) {
-         // Skip overriden changes
+         // Skip overridden changes
          if (change.overridden) {
             prevChange = change;
             change = change.next;
@@ -510,22 +541,18 @@ public class SyncLayer {
             continue;
          }
 
-         addChangedObject(parentContext, sb, change, prevChange, changeCtx, createdTypes);
+         addChangedObject(parentContext, ser, change, prevChange, changeCtx, createdTypes);
 
          prevChange = change;
          change = change.next;
       }
-      // If we ended up serializing remote changes, need to put it back in case there's another layer of changes
-      // in the stream.  We could of course propagate the remoteChange flag to avoid that but I think it's
-      // session to global now so it would be there in any case.
       if (changeCtx.remoteChange) {
-         appendRemoteChanges(sb, false, changeCtx.currentObjNames.size() == 0);
+         int indent = changeCtx.currentObjNames.size();
+         ser.appendRemoteChanges(false, indent == 0, indent);
       }
-      popCurrentObjNames(sb, changeCtx.currentObjNames, changeCtx.currentObjNames.size());
+      popCurrentObjNames(ser, changeCtx.currentObjNames, changeCtx.currentObjNames.size());
 
-      if (sb.length() > 0)
-         return syncManager.syncDestination.translateSyncLayer(sb.toString());
-      return "";
+      return ser;
    }
 
    private String getPathName(List<String> names) {
@@ -549,11 +576,13 @@ public class SyncLayer {
       boolean remoteChange;
    }
 
-   private void addChangedObject(SyncManager.SyncContext parentContext, StringBuilder sb, SyncChange change, SyncChange prevChange,
+   private void addChangedObject(SyncManager.SyncContext parentContext, SyncSerializer ser, SyncChange change, SyncChange prevChange,
                                    SyncChangeContext changeCtx, HashSet<String> createdTypes) {
       Object changedObj = change.obj;
       String objName;
 
+      // As we add this change, we might encounter instances which are newly referenced in this sync layer.  This list accumulates those
+      // objects so we can be sure to include their definition before we serialize this change.
       ArrayList<SyncChange> depChanges = new ArrayList<SyncChange>();
 
       HashMap<String,Object> changeMap = changedValues.get(changedObj);
@@ -585,6 +614,8 @@ public class SyncLayer {
       Object newObjType = DynUtil.getType(newObj);
       String newLastPackageName = changeCtx.lastPackageName;
 
+      boolean useObjNameForPackage = true;
+
       // When we are creating a new type, the current object is the parent of the object itself
       if (isNew) {
          SyncManager.InstInfo instInfo = parentContext.getInstInfo(changedObj);
@@ -608,9 +639,17 @@ public class SyncLayer {
                int numLevels = DynUtil.getNumInnerTypeLevels(newObjType);
                if (numLevels > 0)
                   newObjName = CTypeUtil.getPackageName(objTypeName);
-               // Creating a new top level object with new args.  Use the class as the context for the static variable
-               else
-                  newObjName = CTypeUtil.getClassName(DynUtil.getTypeName(newObjType, false));
+               else {
+                  // For SC serialization format, because it's like Java we can't omit the top-level name so we use the new obj type name but for JSON and other formats
+                  // we don't want this top-level thing
+                  if (ser.needsObjectForTopLevelNew()) {
+                     newObjName = CTypeUtil.getClassName(DynUtil.getTypeName(newObjType, false));
+                     useObjNameForPackage = false;
+                  }
+                  else {
+                     newObjName = "";
+                  }
+               }
             }
             objName = syncHandler.getObjectBaseName(depChanges, this);
          }
@@ -645,10 +684,11 @@ public class SyncLayer {
       // First we compute the new obj name and new obj names for this change.  They are not getting applied yet though so we keep them as a copy.
       // We may need to add dependent objects first.
 
-      StringBuilder newSB = new StringBuilder();
-      StringBuilder switchSB = null;
+      SyncSerializer switchSB = null;
+      int switchObjNum = -1;
+      int switchObjStart = -1;
 
-      String newPackageName = syncHandler.getPackageName();
+      String newPackageName = useObjNameForPackage ? syncHandler.getPackageName() : CTypeUtil.getPackageName(objTypeName);
       boolean packagesMatch = !(changeCtx.lastPackageName != newPackageName && (changeCtx.lastPackageName == null || !changeCtx.lastPackageName.equals(newPackageName)));
 
       boolean pushName = true;
@@ -660,9 +700,14 @@ public class SyncLayer {
       if (!packagesMatch) {
          if (sz > 0) {
             if (switchSB == null)
-               switchSB = new StringBuilder();
+               switchSB = ser.createTempSerializer(false, newObjNames.size());
             // Pop from sz to the one before curIx
-            popCurrentObjNames(switchSB, newObjNames, sz);
+            // But... do not put the close braces into switchSB because we may need to change the number of close tags before
+            // we insert the new object name.  Instead, keep track of the start/end level and generate them just before
+            // we prepend the switchSB.
+            switchObjNum = sz;
+            switchObjStart = newObjNames.size();
+            popCurrentObjNames(null, newObjNames, sz);
 
             // This is the "object x" case with creating a new top-level object, such as an ObjectId.  We'll do object x as a top-level which is fine
             if (isNew && !newObjName.contains(".") && (newArgs == null || newArgs.length == 0)) {
@@ -691,8 +736,10 @@ public class SyncLayer {
                      // Found a parent so close to reach it's context, then strip that part off of the rest of the name we need to set.
                      if (parIx != -1) {
                         if (switchSB == null)
-                           switchSB = new StringBuilder();
-                        popCurrentObjNames(switchSB, newObjNames, sz - parIx - 1);
+                           switchSB = ser.createTempSerializer(false, newObjNames.size());
+                        switchObjNum = sz - parIx - 1;
+                        switchObjStart = newObjNames.size();
+                        popCurrentObjNames(null, newObjNames, switchObjNum);
                         newObjName = currentChildPath;
                         break;
                      }
@@ -702,8 +749,10 @@ public class SyncLayer {
                   // Nothing in common so get rid of all of these names
                   if (currentParent == null) {
                      if (switchSB == null)
-                        switchSB = new StringBuilder();
-                     popCurrentObjNames(switchSB, newObjNames, sz);
+                        switchSB = ser.createTempSerializer(false, newObjNames.size());
+                     switchObjNum = sz;
+                     switchObjStart = newObjNames.size();
+                     popCurrentObjNames(null, newObjNames, sz);
                      // This is the "object x" case with creating a new top-level object, such as an ObjectId.  We'll do object x as a top-level which is fine
                      if (isNew && !newObjName.contains(".") && (newArgs == null || newArgs.length == 0)) {
                         pushName = false; // topLevel
@@ -712,9 +761,11 @@ public class SyncLayer {
                   }
                } else {
                   if (switchSB == null)
-                     switchSB = new StringBuilder();
+                     switchSB = ser.createTempSerializer(false, newObjNames.size());
                   // Pop from sz to the one before curIx
-                  popCurrentObjNames(switchSB, newObjNames, sz - curIx - 1);
+                  switchObjNum = sz - curIx - 1;
+                  switchObjStart = newObjNames.size();
+                  popCurrentObjNames(null, newObjNames, switchObjNum);
                   pushName = false;
                }
             }
@@ -726,95 +777,47 @@ public class SyncLayer {
          System.err.println("*** No object name for sync operation");
       }
       else {
-         String packageName = syncHandler.getPackageName();
+         String packageName = useObjNameForPackage ? syncHandler.getPackageName() : CTypeUtil.getPackageName(objTypeName);
          if (changeCtx.lastPackageName != packageName && (changeCtx.lastPackageName == null || !changeCtx.lastPackageName.equals(packageName))) {
             if (newObjNames.size() > 0)
                System.err.println("*** Mismatching packages with somehow matching types");
             if (switchSB == null)
-               switchSB = new StringBuilder();
-            switchSB.append("package ");
-            // Need to be able to override the package with a null in the model.
-            if (packageName != null)
-               switchSB.append(packageName);
-            switchSB.append(";\n\n");
+               switchSB = ser.createTempSerializer(false, newObjNames.size());
+            switchSB.changePackage(packageName);
             newLastPackageName = packageName;
          }
       }
 
       if (pushName && newObjName != null && newObjName.length() > 0) {
-         if (switchSB == null)
-            switchSB = new StringBuilder();
          int currSize = newObjNames.size();
          newObjNames.add(newObjName);
-         switchSB.append(Bind.indent(currSize));
-         switchSB.append(newObjName);
-         switchSB.append(" {\n");
+         int indent = currSize + 1;
+         if (switchSB == null)
+            switchSB = ser.createTempSerializer(false, indent);
+         else
+            switchSB.setIndent(indent);
+         switchSB.pushCurrentObject(newObjName, currSize);
       }
       else if (sz == 0)
          topLevel = true;
 
       // END - set current context
 
+      SyncSerializer newSB = ser.createTempSerializer(false, newObjNames.size());
+
       boolean newSBPushed = false;
       if (isNew) {
-         newSB.append(Bind.indent(newObjNames.size()));
-         if (newArgs == null || newArgs.length == 0) {
-            newSB.append("object ");
-            String objBaseName = CTypeUtil.getClassName(objName);
-            newSB.append(objBaseName);
-            newObjNames.add(objName);
-            newSB.append(" extends ");
-            newSB.append(objTypeName);
-            newSB.append(" {\n");
-            newSBPushed = true;
-         }
-         else {
-            // When there are parameters passed to the addSyncInst call, those are the constructor parameters.
-            // This means we can't use the object tag... instead we define a field with the objName in the context
-            // of the parent object (so that's accessible when we call the new).   For top-level new X calls we need
-            // to make them static since they are not using the outer object.
-            if (DynUtil.getNumInnerObjectLevels(change.obj) == 0)
-               newSB.append("static ");
-            newSB.append(objTypeName);
-            newSB.append(" ");
-            String newVarName = CTypeUtil.getClassName(syncHandler.getObjectBaseName(depChanges, this));
-            newSB.append(newVarName);
-            newSB.append(" = new ");
-            newSB.append(objTypeName);
-            newSB.append("(");
-            boolean first = true;
-            StringBuilder preBlockCode = new StringBuilder();
-            StringBuilder postBlockCode = new StringBuilder();
-            for (Object newArg:newArgs) {
-               if (!first)
-                  newSB.append(", ");
-               else
-                  first = false;
-               CharSequence res = parentContext.expressionToString(newArg, newObjNames, newLastPackageName, preBlockCode, postBlockCode, newVarName, false, "", depChanges, this);
-               newSB.append(res);
-            }
-            // For property types like ArrayList and Map which have to execute statements at the block level to support their value.
-            newSB.append(postBlockCode);
-            newSB.append(");\n");
-
-            if (preBlockCode.length() > 0) {
-               StringBuilder preBuffer = new StringBuilder();
-               preBuffer.append(preBlockCode);
-               preBuffer.append(newSB);
-               newSB = preBuffer;
-            }
-
-            if (change instanceof SyncPropChange) {
-               newSB.append(Bind.indent(newObjNames.size()));
-               newSB.append(newVarName);
-               newSB.append(" {\n");
-               startObjNames = (ArrayList<String>) newObjNames.clone();
-               newObjNames.add(newVarName);
-            }
+         NewObjResult newObjRes = newSB.appendNewObj(changedObj, objName, objTypeName, newArgs, newObjNames, newLastPackageName, syncHandler, parentContext, this, depChanges, change instanceof SyncPropChange);
+         if (newObjRes != null) {
+            if (newObjRes.newSB != null)
+               newSB = newObjRes.newSB;
+            newSBPushed = newObjRes.newSBPushed;
+            if (newObjRes.startObjNames != null)
+               startObjNames = newObjRes.startObjNames;
          }
 
          // This prevents us from issuing 2 object operators in the same serialized session.  We could just call registerObjName on this
-         // and avoid the extra hash map but I think there's value in being able to serlialize more than once before we mark the sync as completed.
+         // and avoid the extra hash map but I think there's value in being able to serialize more than once before we mark the sync as completed.
          // If the remote side does not get data, we may need to resync with further changes, meaning we need to serialize again.
          if (createdTypes != null)
             createdTypes.add(changedObjFullName);
@@ -826,111 +829,29 @@ public class SyncLayer {
          if (changeMap != null && changeMap.containsKey(propName)) {
             Object propValue = changeMap.get(propName);
 
-            StringBuilder preBlockCode = new StringBuilder();
-            StringBuilder postBlockCode = new StringBuilder();
-            StringBuilder statement = new StringBuilder();
-
-            statement.append(Bind.indent(newObjNames.size()));
-
-            if (propValue != null) {
-               // Which sync context to use for managing synchronization of on-demand references for properties of this component?   When a session scoped component extends or refers to a global scoped component - e.g. EditorFrame's editorModel, typeTreeModel, etc.
-               // how do we keep everything in sync?  Global scoped contexts keep the list of session contexts which are mapping them.  When session scoped extends global, it becomes session - so editorModel/typeTreeModel should be session.  But LayeredSystem,
-               // Layer's etc. should be global - shared.  Information replicated into the sessionSyncContext as needed.
-               // Change listeners - global or session scoped level:
-               //   1) do them at the global level to synchronize event propagation to the session level using the back-event notification.  Theoretically you could generate a single serialized sync layer and broadcast it out to all listeners.  they are
-               //    synchronized and seeing the same thing.  they can ignore any data they get pushed which does not match their criteria.
-               //   2) NO: adding/removing/delivering events is complicated.  We need to sync the add listener with the get intitial sync value.  It's rare that one exact layer applies to everyone so that optimization won't work. - it's likely that application logic has customized it so different users see different things.  It's a security violation to
-               //    violate application logic and broadcast all data to all users.
-               //   ?? What about the property value listener?   That too should be done at the session level.
-               //    simplify by doing event listeners, event propagation at the session scoped level always.  register instances, names etc. globally so those are all shared.
-               //  Need to propagate both contexts - session and global through the createOnDemand calls
-               //  Use global "new names" - never commit to registeredNewNames for global.  Instead put them into session so we keep track of what's registerd where.
-               //
-               // Problem with making the global objects full managed at the session level - if there are any changes at the global level which depend on the global object, it's change also must be tracked at the global level.  The depChanges takes
-               // care of that now but currently we are registering the names at the session level which causes the problem.
-               // What changes must be made at the global level?  Any initSyncInsts which are not on-demand and are on global scoped components.  We don't have a session scope then.
-               SyncHandler valSyncHandler = parentContext.getSyncHandler(propValue);
-               statement.append(valSyncHandler.getPropertyUpdateCode(changedObj, propName, propValue, parentContext.getPreviousValue(changedObj, propName), newObjNames, newLastPackageName, preBlockCode, postBlockCode, depChanges, this));
-            }
-            else {
-               statement.append(propName);
-               statement.append(" = null;\n");
-            }
-            statement.append(";\n");
-
-            newSB.append(preBlockCode);
-            newSB.append(statement);
-            newSB.append(postBlockCode);
+            newSB.appendProp(changedObj, propName, propValue, newObjNames, newLastPackageName, parentContext, this, depChanges);
          }
       }
       else if (change instanceof SyncMethodCall) {
          SyncMethodCall smc = (SyncMethodCall) change;
 
-         StringBuilder preBlockCode = new StringBuilder();
-         StringBuilder postBlockCode = new StringBuilder();
-         StringBuilder statement = new StringBuilder();
-
-         int indentSize = newObjNames.size();
-
-         statement.append(Bind.indent(indentSize));
-
-         statement.append("Object ");
-         statement.append(smc.callId);
-         statement.append(" = ");
-         statement.append(smc.methName);
-         statement.append("(");
-         if (smc.args != null) {
-            int argIx = 0;
-            for (Object arg:smc.args) {
-               if (argIx > 0)
-                  statement.append(", ");
-               statement.append(parentContext.expressionToString(arg, newObjNames, newLastPackageName, preBlockCode, postBlockCode, null, false, String.valueOf(argIx), depChanges, this));
-               argIx++;
-            }
-         }
-         statement.append(");\n");
-
-         newSB.append(preBlockCode);
-         newSB.append(statement);
-         newSB.append(postBlockCode);
+         newSB.appendMethodCall(parentContext, smc, newObjNames, newLastPackageName, depChanges, this);
       }
       else if (change instanceof SyncMethodResult) {
          SyncMethodResult mres = (SyncMethodResult) change;
 
-         StringBuilder preBlockCode = new StringBuilder();
-         StringBuilder postBlockCode = new StringBuilder();
-         StringBuilder statement = new StringBuilder();
+         newSB.appendMethodResult(parentContext, mres, newObjNames, newLastPackageName, depChanges, this);
 
-         int indentSize = newObjNames.size();
-
-         statement.append(Bind.indent(indentSize + 1));
-         statement.append("sc.sync.SyncManager.processMethodReturn(");
-         statement.append("\"");
-         statement.append(mres.callId);
-         statement.append("\", ");
-         statement.append(parentContext.expressionToString(mres.retValue, newObjNames, newLastPackageName, preBlockCode, postBlockCode, null, true, "", depChanges, this));
-         statement.append(");\n");
-
-         newSB.append(Bind.indent(indentSize));
-         newSB.append("{\n");
-         newSB.append(preBlockCode);
-         newSB.append(statement);
-         newSB.append(postBlockCode);
-         newSB.append(Bind.indent(indentSize));
-         newSB.append("}\n");
       }
       else if (change instanceof SyncFetchProperty) {
          SyncFetchProperty fetchProp = (SyncFetchProperty) change;
 
          int indentSize = newObjNames.size();
 
-         newSB.append(Bind.indent(indentSize));
-         // TODO: should we set the @sc.obj.Sync annotation here or is this the only reason we'd ever use override is to fetch?
-         newSB.append("override ");
-         newSB.append(fetchProp.propName);
-         newSB.append(";\n");
+         newSB.appendFetchProperty(fetchProp.propName, indentSize);
       }
 
+      // Before we add the newSB, insert any dependencies that need to be before
       if (depChanges.size() != 0) {
          String origPackage = newLastPackageName;
          int dix = 0;
@@ -947,7 +868,7 @@ public class SyncLayer {
             else
                depChange.next = depChanges.get(dix+1);
 
-            addChangedObject(parentContext, sb, depChange, prevChange, changeCtx, createdTypes);
+            addChangedObject(parentContext, ser, depChange, prevChange, changeCtx, createdTypes);
             prevChange = depChange;
             dix++;
          }
@@ -959,12 +880,10 @@ public class SyncLayer {
          if (!currentObjNames.equals(toCompNames)) {
             // In this case, we just do the switch back and so do not need the original 'switch code' used to switch the types originally
             switchSB = null;
-            popCurrentObjNames(sb, currentObjNames, currentObjNames.size());
+            switchObjStart = -1;
+            popCurrentObjNames(ser, currentObjNames, currentObjNames.size());
             if (!DynUtil.equalObjects(origPackage, changeCtx.lastPackageName)) {
-               sb.append("package ");
-               if (origPackage != null)
-                  sb.append(origPackage);
-               sb.append(";\n\n");
+               ser.changePackage(origPackage);
             }
 
             ArrayList<String> toPush = toCompNames;
@@ -972,26 +891,38 @@ public class SyncLayer {
                toPush = new ArrayList<String>(toCompNames);
                toPush.remove(toPush.size()-1);
             }
-            pushCurrentObjNames(sb, toPush, toPush.size());
+            pushCurrentObjNames(ser, toPush, toPush.size());
          }
          else {
             // Just leave the current object since the dep set it properly for us
-            if (DynUtil.equalObjects(newLastPackageName, changeCtx.lastPackageName))
+            if (DynUtil.equalObjects(newLastPackageName, changeCtx.lastPackageName)) {
                switchSB = null;
+               switchObjStart = -1;
+            }
+            else {
+               // Cancel the 'close' brace we would have needed since this was done already but we do need to switch the package part
+               switchObjStart = -1;
+            }
          }
       }
       // The close is kept separate - if we have to change names due to a dependent object, that will have already closed it for us.
-      if (switchSB != null)
-         sb.append(switchSB);
+      if (switchSB != null) {
+         if (switchObjStart != -1) {
+            int end = switchObjStart - switchObjNum;
+            for (int popIx = switchObjStart - 1; popIx >= end; popIx--)
+               ser.popCurrentObject(popIx);
+         }
+         ser.appendSerializer(switchSB);
+      }
 
       // TODO: perhaps there won't be an object in context at this time so we need to add "SyncManager {" just so we are in the right code type
       boolean remoteChange = change.remoteChange;
       if (changeCtx.remoteChange != remoteChange) {
          changeCtx.remoteChange = remoteChange;
-         appendRemoteChanges(sb, remoteChange, topLevel);
+         ser.appendRemoteChanges(remoteChange, topLevel, newObjNames.size());
       }
 
-      sb.append(newSB);
+      ser.appendSerializer(newSB);
 
       currentObjNames.clear();
       currentObjNames.addAll(newObjNames);
@@ -1000,49 +931,29 @@ public class SyncLayer {
 
    public final static String GLOBAL_TYPE_NAME = "_GLOBAL_";
 
-   static void appendRemoteChanges(StringBuilder sb, boolean remoteChange, boolean topLevel) {
-      if (topLevel) {
-         sb.append(GLOBAL_TYPE_NAME);
-         sb.append(" { ");
-      }
-      // TODO: import these things to make the strings smaller
-      sb.append("{ sc.sync.SyncManager.setSyncState(");
-      if (remoteChange)
-         sb.append("sc.sync.SyncManager.SyncState.InitializingLocal");
-      else
-         sb.append("sc.sync.SyncManager.SyncState.Initializing");
-      sb.append("); }");
-      if (topLevel)
-         sb.append("}");
-      sb.append("\n");
-   }
-
-   static void pushCurrentObjNames(StringBuilder res, ArrayList<String> currentObjNames, int num) {
+   static void pushCurrentObjNames(SyncSerializer ser, ArrayList<String> currentObjNames, int num) {
       String parentName = null;
       for (int i = 0; i < num; i++) {
          String objName = currentObjNames.get(i);
          if (i > 0) {
-            res.append(Bind.indent(i));
-
             if (objName.startsWith(parentName))
                objName = objName.substring(parentName.length() + 1);
          }
          // Use the whole name when it's the first
-         res.append(objName);
          if (parentName == null)
             parentName = objName;
          else
             parentName = parentName + "." + objName;
-         res.append(" {\n");
+
+         ser.pushCurrentObject(objName, i);
       }
    }
 
-   static void popCurrentObjNames(StringBuilder res, ArrayList<String> currentObjNames, int num) {
+   static void popCurrentObjNames(SyncSerializer ser, ArrayList<String> currentObjNames, int num) {
       for (int i = 0; i < num; i++) {
          int ix = currentObjNames.size()-1;
-         if (ix > 0)
-            res.append(Bind.indent(ix));
-         res.append("}\n");
+         if (ser != null)
+            ser.popCurrentObject(ix);
          currentObjNames.remove(currentObjNames.size()-1);
       }
    }
@@ -1059,7 +970,7 @@ public class SyncLayer {
          SyncChange change = syncChangeList;
 
          while (change != null) {
-            // Skip overriden changes
+            // Skip overridden changes
             if (change.overridden) {
                change = change.next;
                continue;
@@ -1074,6 +985,16 @@ public class SyncLayer {
 
    public void dump() {
       System.out.println(getChangeList());
+   }
+
+   public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append("syncLayer for: ");
+      if (syncContext != null)
+         sb.append(syncContext);
+      if (initialLayer)
+         sb.append(" - initial layer");
+      return sb.toString();
    }
 
 }

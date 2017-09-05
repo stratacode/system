@@ -119,9 +119,9 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
 
          // Check to be sure the initializer is compatible with the property
          // Skip this test for reverse-only bindings
-         if (initializer != null && (bindingDirection == null || bindingDirection.doForward())) {
+         if (initializer != null && !isReverseOnlyExpression()) {
             Object propType = isSetMethod ? ModelUtil.getSetMethodPropertyType(assignedProperty) : ModelUtil.getVariableTypeDeclaration(assignedProperty);
-            initializer.setInferredType(propType);
+            initializer.setInferredType(propType, true);
             Object initType = initializer.getGenericType();
             if (initType != null && propType != null &&
                 !ModelUtil.isAssignableFrom(propType, initType, true, null, getLayeredSystem())) {
@@ -682,7 +682,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       ParseUtil.styleString(adapter, "member", pnode.children.get(0).toString(), false);
       for (int i = 1; i < pnode.children.size(); i++) {
          Object childNode = pnode.children.get(i);
-         if (childNode instanceof IParseNode && ((IParseNode) childNode).getSemanticValue() == initializer)
+         if (childNode instanceof IParseNode && ((IParseNode) childNode).getSemanticValue() == initializer && initializer != null)
             initializer.styleNode(adapter);
          else
             ParseUtil.toStyledString(adapter, pnode.children.get(i));
@@ -865,6 +865,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
    public void stop() {
       super.stop();
       assignedProperty = null;
+      starting = false;
    }
 
    /**
@@ -951,9 +952,6 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
    }
 
    public PropertyAssignment refreshNode() {
-      JavaModel oldModel = getJavaModel();
-      if (!oldModel.removed)
-         return this; // We are still valid
       BodyTypeDeclaration type = getEnclosingType().refreshNode();
       if (type == null)
          return this;
@@ -1018,5 +1016,22 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       if (propertyName != null) {
          addMemberByName(membersByName, propertyName);
       }
+   }
+
+   public boolean isReverseOnlyExpression() {
+      return bindingDirection != null && !bindingDirection.doForward();
+   }
+
+   public Map<String,Object> getAnnotations() {
+      Map<String,Object> props = super.getAnnotations();
+      Map<String,Object> propMap = null;
+      if (assignedProperty != null) {
+         propMap = ModelUtil.getPropertyAnnotations(assignedProperty);
+      }
+      if (props != null && propMap != null)
+         props.putAll(propMap);
+      if (props == null)
+         return propMap;
+      return props;
    }
 }

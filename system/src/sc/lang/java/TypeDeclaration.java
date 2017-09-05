@@ -17,6 +17,7 @@ import sc.layer.IFileProcessorResult;
 import sc.layer.SrcEntry;
 import sc.obj.IComponent;
 import sc.layer.LayeredSystem;
+import sc.parser.GenFileLineIndex;
 import sc.parser.ParseUtil;
 import sc.type.CTypeUtil;
 import sc.util.IdentityHashSet;
@@ -121,9 +122,10 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
       initDynamicType();
 
-      if (m != null) {
+      // Don't add the transformed types to the main type system.
+      if (m != null && !isTransformedType()) {
          // Types defined inside of a method are not globally visible within the file
-         if (getEnclosingMethod() == null)
+         if (getEnclosingMethod() == null && typeName != null && !isAnonymousType())
             m.addTypeDeclaration(getFileRelativeTypeName(), this);
       }
 
@@ -237,11 +239,13 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    }
 
    public void stop() {
-      if (!started) return;
-
-      unregister();
+      if (started)
+         unregister();
 
       super.stop();
+
+      typeInfoInitialized = false;
+      implementsBoundTypes = null;
    }
 
    public boolean isAutoComponent() {
@@ -270,8 +274,10 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
       // Need to start the extends type as we need to dig into it
       Object extendsTypeDecl = extendsType.getTypeDeclaration();
-      if (extendsTypeDecl == null)
+      if (extendsTypeDecl == null) {
          extendsType.displayTypeError("Implemented class not found: ", extendsType.getFullTypeName(), " for ");
+         extendsTypeDecl = extendsType.getTypeDeclaration();
+      }
       return extendsTypeDecl;
    }
 
@@ -283,8 +289,11 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    public void initTypeInfo() {
       if (typeInfoInitialized)
          return;
+      if (!isInitialized()) {
+         JavaModel model = getJavaModel();
+         ParseUtil.initComponent(model);
+      }
       typeInfoInitialized = true;
-
 
       // Need to make sure the parent type is initialized before the sub-type since we need to search the parent types extends/implementBoundTypes to possibly find the implements types here
       TypeDeclaration enclType = getEnclosingType();
@@ -313,6 +322,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       }
       if (m != null && m.getLayer() != null && m.getLayer().annotationLayer && !isAnnotationDefinition()) {
          displayError("Annotation layers may only attach annotations onto definitions: ");
+         boolean dummy = isAnnotationDefinition();
       }
    }
 
@@ -388,7 +398,14 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
             ITypeDeclaration res = getImplicitEnclosingType(impl, par);
             return res;
          }
-         if (par instanceof ITypeDeclaration) {
+         else if (par instanceof Element) {
+            Element elem = (Element) par;
+            TypeDeclaration res = elem.getElementTypeDeclaration();
+            if (res == null)
+               return elem.getEnclosingType();
+            return res;
+         }
+         else if (par instanceof ITypeDeclaration) {
             ITypeDeclaration itd = (ITypeDeclaration) par;
             if (itd.isRealType())
                return itd;
@@ -465,8 +482,9 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       initTypeInfo();
 
       if (implementsBoundTypes != null) {
+         LayeredSystem sys = getLayeredSystem();
          for (Object impl:implementsBoundTypes) {
-            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs)) != null)
+            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, sys)) != null)
                return v;
          }
       }
@@ -481,7 +499,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
       if (implementsBoundTypes != null && !skipIfaces) {
          for (Object impl:implementsBoundTypes) {
-            if (impl != null && (v = ModelUtil.definesMember(impl, name, mtype, refType, ctx, skipIfaces, isTransformed)) != null)
+            if (impl != null && (v = ModelUtil.definesMember(impl, name, mtype, refType, ctx, skipIfaces, isTransformed, getLayeredSystem())) != null)
                return v;
          }
       }
@@ -603,7 +621,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
       // Occasionally, like when styling code snippets we'll bring in a new type with layer=null so it does not
       // get stored in the type cache but we still want to consider it the same type if its name is the same.
-      if (this == other || (typeName.equals(other.getTypeName()) && getFullTypeName().equals(other.getFullTypeName())))
+      if (this == other || (typeName != null && typeName.equals(other.getTypeName()) && getFullTypeName().equals(other.getFullTypeName())))
          return true;
 
       if (other instanceof ModifyDeclaration) {
@@ -632,10 +650,17 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       }
 
       Object extType = getDerivedTypeDeclaration();
-      if (extType instanceof ITypeDeclaration)
-         return ((ITypeDeclaration) extType).isAssignableTo(other);
-      else if (extType != null)
-         return ModelUtil.isAssignableFrom(other, extType);
+      if (extType instanceof ITypeDeclaration) {
+         if (((ITypeDeclaration) extType).isAssignableTo(other))
+            return true;
+      }
+      else if (extType != null && ModelUtil.isAssignableFrom(other, extType))
+         return true;
+
+      // NOTE: this test is replicated in implementsType
+      if (isAutoComponent() && other.getFullTypeName().equals("sc.obj.ComponentImpl"))
+         return true;
+
       return false;
    }
 
@@ -666,7 +691,9 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    public Definition modifyDefinition(BodyTypeDeclaration base, boolean doMerge, boolean inTransformed) {
       TypeDeclaration otherType = (TypeDeclaration) base.getInnerType(typeName, null, true, false, false);
       Object annotObj;
-      if (otherType != null) {
+      // We are inside of a modify but are defining a new type.  If this type is the same as the inherited type
+      // we can just replace it, but if it's a new type, it just gets added to the modified type.
+      if (otherType != null && ModelUtil.sameTypes(otherType, this)) {
          overrides = otherType;
          // Preserves the order of the children in the list.
          otherType.parentNode.replaceChild(otherType, this);
@@ -730,23 +757,37 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
             return true;
       }
 
-      // We use the ComponentImpl's _initState field so this test ensures that we recognize the ownership of that field.  Even if the type is transformed, we might have resolved a reference before it was.
+      // We use the ComponentImpl's _initState field to resolve _initState references on untransformed components.
+      // This test is needed because that field is protected and we need to be 'assignable' to ComponentImpl to access it.
+      // NOTE: this test is replicated in isAssignableTo.
       if (isAutoComponent() && fullTypeName.equals("sc.obj.ComponentImpl"))
          return true;
 
       return false;
    }
 
-
-   public void addPropertyToMakeBindable(String propertyName, Object propType, JavaModel fromModel) {
-      addPropertyToMakeBindable(propertyName, propType, fromModel, false);
-   }
-
-   public void addPropertyToMakeBindable(String propertyName, Object propType, JavaModel fromModel, boolean referenceOnly) {
+   public void addPropertyToMakeBindable(String propertyName, Object propType, JavaModel fromModel, boolean referenceOnly, JavaSemanticNode fromNode) {
       assert isClassOrObjectType();
 
       Layer lyr = getLayer();
       LayeredSystem sys = lyr != null ? lyr.getLayeredSystem() : null;
+
+      if (lyr != null && lyr.annotationLayer) {
+         if (fromNode != null && fromNode instanceof Expression) {
+            Expression fromExpr = (Expression) fromNode;
+            Statement fromSt = fromExpr.bindingStatement;
+
+            if (fromSt != null && ModelUtil.getAnnotation(fromSt, "sc.bind.NoBindWarn") != null)
+               return;
+         }
+
+         if (fromNode == null)
+            fromNode = this;
+
+         if (!fromModel.disableTypeErrors)
+            fromNode.displayWarning("Unable to make property: " + propertyName + " bindable on annotation type: " + typeName + " for: ");
+         return;
+      }
       if (sys != null && sys.buildLayer != null && sys.buildLayer.compiled && !referenceOnly) {
          Object field;
          // First check if the model has a known bindable property.  If this is a dynamic type, all sets should throw the property change even through the wrapper.  Not entirely sure
@@ -793,35 +834,6 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
          propertiesToMakeBindable.put(propertyName, referenceOnly);
          if (fromModel != null)
             getJavaModel().addBindDependency(this, propertyName, fromModel.getModelTypeDeclaration(), referenceOnly);
-      }
-   }
-
-   public void startExtendedType(BodyTypeDeclaration extendsType, String message) {
-      JavaModel extendsModel = extendsType.getJavaModel();
-      boolean doValidate = isValidated();
-      boolean incrNest = false;
-      JavaSemanticNode extendsNode = extendsModel == null ? extendsType : extendsModel;
-      if (extendsModel.layer != null && extendsModel.isLayerModel && extendsModel.layer.excluded)
-         return;
-      // Do nothing if the type or model is already at the level we need it
-      if ((!doValidate && extendsNode.isStarted()) || (doValidate && extendsNode.isValidated()))
-         return;
-      try {
-         if (extendsModel != null && (extendsModel.layeredSystem == null || extendsModel.layeredSystem.options.verbose)) {
-            System.out.println(StringUtil.indent(++LayeredSystem.nestLevel) + (!extendsType.isStarted() ? "Starting: ": "Validating: ") + message + " type " + extendsModel.getSrcFile() + " runtime: " + getLayeredSystem().getRuntimeName());
-            incrNest = true;
-         }
-         // If this type is already validated, validate the extended type
-         if (doValidate) {
-            // work at the model level as it's important the model gets started
-            ParseUtil.initAndStartComponent(extendsNode);
-         }
-         else
-            ParseUtil.startComponent(extendsNode);
-      }
-      finally {
-         if (incrNest)
-            LayeredSystem.nestLevel--;
       }
    }
 
@@ -980,14 +992,17 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return result;
    }
 
-   private void addIFieldDefinition(Object modifiers, JavaType type, String varName, String operator, Expression initializer, boolean bindable) {
+   private void addIFieldDefinition(Object modifiers, JavaType type, String varName, String operator, Expression initializer, boolean bindable, ISrcStatement fromSt) {
       initializer = initializer == null ? null : (Expression) initializer.deepCopy(CopyNormal, null);
       FieldDefinition newField = FieldDefinition.createFromJavaType(type, varName, operator, initializer);
       if (modifiers instanceof ISemanticNode)
          modifiers = ((ISemanticNode) modifiers).deepCopy(CopyNormal, null);
       newField.setProperty("modifiers", modifiers);
-      newField.variableDefinitions.get(0).convertGetSet = true;
-      newField.variableDefinitions.get(0).bindable = bindable;
+      VariableDefinition newVarDef = newField.variableDefinitions.get(0);
+      newVarDef.convertGetSet = true;
+      newVarDef.bindable = bindable;
+      newVarDef.fromStatement = fromSt;
+      newField.fromStatement = fromSt;
       addBodyStatementIndent(newField);
    }
 
@@ -1072,7 +1087,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
                         // Need to call this so we have the types imported before the referenced field is initialized
                         addInterfaceImports(res);
                         // Note addFieldDefinition does a deep copy on the initExpr
-                        addIFieldDefinition(fd.modifiers, fd.type, varDef.variableName, initializer.getOperatorStr(), initExpr, varDef.bindable);
+                        addIFieldDefinition(fd.modifiers, fd.type, varDef.variableName, initializer.getOperatorStr(), initExpr, varDef.bindable, assign);
                      }
                      else // Right now we can only inherit interface fields from source based definitions - this is a special case of one where we refer to a compiled definition.  Need a metadata solution to store the info we need to create the field
                         System.err.println("*** Interface property refers to compiled field!");
@@ -1080,7 +1095,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
                   else if (resVarDef != null) {
                      FieldDefinition fd = (FieldDefinition) resVarDef.getDefinition();
                      Expression initExpr = resVarDef.initializer;
-                     addIFieldDefinition(fd.modifiers, fd.type, resVarDef.variableName, resVarDef.operator, initExpr, resVarDef.bindable);
+                     addIFieldDefinition(fd.modifiers, fd.type, resVarDef.variableName, resVarDef.operator, initExpr, resVarDef.bindable, resVarDef);
                      addInterfaceImports(res);
                   }
                }
@@ -1124,7 +1139,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
                      FieldDefinition fd = (FieldDefinition) resVarDef.getDefinition();
                      IVariableInitializer initializer = pa.getInheritedMember();
                      addInterfaceImports(res);
-                     addIFieldDefinition(fd.modifiers, fd.type, resVarDef.variableName, initializer.getOperatorStr(), pa.getInitializerExpr(), resVarDef.bindable);
+                     addIFieldDefinition(fd.modifiers, fd.type, resVarDef.variableName, initializer.getOperatorStr(), pa.getInitializerExpr(), resVarDef.bindable, pa);
                   }
                }
                // else - there's a definition for a field in this type.  even if there's no initializer, we will not use the one in the interface.  This is a questionable case but basing this on the need to inherit from an interface and override the value to null.
@@ -1146,7 +1161,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
                      SemanticNodeList<Object> mods = new SemanticNodeList<Object>();
                      mods.add("public");
                      meth.setProperty("modifiers", mods);
-                     meth.setProperty("type", JavaType.createJavaType(membType));
+                     meth.setProperty("type", JavaType.createJavaType(getLayeredSystem(), membType));
 
                      BlockStatement methBody = new BlockStatement();
                      methBody.visible = true;
@@ -1180,15 +1195,19 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly) {
       List<Object> result = super.getAllInnerTypes(modifier, thisClassOnly);
 
-      initTypeInfo();
+      if (!thisClassOnly) {
+         // Only init the type info if we are looking for the implements types.  In updateType we do not want to init the type just to do the update since
+         // the update happens during the 'reinitialize' process, which is too soon to accurately resolve types.  We need to reinit the other types first.
+         initTypeInfo();
 
-      if (implementsBoundTypes != null && !thisClassOnly) {
-         for (Object impl:implementsBoundTypes) {
-            Object[] implResult = ModelUtil.getAllInnerTypes(impl, modifier, thisClassOnly);
-            if (implResult != null && implResult.length > 0) {
-               if (result == null)
-                  result = new ArrayList<Object>();
-               result.addAll(Arrays.asList(implResult));
+         if (implementsBoundTypes != null) {
+            for (Object impl : implementsBoundTypes) {
+               Object[] implResult = ModelUtil.getAllInnerTypes(impl, modifier, thisClassOnly);
+               if (implResult != null && implResult.length > 0) {
+                  if (result == null)
+                     result = new ArrayList<Object>();
+                  result.addAll(Arrays.asList(implResult));
+               }
             }
          }
       }
@@ -1501,7 +1520,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    private final static String STATIC_DYN_TEMPLATE_FILE = "sc/lang/java/StaticDynTypeTemplate.sctp";
 
    public void transformCompiledType() {
-      // Do this for classes for which we're generating reflective dyn type info - don't do it for types which we are skipping though
+      // Do this for classes for which we're generating reflective dyn type info - don't do it for types for which there's no compiled class
       if ((needsDynType() || ModelUtil.getSuperInitTypeCall(getLayeredSystem(), this) != null) && needsOwnClass(false)) {
          DynStubParameters params = getDynamicStubParameters();
          if (!ModelUtil.isAssignableFrom(IDynObject.class, this)) {
@@ -1734,9 +1753,9 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return res;
    }
 
-   // Changed changed models is null - any changed types where there's a file dependent we return true.  When it's set, only
+   // When changed models is null - any changed types where there's a file dependent we return true.  When it's set, only
    // changed files in the dependency chain after the sinceLayer are considered.
-   public boolean changedSinceLayer(Layer sinceLayer, boolean resolve, IdentityHashSet<TypeDeclaration> visited, Map<String,IFileProcessorResult> changedModels) {
+   public boolean changedSinceLayer(Layer sinceLayer, Layer genLayer, boolean resolve, IdentityHashSet<TypeDeclaration> visited, Set<String> changedTypes, boolean processJava) {
       if (visited == null)
          visited = new IdentityHashSet<TypeDeclaration>();
       else if (visited.contains(this))
@@ -1747,31 +1766,69 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       // Get the most specific version of this type - i.e. walk up the modified food-chain.
       TypeDeclaration td = resolve ? (TypeDeclaration) resolve(true) : this;
 
-      if (changedModels == null || changedModels.get(td.getFullTypeName()) != null) {
-         Layer typeLayer = td.getLayer();
-         if (typeLayer.getLayerPosition() > sinceLayer.getLayerPosition())
+      String fullTypeName = td.getFullTypeName();
+      Layer typeLayer = td.getLayer();
+
+      if (changedTypes == null || changedTypes.contains(fullTypeName)) {
+         if (typeLayer == null)
             return true;
+         // If it's an annotation layer, we don't generate anything for it so don't consider
+         if (sinceLayer == null) {
+            boolean fixedModel = false;
+            // If the type layer is already compiled and final - e.g. sys.sccore the model is not changed even if sinceLayer == null but not for JS where we process Java files
+            if (typeLayer.finalLayer && typeLayer.compiled && !processJava)
+               fixedModel = true;
+
+            // We do not have to consider annotation layers as changed at least in terms of dependent files.  They are not transformed anyway so will never have a "sinceLayer" that's not null
+            if (typeLayer.annotationLayer)
+               fixedModel = true;
+
+            // Unless it's a special case model (i.e. one that's fixed in this case) if it has not been transformed yet, it's changed
+            if (!fixedModel)
+               return true;
+         }
+         if (sinceLayer != null) {
+            if (genLayer == null || typeLayer.getLayerPosition() > sinceLayer.getLayerPosition())
+               return true;
+         }
+      }
+
+      Layer fromLayer = genLayer.getNextLayer();
+
+      // For the root type, see if it's been modified by another file in between the layer we are building now to the layer where it
+      // was initialized.  If so, we need to stop it before we do the build.
+      if (getEnclosingType() == null) {
+         LayeredSystem sys = getLayeredSystem();
+         JavaModel model = getJavaModel();
+         SrcEntry srcEnt = sys.getSrcFileFromTypeName(fullTypeName, true, fromLayer, model.getPrependPackage(), null, typeLayer, false);
+         if (srcEnt != null) {
+            Layer srcLayer = srcEnt.layer;
+            // Is there a src file included in this build which is after the layer where we last initialized the type.  If so we need to
+            // restart it on this build.
+            if (sinceLayer != null && srcLayer != null && srcLayer.getLayerPosition() > sinceLayer.getLayerPosition())
+               return true;
+         }
       }
 
       Object extTD = td.getExtendsTypeDeclaration();
-      if (extTD instanceof TypeDeclaration && ((TypeDeclaration)extTD).changedSinceLayer(sinceLayer, true, visited, changedModels))
+      if (extTD instanceof TypeDeclaration && ((TypeDeclaration)extTD).changedSinceLayer(sinceLayer, genLayer, true, visited, changedTypes, processJava))
          return true;
 
       Object derivedTD = td.getDerivedTypeDeclaration();
       if (derivedTD != extTD)
-         if (derivedTD instanceof TypeDeclaration && ((TypeDeclaration)derivedTD).changedSinceLayer(sinceLayer, false, visited, changedModels))
+         if (derivedTD instanceof TypeDeclaration && ((TypeDeclaration)derivedTD).changedSinceLayer(sinceLayer, genLayer, false, visited, changedTypes, processJava))
             return true;
 
-      if (bodyChangedSinceLayer(body, sinceLayer, visited, changedModels) || bodyChangedSinceLayer(hiddenBody, sinceLayer, visited, changedModels))
+      if (bodyChangedSinceLayer(body, sinceLayer, genLayer, visited, changedTypes, processJava) || bodyChangedSinceLayer(hiddenBody, sinceLayer, genLayer, visited, changedTypes, processJava))
          return true;
       return false;
    }
 
-   private boolean bodyChangedSinceLayer(SemanticNodeList<Statement> bodyList, Layer sinceLayer, IdentityHashSet<TypeDeclaration> visited, Map<String,IFileProcessorResult> changedModels) {
+   private boolean bodyChangedSinceLayer(SemanticNodeList<Statement> bodyList, Layer sinceLayer, Layer genLayer, IdentityHashSet<TypeDeclaration> visited, Set<String> changedTypes, boolean processJava) {
       if (bodyList == null)
          return false;
       for (Statement st:bodyList)
-         if (st instanceof TypeDeclaration && ((TypeDeclaration) st).changedSinceLayer(sinceLayer, true, visited, changedModels))
+         if (st instanceof TypeDeclaration && ((TypeDeclaration) st).changedSinceLayer(sinceLayer, genLayer, true, visited, changedTypes, processJava))
             return true;
       return false;
    }
@@ -1783,4 +1840,5 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    public AccessLevel getDefaultAccessLevel() {
       return null;
    }
+
 }

@@ -31,12 +31,17 @@ public class NewlineParseNode extends FormattingParseNode {
       return terminator + getNewlineSeparator();
    }
 
-   /** This node is inserted into the tree in places where we might need to insert a newline.  It chooses the indent
+   /**
+    * This node is inserted into the parse-node tree where formatting rules might require a newline.  It also chooses the indent
     * level to put in after the newline based on the indent level of the next semantic value.
     *
     * @param ctx
     */
    public void format(FormatContext ctx) {
+      if (ctx.replaceFormatting) {
+         ctx.setReplaceNode(this);
+      }
+
       if (ctx.semanticValueOnly)
          return;
 

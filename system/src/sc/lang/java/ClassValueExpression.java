@@ -49,9 +49,12 @@ public class ClassValueExpression extends Expression {
          displayTypeError("No class: " + typeIdentifier + " for ");
       }
       else {
+         if (arrayBrackets != null) {
+            boundType = new ArrayTypeDeclaration(getLayeredSystem(), getEnclosingType(), boundType, arrayBrackets);
+         }
          ArrayList<Object> types = new ArrayList<Object>(1);
          types.add(boundType);
-         paramType = new ParamTypeDeclaration(getEnclosingType(), ModelUtil.getTypeParameters(Class.class), types, Class.class);
+         paramType = new ParamTypeDeclaration(getLayeredSystem(), getEnclosingType(), ModelUtil.getTypeParameters(Class.class), types, Class.class);
       }
    }
 

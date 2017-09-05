@@ -46,6 +46,11 @@ public class PreErrorParseNode extends ErrorParseNode {
       value.computeLineNumberForNode(ctx, toFindPN);
    }
 
+   public void setStartIndex(int ix) {
+      super.setStartIndex(ix);
+      value.setStartIndex(ix + errorText.length());
+   }
+
    @Override
    public void findStartDiff(DiffContext ctx, boolean atEnd, Object parSemVal, ParentParseNode parSemNode, int childIx) {
       super.findStartDiff(ctx, atEnd, parSemVal, parSemNode, childIx);

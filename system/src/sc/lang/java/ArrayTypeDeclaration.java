@@ -33,16 +33,21 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
    public static final int length = 0;
    public static final Field LENGTH_FIELD = RTypeUtil.getField(ArrayTypeDeclaration.class, "length");
 
-   public ITypeDeclaration definedInType;
+   LayeredSystem system;
+   public Object definedInType;
 
    // All array classes just have this one property so they share the same cache
    private final static DynType arrayPropertyCache = TypeUtil.getPropertyCache(OBJECT_ARRAY_CLASS);
 
-   public ArrayTypeDeclaration(ITypeDeclaration dit, Object comp, String arrayDims) {
+   public ArrayTypeDeclaration(LayeredSystem sys, Object dit, Object comp, String arrayDims) {
+      system = sys;
       if (comp == null)
          System.out.println("*** Error null array component type");
       if (comp instanceof ArrayTypeDeclaration)
          System.out.println("*** Error - nesting array types");
+
+      if (comp instanceof String && ((String) comp).equals("Invalid type sentinel"))
+         System.out.println("*** Invalid array type!");
       componentType = comp;
       arrayDimensions = arrayDims;
       definedInType = dit;
@@ -53,22 +58,22 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
    }
 
    /** Handles nested array inside of array */
-   public static ArrayTypeDeclaration create(Object compType, String arrayDims, ITypeDeclaration dit) {
+   public static ArrayTypeDeclaration create(LayeredSystem sys, Object compType, String arrayDims, Object dit) {
       if (compType instanceof ArrayTypeDeclaration) {
          ArrayTypeDeclaration prevArr = (ArrayTypeDeclaration) compType;
          arrayDims = prevArr.arrayDimensions + arrayDims;
          compType = prevArr.getComponentType();
       }
-      return new ArrayTypeDeclaration(dit, compType, arrayDims);
+      return new ArrayTypeDeclaration(sys, dit, compType, arrayDims);
    }
 
-   public static ArrayTypeDeclaration create(Object compType, int ndim, ITypeDeclaration dit) {
+   public static ArrayTypeDeclaration create(LayeredSystem sys, Object compType, int ndim, Object dit) {
       while (compType instanceof ArrayTypeDeclaration) {
          ArrayTypeDeclaration arrCompType = (ArrayTypeDeclaration) compType;
          ndim += arrCompType.getNdim();
          compType = arrCompType.getComponentType();
       }
-      return new ArrayTypeDeclaration(dit, compType, JavaType.getDimsStr(ndim));
+      return new ArrayTypeDeclaration(sys, dit, compType, JavaType.getDimsStr(ndim));
    }
 
    public boolean isAssignableFrom(ITypeDeclaration other, boolean assignmentSemantics) {
@@ -92,7 +97,7 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
          int dimDiff = otherTD.arrayDimensions.length() - arrayDimensions.length();
          if (dimDiff < 0)
             return false;
-         ArrayTypeDeclaration otherCompArr = new ArrayTypeDeclaration(otherTD.definedInType, otherTD.componentType, otherTD.arrayDimensions.substring(dimDiff));
+         ArrayTypeDeclaration otherCompArr = new ArrayTypeDeclaration(otherTD.system, otherTD.definedInType, otherTD.componentType, otherTD.arrayDimensions.substring(dimDiff));
          return ModelUtil.isAssignableFrom(componentType, otherCompArr, assignmentSemantics, null, getLayeredSystem());
       }
    }
@@ -166,10 +171,10 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
    }
 
    public Object definesMethod(String name, List<? extends Object> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
-      Object res = ModelUtil.definesMethod(OBJECT_ARRAY_CLASS, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
+      Object res = ModelUtil.definesMethod(OBJECT_ARRAY_CLASS, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, getLayeredSystem());
       // The clone method in an array declaration seems to magically know the return value is an array even though reflection on the class does not detect a clone method.
       if (name.equals("clone")) {
-         return new ArrayCloneMethod(this, res, definedInType.getJavaModel());
+         return new ArrayCloneMethod(this, res, system, definedInType instanceof ITypeDeclaration ? ((ITypeDeclaration) definedInType).getJavaModel() : null);
       }
       return res;
    }
@@ -185,7 +190,7 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
    public Object definesMember(String name, EnumSet<JavaSemanticNode.MemberType> type, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {
       if (type.contains(JavaSemanticNode.MemberType.Field) && name.equals("length"))  // TODO: Java won't let us get at the real field.  This is to avoid compile errors but maybe we need to build a FieldDef
          return LENGTH_FIELD;
-      return ModelUtil.definesMember(OBJECT_ARRAY_CLASS, name, type, refType, ctx, skipIfaces, isTransformed);
+      return ModelUtil.definesMember(OBJECT_ARRAY_CLASS, name, type, refType, ctx, skipIfaces, isTransformed, system);
    }
 
    public Object definesMember(String name, EnumSet<JavaSemanticNode.MemberType> type, Object refType, TypeContext ctx) {
@@ -214,7 +219,7 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
             int semiIx = otherBaseType.indexOf(';');
             if (semiIx != -1)
                otherBaseType = otherBaseType.substring(0, semiIx);
-            return ModelUtil.implementsType(new ArrayTypeDeclaration(definedInType, componentType, StringUtil.repeat("[]", ourResDim)), otherBaseType, assignment, allowUnbound);
+            return ModelUtil.implementsType(new ArrayTypeDeclaration(system, definedInType, componentType, StringUtil.repeat("[]", ourResDim)), otherBaseType, assignment, allowUnbound);
          }
 
          // It has more dims than us.  Need to strip off
@@ -228,8 +233,12 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
          Type t = Type.getArrayType(arrayTypeName);
 
          Object otherComponentType;
-         if (t.primitiveClass == null)
-            otherComponentType = definedInType.findTypeDeclaration(otherTypeName.substring(otherNdim + 1, otherTypeName.length()-1), false);
+         if (t.primitiveClass == null) {
+            if (definedInType instanceof ITypeDeclaration)
+               otherComponentType = ((ITypeDeclaration) definedInType).findTypeDeclaration(otherTypeName.substring(otherNdim + 1, otherTypeName.length() - 1), false);
+            else
+               otherComponentType = ModelUtil.findTypeDeclaration(system, definedInType, otherTypeName.substring(otherNdim + 1, otherTypeName.length() - 1), null, false);
+         }
          else
             otherComponentType = t.primitiveClass;
 
@@ -243,19 +252,21 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
    }
 
    public Object getInheritedAnnotation(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
-      return ModelUtil.getInheritedAnnotation(definedInType.getLayeredSystem(), componentType, annotationName, skipCompiled, refLayer, layerResolve);
+      return ModelUtil.getInheritedAnnotation(getLayeredSystem(), componentType, annotationName, skipCompiled, refLayer, layerResolve);
    }
 
    public ArrayList<Object> getAllInheritedAnnotations(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
-      return ModelUtil.getAllInheritedAnnotations(definedInType.getLayeredSystem(), componentType, annotationName, skipCompiled, refLayer, layerResolve);
+      return ModelUtil.getAllInheritedAnnotations(getLayeredSystem(), componentType, annotationName, skipCompiled, refLayer, layerResolve);
    }
 
    // Don't think this is used right now but basically keep the dimensions in tact and return the componenet's base type.
    public Object getDerivedTypeDeclaration() {
+      if (ModelUtil.isTypeVariable(componentType))
+         return null;
       Object superComponentType = ModelUtil.getSuperclass(componentType);
       if (superComponentType == null)
          return null;
-      return new ArrayTypeDeclaration(definedInType, superComponentType, arrayDimensions);
+      return new ArrayTypeDeclaration(system, definedInType, superComponentType, arrayDimensions);
    }
 
    public Object getExtendsTypeDeclaration() {
@@ -327,7 +338,7 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
       if (numDims == 1)
          return componentType;
       else
-         return ArrayTypeDeclaration.create(componentType, numDims - 1, definedInType);
+         return ArrayTypeDeclaration.create(system, componentType, numDims - 1, definedInType);
    }
 
    public int getNumDims() {
@@ -335,15 +346,17 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
    }
 
    public Object getClass(String className, boolean useImports) {
-      return definedInType.getClass(className, useImports);
+      return ((ITypeDeclaration) definedInType).getClass(className, useImports);
    }
 
    public Object findTypeDeclaration(String typeName, boolean addExternalReference) {
-      return definedInType.findTypeDeclaration(typeName, addExternalReference);
+      return ModelUtil.findTypeDeclaration(system, definedInType, typeName, null, addExternalReference);
    }
 
    public JavaModel getJavaModel() {
-      return definedInType.getJavaModel();
+      if (definedInType instanceof ITypeDeclaration)
+         return ((ITypeDeclaration) definedInType).getJavaModel();
+      return null;
    }
 
    public boolean isLayerType() {
@@ -351,11 +364,11 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
    }
 
    public Layer getLayer() {
-      return definedInType != null ? definedInType.getLayer() : null;
+      return definedInType instanceof ITypeDeclaration ? ((ITypeDeclaration) definedInType).getLayer() : null;
    }
 
    public LayeredSystem getLayeredSystem() {
-      return definedInType == null ? null : definedInType.getLayeredSystem();
+      return system;
    }
 
    public List<?> getClassTypeParameters() {
@@ -443,9 +456,19 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
    public ArrayTypeDeclaration cloneForNewTypes() {
       if (componentType instanceof ParamTypeDeclaration) {
          Object newCompType = ((ParamTypeDeclaration) componentType).cloneForNewTypes();
-         return new ArrayTypeDeclaration(definedInType, newCompType, arrayDimensions);
+         return new ArrayTypeDeclaration(system, definedInType, newCompType, arrayDimensions);
       }
       // No mutable state so no need to clone
+      return this;
+   }
+
+   @Override
+   public ITypeDeclaration resolve(boolean modified) {
+      if (componentType instanceof ITypeDeclaration) {
+         Object newType = ((ITypeDeclaration) componentType).resolve(modified);
+         if (newType != null)
+            componentType = newType;
+      }
       return this;
    }
 }

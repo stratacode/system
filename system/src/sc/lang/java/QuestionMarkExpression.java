@@ -7,6 +7,7 @@ package sc.lang.java;
 import sc.bind.BindingDirection;
 import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
+import sc.lang.sc.PropertyAssignment;
 
 import java.util.List;
 import java.util.Set;
@@ -24,16 +25,18 @@ public class QuestionMarkExpression extends Expression {
       getTypeDeclaration();
    }
 
-   public boolean setInferredType(Object type) {
+   public boolean setInferredType(Object type, boolean finalType) {
       boolean res = false;
       if (trueChoice != null)
-         res = trueChoice.setInferredType(type);
+         res = trueChoice.setInferredType(type, finalType);
       if (falseChoice != null)
-         res |= falseChoice.setInferredType(type);
+         res |= falseChoice.setInferredType(type, finalType);
       return res;
    }
 
    public boolean propagatesInferredType(Expression child) {
+      if (!hasInferredType())
+         return false;
       return child == trueChoice || child == falseChoice;
    }
 
@@ -55,7 +58,7 @@ public class QuestionMarkExpression extends Expression {
          // Not resolved
          if (trueType == null || falseType == null)
             return null;
-         return ModelUtil.coerceTypes(trueType, falseType);
+         return ModelUtil.coerceTypes(getLayeredSystem(), trueType, falseType);
       }
       catch (IllegalArgumentException exc) {
          // Don't care about the type of the question mark in the reverse only case since we are not returning anything.
@@ -63,7 +66,7 @@ public class QuestionMarkExpression extends Expression {
             return Object.class;
          displayError("Types used in question mark operator do not match: ", " " + falseType + " != " + trueType);
          try {
-            return ModelUtil.coerceTypes(trueType, falseType);
+            return ModelUtil.coerceTypes(getLayeredSystem(), trueType, falseType);
          }
          catch (IllegalArgumentException exc2) {
          }
@@ -197,9 +200,15 @@ public class QuestionMarkExpression extends Expression {
       if (!condStr.endsWith(" "))
          sb.append(" ");
       sb.append("? ");
-      sb.append(trueChoice.toGenerateString());
+      if (trueChoice != null)
+         sb.append(trueChoice.toGenerateString());
+      else
+         sb.append("null");
       sb.append(" : ");
-      sb.append(falseChoice.toGenerateString());
+      if (falseChoice != null)
+         sb.append(falseChoice.toGenerateString());
+      else
+         sb.append("null");
       return sb.toString();
    }
 

@@ -63,10 +63,17 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
       return toString().charAt(ix);
    }
 
+   // TODO: this could be made a lot faster
    public int indexOf(String substr) {
       return toString().indexOf(substr);
    }
 
+   // TODO: this too
+   public int indexOf(String substr, int fromIndex) {
+      return toString().indexOf(substr, fromIndex);
+   }
+
+   // TODO: and this!
    public int lastIndexOf(String substr) {
       return toString().lastIndexOf(substr);
    }
@@ -175,6 +182,10 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
       return null;
    }
 
+   public int getChildStartOffset(Parselet matchParselet) {
+      return -1;
+   }
+
    public abstract Object getSkippedValue();
 
    public boolean canSkip() {
@@ -203,5 +214,19 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
 
    public void setErrorNode(boolean val) {
       errorNode = val;
+   }
+
+   public int getNumSemanticValues() {
+      return 1;
+   }
+
+   public void diffParseNode(IParseNode other, StringBuilder diffs) {
+      if (other.getClass() != this.getClass()) {
+         diffs.append("Difference classes for node: " + this.getClass() + " and " + other.getClass());
+      }
+   }
+
+   public boolean isIncomplete() {
+      return errorNode;
    }
 }

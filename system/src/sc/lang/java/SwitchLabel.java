@@ -72,4 +72,9 @@ public class SwitchLabel extends ExpressionStatement {
    public String getUserVisibleName() {
       return "case " + (expression == null ? "<null>" : expression.getUserVisibleName());
    }
+
+   public void addReturnStatements(List<Statement> res, boolean incThrow) {
+      if (expression != null)
+         expression.addReturnStatements(res, incThrow);
+   }
 }

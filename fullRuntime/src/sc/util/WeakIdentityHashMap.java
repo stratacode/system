@@ -6,15 +6,14 @@ package sc.util;
 
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Implementation of a weak hash map that always uses object identity, not equals/hashCode.
+ * Also preserves the insertion order, so when we iterate over lists of instances, we get them
+ * in the order in which they were registered.
+ *
  * Useful to associate data structures with any user defined class without requiring them
  * to adhere to a contract.
  */
@@ -24,10 +23,12 @@ public class WeakIdentityHashMap<K, V> implements Map<K, V> {
    private Map<IdentityWeakRef, V> map;
 
    public WeakIdentityHashMap(int initialCapacity) {
-      // Using concurrent hashmap here becausae the LayeredSystem properties like objectNameIndex, dynInnerToOuterIndex
+      // Originally used concurrent hashmap here because the LayeredSystem properties like objectNameIndex, dynInnerToOuterIndex
       // all can be accessed by multiple threads.  We could synchronize LayeredSystem itself but that's probably more
       // expensive and more code so taking this short cut.
-      map = new ConcurrentHashMap<IdentityWeakRef, V>(initialCapacity);
+      //map = new ConcurrentHashMap<IdentityWeakRef, V>(initialCapacity);
+      // Now we also need ordering so we can retrieve instances in the order in which they were created so just going to synchronize on the map itself
+      map = Collections.synchronizedMap(new LinkedHashMap<IdentityWeakRef, V>(initialCapacity));
    }
 
    public WeakIdentityHashMap() {
@@ -51,7 +52,7 @@ public class WeakIdentityHashMap<K, V> implements Map<K, V> {
 
     public Set<Map.Entry<K, V>> entrySet() {
        cleanup();
-       Set<Map.Entry<K, V>> ret = new HashSet<Map.Entry<K, V>>();
+       Set<Map.Entry<K, V>> ret = new LinkedHashSet<Map.Entry<K, V>>();
        for (Map.Entry<IdentityWeakRef, V> ref : map.entrySet()) {
           final K key = ref.getKey().get();
           final V value = ref.getValue();
@@ -73,7 +74,7 @@ public class WeakIdentityHashMap<K, V> implements Map<K, V> {
 
     public Set<K> keySet() {
         cleanup();
-        Set<K> ret = new HashSet<K>();
+        Set<K> ret = new LinkedHashSet<K>();
         for (IdentityWeakRef ref:map.keySet()) {
             ret.add(ref.get());
         }

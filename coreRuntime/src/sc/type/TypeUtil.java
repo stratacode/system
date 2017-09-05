@@ -202,7 +202,7 @@ public class TypeUtil  {
          if (PTypeUtil.hasModifier(props[i].getPropertyMember(), modifier))
             newProps[ct++] = props[i];
       }
-      if (ct != props.length)
+      if (ct != newProps.length)
          System.err.println("*** Internal error retrieving properties for: " + beanClass);
       return newProps;
    }
@@ -301,7 +301,7 @@ public class TypeUtil  {
       Object newMapping = getPropertyMapping(parent.getClass(), propName, null, null);
       // No mapping
       if (newMapping == null) {
-         throw new IllegalArgumentException("Can't get property value: " + propName + " from: " + parent.getClass() + ": " + DynUtil.getInstanceName(parent));
+         throw new IllegalArgumentException("No property: " + propName + " in class: " + parent.getClass() + " for instance: " + DynUtil.getInstanceName(parent));
       }
       return getPropertyValue(parent, newMapping);
    }

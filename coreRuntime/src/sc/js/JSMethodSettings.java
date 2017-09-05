@@ -14,4 +14,5 @@ import java.lang.annotation.Target;
 public @interface JSMethodSettings {
    String replaceWith() default "";  /** Replace references to this method in the generated JS code with the method name specified */
    boolean omit() default false;     /** Do not include this method in the JS representation */
+   String parameterTypes() default ""; /** Specify comma separated list of complete type names for parameter types to use for the JS conversion */
 }

@@ -5,17 +5,17 @@
 package sc.lang.java;
 
 import sc.bind.ArraySelectorBinding;
+import sc.bind.Bind;
+import sc.bind.BindingDirection;
+import sc.bind.IBinding;
 import sc.dyn.DynUtil;
+import sc.lang.ILanguageModel;
 import sc.lang.ISrcStatement;
 import sc.lang.JavaLanguage;
-import sc.lang.ILanguageModel;
+import sc.lang.SemanticNodeList;
 import sc.parser.ParseUtil;
 import sc.type.CTypeUtil;
 import sc.type.RTypeUtil;
-import sc.bind.BindingDirection;
-import sc.bind.Bind;
-import sc.bind.IBinding;
-import sc.lang.SemanticNodeList;
 
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
@@ -30,6 +30,7 @@ public class SelectorExpression extends ChainedExpression {
    transient boolean isAssignment;
    transient boolean referenceInitializer;
    transient Object inferredType;
+   transient boolean inferredFinal = true;
 
    public static SelectorExpression create(Expression baseExpr, Selector... selectors) {
       SelectorExpression selExpr = new SelectorExpression();
@@ -72,6 +73,11 @@ public class SelectorExpression extends ChainedExpression {
                   if (nextName.equals("this")) {
                      idTypes[i] = IdentifierExpression.IdentifierType.ThisExpression;
                      boundTypes[i] = currentType;
+
+                     TypeDeclaration exprEnclType = getEnclosingType();
+                     if (!ModelUtil.isOuterType(exprEnclType, currentType)) {
+                        expression.displayError("Type: " + ModelUtil.getClassName(currentType) + " not an enclosing type of: " + ModelUtil.getClassName(exprEnclType) + " for: ");
+                     }
                   }
                   else if (nextName.equals("super")) {
                      idTypes[i] = IdentifierExpression.IdentifierType.SuperExpression;
@@ -148,6 +154,19 @@ public class SelectorExpression extends ChainedExpression {
             }
          }
       }
+   }
+
+   public void stop() {
+      if (boundTypes == null || idTypes == null)
+         return;
+
+      // Force the subclass to do a stop even if we've only been resolved, not started
+      if (!started)
+         started = true;
+
+      super.stop();
+      boundTypes = null;
+      idTypes = null;
    }
 
    public Object eval(Class expectedType, ExecutionContext ctx) {
@@ -311,7 +330,9 @@ public class SelectorExpression extends ChainedExpression {
    public Object getTypeDeclaration(int ix) {
       if (boundTypes == null)
          return null;
-      return IdentifierExpression.getTypeForIdentifier(idTypes, boundTypes, getArguments(ix), ix, getJavaModel(), inferredType, getEnclosingType());
+      int last = selectors.size()-1;
+      Object rootType = last == 0 ? expression.getGenericType() : getGenericTypeForSelector(last, null);
+      return IdentifierExpression.getTypeForIdentifier(idTypes, boundTypes, getArguments(ix), ix, getJavaModel(), rootType, inferredType, getEnclosingType());
    }
 
    public Object getGenericType() {
@@ -321,7 +342,9 @@ public class SelectorExpression extends ChainedExpression {
       }
 
       int last = selectors.size()-1;
-      return IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, getArguments(last), last, getJavaModel(), last == 0 ? expression.getGenericType() : getGenericTypeForSelector(last, null), inferredType, getEnclosingType());
+
+      Object rootType = last == 0 ? expression.getGenericType() : getGenericTypeForSelector(last, null);
+      return IdentifierExpression.getGenericTypeForIdentifier(idTypes, boundTypes, getArguments(last), last, getJavaModel(), rootType, inferredType, getEnclosingType());
    }
 
    private Object getGenericTypeForSelector(int i, Object currentType) {
@@ -366,10 +389,6 @@ public class SelectorExpression extends ChainedExpression {
             return null;
       }
       return null;
-   }
-
-   public Object getBoundType(int ix) {
-      return boundTypes == null || boundTypes.length <= ix ? null : boundTypes[ix];
    }
 
    private List<Expression> getArguments(int ix) {
@@ -746,6 +765,40 @@ public class SelectorExpression extends ChainedExpression {
       }
    }
 
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
+      if (selectors == null)
+         return null;
+      SelectorExpression origSel = origNode instanceof SelectorExpression ? (SelectorExpression) origNode : null;
+      // The origIdent inside of an Element tag will not have been started, but the replacedByStatement which represents in the objects is started
+      if (origSel != null && origSel.replacedByStatement instanceof SelectorExpression)
+         origSel = (SelectorExpression) origSel.replacedByStatement;
+
+      Object[] useTypes = origSel == null ? boundTypes : origSel.boundTypes;
+
+      for (int i = 0; i < selectors.size(); i++) {
+         Selector sel = selectors.get(i);
+         if (sel instanceof VariableSelector) {
+            VariableSelector vsel = (VariableSelector) sel;
+            String ident = vsel.identifier;
+            if (ident != null) {
+               int dummyIx = ident.indexOf(dummyIdentifier);
+               if (dummyIx != -1) {
+                  String matchPrefix = ident.substring(0, dummyIx);
+
+                  Object curType = i == 0 ? (expression == null ? null :expression.getTypeDeclaration()) : getTypeDeclaration(i-1);
+                                            //(useTypes == null ? null : useTypes[i-1]);
+
+                  if (curType != null)
+                     ModelUtil.suggestMembers(origModel, curType, matchPrefix, candidates, false, true, true, false);
+
+                  return matchPrefix;
+               }
+            }
+         }
+      }
+      return null;
+   }
+
    public void visitTypeReferences(CycleInfo info, TypeContext ctx) {
       info.visit(expression, ctx, false);
       if (boundTypes != null) {
@@ -867,10 +920,6 @@ public class SelectorExpression extends ChainedExpression {
    }
 
    public Statement transformToJS() {
-      if (expression instanceof IdentifierExpression) {
-         IdentifierExpression idx = (IdentifierExpression) expression;
-      }
-
       if (idTypes[0] == IdentifierExpression.IdentifierType.ThisExpression) {
          IdentifierExpression newExpr = IdentifierExpression.create("this");
          Object refType = boundTypes[0];
@@ -1008,16 +1057,62 @@ public class SelectorExpression extends ChainedExpression {
       return false;
    }
 
-   public boolean setInferredType(Object inferredType) {
+   public boolean setInferredType(Object inferredType, boolean finalType) {
       this.inferredType = inferredType;
+      this.inferredFinal = finalType;
       // Re-resolve this now that we have the inferred type
       resolveTypeDeclaration();
       return false;
    }
 
-   // We propagate to arguments in VariableSelectors but not to the root expression
-   public boolean propagatesInferredType(Expression child) {
-      return child != expression;
+   public boolean isInferredSet() {
+      return inferredType != null || !hasInferredType();
    }
 
+   public boolean isInferredFinal() {
+      return inferredFinal;
+   }
+
+   // We propagate to arguments in VariableSelectors but not to the root expression and not when a direct child of a PropertyAssignment that's a reverse only binding
+   public boolean propagatesInferredType(Expression child) {
+      if (child == expression)
+         return false;
+      // Since child can be any descendant, if it's an argument to a method it has an inferred type
+      if (isSelectorArg(child))
+         return true;
+      // TODO: Not sure what other expression children a selector expression can have but there's a case where we are a child of a PropertyAssignment, reverse-only binding which might get here?
+      if (!hasInferredType())
+         return false;
+      return true;
+   }
+
+   private boolean isSelectorArg(Expression child) {
+      if (selectors == null)
+         return false;
+      for (Selector sel:selectors) {
+         if (sel instanceof VariableSelector) {
+            VariableSelector vsel = (VariableSelector) sel;
+            if (vsel.arguments != null && vsel.arguments.contains(child))
+               return true;
+         }
+         if (sel instanceof ArraySelector) {
+            ArraySelector asel = (ArraySelector) sel;
+            if (asel.expression == child)
+               return true;
+         }
+      }
+      return false;
+   }
+
+   /* For Selector expressions, styling is done in the Selector sub-classes.
+    * Because identifier expressions use a list of strings, we needed to 
+    * handle them up one level, but that essentially duplicated a lot of logic
+    * in the parselets grammar to make that happen. 
+   public void styleNode(IStyleAdapter adapter) {
+   }
+   */
+
+   public Object getBoundType(int ix) {
+      return boundTypes == null || boundTypes.length <= ix ? null : boundTypes[ix];
+   }
 }

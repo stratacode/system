@@ -31,7 +31,7 @@ import java.util.Map;
  * most commonly in reverse-only bindings to perform an assignment when the binding is fired.
  * </p>
  * <p>
- * SC developers note: When you add new code to the core runtime (i.e. used by GWT), you must add the package name to the jarPackages.
+ * SC developers note: When you add new code to the core runtime (i.e. used by GWT or other non-reflective runtimes), you must add the package name to the jarPackages.
  * You also must change the Bind's CompilerSettings in the full runtime and the StrataCode.gwt.xml file in the
  * core src root folder.
  * </p>
@@ -573,6 +573,10 @@ public class Bind {
                else
                   newListeners = oldListeners;
 
+               if (propPos >= newListeners.length) {
+                  System.err.println("*** addListener - invalid property index!");
+                  return;
+               }
                BindingListener cur = newListeners[propPos];
                // Increment the number of properties which have a binding the first time we add a binding
                if (cur == null)
@@ -775,6 +779,14 @@ public class Bind {
    /** like sendChangedEvent but a shorter name for less JS code.  Also takes the value for nice logging. */
    public static void sendChange(Object obj, String propName, Object val) {
       sendEvent(IListener.VALUE_CHANGED, obj, propName == null ? null : DynUtil.getPropertyMapping(DynUtil.getType(obj), propName), val);
+   }
+
+   public static void sendInvalidate(Object obj, String propName, Object val) {
+      sendEvent(IListener.VALUE_INVALIDATED, obj, propName == null ? null : DynUtil.getPropertyMapping(DynUtil.getType(obj), propName), val);
+   }
+
+   public static void sendValidate(Object obj, String propName, Object val) {
+      sendEvent(IListener.VALUE_VALIDATED, obj, propName == null ? null : DynUtil.getPropertyMapping(DynUtil.getType(obj), propName), val);
    }
 
    public static void sendChange(Object obj, IBeanMapper prop, Object val) {
@@ -1035,6 +1047,7 @@ public class Bind {
       bindState.nestedLevel++;
       bindState.obj = obj;
       bindState.prop = prop;
+      // When nestedLevel > the threshold.  Turn on recursion detection.  For each new frame we add: obj, prop, listener, eventDetail? to a list.  Keep recording until we find a matching list already in the list.  Then gather up the list, format it into a nice error message.
       if (bindState.nestedLevel >= RecursionDetectionThreadhold) {
          if (bindState.recurseFrames == null)
             bindState.recurseFrames = new ArrayList<BindFrame>();
@@ -1047,7 +1060,6 @@ public class Bind {
          }
          bindState.recurseFrames.add(bf);
       }
-      // TODO: insert check for nestedLevel > some threshold.  Turn on recursion detection.  When that's on, we add: obj, prop, listener, eventDetail? to a list.  Keep recording until we find a matching list already in the list.  Then gather up the list, format it into a nice error message.
       try {
          switch (event) {
             case IListener.VALUE_INVALIDATED:
@@ -1238,9 +1250,11 @@ public class Bind {
       }
    }
 
-   public static String indent(int l) {
-      StringBuffer sb = new StringBuffer();
-      for (int i = 0; i < l; i++)
+   public static String indent(int n) {
+      if (n == 0)
+         return "";
+      StringBuilder sb = new StringBuilder();
+      for (int i = 0; i < n; i++)
          sb.append("   ");
       return sb.toString();
    }

@@ -8,16 +8,13 @@ import sc.obj.Constant;
 import sc.type.CTypeUtil;
 import sc.util.FileUtil;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 
 /**
  * Represents a src file being processed by the layered system.
  * Stores the layer containing the file and the various path components. 
  */
-public class SrcEntry {
+public class SrcEntry implements Cloneable {
    public Layer layer;
    @Constant // eliminate binding warnings
    public String absFileName;  /* The absolute file name of the src entry */
@@ -125,6 +122,38 @@ public class SrcEntry {
       }
    }
 
+   public String getFileAsString() {
+      long len = getFileSize();
+      byte [] buffer = new byte[(int) len];
+      InputStream is = getInputStream();
+      if (is == null)
+         return null;
+      int start = 0;
+      try {
+         while (len > 0) {
+            // Even though read is supposed to be blocking, for Zip files it's doing some buffering so need this loop.
+            int readLen = is.read(buffer, start, (int) len);
+            if (readLen == -1)
+               throw new IllegalArgumentException("Unable to read all of file - read for: " + start + ":" + len + " failed for: " + absFileName);
+            if (readLen == len)
+               return new String(buffer);
+            start += readLen;
+            len -= readLen;
+         }
+      }
+      catch (IOException exc) {
+         throw new IllegalArgumentException("Unable to read all of file: " + this + ":" + len + " exc: " + exc);
+      }
+      finally {
+         FileUtil.safeClose(is);
+      }
+      throw new IllegalArgumentException("Invalid read return from input stream");
+   }
+
+   public long getFileSize() {
+      return new File(absFileName).length();
+   }
+
    public boolean isZip() {
       return false;
    }
@@ -135,5 +164,13 @@ public class SrcEntry {
 
    public String getJarUrl() {
       return "file://" + absFileName;
+   }
+
+   public SrcEntry clone() {
+      try {
+         return (SrcEntry) super.clone();
+      }
+      catch (CloneNotSupportedException exc) {}
+      return null;
    }
 }

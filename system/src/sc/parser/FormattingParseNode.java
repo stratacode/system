@@ -109,4 +109,8 @@ public abstract class FormattingParseNode extends AbstractParseNode {
          }
       }
    }
+
+   public boolean isGeneratedTree() {
+      return true; // These formatting nodes only live in generated models
+   }
 }

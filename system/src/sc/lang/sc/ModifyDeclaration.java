@@ -19,7 +19,11 @@ import sc.lang.java.*;
 
 import java.util.*;
 
-/** The semantic node class which is used for the modify operation. */
+/**
+ * The semantic node class which is used for the modify operation.  The modify type is used to modify Java code and for defining layers.
+ * You might modify another type which we have in src in which case "modifyTypeDecl" is
+ * set to point to the type, or you might modify a class for an annotation layer or a layer definition file - then modifyClass is set to refer to the modified type.
+ */
 public class ModifyDeclaration extends TypeDeclaration {
    public SemanticNodeList<JavaType> extendsTypes;
 
@@ -27,7 +31,9 @@ public class ModifyDeclaration extends TypeDeclaration {
    transient private Object modifyClass;
    transient Object[] extendsBoundTypes;
    transient private boolean typeInitialized = false;
-   transient public boolean temporaryType;
+   // ModifyInherited = true when you use a modify in an inner type where the modified type is actually in a base class,
+   // not the same type that the parent type is modifying.  If your outer class extends "OuterExtends", this modifyInherited case is a shortcut for:
+   //      class innerName extends OuterExtends.innerName
    transient public boolean modifyInherited = false;
    transient public boolean compoundName = false;
    transient public boolean enumConstant = false;
@@ -68,8 +74,10 @@ public class ModifyDeclaration extends TypeDeclaration {
    protected void updateBoundExtendsType(Object extType, Object oldType) {
       if (modifyTypeDecl != oldType)
          System.out.println("*** Warning - updating modify with inconsistent type?");
-      if (extType instanceof BodyTypeDeclaration)
+      if (extType instanceof BodyTypeDeclaration) {
          modifyTypeDecl = (BodyTypeDeclaration) extType;
+         checkModify();
+      }
       else
          throw new UnsupportedOperationException();
    }
@@ -113,8 +121,10 @@ public class ModifyDeclaration extends TypeDeclaration {
             // to modify it.  But we need to get the most specific one: UnitConverter(extended).converters.
             if (modifyInherited && modifyTypeDecl.replacedByType != null) {
                BodyTypeDeclaration resolvedDecl = modifyTypeDecl.resolve(true);
-               if (resolvedDecl != this)
+               if (resolvedDecl != this) {
                   modifyTypeDecl = resolvedDecl;
+                  checkModify();
+               }
                else
                   System.err.println("*** Recursive modify in resolve");
             }
@@ -132,8 +142,9 @@ public class ModifyDeclaration extends TypeDeclaration {
             // specific definition.  It does not matter much for most contracts given type compatibility but the
             // assignment contract requires the most specific definition so we can detect cycles properly.
             if (!inactiveType && !temporaryType && !thisModel.temporary) {
-               if (modifyTypeDecl.replacedByType != null) {
-                  if (modifyTypeDecl.replacedByType == this) {
+               BodyTypeDeclaration modReplacedByType = modifyTypeDecl.replacedByType ;
+               if (modReplacedByType != null) {
+                  if (modReplacedByType == this) {
                      System.out.println("*** Warning - already modified this type");
                      modifyTypeDecl.replacedByType = null;
                   }
@@ -143,8 +154,8 @@ public class ModifyDeclaration extends TypeDeclaration {
                   }
                   // If we are in the same layer, we are just about to replace the type as part of updateType
                   // Just don't update replacedByType in this case since we'll set that later on anyway.
-                  else if (modifyTypeDecl.replacedByType.getLayer() != getLayer()) {
-                     if (modifyTypeDecl.replacedByType.removed)
+                  else if (modReplacedByType.getLayer() != getLayer()) {
+                     if (modReplacedByType.removed || modReplacedByType.getLayer().excluded)
                         modifyTypeDecl.replacedByType = null;
                      else {
                         // For layer components we might get the wrong type here - we use the baseLayers to do teh resolution so we may not find the
@@ -155,11 +166,12 @@ public class ModifyDeclaration extends TypeDeclaration {
                            System.out.println("**** Warning - modify declaration: " + typeName + " in layer: " + getLayer() + " not replacing upstream layer of: " + modifyTypeDecl.getLayer() + " since it's already modified by: " + modifyTypeDecl.replacedByType.getLayer());
                         } else {
                            // This layer should be in front of us -
-                           if (getLayer().layerPosition != -1 && getLayer().layerPosition < modifyTypeDecl.replacedByType.getLayer().layerPosition)
+                           if (getLayer().layerPosition != -1 && getLayer().layerPosition < modReplacedByType.getLayer().layerPosition)
                               System.out.println("*** Error - improper layer init ordering");
                            else {
                               while (modifyTypeDecl.replacedByType != null) {
                                  modifyTypeDecl = modifyTypeDecl.replacedByType;
+                                 checkModify();
                               }
 
                               modifyTypeDecl.replacedByType = null;
@@ -317,6 +329,21 @@ public class ModifyDeclaration extends TypeDeclaration {
       isStarting = false;
    }
 
+   public void stop() {
+      super.stop();
+      modifyTypeDecl = null;
+      modifyClass = null;
+      extendsBoundTypes = null;
+      typeInitialized = false;
+      modifyInherited = false;
+      compoundName = false;
+      enumConstant = false;
+      hiddenByType = null;
+      hiddenByRoot = null;
+      impliedRoots = null;
+      isStarting = false;
+   }
+
    private boolean needsSubType() {
       return modifyInherited && !temporaryType && modifyTypeDecl instanceof TypeDeclaration && !isHiddenType();
    }
@@ -330,6 +357,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       if (modifyTypeDecl != null) {
          // Get the most recent type in case this one was replaced
          modifyTypeDecl = modifyTypeDecl.resolve(false);
+         checkModify();
 
          // Start and validate the modified type
          ParseUtil.initAndStartComponent(modifyTypeDecl);
@@ -343,12 +371,20 @@ public class ModifyDeclaration extends TypeDeclaration {
          Object extType = extendsBoundTypes[0];
          if (extType != null && modifyTypeDecl instanceof TypeDeclaration) {
             TypeDeclaration baseTypeDecl = (TypeDeclaration) modifyTypeDecl;
-            Object modifyType = baseTypeDecl.getExtendsTypeDeclaration();
-            if (modifyType != null && !ModelUtil.isAssignableFrom(modifyType, extType)) {
-               // For inactivated layers, we allow this since it's ok to have lots of layers with different implementations until you run them.
-               if (getLayer().activated) {
+            Object modifyExtendsType = baseTypeDecl.getExtendsTypeDeclaration();
+            // TODO: should we also allow you to extend a sub-class that's already implemented by the type you modify? - i.e. include an && !isAssignableFrom test the other way?
+            if (modifyExtendsType != null && !ModelUtil.isAssignableFrom(modifyExtendsType, extType)) {
+               Layer thisLayer = getLayer();
+               Layer modLayer = baseTypeDecl.getLayer();
+               // For inactivated layers, we need to allow this since it's ok to have lots of layers with different implementations until you run them, but if our layer directly extends
+               // the layer in question, we can safely report the error.
+               if (getLayer().activated || (thisLayer != null && modLayer != null && thisLayer.extendsLayer(modLayer))) {
+                  JavaSemanticNode node = this;
+                  // Try to report the error on the conflicting extends type
+                  if (extendsTypes != null && extendsTypes.size() > 0)
+                     node = extendsTypes.get(0);
                   // Is this an error or a warning?  We let you replace the class and break the contract - should we let you replace the extends type?   or should this be a strict option on the layer?
-                  displayTypeError("Modify extends incompatible type - ", ModelUtil.getClassName(extType), " should extend existing extends: ", ModelUtil.getClassName(modifyType), " for: ");
+                  node.displayTypeError("Modify extends incompatible type - ", ModelUtil.getClassName(extType), " should extend existing extends: ", ModelUtil.getClassName(modifyExtendsType), " for: ");
                }
             }
          }
@@ -358,6 +394,7 @@ public class ModifyDeclaration extends TypeDeclaration {
    }
 
    public void unregister() {
+      super.unregister();
       if (modifyTypeDecl != null && modifyTypeDecl instanceof TypeDeclaration)
          getLayeredSystem().removeSubType((TypeDeclaration) modifyTypeDecl, this);
    }
@@ -379,7 +416,23 @@ public class ModifyDeclaration extends TypeDeclaration {
       String fullTypeName = getFullTypeName();
       if (isLayerType || thisModel == null)
          return null;
-      return temporaryType ? thisModel.layeredSystem.getSrcTypeDeclaration(fullTypeName, null, true) : thisModel.getPreviousDeclaration(fullTypeName);
+      TypeDeclaration res = null;
+      if (temporaryType)
+         res = thisModel.layeredSystem.getSrcTypeDeclaration(fullTypeName, null, true);
+
+      return res == null ? thisModel.getPreviousDeclaration(fullTypeName) : res;
+   }
+
+   private void checkModify() {
+      if (getLayer() != null && modifyTypeDecl != null && modifyTypeDecl.getLayer() != null) {
+         if (getLayer().activated != modifyTypeDecl.getLayer().activated) {
+            System.out.println("*** Invalid modify type - mixing inactive and active layers");
+            // TODO: debug only
+            Object modType = getModifyType();
+         }
+         if (!temporaryType && !modifyInherited && ModelUtil.sameTypes(this, modifyTypeDecl) && getLayer().getLayerName().equals(modifyTypeDecl.getLayer().getLayerName()))
+            System.out.println("*** Warning modifying a type by the one in the same layer: " + modifyTypeDecl);
+      }
    }
 
    protected void completeInitTypeInfo() {
@@ -387,12 +440,13 @@ public class ModifyDeclaration extends TypeDeclaration {
 
       JavaModel thisModel = getJavaModel();
       if (thisModel == null) {
-         System.out.println("*** Error: initializing the type of a modify type that's not in a model!");
+         // Fragment encountered during syntax parsing - nothing to initialize
+         return;
       }
 
       boolean skipRoots = false;
 
-      if (thisModel != null && thisModel.customResolver != null) {
+      if (thisModel.customResolver != null) {
          String ftName = getFullTypeName();
 
          // There's a custom resolver for finding types - i.e. the model stream which will string together all of the modify tags that occur in the same stream for one object.
@@ -402,7 +456,7 @@ public class ModifyDeclaration extends TypeDeclaration {
             DynUtil.execLaterJobs();
             type = thisModel.customResolver.resolveType(thisModel.getPackagePrefix(), ftName, true, this);
          }
-         if (type instanceof Class) {
+         if (ModelUtil.isCompiledClass(type)) {
             modifyClass = type;
          }
          else if (type instanceof TypeDeclaration) {
@@ -417,6 +471,7 @@ public class ModifyDeclaration extends TypeDeclaration {
                   modifyClass = ClassDeclaration.class;
             }
          }
+         checkModify();
          // Don't want to set the implied roots for the ModelStream case.  The intermediate objects may not be valid
          // and it is not necessary for what we are doing with them.
          skipRoots = true;
@@ -464,6 +519,19 @@ public class ModifyDeclaration extends TypeDeclaration {
                   if (enclType != null && enclType.isEnumeratedType()) {
                      enumConstant = true;
                   }
+                  // A special case for temporary models which use modifyInherited.  They need to be able to resolve the
+                  // inner types of the ext-type of the temporary type.
+                  else if (enclType != null && temporaryType) {
+                     Object enclExtType = ModelUtil.getExtendsClass(enclType);
+                     if (enclExtType != null) {
+                        Object inheritedType = ModelUtil.getInnerType(enclExtType, typeName, null);
+                        if (inheritedType instanceof BodyTypeDeclaration)
+                           modifyTypeDecl = (BodyTypeDeclaration) inheritedType;
+                        else if (inheritedType != null)
+                           modifyClass = inheritedType;
+                        modifyInherited = true;
+                     }
+                  }
                }
             }
             if (!isLayerType && modifyClass != null && thisModel != null && thisModel.getLayer() != null && !thisModel.getLayer().annotationLayer && !temporaryType)
@@ -472,10 +540,12 @@ public class ModifyDeclaration extends TypeDeclaration {
          else {
             if (modifyType == this)
                System.out.println("*** ERROR recursive modify");
-            else
+            else {
                // Bind this here so that we use the pre-transformed value even after
                // this declaration has been moved.
                modifyTypeDecl = modifyType;
+               checkModify();
+            }
 
             JavaModel modifiedModel = modifyType.getJavaModel();
             if (modifiedModel.isLayerModel) {
@@ -548,7 +618,7 @@ public class ModifyDeclaration extends TypeDeclaration {
 
                   // Do errors for the layer def file when it gets started - skip this for peerMode.  The checkPeers flag here does not work because we only set them
                   // after we've initialized the layers so this is too late.
-                  if (!sys.peerMode && sys.getActiveOrInactiveLayerByPath(layerTypeName, CTypeUtil.getPackageName(layer.getLayerName()), false, true, true) == null) {
+                  if (!sys.peerMode && (layer.activated ? sys.getLayerByPath(layerTypeName, true) : sys.getInactiveLayer(layerTypeName, false, true, true, false)) == null) {
                      extendsType.displayTypeError("No layer: ");
                   }
                }
@@ -690,14 +760,16 @@ public class ModifyDeclaration extends TypeDeclaration {
          return v;
 
       if (extendsBoundTypes != null) {
+         LayeredSystem sys = getLayeredSystem();
          for (Object impl:extendsBoundTypes) {
-            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs)) != null)
+            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, sys)) != null)
                return v;
          }
       }
       if (impliedRoots != null) {
+         LayeredSystem sys = getLayeredSystem();
          for (Object impl:impliedRoots) {
-            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs)) != null)
+            if (impl != null && (v = ModelUtil.definesMethod(impl, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, sys)) != null)
                return v;
          }
       }
@@ -721,7 +793,7 @@ public class ModifyDeclaration extends TypeDeclaration {
          typeObj = modifyClass;
 
       if (typeObj != null)
-         return ModelUtil.declaresConstructor(typeObj, types, ctx);
+         return ModelUtil.declaresConstructor(getLayeredSystem(), typeObj, types, ctx);
       return null;
    }
 
@@ -760,7 +832,7 @@ public class ModifyDeclaration extends TypeDeclaration {
 
       if (extendsBoundTypes != null) {
          for (Object impl:extendsBoundTypes) {
-            if (impl != null && (v = ModelUtil.definesConstructor(impl, types, ctx, null, isTransformed)) != null)
+            if (impl != null && (v = ModelUtil.definesConstructor(getLayeredSystem(), impl, types, ctx, null, isTransformed)) != null)
                return v;
          }
       }
@@ -773,19 +845,19 @@ public class ModifyDeclaration extends TypeDeclaration {
          // After we've been transformed, objects should not prevent us from finding a getX method in the base type
          // At this point, really the modify type is not used - it has been merged into the base type
          if (v == STOP_SEARCHING_SENTINEL && transformed && modifyTypeDecl != null)
-            return ModelUtil.definesMember(modifyTypeDecl, name, mtype, refType, ctx, skipIfaces, isTransformed);
+            return ModelUtil.definesMember(modifyTypeDecl, name, mtype, refType, ctx, skipIfaces, isTransformed, getLayeredSystem());
          return v;
       }
 
       if (extendsBoundTypes != null) {
          for (Object impl:extendsBoundTypes) {
-            if (impl != null && (v = ModelUtil.definesMember(impl, name, mtype, refType, ctx, skipIfaces, isTransformed)) != null)
+            if (impl != null && (v = ModelUtil.definesMember(impl, name, mtype, refType, ctx, skipIfaces, isTransformed, getLayeredSystem())) != null)
                return v;
          }
       }
       if (impliedRoots != null) {
          for (Object impl:impliedRoots) {
-            if (impl != null && (v = ModelUtil.definesMember(impl, name, mtype, refType, ctx, skipIfaces, isTransformed)) != null)
+            if (impl != null && (v = ModelUtil.definesMember(impl, name, mtype, refType, ctx, skipIfaces, isTransformed, getLayeredSystem())) != null)
                return v;
          }
       }
@@ -1179,13 +1251,16 @@ public class ModifyDeclaration extends TypeDeclaration {
                   BodyTypeDeclaration newDecl = modifyTypeDecl.resolve(false);
                   if (newDecl == this)
                      System.err.println("*** ERROR recursive modify");
-                  else
+                  else {
                      modifyTypeDecl = newDecl;
+                     checkModify();
+                  }
                }
                modType = modifyTypeDecl.transformedType;
-               if (modType == null)
+               if (modType == null) {
                   System.out.println("*** Error no transformed type for modify!");
-               modType = modifyTypeDecl;
+                  modType = modifyTypeDecl;
+               }
             }
          }
       }
@@ -1233,8 +1308,9 @@ public class ModifyDeclaration extends TypeDeclaration {
                modType.transformDefaultModifier();
             }
 
-            if (propertiesToMakeBindable != null)
+            if (propertiesToMakeBindable != null) {
                modType.addAllPropertiesToMakeBindable(propertiesToMakeBindable);
+            }
 
             if (dynInvokeMethods != null)
                modType.mergeDynInvokeMethods(dynInvokeMethods);
@@ -1569,6 +1645,8 @@ public class ModifyDeclaration extends TypeDeclaration {
    }
 
    public boolean isAssignableFrom(ITypeDeclaration other, boolean assignmentSemantics) {
+      if (other.getFullTypeName().equals(getFullTypeName()))
+         return true;
       Object extType = getDerivedTypeDeclaration();
       return ModelUtil.isAssignableFrom(extType, other, assignmentSemantics, null, getLayeredSystem());
    }
@@ -1588,7 +1666,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       if (implementsBoundTypes != null) {
          for (int i = 0; i < implementsBoundTypes.length; i++) {
             Object implType = implementsBoundTypes[i];
-            if (implType instanceof Class)
+            if (ModelUtil.isCompiledClass(implType))
                implType = ModelUtil.resolveSrcTypeDeclaration(getLayeredSystem(), implType, false, false);
 
             if (implType instanceof ITypeDeclaration && ((ITypeDeclaration) implType).isAssignableTo(other))
@@ -2006,6 +2084,9 @@ public class ModifyDeclaration extends TypeDeclaration {
       else if (modifyClass instanceof CFClass) {
          return getLayeredSystem().getCompiledClass(getFullTypeName());
       }
+      else if (enumConstant) {
+         return getEnclosingType().getCompiledClass();
+      }
       else
          return null;
    }
@@ -2026,7 +2107,7 @@ public class ModifyDeclaration extends TypeDeclaration {
     * The initDynInstance handles all of the initialization
     *
    public void initDynInstance(Object inst, ExecutionContext ctx, boolean popCurrentObj) {
-      // TODO: should avoid double initialization here by overriden fields
+      // TODO: should avoid double initialization here by overridden fields
       if (modifyTypeDecl != null)
          modifyTypeDecl.initDynInstance(inst, ctx, popCurrentObj);
       super.initDynInstance(inst, ctx, popCurrentObj);
@@ -2143,6 +2224,7 @@ public class ModifyDeclaration extends TypeDeclaration {
          boolean sameTypes = ModelUtil.sameTypes(extType, this);
          if ((sameTypes && !modifyInherited) || (!sameTypes && modifyInherited)) {
             modifyTypeDecl = extType;
+            checkModify();
             return true;
          }
       }
@@ -2244,6 +2326,7 @@ public class ModifyDeclaration extends TypeDeclaration {
                System.out.println("*** Error: unable to resolve modify type after flush cache for: " + typeName);
             else
                startExtendedType(modifyTypeDecl, "modified");
+            checkModify();
          }
          else {
             modifyTypeDecl.refreshBoundTypes(flags);
@@ -2252,8 +2335,8 @@ public class ModifyDeclaration extends TypeDeclaration {
             m.layeredSystem.addSubType((TypeDeclaration) modifyTypeDecl, this);
 
       }
-      if (modifyClass instanceof Class && ((flags & ModelUtil.REFRESH_CLASSES) != 0)) {
-         modifyClass = ModelUtil.refreshBoundClass(getLayeredSystem(), (Class) modifyClass);
+      if (ModelUtil.isCompiledClass(modifyClass) && ((flags & ModelUtil.REFRESH_CLASSES) != 0)) {
+         modifyClass = ModelUtil.refreshBoundClass(getLayeredSystem(), modifyClass);
       }
       if (extendsTypes != null) {
          Object[] oldExtTypes = new Object[extendsTypes.size()];
@@ -2270,7 +2353,7 @@ public class ModifyDeclaration extends TypeDeclaration {
                   initExtendsTypes();
                   break;
                }
-               if (((flags & ModelUtil.REFRESH_CLASSES) != 0) && extBoundType instanceof Class) {
+               if (((flags & ModelUtil.REFRESH_CLASSES) != 0) && ModelUtil.isCompiledClass(extBoundType)) {
                   extendsBoundTypes = null;
                   initExtendsTypes();
                   break;
@@ -2424,6 +2507,13 @@ public class ModifyDeclaration extends TypeDeclaration {
          return modifyTypeDecl;
 
       return super.getExtendsTypeDeclaration();
+   }
+
+   public Object getModifiedExtendsTypeDeclaration() {
+      if (modifyInherited) {
+         return getModifiedType();
+      }
+      return null;
    }
 
    public boolean isCompiledProperty(String propName, boolean fieldMode, boolean interfaceMode) {
@@ -2667,4 +2757,5 @@ public class ModifyDeclaration extends TypeDeclaration {
    public String getOperatorString() {
       return "<modify>";
    }
+
 }

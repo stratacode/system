@@ -5,6 +5,7 @@
 package sc.lang;
 
 import sc.js.JSSettings;
+import sc.obj.EditorSettings;
 import sc.parser.IParseNode;
 import sc.parser.IStyleAdapter;
 import sc.parser.Language;
@@ -14,11 +15,11 @@ import java.util.IdentityHashMap;
 import java.util.List;
 
 /**
- * The semantic node interfaface is implemented by primarily SemanticNode and SemanticNodeList.  Instances of this interface
+ * The semantic node interface is implemented by primarily SemanticNode and SemanticNodeList.  Instances of this interface
  * are created by the parser when it parses a parselets grammar, or by the framework developer when they create or modify an object model.  The object
  * model is formed by a tree of these semantic nodes - e.g. ClassDeclaration, IfStatement, BodyStatements, etc.  The ISemanticNode
  * interface offers methods for editing the tree - replaceChild, etc.  You can convert any node to its language representation.
- * The SemanticNode also has an optional parsenode associated with it.  The parse-node tree is maintained in parallel to the semantic node tree
+ * The SemanticNode also has an optional parseNode associated with it.  The parse-node tree is maintained in parallel to the semantic node tree
  * and represents the raw matched strings with their parselets (the grammar elements that produced them).   As you make changes to the semantic node tree,
  * the parse node tree is updated automatically or invalidated and regenerated the next time it is requested.  You can also strip off the parse node and
  * regenerate them from scratch.  All of this is done using the same grammar model.
@@ -29,6 +30,7 @@ public interface ISemanticNode {
    public void setParseNode(IParseNode pn);
    public IParseNode getParseNode();
 
+   @EditorSettings(visible=false)
    public ISemanticNode getParentNode();
    public void setParentNode(ISemanticNode node);
    public ISemanticNode getRootNode();
@@ -79,6 +81,9 @@ public interface ISemanticNode {
    public static final int CopyTransformed = 8;
 
    public static final int SkipParseNode = 16;
+
+   /** Indicates that the copy will replace the current statement in the model which is started.  E.g. a TemplateExpression sets replaceStatement to the copy, so we can trace from the original to the actual code-model which is resolved */
+   public static final int CopyReplace = 32;
 
    /**
     * Copy just some of the state in the semantic nodes.  Used to speed things up and make code more robust during

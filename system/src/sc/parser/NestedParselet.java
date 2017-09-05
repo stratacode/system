@@ -1414,11 +1414,12 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       return pn;
    }
 
-   public boolean setSemanticValue(ParentParseNode parent, Object node, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, boolean replaceValue, boolean reparse) {
+   public int setSemanticValue(ParentParseNode parent, Object node, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, boolean replaceValue, boolean reparse, Object replacedValue) {
       if (trace && parser.enablePartialValues)
          System.out.println("*** setting semantic value of traced element");
 
-      boolean hasValue = !skipSemanticValue;
+      // The number to add onto childIndex for the next child node - 0 (skip this node - use the same index, 1 = for scalar semantic values, > 0 when concatenating arrays
+      int valueCount = skipSemanticValue ? 0 : 1;
 
       int sequenceSize = parselets.size();
 
@@ -1448,13 +1449,14 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
               System.out.println("*** Invalid slot index in parameter mapping!");
             switch (parameterMapping[slotIndex]) {
                case SKIP:
-                  hasValue = false;
+                  valueCount = 0;
                   break;
 
                case NAMED_SLOT:
                   // For named slots with arrays we only count a value when we match the last node (i.e. we process the slot mappings
-                  if (getSemanticValueIsArray())
-                     hasValue = slotIndex == sequenceSize - 1;
+                  if (getSemanticValueIsArray()) {
+                     valueCount = slotIndex == sequenceSize - 1 ? 1 : 0;
+                  }
                   break;
 
                case PROPAGATE:
@@ -1511,14 +1513,20 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                   break;
 
                case ARRAY:
-                  boolean appendArray = slotIndex > 0 && hasPreviousArray(slotIndex);
+                  boolean appendArray = repeat || (slotIndex > 0 && hasPreviousArray(slotIndex));
+                  //if (appendArray && repeat && (!hasPreviousArray(slotIndex) || slotIndex == 0))
+                  //   System.out.println("***");
                   if (node instanceof IParseNode) {
-                     Object sv = ((IParseNode) node).getSemanticValue();
+                     IParseNode childNode = (IParseNode) node;
+                     Object sv = childNode.getSemanticValue();
                      if (sv instanceof List) {
-                        if (parent.value == null)
+                        if (parent.value == null) {
                            parent.setSemanticValue(sv, !reparse);
+                           valueCount = childNode.getNumSemanticValues();
+                        }
                         else if (replaceValue) {
                            parent.value = sv;
+                           valueCount = childNode.getNumSemanticValues();
                         }
                         else {
                            if (childIndex == -1)
@@ -1544,11 +1552,18 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                                     else
                                        parentList.add(newList.get(newIx), true, false);
                                  }
+                                 valueCount = newSize;
                               }
                               else {
                                  // TODO: Are there any cases where this is not the right thing?
                                  parent.value = sv;
+                                 valueCount = childNode.getNumSemanticValues();
                               }
+                           }
+                           else {
+                              // Here we need to figure out how many elements were produced as part of the 'node'
+                              // so that the upstream parselet can figure out how many to skip.
+                              valueCount = childNode.getNumSemanticValues();
                            }
                         }
                      }
@@ -1565,7 +1580,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                      }
                      // sv == null has no value so don't increment the svcount
                      else
-                        hasValue = false;
+                        valueCount = 0;
                   }
                   else if (node != null) {
                      SemanticNodeList snl;
@@ -1630,21 +1645,17 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                case INHERIT:
                   if (node instanceof ParentParseNode) {
                      ParentParseNode pnode = (ParentParseNode) node;
-                     // TODO: need to make sure these get processed
-                     if (pnode.parselet.slotMapping != null) {
-                        if (getSemanticValueIsArray() && !pnode.parselet.getSemanticValueIsArray()) {
-                           List semValList = (List) parent.getSemanticValue();
-                           if (semValList.size() == 0)
-                              System.err.println("**** Warning: not processing slot mappings for value: " + pnode);
-                           else
-                              pnode.parselet.processSlotMappings(0, pnode, semValList.get(semValList.size() - 1), true, childIndex);
-                        }
-                        else
-                           pnode.parselet.processSlotMappings(0, pnode, parent.getSemanticValue(), true, childIndex);
-                     }
+                     NestedParselet childParselet = pnode.parselet;
+                     processInheritedSlotMappings(parent, childParselet, pnode, childIndex, reparse);
                   }
-                  else if (node != null)
-                     System.err.println("*** The '*' operator was used on a slot which produced an invalid result: " + node);
+                  else if (node != null && !(node instanceof ErrorParseNode))
+                     System.err.println("*** The '*' operator produced a parse node of type: " + node.getClass() + " when it should have produced a ParentParseNode");
+                  // This is the case where we are reparsing and we now have a null where we used to have a value with inherited property assignments.  We need to
+                  // process these assignments with the null value on the old-node's child parselet
+                  else if (reparse && replacedValue instanceof ParentParseNode && node == null) {
+                     ParentParseNode replacedNode = (ParentParseNode) replacedValue;
+                     processInheritedSlotMappings(parent, replacedNode.parselet, null, childIndex, reparse);
+                  }
                   break;
             }
          }
@@ -1766,14 +1777,29 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
             // Two reasons to wait: 1) for chained sequences and 2) for propagated values
             // so that we don't try to set the value before the propagated slot has been
             // processed.
-            processSlotMappings(startIx, parent, toProcess, false, childIndex);
+            processSlotMappings(startIx, parent, toProcess, false, childIndex, reparse);
 
             if (trace && parser.enablePartialValues)
                System.out.println("*** Semantic value of: " + this + FileUtil.LINE_SEPARATOR +
                        "    " + parent + " => " + parent.getSemanticValue());
          }
       }
-      return hasValue;
+      return valueCount;
+   }
+
+   private void processInheritedSlotMappings(ParentParseNode parent, NestedParselet childParselet, ParentParseNode pnode, int childIndex, boolean reparse) {
+      // TODO: are we missing any cases here that are not being processed?
+      if (childParselet.slotMapping != null) {
+         if (getSemanticValueIsArray() && !childParselet.getSemanticValueIsArray()) {
+            List semValList = (List) parent.getSemanticValue();
+            if (semValList.size() == 0)
+               System.err.println("**** Warning: not processing slot mappings for value: " + pnode);
+            else
+               childParselet.processSlotMappings(0, pnode, semValList.get(semValList.size() - 1), true, childIndex, reparse);
+         }
+         else
+            childParselet.processSlotMappings(0, pnode, parent.getSemanticValue(), true, childIndex, reparse);
+      }
    }
 
    boolean propagatesArray() {
@@ -1797,7 +1823,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       return arraySlotFound;
    }
 
-   public boolean removeFromSemanticValue(ParentParseNode parent, Object node, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, boolean replaceValue, boolean reparse) {
+   public boolean removeFromSemanticValue(ParentParseNode parent, Object node, int svCount, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, boolean replaceValue, boolean reparse) {
       if (trace && parser.enablePartialValues)
          System.out.println("*** removing from semantic value of traced element");
 
@@ -1809,6 +1835,8 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                // TODO: maybe we should clear the value when slotIndex = parselets.size() - 1 and remove it when slotIndex == 0
                // When we remove the first value for this array element, we also remove the element in the semantic value
                int svIndex = childIndex / parselets.size();
+               //if (svIndex != svCount) // TODO: should we be using svIndex or svCount here?
+               //   System.out.println("***");
                Object sv = parent.getSemanticValue();
                if (sv instanceof List) {
                   SemanticNodeList parentList = (SemanticNodeList) sv;
@@ -1839,10 +1867,10 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                      }
                   }
                   else if (node instanceof StringToken) {
-                     System.err.println("*** Not removing from string token value");
+                     //System.err.println("*** Not removing from string token value");
                   }
                   else if (node instanceof String) {
-                     System.err.println("*** Not removing from string value");
+                     //System.err.println("*** Not removing from string value");
                   }
                   break;
 
@@ -1856,13 +1884,14 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
                            if (sv instanceof List) {
                               List svList = (List) sv;
-                              for (int svix = 0; svix < svList.size(); svix++) {
+                              for (int svix = svCount; svix < svList.size(); svix++) {
                                  Object svElem = svList.get(svix);
-                                 int oldIx = parentList.indexOf(svElem);
+                                 // Make sure we start at childIndex and only remove elements that are after it.  We might match a 'break' statement or something
+                                 // which occurs multiple times in the children list.
+                                 int oldIx = indexOfFrom(parentList, childIndex, svElem);
                                  if (oldIx != -1)
                                     parentList.remove(oldIx, false);
-                                 //else
-                                 //   System.err.println("*** Could not find old element in semenatic value - not removing");
+                                 // else - we may well have cleared this value already and so do not have to update it
                               }
                            }
                            else {
@@ -1880,7 +1909,22 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                      }
                   }
                   else if (node != null) {
-                     if (parent.value != null) {
+                     if (parent.value instanceof List) {
+                        SemanticNodeList parentList = (SemanticNodeList) parent.value;
+                        int plix;
+                        boolean found = false;
+                        for (plix = 0; plix < parentList.size(); plix++) {
+                           if (parentList.get(plix).equals(node)) {
+                              parentList.remove(plix, false);
+                              found = true;
+                              break;
+                           }
+                        }
+                        if (!found)
+                           System.err.println("*** Did not find child to remove");
+
+                     }
+                     else if (parent.value != null) {
                         System.err.println("*** Not removing from non-parse node child");
                      }
                   }
@@ -1895,6 +1939,21 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       return hasValue;
    }
 
+   private static int indexOfFrom(List list, int fromIx, Object elem) {
+      int size = list.size();
+      if (elem == null) {
+         for (int i = fromIx; i < size; i++)
+            if (list.get(i) == null)
+               return i;
+      }
+      else {
+         for (int i = fromIx; i < size; i++)
+            if (elem.equals(list.get(i)))
+               return i;
+      }
+      return -1;
+   }
+
    /**
     * Is this a parselet which is building up the semantic value of an array with a previous slot?
     */
@@ -1905,7 +1964,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       return false;
    }
 
-   public void processSlotMappings(int startIx, ParentParseNode srcNode, Object dstNode, boolean recurse, int childIndex) {
+   public void processSlotMappings(int startIx, ParentParseNode srcNode, Object dstNode, boolean recurse, int childIndex, boolean reparse) {
       if (dstNode == null)
          return;
 
@@ -1940,6 +1999,10 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                value = ParseUtil.nodeToSemanticValue(oldResult);
                setSemanticProperty(dstNode, slotMapping[i], value);
             }
+            // When reparsing, if we have a null value it's possible the original did not have a null so need to clear it out here
+            else if (reparse && srcNode == null) {
+               setSemanticProperty(dstNode, slotMapping[i], null);
+            }
             // else - when dealing with partial results, we might not have parsed this slot so don't bother with the semantic value
          }
       }
@@ -1952,7 +2015,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          for (int inheritSlot : inheritSlots)
             if (srcNode.parselet.slotMapping != null)
                ((NestedParselet) parselets.get(inheritSlot)).processSlotMappings(0,
-                       (ParentParseNode) srcNode.children.get(inheritSlot), dstNode, true, childIndex);
+                       (ParentParseNode) srcNode.children.get(inheritSlot), dstNode, true, childIndex, reparse);
       }
 
       if (language.debug)
@@ -2298,6 +2361,11 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                   if (!childParselet.emptyValue(ctx, slotValue))
                      return false;
                }
+               // If there are keywords that are matched at the end of the sequence, e.g. the close brace in a block statement
+               // that counts as a non-empty value.  We can't just skip all keywords because there's the case where IfStatement
+               // optionally matches 'else elseStatement'.  If elseStatement is null, there's an empty value.
+               else if (parameterMapping[i] == ParameterMapping.SKIP && i == numParselets - 1)
+                  return false;
             }
             return true;
          }
@@ -2714,16 +2782,32 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       return -1;
    }
 
-   void removeChildrenForReparse(Parser parser, ParentParseNode value, int newChildCount) {
+   public int getParseletSlotIxFromType(Object semValue) {
+      if (semValue == null)
+         return -1;
+      if (parselets != null) {
+         int sz = parselets.size();
+         Class semType = semValue.getClass();
+         for (int i = 0; i < sz; i++) {
+            Parselet child = parselets.get(i);
+            if (child.getSemanticValueClass().isAssignableFrom(semType))
+               return i;
+         }
+      }
+      return -1;
+
+   }
+
+   void removeChildrenForReparse(Parser parser, ParentParseNode value, int svCount, int newChildCount) {
       if (value == null || value.children == null)
          return;
       while (value.children.size() > newChildCount) {
          int childIx = value.children.size() - 1;
-         removeForReparse(parser, value, childIx);
+         removeForReparse(parser, value, svCount, childIx);
       }
    }
 
-   void removeForReparse(Parser parser, ParentParseNode value, int childIx) {
+   void removeForReparse(Parser parser, ParentParseNode value, int svIndex, int childIx) {
       // TODO: in the current test case these are ErrorParseNodes but if they are not errors, do we need to update the semantic value?
       Object remValue = value.children.get(childIx);
       if (!(remValue instanceof ErrorParseNode)) {
@@ -2731,13 +2815,17 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
             Parselet remParselet = ((IParseNode) remValue).getParselet();
             int slotIx = getParseletSlotIx(remParselet);
             if (slotIx != -1)
-               value.removeForReparse(childIx, slotIx, false, parser);
+               value.removeForReparse(svIndex, childIx, slotIx, false, parser);
             else {
                value.children.remove(childIx);
             }
          }
          else {
-            value.children.remove(childIx);
+            int slotIx = getParseletSlotIxFromType(remValue);
+            if (slotIx != -1)
+               value.removeForReparse(svIndex, childIx, slotIx, false, parser);
+            else
+               value.children.remove(childIx);
          }
       }
       else
@@ -2757,4 +2845,48 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       return super.getBeforeFirstNode(beforeFirstNode);
    }
    */
+
+   protected String acceptTree(SemanticContext ctx, Object value, int startIx, int endIx) {
+      String res = super.acceptTree(ctx, value, startIx, endIx);
+      if (res != null)
+         return res;
+
+      int curStartIx = startIx;
+      int curEndIx = endIx;
+
+      if (value instanceof ParentParseNode) {
+         ParentParseNode pn = (ParentParseNode) value;
+         ArrayList<Object> children = pn.children;
+         if (children != null) {
+            int ix = 0;
+            for (Object child:children) {
+               int childSz = 0;
+               // Note: for startIndex here, the child parse node may still be using the old index, so we are going off
+               // of the startIndex of the current parse, plus the length of the children we have to accept.
+               if (child instanceof IParseNode) {
+                  IParseNode childPN = (IParseNode) child;
+                  res = childPN.getParselet().acceptTree(ctx, child, curStartIx, curEndIx);
+                  if (res != null)
+                     return res;
+                  childSz = childPN.length();
+               }
+               else if (child != null) {
+                  Parselet childParselet = getChildParselet(child, ix);
+                  if (childParselet != null) {
+                     res = childParselet.acceptTree(ctx, child, curStartIx, curEndIx);
+                     if (res != null)
+                        return res;
+                  }
+                  if (child instanceof CharSequence)
+                     childSz = ((CharSequence) child).length();
+               }
+               curStartIx += childSz;
+               curEndIx += childSz;
+               ix++;
+            }
+         }
+      }
+      return null;
+   }
+
 }

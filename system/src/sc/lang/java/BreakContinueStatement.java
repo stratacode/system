@@ -22,4 +22,15 @@ public class BreakContinueStatement extends Statement {
    }
 
    public Statement transformToJS() { return this; }
+
+   public String toString() {
+      if (operator == null)
+         return "<null break/continue>";
+      else {
+         if (labelName == null)
+            return operator;
+         else
+            return operator + " " + labelName;
+      }
+   }
 }

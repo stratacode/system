@@ -15,10 +15,22 @@ import java.util.Set;
 /**
  * Implements the parser for the schtml format.  This specific file defines the HTML grammar, built on top of the
  * template language.  The template declarations, the text strings, are extended to include tag objects, using the
- * sc.lang.html.Element class.  When you parse an HTML file, this language produces a Template instance which has
+ * sc.lang.html.Element class.  When you parse an schtml file, this language produces a Template instance which has
  * Element instances as additional types of it's templateDeclarations property.  During the init process, each
  * Template object converts all Element types into StrataCode language elements.  At this point the Template is processed
  * like any other template from the Template language - converted to Java, Javascript, or interpreted.
+ *
+ * In general, SCHTML provides a structured subset of HTML for manageability.  It validates all tags, attributes, etc.
+ * though is more strict in some cases than typical HTML.
+ *
+ * TODO: The parser here generates the HTML tree, matching open and close tags using a rudimentary approach to first
+ * parse a tree-tag, then when that fails to parse a valid body + close tag, just to go and parse an simple tag.  Because we
+ * enable caching on the key elements it's faster than it might seem at first glance, but it's still not nearly as fast as it
+ * could be.   A simple performance optimization would be to pre-parse a table of </tagName patterns that we find, possibly with
+ * the index where we find it.  Given that most tags are used only one way in any given file, we'd be able to skip the tree-tag
+ * parsing for <br> and <p> tags, for example.
+ *
+ * TODO: It would be nice to have a grammar that deals with pure HTML, that's not based on the template language
  */
 public class HTMLLanguage extends TemplateLanguage {
    public final static HTMLLanguage INSTANCE = new HTMLLanguage();
@@ -32,14 +44,22 @@ public class HTMLLanguage extends TemplateLanguage {
       public class HTMLContextEntry {
          int startIx;
          int endIx;
+         int endTagIx;
          String tagName;
+
+         public String toString() {
+            return tagName + "[" + startIx + ":" + endTagIx + "]";
+         }
       }
       ArrayList<HTMLContextEntry> tagStack = new ArrayList<HTMLContextEntry>();
+
+      ArrayList<HTMLContextEntry> removedStack = new ArrayList<HTMLContextEntry>();
 
       void addEntry(Object semanticValue, int startIx, int endIx) {
          HTMLContextEntry ent = new HTMLContextEntry();
          ent.startIx = startIx;
          ent.endIx = endIx;
+         ent.endTagIx = -1;
          ent.tagName = semanticValue.toString().toLowerCase();
          tagStack.add(ent);
       }
@@ -52,19 +72,23 @@ public class HTMLLanguage extends TemplateLanguage {
       }
 
       public Object resetToIndex(int ix) {
-         ArrayList<HTMLContextEntry> removed = null;
+         ArrayList<HTMLContextEntry> removedList = null;
+         // When we are resetting the index back - behind the current pointer, we might need to remove tag stack entries.
+         // Keep track of those we remove so we can restore them again if we set the index ahead again.
          for (int i = tagStack.size() - 1; i >= 0; i--) {
             if (tagStack.get(i).startIx >= ix) {
-               if (removed == null)
-                  removed = new ArrayList<HTMLContextEntry>();
-               removed.add(tagStack.remove(i));
-               i--;
+               if (removedList == null)
+                  removedList = new ArrayList<HTMLContextEntry>();
+               HTMLContextEntry removedEntry = tagStack.remove(i);
+               removedList.add(removedEntry);
+
+               addRemovedStackEntry(removedEntry);
             }
             else {
                break;
             }
          }
-         return removed;
+         return removedList;
       }
 
       public void restoreToIndex(int ix, Object retVal) {
@@ -73,16 +97,71 @@ public class HTMLLanguage extends TemplateLanguage {
             for (int i = 0; i < toRestore.size(); i++)
                tagStack.add(toRestore.get(i));
          }
+         else {
+            for (int i = removedStack.size() - 1; i >= 0 && i < removedStack.size(); i--) {
+               HTMLContextEntry removedEnt = removedStack.get(i);
+               if (removedEnt.startIx <= ix) {
+                  // Does this tag overlap the current position?  If so, we add it back in to the current tag stack.
+                  if (removedEnt.endTagIx != -1 && removedEnt.endTagIx >= ix) {
+                     addTagStackEntry(removedEnt);
+                  }
+                  //removedStack.remove(i);
+                  //i++;
+               }
+            }
+         }
       }
 
-      public void popTagName() {
+      public void popTagName(int endTagIx) {
          int sz = tagStack.size();
          if (sz == 0)
             System.err.println("*** invalid pop tag!");
-         else
-            tagStack.remove(sz-1);
+         else {
+            HTMLContextEntry removedEnt = tagStack.remove(sz - 1);
+            removedEnt.endTagIx = endTagIx;
+            addRemovedStackEntry(removedEnt);
+         }
       }
 
+      private void addTagStackEntry(HTMLContextEntry toAdd) {
+         int i;
+         for (i = tagStack.size() - 1; i >= 0; i--) {
+            HTMLContextEntry curEnt = tagStack.get(i);
+            if (curEnt.startIx < toAdd.startIx) {
+               break;
+            }
+            else if (curEnt.startIx == toAdd.startIx) {
+               assert(curEnt.tagName.equals(toAdd.tagName));
+               if (curEnt.endTagIx == -1)
+                  curEnt.endTagIx = toAdd.endTagIx;
+               return;
+            }
+         }
+         if (i == tagStack.size() - 1)
+            tagStack.add(toAdd);
+         else
+            tagStack.add(i + 1, toAdd);
+      }
+
+      private void addRemovedStackEntry(HTMLContextEntry removedEnt) {
+         int i;
+         for (i = removedStack.size() - 1; i >= 0; i--) {
+            HTMLContextEntry curEnt = removedStack.get(i);
+            if (curEnt.startIx < removedEnt.startIx) {
+               break;
+            }
+            else if (curEnt.startIx == removedEnt.startIx) {
+               assert(curEnt.tagName.equals(removedEnt.tagName));
+               if (curEnt.endTagIx == -1)
+                  curEnt.endTagIx = removedEnt.endTagIx;
+               return;
+            }
+         }
+         if (i == removedStack.size() - 1)
+            removedStack.add(removedEnt);
+         else
+            removedStack.add(i + 1, removedEnt);
+      }
    }
 
    /**
@@ -109,7 +188,8 @@ public class HTMLLanguage extends TemplateLanguage {
 
    Symbol closeTagChar = new Symbol("/");
    Symbol beginTagChar = new Symbol("<");
-   Symbol endTagChar = new Symbol(SKIP_ON_ERROR, ">");
+   public Symbol endTagChar = new Symbol(SKIP_ON_ERROR, ">");
+   public Symbol reqEndTagChar = new Symbol(">");
 
    public boolean validTagChar(char c) {
       return Character.isLetterOrDigit(c) || c == '-' || c == ':';
@@ -216,7 +296,7 @@ public class HTMLLanguage extends TemplateLanguage {
 
    /**
     * This class extends the parser's core Sequence(list of parselets) class to add all of the logic necessary to
-    * parse the quirky HTML syntax.  It's used in the grammar definition for various types of HTML tags, configured
+    * parse the HTML syntax.  It's used in the grammar definition for various types of HTML tags, configured
     * based on the specific type.  It overrides the accept method - used to determine whether this grammar node matches
     * an input string - to accept/reject appropriately based on the type of tag.   The key variables are whether the tag
     * needs a new line and indentation during generation, whether it's like the script tag which is unescaped, and whether
@@ -270,11 +350,11 @@ public class HTMLLanguage extends TemplateLanguage {
                   return "No open tag for close tag: " + strValue;
                if (!openTagName.equalsIgnoreCase(strValue))
                   return "Mismatching close tag name: " + value + " does not match open: " + openTagName;
-               hctx.popTagName();
+               hctx.popTagName(startIx);
                break;
          }
 
-         // This is called for both parsing and generation.  We are not doing the tag name stack during the generate
+         // This is called for both parsing when startIx is known and generation when it's -1.  We are not doing the tag name stack during the generate since the tagStack is about creating the tree and it already tree exists
          if (startIx != -1 && (matchType == TagNameMatchType.UnescapedOpen || matchType == TagNameMatchType.EscapedOpen))
             ((HTMLSemanticContext) ctx).addEntry(value, startIx, endIx);
          return null;
@@ -299,6 +379,11 @@ public class HTMLLanguage extends TemplateLanguage {
 
    public Sequence attributeValueLiteral = new Sequence("(,.,)", doubleQuote, attributeValueString, doubleQuote);
    public Sequence attributeValueSQLiteral = new Sequence("(,.,)", singleQuote, attributeValueSingleQuoteString, singleQuote);
+   {
+      // Handles the case where we have: value=":= foo."
+      attributeValueLiteral.skipOnErrorSlot = 2;
+      attributeValueSQLiteral.skipOnErrorSlot = 2;
+   }
 
    Parselet attributeValue =  new OrderedChoice(attributeValueLiteral, attributeValueSQLiteral);
 
@@ -309,27 +394,37 @@ public class HTMLLanguage extends TemplateLanguage {
       // Here we are skipping any incomplete attributes (e.g. id=) till we hit the end of close tag or the start of the next tag
       // It's important that we do not consume part or all of the next tag in the body of this tag if for some reason we decide to put this back in.
       tagAttributes.skipOnErrorParselet = createSkipOnErrorParselet("<tagAttributesError>", "/", "<", ">", Symbol.EOF);
-      tagAttributes.cacheResults = true;
+
+      // We used to set the cacheResults on the tagAttributes but that means we call parseExtendedErrors on it because of the skipOnErrorParselet.  That conflicts
+      // with the fact that we are caching primary which is a child of tagAttribute.  The parseExtendedErrors does not get the cached value and so reparses the entire
+      // thing, causing more work and the second reparse can get cached primaries and update the parentNode to point to a part of the model that gets discarded when
+      // the parseExtendedErrors fails to produce a better result.   By setting it on tagAttribute, we get the caching in the parseExtendedErrors and avoid the parentNode.  see re59
+      tagAttribute.cacheResults = true;
    }
    // TODO: how do we deal with appending newlines after the start tag?  Used to having tagSpacingEOL here but that ate up the space in the content.  Need features of tagSpacingEOL perhaps when processing the endTagChar?
-   Sequence simpleTag = new Sequence("Element(,tagName,attributeList,selfClose,)", beginTagChar, anyTagName, tagAttributes, new Sequence("('')", OPTIONAL, closeTagChar), endTagChar);
+   public Sequence simpleTag = new Sequence("Element(,tagName,attributeList,selfClose,)", beginTagChar, anyTagName, tagAttributes, new Sequence("('')", OPTIONAL, closeTagChar), endTagChar);
    {
       simpleTag.enableTagMode = true;
       // If an error occurs after we parse the name we can skip it (enablePartialValues only)
       simpleTag.skipOnErrorSlot = 2;
+      // Don't match just the < for a partial value match
+      simpleTag.minContentSlot = 1;
    }
-   Sequence closeTag = new Sequence("(,,'',)", beginTagChar, closeTagChar, closeTagName, endTagChar);
+   public Sequence closeTag = new Sequence("(,,'',)", beginTagChar, closeTagChar, closeTagName, endTagChar);
    {
       closeTag.skipOnErrorSlot = 3;
    }
 
    public class TagStartSequence extends Sequence {
       public TagStartSequence(Parselet tagName, Parselet tagBody) {
-         super("Element(,tagName,attributeList,,children,closeTagName)", beginTagChar, tagName, tagAttributes, endTagChar, tagBody, closeTag);
+         // Using reqEndTagChar here so we do not accept a partial match which ends with /> - that and partial value tags should just be treated
+         // as simpleTags - not going to try and detect the tree of a partial tag.
+         super("Element(,tagName,attributeList,,children,closeTagName)", beginTagChar, tagName, tagAttributes, reqEndTagChar, tagBody, closeTag);
          enableTagMode = true;
          // Do not consider a match of just the beginTagChar as content when doing partial values extension.
          // There are other parselets that will match that character
-         minContentSlot = 1;
+         // Need to match the full <tag attributes> so that we do not match <tag attributes/> in partialValues mode.  We do not want to parse the body of a treeTag when we have a simpleTag definition.
+         minContentSlot = 3;
       }
    }
 
@@ -371,6 +466,9 @@ public class HTMLLanguage extends TemplateLanguage {
       templateString.cacheResults = true;
       tagComment.cacheResults = true;
       anyTag.cacheResults = true;
+      // A simpleTag can turn into a treeTag due to changes outside of the simpleTag's parsed boundary so we cannot use
+      // the results of this parselet during the reparse operation.
+      anyTag.reparseable = false;
       unescapedTemplateString.cacheResults = true;
 
       templateString.add("<");

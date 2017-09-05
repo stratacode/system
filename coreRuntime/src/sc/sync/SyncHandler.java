@@ -4,7 +4,6 @@
 
 package sc.sync;
 
-import sc.bind.Bind;
 import sc.dyn.DynUtil;
 import sc.obj.Sync;
 import sc.obj.SyncMode;
@@ -28,6 +27,11 @@ public class SyncHandler {
    /** Hook for subclasses to substitute a new instance for the one in the model.  Given the original instance, return
     the instance that is to be used to synchronize against the client. */
    protected Object replaceInstance(Object inst) {
+      if (inst instanceof Class) {
+         ClassSyncWrapper classWrap = new ClassSyncWrapper(((Class) inst).getName());
+         SyncManager.addSyncInst(classWrap, true, false, null, classWrap.className);
+         return classWrap;
+      }
       return inst;
    }
 
@@ -36,6 +40,13 @@ public class SyncHandler {
     * deserialized and before it's used in the application, for a property set or method call.
     */
    protected Object restoreInstance(Object inst) {
+      if (inst instanceof ClassSyncWrapper) {
+         String remoteClassName = ((ClassSyncWrapper) inst).className;
+         Object remoteClass = DynUtil.findType(remoteClassName);
+         if (remoteClass == null)
+            System.err.println("*** Unable to restore reference to class: " + remoteClassName);
+         return remoteClass;
+      }
       return inst;
    }
 
@@ -70,143 +81,43 @@ public class SyncHandler {
       return root;
    }
 
-   public CharSequence getPropertyUpdateCode(Object changedObj, String propName, Object propValue, Object previousValue, ArrayList<String> currentObjNames, String currentPackageName, StringBuilder preBlockCode, StringBuilder postBlockCode, List<SyncLayer.SyncChange> depChanges, SyncLayer syncLayer) {
-      try {
-         StringBuilder sb = new StringBuilder();
-         sb.append(propName);
-         sb.append(" = ");
-         sb.append(syncContext.expressionToString(propValue, currentObjNames, currentPackageName, preBlockCode, postBlockCode, propName, false, "", depChanges, syncLayer));
-         return sb;
-      }
-      catch (UnsupportedOperationException exc) {
-         System.err.println("*** Error serializing property: " + propName);
-         exc.printStackTrace();
-         return "// Error serializing value of property: " + propName;
-      }
-      catch (RuntimeException exc) {
-         System.err.println("*** Runtime error in expressionToString for: " + propName);
-         exc.printStackTrace();
-         throw exc;
-      }
+   public void appendPropertyUpdateCode(SyncSerializer ser, Object changedObj, String propName, Object propValue, Object previousValue, ArrayList<String> currentObjNames, String currentPackageName, SyncSerializer preBlockCode, SyncSerializer postBlockCode,
+                                        List<SyncLayer.SyncChange> depChanges, SyncLayer syncLayer) {
+      ser.appendPropertyAssignment(syncContext, changedObj, propName, propValue, previousValue, currentObjNames, currentPackageName, preBlockCode, postBlockCode, depChanges, syncLayer);
    }
 
-   public CharSequence expressionToString(ArrayList<String> currentObjNames, String currentPackageName, StringBuilder preBlockCode, StringBuilder postBlockCode, String varName, boolean inBlock, String uniqueId, List<SyncLayer.SyncChange> depChanges, SyncLayer syncLayer) {
-      if (changedObj == null)
-         return "null";
+   public void formatExpression(SyncSerializer ser, StringBuilder out, ArrayList<String> currentObjNames, String currentPackageName, SyncSerializer preBlockCode,
+                                SyncSerializer postBlockCode, String varName, boolean inBlock, String uniqueId, List<SyncLayer.SyncChange> depChanges, SyncLayer syncLayer) {
+      if (changedObj == null) {
+         ser.formatNullValue(out);
+         return;
+      }
 
       Class cl = changedObj.getClass();
-      int numLevels = currentObjNames.size();
       if (PTypeUtil.isArray(cl) || changedObj instanceof Collection) {
          StringBuilder sb = new StringBuilder();
-         int sz = DynUtil.getArrayLength(changedObj);
-         if (varName == null) {
-            // We already have registered a global id for this object so we can just use that id.
-            String objName = syncContext.getObjectName(changedObj, null, false, false, null, syncLayer);
-            if (objName != null) {
-               if (currentPackageName != null && objName.startsWith(currentPackageName)) {
-                  sb.append(objName.substring(currentPackageName.length() + 1));
-               }
-               else
-                  sb.append(objName);
-            }
-            else {
-               preBlockCode.append(Bind.indent(numLevels));
-               String typeName = DynUtil.getTypeName(cl, true);
-               preBlockCode.append(typeName);
-               preBlockCode.append(" ");
-               preBlockCode.append("_lt");
-               preBlockCode.append(uniqueId);
-               preBlockCode.append(" = ");
-               preBlockCode.append("new ");
-               preBlockCode.append(typeName);
-               preBlockCode.append("();\n");
-               if (!inBlock) {
-                  preBlockCode.append(Bind.indent(numLevels));
-                  preBlockCode.append("{\n");
-               }
-               int numCodeLevels = numLevels + 1;
-
-               for (int i = 0; i < sz; i++) {
-                  Object val = DynUtil.getArrayElement(changedObj, i);
-                  CharSequence valueExpr = syncContext.expressionToString(val, currentObjNames, currentPackageName, preBlockCode, postBlockCode, null, true, uniqueId + "_" + i, depChanges, syncLayer);
-                  preBlockCode.append(Bind.indent(numCodeLevels));
-                  preBlockCode.append("_lt");
-                  preBlockCode.append(uniqueId);
-                  preBlockCode.append(".add(");
-                  preBlockCode.append(valueExpr);
-                  preBlockCode.append(");\n");
-               }
-               if (!inBlock) {
-                  preBlockCode.append(Bind.indent(numLevels));
-                  preBlockCode.append("}\n");
-               }
-
-               sb.append("_lt");
-               sb.append(uniqueId);
-            }
+         // We already have registered a global id for this object so we can just use that id.
+         String objName = syncContext.getObjectName(changedObj, null, false, false, null, syncLayer);
+         if (objName != null) {
+            // TODO: for some reason if varName == null we used to not check for an existing reference but that broke the JSON for the 'converters' object
+            ser.formatReference(out, objName, currentPackageName);
          }
-         // In this case it is a simple variable definition so we can use array initializer syntax
          else {
-            sb.append("{");
-            for (int i = 0; i < sz; i++) {
-               Object val = DynUtil.getArrayElement(changedObj, i);
-               if (i != 0)
-                  sb.append(", ");
-               sb.append(syncContext.expressionToString(val, currentObjNames, currentPackageName, preBlockCode, postBlockCode, null, inBlock, uniqueId + "_" + i, depChanges, syncLayer));
+            if (varName == null) {
+               // We have to create the array - i.e. new Type[] { val1, val2, ...} or x = new ArrayList(); x.add(val1), ...
+               String typeName = DynUtil.getTypeName(cl, true);
+               ser.formatNewArrayDef(out, syncContext, changedObj, typeName, currentObjNames, currentPackageName, preBlockCode, postBlockCode, inBlock, uniqueId, depChanges, syncLayer);
             }
-            sb.append("}");
+            // In this case it is a simple variable definition so we can use array initializer syntax
+            else {
+               ser.formatArrayExpression(out, syncContext, changedObj, currentObjNames, currentPackageName, preBlockCode, postBlockCode, inBlock, uniqueId, depChanges, syncLayer);
+            }
          }
-         return sb;
       }
       else if (changedObj instanceof Map) {
-         StringBuilder sb = new StringBuilder();
-         sb.append("new ");
-         sb.append(DynUtil.getTypeName(cl, true));
-            sb.append("();\n");
          Map changedMap = (Map) changedObj;
-         if (changedMap.size() > 0) {
-            if (!inBlock) {
-               postBlockCode.append(Bind.indent(numLevels));
-               postBlockCode.append("{\n");
-            }
-            int ct = 0;
 
-            StringBuilder mb = new StringBuilder();
-            for (Object mapEntObj: changedMap.entrySet()) {
-               StringBuilder mapPreBlockCode = new StringBuilder();
-               StringBuilder mapPostBlockCode = new StringBuilder();
-               Map.Entry mapEnt = (Map.Entry) mapEntObj;
-               StringBuilder newExpr = new StringBuilder();
-               newExpr.append(Bind.indent(numLevels + 1));
-               // If we are the initializer for a variable, just use that name.
-               if (varName != null)
-                  newExpr.append(varName);
-               // Otherwise, this object needs to have a global name we can use to refer to it with.
-               else {
-                  String objName = syncContext.getObjectName(changedMap, varName, true, true, depChanges, syncLayer);
-                  if (objName != null)
-                     newExpr.append(objName);
-               }
-               String subUniqueId = uniqueId + "_" + ct;
-               newExpr.append(".put(");
-               newExpr.append(syncContext.expressionToString(mapEnt.getKey(), currentObjNames, currentPackageName, mapPreBlockCode, mapPostBlockCode, null, true, subUniqueId, depChanges, syncLayer));
-               newExpr.append(", ");
-               newExpr.append(syncContext.expressionToString(mapEnt.getValue(), currentObjNames, currentPackageName, mapPreBlockCode, mapPostBlockCode, null, true, subUniqueId, depChanges, syncLayer));
-               newExpr.append(");\n");
-
-               mb.append(mapPreBlockCode);
-               mb.append(newExpr);
-               mb.append(mapPostBlockCode);
-               ct++;
-            }
-
-            postBlockCode.append(mb);
-            if (!inBlock) {
-               postBlockCode.append(Bind.indent(numLevels));
-               postBlockCode.append("}\n");
-            }
-         }
-         return sb.toString();
+         ser.formatMap(out, syncContext, changedMap, DynUtil.getTypeName(cl, true), currentObjNames, currentPackageName, preBlockCode, postBlockCode, varName, inBlock, uniqueId, depChanges, syncLayer);
       }
       else {
          Type literalType;
@@ -220,31 +131,44 @@ public class SyncHandler {
          }
          switch (literalType) {
             case Boolean:
-               return ((Boolean) changedObj) ? "true" : "false";
+               ser.formatBoolean(out, (Boolean) changedObj);
+               break;
             case Byte:
+               ser.formatByte(out, (Byte) changedObj);
+               break;
             case Short:
+               ser.formatShort(out, (Short) changedObj);
+               break;
             case Integer:
-               return changedObj.toString();
+               ser.formatInt(out, (Integer) changedObj);
+               break;
             case Long:
-               return changedObj.toString() +  "l";
+               ser.formatLong(out, (Long) changedObj);
+               break;
             case Float:
-               return changedObj.toString() +  "f";
+               ser.formatFloat(out, (Float) changedObj);
+               break;
             case Double:
-               return changedObj.toString() +  "d";
+               ser.formatDouble(out, (Double) changedObj);
+               break;
             case Character:
-               return "'" + CTypeUtil.escapeJavaString(changedObj.toString(), true) + "'";
+               ser.formatChar(out, changedObj.toString());
+               break;
             case String:
-               return "\"" + CTypeUtil.escapeJavaString(changedObj.toString(), false) + "\"";
+               ser.formatString(out, changedObj.toString());
+               break;
+            case Number: // Here for JS
+               ser.formatNumber(out, (Number) changedObj);
+               break;
             case Object:
                String val = syncContext.getObjectName(changedObj, varName, false, false, null, syncLayer);
-               if (val != null) {
-                  if (currentPackageName != null && val.startsWith(currentPackageName) && currentPackageName.length() > 0)
-                     val = val.substring(currentPackageName.length() + 1);
-                  return val;
-               }
-               return syncContext.createOnDemandInst(changedObj, depChanges, varName, syncLayer);
-            default: // TODO: Number on the JS side falls into this case
-               return changedObj.toString();
+               if (val == null)
+                  val = syncContext.createOnDemandInst(changedObj, depChanges, varName, syncLayer);
+               ser.formatReference(out, val, currentPackageName);
+               break;
+            default:
+               ser.formatDefault(out, changedObj);
+               break;
          }
       }
    }

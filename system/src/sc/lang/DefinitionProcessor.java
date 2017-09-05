@@ -142,7 +142,7 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
       if (def instanceof TypeDeclaration) {
          LayeredSystem sys = def.getLayeredSystem();
          BuildInfo bi = sys.buildInfo;
-         if (skipAbstract && ModelUtil.isAbstractType(def))
+         if (bi == null || (skipAbstract && ModelUtil.isAbstractType(def)))
             return;
          if (typeGroupName != null) {
             bi.addTypeGroupMember(ModelUtil.getTypeName(def), typeGroupName);
@@ -159,6 +159,8 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
       else if (def instanceof TypedDefinition && typeGroupName != null) {
          LayeredSystem sys = def.getLayeredSystem();
          BuildInfo bi = sys.buildInfo;
+         if (bi == null)
+            return;
          TypeDeclaration enclType = ((TypedDefinition) def).getEnclosingType();
          bi.addTypeGroupMember(enclType.getFullTypeName(), typeGroupName);
       }

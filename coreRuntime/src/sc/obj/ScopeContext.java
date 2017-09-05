@@ -4,6 +4,8 @@
 
 package sc.obj;
 
+import java.util.Map;
+
 /** Implemented by scope implementations to manage values obtained with this scope's lifecycle (e.g. session, global, request, per-store, per-merchant, etc.) */
 @sc.js.JSSettings(jsModuleFile="js/scgen.js", prefixAlias="sc_")
 public abstract class ScopeContext {
@@ -16,6 +18,9 @@ public abstract class ScopeContext {
    public abstract ScopeDefinition getScopeDefinition();
 
    public abstract String getId();
+
+   // NOTE: returns the underlying map which is storing the values for efficiency.
+   public abstract Map<String,Object> getValues();
 
    public void setDestroyListener(ScopeDestroyListener listener) {
       destroyListener = listener;

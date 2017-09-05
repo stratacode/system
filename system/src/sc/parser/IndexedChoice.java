@@ -17,7 +17,7 @@ import java.util.*;
  */
 public class IndexedChoice extends OrderedChoice {
    SymbolChoice indexedKeys = new SymbolChoice(LOOKAHEAD | SKIP | NOERROR);
-   Map<CharSequence,OrderedChoice.MatchResult> indexedParselets = new HashMap<CharSequence,OrderedChoice.MatchResult>();
+   HashMap<CharSequence,OrderedChoice.MatchResult> indexedParselets = new HashMap<CharSequence,OrderedChoice.MatchResult>();
    OrderedChoice.MatchResult defaultParselets = new OrderedChoice.MatchResult();
 
    public IndexedChoice() { super(); }
@@ -212,11 +212,46 @@ public class IndexedChoice extends OrderedChoice {
       return indexedParselets.get((CharSequence)indexedMatchObj);
    }
 
-   protected void clear()
-   {
+   protected List<Parselet> getMatchingParselets(IString str) {
+      int keySize = indexedKeys.keySize;
+      if (str.length() >= keySize) {
+         List<IString> possibleMatches = indexedKeys.valueIndex.get(str.substring(0, keySize));
+         if (possibleMatches != null) {
+            for (IString poss:possibleMatches) {
+               if (str.startsWith(poss)) {
+                  return indexedParselets.get(poss);
+               }
+            }
+         }
+      }
+      return defaultParselets;
+   }
+
+   protected void clear() {
       super.clear();
       indexedKeys.clear();
       indexedParselets.clear();
       defaultParselets.clear();
+   }
+
+   /**
+    * When we have a string value, the parse node may not have enough info to do an accurate match, so instead use the index info*
+    * This allows us to find the correct styleName for a spacing node
+    */
+   public Parselet getChildParselet(Object childParseNode, int index) {
+      if (childParseNode instanceof IString) {
+         List<Parselet> choices = getMatchingParselets((IString) childParseNode);
+         if (choices != null && choices.size() > 0)
+            return choices.get(0);
+      }
+      return super.getChildParselet(childParseNode, index);
+   }
+
+   public IndexedChoice clone() {
+      IndexedChoice res = (IndexedChoice) super.clone();
+      res.indexedKeys = (SymbolChoice) res.indexedKeys.clone();
+      res.defaultParselets = res.defaultParselets.clone();
+      res.indexedParselets = (HashMap<CharSequence,OrderedChoice.MatchResult>) res.indexedParselets.clone();
+      return res;
    }
 }

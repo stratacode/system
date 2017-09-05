@@ -1,0 +1,166 @@
+/*
+ * Copyright (c) 2014. Jeffrey Vroom. All Rights Reserved.
+ */
+
+package sc.lang;
+
+import sc.layer.Layer;
+import sc.layer.LayerUtil;
+import sc.util.FileUtil;
+import sc.util.StringUtil;
+
+import java.io.File;
+import java.io.PrintWriter;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
+
+public class InstallLayerWizard extends CommandWizard {
+   enum Step {
+      Start, Name,
+   }
+
+   Step currentStep;
+
+   public static void start(AbstractInterpreter cmd) {
+      InstallLayerWizard wizard = new InstallLayerWizard();
+      wizard.commandInterpreter = cmd;
+      wizard.currentStep = Step.Start;
+      wizard.verbose = cmd.system.options.info;
+      cmd.currentWizard = wizard;
+   }
+
+   public String prompt() {
+      switch (currentStep) {
+         case Start:
+            List<File> layerPathDirs = commandInterpreter.system.layerPathDirs;
+            int i = 0;
+            System.out.println(" Current layer bundles: ");
+            for (File layerPathDir:layerPathDirs) {
+               System.out.println(" " + i++ + ": " + layerPathDir);
+            }
+            return "Install a new bundle?: [y] ";
+         case Name:
+            return "Enter name of : " + commandInterpreter.system.getNewLayerDir() + FileUtil.FILE_SEPARATOR_CHAR;
+
+         default:
+            return "???";
+      }
+   }
+
+   public String getDefaultPackage() {
+      return commandInterpreter.currentLayer == null ? "" : commandInterpreter.currentLayer.packagePrefix;
+   }
+
+   public Object parseCommand(String input) {
+      try {
+         switch (currentStep) {
+            case Start:
+               if (validateYesNo(input, true))
+                  currentStep = Step.Name;
+               else
+                  commandInterpreter.currentWizard = null;
+               break;
+            case Name:
+               try {
+                  layerName = commandInterpreter.validateNewLayerPath(input);
+               }
+               catch (IllegalArgumentException exc) {
+                  System.err.println("\nError: " + exc.getMessage() + "\n");
+                  currentStep = Step.Name;
+                  break;
+               }
+               currentStep = Step.Dynamic;
+               break;
+            case Dynamic:
+               isDynamic = validateYesNo(input, true);
+               currentStep = Step.Public;
+               break;
+            case Public:
+               try {
+                  isPublic = validateYesNo(input, true);
+               }
+               catch (IllegalArgumentException exc) {
+                  System.err.println("\nError: " + exc.getMessage() + "\n");
+                  currentStep = Step.Public;
+                  break;
+               }
+               currentStep = Step.Package;
+               break;
+            case Package:
+               try {
+                  if (input.trim().length() == 0)
+                     layerPackage = getDefaultPackage();
+                  else
+                     layerPackage = commandInterpreter.validateIdentifier(input);
+               }
+               catch (IllegalArgumentException exc) {
+                  System.err.println("\nError: " + exc.getMessage() + "\n");
+                  currentStep = Step.Package;
+                  break;
+               }
+               currentStep = Step.Extends;
+               break;
+            case Extends:
+               try {
+                  extendsNames = commandInterpreter.validateExtends(input);
+                  if (extendsNames == null)
+                     currentStep = Step.Confirm;
+                  else
+                     currentStep = Step.Transparent;
+               }
+               catch (IllegalArgumentException exc) {
+                  System.err.println("\nError: " + exc.getMessage() + "\n");
+                  currentStep = Step.Extends;
+                  break;
+               }
+               break;
+            case Transparent:
+               try {
+                  isTransparent = validateYesNo(input, false);
+               }
+               catch (IllegalArgumentException exc) {
+                  System.err.println("\nError: " + exc.getMessage() + "\n");
+                  currentStep = Step.Transparent;
+                  break;
+               }
+               currentStep = Step.Confirm;
+               break;
+            case Confirm:
+               try {
+                  if (validateYesNo(input, true)) {
+                     Layer layer = commandInterpreter.system.createLayer(layerName, layerPackage, extendsNames, isDynamic, isPublic, isTransparent, true, true);
+                     commandInterpreter.setCurrentLayer(layer);
+                  }
+               }
+               catch (IllegalArgumentException exc) {
+                  System.err.println("\nError: " + exc.getMessage() + "\n");
+                  currentStep = Step.Confirm;
+                  break;
+               }
+               commandInterpreter.currentWizard = null;
+               break;
+         }
+      }
+      catch (IllegalArgumentException exc) {
+         System.err.println(exc.getMessage());
+         commandInterpreter.currentWizard = null;
+      }
+      commandInterpreter.pendingInput = new StringBuffer();
+      PrintWriter recWriter;
+      // Record these commands
+      if ((recWriter = commandInterpreter.recordOutputWriter) != null) {
+         recWriter.println(input);
+         recWriter.flush();
+      }
+      return Boolean.TRUE;
+   }
+
+   public int complete(String command, int cursor, List candidates) {
+      switch (currentStep) {
+         case Extends:
+            return commandInterpreter.completeExistingLayer(command, cursor, candidates);
+      }
+      return -1;
+   }
+}

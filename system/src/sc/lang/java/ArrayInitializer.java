@@ -25,8 +25,8 @@ public class ArrayInitializer extends Expression {
       super.start();
    }
 
-   public boolean setInferredType(Object type) {
-      super.setInferredType(type);
+   public boolean setInferredType(Object type, boolean finalType) {
+      super.setInferredType(type, finalType);
 
       inferredType = type;
 
@@ -35,7 +35,7 @@ public class ArrayInitializer extends Expression {
          Object componentType = ModelUtil.getArrayComponentType(type);
          if (initializers != null && componentType != null) {
             for (Expression init:initializers) {
-               init.setInferredType(componentType);
+               init.setInferredType(componentType, finalType);
             }
 
             for (Expression init:initializers) {
@@ -162,13 +162,13 @@ public class ArrayInitializer extends Expression {
             if (initType == null)
                initType = newType;
             else
-               initType = ModelUtil.findCommonSuperClass(initType, newType);
+               initType = ModelUtil.findCommonSuperClass(getLayeredSystem(), initType, newType);
          }
       }
       if (initType == null)
          return null; // TODO: do we need a new type for {null} - an array with null?
       if (inferredType == null || ModelUtil.isArray(inferredType))
-         return ArrayTypeDeclaration.create(initType, "[]", getEnclosingType());
+         return ArrayTypeDeclaration.create(getLayeredSystem(), initType, "[]", getEnclosingType());
       else if (ModelUtil.isAssignableFrom(List.class, inferredType)) {
          //return new ParamTypeDeclaration(getEnclosingType(), ModelUtil.getTypeParameters(List.class), Collections.singletonList(initType), inferredType);
          return inferredType;
@@ -178,7 +178,7 @@ public class ArrayInitializer extends Expression {
          return inferredType;
       }
       else {
-         return ArrayTypeDeclaration.create(initType, "[]", getEnclosingType());
+         return ArrayTypeDeclaration.create(getLayeredSystem(), initType, "[]", getEnclosingType());
       }
    }
 

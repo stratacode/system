@@ -5,6 +5,7 @@
 package sc.lang.java;
 
 import java.util.List;
+import java.util.Map;
 
 import sc.bind.Bind;
 import sc.bind.IChangeable;
@@ -14,6 +15,8 @@ import sc.layer.LayeredSystem;
 import sc.obj.Constant;
 import sc.obj.IObjectId;
 
+/** A wrapper around the TypeDeclaration classes for synchronizing editable type info to a remote client.
+ *  There's a javascript version of this class */
 public class ClientTypeDeclaration extends TypeDeclaration implements IChangeable, IObjectId {
    /*
    @Constant
@@ -50,17 +53,26 @@ public class ClientTypeDeclaration extends TypeDeclaration implements IChangeabl
    public void setPackageName(String pn) {
       packageName = pn;
    }
-
    public String getPackageName() {
       return packageName;
    }
- 
+
+   private String scopeName;
+   @Constant
+   public void setScopeName(String pn) {
+      scopeName = pn;
+   }
+   public String getScopeName() {
+      if (orig != null)
+         return orig.getScopeName();
+      return scopeName;
+   }
+
    private boolean dynamicType;
    @Constant
    public void setDynamicType(boolean dt) {
       dynamicType = dt;
    }
-
    public boolean isDynamicType() {
       return dynamicType;
    }
@@ -101,6 +113,14 @@ public class ClientTypeDeclaration extends TypeDeclaration implements IChangeabl
       fullTypeName = ftn;
    }
 
+   String extendsTypeName;
+   @Constant
+   public String getExtendsTypeName() {
+      return extendsTypeName;
+   }
+   public void setExtendsTypeName(String ftn) {
+      extendsTypeName = ftn;
+   }
 
    public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified) {
       if (orig != null)
@@ -132,4 +152,22 @@ public class ClientTypeDeclaration extends TypeDeclaration implements IChangeabl
          return orig.getExtendsTypeDeclaration();
       return super.getExtendsTypeDeclaration();
    }
+
+   private Map<String,Object> annotations;
+   @Constant
+   public void setAnnotations(Map<String,Object> an) {
+      annotations = an;
+   }
+   public Map<String, Object> getAnnotations() {
+      return annotations;
+   }
+
+   private int modifierFlags;
+   public void setModifierFlags(int val) {
+      modifierFlags = val;
+   }
+   public int getModifierFlags() {
+      return modifierFlags;
+   }
+
 }

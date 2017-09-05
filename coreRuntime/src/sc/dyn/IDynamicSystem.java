@@ -24,6 +24,8 @@ public interface IDynamicSystem {
 
    Object getAnnotation(Object def, Class annotClass);
 
+   Object getAnnotationByName(Object def, String annotName);
+
    Object[] getMethods(Object type, String methodName);
 
    Object getDeclaringClass(Object method);
@@ -31,6 +33,8 @@ public interface IDynamicSystem {
    Object invokeMethod(Object obj, Object method, Object[] paramValues);
 
    String getMethodName(Object method);
+
+   String getMethodTypeSignature(Object method);
 
    Object evalCast(Object type, Object value);
 
@@ -104,8 +108,6 @@ public interface IDynamicSystem {
 
    String getInnerTypeName(Object type);
 
-   int getNumInnerObjectLevels(Object type);
-
    Object resolveRuntimeName(String name, boolean create);
 
    Object findType(String typeName);
@@ -130,6 +132,8 @@ public interface IDynamicSystem {
 
    boolean isEnumConstant(Object obj);
 
+   boolean isEnumType(Object type);
+
    Object getEnumConstant(Object typeObj, String enumConstName);
 
    Object getExtendsType(Object type);
@@ -137,4 +141,22 @@ public interface IDynamicSystem {
    Iterator<Object> getInstancesOfTypeAndSubTypes(String typeName);
 
    String getInheritedScopeName(Object obj);
+
+   void registerTypeChangeListener(ITypeChangeListener type);
+
+   int getLayerPosition(Object type);
+
+   void applySyncLayer(String lang, String destName, String scopeName, String code, boolean isReset, boolean allowCodeEval);
+
+   Object newInnerInstance(Object typeObj, Object outerObj, String constrSig, Object[] params);
+
+   boolean isComponentType(Object type);
+
+   boolean isArray(Object type);
+
+   Object getComponentType(Object arrayType);
+
+   Object getPropertyAnnotationValue(Object typeObj, String propName, String annotName, String attName);
+
+   void addDynListener(IDynListener listener);
 }

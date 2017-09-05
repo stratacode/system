@@ -98,6 +98,6 @@ project(':system') {
     apply plugin: 'java'
     dependencies {
         compile project(':fullRuntime')
-        compile 'jline:jline:1.0'
+        compile 'jline:jline:2.14.5'
     }
 }

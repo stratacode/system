@@ -113,7 +113,8 @@ public class SCLanguage extends JavaLanguage {
       memberDeclaration.addDefault(modifyDeclarationWithoutModifiers);
 
       classBodyDeclarations.setName("<classBodyDeclarations>([],[],,[],[],[])");
-      classBodyDeclarations.add(overrideProperty, overrideMethod, propertyAssignment);
+      // Method should be ahead of property here for partial results to work properly since a property is a subset of a method when you take away the ;
+      classBodyDeclarations.add(overrideMethod, overrideProperty, propertyAssignment);
 
       // Overrides the result class name used for this grammar.
       compilationUnit.setResultClassName("SCModel");

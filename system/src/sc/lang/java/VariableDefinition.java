@@ -15,15 +15,13 @@ import sc.parser.IStyleAdapter;
 import sc.parser.Language;
 import sc.parser.ParentParseNode;
 import sc.parser.ParseUtil;
+import sc.type.CTypeUtil;
 import sc.type.IBeanMapper;
 import sc.type.Type;
 import sc.util.StringUtil;
 
 import java.lang.reflect.Field;
-import java.util.Collection;
-import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public class VariableDefinition extends AbstractVariable implements IVariableInitializer, ISrcStatement {
    public Expression initializer;
@@ -43,10 +41,16 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
    // Set to true if there's a method of the same name.  This is used in the Javascript conversion, which unlike Java has one namespace shared by fields and methods.
    public transient boolean shadowedByMethod = false;
 
+   // Used only for serialization purposes because we use this class in the meta-data model for the client
+   public transient boolean indexedProperty = false;
+
    // When doing conversions to other languages, may need to freeze the type
    public transient Object frozenTypeDecl;
 
    public transient ISrcStatement fromStatement;
+
+   // Used for serializing VariableDefinition metadata
+   public transient Map<String,Object> annotations = null;
 
    private static boolean wasBound = false;
 
@@ -95,12 +99,28 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       }
 
       if (!convertGetSet) {
-         Object annotObj = ModelUtil.getAnnotation(getDefinition(), "sc.obj.GetSet");
+         Statement def = getDefinition();
+         Object annotObj = ModelUtil.getAnnotation(def, "sc.obj.GetSet");
          if (annotObj != null) {
-            Object value = ModelUtil.getAnnotationValue(annotObj, "value");
-            if (value == null || (value instanceof Boolean && ((Boolean) value)))
-               convertGetSet = true;
+            if (!(def instanceof FieldDefinition)) {
+               displayError("@GetSet annotation invalid on non-fields: ");
+            }
+            else {
+               Object value = ModelUtil.getAnnotationValue(annotObj, "value");
+               if (value == null || (value instanceof Boolean && ((Boolean) value)))
+                  convertGetSet = true;
+            }
          }
+         /*
+          * TODO: If we have a field which lives in a type with an abstract getX and setX methods, but no implementation, should we set convertGetSet to
+          * automatically fill that contract?  What are the side-effects of doing that for an abstract class where maybe a getX or setX is already implemented downstream?
+          * Need to match the public/private modifiers... since a private field should not convertGetSet on an interface.
+         if (!convertGetSet && def instanceof FieldDefinition) {
+            TypeDeclaration enclType = getEnclosingType();
+            Object getXMeth = enclType.definesMethod("get" + CTypeUtil.capitalizePropertyName(variableName), null, )
+            if (getMeth.isAbstract() && modifiers match) convertGetSet = true;
+         }
+         */
       }
       super.init();
    }
@@ -136,13 +156,20 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       // Check to be sure the initializer is compatible with the property
       if (initializer != null) {
          Object varType = getTypeDeclaration();
-         initializer.setInferredType(varType);
+         // TODO: or should we clone the type here?   the lambda expression will set type parameters to further refine the type
+         if (varType instanceof ParamTypeDeclaration)
+            ((ParamTypeDeclaration) varType).writable = true;
+
+         initializer.setInferredType(varType, true);
          Object initType = initializer.getGenericType();
          if (initType != null && varType != null && !ModelUtil.isAssignableFrom(varType, initType, true, null, getLayeredSystem()) && (bindingDirection == null || bindingDirection.doForward())) {
             if (!ModelUtil.hasUnboundTypeParameters(initType)) {
-               displayTypeError("Type mismatch - assignment to variable with type: " + ModelUtil.getTypeName(varType, true, true) + " does not match expression type: " + ModelUtil.getTypeName(initType, true, true) + " for: ");
-               boolean xx = initType != null && varType != null && !ModelUtil.isAssignableFrom(varType, initType, true, null, getLayeredSystem()) && (bindingDirection == null || bindingDirection.doForward());
-               initType = initializer.getGenericType();
+               // Weird case - if this is a synchronization operation involving a remote method that is a 'void' return - we don't know that on the client and so create a field/variable assignment
+               if (initType != Void.TYPE || getJavaModel().mergeDeclaration) {
+                  displayTypeError("Type mismatch - assignment to variable with type: " + ModelUtil.getTypeName(varType, true, true) + " does not match expression type: " + ModelUtil.getTypeName(initType, true, true) + " for: ");
+                  boolean xx = initType != null && varType != null && !ModelUtil.isAssignableFrom(varType, initType, true, null, getLayeredSystem()) && (bindingDirection == null || bindingDirection.doForward());
+                  initType = initializer.getGenericType();
+               }
             }
          }
          else if (initType != varType) {
@@ -218,7 +245,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       // Handles old school array dimensions after the variable name
       if (arrayDimensions == null)
          return type;
-      return new ArrayTypeDeclaration(getJavaModel().getModelTypeDeclaration(), type, arrayDimensions);
+      return new ArrayTypeDeclaration(getLayeredSystem(), getEnclosingType(), type, arrayDimensions);
    }
 
    public String getVariableTypeName() {
@@ -364,11 +391,12 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
    public void makeBindable(boolean referenceOnly) {
       if (!bindable && !referenceOnly) {
          JavaModel model = getJavaModel();
-         LayeredSystem sys = model.getLayeredSystem();
+         LayeredSystem sys = model == null ? null : model.getLayeredSystem();
          // Only start checking after the current buildLayer is compiled.  Otherwise, this touches runtime classes
          // during the normal build which can suck in a version that will be replaced later on.
          // Don't do this test for the JS runtime... it forces us to load the js version of the class
-         if (sys != null && sys.buildLayer != null && sys.buildLayer.compiled && !sys.isDynamicRuntime()) {
+         // Don't do this when we are being restarted - i.e. before we are validated - it's too soon to init the property cache
+         if (sys != null && sys.buildLayer != null && sys.buildLayer.compiled && !sys.isDynamicRuntime() && isValidated()) {
             Object field = getRuntimePropertyMapping();
             // If field is null, it means we have not compiled a compiled class yet
             if (field != null && (!ModelUtil.isDynamicType(field) && !ModelUtil.isBindable(field)) && canMakeBindable() && !ModelUtil.isConstant(field))
@@ -464,6 +492,9 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
 
    public VariableDefinition deepCopy(int options, IdentityHashMap<Object, Object> oldNewMap) {
       VariableDefinition newVarDef = (VariableDefinition) super.deepCopy(options, oldNewMap);
+
+      // TODO: Do we need this?
+      //newVarDef.fromStatement = this;
 
       if ((options & CopyState) != 0) {
          newVarDef.bindable = bindable;
@@ -641,6 +672,14 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       throw new UnsupportedOperationException();
    }
 
+   public boolean getIndexedProperty() {
+      return indexedProperty;
+   }
+
+   public void setIndexedProperty(boolean v) {
+      indexedProperty = v;
+   }
+
    public String getOperatorStr() {
       return operator;
    }
@@ -657,6 +696,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       VariableDefinition varDef = new VariableDefinition();
       varDef.variableName = field.getName();
       varDef.frozenTypeDecl = field.getType();
+      varDef.annotations = ModelUtil.createAnnotationsMap(field.getAnnotations());
       return varDef;
    }
 
@@ -690,25 +730,46 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
 
    public VariableDefinition refreshNode() {
       JavaModel oldModel = getJavaModel();
-      if (oldModel == null || !oldModel.removed)
-         return this; // We are still valid
       Statement def = getDefinition();
       if (def instanceof FieldDefinition) {
-         Object res = oldModel.layeredSystem.getSrcTypeDeclaration(getEnclosingType().getFullTypeName(), null, true,  false, false, oldModel.layer, oldModel.isLayerModel);
-         if (res instanceof BodyTypeDeclaration) {
-            Object newField = ((BodyTypeDeclaration) res).declaresMember(variableName, MemberType.FieldSet, null, null);
-            if (newField instanceof VariableDefinition)
-               return (VariableDefinition) newField;
-            displayError("Field removed ", variableName, " for: ");
-            // TODO: debug only
-            newField = ((BodyTypeDeclaration) res).declaresMember(variableName, MemberType.FieldSet, null, null);
+         BodyTypeDeclaration type = getEnclosingType().refreshNode();
+         if (type == null)
+            return this;
+         Object newField = type.declaresMember(variableName, MemberType.FieldSet, null, null);
+         if (newField instanceof VariableDefinition)
+            return (VariableDefinition) newField;
+         System.err.println("Failed to find field on refresh " + variableName + " for: ");
+         // TODO: debug only
+         newField = type.declaresMember(variableName, MemberType.FieldSet, null, null);
+      }
+      else if (def instanceof VariableStatement) {
+         AbstractMethodDefinition newMeth = getEnclosingMethod();
+         VariableStatement varSt;
+         if (newMeth != null) {
+            varSt = (VariableStatement) newMeth.findStatement((Statement) def);
+            if (varSt == null)
+               System.err.println("*** Can't refresh VarStatement from method");
+         }
+         else {
+            TypeDeclaration enclType = getEnclosingType();
+            if (enclType == null)
+               return this;
+            BodyTypeDeclaration type = enclType.refreshNode();
+            if (type == null)
+               return this;
+            varSt = (VariableStatement) type.findStatement((Statement) def);
+            if (varSt == null)
+               System.err.println("*** Can't refresh VarStatement from type");
+         }
+         if (varSt != null) {
+            for (VariableDefinition varDef:varSt.definitions) {
+               if (varDef.variableName.equals(variableName))
+                  return varDef;
+            }
+            System.err.println("*** Can't find varDef");
          }
       }
-      if (def instanceof VariableStatement) {
-         // Don't think we need these references outside of the file
-         return null;
-      }
-      return null;
+      return this;
    }
 
    public ISrcStatement getSrcStatement(Language lang) {
@@ -736,6 +797,11 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       }
       if (initializer != null && initializer.findFromStatement(st) != null)
          return this;
+      if (origInitializer != null && st instanceof VariableDefinition) {
+         VariableDefinition varSt = (VariableDefinition) st;
+         if (varSt.initializer != null && origInitializer.findFromStatement(varSt.initializer) != null)
+            return this;
+      }
       return null;
    }
 
@@ -745,6 +811,11 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
 
    public boolean getNodeContainsPart(ISrcStatement partNode) {
       return this == partNode || sameSrcLocation(partNode);
+   }
+
+   @Override
+   public int getNumStatementLines() {
+      return ParseUtil.countLinesInNode(getParseNode());
    }
 
    public boolean childIsTopLevelStatement(ISrcStatement st) {
@@ -757,5 +828,12 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          res.add(fromSt);
    }
 
+   // Here only for meta-data serialization purposes
+   public int getModifierFlags() {
+      return getDefinition().getModifierFlags();
+   }
+   public void setModifierFlags() {
+      throw new UnsupportedOperationException();
+   }
 }
 

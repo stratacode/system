@@ -19,10 +19,7 @@ import sc.lang.sc.OverrideAssignment;
 import sc.lang.template.Template;
 import sc.lang.template.TemplateStatement;
 import sc.layer.*;
-import sc.obj.GlobalScopeDefinition;
-import sc.obj.IAltComponent;
-import sc.obj.IComponent;
-import sc.obj.ScopeDefinition;
+import sc.obj.*;
 import sc.type.*;
 import sc.util.*;
 import sc.bind.BindingDirection;
@@ -35,6 +32,7 @@ import java.io.File;
 import java.io.StringReader;
 import java.lang.annotation.ElementType;
 import java.lang.reflect.*;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.*;
 
@@ -104,8 +102,15 @@ public class ModelUtil {
    }
 
    public static Object getVariableGenericTypeDeclaration(Object varObj, JavaModel model) {
-      if (varObj instanceof Field)
-         return ((Field) varObj).getGenericType();
+      if (varObj instanceof Field) {
+         try {
+            return ((Field) varObj).getGenericType();
+         }
+         catch (Exception exc) {
+            model.displayError("Failed to resolve generic type for : " + varObj.toString() + ": " + exc.toString());
+            return null;
+         }
+      }
       else if (varObj instanceof ITypedObject)
          return ((ITypedObject) varObj).getTypeDeclaration();
       else if (varObj instanceof IBeanMapper)
@@ -133,8 +138,19 @@ public class ModelUtil {
          //   System.out.println("*** Null type parameter default");
          if (boundType instanceof ExtendsType.WildcardTypeDeclaration)
             continue;
+         // When we have a TypeParameter that conveys type info, pass along the TypeParameter so we don't lose any information
+         if (tp instanceof TypeParameter && ((TypeParameter) tp).extendsType != null)
+            boundType = tp;
          if (boundType != Object.class)
             paramMap.put(new TypeParamKey(tp), boundType);
+      }
+
+
+      // For Java 7 and Java 8 the targetType or inferredType of the method call can bind more parameters
+      // Need to do this before we process the parameters, since if a type parameter is bound by a parameter it will replace the
+      // return type (see test.methParam for a simple example that requires this order)
+      if (retInferredType != null && retType != null) {
+         addTypeParamDefinitions(paramMap, retType, retInferredType, retInferredType);
       }
 
       int argSize = arguments.size();
@@ -182,11 +198,6 @@ public class ModelUtil {
          }
       }
 
-      // For Java 7 and Java 8 the targetType or inferredType of the method call can bind more parameters
-      if (retInferredType != null && retType != null) {
-         addTypeParamDefinitions(paramMap, retType, retInferredType, retInferredType);
-      }
-
       return paramMap;
    }
 
@@ -221,9 +232,15 @@ public class ModelUtil {
                if (ModelUtil.getTypeName(genParam).equals("java.lang.Class") && DynUtil.isType(argType)) {
                   // assert curParamType.isAssignableFrom(atp)
                   if (curParamType != null && ModelUtil.isAssignableFrom(curParamType, paramArgType)) {
-                     argType = paramArgType;
-                     if (!(argType instanceof ExtendsType.WildcardTypeDeclaration))
-                         paramMap.put(new TypeParamKey(atp), argType);
+                     // Only do this rule when the param type is a real class.  If it's a type parameter, it's not the right mapping to apply this special rule
+                     if (!ModelUtil.isTypeVariable(curParamType)) {
+                        argType = paramArgType;
+                        if (!(argType instanceof ExtendsType.WildcardTypeDeclaration))
+                           paramMap.put(new TypeParamKey(atp), argType);
+                     }
+                     else {
+                        //System.out.println("***");
+                     }
                   }
                }
                else {
@@ -280,14 +297,14 @@ public class ModelUtil {
       throw new UnsupportedOperationException();
    }
 
-   public static Object getMethodTypeDeclaration(Object typeContext, Object varObj, List<Expression> arguments, JavaModel model, Object inferredType, ITypeDeclaration definedInType) {
-      Object type = getMethodTypeDeclarationInternal(typeContext, varObj, arguments, model, inferredType, definedInType);
+   public static Object getMethodTypeDeclaration(Object typeContext, Object varObj, List<Expression> arguments, LayeredSystem sys, JavaModel model, Object inferredType, Object definedInType) {
+      Object type = getMethodTypeDeclarationInternal(typeContext, varObj, arguments, sys, model, inferredType, definedInType);
       if (type instanceof Class)
          return mapClassToType((Class) type, model);
       return type;
    }
 
-   private static Object getMethodTypeDeclarationInternal(Object typeContext, Object varObj, List<Expression> arguments, JavaModel model, Object inferredType, ITypeDeclaration definedInType) {
+   private static Object getMethodTypeDeclarationInternal(Object typeContext, Object varObj, List<Expression> arguments, LayeredSystem sys, JavaModel model, Object inferredType, Object definedInType) {
       if (varObj == null)
          return null;
       if (varObj instanceof Method || varObj instanceof IMethodDefinition) {
@@ -336,14 +353,26 @@ public class ModelUtil {
                   // e.g. public static <T> List<T> asList(T... a)
 
                   int ntps = getNumTypeParameters(retType);
-                  List<Object> typeDefs = new ArrayList(ntps);
-                  LayeredSystem sys = model.getLayeredSystem();
+                  List<Object> typeDefs = new ArrayList<Object>(ntps);
+                  if (sys == null && model != null)
+                     sys = model.getLayeredSystem();
                   for (int i = 0; i < ntps; i++) {
                      Object typeParam = getTypeParameter(retType, i);
                      if (ModelUtil.isTypeVariable(typeParam)) {
                         String paramName = ModelUtil.getTypeParameterName(typeParam);
                         TypeParamKey paramKey = new TypeParamKey(typeParam);
                         Object paramMappedType = paramMap.get(paramKey);
+
+                        // If the parameter is like G extends T we still need to lookup T to get the value
+                        if (paramMappedType != null && ModelUtil.isTypeVariable(paramMappedType)) {
+                           if (varObj instanceof ParamTypedMethod) {
+                              Object paramMappedValue = ((ParamTypedMethod) varObj).getTypeForVariable(paramMappedType, true);
+                              if (paramMappedValue != null)
+                                 paramMappedType = paramMappedValue;
+                           }
+                           else
+                              System.out.println("*** Warning - unhandled case getting method type");
+                        }
 
                         Object argMappedType = getTypeDeclFromType(typeContext, typeParam, false, sys, false, definedInType);
                         if (paramMappedType == null) {
@@ -370,7 +399,7 @@ public class ModelUtil {
                   Object baseParamType = ModelUtil.getParamTypeBaseType(retType);
                   ParamTypeDeclaration resType;
                   if (definedInType != null)
-                     resType = new ParamTypeDeclaration(definedInType, typeParams, typeDefs, baseParamType);
+                     resType = new ParamTypeDeclaration(sys, definedInType, typeParams, typeDefs, baseParamType);
                   else
                      resType = new ParamTypeDeclaration(sys, typeParams, typeDefs, baseParamType);
                   if (varObj instanceof ParamTypedMethod && ((ParamTypedMethod) varObj).unboundInferredType)
@@ -385,7 +414,7 @@ public class ModelUtil {
                   if (paramType == null) {
                      paramType = retType;
                   }
-                  return new ArrayTypeDeclaration(model.getModelTypeDeclaration(), paramType, StringUtil.repeat("[]", ndim));
+                  return new ArrayTypeDeclaration(sys, definedInType, paramType, StringUtil.repeat("[]", ndim));
                }
                if (retType != null && isTypeVariable)
                   return retType;
@@ -411,7 +440,7 @@ public class ModelUtil {
       throw new UnsupportedOperationException();
    }
 
-   public static Object getTypeDeclFromType(Object typeContext, Object type, boolean classOnly, LayeredSystem sys, boolean bindUnboundParams, ITypeDeclaration definedInType) {
+   public static Object getTypeDeclFromType(Object typeContext, Object type, boolean classOnly, LayeredSystem sys, boolean bindUnboundParams, Object definedInType) {
       if (type instanceof Class)
          return type;
       else if (ModelUtil.hasTypeParameters(type)) {
@@ -433,7 +462,7 @@ public class ModelUtil {
             Object baseType = ModelUtil.getParamTypeBaseType(type);
             ParamTypeDeclaration res;
             if (definedInType != null) {
-               res = new ParamTypeDeclaration(definedInType, typeParams, Arrays.asList(types), baseType);
+               res = new ParamTypeDeclaration(sys, definedInType, typeParams, Arrays.asList(types), baseType);
             }
             else {
                res = new ParamTypeDeclaration(sys, typeParams, Arrays.asList(types), baseType);
@@ -456,7 +485,7 @@ public class ModelUtil {
          if (bindUnboundParams && ModelUtil.hasTypeVariables(compTypeDecl))
             compTypeDecl = ModelUtil.getTypeParameterDefault(compTypeDecl);
          if (compTypeDecl instanceof ParamTypeDeclaration || ModelUtil.isTypeVariable(compTypeDecl)) {
-            ITypeDeclaration dit = null;
+            Object dit = null;
             // TODO: Should we perhaps always use definedInType here for the ArrayTypeDeclarations?
             if (typeContext instanceof ParameterizedType) {
                if (definedInType != null)
@@ -468,7 +497,7 @@ public class ModelUtil {
                dit = (ITypeDeclaration) ModelUtil.getEnclosingType(typeContext);
             if (dit == null)
                dit = definedInType;
-            return ArrayTypeDeclaration.create(compTypeDecl, ndim, dit);
+            return ArrayTypeDeclaration.create(sys, compTypeDecl, ndim, dit);
          }
          return Array.newInstance((Class) compTypeDecl, dims).getClass();
       }
@@ -520,7 +549,7 @@ public class ModelUtil {
             if (type instanceof ExtendsType.LowerBoundsTypeDeclaration)
                return type;
             // Need to resolve the type parameters here and return a LowerBoundTD that points to the resolved type paraemters
-            return new ExtendsType.LowerBoundsTypeDeclaration(type);
+            return new ExtendsType.LowerBoundsTypeDeclaration(sys, type);
          }
          else
             return getTypeDeclFromType(typeContext, getWildcardUpperBounds(type), classOnly, sys, bindUnboundParams, definedInType);
@@ -741,7 +770,13 @@ public class ModelUtil {
          return pkg.getName();
       }
       else if (type instanceof ITypeDeclaration) {
-         return CTypeUtil.getPackageName(ModelUtil.getTypeName(getRootType(type)));
+         Object rootType = getRootType(type);
+         if (rootType != null)
+            type = rootType;
+         String typeName = ModelUtil.getTypeName(type);
+         if (typeName == null)
+            return null;
+         return CTypeUtil.getPackageName(typeName);
       }
       else
          throw new UnsupportedOperationException();
@@ -781,9 +816,11 @@ public class ModelUtil {
    }
 
    /**
-    * Uses a more flexible comparison for the arguments.
+    * Returns the method specified on resultClass with the given name which matches either the paraemetersOrExpressions, or a
+    * specific list of parameter types.
+    * TODO: we should consolidate this logic - this version is used for Class types, CFClass has a defineMethod and AbstractMethodDefinition.definesMethod also has similar logic
     */
-   public static Object getMethod(LayeredSystem sys, Object resultClass, String methodName, Object refType, ITypeParamContext ctx, Object inferredType, boolean staticOnly, Object... types) {
+   public static Object getMethod(LayeredSystem sys, Object resultClass, String methodName, Object refType, ITypeParamContext ctx, Object inferredType, boolean staticOnly, List<JavaType> methodTypeArgs, List<?> parametersOrExpressions, Object[] typesToMatch) {
       // TODO: Need to wrap any param type methods and set the inferredType so we do the lookup accurately
 
       Object[] list = ModelUtil.getMethods(resultClass, methodName, null);
@@ -792,32 +829,54 @@ public class ModelUtil {
          // Interfaces don't inherit object methods in Java but an inteface type in this system needs to still
          // implement methods like "toString" even if they are not on the interface.
          if (ModelUtil.isInterface(resultClass)) {
-            return getMethod(sys, Object.class, methodName, refType, null, inferredType, staticOnly, types);
+            return getMethod(sys, Object.class, methodName, refType, null, inferredType, staticOnly, methodTypeArgs, parametersOrExpressions, typesToMatch);
          }
          return null;
       }
 
-      int typesLen = types == null ? 0 : types.length;
+      int typesLen = typesToMatch != null ? typesToMatch.length : parametersOrExpressions == null ? 0 : parametersOrExpressions.size();
       Object res = null;
+      Object[] prevExprTypes = null;
+      ArrayList<Expression> toClear = null;
       for (int i = 0; i < list.length; i++) {
          Object toCheck = list[i];
          if (ModelUtil.getMethodName(toCheck).equals(methodName)) {
+            ParamTypedMethod paramMethod = null;
+
             Object[] parameterTypes = ModelUtil.getParameterTypes(toCheck);
             int paramLen = parameterTypes == null ? 0 : parameterTypes.length;
+
+            int last = paramLen - 1;
+            if (paramLen != typesLen) {
+               // If the last guy is not a repeating parameter, it can't match
+               if (last < 0 || !ModelUtil.isVarArgs(toCheck) || !ModelUtil.isArray(parameterTypes[last]) || typesLen < last)
+                  continue;
+            }
+
             if (staticOnly && !ModelUtil.hasModifier(toCheck, "static"))
                continue;
+
+            if (!(toCheck instanceof ParamTypedMethod) && ModelUtil.isParameterizedMethod(toCheck) && typesToMatch == null) {
+
+               // TODO: resultClass converted to definedIntype here - we could do a wrapper for the getClass method
+               paramMethod = new ParamTypedMethod(sys, toCheck, ctx, resultClass, parametersOrExpressions, inferredType, methodTypeArgs);
+
+               parameterTypes = paramMethod.getParameterTypes(true);
+               toCheck = paramMethod;
+
+               // Something did not match in the method type parameters - e.g. <T extends X> conflicted with another use of T.
+               if (paramMethod.invalidTypeParameter)
+                  continue;
+            }
+
+
             if (paramLen == 0 && typesLen == 0) {
                if (refType == null || checkAccess(refType, toCheck))
-                  res = ModelUtil.pickMoreSpecificMethod(res, toCheck, null);
+                  res = ModelUtil.pickMoreSpecificMethod(res, toCheck, null, null, null);
             }
             else {
                int j;
-               int last = paramLen - 1;
-               if (paramLen != typesLen) {
-                  // If the last guy is not a repeating parameter, it can't match
-                  if (last < 0 || !ModelUtil.isVarArgs(toCheck) || !ModelUtil.isArray(parameterTypes[last]) || typesLen < last)
-                     continue;
-               }
+               Object[] nextExprTypes = new Object[typesLen];
                for (j = 0; j < typesLen; j++) {
                   Object paramType;
                   if (j > last) {
@@ -826,10 +885,35 @@ public class ModelUtil {
                   }
                   else
                      paramType = parameterTypes[j];
-                  if (types[j] != null && !ModelUtil.isAssignableFrom(paramType, types[j], false, ctx, sys)) {
+
+                  Object exprType;
+                  if (typesToMatch == null) {
+                     Object exprObj = parametersOrExpressions.get(j);
+
+                     if (exprObj instanceof Expression) {
+                        if (paramType instanceof ParamTypeDeclaration)
+                           paramType = ((ParamTypeDeclaration) paramType).cloneForNewTypes();
+                        Expression paramExpr = (Expression) exprObj;
+                        paramExpr.setInferredType(paramType, false);
+                        if (toClear == null)
+                           toClear = new ArrayList<Expression>();
+                        toClear.add(paramExpr);
+                     }
+                     exprType = ModelUtil.getVariableTypeDeclaration(exprObj);
+
+                     // This was an invalid lambda
+                     if (exprType instanceof BaseLambdaExpression.LambdaInvalidType)
+                        break;
+                  }
+                  else
+                     exprType = typesToMatch[j];
+
+                  nextExprTypes[j] = exprType;
+
+                  if (exprType != null && !ModelUtil.isAssignableFrom(paramType, exprType, false, ctx, sys)) {
                      // Repeating parameters... if the last parameter is an array match if the component type matches
                      if (j >= last && ModelUtil.isArray(paramType) && ModelUtil.isVarArgs(toCheck)) {
-                        if (!ModelUtil.isAssignableFrom(ModelUtil.getArrayComponentType(paramType), types[j], false, ctx)) {
+                        if (!ModelUtil.isAssignableFrom(ModelUtil.getArrayComponentType(paramType), exprType, false, ctx)) {
                            break;
                         }
                      }
@@ -838,9 +922,18 @@ public class ModelUtil {
                   }
                }
                if (j == typesLen) {
-                  if (refType == null || checkAccess(refType, toCheck))
-                     res = ModelUtil.pickMoreSpecificMethod(res, toCheck, types);
+                  if (refType == null || checkAccess(refType, toCheck)) {
+                     res = ModelUtil.pickMoreSpecificMethod(res, toCheck, nextExprTypes, prevExprTypes, parametersOrExpressions);
+                     if (res == toCheck)
+                        prevExprTypes = nextExprTypes;
+                  }
                }
+            }
+            // Don't leave the inferredType lying around in the parameter expressions for when we start matching the next method.
+            if (toClear != null) {
+               for (Expression clearExpr:toClear)
+                  clearExpr.clearInferredType();
+               toClear = null;
             }
          }
       }
@@ -924,6 +1017,10 @@ public class ModelUtil {
       return ModelUtil.getMethodName(c1).equals(ModelUtil.getMethodName(c2));
    }
 
+   /*
+    * Checks if the parameters in the two methods match.  First call methodNamesMatch if you want to really compare
+    * that they are the same methods.
+    */
    public static boolean methodsMatch(Object m1, Object m2) {
       if (m1 == null)
          return m2 == null;
@@ -940,6 +1037,75 @@ public class ModelUtil {
       if (!ModelUtil.sameTypes(encl1Type, encl2Type))
          return false;
       return ModelUtil.isVarArgs(m1) == ModelUtil.isVarArgs(m2);
+   }
+
+   /*
+    * Checks if the parameters in the two methods match.  First call methodNamesMatch if you want to really compare
+    * that they are the same methods.
+    */
+   public static boolean sameMethodParameters(Object m1, Object m2) {
+      if (m1 == null)
+         return m2 == null;
+
+      if (m2 == null)
+         return false;
+
+      Object[] c1Types = ModelUtil.getParameterTypes(m1);
+      Object[] c2Types = ModelUtil.getParameterTypes(m2);
+      if (!sameParameters(c1Types, c2Types, false, null))
+         return false;
+      Object encl1Type = ModelUtil.getEnclosingType(m1);
+      Object encl2Type = ModelUtil.getEnclosingType(m2);
+      if (!ModelUtil.sameTypes(encl1Type, encl2Type))
+         return false;
+      return ModelUtil.isVarArgs(m1) == ModelUtil.isVarArgs(m2);
+   }
+
+   /** Returns true for two methods which match in name and parameter signature.  Beware that it will return true for the same method in different layers (use sameMethodInLayer). */
+   public static boolean sameMethods(Object m1, Object m2) {
+      return ModelUtil.methodNamesMatch(m1, m2) && ModelUtil.sameMethodParameters(m1, m2);
+   }
+
+   /**
+    * Returns true for two methods which are not only the same name, signature but also defined in the same layer.
+    * Will consider two methods in
+    * different runtimes but the same layer the same method.
+    */
+   public static boolean sameMethodInLayer(LayeredSystem sys, Object m1, MethodDefinition m2) {
+      if (ModelUtil.sameMethods(m1, m2)) {
+         Object enc1 = ModelUtil.getEnclosingType(m1);
+         Object enc2 = ModelUtil.getEnclosingType(m2);
+         if (ModelUtil.sameTypes(enc1, enc2)) {
+            Layer l1 = ModelUtil.getLayerForType(sys, enc1);
+            Layer l2 = ModelUtil.getLayerForType(sys, enc2);
+            if (l1 == l2 || l1 != null && l2 != null && l1.getLayerName().equals(l2.getLayerName()))
+               return true;
+         }
+      }
+      return false;
+   }
+
+   public static boolean sameParameters(Object[] c1Types, Object[] c2Types, boolean allowUnbound, LayeredSystem sys) {
+      int c1Len = c1Types == null ? 0 : c1Types.length;
+      int checkLen = c2Types == null ? 0 : c2Types.length;
+      if (c1Len != checkLen)
+         return false;
+
+      if (c1Types != null) {
+         for (int i = 0; i < c1Types.length; i++) {
+            Object c1Arg = c1Types[i];
+            Object c2Arg = c2Types[i];
+
+            if (c1Arg == c2Arg)
+               continue;
+
+            if (sameTypes(c1Arg, c2Arg))
+               continue;
+
+            return false;
+         }
+      }
+      return true;
    }
 
    public static boolean parametersMatch(Object[] c1Types, Object[] c2Types, boolean allowUnbound, LayeredSystem sys) {
@@ -969,7 +1135,7 @@ public class ModelUtil {
    }
 
    /** Chooses the method with the more specific return type - as per the searchMethods method in java.lang.Class */
-   public static Object pickMoreSpecificMethod(Object c1, Object c2, Object[] types) {
+   public static Object pickMoreSpecificMethod(Object c1, Object c2, Object[] c1ArgTypes, Object[] c2ArgTypes, List<? extends Object> exprs) {
       if (c1 == null)
          return c2;
 
@@ -978,7 +1144,7 @@ public class ModelUtil {
       Object defaultType = c2;
 
       // First an exact match of parameter types overrides - e.g. Math.abs(int)
-      if (types != null) {
+      if (c1ArgTypes != null) {
          Object[] c1Types = ModelUtil.getParameterTypes(c1);
          Object[] c2Types = ModelUtil.getParameterTypes(c2);
          int c1Len = c1Types == null ? 0 : c1Types.length;
@@ -991,13 +1157,14 @@ public class ModelUtil {
 
          boolean paramsSorted = false;
 
-         int paramLen = types.length;
+         int param1Len = c1ArgTypes.length;
+         int param2Len = c2ArgTypes == null ? param1Len : c2ArgTypes.length;
 
          // If we have one var arg and one non-var-arg and the same parameters, choose the type based on whether the
          // varArg argument is an array.  If it's an array, choose the varArgs one.  If not, choose the scalar.
          if (c1VarArg != c2VarArg) {
             if (c1Len == checkLen) {
-               Object lastType = types[types.length - 1];
+               Object lastType = c1ArgTypes[param1Len - 1];
                // This rule for using varArgs to match arrays applies to Integer[] but not int[]
                boolean lastTypeArr = ModelUtil.isArray(lastType) && !ModelUtil.isPrimitive(ModelUtil.getArrayComponentType(lastType));
                // If one matches exactly and the other matches because it's a repeat definition, choose the non-repeating one (e.g. Seq.of(T) versus Seq.of(T...) except if you have an array param.
@@ -1013,9 +1180,9 @@ public class ModelUtil {
             }
             // Another var args case - we'd rather match the method with the exact number of parameters over a var args with fewer
             else {
-               if (c1VarArg && checkLen == paramLen)
+               if (c1VarArg && checkLen == param1Len)
                   defaultType = c2;
-               else if (c2VarArg && c1Len == paramLen)
+               else if (c2VarArg && c1Len == param1Len)
                   defaultType = c1;
             }
          }
@@ -1023,16 +1190,23 @@ public class ModelUtil {
          // First if any of the parameters is a lambda expression, we need to ensure the
          // lambda expression parameters match the parameters of the single-interface method
          // defined for this parameter type.
-         for (int i = 0; i < paramLen; i++) {
-            Object arg = types[i];
+         for (int i = 0; i < param1Len; i++) {
+            Object arg = c1ArgTypes[i];
+            // TODO: lambda params case - choosing the method with fewer parameters?
+            if (i >= param2Len)
+               return c2;
             if (arg instanceof BaseLambdaExpression.LambdaInferredType) {
                boolean repeat1Arg = c1Types.length <= i;
                boolean repeat2Arg = c2Types.length <= i;
-               Object c1Arg = repeat1Arg ? c1Types[c1Types.length] : c1Types[i];
-               Object c2Arg = repeat2Arg ? c2Types[c2Types.length] : c2Types[i];
+               Object c1Arg = repeat1Arg ? c1Types[c1Types.length-1] : c1Types[i];
+               Object c2Arg = repeat2Arg ? c2Types[c2Types.length-1] : c2Types[i];
 
-               boolean c2Interface = ModelUtil.isInterface(c2Arg);
                BaseLambdaExpression lambda = ((BaseLambdaExpression.LambdaInferredType) arg).rootExpr;
+
+               Object lambdaRes = lambda.pickMoreSpecificMethod(c1, c1Arg, i >= c1Types.length - 1 && c1VarArg, c2, c2Arg, i >= c2Types.length - 1 && c2VarArg);
+               if (lambdaRes != null)
+                  return lambdaRes;
+               /*
                if (c2Interface && !lambda.lambdaParametersMatch(c2Arg, i >= c2Types.length - 1 && c2VarArg))
                   c2Interface = false;
                boolean c1Interface = ModelUtil.isInterface(c1Arg);
@@ -1044,16 +1218,42 @@ public class ModelUtil {
                }
                else if (!c2Interface)
                   return c1;
+               */
             }
          }
 
-         if (!paramsSorted) {
-            for (int i = 0; i < types.length; i++) {
-               Object arg = types[i];
+         // There are some special rules for matching method calls with lambda expressions.
+         if (exprs != null) {
+            for (int i = 0; i < param1Len; i++) {
+               // TODO: lambda params case - choosing the method with fewer parameters?
+               if (i >= param2Len)
+                  return c2;
                boolean repeat1Arg = c1Types.length <= i;
                boolean repeat2Arg = c2Types.length <= i;
                Object c1Arg = repeat1Arg ? c1Types[c1Types.length-1] : c1Types[i];
                Object c2Arg = repeat2Arg ? c2Types[c2Types.length-1] : c2Types[i];
+               Object expr = exprs.get(i);
+
+               if (expr instanceof BaseLambdaExpression) {
+                  BaseLambdaExpression lambda = (BaseLambdaExpression) expr;
+                  Object lambdaRes = lambda.pickMoreSpecificMethod(c1, c1Arg, i >= c1Types.length - 1 && c1VarArg, c2, c2Arg, i >= c2Types.length - 1 && c2VarArg);
+                  if (lambdaRes != null)
+                     return lambdaRes;
+               }
+            }
+         }
+
+         if (!paramsSorted) {
+            for (int i = 0; i < param1Len; i++) {
+               // TODO: lambda params case - choosing the method with fewer parameters?
+               if (i >= param2Len)
+                  return c2;
+               Object c1ArgType = c1ArgTypes[i];
+               Object c2ArgType = c2ArgTypes[i];
+               boolean repeat1Arg = c1Types.length <= i;
+               boolean repeat2Arg = c2Types.length <= i;
+               Object c1Arg = repeat1Arg ? c1Types[c1Types.length - 1] : c1Types[i];
+               Object c2Arg = repeat2Arg ? c2Types[c2Types.length - 1] : c2Types[i];
 
                if (c1Arg == c2Arg)
                   continue;
@@ -1071,14 +1271,31 @@ public class ModelUtil {
                }
                */
 
-               if (sameTypes(arg, c1Arg))
+               if (sameTypes(c1ArgType, c1Arg))
                   return c1;
 
-               if (sameTypes(arg, c2Arg))
+               if (sameTypes(c2ArgType, c2Arg))
                   return c2;
 
-               if (isANumber(arg)) {
-                  if (ModelUtil.isInteger(arg)) {
+               boolean c1ArgTypePrim = ModelUtil.isPrimitive(c1ArgType);
+               boolean c1ArgPrim = ModelUtil.isPrimitive(c1Arg);
+
+               boolean c2ArgTypePrim = ModelUtil.isPrimitive(c2ArgType);
+               boolean c2ArgPrim = ModelUtil.isPrimitive(c2Arg);
+
+               // Need Integer to int to take precedence over Integer long
+               if (c1ArgTypePrim && !c1ArgPrim && sameTypes(ModelUtil.wrapPrimitiveType(c1ArgType), c1Arg))
+                  return c1;
+               if (!c1ArgTypePrim && c1ArgPrim && sameTypes(ModelUtil.wrapPrimitiveType(c1Arg), c1ArgType))
+                  return c1;
+
+               if (c2ArgTypePrim && !c2ArgPrim && sameTypes(ModelUtil.wrapPrimitiveType(c2ArgType), c2Arg))
+                  return c2;
+               if (!c2ArgTypePrim && c2ArgPrim && sameTypes(ModelUtil.wrapPrimitiveType(c2Arg), c2ArgType))
+                  return c2;
+
+               if (isANumber(c1ArgType)) {
+                  if (ModelUtil.isInteger(c1ArgType)) {
                      boolean c1Int = ModelUtil.isAnInteger(c1Arg);
                      boolean c2Int = ModelUtil.isAnInteger(c2Arg);
                      if (!c1Int && c2Int)
@@ -1088,13 +1305,7 @@ public class ModelUtil {
                   }
                }
 
-               // TODO: This does not look right - we should pick the more specific the args in both directions here right?
-               // And only return if they are diferent.  And why do we return defaultType after the first parameter?
-               if (ModelUtil.isAssignableFrom(c1Arg, c2Arg))
-                  return c2;
-               //else if (ModelUtil.isAssignableFrom(c2Arg, c1Arg))
-
-               boolean argIsArray = ModelUtil.isArray(arg);
+               boolean argIsArray = ModelUtil.isArray(c1ArgType);
                if (ModelUtil.isArray(c1Arg) && !ModelUtil.isArray(c2Arg)) {
                   if (argIsArray)
                      return c1;
@@ -1137,33 +1348,40 @@ public class ModelUtil {
       return defaultType;
    }
 
+   public static boolean sameTypesOrVariables(Object typeObj1, Object typeObj2) {
+      if (ModelUtil.isTypeVariable(typeObj1))
+         return ModelUtil.isTypeVariable(typeObj2) && ModelUtil.sameTypeParameters(typeObj1, typeObj2);
+      return !ModelUtil.isTypeVariable(typeObj2) && ModelUtil.sameTypes(typeObj1, typeObj2);
+   }
+
    /** isSameType might be a better name? */
    public static boolean sameTypes(Object typeObj1, Object typeObj2) {
       if (typeObj1 == typeObj2)
          return true;
 
-      if (isInteger(typeObj1) && isInteger(typeObj2))
+      if (isInteger(typeObj1) && isInteger(typeObj2) && isPrimitive(typeObj1) == isPrimitive(typeObj2))
          return true;
 
-      if (isLong(typeObj1) && isLong(typeObj2))
+      // For sameMethods at least, it's ok to have foo(long p) and foo(Long p) as separate methods so need to treat these cases differently here
+      if (isLong(typeObj1) && isLong(typeObj2) && isPrimitive(typeObj1) == isPrimitive(typeObj2))
          return true;
 
-      if (isShort(typeObj1) && isShort(typeObj2))
+      if (isShort(typeObj1) && isShort(typeObj2) && isPrimitive(typeObj1) == isPrimitive(typeObj2))
          return true;
 
-      if (isByte(typeObj1) && isByte(typeObj2))
+      if (isByte(typeObj1) && isByte(typeObj2) && isPrimitive(typeObj1) == isPrimitive(typeObj2))
          return true;
 
-      if (isDouble(typeObj1) && isDouble(typeObj2))
+      if (isDouble(typeObj1) && isDouble(typeObj2) && isPrimitive(typeObj1) == isPrimitive(typeObj2))
          return true;
 
-      if (isFloat(typeObj1) && isFloat(typeObj2))
+      if (isFloat(typeObj1) && isFloat(typeObj2) && isPrimitive(typeObj1) == isPrimitive(typeObj2))
          return true;
 
-      if (isBoolean(typeObj1) && isBoolean(typeObj2))
+      if (isBoolean(typeObj1) && isBoolean(typeObj2) && isPrimitive(typeObj1) == isPrimitive(typeObj2))
          return true;
 
-      if (isCharacter(typeObj1) && isCharacter(typeObj2))
+      if (isCharacter(typeObj1) && isCharacter(typeObj2) && isPrimitive(typeObj1) == isPrimitive(typeObj2))
          return true;
 
       if (typeObj1 == null || typeObj2 == null)
@@ -1226,7 +1444,19 @@ public class ModelUtil {
       return true;
    }
 
+   public static boolean sameTypesAndLayers(LayeredSystem sys, Object type1, Object type2) {
+      if (ModelUtil.sameTypes(type1, type2)) {
+         Layer l1 = ModelUtil.getLayerForType(sys, type1);
+         Layer l2 = ModelUtil.getLayerForType(sys, type2);
+         if (l1 == l2)
+            return true;
+      }
+      return false;
+   }
+
    public static boolean sameTypeParameters(Object tp1, Object tp2) {
+      if (tp1 == tp2)
+         return true;
       String tpName1 = ModelUtil.getTypeParameterName(tp1);
       String tpName2 = ModelUtil.getTypeParameterName(tp2);
       if (tpName1 == null || tpName2 == null)
@@ -1348,9 +1578,17 @@ public class ModelUtil {
       return type == Number.class;
    }
 
-   public static Object coerceTypes(Object lhsType, Object rhsType) {
+   public static Object coerceTypes(LayeredSystem sys, Object lhsType, Object rhsType) {
       if (lhsType == rhsType)
          return lhsType;
+
+      // Once we are coercing an 'int' to something that's an object, this is a case where we need to
+      // do the auto-boxing
+      if (ModelUtil.isPrimitive(lhsType))
+         lhsType = ModelUtil.wrapPrimitiveType(lhsType);
+
+      if (ModelUtil.isPrimitive(rhsType))
+         rhsType = ModelUtil.wrapPrimitiveType(rhsType);
 
       if (lhsType instanceof BaseLambdaExpression.LambdaInferredType) {
          return rhsType; // Either another inferred type or the real type
@@ -1367,24 +1605,81 @@ public class ModelUtil {
       if (isANumber(lhsType) && isANumber(rhsType))
          return coerceNumberTypes(lhsType, rhsType);
 
-      if (ModelUtil.isAssignableFrom(lhsType, rhsType))
+      // If you have one side that is ? super SuperType and we have SubType extends SuperType, oddly this seems to clamp the
+      // coerced type to SuperType
+      if (lhsType instanceof ExtendsType.LowerBoundsTypeDeclaration) {
+         ExtendsType.LowerBoundsTypeDeclaration lbt = (ExtendsType.LowerBoundsTypeDeclaration) lhsType;
+         if (ModelUtil.isAssignableFrom(rhsType, lbt.baseType))
+            return lbt.baseType;
+         return rhsType;
+      }
+      if (rhsType instanceof ExtendsType.LowerBoundsTypeDeclaration) {
+         ExtendsType.LowerBoundsTypeDeclaration rbt = (ExtendsType.LowerBoundsTypeDeclaration) rhsType;
+         if (ModelUtil.isAssignableFrom(rbt.baseType, lhsType))
+            return rbt.baseType;
          return lhsType;
-      else if (ModelUtil.isAssignableFrom(rhsType, lhsType))
+      }
+
+      boolean lhsMatch = ModelUtil.isAssignableFrom(lhsType, rhsType);
+      boolean rhsMatch = ModelUtil.isAssignableFrom(rhsType, lhsType);
+      if (lhsMatch && !rhsMatch)
+         return lhsType;
+      else if (rhsMatch && !lhsMatch)
          return rhsType;
       else {
-         Object type = ModelUtil.findCommonSuperClass(lhsType, rhsType);
+         if (ModelUtil.sameTypesAndParams(lhsType, rhsType))
+            return lhsType;
+
+         boolean lhsTypeVar = ModelUtil.isTypeVariable(lhsType);
+         boolean rhsTypeVar = ModelUtil.isTypeVariable(rhsType);
+         if (lhsTypeVar && !rhsTypeVar)
+            return rhsType;
+         if (rhsTypeVar && !lhsTypeVar)
+            return lhsType;
+
+         if (rhsTypeVar && lhsTypeVar)
+            return lhsType; // TODO: Is there something more intelligent we need to do to coalesce type variables?
+
+         Object type = ModelUtil.findCommonSuperClass(sys, lhsType, rhsType);
          if (type != null) {
             Object[] ifaces = ModelUtil.getOverlappingInterfaces(lhsType, rhsType);
             if (ifaces == null || ModelUtil.implementsInterfaces(type, ifaces))
                return type;
             // Weird case - need to build a new type which represents the common base type combined with the overlapping interfaces
-            return new CoercedTypeDeclaration(type, ifaces);
+            return new CoercedTypeDeclaration(sys, type, ifaces);
          }
          throw new IllegalArgumentException("Cannot coerce types: " + ModelUtil.getTypeName(lhsType) + " and: " + ModelUtil.getTypeName(rhsType));
       }
    }
 
-   public static Object refineType(ITypeDeclaration definedInType, Object origType, Object newType) {
+   /**
+    * This is used to combine the inferredType with the type extracted from the parameters in determining "the" type.
+    * Originally it also called coerceTypes but ran into some problems with that.
+    */
+   public static Object blendTypes(Object lhsType, Object rhsType) {
+      // If you have one side that is ? super SuperType and we have SubType extends SuperType, oddly this seems to clamp the
+      // coerced type to SuperType
+      if (lhsType instanceof ExtendsType.LowerBoundsTypeDeclaration) {
+         ExtendsType.LowerBoundsTypeDeclaration lbt = (ExtendsType.LowerBoundsTypeDeclaration) lhsType;
+         if (lbt.baseType == Object.class)
+            return rhsType;
+         if (ModelUtil.isAssignableFrom(rhsType, lbt.baseType))
+            return lbt.baseType;
+         return rhsType;
+      }
+      if (rhsType instanceof ExtendsType.LowerBoundsTypeDeclaration) {
+         ExtendsType.LowerBoundsTypeDeclaration rbt = (ExtendsType.LowerBoundsTypeDeclaration) rhsType;
+         if (rbt.baseType == Object.class)
+            return lhsType;
+         if (ModelUtil.isAssignableFrom(rbt.baseType, lhsType))
+            return rbt.baseType;
+         return lhsType;
+      }
+
+      return lhsType;
+   }
+
+   public static Object refineType(LayeredSystem sys, Object definedInType, Object origType, Object newType) {
       if (origType == newType)
          return origType;
 
@@ -1442,7 +1737,7 @@ public class ModelUtil {
             else {
                // TODO: is this right?  Do we actually even get here?  Basically we do not have any bindings for type parameters
                List<?> typeParams = ModelUtil.getTypeParameters(origType);
-               return new ParamTypeDeclaration(definedInType, typeParams, (List<Object>)typeParams, newType);
+               return new ParamTypeDeclaration(sys, definedInType, typeParams, (List<Object>)typeParams, newType);
             }
          }
          else {
@@ -1453,9 +1748,9 @@ public class ModelUtil {
             for (int i = 0; i < numParams; i++) {
                Object op = ModelUtil.getTypeParameter(origType, i);
                Object np = ModelUtil.getTypeParameter(newType, i);
-               typeDefs.add(refineType(definedInType, op, np));
+               typeDefs.add(refineType(sys, definedInType, op, np));
             }
-            ParamTypeDeclaration mergedParamType = new ParamTypeDeclaration(definedInType, typeParams, typeDefs, ModelUtil.getParamTypeBaseType(newType));
+            ParamTypeDeclaration mergedParamType = new ParamTypeDeclaration(sys, definedInType, typeParams, typeDefs, ModelUtil.getParamTypeBaseType(newType));
             return mergedParamType;
          }
       }
@@ -1470,8 +1765,20 @@ public class ModelUtil {
    }
 
    public static Object[] getAllImplementsTypeDeclarations(Object c1) {
-      if (c1 instanceof Class)
-         return ((Class) c1).getInterfaces();
+      if (c1 instanceof Class) {
+         Class class1 = (Class) c1;
+         Object[] ifaces = class1.getInterfaces();
+         ArrayList<Object> res = new ArrayList<Object>(Arrays.asList(ifaces));
+         Object superClass = class1.getSuperclass();
+         if (superClass != null) {
+            Object[] superIfaces = getAllImplementsTypeDeclarations(superClass);
+            for (Object superIface:superIfaces) {
+               if (!res.contains(superIface))
+                  res.add(superIface);
+            }
+         }
+         return res.toArray();
+      }
       else if (c1 instanceof ITypeDeclaration) {
          return ((ITypeDeclaration) c1).getAllImplementsTypeDeclarations();
       }
@@ -1510,24 +1817,116 @@ public class ModelUtil {
       return res.toArray();
    }
 
-   public static Object findCommonSuperClass(Object c1, Object c2) {
+   private static Object coerceTypeParams(LayeredSystem sys, Object o1Param, Object o2Param) {
+      Object newParam;
+      if (o1Param == null) {
+         if (o2Param == null)
+            newParam = null;
+         else
+            newParam = o2Param;
+      }
+      else if (o2Param == null) {
+         newParam = o1Param;
+      }
+      else {
+         boolean o1ParamTypeVar = ModelUtil.isTypeVariable(o1Param);
+         boolean o2ParamTypeVar = ModelUtil.isTypeVariable(o2Param);
+         if (o1ParamTypeVar) {
+            if (o2ParamTypeVar)
+               newParam = o1Param; // TODO: do we need to pick the more specific one here?
+            else
+               newParam = o2Param;
+         }
+         else if (o2ParamTypeVar) {
+            newParam = o1Param;
+         }
+         else {
+            newParam = ModelUtil.findCommonSuperClass(sys, o1Param, o2Param);
+         }
+      }
+      return newParam;
+   }
+
+   public static Object findCommonSuperClass(LayeredSystem sys, Object c1, Object c2) {
       Object o1 = c1;
       Object o2 = c2;
 
-      if (o1 == null && o2 != null)
-         return o2;
-      if (o2 == null && o1 != null)
+      if (o1 == o2)
          return o1;
 
-      while (o1 != null && !ModelUtil.isAssignableFrom(o1, o2))
+      if (o1 == null)
+         return o2;
+      if (o2 == null)
+         return o1;
+
+      if (o1 == NullLiteral.NULL_TYPE)
+         return o2;
+      if (o2 == NullLiteral.NULL_TYPE)
+         return o1;
+
+      boolean o1ParamType = ModelUtil.isParameterizedType(o1);
+      boolean o2ParamType = ModelUtil.isParameterizedType(o2);
+      if (o1ParamType && o2ParamType) {
+         Object o1Base = ModelUtil.getParamTypeBaseType(o1);
+         Object o2Base = ModelUtil.getParamTypeBaseType(o2);
+         if (ModelUtil.sameTypes(o1Base, o2Base)) {
+            int numParams = ModelUtil.getNumTypeParameters(o1);
+            ArrayList<Object> newParams = new ArrayList<Object>(numParams);
+            for (int i = 0; i < numParams; i++) {
+               Object o1Param = ModelUtil.getTypeParameter(o1, i);
+               Object o2Param = ModelUtil.getTypeParameter(o2, i);
+               Object newParam;
+
+               newParam = coerceTypeParams(sys, o1Param, o2Param);
+               newParams.add(newParam);
+            }
+            return new ParamTypeDeclaration(sys, ModelUtil.getTypeParameters(o1), newParams, o1Base);
+         }
+         else {
+            if (ModelUtil.isTypeVariable(o1)) {
+               if (ModelUtil.sameTypeParameters(o1, o2))
+                  return o1;
+               if (ModelUtil.isTypeVariable(o2))
+                  return o1;
+            }
+
+            if (o1Base == c1)
+               System.out.println("*** Error recursive coerceTypes call");
+            if (o2Base == c2)
+               System.out.println("*** Error recursive coerceTypes call");
+
+            Object newBaseType = ModelUtil.findCommonSuperClass(sys, o1Base, o2Base);
+            List<?> newBaseTypeParams = ModelUtil.getTypeParameters(newBaseType);
+            int sz = newBaseTypeParams.size();
+            ArrayList<Object> newTypeParams = new ArrayList<Object>(sz);
+
+            for (int i = 0; i < sz; i++)
+               newTypeParams.add(ModelUtil.coerceTypeParams(sys, ModelUtil.getTypeParameter(o1, i), ModelUtil.getTypeParameter(o2, i)));
+
+            return new ParamTypeDeclaration(sys, newBaseTypeParams, newTypeParams, newBaseType);
+         }
+      }
+      // Strip off the type parameters if only one type has them (or perhaps we should substitute ? for each of them
+      else if (o1ParamType)
+         o1 = ModelUtil.getParamTypeBaseType(o1);
+      else if (o2ParamType)
+         o2 = ModelUtil.getParamTypeBaseType(o2);
+
+      while (o1 != null && !ModelUtil.isAssignableFrom(o1, o2, sys))
          o1 = ModelUtil.getSuperclass(o1);
 
-      while (o2 != null && !ModelUtil.isAssignableFrom(o2, c1))
+      while (o2 != null && !ModelUtil.isAssignableFrom(o2, c1, sys))
          o2 = ModelUtil.getSuperclass(o2);
 
       // We found a class which matches so return that
-      if (o1 != null && o2 != null)
+      if (o1 != null && o2 != null && o1 != Object.class && o2 != Object.class)
          return ModelUtil.isAssignableFrom(o1, o2) ? o2 : o1;
+
+      Object i1 = findBestMatchingInterface(c1, c2, null);
+      Object i2 = findBestMatchingInterface(c2, c1, null);
+
+      if (i1 != null && i2 != null && i1 != Object.class && i2 != Object.class)
+         return ModelUtil.isAssignableFrom(i1, i2, sys) ? i2 : i1;
 
       if (o1 != null)
          return o1;
@@ -1535,17 +1934,11 @@ public class ModelUtil {
       if (o2 != null)
          return o2;
 
-      o1 = findBestMatchingInterface(c1, c2, null);
-      o2 = findBestMatchingInterface(c2, c1, null);
+      if (i1 != null)
+         return i1;
 
-      if (o1 != null && o2 != null)
-         return ModelUtil.isAssignableFrom(o1, o2) ? o2 : o1;
-
-      if (o1 != null)
-         return o1;
-
-      if (o2 != null)
-         return o2;
+      if (i2 != null)
+         return i2;
 
       return null;
    }
@@ -1633,6 +2026,13 @@ public class ModelUtil {
 
    // TODO: Performance Fix - me - should be looking up a precedence value in each type and just comparing them
    public static Object coerceNumberTypes(Object lhsType, Object rhsType) {
+      // If we are coercing Integer, Float, etc. and Number the base is a Number
+      if (isNumber(lhsType))
+         return lhsType;
+
+      if (isNumber(rhsType))
+         return rhsType;
+
       if (lhsType == rhsType)
            return lhsType;
 
@@ -1706,6 +2106,10 @@ public class ModelUtil {
       return paramType instanceof ParamTypeDeclaration || paramType instanceof ParameterizedType;
    }
 
+   public static boolean hasDefinedTypeParameters(Object paramType) {
+      return paramType instanceof ParamTypeDeclaration || paramType instanceof ParameterizedType || ModelUtil.getTypeParameters(paramType) != null;
+   }
+
    public static int getNumTypeParameters(Object paramType) {
       if (paramType instanceof ParamTypeDeclaration) {
          return ((ParamTypeDeclaration) paramType).types.size();
@@ -1748,7 +2152,7 @@ public class ModelUtil {
          // Wildcard types <> no type is specified so just use the type param
          if (ptd.types.size() != 0)
             res = ptd.types.get(ix);
-         if (res == null)
+         if (res == null && ix < ptd.typeParams.size())
             res = ptd.typeParams.get(ix);
          return res;
       }
@@ -1866,24 +2270,28 @@ public class ModelUtil {
          }
       }
 
-      if (isANumber(type1) && isANumber(type2))
+      boolean type1Num = isANumber(type1);
+      boolean type2Num = isANumber(type2);
+      if (type1Num && type2Num)
          // Note: switching the order here to "lhs" = "rhs"
          return numberTypesAssignableFrom(type1, type2, assignmentSemantics);
 
       if (isBoolean(type1) && isBoolean(type2))
          return true;
 
-      if (isCharacter(type1) && isCharacter(type2))
+      boolean type1Char = isCharacter(type1);
+      boolean type2Char = isCharacter(type2);
+      if (type1Char && type2Char)
          return true;
 
       // Characters can be assigned to ints and vice versa during assignments only
       if (assignmentSemantics) {
-         if (isCharacter(type1) && isAnInteger(type2) || (isCharacter(type2) && isAnInteger(type1)))
+         if ((type1Char && type2Num) || (type2Char && type1Num))
             return true;
       }
       else {
          // Method parameters - an integer can be assigned with a character argument
-         if (isAnInteger(type1) && isCharacter(type2))
+         if (isAnInteger(type1) && type2Char)
             return true;
       }
 
@@ -2027,6 +2435,15 @@ public class ModelUtil {
    }
 
    private static boolean numberTypesAssignableFrom(Object lhsType, Object rhsType, boolean assignmentSemantics) {
+      // In case there are annotation layers that modify the Java native types (like there are for JS) we need to skip those types
+      while (lhsType instanceof ModifyDeclaration) {
+         lhsType = ((ModifyDeclaration) lhsType).getDerivedTypeDeclaration();
+      }
+
+      while (rhsType instanceof ModifyDeclaration) {
+         rhsType = ((ModifyDeclaration) rhsType).getDerivedTypeDeclaration();
+      }
+
       // Any number can be assigned to a double or a number
       if (isDouble(lhsType) || isNumber(lhsType)) {
          return true;
@@ -2159,6 +2576,35 @@ public class ModelUtil {
       return null;
    }
 
+   public static Map<String,Object> getPropertyAnnotations(Object property) {
+      Map<String,Object> res = getAnnotations(property);
+      Map<String,Object> newRes = null;
+      if (ModelUtil.isGetMethod(property)) {
+         Object setMethod = ModelUtil.getSetMethodFromGet(property);
+         if (setMethod != null) {
+            newRes = ModelUtil.getAnnotations(setMethod);
+         }
+      }
+      else if (ModelUtil.isSetMethod(property)) {
+         Object getMethod = ModelUtil.getGetMethodFromSet(property);
+         if (getMethod != null)
+            newRes = ModelUtil.getAnnotations(getMethod);
+      }
+      if (res == null)
+         return newRes;
+      if (newRes == null)
+         return res;
+      HashMap<String,Object> combined = new HashMap<String,Object>();
+      combined.putAll(res);
+      combined.putAll(newRes);
+      return combined;
+   }
+
+   /** This method is available in the Javascript runtime so we have it here so the APIs stay in sync */
+   public static boolean hasAnnotation(Object definition, String annotationName) {
+      return getAnnotation(definition, annotationName) != null;
+   }
+
    public static Object getAnnotation(Object definition, String annotationName) {
       PerfMon.start("getAnnotation");
       try {
@@ -2166,22 +2612,15 @@ public class ModelUtil {
          return ((IDefinition) definition).getAnnotation(annotationName);
       }
       else {
-         // TODO: fix annotation names
-         Class annotationClass;
-         if (annotationName.equals("Bindable")) // TODO remove me
-            System.err.println("*** Old Bindable annotation");
-         if (annotationName.equals("Bindable") || annotationName.equals("sc.bind.Bindable"))
-            annotationClass = Bindable.class;
-         else if (annotationName.equals("BindSettings"))
-            annotationClass = BindSettings.class;
-         else
-            annotationClass = RDynUtil.loadClass(annotationName);
+         Class annotationClass = RDynUtil.loadClass(annotationName);
          if (annotationClass == null) {
             annotationClass = RDynUtil.loadClass("sc.obj." + annotationName);
             if (annotationClass == null) {
                // NOTE: assuming that the layers are defined properly, compiled classes can't have non-compiled annotations so just return null, e.g. searching for a JSSettings or MainInit annotation on a compiled class.
                return null;
             }
+            else
+               System.err.println("*** Using auto-imported sc.obj annoatation: " + annotationName);
          }
 
          java.lang.annotation.Annotation jlannot;
@@ -2242,6 +2681,21 @@ public class ModelUtil {
       return null;
    }
 
+   public static Object getAnnotationValueFromList(List<Object> annotations, String s) {
+      for (Object annotation:annotations) {
+         Object val;
+         if (annotation instanceof IAnnotation)
+            val = ((IAnnotation) annotation).getAnnotationValue(s);
+         else if (annotation instanceof java.lang.annotation.Annotation)
+            val = TypeUtil.invokeMethod(annotation, RTypeUtil.getMethod(annotation.getClass(), s), (Object[]) null);
+         else
+            throw new UnsupportedOperationException();
+         if (val != null)
+            return val;
+      }
+      return null;
+   }
+
    public static Object getAnnotationValue(Object annotation, String s) {
       if (annotation instanceof IAnnotation)
          return ((IAnnotation) annotation).getAnnotationValue(s);
@@ -2272,7 +2726,7 @@ public class ModelUtil {
       return parameterTypes;
    }
 
-   public static JavaType[] parametersToJavaTypeArray(Object method, List<? extends Object> parameters, ParamTypedMethod ctx) {
+   public static JavaType[] parametersToJavaTypeArray(LayeredSystem sys, Object method, List<? extends Object> parameters, ParamTypedMethod ctx) {
       Object[] paramTypes = ModelUtil.getParameterTypes(method, false);
       int size = parameters == null ? 0 : parameters.size();
       // Perf tuneup: could move logic to do comparisons into the cache so we don't allocate the temporary array here
@@ -2302,7 +2756,7 @@ public class ModelUtil {
          else if (paramType != null) {
             // Used to pass in ctx here as the type param context but really the method's paramType info should not be used
             // to resolve the type variables here in that context.
-            parameterTypes[i] = JavaType.createFromParamType(paramType, null, ctx.getDefinedInType());
+            parameterTypes[i] = JavaType.createFromParamType(sys, paramType, null, ctx.getDefinedInType());
          }
          else
             parameterTypes[i] = null;
@@ -2322,19 +2776,17 @@ public class ModelUtil {
             return res;
       }
       else if (td instanceof Class) {
-         Object[] parameterTypes = parametersToTypeArray(parameters, ctx);
-         // TODO: I think we need to pass in inferredType since this can affect the choice of the method we are picking
-         if ((res = ModelUtil.getMethod(sys, td, name, refType, ctx, inferredType, staticOnly, parameterTypes)) != null)
+         if ((res = ModelUtil.getMethod(sys, td, name, refType, ctx, inferredType, staticOnly, methodTypeArgs, parameters, null)) != null)
             return res;
       }
       return null;
    }
 
-   public static Object declaresConstructor(Object td, List<?> parameters, ITypeParamContext ctx) {
-      return declaresConstructor(td, parameters, ctx, null);
+   public static Object declaresConstructor(LayeredSystem sys, Object td, List<?> parameters, ITypeParamContext ctx) {
+      return declaresConstructor(sys, td, parameters, ctx, null);
    }
 
-   public static Object declaresConstructor(Object td, List<?> parameters, ITypeParamContext ctx, Object refType) {
+   public static Object declaresConstructor(LayeredSystem sys, Object td, List<?> parameters, ITypeParamContext ctx, Object refType) {
       Object res;
       if (td instanceof ITypeDeclaration) {
          if ((res = ((ITypeDeclaration)td).declaresConstructor(parameters, ctx)) != null)
@@ -2345,8 +2797,11 @@ public class ModelUtil {
          Object[] types = parametersToTypeArray(parameters, ctx);
          Object[] list = getConstructors(td, null);
          res = null;
+         Object[] prevExprTypes = null;
+         ArrayList<Expression> toClear = null;
          Object enclType = ModelUtil.getEnclosingInstType(td);
          int paramStart = 0;
+
          // The compiled class will have the outer class as an instance parameter.  When calling from the source world though, we don't have
          // that parameter in the list.  Skip that parameter.
          if (enclType != null)
@@ -2355,18 +2810,32 @@ public class ModelUtil {
             Object toCheck = list[i];
             Object[] parameterTypes = ModelUtil.getParameterTypes(toCheck);
             int paramLen = (parameterTypes == null ? 0 : parameterTypes.length) - paramStart;
+            int last = paramLen - 1 + paramStart;
+            if (paramLen != paramsLen) {
+               // If the last guy is not a repeating parameter, it can't match
+               if (last < 0 || !ModelUtil.isVarArgs(toCheck) || !ModelUtil.isArray(parameterTypes[last]) || paramsLen < last)
+                  continue;
+            }
+
+            ParamTypedMethod paramMethod = null;
+            if (!(toCheck instanceof ParamTypedMethod) && ModelUtil.isParameterizedMethod(toCheck)) {
+
+               // TODO: resultClass converted to definedIntype here - we could do a wrapper for the getClass method
+               paramMethod = new ParamTypedMethod(sys, toCheck, ctx, td, parameters, null, null);
+
+               parameterTypes = paramMethod.getParameterTypes(true);
+               toCheck = paramMethod;
+               if (paramMethod.invalidTypeParameter)
+                  continue;
+            }
+
             if (paramLen == 0 && paramsLen == 0) {
                if (refType == null || checkAccess(refType, toCheck))
-                  res = ModelUtil.pickMoreSpecificMethod(res, toCheck, null);
+                  res = ModelUtil.pickMoreSpecificMethod(res, toCheck, null, null, parameters);
             }
             else {
                int j;
-               int last = paramLen - 1 + paramStart;
-               if (paramLen != paramsLen) {
-                  // If the last guy is not a repeating parameter, it can't match
-                  if (last < 0 || !ModelUtil.isVarArgs(toCheck) || !ModelUtil.isArray(parameterTypes[last]) || paramsLen < last)
-                     continue;
-               }
+               Object[] nextExprTypes = new Object[paramsLen];
                for (j = 0; j < paramsLen; j++) {
                   Object paramType;
                   if (j > last) {
@@ -2375,7 +2844,24 @@ public class ModelUtil {
                   }
                   else
                      paramType = parameterTypes[j+paramStart];
-                  if (types[j] != null && !ModelUtil.isAssignableFrom(paramType, types[j], false, ctx)) {
+
+                  Object exprType;
+                  Object exprObj = parameters.get(j);
+
+                  if (exprObj instanceof Expression) {
+                     if (paramType instanceof ParamTypeDeclaration)
+                        paramType = ((ParamTypeDeclaration) paramType).cloneForNewTypes();
+                     Expression paramExpr = (Expression) exprObj;
+                     paramExpr.setInferredType(paramType, false);
+                     if (toClear == null)
+                        toClear = new ArrayList<Expression>();
+                     toClear.add(paramExpr);
+                  }
+                  exprType = ModelUtil.getVariableTypeDeclaration(exprObj);
+
+                  nextExprTypes[j] = exprType;
+
+                  if (exprType != null && !ModelUtil.isAssignableFrom(paramType, exprType, false, ctx)) {
                      // Repeating parameters... if the last parameter is an array match if the component type matches
                      if (j >= last && ModelUtil.isArray(paramType) && ModelUtil.isVarArgs(toCheck)) {
                         if (!ModelUtil.isAssignableFrom(ModelUtil.getArrayComponentType(paramType), types[j], false, ctx)) {
@@ -2387,8 +2873,17 @@ public class ModelUtil {
                   }
                }
                if (j == paramsLen) {
-                  if (refType == null || checkAccess(refType, toCheck))
-                     res = ModelUtil.pickMoreSpecificMethod(res, toCheck, types);
+                  if (refType == null || checkAccess(refType, toCheck)) {
+                     res = ModelUtil.pickMoreSpecificMethod(res, toCheck, nextExprTypes, prevExprTypes, parameters);
+                     if (res == toCheck)
+                        prevExprTypes = nextExprTypes;
+                  }
+               }
+               // Don't leave the inferredType lying around in the parameter expressions for when we start matching the next method.
+               if (toClear != null) {
+                  for (Expression clearExpr:toClear)
+                     clearExpr.clearInferredType();
+                  toClear = null;
                }
             }
          }
@@ -2403,11 +2898,11 @@ public class ModelUtil {
     * NOTE: it's rare that you want to use this method - use declaresConstructor instead.  This one searches for a matching
     * constructor in the type hierarchy but Java does not inherit constructors automatically from one type to it's sub-types.
     */
-   public static Object definesConstructor(Object td, List<?> parameters, ITypeParamContext ctx) {
-      return definesConstructor(td, parameters, ctx, null, false);
+   public static Object definesConstructor(LayeredSystem sys, Object td, List<?> parameters, ITypeParamContext ctx) {
+      return definesConstructor(sys, td, parameters, ctx, null, false);
    }
 
-   public static Object definesConstructor(Object td, List<?> parameters, ITypeParamContext ctx, Object refType, boolean isTransformed) {
+   public static Object definesConstructor(LayeredSystem sys, Object td, List<?> parameters, ITypeParamContext ctx, Object refType, boolean isTransformed) {
       Object res;
       if (td instanceof ITypeDeclaration && !(td instanceof CFClass)) {
          if ((res = ((ITypeDeclaration)td).definesConstructor(parameters, ctx, isTransformed)) != null)
@@ -2426,27 +2921,44 @@ public class ModelUtil {
       }
       */
       else if (td instanceof Class || td instanceof CFClass) {
-         int paramsLen = parameters == null ? 0 : parameters.size();
+         int argsLen = parameters == null ? 0 : parameters.size();
          Object[] types = parametersToTypeArray(parameters, ctx);
          Object[] list = getConstructors(td, null);
          res = null;
+         Object[] prevExprTypes = null;
+         ArrayList<Expression> toClear = null;
          for (int i = 0; i < list.length; i++) {
             Object toCheck = list[i];
             Object[] parameterTypes = ModelUtil.getParameterTypes(toCheck);
             int paramLen = parameterTypes == null ? 0 : parameterTypes.length;
-            if (paramLen == 0 && paramsLen == 0) {
+            int last = paramLen - 1;
+            boolean isVarArgs = ModelUtil.isVarArgs(toCheck);
+            if (paramLen != argsLen) {
+               // If the last guy is not a repeating parameter, it can't match
+               if (last < 0 || !isVarArgs || !ModelUtil.isArray(parameterTypes[last]) || argsLen < last)
+                  continue;
+            }
+
+            ParamTypedMethod paramMethod = null;
+            if (!(toCheck instanceof ParamTypedMethod) && ModelUtil.isParameterizedMethod(toCheck)) {
+
+               // TODO: resultClass converted to definedIntype here - we could do a wrapper for the getClass method
+               paramMethod = new ParamTypedMethod(sys, toCheck, ctx, td, parameters, null, null);
+
+               parameterTypes = paramMethod.getParameterTypes(true);
+               toCheck = paramMethod;
+               if (paramMethod.invalidTypeParameter)
+                  continue;
+            }
+
+            if (paramLen == 0 && argsLen == 0) {
                if (refType == null || checkAccess(refType, toCheck))
-                  res = ModelUtil.pickMoreSpecificMethod(res, toCheck, null);
+                  res = ModelUtil.pickMoreSpecificMethod(res, toCheck, null, null, parameters);
             }
             else {
                int j;
-               int last = paramLen - 1;
-               if (paramLen != paramsLen) {
-                  // If the last guy is not a repeating parameter, it can't match
-                  if (last < 0 || !ModelUtil.isVarArgs(toCheck) || !ModelUtil.isArray(parameterTypes[last]) || paramsLen < last)
-                     continue;
-               }
-               for (j = 0; j < paramsLen; j++) {
+               Object[] nextExprTypes = new Object[argsLen];
+               for (j = 0; j < argsLen; j++) {
                   Object paramType;
                   if (j > last) {
                      if (!ModelUtil.isArray(paramType = parameterTypes[last]))
@@ -2454,9 +2966,34 @@ public class ModelUtil {
                   }
                   else
                      paramType = parameterTypes[j];
-                  if (types[j] != null && !ModelUtil.isAssignableFrom(paramType, types[j], false, ctx)) {
+
+                  Object exprType;
+                  Object exprObj = parameters.get(j);
+
+                  if (exprObj instanceof Expression) {
+                     Object infParamType = paramType;
+                     if (infParamType instanceof ParamTypeDeclaration)
+                        infParamType = ((ParamTypeDeclaration) infParamType).cloneForNewTypes();
+                     Expression paramExpr = (Expression) exprObj;
+                     if (isVarArgs && j >= last && ModelUtil.isArray(infParamType)) {
+                        infParamType = ModelUtil.getArrayComponentType(infParamType);
+                     }
+                     paramExpr.setInferredType(infParamType, false);
+                     if (toClear == null)
+                        toClear = new ArrayList<Expression>();
+                     toClear.add(paramExpr);
+                  }
+                  exprType = ModelUtil.getVariableTypeDeclaration(exprObj);
+
+                  // Lambda inferred type is not valid so can't be a match
+                  if (exprType instanceof BaseLambdaExpression.LambdaInvalidType)
+                     break;
+
+                  nextExprTypes[j] = exprType;
+
+                  if (exprType != null && !ModelUtil.isAssignableFrom(paramType, exprType, false, ctx)) {
                      // Repeating parameters... if the last parameter is an array match if the component type matches
-                     if (j >= last && ModelUtil.isArray(paramType)) {
+                     if (j >= last && ModelUtil.isArray(paramType) && isVarArgs) {
                         if (!ModelUtil.isAssignableFrom(ModelUtil.getArrayComponentType(paramType), types[j], false, ctx)) {
                            break;
                         }
@@ -2465,9 +3002,18 @@ public class ModelUtil {
                         break;
                   }
                }
-               if (j == paramsLen) {
-                  if (refType == null || checkAccess(refType, toCheck))
-                     res = ModelUtil.pickMoreSpecificMethod(res, toCheck, types);
+               if (j == argsLen) {
+                  if (refType == null || checkAccess(refType, toCheck)) {
+                     res = ModelUtil.pickMoreSpecificMethod(res, toCheck, nextExprTypes, prevExprTypes, parameters); // TODO separate types for each inferred type
+                     if (res == toCheck)
+                        prevExprTypes = nextExprTypes;
+                  }
+               }
+               // Don't leave the inferredType lying around in the parameter expressions for when we start matching the next method.
+               if (toClear != null) {
+                  for (Expression clearExpr:toClear)
+                     clearExpr.clearInferredType();
+                  toClear = null;
                }
             }
          }
@@ -2680,9 +3226,22 @@ public class ModelUtil {
       if (member instanceof PropertyAssignment)
          member = ((PropertyAssignment) member).getAssignedProperty();
       if (member instanceof IBeanMapper)
-         return((IBeanMapper) member).getGetSelector();
+         return((IBeanMapper) member).getSetSelector();
       if (member instanceof IMethodDefinition)
          return ((IMethodDefinition) member).getSetMethodFromGet();
+      // TODO: handle Method here - usually it will be an IBeanMapper
+      return null;
+   }
+
+   public static Object getFieldFromGetSetMethod(Object member) {
+      if (member instanceof ParamTypedMember)
+         member = ((ParamTypedMember) member).getMemberObject();
+      if (member instanceof PropertyAssignment)
+         member = ((PropertyAssignment) member).getAssignedProperty();
+      if (member instanceof IBeanMapper)
+         return((IBeanMapper) member).getField();
+      if (member instanceof IMethodDefinition)
+         return ((IMethodDefinition) member).getFieldFromGetSetMethod();
       // TODO: handle Method here - usually it will be an IBeanMapper
       return null;
    }
@@ -2706,15 +3265,25 @@ public class ModelUtil {
    }
 
    public static Object getPropertyType(Object prop) {
+      return getPropertyType(prop, null);
+   }
+
+   /** For compiled properties, if you pass in a layered system, you will get the annotated version of the type, not the compiled type */
+   public static Object getPropertyType(Object prop, LayeredSystem sys) {
       if (prop instanceof ParamTypedMember)
          prop = ((ParamTypedMember) prop).getMemberObject();
-      if (prop instanceof IBeanMapper)
-         return ((IBeanMapper) prop).getPropertyType();
+      if (prop instanceof IBeanMapper) {
+         IBeanMapper mapper = (IBeanMapper) prop;
+         Object propType = mapper.getPropertyType();
+         if (sys != null)
+            return resolveSrcTypeDeclaration(sys, propType);
+         return propType;
+      }
       else if (prop instanceof PropertyAssignment) {
          Object propType = ((PropertyAssignment) prop).getPropertyDefinition();
          if (propType == null)
             return Object.class; // Unresolved property - for lookupUIIcon just return something generic here
-         return getPropertyType(propType);
+         return getPropertyType(propType, sys);
       }
       else if (ModelUtil.isField(prop))
          return getFieldType(prop);
@@ -3078,82 +3647,6 @@ public class ModelUtil {
       throw new UnsupportedOperationException();
    }
 
-   public static String unescapeJavaString(String str) {
-      StringBuilder sb = new StringBuilder(str.length());
-      int len = str.length();
-      for (int i = 0; i < len; i++) {
-         char charVal = str.charAt(i);
-         if (charVal == '\\' && i < len - 1) {
-            i++;
-            switch (str.charAt(i)) {
-               case 'b':
-                  charVal = '\b';
-                  break;
-               case 't':
-                  charVal = '\t';
-                  break;
-               case 'n':
-                  charVal = '\n';
-                  break;
-               case 'f':
-                  charVal = '\f';
-                  break;
-               case 'r':
-                  charVal = '\r';
-                  break;
-               case '"':
-                  charVal = '\"';
-                  break;
-               case '\\':
-                  charVal = '\\';
-                  break;
-               case '\'':
-                  charVal = '\'';
-                  break;
-               case 'u':
-                  String hexStr = str.substring(i+1,i+5);
-                  i += 4;
-                  try {
-                     charVal = (char) Integer.parseInt(hexStr, 16);
-                  }
-                  catch (NumberFormatException exc) {
-                     System.err.println("**** Invalid character unicode escape: " + hexStr + " should be a hexadecimal number");
-                  }
-                  break;
-               case '0':
-               case '1':
-               case '2':
-               case '3':
-               case '4':
-               case '5':
-               case '6':
-               case '7':
-                  int olen = 1;
-                  // May be \3\u1234  or \123 or \1\2\3
-                  for (int oix = i + 1; oix < len; oix++) {
-                     char nextChar = str.charAt(i + olen);
-                     if (Character.isDigit(nextChar) && nextChar < '8')
-                        olen++;
-                     else
-                        break;
-                  }
-
-                  String octStr = str.substring(i, i + olen);
-                  i += olen - 1;
-                  try {
-                     charVal = (char) Integer.parseInt(octStr, 8);
-                  }
-                  catch (NumberFormatException exc) {
-                     System.err.println("**** Invalid character octal escape: " + octStr + " should be an octal number");
-                  }
-                  break;
-            }
-         }
-         sb.append(charVal);
-      }
-      return sb.toString();
-   }
-
    public static Object getOuterObject(Object toConstructType, ExecutionContext ctx) {
       Object toConstructCompiled = ModelUtil.getCompiledClass(toConstructType);
       if (toConstructCompiled == null) {
@@ -3448,6 +3941,11 @@ public class ModelUtil {
       }
       if (assignedProperty == null)
          return false;
+      Object enclType = ModelUtil.getEnclosingType(assignedProperty);
+      if (enclType instanceof BodyTypeDeclaration) {
+         if (((BodyTypeDeclaration) enclType).isAutomaticBindable(ModelUtil.getPropertyName(assignedProperty)))
+            return true;
+      }
       return getAnnotation(assignedProperty, "sc.bind.Bindable") != null;
    }
 
@@ -3466,6 +3964,11 @@ public class ModelUtil {
       }
       if (assignedProperty == null)
          return false;
+      Object enclType = ModelUtil.getEnclosingType(assignedProperty);
+      if (enclType instanceof BodyTypeDeclaration) {
+         if (((BodyTypeDeclaration) enclType).isAutomaticBindable(ModelUtil.getPropertyName(assignedProperty)))
+            return true;
+      }
       Object bindAnnot = getAnnotation(assignedProperty, "sc.bind.Bindable");
       return bindAnnot != null && ModelUtil.isAutomaticBindingAnnotation(bindAnnot);
    }
@@ -3493,10 +3996,27 @@ public class ModelUtil {
 
       Object annotation = getAnnotation(assignedProperty, "sc.obj.Constant");
       if (annotation == null && !isField && !(assignedProperty instanceof PropertyAssignment)) {
-         if (!(assignedProperty instanceof IBeanMapper) && ModelUtil.isGetMethod(assignedProperty)) {
-            Object setMethod = ModelUtil.getSetMethodFromGet(assignedProperty);
-            if (setMethod != null)
-               annotation = ModelUtil.getAnnotation(setMethod, "sc.obj.Constant");
+         if (!(assignedProperty instanceof IBeanMapper)) {
+            if (ModelUtil.isGetMethod(assignedProperty)) {
+               Object setMethod = ModelUtil.getSetMethodFromGet(assignedProperty);
+               if (setMethod != null)
+                  annotation = ModelUtil.getAnnotation(setMethod, "sc.obj.Constant");
+               if (annotation == null) {
+                  Object field = ModelUtil.getFieldFromGetSetMethod(assignedProperty);
+                  if (field != null)
+                     annotation = ModelUtil.getAnnotation(field, "sc.obj.Constant");
+               }
+            }
+            else if (ModelUtil.isSetMethod(assignedProperty)) {
+               Object getMethod = ModelUtil.getGetMethodFromSet(assignedProperty);
+               if (getMethod != null)
+                  annotation = ModelUtil.getAnnotation(getMethod, "sc.obj.Constant");
+               if (annotation == null) {
+                  Object field = ModelUtil.getFieldFromGetSetMethod(assignedProperty);
+                  if (field != null)
+                     annotation = ModelUtil.getAnnotation(field, "sc.obj.Constant");
+               }
+            }
          }
       }
       if (annotation == null) {
@@ -3722,7 +4242,7 @@ public class ModelUtil {
          return ((IMethodDefinition) method).isSetIndexMethod();
       else if (method instanceof Method)
          return RTypeUtil.isSetIndexMethod((Method) method);
-      else if (method instanceof VariableDefinition)
+      else if (method instanceof VariableDefinition || ModelUtil.isField(method))
          return false;
       else
          throw new UnsupportedOperationException();
@@ -3749,7 +4269,8 @@ public class ModelUtil {
    public static boolean typeIsVoid(Object type) {
       if (type instanceof JavaType)
          return ((JavaType) type).isVoid();
-      return type == Void.class || type == Void.TYPE;
+      // NOTE: do not include java.lang.Void here - i.e. Void.class.  that's a placeholder for type parameters and is assignable to object.
+      return type == Void.TYPE;
    }
 
    public static boolean typeIsInteger(Object type) {
@@ -3757,7 +4278,7 @@ public class ModelUtil {
          String typeName = ((JavaType) type).getFullTypeName();
          return typeName != null && (typeName.equals("java.lang.Integer") || typeName.equals("int"));
       }
-      return type == Void.class || type == Void.TYPE;
+      return type == Integer.class || type == Integer.TYPE;
    }
 
    public static boolean typeIsBoolean(Object type) {
@@ -3765,7 +4286,7 @@ public class ModelUtil {
          String typeName = ((JavaType) type).getFullTypeName();
          return typeName != null && (typeName.equals("java.lang.Boolean") || typeName.equals("boolean"));
       }
-      return type == Void.class || type == Void.TYPE;
+      return type == Boolean.class || type == Boolean.TYPE;
    }
 
    public static boolean typeIsString(Object type) {
@@ -3857,6 +4378,8 @@ public class ModelUtil {
          Object retType = ((IMethodDefinition) method).getReturnType(false);
          return retType instanceof TypeParameter || ModelUtil.hasUnboundTypeParameters(retType);
       }
+      else if (method instanceof Constructor)
+         return false;
       throw new UnsupportedOperationException();
    }
 
@@ -3864,7 +4387,7 @@ public class ModelUtil {
       if (method instanceof Method) {
          Type[] paramTypes = ((Method) method).getGenericParameterTypes();
          for (Type paramType:paramTypes)
-            if (paramType instanceof TypeVariable || ModelUtil.hasUnboundTypeParameters(paramType))
+            if (paramType instanceof TypeVariable || ModelUtil.isParameterizedType(paramType))
                return true;
          return false;
       }
@@ -3874,13 +4397,16 @@ public class ModelUtil {
             for (JavaType paramType:paramTypes) {
                if (paramType.isParameterizedType())
                   return true;
-               // TODO: remove this test - replaced the the one above which works and this one only would work if we got the type declaration first
-               if (ModelUtil.hasUnboundTypeParameters(paramType)) {
-                  System.err.println("*** Not reached?");
-                  return true;
-               }
             }
          }
+         return false;
+      }
+      // TODO: In Java 1.8 there's a new Executable interface - but not using it for compatibility with older versions
+      if (method instanceof Constructor) {
+         Type[] paramTypes = ((Constructor) method).getGenericParameterTypes();
+         for (Type paramType:paramTypes)
+            if (paramType instanceof TypeVariable || ModelUtil.isParameterizedType(paramType))
+               return true;
          return false;
       }
       throw new UnsupportedOperationException();
@@ -3891,6 +4417,8 @@ public class ModelUtil {
     * method for the native Class/Method etc. as they do not store the type param stuff in the same place.
     */
    public static Object getParameterizedType(Object member, JavaSemanticNode.MemberType type) {
+      if (member instanceof ParamTypedMember)
+         return ((ParamTypedMember) member).paramTypeDecl;
       if (type == JavaSemanticNode.MemberType.SetMethod) {
          if (member instanceof IMethodDefinition) {
             Object[] paramTypes = ((IMethodDefinition) member).getParameterTypes(false);
@@ -3955,6 +4483,19 @@ public class ModelUtil {
       return type instanceof WildcardType || type instanceof ExtendsType;
    }
 
+   public static boolean isUnboundedWildcardType(Object type) {
+      if (type instanceof ExtendsType.WildcardTypeDeclaration) {
+         return true;
+      }
+      else if (type instanceof WildcardType) {
+         WildcardType wt = (WildcardType) type;
+         return wt.getUpperBounds().length == 0 && wt.getLowerBounds().length == 0;
+      }
+      else if (type instanceof ExtendsType)
+         return ((ExtendsType) type).typeArgument == null;
+      return false;
+   }
+
    public static boolean isSuperWildcard(Object type) {
       if (type instanceof WildcardType)
          return type.toString().contains("super");
@@ -3974,8 +4515,12 @@ public class ModelUtil {
    }
 
    public static Object getWildcardLowerBounds(Object type) {
-      if (type instanceof WildcardType)
-         return ((WildcardType) type).getLowerBounds()[0];
+      if (type instanceof WildcardType) {
+         Type[] bounds = ((WildcardType) type).getLowerBounds();
+         if (bounds.length == 0)
+            return null;
+         return bounds[0];
+      }
       else if (type instanceof ExtendsType) {
          return ((ExtendsType) type).typeArgument.getTypeDeclaration();
       }
@@ -4002,7 +4547,7 @@ public class ModelUtil {
 
    public static boolean hasTypeVariables(Object type) {
       return ModelUtil.isTypeVariable(type) || (type instanceof ExtendsType.LowerBoundsTypeDeclaration && hasTypeVariables(((ExtendsType.LowerBoundsTypeDeclaration) type).getBaseType())) ||
-             (ModelUtil.isGenericArray(type) && hasTypeVariables(ModelUtil.getGenericComponentType(type)));
+             (ModelUtil.isGenericArray(type) && hasTypeVariables(ModelUtil.getGenericComponentType(type))) || (type instanceof WildcardType && ModelUtil.hasTypeVariables(getWildcardBounds(type)));
    }
 
    public static String getTypeParameterString(Object type) {
@@ -4072,7 +4617,7 @@ public class ModelUtil {
          return getTypeParameterDefault(((ExtendsType.LowerBoundsTypeDeclaration) typeParam).getBaseType());
       }
       else if (ModelUtil.isGenericArray(typeParam)) {
-         return new ArrayTypeDeclaration(typeParam instanceof ArrayTypeDeclaration ? ((ArrayTypeDeclaration) typeParam).definedInType : null, ModelUtil.getTypeParameterDefault(ModelUtil.getGenericComponentType(typeParam)), "[]");
+         return new ArrayTypeDeclaration(typeParam instanceof ITypeDeclaration ? ((ITypeDeclaration) typeParam).getLayeredSystem() : null, typeParam instanceof ArrayTypeDeclaration ? ((ArrayTypeDeclaration) typeParam).definedInType : null, ModelUtil.getTypeParameterDefault(ModelUtil.getGenericComponentType(typeParam)), "[]");
       }
       else
          throw new UnsupportedOperationException();
@@ -4280,7 +4825,34 @@ public class ModelUtil {
       return typeParamName;
    }
 
-   /** Given a subType and the typeParameter in the sub-type, returns the type or type parameter in the base type.  */
+   public static Object resolveBaseTypeParameters(LayeredSystem sys, Object subType, Object baseType) {
+      if (ModelUtil.sameTypes(subType, baseType)) {
+         return ModelUtil.getTypeParameters(subType);
+      }
+      List<Object> extTypes = getExtendsJavaTypePath(baseType, subType);
+      if (extTypes == null || extTypes.size() == 0) {
+         System.err.println("*** No extends path from baseType to subType");
+         return null;
+      }
+
+      int numInParams = ModelUtil.getNumTypeParameters(subType);
+      int numOutParams = ModelUtil.getNumTypeParameters(baseType);
+      ArrayList<Object> res = new ArrayList<Object>(numOutParams);
+      for (int i = 0; i < numOutParams; i++) {
+         Object typeParam = ModelUtil.getTypeParameter(baseType, i);
+         Object newParam = resolveBaseTypeParameterInternal(extTypes, subType, baseType, typeParam);
+         res.add(newParam);
+      }
+      return res;
+   }
+
+   /**
+    * TODO: this seems like the same thing as resolveTypeParameter - can we eliminate one implementation?
+    *
+    * Given a subType and baseType and the typeParameter in the base-type, returns the type or type parameter in the sub type.
+    * For example, given List<E> and MyList implements List<Integer> you provide subType = MyList, baseType = List and typeParam = E
+    * and get back Integer.
+    */
    public static Object resolveBaseTypeParameter(Object subType, Object baseType, Object typeParam) {
       if (ModelUtil.sameTypes(subType, baseType)) {
          String typeParamName = ModelUtil.getTypeParameterName(typeParam);
@@ -4294,6 +4866,87 @@ public class ModelUtil {
          return typeParam;
       }
       List<Object> extTypes = getExtendsJavaTypePath(baseType, subType);
+
+      return resolveBaseTypeParameterInternal(extTypes, subType, baseType, typeParam);
+   }
+
+   public static List<Object> resolveSubTypeParameters(Object subType, Object baseType) {
+      List<?> typeParams = ModelUtil.getTypeParameters(subType);
+      if (typeParams == null)
+         return null;
+      int numParams = typeParams.size();
+      ArrayList<Object> res = new ArrayList<Object>(numParams);
+      if (ModelUtil.sameTypes(subType, baseType)) {
+         for (int i = 0; i < numParams; i++) {
+            res.add(ModelUtil.getTypeParameter(subType, i));
+         }
+         return res;
+      }
+      else {
+         List<Object> extTypes = getExtendsJavaTypePath(baseType, subType);
+         for (int pix = 0; pix < numParams; pix++) {
+            int srcIx = pix;
+            Object nextType = subType;
+            Object paramRes = ModelUtil.getTypeParameter(subType, pix);
+            Object origRes = paramRes;
+            Object lastTypeArg = null;
+            Object nextParamType = null;
+            if (ModelUtil.isTypeVariable(paramRes)) {
+               for (int extIx = 0; extIx < extTypes.size(); extIx++) {
+                  Object ext = extTypes.get(extIx);
+                  List<?> typeArgs = ModelUtil.getTypeArguments(ext);
+                  if (typeArgs == null) {
+                     break;
+                  }
+                  srcIx = -1;
+                  Object typeArg = null;
+                  for (int tix = 0; tix < typeArgs.size(); tix++) {
+                     typeArg = typeArgs.get(tix);
+                     typeArg = resolveExtTypeDeclaration(typeArg);
+                     if (ModelUtil.isTypeVariable(typeArg) && ModelUtil.sameTypeParameters(paramRes, typeArg)) {
+                        srcIx = tix;
+                        break;
+                     }
+                  }
+                  if (srcIx == -1) {
+                     break;
+                  }
+                  nextType = resolveExtTypeDeclaration(ext);
+                  if (srcIx >= typeArgs.size()) {
+                     srcIx = -1;
+                     break;
+                  }
+                  if (typeArg instanceof JavaType)
+                     typeArg = ((JavaType) typeArg).getTypeDeclaration();
+                  if (nextType == null) {
+                     srcIx = -1;
+                     break;
+                  }
+                  paramRes = ModelUtil.getTypeArgument(nextType, srcIx);
+                  if (!ModelUtil.isTypeVariable(paramRes)) {
+                     srcIx = -1;
+                     break;
+                  }
+               }
+            }
+            else
+               srcIx = -1;
+            if (srcIx != -1)
+               paramRes = ModelUtil.getTypeParameter(baseType, srcIx);
+            if (!ModelUtil.isTypeVariable(paramRes))
+               res.add(paramRes);
+            else
+               res.add(origRes);
+         }
+      }
+      return res;
+   }
+
+   private static Object resolveExtTypeDeclaration(Object ext) {
+      return ext instanceof JavaType ? ((JavaType) ext).getTypeDeclaration() : (ext instanceof ParameterizedType ? ((ParameterizedType) ext).getRawType() : ext);
+   }
+
+   private static Object resolveBaseTypeParameterInternal(List<Object> extTypes, Object subType, Object baseType, Object typeParam) {
       if (extTypes == null || extTypes.size() == 0) {
          System.err.println("*** No extends path from baseType to subType");
          return null;
@@ -4311,7 +4964,6 @@ public class ModelUtil {
          ct++;
       }
       if (curParamIx == -1) {
-         System.err.println("*** No typeParam in resultType");
          return null;
       }
 
@@ -4372,7 +5024,12 @@ public class ModelUtil {
       return ModelUtil.getTypeParameterDefault(lastTypeArg);
    }
 
-   /** Computes the type parameter in type 'resultType' that corresponds to the typeParam which is a type parameter for it's base class srcType */
+   /**
+    * Computes the type parameter in type 'resultType' that corresponds to "typeParam" you provide for the base type srcType.
+    * In other words, it lets you determine the value of a base type's type parameter when evaluated in the context of the sub-type.
+    * So List<E> - you provide List.class, E, and the resultType of MySubType implements List<Integer> and it will return Integer.class
+    * This "typeParam" should be one of the type variables srcType was defined with, and srcType should be a baseType of resultType.
+    */
    public static Object resolveTypeParameter(Object srcType, Object resultType, Object typeParam) {
       String typeParamName = ModelUtil.getTypeParameterName(typeParam);
       int srcIx = ModelUtil.getTypeParameterPosition(srcType, typeParamName);
@@ -4475,6 +5132,9 @@ public class ModelUtil {
          if (extJavaType instanceof ParameterizedType) {
             return Arrays.asList(((ParameterizedType) extJavaType).getActualTypeArguments());
          }
+         else if (extJavaType instanceof Class) {
+            return null;
+         }
          else {
             throw new UnsupportedOperationException();
          }
@@ -4501,11 +5161,17 @@ public class ModelUtil {
          throw new IllegalArgumentException();
    }
 
-   public static Object definesMember(Object type, String name, EnumSet<JavaSemanticNode.MemberType> mtypes, Object refType, TypeContext ctx) {
-      return definesMember(type, name, mtypes, refType, ctx, false, false);
+   /**
+    * Looks for a member - field, method, enum with the given name on the given type.  The refType specifies a type used for access control checks - if you're not allowed, null is returned.
+    * Pass in a LayeredSystem if you want to find a src reference for an annotation layer that's applied to a compiled type.  For example, you might have a compiled type Foo that extends Bar which
+    * has an annotation layer.  If we find a member in 'Bar', we need to check if the 'Bar' src type has a version of that member.  If so we return that instead since it's more specific.
+    * This is the one of the ways we can attach meta-data onto types that are delivered in a compiled format.  If you don't care about that, pass in null for the sys and that check is not performed.
+    */
+   public static Object definesMember(Object type, String name, EnumSet<JavaSemanticNode.MemberType> mtypes, Object refType, TypeContext ctx, LayeredSystem sys) {
+      return definesMember(type, name, mtypes, refType, ctx, false, false, sys);
    }
 
-   public static Object definesMember(Object type, String name, EnumSet<JavaSemanticNode.MemberType> mtypes, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {
+   public static Object definesMember(Object type, String name, EnumSet<JavaSemanticNode.MemberType> mtypes, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed, LayeredSystem sys) {
       Object res;
       if (type instanceof ITypeDeclaration) {
          if ((res = ((ITypeDeclaration) type).definesMember(name, mtypes, refType, ctx, skipIfaces, isTransformed)) != null)
@@ -4522,8 +5188,8 @@ public class ModelUtil {
             return null;
 
          Class classDecl = (Class) type;
-         IBeanMapper mapper;
-         IBeanMapper rm;
+         IBeanMapper mapper = null;
+         boolean found = false;
          for (JavaSemanticNode.MemberType mtype:mtypes) {
             switch (mtype) {
                case Field:
@@ -4533,7 +5199,9 @@ public class ModelUtil {
                      return ArrayTypeDeclaration.LENGTH_FIELD;
                   if ((mapper = PTypeUtil.getPropertyMapping(classDecl, name)) != null && mapper.getField() != null &&
                        (refType == null || checkAccess(refType, mapper.getField())))
-                     return mapper;
+                     found = true;
+                  else
+                     mapper = null;
 
                   //Object theField;
 
@@ -4552,15 +5220,18 @@ public class ModelUtil {
 
                   break;
                case GetMethod:
-                  if ((res = TypeUtil.getPropertyMapping(classDecl, name, null, null)) != null &&
-                       res instanceof IBeanMapper && (rm = (IBeanMapper) res).hasAccessorMethod() &&
-                     (refType == null || checkAccess(refType, rm.getPropertyMember())))
-                     return res;
+                  if ((mapper = TypeUtil.getPropertyMapping(classDecl, name, null, null)) != null &&
+                      mapper.hasAccessorMethod() && (refType == null || checkAccess(refType, mapper.getPropertyMember())))
+                     found = true;
+                  else
+                     mapper = null;
                   break;
                case SetMethod:
                   if ((mapper = PTypeUtil.getPropertyMapping(classDecl, name)) != null &&
                        mapper.hasSetterMethod() && (refType == null || checkAccess(refType, mapper.getPropertyMember())))
-                     return mapper;
+                     found = true;
+                  else
+                     mapper = null;
                   break;
                case Enum:
                   if ((res = RTypeUtil.getEnum(classDecl, name)) != null)
@@ -4568,20 +5239,46 @@ public class ModelUtil {
                   break;
                case GetIndexed:
                   IBeanIndexMapper im;
-                  if ((res = TypeUtil.getPropertyMapping(classDecl, name, null, null)) != null &&
-                          res instanceof IBeanIndexMapper && (im = (IBeanIndexMapper) res).hasIndexedAccessorMethod() &&
+                  if ((mapper = TypeUtil.getPropertyMapping(classDecl, name, null, null)) != null &&
+                          mapper instanceof IBeanIndexMapper && (im = (IBeanIndexMapper) mapper).hasIndexedAccessorMethod() &&
                           (refType == null || checkAccess(refType, im.getPropertyMember())))
-                     return res;
+                     found = true;
+                  else
+                     mapper = null;
                   break;
                case SetIndexed:
                   if ((mapper = PTypeUtil.getPropertyMapping(classDecl, name)) != null && mapper instanceof IBeanIndexMapper &&
                           ((IBeanIndexMapper) mapper).hasIndexedSetterMethod() && (refType == null || checkAccess(refType, mapper.getPropertyMember())))
-                     return mapper;
+                     found = true;
+                  else
+                     mapper = null;
                   break;
+            }
+            if (found && mapper != null) {
+               return convertMapperToSrc(type, mapper, name, mtypes, refType, ctx, sys);
             }
          }
       }
       return null;
+   }
+
+   public static Object convertMapperToSrc(Object origType, IBeanMapper mapper, String name, EnumSet<JavaSemanticNode.MemberType> mtypes, Object refType, TypeContext ctx, LayeredSystem sys) {
+      if (sys == null)
+         return mapper;
+      Object enclType = getEnclosingType(mapper.getPropertyMember());
+      // Skipping ComponentImpl here because it's a special class used to hold the _initState field... if we resolve it here during transform, it might load it after it's been started and at least
+      if (enclType != null && enclType != ComponentImpl.class) {
+         Object srcClass = resolveSrcTypeDeclaration(sys, enclType);
+         if (srcClass instanceof BodyTypeDeclaration && srcClass != enclType && srcClass != origType) {
+            BodyTypeDeclaration srcType = (BodyTypeDeclaration) srcClass;
+            // We found the member on a compiled class and there's a src type that's annotating that class.  See if the class declares a non-compiled member for the one we found and if so return that instead.
+            Object newMember = srcType.declaresMember(name, mtypes, refType, ctx);
+            if (newMember != null && newMember != mapper) {
+               return newMember;
+            }
+         }
+      }
+      return mapper;
    }
 
    public static boolean isTypeInLayer(Object type, Layer layer) {
@@ -4737,10 +5434,29 @@ public class ModelUtil {
       return null;
    }
 
+   /** Similar to DynUtil.findType, but if there are any source type declarations availble, that is returned first */
+   public static Object findType(LayeredSystem sys, String typeName) {
+      Object res = findTypeDeclaration(sys, typeName, null, false);
+      if (res != null)
+         return res;
+      return DynUtil.findType(typeName);
+   }
+
    public static Object findTypeDeclaration(LayeredSystem sys, String typeName, Layer refLayer, boolean layerResolve) {
       if (sys == null)
          sys = LayeredSystem.getCurrent();
       return sys.getTypeDeclaration(typeName, false, refLayer, layerResolve);
+   }
+
+   public static Object findTypeDeclaration(LayeredSystem sys, Object baseType, String typeName, Layer refLayer, boolean addExternalReference) {
+      if (sys == null)
+         sys = LayeredSystem.getCurrent();
+      if (baseType instanceof ITypeDeclaration)
+         return ((ITypeDeclaration) baseType).findTypeDeclaration(typeName, addExternalReference);
+      Object innerType = ModelUtil.getInnerType(baseType, typeName, null);
+      if (innerType != null)
+         return innerType;
+      return sys.getTypeDeclaration(typeName, false, refLayer, false);
    }
 
    public static Object resolveSrcTypeDeclaration(LayeredSystem sys, Object type) {
@@ -4785,6 +5501,8 @@ public class ModelUtil {
          return ((Class) type).getSuperclass();
       else if (type instanceof ITypeDeclaration)
          return ((ITypeDeclaration) type).getExtendsTypeDeclaration();
+      else if (type instanceof ParameterizedType)
+         return getExtendsClass(ModelUtil.getParamTypeBaseType(type));
       else
          throw new UnsupportedOperationException();
    }
@@ -4797,6 +5515,11 @@ public class ModelUtil {
          return ((BodyTypeDeclaration) type).getCompiledExtendsTypeDeclaration();
       else
          throw new UnsupportedOperationException();
+   }
+
+   public static String getExtendsTypeName(Object type) {
+      Object ext = getExtendsClass(type);
+      return ext == null ? null : ModelUtil.getTypeName(ext);
    }
 
    public static Object getExtendsJavaType(Object type) {
@@ -4913,8 +5636,8 @@ public class ModelUtil {
    }
 
    public static Layer getLayerForType(LayeredSystem sys, Object type) {
-      if (type instanceof BodyTypeDeclaration)
-         return ((BodyTypeDeclaration) type).getLayer();
+      if (type instanceof ITypeDeclaration)
+         return ((ITypeDeclaration) type).getLayer();
       if (sys != null && type instanceof Class) {
          SrcEntry srcEnt = sys.getSrcFileFromTypeName(ModelUtil.getTypeName(type), true, null, true, null);
          if (srcEnt != null)
@@ -4949,6 +5672,8 @@ public class ModelUtil {
 
    /** Returns true for EnumConstants */
    public static boolean isEnum(Object varObj) {
+      if (varObj instanceof ClientTypeDeclaration)
+         varObj = ((ClientTypeDeclaration) varObj).getOriginal();
       if (varObj instanceof EnumConstant)
          return true;
       if (varObj instanceof CFField && ((CFField) varObj).isEnumConstant())
@@ -4987,13 +5712,25 @@ public class ModelUtil {
    }
 
    public static boolean isEnumType(Object varObj) {
+      if (varObj instanceof ClientTypeDeclaration)
+         varObj = ((ClientTypeDeclaration) varObj).getOriginal();
       return varObj instanceof EnumDeclaration || ((varObj instanceof Class) && ((Class) varObj).isEnum()) ||
              ((varObj instanceof CFClass) && ((CFClass) varObj).isEnum()) || (varObj instanceof ModifyDeclaration && isEnumType(((ModifyDeclaration) varObj).getModifiedType()));
    }
 
+   public static Object[] getEnumConstants(Object enumType) {
+      if (enumType instanceof ClientTypeDeclaration)
+         enumType = ((ClientTypeDeclaration) enumType).getOriginal();
+      if (enumType instanceof BodyTypeDeclaration)
+         return ((BodyTypeDeclaration) enumType).getEnumValues();
+      return DynUtil.getEnumConstants(enumType);
+   }
+
    public static Object getEnumTypeFromEnum(Object enumObj) {
-      if (enumObj instanceof EnumConstant)
-         return enumObj;
+      if (enumObj instanceof EnumConstant) {
+         // The type of the EnumConstant is the enum itself, not the constant
+         return ((EnumConstant) enumObj).getEnclosingType();
+      }
       if (enumObj instanceof CFField)
          return ((CFField) enumObj).getEnclosingIType();
       if (enumObj instanceof java.lang.Enum)
@@ -5072,7 +5809,7 @@ public class ModelUtil {
       return mergeTypesAndProperties(type, types, props);
    }
 
-   public static Object[] getMergedPropertiesAndTypes(Object type, String modifier) {
+   public static Object[] getMergedPropertiesAndTypes(Object type, String modifier, LayeredSystem sys) {
       Object[] types = getAllInnerTypes(type, modifier, false);
       Object[] props = getMergedProperties(type, modifier);
       return mergeTypesAndProperties(type, types, props);
@@ -5119,10 +5856,10 @@ public class ModelUtil {
          Object prop = props[i];
          if (prop != null) {
             String propName = ModelUtil.getPropertyName(prop);
-            Object def = ModelUtil.definesMember(type, propName, JavaSemanticNode.MemberType.AllSet, null, null);
+            Object def = ModelUtil.definesMember(type, propName, JavaSemanticNode.MemberType.AllSet, null, null, null);
             if (def == null) {
                System.err.println("*** Can't resolve merged property");
-               def = ModelUtil.definesMember(type, propName, JavaSemanticNode.MemberType.AllSet, null, null);
+               def = ModelUtil.definesMember(type, propName, JavaSemanticNode.MemberType.AllSet, null, null, null);
             }
             // Reverse bindings do not replace the previous definition so don't let them do that here
             else if (!ModelUtil.isReverseBinding(def))
@@ -5147,10 +5884,10 @@ public class ModelUtil {
             Object prop = props[i];
             if (prop != null) {
                String propName = ModelUtil.getPropertyName(prop);
-               Object def = ModelUtil.definesMember(type, propName, JavaSemanticNode.MemberType.AllSet, null, null);
+               Object def = ModelUtil.definesMember(type, propName, JavaSemanticNode.MemberType.AllSet, null, null, null);
                if (def == null) {
                   System.err.println("*** Can't resolve merged property: " + propName + " in type: " + ModelUtil.getTypeName(type));
-                  def = ModelUtil.definesMember(type, propName, JavaSemanticNode.MemberType.AllSet, null, null);
+                  def = ModelUtil.definesMember(type, propName, JavaSemanticNode.MemberType.AllSet, null, null, null);
                }
                else if (!ModelUtil.isReverseBinding(def))
                   props[i] = def;
@@ -5186,22 +5923,31 @@ public class ModelUtil {
       throw new UnsupportedOperationException();
    }
 
-   public static Object[] getDeclaredPropertiesAndTypes(Object typeObj, String modifier) {
+   public static Object[] getDeclaredPropertiesAndTypes(Object typeObj, String modifier, LayeredSystem sys) {
+      if (ModelUtil.hasTypeParameters(typeObj))
+         typeObj = getParamTypeBaseType(typeObj);
+      if (ModelUtil.isGenericArray(typeObj) || typeObj instanceof ArrayTypeDeclaration)
+         typeObj = ModelUtil.getGenericComponentType(typeObj);
+
       Object[] types = ModelUtil.getAllInnerTypes(typeObj, modifier, true);
-      ArrayList<Object> res = new ArrayList();
+      ArrayList<Object> res = new ArrayList<Object>();
       if (typeObj instanceof Class) {
-         Object[] props = RTypeUtil.getDeclaredProperties((Class) typeObj, null);
+         Object[] props = RTypeUtil.getDeclaredProperties((Class) typeObj, modifier);
          if (props != null) {
             for (int i = 0; i < props.length; i++) {
                Object prop = props[i];
                if (prop instanceof Class)
                   continue;
+               if (sys != null && prop instanceof IBeanMapper) {
+                  IBeanMapper mapper = (IBeanMapper) prop;
+                  prop = convertMapperToSrc(typeObj, mapper, mapper.getPropertyName(), JavaSemanticNode.MemberType.PropertyAnySet, null, null, sys);
+               }
                res.add(prop);
             }
          }
       }
       else if (typeObj instanceof BodyTypeDeclaration) {
-         List<Object> props = ((BodyTypeDeclaration) typeObj).getDeclaredProperties(null, true, false);
+         List<Object> props = ((BodyTypeDeclaration) typeObj).getDeclaredProperties(modifier, true, false);
          if (props != null) {
             for (int i = 0; i < props.size(); i++) {
                Object prop = props.get(i);
@@ -5544,6 +6290,10 @@ public class ModelUtil {
       return null;
    }
 
+   /**
+    * Modifies the code for the current program model, setting the specified property called 'elem' to a text value specified.   This
+    * operation is invoked when you update the initialization expression for a property, field, etc. in a program editor.
+    */
    public static Object setElementValue(Object type, Object instance, Object elem, String text, boolean updateInstances, boolean valueIsExpr) {
       String origText = text;
       if (elem instanceof IBeanMapper) {
@@ -5906,10 +6656,10 @@ public class ModelUtil {
 
          if (encType != null) // Include members that are visible in the namespace
             suggestMembers(model, encType, prefix, candidates, true, includeProps, includeMethods, false);
-         else // only for the root - search the global ones
+         else if (model != null) // only for the root - search the global ones
             model.findMatchingGlobalNames(prefix, candidates);
       }
-      if (includeClassBodyKeywords && model.getLanguage() instanceof JavaLanguage) {
+      if (includeClassBodyKeywords && model != null && model.getLanguage() instanceof JavaLanguage) {
          List<String> keywords = ((JavaLanguage) model.getLanguage()).getClassLevelKeywords();
          for (int i = 0; i < keywords.size(); i++) {
             String keyword = keywords.get(i);
@@ -5922,6 +6672,8 @@ public class ModelUtil {
    public static void suggestTypes(JavaModel model, String prefix, String lastIdent, Set<String> candidates, boolean includeGlobals) {
       if (prefix == null)
          prefix = "";
+      if (model == null)
+         return;
       Set<String> files = model.layeredSystem.getFilesInPackage(prefix);
       if (files != null) {
          for (String file:files) {
@@ -6084,7 +6836,7 @@ public class ModelUtil {
 
    public static CoalescedHashMap getMethodCache(Object type) {
       if (type instanceof Class)
-         return RTypeUtil.getMethodCache((Class) type);
+         return RTypeUtil.getMethodCache((Class) type).methodsByName;
       else if (type instanceof CFClass)
          return ((CFClass) type).getMethodCache();
       else if (type instanceof TypeDeclaration)
@@ -6124,7 +6876,7 @@ public class ModelUtil {
       else if (def instanceof IMethodDefinition && ((IMethodDefinition) def).getPropertyName() != null) {
          propName = ((IMethodDefinition) def).getPropertyName();
          if (propName != null) {
-            res = ModelUtil.definesMember(specEncType, ModelUtil.getPropertyName(def), JavaSemanticNode.MemberType.PropertyAssignmentSet, null, null);
+            res = ModelUtil.definesMember(specEncType, ModelUtil.getPropertyName(def), JavaSemanticNode.MemberType.PropertyAssignmentSet, null, null, model.layeredSystem);
             if (res == null) {
                System.out.println("*** no member in specEncType");
                res = def;
@@ -6134,7 +6886,7 @@ public class ModelUtil {
             res = def;
       }
       else if (ModelUtil.isField(def)) {
-         res = ModelUtil.definesMember(specEncType, ModelUtil.getPropertyName(def), JavaSemanticNode.MemberType.PropertyAssignmentSet, null, null);
+         res = ModelUtil.definesMember(specEncType, ModelUtil.getPropertyName(def), JavaSemanticNode.MemberType.PropertyAssignmentSet, null, null, model.layeredSystem);
          if (res == null) {
             System.out.println("*** no field in specEncType");
             res = def;
@@ -6249,7 +7001,7 @@ public class ModelUtil {
       // turns out, it does the lifecycle management we need through lifecycle.  This is not the clearest way
       // to spec it but if the overrideStartName is set, it means it does not implement the interface and we
       // can't treat it as a component in the code.
-      Object compilerSettings = ModelUtil.getInheritedAnnotation(sys, typeDecl, "sc.obj.CompilerSettings", false, typeDecl instanceof ITypeDeclaration ? ((BodyTypeDeclaration) typeDecl).getLayer() : null, false);
+      Object compilerSettings = ModelUtil.getInheritedAnnotation(sys, typeDecl, "sc.obj.CompilerSettings", false, typeDecl instanceof ITypeDeclaration ? ((ITypeDeclaration) typeDecl).getLayer() : null, false);
       if (compilerSettings == null)
          return true;
       String overrideStartName;
@@ -6356,7 +7108,7 @@ public class ModelUtil {
          }
          return JavaType.createFromTypeParams(ModelUtil.getTypeName(fieldType), fieldTypeParams);
       }
-      return JavaType.createJavaType(fieldType);
+      return JavaType.createJavaType(srcType.getLayeredSystem(), fieldType);
    }
 
    public static Object getStaticPropertyValue(Object staticType, String firstIdentifier) {
@@ -6447,6 +7199,7 @@ public class ModelUtil {
          throw new UnsupportedOperationException();
    }
 
+   /** Returns the type signature for the parameters for a method - NOTE: does not include the return type like the Java method signature that's in the class file.  */
    public static String getTypeSignature(Object obj) {
       if (obj == null)
          return null;
@@ -6685,7 +7438,7 @@ public class ModelUtil {
       if (field == ArrayTypeDeclaration.LENGTH_FIELD)
          return field;
       Object enclType = refreshBoundClass(sys, field.getDeclaringClass());
-      Object res = ModelUtil.definesMember(enclType, ModelUtil.getPropertyName(field), JavaSemanticNode.MemberType.FieldSet, null, null);
+      Object res = ModelUtil.definesMember(enclType, ModelUtil.getPropertyName(field), JavaSemanticNode.MemberType.FieldSet, null, null, sys);
       if (res == null)
          System.out.println("*** Unable to refreshBoundField");
       return res;
@@ -6738,8 +7491,8 @@ public class ModelUtil {
       return boundType;
    }
 
-   public static Object refreshBoundClass(LayeredSystem sys, Class boundClass) {
-      Object res = sys.getClass(boundClass.getName(), true);
+   public static Object refreshBoundClass(LayeredSystem sys, Object boundClass) {
+      Object res = sys.getClass(ModelUtil.getTypeName(boundClass), true);
       if (res != null)
          return res;
       return boundClass;
@@ -6859,7 +7612,8 @@ public class ModelUtil {
    }
 
    public static boolean isConstructor(Object method) {
-      return method instanceof Constructor || method instanceof ConstructorDefinition || (method instanceof CFMethod && ((CFMethod) method).getMethodName().equals("<init>"));
+      return method instanceof Constructor || method instanceof ConstructorDefinition || (method instanceof CFMethod && ((CFMethod) method).getMethodName().equals("<init>")) ||
+              (method instanceof ParamTypedMethod && isConstructor(((ParamTypedMethod) method).method));
    }
 
    /** Weird rule in java.  When you have a parameterized return type and no arguments, the type comes from the LHS of the assignment expression
@@ -6901,7 +7655,7 @@ public class ModelUtil {
          return ((ITypeDeclaration) impl).isCompiledProperty(name, fieldMode, interfaceMode);
       else {
          // Assume the rest are all compiled types
-         return ModelUtil.definesMember(impl, name, JavaSemanticNode.MemberType.PropertyGetSetObj, null, null) != null;
+         return ModelUtil.definesMember(impl, name, JavaSemanticNode.MemberType.PropertyGetSetObj, null, null, null) != null;
       }
    }
 
@@ -7135,9 +7889,12 @@ public class ModelUtil {
          return ((ClassType) javaType).getTypeArgument(ix);
       else if (javaType instanceof ParameterizedType) {
          ParameterizedType pt = (ParameterizedType) javaType;
-         Object[] actual = pt.getActualTypeArguments();
-         if (actual == null || ix >= actual.length)
-            return null;
+         Type[] actual = pt.getActualTypeArguments();
+         if (actual == null || ix >= actual.length) {
+            TypeVariable[] arr = ((Class) pt.getRawType()).getTypeParameters();
+            if (arr != null && ix < arr.length)
+               return arr[ix];
+         }
          return actual[ix];
          //Object res = getTypeVariable(pt.getRawType(), ix);
          //Object res2 = ModelUtil.getTypeVariable(javaType, ix);
@@ -7145,6 +7902,9 @@ public class ModelUtil {
       else if (javaType instanceof ParamTypeDeclaration) {
          ParamTypeDeclaration ptd = (ParamTypeDeclaration) javaType;
          return ptd.typeParams.get(ix);
+      }
+      else if (javaType instanceof Class) {
+         return ((Class) javaType).getTypeParameters()[ix];
       }
       else
          return null;
@@ -7264,8 +8024,9 @@ public class ModelUtil {
 
       Object enclType = ModelUtil.getEnclosingType(meth);
       enclType = ModelUtil.resolveSrcTypeDeclaration(sys, enclType, cachedOnly, srcOnly);
-      Object newMeth = ModelUtil.getMethod(sys, enclType, ModelUtil.getMethodName(meth), null, null, null, false, ModelUtil.getParameterTypes(meth));
-      if (newMeth != null)
+      // TODO performance: should have a way to do 'declaresMethod' here to avoid the 'sameTypes' call on the enclosing type.
+      Object newMeth = ModelUtil.getMethod(sys, enclType, ModelUtil.getMethodName(meth), null, null, null, false, null, null, ModelUtil.getParameterTypes(meth));
+      if (newMeth != null && ModelUtil.sameTypes(ModelUtil.getEnclosingType(newMeth), enclType))
          return newMeth;
       return meth;
    }
@@ -7368,8 +8129,13 @@ public class ModelUtil {
          else
             ((VariableDefinition) member).needsDynAccess = true;
       }
-      else
-         type.addPropertyToMakeBindable(propName, null, null, !needsBindable);
+      else {
+         member = type.definesMember(propName, JavaSemanticNode.MemberType.PropertyAnySet, null, null);
+         if (member != null) {
+            if (!ModelUtil.isBindable(member))
+               type.addPropertyToMakeBindable(propName, null, null, !needsBindable, null);
+         }
+      }
    }
 
    public static boolean hasUnboundTypeParameters(Object type) {
@@ -7382,6 +8148,11 @@ public class ModelUtil {
          }
       }
       return false;
+   }
+
+   // TODO: it seems like we need to use this method in places where we use hasUnboundTypeParaemters and make sure we check for ? extends Type<T>
+   public static boolean hasAnyTypeVariables(Object type) {
+      return ModelUtil.hasTypeVariables(type) || ModelUtil.hasUnboundTypeParameters(type);
    }
 
    /**
@@ -7511,7 +8282,14 @@ public class ModelUtil {
    }
 
    public static ISemanticNode getTopLevelStatement(ISemanticNode node) {
+      ISemanticNode origNode = node;
+      while (node instanceof SemanticNodeList)
+         node = node.getParentNode();
+      if (node == null)
+         return origNode;
       Statement st = node instanceof Statement ? (Statement) node : ((JavaSemanticNode) node).getEnclosingStatement();
+      if (st == null)
+         return node;
       ISemanticNode parent = st.getParentNode();
 
       // We use the block statement that's part of the method to represent the "end of the method"
@@ -7530,6 +8308,9 @@ public class ModelUtil {
          if (parentStatement.childIsTopLevelStatement(st))
             return st;
       }
+      // Element and other statements
+      else if (parent instanceof ISrcStatement)
+         return parent;
 
       // TODO: what about variable definitions and fields?  Shouldn't the variable definition be the top-level statement?
       return getTopLevelStatement(parent);
@@ -7549,8 +8330,8 @@ public class ModelUtil {
                   }
                }
             }
-            if (!found)
-               System.err.println("*** Warning - some statements not matched up with the generated source: " + fromSt);
+            //if (!found) - this happens for mixin templates but they should be caught by the default statement
+            //   System.err.println("*** Warning - some statements not matched up with the generated source: " + fromSt);
          }
       }
       // Do this even if there are no assignments - any statement which does not have a fromStatement will be set to
@@ -7586,6 +8367,9 @@ public class ModelUtil {
       else if (method instanceof Method) {
          return ((Method) method).getTypeParameters();
       }
+      else if (method instanceof Constructor) {
+         return ((Constructor) method).getTypeParameters();
+      }
       else
          throw new UnsupportedOperationException();
    }
@@ -7599,7 +8383,7 @@ public class ModelUtil {
       Object[] typeParams = getMethodTypeParameters(method);
       if (typeParams != null && typeParams.length > 0)
          return true;
-      Object[] methParams = ModelUtil.getParameterTypes(method, false);
+      Object[] methParams = ModelUtil.getGenericParameterTypes(method, false);
       if (methParams != null) {
          for (Object methParam:methParams) {
             // Used to only consider unbound params here but we can refine even a bound type paraemter apparently so
@@ -7645,7 +8429,7 @@ public class ModelUtil {
 
    public static boolean overridesMethodInType(Object type, Object meth) {
       Object[] paramTypes = ModelUtil.getGenericParameterTypes(meth, false);
-      if (getMethod(null, type, ModelUtil.getMethodName(meth), null, null, null, false, paramTypes) != null)
+      if (getMethod(null, type, ModelUtil.getMethodName(meth), null, null, null, false, null, null, paramTypes) != null)
          return true;
       return false;
    }
@@ -7678,7 +8462,7 @@ public class ModelUtil {
                      System.err.println("Bad value to CompilerSettings.propagateConstructor annotation " + pConstructor + " no type: " + argTypeNames[i]);
                }
                List constParams = Arrays.asList(propagateConstructorArgs);
-               return ModelUtil.definesConstructor(type, constParams, null);
+               return ModelUtil.definesConstructor(sys, type, constParams, null);
             }
          }
       }
@@ -7705,5 +8489,170 @@ public class ModelUtil {
          return "[]";
       }
       throw new UnsupportedOperationException();
+   }
+
+   public static String paramTypeToString(Object type) {
+      if (type instanceof TypeDeclaration)
+         return ((TypeDeclaration) type).typeName;
+      else if (type instanceof Class)
+         return CTypeUtil.getClassName(ModelUtil.getTypeName(type));
+      else
+         return type.toString();
+   }
+
+   public static Object getClassFromType(LayeredSystem system, Object definedInType, String className, boolean useImports) {
+      if (definedInType instanceof ITypeDeclaration) {
+         return ((ITypeDeclaration) definedInType).getClass(className, useImports);
+      }
+      return system.getTypeDeclaration(className);
+   }
+
+   public static Object resolveCompiledType(LayeredSystem sys, Object extendsType, String fullTypeName) {
+      if (extendsType instanceof BodyTypeDeclaration) {
+         Object newExtType = ((BodyTypeDeclaration) extendsType).getCompiledClass();
+         if (newExtType != null)
+            extendsType = newExtType;
+         else
+            sys.error("Unable to resolve compiled interface for: " + fullTypeName);
+      }
+
+      Object compiledType = sys.getClassWithPathName(fullTypeName, null, false, true, false);
+      // In some situations we might find a source file version of some class... the CFClass can only
+      // point to the compiled class
+      if (extendsType instanceof ParamTypeDeclaration) {
+         ((ParamTypeDeclaration) extendsType).setBaseType(compiledType);
+      }
+      if (extendsType instanceof ArrayTypeDeclaration) {
+         if (compiledType != null)
+            ((ArrayTypeDeclaration) extendsType).componentType = compiledType;
+         else
+            sys.error("Unable to resolve compiled interface for: " + fullTypeName);
+      }
+      return extendsType;
+   }
+
+   /** Returns true if  is equal to child or is in the  */
+   public static boolean isOuterTypeOf(BodyTypeDeclaration parentTD, TypeDeclaration enclType) {
+      if (enclType == null)
+         return false;
+      if (ModelUtil.sameTypes(parentTD, enclType))
+         return true;
+       return isOuterTypeOf(parentTD, enclType.getEnclosingType());
+   }
+
+   public static String getDebugName(Object privRes) {
+      if (ModelUtil.isField(privRes))
+         return "field";
+      if (ModelUtil.isMethod(privRes))
+         return "method";
+      if (ModelUtil.isEnum(privRes))
+         return "enum";
+      if (ModelUtil.isCompiledClass(privRes))
+         return "compiled class";
+      if (privRes instanceof TypeDeclaration)
+         return "type";
+      if (privRes == null)
+         return "<null member>";
+      return "<unknown member>";
+   }
+
+   public static Object[] getTypesFromExpressions(List<Expression> args) {
+      if (args == null)
+         return null;
+      int sz = args.size();
+      Object[] res = new Object[sz];
+      for (int i = 0; i < sz; i++) {
+         res[i] = args.get(i).getTypeDeclaration();
+      }
+      return res;
+   }
+
+   static boolean isRemoteMethod(LayeredSystem sys, Object methObj) {
+      Object remoteAnnot = getAnnotation(methObj, "sc.obj.Remote");
+      if (remoteAnnot != null) {
+         String remoteRts = (String) getAnnotationValue(remoteAnnot, "remoteRuntimes");
+         String localRts = (String) getAnnotationValue(remoteAnnot, "localRuntimes");
+         boolean remote = true;
+         String runtimeName = sys.getRuntimeName();
+         boolean alreadyMatched = false;
+         if (!StringUtil.isEmpty(remoteRts)) {
+            remote = false;
+            String[] remoteArr = StringUtil.split(remoteRts, ',');
+            for (int i = 0; i < remoteArr.length; i++) {
+               if (remoteArr[i].equals(runtimeName)) {
+                  alreadyMatched = true;
+                  remote = true;
+                  break;
+               }
+            }
+         }
+         if (!StringUtil.isEmpty(localRts)) {
+            String[] remoteArr = StringUtil.split(remoteRts, ',');
+            for (int i = 0; i < remoteArr.length; i++) {
+               if (remoteArr[i].equals(runtimeName)) {
+                  if (alreadyMatched)
+                     System.out.println("Warning: method " + methObj + " has conflicting definitions in remoteRuntime and localRuntime for: " + runtimeName + " - ignoring @Remote definition");
+                  remote = false;
+                  break;
+               }
+            }
+         }
+         return remote;
+      }
+      else
+         return false;
+   }
+
+   public static Map<String, Object> getAnnotations(Object def) {
+      if (def instanceof ParamTypedMember) {
+         return getAnnotations(((ParamTypedMember) def).getMemberObject());
+      }
+      if (def instanceof IDefinition)
+         return ((IDefinition) def).getAnnotations();
+      else if (def instanceof AnnotatedElement) {
+         java.lang.annotation.Annotation[] annots = ((AnnotatedElement) def).getAnnotations();
+         return createAnnotationsMap(annots);
+      }
+      else if (def instanceof IBeanMapper) {
+         // TODO: For get/set methods, do we have to combine annotations here?
+         IBeanMapper mapper = (IBeanMapper) def;
+         Object gsel = mapper.getGetSelector();
+         Map<String,Object> res = null;
+         if (gsel != null)
+            res = getAnnotations(gsel);
+         Object ssel = mapper.getSetSelector();
+         if (ssel != null && ssel != gsel) {
+            Map<String,Object> nres = getAnnotations(ssel);
+            if (nres != null && res != null)
+               res.putAll(nres);
+            else if (res == null)
+               res = nres;
+         }
+         Object fsel = mapper.getField();
+         if (fsel != null && fsel != ssel) {
+            Map<String,Object> nres = getAnnotations(fsel);
+            if (nres != null && res != null)
+               res.putAll(nres);
+            else if (res == null)
+               res = nres;
+         }
+         return res;
+      }
+      else if (def instanceof VariableDefinition)
+         return ((VariableDefinition)def).getDefinition().getAnnotations();
+      else
+         throw new UnsupportedOperationException();
+   }
+
+   public static Map<String, Object> createAnnotationsMap(java.lang.annotation.Annotation[] annotations) {
+      if (annotations != null) {
+         TreeMap<String,Object> res = new TreeMap<String,Object>();
+         for (java.lang.annotation.Annotation annot:annotations) {
+            Annotation myAnnot = Annotation.createFromElement(annot);
+            Annotation.addToAnnotationsMap(res, myAnnot);
+         }
+         return res;
+      }
+      return null;
    }
 }

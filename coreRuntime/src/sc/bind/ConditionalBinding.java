@@ -50,10 +50,10 @@ public class ConditionalBinding extends AbstractMethodBinding {
                res = DynUtil.evalConditionalExpression(operator, lhsVal, rhsVal);
             }
             catch (RuntimeException exc) {
-               if (info || trace)
+               if (info || trace) {
                   System.err.println("Runtime exception from conditional binding: " + this + ": " + exc);
-               if (trace)
                   exc.printStackTrace();
+               }
             }
          }
          else {

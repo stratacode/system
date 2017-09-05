@@ -24,7 +24,7 @@ import java.util.Set;
 /**
  * The cousin to GlueStatement.  This gets produced in the TemplateLanguage grammar by matching %> templateStuff <%.  It turns into one giant out.append(...) call effectively.
  * We can then insert a GlueExpression into the "primary" grammar node as an option in the template language.  This allows us to break into template mode in place of a Java expression - e.g.
- * pass template strings as parametrs to a method or compare or initialize variables etc.
+ * pass template strings as parameters to a method or compare or initialize variables etc.
  */
 public class GlueExpression extends Expression {
    public List<Object> expressions; // IStrings or expressions - all turn into "append" operations onto the StringBuffer
@@ -127,6 +127,8 @@ public class GlueExpression extends Expression {
    }
 
    public int transformTemplate(int ix, ILanguageModel.RuntimeType type) {
+      if (expressions == null)
+         return ix;
       SemanticNodeList<Expression> exprs = new SemanticNodeList<Expression>(expressions.size());
       for (Object expr:expressions) {
          if (expr instanceof IString) {
@@ -151,6 +153,7 @@ public class GlueExpression extends Expression {
          res = BinaryExpression.createMultiExpression(exprs.toArray(new Expression[exprs.size()]), "+");
          if (bindingDirection != null)
             res.setBindingInfo(bindingDirection, bindingStatement, nestedBinding);
+         res.fromStatement = this;
       }
       if (parentNode.replaceChild(this, res) == -1) {
          System.err.println("*** - unable to replace glue expreession child");
@@ -194,5 +197,9 @@ public class GlueExpression extends Expression {
                ((Expression) expr).addBreakpointNodes(res, srcStatement);
          }
       }
+   }
+
+   public boolean isLeafStatement() {
+      return false;
    }
 }

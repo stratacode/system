@@ -151,7 +151,9 @@ public class BuildInfo {
       for (int i = 0; i < mainMethods.size(); i++) {
          MainMethod m = mainMethods.get(i);
          if (p.matcher(m.typeName).matches()) {
-            system.runMainMethod(m.typeName, m.args == null ? runClassArgs : m.args, lowestLayer);
+            String err = system.runMainMethod(m.typeName, m.args == null ? runClassArgs : m.args, lowestLayer);
+            if (err != null)
+               system.error(err);
             any = true;
          }
       }
@@ -451,11 +453,11 @@ public class BuildInfo {
     * We also must track the set of models that have already been processed in a previous build layer.  If the model
     * is changed but also processed, we can't remove it because we won't be adding it back in again.
     */
-   void cleanStaleEntries(HashMap<String,IFileProcessorResult> changedModels, Set<String> processedModels, boolean removeEntries) {
+   void cleanStaleEntries(HashSet<String> changedTypes, Set<String> processedModels, boolean removeEntries) {
       if (modelJarFiles != null) {
          for (int i = 0; i < modelJarFiles.size(); i++) {
             ModelJar mj = modelJarFiles.get(i);
-            if (mj == null || (changedModels.get(mj.typeName) != null && !processedModels.contains(mj.typeName))) {
+            if (mj == null || (changedTypes.contains(mj.typeName) && !processedModels.contains(mj.typeName))) {
                modelJarFiles.remove(i);
                i--;
             }
@@ -464,7 +466,7 @@ public class BuildInfo {
       if (mainMethods != null) {
          for (int i = 0; i < mainMethods.size(); i++) {
             MainMethod mm = mainMethods.get(i);
-            if (changedModels.get(mm.typeName) != null && !processedModels.contains(mm.typeName)) {
+            if (changedTypes.contains(mm.typeName) && !processedModels.contains(mm.typeName)) {
                mainMethods.remove(i);
                i--;
             }
@@ -473,7 +475,7 @@ public class BuildInfo {
       if (testInstances != null) {
          for (int i = 0; i < testInstances.size(); i++) {
             TestInstance ti = testInstances.get(i);
-            if (changedModels.get(ti.typeName) != null && !processedModels.contains(ti.typeName)) {
+            if (changedTypes.contains(ti.typeName) && !processedModels.contains(ti.typeName)) {
                testInstances.remove(i);
                i--;
             }
@@ -488,7 +490,7 @@ public class BuildInfo {
                it.remove();
                changed = true;
             }
-            if (changedModels.get(ti.typeName) != null && !processedModels.contains(ti.typeName)) {
+            if (changedTypes.contains(ti.typeName) && !processedModels.contains(ti.typeName)) {
                // We call this multiple times on the same build info when building successive layers.  Some of these
                // guys may have already changed on this build and won't be processed in the next set of files 
                if (!ti.changed) {
@@ -507,9 +509,9 @@ public class BuildInfo {
       if (extDynTypes != null && removeEntries) {
          for (ExternalDynType edt:extDynTypes) {
             if (edt.reverseDeps != null) {
-               // Remove any type references from types which are in the changedModels set but did not get added to the
+               // Remove any type references from types which are in the changedTypes set but did not get added to the
                // registry since being restored.
-               edt.reverseDeps.cleanStaleEntries(changedModels);
+               edt.reverseDeps.cleanStaleEntries(changedTypes);
                if (edt.reverseDeps.hasChanged() || externalTypeClassStale(edt.className)) {
                   ReverseDependencies.saveReverseDeps(edt.reverseDeps, FileUtil.addExtension(getExternalDynTypeFileName(edt.className), ReverseDependencies.REVERSE_DEPENDENCIES_EXTENSION));
                   if (toCompile == null)

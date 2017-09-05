@@ -7,25 +7,51 @@ package sc.lang;
 import sc.bind.Bind;
 import sc.bind.DestinationListener;
 import sc.dyn.DynUtil;
-import sc.lang.sc.PropertyAssignment;
+import sc.dyn.IScheduler;
+import sc.dyn.ScheduledJob;
+import sc.lang.java.AbstractMethodDefinition;
+import sc.lang.java.BlockStatement;
+import sc.lang.java.BodyTypeDeclaration;
+import sc.lang.java.DeclarationType;
+import sc.lang.java.Expression;
+import sc.lang.java.ImportDeclaration;
+import sc.lang.java.JavaModel;
+import sc.lang.java.JavaSemanticNode;
+import sc.lang.java.ModelUtil;
+import sc.lang.java.Package;
+import sc.lang.java.Statement;
+import sc.lang.java.TypeDeclaration;
+import sc.lang.java.TypedDefinition;
+import sc.lang.java.VariableDefinition;
 import sc.lang.sc.EndTypeDeclaration;
 import sc.lang.sc.ModifyDeclaration;
-import sc.lang.java.Package;
-import sc.lang.java.*;
+import sc.lang.sc.PropertyAssignment;
+import sc.layer.Layer;
 import sc.layer.LayerUtil;
-import sc.layer.SrcEntry;
 import sc.layer.LayeredSystem;
-import sc.parser.*;
+import sc.layer.SrcEntry;
+import sc.parser.ParentParseNode;
+import sc.parser.ParseError;
+import sc.parser.ParseUtil;
+import sc.parser.Parselet;
+import sc.parser.Parser;
 import sc.type.CTypeUtil;
 import sc.type.TypeUtil;
 import sc.util.FileUtil;
 import sc.util.StringUtil;
-import sc.layer.Layer;
 
-import java.io.*;
-import java.util.*;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringReader;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
 
-public abstract class AbstractInterpreter extends EditorContext {
+public abstract class AbstractInterpreter extends EditorContext implements IScheduler {
    static SCLanguage vlang = SCLanguage.INSTANCE;
 
    StringBuffer pendingInput = new StringBuffer();
@@ -332,7 +358,7 @@ public abstract class AbstractInterpreter extends EditorContext {
                
                TypeDeclaration currentDef = system.getSrcTypeDeclaration(CTypeUtil.prefixPath(model.getPackagePrefix(), type.typeName), currentLayer.getNextLayer(), true);
                if (currentDef == null || currentDef.getLayer() != layer) {
-                  system.refreshRuntimes();
+                  system.refreshRuntimes(true);
                   currentDef = system.getSrcTypeDeclaration(CTypeUtil.prefixPath(model.getPackagePrefix(), type.typeName), currentLayer.getNextLayer(), true);
                   if (currentDef == null) {
                      System.err.println("No type (mismatching case?): " + type.typeName);
@@ -348,7 +374,7 @@ public abstract class AbstractInterpreter extends EditorContext {
                   type.parentNode = currentDef.parentNode;
                   // We're going to throw this away so this tells the system not to consider it part of the type
                   // system.
-                  modType.temporaryType = true;
+                  modType.markAsTemporary();
                   ParseUtil.initAndStartComponent(type);
                   if (modType.mergeDefinitionsInto(currentDef, false))
                      addChangedModel(currentDef.getJavaModel());
@@ -463,12 +489,13 @@ public abstract class AbstractInterpreter extends EditorContext {
       else if (statement instanceof PropertyAssignment) {
          Object curObj;
          boolean pushed = false;
+         boolean noInstance = false;
          PropertyAssignment pa = (PropertyAssignment) statement;
          if (!pa.isStatic() && autoObjectSelect) {
             if (!hasCurrentObject() || (curObj = getCurrentObject()) == null) {
                Object res = SelectObjectWizard.start(this, statement);
                if (res == SelectObjectWizard.NO_INSTANCES_SENTINEL)
-                  skipEval = true;
+                  noInstance = true; // TODO: see below - used to set skipEval = true here
                else if (res == null)
                   return;
                else {
@@ -486,6 +513,8 @@ public abstract class AbstractInterpreter extends EditorContext {
          try {
             BodyTypeDeclaration current = currentTypes.get(currentTypes.size()-1);
             PropertyAssignment assign = (PropertyAssignment) statement;
+
+            // TODO: if noInstance = true and assign.assignedProperty is an instance property we should not try to update the instances
 
             JavaSemanticNode newDefinition = current.updateProperty(assign, execContext, !skipEval, null);
             addChangedModel(pendingModel);
@@ -1034,11 +1063,28 @@ public abstract class AbstractInterpreter extends EditorContext {
    /** Directory to run commands - defaults to the current directory */
    public String execDir = null;
 
+   // TODO: should we use a more complete shell environment - support with JLine 3.x or Crashub.org to get complete shell features, remote access, etc?
    /** Run a system command */
    public int exec(String argStr) {
       String[] args = StringUtil.splitQuoted(argStr);
+      String outputFile = null;
+      String inputFile = null;
+      for (int i = 0; i < args.length; i++) {
+         String arg = args[i];
+         if ((arg.equals(">") || arg.equals("<")) && i < args.length - 1) {
+            if (arg.equals(">"))
+               outputFile = args[i+1];
+            else
+               inputFile = args[i+1];
+            ArrayList<String> argsList = new ArrayList<String>(Arrays.asList(args));
+            argsList.remove(i);
+            argsList.remove(i);
+            args = argsList.toArray(new String[argsList.size()]);
+            i--;
+         }
+      }
       ProcessBuilder pb = new ProcessBuilder(args);
-      return LayerUtil.execCommand(pb, execDir);
+      return LayerUtil.execCommand(pb, execDir, inputFile, outputFile);
    }
 
    public void quit() {
@@ -1111,4 +1157,23 @@ public abstract class AbstractInterpreter extends EditorContext {
       return 80;
    }
 
+   public void initReadThread() {
+      DynUtil.setThreadScheduler(this);
+   }
+
+   private ArrayList<ScheduledJob> toRunLater = new ArrayList<ScheduledJob>();
+
+   public void invokeLater(Runnable r, int priority) {
+      ScheduledJob job = new ScheduledJob();
+      job.priority = priority;
+      job.toInvoke = r;
+      ScheduledJob.addToJobList(toRunLater, job);
+   }
+
+   public void execLaterJobs() {
+      for (int i = 0; i < toRunLater.size(); i++) {
+         ScheduledJob toRun = toRunLater.get(i);
+         toRun.toInvoke.run();
+      }
+   }
 }

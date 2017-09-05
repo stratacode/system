@@ -12,14 +12,14 @@ import sc.lang.SemanticNodeList;
 import java.lang.reflect.Array;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.TreeMap;
 
-public class Annotation extends JavaSemanticNode implements IAnnotation {
+public class Annotation extends ErrorSemanticNode implements IAnnotation {
    public String typeName;
    // either List<elementValue> or elementValue
    public Object elementValue;
 
    public transient Object boundType;
-   transient Object[] errorArgs;
 
    public static Annotation create(String typeName) {
       Annotation annot = new Annotation();
@@ -200,7 +200,7 @@ public class Annotation extends JavaSemanticNode implements IAnnotation {
 
    public static Annotation createFromElement(java.lang.annotation.Annotation elem) {
       Annotation newAnnot = new Annotation();
-      newAnnot.typeName = elem.getClass().getName();
+      newAnnot.typeName = elem.annotationType().getTypeName();
       if (ModelUtil.isComplexAnnotation(elem)) {
           newAnnot.setProperty("elementValue", ModelUtil.getAnnotationComplexValues(elem));
       }
@@ -316,23 +316,35 @@ public class Annotation extends JavaSemanticNode implements IAnnotation {
       return super.toSafeLanguageString();
    }
 
-   public boolean displayTypeError(String...args) {
-      Statement st;
-      if (super.displayTypeError(args)) {
-         errorArgs = args;
-         return true;
-      }
-      return false;
+   public void stop() {
+      super.stop();
+      boundType = null;
    }
 
-   public String getNodeErrorText() {
-      if (errorArgs != null) {
-         StringBuilder sb = new StringBuilder();
-         for (Object arg:errorArgs)
-            sb.append(arg.toString());
-         sb.append(this.toString());
-         return sb.toString();
+   String getAnnotationValueKey(AnnotationValue val) {
+      return Definition.getAnnotationValueKey(getFullTypeName(), val.identifier);
+   }
+
+   public static void addToAnnotationsMap(TreeMap<String, Object> res, IAnnotation annot) {
+      if (annot.isComplexAnnotation()) {
+         List<AnnotationValue> elemVals = annot.getElementValueList();
+         boolean arrayVal = false;
+         for (AnnotationValue elemVal:elemVals) {
+            res.put(Definition.getAnnotationValueKey(annot.getTypeName(), elemVal.identifier), elemVal.getPrimitiveValue());
+         }
       }
-      return null;
+      else {
+         Object annotVal = annot.getElementSingleValue();
+         if (annotVal instanceof AnnotationValue) {
+            AnnotationValue elemVal = (AnnotationValue) annotVal;
+            res.put(Definition.getAnnotationValueKey(annot.getTypeName(), elemVal.identifier), elemVal.getPrimitiveValue());
+         }
+         else if (annotVal == null) {
+            res.put(annot.getTypeName(), Boolean.TRUE);
+         }
+         else if (annotVal instanceof Expression) {
+            res.put(annot.getTypeName(), AnnotationValue.elemValToPrimitiveValue(annotVal));
+         }
+      }
    }
 }

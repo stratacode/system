@@ -43,10 +43,14 @@ public @interface CompilerSettings {
    /** For components that are created externally (e.g. android's activity), specifies the name of a method that will be called which is used for component initialization.
        The template should define a method called _init where all sc' init code goes.  A call to _init is inserted into the onInitMethod. */
    String onInitMethod() default "";        
-   /** Setting this flag tells sc to propagate a constructor with the given set of parameter types in any sub-classes of the given type unless that sub-class has a constructor defined explicitly */
+   /**
+    * Setting this for a class generates a constructor with the given set of parameter types in any sub-classes of the
+    * given type unless that sub-class has a matching constructor defined explicitly.
+    * When you set this on a class, it should define a matching constructor
+    */
    String propagateConstructor() default "";
    /** Specify a list of strings where each string contains the comma separated list of parameter types for constructor signatures that should be propagated */
-   // TODO: should we add support for propagating more than one constructor?
+   // TODO: should we add support for propagating more than one constructor, either with propagateConstructors or with an @Propagate annotation on the method itself?
    //String[] propagateConstructors() default {};
    /** If your class has a final start method but calls some other method, it can still be a component.  Set this property to the name of a method called by start and that method is overridden instead of start. */
    String overrideStartName() default "";    

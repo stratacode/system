@@ -15,7 +15,7 @@ public interface IMethodDefinition extends IMember {
 
    Object getReturnJavaType();
 
-   Object[] getParameterTypes(boolean bound);
+   Object[] getParameterTypes(boolean bindTypeVars);
 
    JavaType[] getParameterJavaTypes(boolean convertRepeating);
 
@@ -30,6 +30,8 @@ public interface IMethodDefinition extends IMember {
    Object getGetMethodFromSet();
 
    Object getSetMethodFromGet();
+
+   Object getFieldFromGetSetMethod();
 
    boolean isGetMethod();
 
@@ -48,4 +50,5 @@ public interface IMethodDefinition extends IMember {
    String getThrowsClause();
 
    Object[] getMethodTypeParameters();
+
 }

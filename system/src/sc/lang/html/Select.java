@@ -97,6 +97,8 @@ public class Select<RE> extends HTMLElement<RE> {
             sb.append("</option>");
          }
          else {
+            // TODO: here and in JS should we have a way to inject the 'selected' attribute if it's not already defined
+            // in the canonical tag?
             Option subOption = (Option) defChildren[ix % defChildren.length];
             subOption.setOptionData(val);
             subOption.outputTag(sb);

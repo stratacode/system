@@ -11,6 +11,7 @@ import sc.lang.java.BodyTypeDeclaration;
 import sc.lifecycle.ILifecycle;
 import sc.type.RTypeUtil;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -28,6 +29,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
 
    public Language language;
 
+   // Should an empty list be treated as no value
    public boolean ignoreEmptyList = true;
 
    // Set this to true if this parselet is not required to be present in the stream.  In this
@@ -64,7 +66,20 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
 
    public boolean started = false;
 
+   /** 
+    * Set to true for parselets which benefit from caching - i.e. commonly are contained in parent regions of different types 
+    * e.g. children of a tree-tag or simple-tag in an HTML element which is parsed both ways when a matching close cannot be found.  
+    */
    public boolean cacheResults = false;
+
+   /** 
+     * Set to false for parselets where the new parse-result during the reparse operation may not be contained in the same region of the file - e.g. 
+     * a simpleTag which turns into a treeTag during a reparse.  The containing anyTag parselet is marked not reparseable so we try the 'treeTag' 
+     * option even during reparse where that simpleTag's contents did not change.  This catches the case where say the end tag changes or some region
+     * in the middle changes.  Unfortunately we will parse a lot more nodes when simpleTags are used... ideally we'd have some optimization to avoid
+     * the treeTag unless there is a possible close tag for that tree.
+     */
+   public boolean reparseable = true;
 
    // TODO: Ifdef "STATS_ENABLED"
    public int attemptCount, successCount;
@@ -398,6 +413,12 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       return name;
    }
 
+   /** Changes the internal name of the parselet while preserving the semantic parameters */
+   public void changeParseletName(String newName) {
+      int ix = name.indexOf('(');
+      name = "<" + newName + ">" + (ix == -1 ? "" : name.substring(ix));
+   }
+
    public Language getLanguage() {
       return language;
    }
@@ -463,6 +484,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       return name;
    }
 
+
    /**
     * Lets subclasses add additional acceptance criteria to a rule.  Returns an error string or null if all is ok.
     * Passed the semanticContext, an optional object the language can use for keeping state during the parse process.
@@ -475,6 +497,15 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
    /** Lets subclasses accept or modify the semantic value.  Returns an error string or null if all is ok. */
    protected String acceptSemanticValue(Object value) {
       return null;
+   }
+
+   /**
+    * Like accept but for hierarchical nodes, performs the 'accept' operation on children in the tree.  We use this
+    * when accepting a cached or reparsed value, or generating a value.  But during the parse operation, the accept
+    * is run on each node as part of the parse so we do not have to recurse to children.
+    * */
+   protected String acceptTree(SemanticContext ctx, Object value, int startIx, int endIx) {
+      return accept(ctx, value, startIx, endIx);
    }
 
    public boolean getTrace() {
@@ -545,6 +576,9 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       node.formatStyled(ctx, adapter);
    }
 
+   /**
+    * The main parse method for the parselet.  Use the supplied parser and generate a 'result' either a CharSequence or an IParseNode.
+    */
    public abstract Object parse(Parser p);
 
    protected boolean anyReparseChanges(Parser parser, Object oldParseNode, DiffContext dctx, boolean forceReparse) {
@@ -580,7 +614,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
          }
       }
       */
-      boolean anyChanges = dctx.changedRegion || forceReparse;
+      boolean anyChanges = !reparseable || dctx.changedRegion || forceReparse;
       if (!anyChanges && parser.currentIndex >= dctx.newLen)
          return true;
       int startChange = dctx.startChangeOffset;
@@ -627,6 +661,12 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
                   return true;
             }
          }
+      }
+      if (!anyChanges) {
+         int curIndex = parser.currentIndex;
+         Object res = acceptTree(parser.semanticContext, oldParseNode, curIndex, oldParseNode == null ? curIndex : curIndex + ((CharSequence) oldParseNode).length());
+         if (res != null)
+            return true;
       }
       return anyChanges;
    }
@@ -723,7 +763,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
    public boolean peek(Parser p) {
       int startIndex = p.currentIndex;
       Object value = p.parseNext(this);
-      p.resetCurrentIndex(startIndex);
+      p.restoreCurrentIndex(startIndex, null);
       // If the parselet is matching EOF, it returns null as a valid match.  Everything else should return a ParseError at EOF.
       if (value == null && p.atEOF())
          return true;
@@ -885,4 +925,5 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
          }
       }
    }
+
 }

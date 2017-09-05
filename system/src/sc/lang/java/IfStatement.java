@@ -5,6 +5,9 @@
 package sc.lang.java;
 
 import sc.lang.ISrcStatement;
+import sc.parser.GenFileLineIndex;
+import sc.parser.IParseNode;
+import sc.parser.ParseUtil;
 
 import java.util.List;
 import java.util.Set;
@@ -23,7 +26,14 @@ public class IfStatement extends NonIndentedStatement {
       super.start();
 
       if (expression != null)
-         expression.setInferredType(Boolean.class);
+         expression.setInferredType(Boolean.class, true);
+   }
+
+   public void validate() {
+      super.validate();
+      Object type = expression.getTypeDeclaration();
+      if (type != null && expression != null && !ModelUtil.isAssignableFrom(Boolean.class, type))
+         expression.displayError("Type: " + ModelUtil.getTypeName(type) + " not a boolean for if expression: ");
    }
 
    public ExecResult exec(ExecutionContext ctx) {
@@ -128,12 +138,65 @@ public class IfStatement extends NonIndentedStatement {
       return sb.toString();
    }
 
-   public void addReturnStatements(List<Statement> res) {
+   public void addReturnStatements(List<Statement> res, boolean incThrow) {
       if (trueStatement != null) {
-         trueStatement.addReturnStatements(res);
+         trueStatement.addReturnStatements(res, incThrow);
       }
       if (falseStatement != null) {
-         falseStatement.addReturnStatements(res);
+         falseStatement.addReturnStatements(res, incThrow);
       }
+   }
+
+   public Statement findStatement(Statement in) {
+      if (trueStatement != null) {
+         Statement out = trueStatement.findStatement(in);
+         if (out != null)
+            return out;
+      }
+      if (falseStatement != null) {
+         Statement out = falseStatement.findStatement(in);
+         if (out != null)
+            return out;
+      }
+      return super.findStatement(in);
+   }
+
+   public boolean isLeafStatement() {
+      return false;
+   }
+
+   /** Return true for a statement where there's no falseStatement yet but there is an 'else' that was parsed as part of the partial value */
+   public boolean isIncompleteElse() {
+      IParseNode ifPN = getParseNode();
+      if (falseStatement == null && trueStatement != null && ifPN != null) {
+         IParseNode truePN = trueStatement.getParseNode();
+         int trueOffset = (truePN.getStartIndex() - ifPN.getStartIndex()) + truePN.toString().trim().length();
+         if (ifPN.indexOf("else", trueOffset) != -1)
+            return true;
+      }
+      return false;
+   }
+
+   /** For the if-statement, our breakpoints really are set on the if (expression) part only */
+   public int getNumStatementLines() {
+      if (expression != null) {
+         IParseNode pn = expression.getParseNode();
+         if (pn == null)
+            return 0;
+         return ParseUtil.countLinesInNode(pn);
+      }
+      return super.getNumStatementLines();
+   }
+
+   public boolean isLineStatement() {
+      return true;
+   }
+
+   public void addToFileLineIndex(GenFileLineIndex idx, int startGenLine) {
+      super.addToFileLineIndex(idx, startGenLine);
+      if (trueStatement != null)
+         trueStatement.addToFileLineIndex(idx, startGenLine);
+      if (falseStatement != null)
+         falseStatement.addToFileLineIndex(idx, startGenLine);
    }
 }

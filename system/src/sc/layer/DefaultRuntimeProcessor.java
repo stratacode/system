@@ -57,6 +57,9 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor, Serializable 
    public void process(BodyTypeDeclaration def) {
    }
 
+   public void stop(BodyTypeDeclaration def) {
+   }
+
    public List<SrcEntry> getProcessedFiles(IFileProcessorResult model, Layer genLayer, String buildSrcDir, boolean generate) {
       return model.getProcessedFiles(genLayer, genLayer.buildSrcDir, generate);
    }
@@ -68,6 +71,10 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor, Serializable 
 
    /** Called after starting all types */
    public void postStart(LayeredSystem sys, Layer genLayer) {
+   }
+
+   /** Called after stopping all types */
+   public void postStop(LayeredSystem sys, Layer genLayer) {
    }
 
    /** Called after processing all types */
@@ -94,6 +101,10 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor, Serializable 
    }
 
    public void clearRuntime() {
+   }
+
+   public List<SrcEntry> buildCompleted() {
+      return null;
    }
 
    public boolean getCompiledOnly() {

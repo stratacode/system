@@ -106,8 +106,14 @@ public class ClassType extends JavaType {
          return;
 
       if (chainedTypes != null)
-         for (ClassType t:chainedTypes)
-           t.chained = true;
+         for (ClassType t:chainedTypes) {
+            if (t == this) {
+               System.err.println("*** Bad ClassType!");
+               chainedTypes = null;
+               break;
+            }
+            t.chained = true;
+         }
 
       super.init();
    }
@@ -126,11 +132,8 @@ public class ClassType extends JavaType {
 
    public void stop() {
       super.stop();
-      // Stopping and starting should re-start if not valid (and possibly even if valid?)
-      if (type == FAILED_TO_INIT_SENTINEL) {
-         type = null;
-         errorArgs = null;
-      }
+      type = null;
+      errorArgs = null;
    }
 
    /** Returns the complete type name including the import */
@@ -245,7 +248,7 @@ public class ClassType extends JavaType {
       return false;
    }
 
-   public Object getTypeDeclaration(ITypeParamContext ctx, ITypeDeclaration itd, boolean resolve, boolean refreshParams, boolean bindUnbound) {
+   public Object getTypeDeclaration(ITypeParamContext ctx, Object itd, boolean resolve, boolean refreshParams, boolean bindUnbound) {
       // We should only be accessing the top level ClassType's type declaration
       // since the chained types are just part of this definition.
       assert !chained;
@@ -258,7 +261,7 @@ public class ClassType extends JavaType {
          if (itd == null)
              itd = getEnclosingIType();
          if (itd != null) {
-            initType(itd.getLayeredSystem(), itd, this, ctx, true, false, null);
+            initType(getLayeredSystem(), itd, this, ctx, true, false, null);
          }
       }
       if (type == FAILED_TO_INIT_SENTINEL)
@@ -266,8 +269,8 @@ public class ClassType extends JavaType {
 
       Object res = type;
 
-      if (type instanceof TypeDeclaration) {
-         TypeDeclaration td = (TypeDeclaration) type;
+      if (type instanceof ITypeDeclaration) {
+         ITypeDeclaration td = (ITypeDeclaration) type;
          type = td.resolve(true);
          res = type;
       }
@@ -281,8 +284,8 @@ public class ClassType extends JavaType {
          if (ModelUtil.isTypeVariable(compType)) {
             Object newType = ctx.getTypeForVariable(compType, resolve);
             if (newType != null) {
-               ITypeDeclaration definedInType = type instanceof ArrayTypeDeclaration ? ((ArrayTypeDeclaration) type).definedInType : getEnclosingType();
-               return ArrayTypeDeclaration.create(newType, 1, definedInType);
+               Object definedInType = type instanceof ArrayTypeDeclaration ? ((ArrayTypeDeclaration) type).definedInType : getEnclosingType();
+               return ArrayTypeDeclaration.create(getLayeredSystem(), newType, 1, definedInType);
             }
          }
       }
@@ -346,7 +349,7 @@ public class ClassType extends JavaType {
       return getTypeArgumentDeclarations(null, null, null, null, null);
    }
 
-   public List<Object> getTypeArgumentDeclarations(LayeredSystem sys, ITypeDeclaration it, JavaSemanticNode node, ITypeParamContext ctx, List<Object> typeParamTypes) {
+   public List<Object> getTypeArgumentDeclarations(LayeredSystem sys, Object it, JavaSemanticNode node, ITypeParamContext ctx, List<Object> typeParamTypes) {
       List<JavaType> typeArgs = getResolvedTypeArguments();
       if (typeArgs == null)
          return null;
@@ -413,7 +416,7 @@ public class ClassType extends JavaType {
     * be resolved - in these cases we need to use typeParam or the type parameter values in typeParam to make the ClassType
     * properly initialized.
     */
-   public void initType(LayeredSystem sys, ITypeDeclaration it, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer, Object typeParam) {
+   public void initType(LayeredSystem sys, Object it, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer, Object typeParam) {
       if (chained)
          return; // Don't need to init if we are just part of someone else's type
 
@@ -429,7 +432,7 @@ public class ClassType extends JavaType {
             // If this is a reference from an annotated layer model we need to annotate the type so we cna make the layer
             // references work like normal types.
             if (it instanceof TypeDeclaration) {
-               JavaModel curModel = it.getJavaModel();
+               JavaModel curModel = ((TypeDeclaration) it).getJavaModel();
                if (curModel != null) {
                   String layerRelPath = CTypeUtil.getPackageName(curModel.getLayer().getLayerName());
                   if (curModel.getUserData() != null) {
@@ -461,6 +464,10 @@ public class ClassType extends JavaType {
             chainedTypes.get(chainedSz-1).typeArguments = typeArguments;
       }
 
+      // The refLayer must be set so we retrieve the type from the right active/inactive layer set
+      Layer refLayer = ctx == null ? (it instanceof TypeDeclaration ? ((TypeDeclaration) it).getLayer() : null) : ctx.getRefLayer();
+
+      boolean userType = false;
       // Looking up type parameters by name is not good here
       if (typeParam != null && ModelUtil.isTypeVariable(typeParam))
          type = typeParam;
@@ -469,13 +476,16 @@ public class ClassType extends JavaType {
       // In the parametrized type info we create ClassTypes which are defined as part of a compiled method - so no relative type info is available.
       // fortunately imports and local references are always made absolute at this level
       else if (it != null) {
-         type = it.findTypeDeclaration(fullTypeName, true);
+         type = ModelUtil.findTypeDeclaration(sys, it, fullTypeName, refLayer, true);
       }
       else if (sys != null) {
-         type = sys.getTypeDeclaration(fullTypeName, srcOnly, ctx == null ? null : ctx.getRefLayer(), false);
+         type = sys.getTypeDeclaration(fullTypeName, srcOnly, refLayer, false);
+      }
+      else if (typeParam != null) {
+         type = typeParam;
+         userType = true;
       }
 
-      boolean userType = false;
       List<Object> typeParamTypes = null;
       // When looking up type parameters, typically the it is the ParamTypeDeclaration but if it's a param method, it won't be so we need to
       // look up the type parameter for the method explicitly here.
@@ -491,7 +501,7 @@ public class ClassType extends JavaType {
 
       if (type == null) { // not a relative name
          if (it != null)
-            type = it.findTypeDeclaration(fullTypeName, true);
+            type = ModelUtil.findTypeDeclaration(sys, it, fullTypeName, refLayer, true);
       }
 
       if (type == null) {
@@ -504,7 +514,7 @@ public class ClassType extends JavaType {
             if (displayError) {
                displayTypeError("No type: ", getFullTypeName(), " for ");
                if (it != null) {
-                  Object dummy = it.findTypeDeclaration(fullTypeName, true);
+                  Object dummy = ModelUtil.findTypeDeclaration(sys, it, fullTypeName, refLayer, true);
                   if (node != null)
                      dummy = node.findType(fullTypeName);
                }
@@ -540,10 +550,10 @@ public class ClassType extends JavaType {
             displayError("Wrong number of type arguments for type: ", ModelUtil.getTypeName(type)," for ");
          else {
             if (it != null)
-               type = new ParamTypeDeclaration(it, typeParams, typeDefs, type);
+               type = new ParamTypeDeclaration(sys, it, typeParams, typeDefs, type);
             else {
                if (ctx != null && ctx.getDefinedInType() != null)
-                  type = new ParamTypeDeclaration(ctx.getDefinedInType(), typeParams, typeDefs, type);
+                  type = new ParamTypeDeclaration(sys, ctx.getDefinedInType(), typeParams, typeDefs, type);
                else
                   type = new ParamTypeDeclaration(sys, typeParams, typeDefs, type);
             }
@@ -552,7 +562,7 @@ public class ClassType extends JavaType {
 
       // Sometimes when we are called, typeParam supplies the component type and others the actual array generic type so be careful not to re-wrap it or leave it unwrapped
       if ((!userType || !ModelUtil.isArray(type)) && arrayDimensions != null && type != FAILED_TO_INIT_SENTINEL) {
-         type = new ArrayTypeDeclaration(it, type, arrayDimensions);
+         type = new ArrayTypeDeclaration(sys, it, type, arrayDimensions);
       }
    }
 
@@ -702,15 +712,20 @@ public class ClassType extends JavaType {
       if (chained)
          return;
 
-      if (type != null && type != FAILED_TO_INIT_SENTINEL) {
+      if (type != FAILED_TO_INIT_SENTINEL) {
          if (type instanceof TypeDeclaration) {
             TypeDeclaration td = (TypeDeclaration) type;
             if (td.getTransformed() || (flags & ModelUtil.REFRESH_TRANSFORMED_ONLY) == 0) {
                type = ModelUtil.refreshBoundType(getLayeredSystem(), type, flags);
             }
          }
-         else if (type instanceof Class) {
+         else if (ModelUtil.isCompiledClass(type)) {
             type = ModelUtil.refreshBoundType(getLayeredSystem(), type, flags);
+         }
+         else if (type == null) {
+            ITypeDeclaration itype = getEnclosingIType();
+            if (itype != null)
+               initType(itype.getLayeredSystem(), itype, this, null, true, false, null);
          }
       }
    }
@@ -738,7 +753,7 @@ public class ClassType extends JavaType {
             for (int i = 0; i < typeArgs.size(); i++) {
                if (i != 0)
                   sb.append(", ");
-               sb.append(typeArgs.get(i).toString());
+               sb.append(ModelUtil.paramTypeToString(typeArgs.get(i)));
             }
             sb.append(">");
             return sb.toString();
@@ -992,7 +1007,7 @@ public class ClassType extends JavaType {
          isQualifiedType = true;
       }
       else {
-         packagePrefix = origModel.getPackagePrefix();
+         packagePrefix = origModel == null ? null : origModel.getPackagePrefix();
       }
       ModelUtil.suggestTypes(origModel, packagePrefix, matchPrefix, candidates, true);
       if (origModel != null && !isQualifiedType) {
@@ -1042,9 +1057,16 @@ public class ClassType extends JavaType {
       if (typeArguments != null)
          return false;
       if (chainedTypes != null) {
-         for (ClassType chained:chainedTypes)
+         for (ClassType chained:chainedTypes) {
+            // Poorly formed ClassType
+            if (chained == this) {
+               System.err.println("*** Bad class type!");
+               chainedTypes = null;
+               return true;
+            }
             if (!chained.isCollapsibleNode())
                return false;
+         }
       }
       return true;
    }
@@ -1059,10 +1081,10 @@ public class ClassType extends JavaType {
             if (newType == null && resolveUnbound)
                newType = ModelUtil.getTypeParameterDefault(baseType);
             if (newType != null && newType != baseType && !(newType instanceof ExtendsType.LowerBoundsTypeDeclaration)) {
-               superWildcard = new ExtendsType.LowerBoundsTypeDeclaration(newType);
+               superWildcard = new ExtendsType.LowerBoundsTypeDeclaration(getLayeredSystem(), newType);
             }
          }
-         return ExtendsType.createSuper(superWildcard, t, getEnclosingType());
+         return ExtendsType.createSuper(getLayeredSystem(), superWildcard, t, getEnclosingType());
       }
       else if (ModelUtil.isGenericArray(type)) {
          Object compType = ModelUtil.getGenericComponentType(type);
@@ -1071,7 +1093,7 @@ public class ClassType extends JavaType {
             if (ModelUtil.isTypeVariable(compType)) {
                Object newCompType = t.getTypeForVariable(compType, resolveUnbound);
                if (newCompType != null && newCompType != compType) {
-                  JavaType resType = ClassType.createJavaType(newCompType);
+                  JavaType resType = ClassType.createJavaType(getLayeredSystem(), newCompType);
                   resType.parentNode = parentNode;
                   return resType.convertToArray(type instanceof ArrayTypeDeclaration ? ((ArrayTypeDeclaration) type).definedInType : getEnclosingIType());
                }
@@ -1082,7 +1104,8 @@ public class ClassType extends JavaType {
          Object typeParam = t == null ? null : t.getTypeForVariable(type, resolveUnbound);
          if (typeParam == null)
             typeParam = type;
-         JavaType res = JavaType.createJavaType(typeParam);
+         JavaType res = JavaType.createJavaType(getLayeredSystem(), typeParam, null, null);
+
          res.parentNode = parentNode;
          return res;
       }
@@ -1138,26 +1161,41 @@ public class ClassType extends JavaType {
       return null;
    }
 
-   public JavaType convertToArray(ITypeDeclaration definedInType) {
+   public JavaType convertToArray(Object definedInType) {
       ClassType newType = (ClassType) super.convertToArray(definedInType);
-      if (type != null)
-         newType.type = ArrayTypeDeclaration.create(type, 1, definedInType == null ? getEnclosingIType() : definedInType);
+      if (type == FAILED_TO_INIT_SENTINEL)
+         newType.type = FAILED_TO_INIT_SENTINEL;
+      else if (type != null)
+         newType.type = ArrayTypeDeclaration.create(getLayeredSystem(), type, 1, definedInType == null ? getEnclosingIType() : definedInType);
       return newType;
    }
 
-   public void convertToSrcReference() {
+   public boolean convertToSrcReference() {
       if (!srcOnly) {
          srcOnly = true;
          if (type != null) {
             // TODO: not handling ParamTypeDeclaration - or ParameterizedType
             if (type instanceof Class) {
                Object newType = ModelUtil.resolveSrcTypeDeclaration(getLayeredSystem(), type);
-               if (newType != null && newType instanceof BodyTypeDeclaration)
+               if (newType != null && newType instanceof BodyTypeDeclaration) {
                   type = newType;
+                  return true;
+               }
             }
          }
       }
+      return false;
    }
 
+   public Object getRawTypeDeclaration() {
+      Object boundType = getTypeDeclaration();
+      while (boundType instanceof ArrayTypeDeclaration || boundType instanceof ParamTypeDeclaration) {
+         if (boundType instanceof ArrayTypeDeclaration)
+            boundType = ((ArrayTypeDeclaration) boundType).getComponentType();
+         else
+            boundType = ((ParamTypeDeclaration) boundType).getBaseType();
+      }
+      return boundType;
+   }
 
 }

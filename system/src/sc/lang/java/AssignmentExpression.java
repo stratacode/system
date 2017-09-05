@@ -65,6 +65,14 @@ public class AssignmentExpression extends TwoOperatorExpression {
       }
    }
 
+   public void stop() {
+      super.stop();
+      selfOperator = null;
+      fromDefinition = null;
+      assignedProperty = null;
+      assignmentBinding = false;
+   }
+
    private boolean isArithSelfOperator() {
       if (selfOperator == null)
          return false;
@@ -105,9 +113,12 @@ public class AssignmentExpression extends TwoOperatorExpression {
       if (lhs != null && rhs != null) {
          boolean useGenericTypes = true;
          Object lhsType = useGenericTypes ? lhs.getGenericType() : lhs.getTypeDeclaration();
+         // TODO: should we clone the type here to avoid modifying the source code's type declaration's type parameters
+         if (lhsType instanceof ParamTypeDeclaration)
+            ((ParamTypeDeclaration) lhsType).writable = true;
 
          // Need to do this to initialize the lambda expression before we try to get the tyep of the rhs
-         rhs.setInferredType(lhsType);
+         rhs.setInferredType(lhsType, true);
 
          Object rhsType = useGenericTypes ? rhs.getGenericType() : rhs.getTypeDeclaration();
          if (lhsType != null && rhsType != null && !ModelUtil.isAssignableFrom(lhsType, rhsType, true, null, getLayeredSystem())) {
@@ -378,13 +389,13 @@ public class AssignmentExpression extends TwoOperatorExpression {
          throw new UnsupportedOperationException();
    }
 
-   public Statement getFromStatement() {
+   public ISrcStatement getFromStatement() {
       if (fromDefinition instanceof VariableDefinition)
          return ((VariableDefinition) fromDefinition).getDefinition();
       else if (fromDefinition instanceof PropertyAssignment)
          return (PropertyAssignment) fromDefinition;
       else
-         return null;
+         return super.getFromStatement();
    }
 
    public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
@@ -396,6 +407,13 @@ public class AssignmentExpression extends TwoOperatorExpression {
          rhs.setBindingInfo(null, null, false);
       */
       return rhs.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
+   }
+
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
+      if (rhs != null) {
+         return rhs.addNodeCompletions(origModel, origNode, matchPrefix, offset, dummyIdentifier, candidates);
+      }
+      return super.addNodeCompletions(origModel, origNode, matchPrefix, offset, dummyIdentifier, candidates);
    }
 
    public boolean applyPartialValue(Object partial) {
@@ -453,5 +471,6 @@ public class AssignmentExpression extends TwoOperatorExpression {
    public boolean propagatesInferredType(Expression child) {
       return true;
    }
+
 }
 

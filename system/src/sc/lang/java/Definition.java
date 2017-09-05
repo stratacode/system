@@ -10,13 +10,11 @@ import sc.lang.sc.ScopeModifier;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.obj.ScopeDefinition;
+import sc.parser.PString;
 
 import java.lang.annotation.ElementType;
 import java.lang.reflect.AnnotatedElement;
-import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.IdentityHashMap;
-import java.util.List;
+import java.util.*;
 
 public abstract class Definition extends JavaSemanticNode implements IDefinition {
    // String or Annotation
@@ -138,7 +136,7 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
 
    /** Overridden  */
    protected void addInheritedAnnotationProcessor(IAnnotationProcessor process, String annotName) {
-      System.err.println("*** No support inherited annotations on this definition type: " + this + " for: " + annotName);
+      System.err.println("*** No support for inherited annotations on: " + this.getClass() + ": " + this + " annotation: " + annotName);
    }
 
    protected void processModifiers(List<Object> modifiers) {
@@ -418,16 +416,24 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
    private boolean includeForType(Annotation annot, MemberType type) {
       JavaModel model = getJavaModel();
       Layer layer = model == null ? null : model.getLayer();
-      IAnnotationProcessor p = getLayeredSystem().getAnnotationProcessor(layer, annot.getFullTypeName());
+      String annotTypeName = annot.getFullTypeName();
+      IAnnotationProcessor p = getLayeredSystem().getAnnotationProcessor(layer, annotTypeName);
       if (p == null) {
          // Right now for the Bindable annotation, we'll move it from the field to the Get/Set during conversion since
          // those become the public contract for the property.
-         if (annot.getTypeName().equals("Bindable") || annot.getTypeName().equals("sc.bind.Bindable")) {
-           if (type == MemberType.Field)
+         if (annotTypeName.equals("sc.bind.Bindable")) {
+            if (type == MemberType.Field)
               return false;
             else if (type == MemberType.SetMethod || type == MemberType.GetMethod)
               return true;
          }
+         // TODO: should we have a hook to make it easier to remove other annotations during transformation - maybe an annotation on the annotation type like the Retention one we customize for JS?
+
+         // This annotation gets stripped off during transformation.  If we don't remove it, the field can be transformed twice since we typically will transform newly added members a second time in case they
+         // use additional extensions.
+         if (annotTypeName.equals("sc.obj.GetSet"))
+            return false;
+
          EnumSet<ElementType> targets = ModelUtil.getAnnotationTargets(annot);
          if (targets != null) {
             switch (type) {
@@ -472,6 +478,10 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
          }
       }
       return null;
+   }
+
+   public boolean hasAnnotation(String annotName) {
+      return getAnnotation(annotName) != null;
    }
 
    public void removeAnnotation(String annotationName) {
@@ -687,4 +697,53 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
       }
       return res;
    }
+
+   // Here to make this synchronizable from dynamic runtime to clients but so far no need to have it sync the other way
+   public void setAnnotations(Map<String,Object> res) {
+      throw new UnsupportedOperationException();
+   }
+
+   public Map<String,Object> getAnnotations() {
+      if (modifiers == null)
+         return null;
+      TreeMap<String,Object> res = null;
+      for (Object modifier:modifiers) {
+         if (modifier instanceof Annotation) {
+            if (res == null) {
+               res = new TreeMap<String,Object>();
+            }
+            Annotation annot = (Annotation) modifier;
+            Annotation.addToAnnotationsMap(res, annot);
+         }
+      }
+      return res;
+   }
+
+   // Mirrors a method in the client side library - used for the accessing keys in the combined "getAnnotations" map we use for speed in serializing this info
+   // to the client.
+   public static String getAnnotationValueKey(String typeName, String ident) {
+      return typeName + "__" + ident;
+   }
+
+   // Here for synchronization - should never be set by the client
+   public void setModifierFlags(int val) {
+      throw new UnsupportedOperationException();
+   }
+
+   /** Used to extract just the important modifiers into a single integer for client/server meta-data synchronization */
+   public int getModifierFlags() {
+      List<Object> allMods = getComputedModifiers();
+      int modFlags = 0;
+      if (allMods != null) {
+         for (Object mod:allMods) {
+            if (PString.isString(mod)) {
+               int flag = sc.type.Modifier.getFlag(mod.toString());
+               if (flag != -1)
+                  modFlags |= flag;
+            }
+         }
+      }
+      return modFlags;
+   }
+
 }

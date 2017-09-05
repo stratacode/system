@@ -77,6 +77,15 @@ public enum Type {
       public Object getDefaultObjectValue() {
          return java.lang.Boolean.FALSE;
       }
+
+      public Object stringToValue(String val) {
+         if (val.equalsIgnoreCase("true"))
+            return java.lang.Boolean.TRUE;
+         else if (val.equalsIgnoreCase("false"))
+            return java.lang.Boolean.FALSE;
+         else
+            throw new IllegalArgumentException("Invalid boolean: " + val);
+      }
    },
    Byte {
       public Object evalArithmetic(String operator, Object lhsObj, Object rhsObj) {
@@ -99,6 +108,10 @@ public enum Type {
       }
       public Object getDefaultObjectValue() {
          return IntegerZero;
+      }
+
+      public Object stringToValue(String val) {
+         return java.lang.Integer.valueOf(val);
       }
    },
    Short {
@@ -123,6 +136,10 @@ public enum Type {
       public Object getDefaultObjectValue() {
          return IntegerZero;
       }
+
+      public Object stringToValue(String val) {
+         return java.lang.Integer.valueOf(val);
+      }
    }, Character {
       public Object evalArithmetic(String operator, Object lhsObj, Object rhsObj) {
          throw new IllegalArgumentException("Illegal arithmetic operation for a char expression");
@@ -138,6 +155,10 @@ public enum Type {
       }
       public Object getDefaultObjectValue() {
          return '\0';
+      }
+
+      public Object stringToValue(String val) {
+         return val.length() == 0 ? '\0' : val.charAt(0);
       }
    },
    Integer {
@@ -257,6 +278,10 @@ public enum Type {
       public Object getDefaultObjectValue() {
          return IntegerZero;
       }
+
+      public Object stringToValue(String val) {
+         return java.lang.Integer.valueOf(val);
+      }
    },
    Float {
       public Object evalArithmetic(String operator, Object lhsObj, Object rhsObj) {
@@ -355,6 +380,10 @@ public enum Type {
       }
       public Object getDefaultObjectValue() {
          return FloatZero;
+      }
+
+      public Object stringToValue(String val) {
+         return java.lang.Float.valueOf(val);
       }
    },
    Long {
@@ -469,6 +498,10 @@ public enum Type {
       public Object getDefaultObjectValue() {
          return 0L;
       }
+
+      public Object stringToValue(String val) {
+         return java.lang.Long.valueOf(val);
+      }
    },
    Double {
       public Object evalArithmetic(String operator, Object lhsObj, Object rhsObj) {
@@ -568,6 +601,10 @@ public enum Type {
       public Object getDefaultObjectValue() {
          return DoubleZero;
       }
+
+      public Object stringToValue(String val) {
+         return java.lang.Double.valueOf(val);
+      }
    },
    String {
       public Object evalArithmetic(String operator, Object lhsObj, Object rhsObj) {
@@ -603,6 +640,10 @@ public enum Type {
       }
       public Object evalUnary(String operator, Object value) {
          throw new IllegalArgumentException("String type does not support unary operator: " + operator);
+      }
+
+      public Object stringToValue(String val) {
+         return val;
       }
    },
    Object {
@@ -667,6 +708,10 @@ public enum Type {
       }
       public boolean isAssignableFromParameter(Type other, Class from, Class to) {
          return other.isANumber();
+      }
+
+      public Object stringToValue(String val) {
+         return java.lang.Double.valueOf(val);
       }
    },
    Void {
@@ -745,12 +790,17 @@ public enum Type {
 
    public char arrayTypeCode;
 
+   private final static String NOT_IMPL_ERROR = "Error - method not implemented in coreRuntime - make sure dependency on the fullRuntime is ahead in the classpath";
+
    public Class getArrayClass(Class componentType, int ndims) {
-      throw new UnsupportedOperationException();
+      System.err.println(NOT_IMPL_ERROR);
+
+      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
    }
 
    public Class getPrimitiveArrayClass(int ndims) {
-      throw new UnsupportedOperationException();
+      System.err.println(NOT_IMPL_ERROR);
+      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
    }
 
 
@@ -782,7 +832,7 @@ public enum Type {
    public boolean evalConditional(String operator, Object lhs, Object rhs) {
       if (operator.equals("instanceof"))
          return DynUtil.instanceOf(lhs, rhs);
-      throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
    }
 
    public abstract Object evalUnary(String operator, Object arg);
@@ -794,7 +844,7 @@ public enum Type {
 
    /** Takes the class used to get this type as the first argument and implements the cast operator on the value */
    public Object evalCast(Class theClass, Object val) {
-      throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
       /*
       if (theClass.isInstance(val)) {
          return val;
@@ -812,31 +862,31 @@ public enum Type {
    }
 
    public boolean isInteger() {
-      throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
    }
 
    public boolean isShort() {
-      throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
    }
 
    public boolean isByte() {
-      throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
    }
 
    public boolean isLong() {
-      throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
    }
 
    public boolean isFloat() {
-      throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
    }
 
    public boolean isDouble() {
-      throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
    }
 
    public boolean isAFloat() {
-      throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
    }
 
    public boolean isAssignableFromAssignment(Type other, Class from, Class to) {
@@ -858,6 +908,20 @@ public enum Type {
 
    public boolean isFloatingType() {
       return this == Float || this == Double;
+   }
+
+   public Object stringToValue(String val) {
+      throw new UnsupportedOperationException("Unable to convert string to type");
+   }
+
+   public static Object propertyStringToValue(Object propType, String strVal) {
+      if (propType instanceof Class) {
+         sc.type.Type t = sc.type.Type.get((Class) propType);
+         return t.stringToValue(strVal);
+      }
+      else {
+         throw new IllegalArgumentException("Unable to convert to: " + propType + " from string");
+      }
    }
 
    public static final Integer IntegerZero = new Integer(0);

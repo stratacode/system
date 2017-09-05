@@ -559,8 +559,10 @@ public class TransformUtil {
 
    public static void addInitedDefinition(ClassDeclaration classDeclaration, boolean useAltComponent) {
       List<Statement> sts = useAltComponent ? TransformUtil.getAltInitedDefinition() : TransformUtil.getInitedDefinition();
-      for (Statement s:sts)
+      for (Statement s:sts) {
          classDeclaration.addBodyStatementIndent(s);
+         s.setFromStatement(classDeclaration.fromStatement);
+      }
    }
 
    static SemanticNodeList<Statement> getInitedDefinition() {
@@ -775,6 +777,10 @@ public class TransformUtil {
       else {
          String rootTypeName = ModelUtil.getTypeName(rootType);
          String innerTypeName = ModelUtil.getTypeName(typeObj);
+         if (rootTypeName.length() >= innerTypeName.length()) {
+            System.out.println("*** Error - invalid root type name!");
+            innerTypeName = ModelUtil.getTypeName(typeObj); // debug only
+         }
          String innerPath = innerTypeName.substring(rootTypeName.length()+1);
          innerPath = innerPath.replace(".","_");
          propertyMappingName = "_" + innerPath + "_" + lowerPropertyName + "Prop";
@@ -944,7 +950,7 @@ public class TransformUtil {
          PerfMon.end("parsePropTemplate");
 
          if (staticResult instanceof ParseError)
-            System.err.println("*** error parsing property template: " + ((ParseError) staticResult).errorStringWithLineNumbers(codeToInsert));
+            System.err.println("*** error parsing static property template: " + ((ParseError) staticResult).errorStringWithLineNumbers(codeToInsert));
          else {
             PerfMon.start("resolvePropTemplate");
             IParseNode staticNode = (IParseNode) staticResult;
@@ -958,6 +964,11 @@ public class TransformUtil {
                // Must put these before any property definitions so that the _Prop variable references will all have been assigned.
                // Alternatively, we could just not use _Prop in the bind call (i.e. only use it for sendEvent)
                enclosingType.addBodyStatementsAt(enclosingType.propDefInsertIndex, staticList);
+
+               // Should we register these lines with the property for debugging purposes?  Since these are at the top of the file, they tend to
+               // be the ones we navigate to since they show up first in the list.  Also, why would we need to debug the definition of the property mapper anyway?
+               //for (Statement newSt:staticList)
+               //   newSt.setFromStatement(srcStatement);
 
                // Offset ix cause we just inserted a statement ahead of the one we are about to insert it
                if (ix >= enclosingType.propDefInsertIndex && enclosingType == propType)
@@ -974,7 +985,7 @@ public class TransformUtil {
       Object result = SCLanguage.INSTANCE.parseString(codeToInsert, SCLanguage.INSTANCE.classBodySnippet);
       PerfMon.end("reparsePropTemplate");
       if (result instanceof ParseError)
-         System.err.println("*** error parsing property template: " + ((ParseError) result).errorStringWithLineNumbers(codeToInsert));
+         System.err.println("*** error reparsing property template: " + ((ParseError) result).errorStringWithLineNumbers(codeToInsert));
       else {
          PerfMon.start("restartPropTemplate");
          IParseNode node = (IParseNode) result;
@@ -1141,7 +1152,7 @@ public class TransformUtil {
       int numParams;
       if (ptypes != null && ptypes.length > 0) {
          numParams = ptypes.length;
-         redirMethod.setProperty("parameters", Parameter.create(ptypes, pnames = ModelUtil.getParameterNames(meth), null, td));
+         redirMethod.setProperty("parameters", Parameter.create(td.getLayeredSystem(), ptypes, pnames = ModelUtil.getParameterNames(meth), null, td));
       }
       else
          numParams = 0;

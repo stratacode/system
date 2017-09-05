@@ -13,8 +13,10 @@ import sc.dyn.RDynUtil;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
+import java.lang.reflect.Modifier;
 import java.util.*;
 
+/** This is the version of the PTypeUtil utilities that is used in the full runtime, with Java reflection etc.  */
 @JSSettings(jsLibFiles="js/scdyn.js")
 public class PTypeUtil {
    public static ThreadLocal<Map<String,Object>> threadLocalMap = new ThreadLocal<Map<String,Object>>();
@@ -485,6 +487,16 @@ public class PTypeUtil {
       return t.primitiveClass == type;
    }
 
+   public static boolean isANumber(Class type) {
+      sc.type.Type t = sc.type.Type.get(type);
+      return t.isANumber();
+   }
+
+   public static boolean isStringOrChar(Class type) {
+      Type t = Type.get(type);
+      return t == Type.String || t == Type.Character;
+   }
+
    public static Object getReturnType(Object method) {
       if (method instanceof Method)
          return ((Method) method).getReturnType();
@@ -884,7 +896,7 @@ public class PTypeUtil {
       return false;
    }
 
-   // Implemented in Javascript
+   // Implemented in Javascript only - TODO: shouldn't we replace this with the IScheduler interface and DynUtil.invokeLater?
    public static void invokeLater(Runnable toRun, long delay) {
       throw new UnsupportedOperationException();
    }
@@ -894,18 +906,23 @@ public class PTypeUtil {
       throw new UnsupportedOperationException();
    }
 
-   // TODO: implemented in JS
    public static boolean isObject(Object obj) {
-      throw new UnsupportedOperationException();
+      return obj != null && isObjectType(obj.getClass());
    }
 
-   // TODO: implemented in JS
    public static boolean isObjectType(Object obj) {
-      throw new UnsupportedOperationException();
+      if (!(obj instanceof Class))
+         throw new UnsupportedOperationException();
+      Object annot = getAnnotationValue((Class) obj, "sc.obj.TypeSettings", "objectType");
+      return annot != null && annot instanceof Boolean && ((Boolean)annot);
    }
 
    public static boolean isArray(Object cl) {
       return cl instanceof Class && ((Class) cl).isArray();
+   }
+
+   public static Object getComponentType(Object cl) {
+      return cl instanceof Class ? ((Class) cl).getComponentType() : null;
    }
 
    public static Object getAnnotationValue(Class cl, String annotName, String annotValue) {
@@ -915,8 +932,16 @@ public class PTypeUtil {
       Annotation annotation = cl.getAnnotation(annotClass);
       if (annotation == null)
          return null;
-      Method method = RTypeUtil.getMethod(annotation.getClass(), annotValue);
-      return TypeUtil.invokeMethod(annotation, method, (Object[])null);
+      return getValueFromAnnotation(annotation, annotValue);
+   }
+
+   public static Object getValueFromAnnotation(Object annotation, String annotValue) {
+      if (annotation instanceof Annotation) {
+         Method method = RTypeUtil.getMethod(annotation.getClass(), annotValue);
+         return TypeUtil.invokeMethod(annotation, method, (Object[]) null);
+      }
+      else
+         throw new IllegalArgumentException("Invalid arg to getValueFromAnnotation");
    }
 
    public static Object getInheritedAnnotationValue(Class cl, String annotName, String annotValue) {
@@ -933,9 +958,35 @@ public class PTypeUtil {
 
       if (annotation == null)
          return null;
+      return getValueFromAnnotation(annotation, annotValue);
+   }
 
-      Method method = RTypeUtil.getMethod(annotation.getClass(), annotValue);
-      return TypeUtil.invokeMethod(annotation, method, (Object[])null);
+   // Takes a def - either a Class, Method, Field and the annotNameOrType - either the String type name of the annot class itself.
+   public static Object getAnnotation(Object def, Object annotNameOrType) {
+      Class annotClass;
+      if (annotNameOrType instanceof String) {
+         annotClass = RDynUtil.loadClass((String) annotNameOrType);
+      }
+      else if (annotNameOrType instanceof Class) {
+         annotClass = (Class) annotNameOrType;
+      }
+      else
+         throw new IllegalArgumentException("Invalid type to getAnnotation");
+
+      Annotation annotation = null;
+      if (def instanceof Class) {
+         Class cl = (Class) def;
+         do {
+            annotation = cl.getAnnotation(annotClass);
+            if (annotation != null)
+               break;
+            cl = cl.getSuperclass();
+         } while (cl != null);
+      }
+      else if (def instanceof AnnotatedElement) {
+         return ((AnnotatedElement) def).getAnnotation(annotClass);
+      }
+      return annotation;
    }
 
    public static Object getEnclosingType(Object typeObj, boolean instOnly) {
@@ -959,6 +1010,9 @@ public class PTypeUtil {
       return res;
    }
 
-   // not sure why this reports an error in IntelliJ's editor but ignore it!
+   public static Object clone(Object o) {
+      Object meth = resolveMethod(o.getClass(), "clone", null);
+      return invokeMethod(o, meth);
+   }
 
 }

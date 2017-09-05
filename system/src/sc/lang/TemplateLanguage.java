@@ -14,12 +14,10 @@ import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.layer.SrcEntry;
 import sc.parser.*;
-import sc.type.TypeUtil;
 import sc.util.FileUtil;
 import sc.util.StringUtil;
 
 import java.io.File;
-import java.io.Reader;
 import java.util.Collections;
 import java.util.List;
 
@@ -72,27 +70,50 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
    public final static TemplateLanguage INSTANCE = new TemplateLanguage();
 
    // Start must chew up space following the delimiter since it is the start of a code construct.
-   SymbolSpace startCodeDelimiter = new SymbolSpace(START_CODE_DELIMITER);
-   SymbolSpace startExpDelimiter = new SymbolSpace(START_EXP_DELIMITER);
-
-   SymbolSpace startDeclDelimiter = new SymbolSpace(START_DECL_DELIMITER);
+   public SymbolSpace startCodeDelimiter = new SymbolSpace(START_CODE_DELIMITER);
+   {
+      // This constraints the symbol match so it will not inaccurately match these more specific tokens.
+      // We don't require this for the grammar but it's helpful for reparsing - so we never match a code segment because it has
+      // better error consumption than the declaration statement
+      startCodeDelimiter.addExcludedValues("<%@", "<%!", "<%=");
+   }
+   public SymbolSpace startExpDelimiter = new KeywordSymbolSpace(START_EXP_DELIMITER);
+   public SymbolSpace startDeclDelimiter = new KeywordSymbolSpace(START_DECL_DELIMITER);
+   public SymbolSpace startImportDelimiter = new KeywordSymbolSpace(START_IMPORT_DELIMITER);
 
    // End does not consume space since that space should be part of the template string
-   Symbol endDelimiter = new Symbol(END_DELIMITER);
+   public Symbol endDelimiter = new KeywordSymbol(END_DELIMITER);
+
+   // Yes, start/end are swapped in these next two.  It's nice to have separate tokens for brace matching purposes in the lexer, or maybe separate styles?
+   public Symbol startGlueDelimiter = new KeywordSymbol(END_DELIMITER);
+   public Symbol endGlueDelimiter = new KeywordSymbol(START_CODE_DELIMITER);
+
+   // Creating these so we have different tokens to match up against the start token - not really needed here but the lexer/highlighting in intelliJ requires separate tokens
+   public Symbol endExpDelimiter = new KeywordSymbol(END_DELIMITER);
+   public Symbol endImportDelimiter = new KeywordSymbol(END_DELIMITER);
+   public Symbol endDeclDelimiter = new KeywordSymbol(END_DELIMITER);
 
    OrderedChoice htmlCommentBody = new OrderedChoice("('','','')", REPEAT | OPTIONAL,
                    new Sequence("('',)", new Symbol("--"), new Symbol(NOT | LOOKAHEAD, ">")),
                    new Sequence("('',)", new Symbol("-"), new Symbol(NOT | LOOKAHEAD, "-")),
                    new Sequence("('',)", new Symbol(NOT, "-"), new Symbol(LOOKAHEAD, Symbol.ANYCHAR)));
-   Sequence tagComment = new Sequence("HTMLComment(,commentBody,)", new Symbol(START_HTML_COMMENT), htmlCommentBody, new Symbol(END_HTML_COMMENT));
-   SymbolChoice templateString = new SymbolChoice(NOT | REPEAT, START_HTML_COMMENT, END_HTML_COMMENT, START_EXP_DELIMITER, START_CODE_DELIMITER, END_DELIMITER, EOF);
+   public Sequence tagComment = new Sequence("HTMLComment(,commentBody,)", new Symbol(START_HTML_COMMENT), htmlCommentBody, new Symbol(END_HTML_COMMENT));
+   public SymbolChoice templateString = new SymbolChoice(NOT | REPEAT, START_HTML_COMMENT, END_HTML_COMMENT, START_EXP_DELIMITER, START_CODE_DELIMITER, END_DELIMITER, EOF);
    {
       templateString.styleName = "templateString";
    }
-   Sequence templateExpression = new Sequence("(,.,)", startExpDelimiter, expression, endDelimiter);
-   Sequence templateStatement = new Sequence("TemplateStatement(,statements,)", startCodeDelimiter,
-                                             blockStatements, endDelimiter);
-   Sequence templateDeclaration = new Sequence("TemplateDeclaration(,body,)", startDeclDelimiter, classBodyDeclarations, endDelimiter);
+   Sequence templateExpression = new Sequence("(,.,)", startExpDelimiter, expression, endExpDelimiter);
+   OrderedChoice templateBlockStatements = (OrderedChoice) blockStatements.clone();
+   // For Java uses of blockStatement, we also match glueStatement (added below to statement because we need that in all normal Java uses of statement).  But for templateStatement
+   // we do not want to match the glue (or it will sometimes match the template statement's end token).  Making a copy of statement before glue is added below and using the copy
+   // for the TemplateStatement's blockStatements copy.
+   IndexedChoice noGlueStatement = (IndexedChoice) statement.clone();
+   {
+      noGlueStatement.changeParseletName("noGlueStatement");
+      templateBlockStatements.set(2, noGlueStatement);
+   }
+   Sequence templateStatement = new Sequence("TemplateStatement(,statements,)", startCodeDelimiter, templateBlockStatements, endDelimiter);
+   Sequence templateDeclaration = new Sequence("TemplateDeclaration(,body,)", startDeclDelimiter, classBodyDeclarations, endDeclDelimiter);
    public OrderedChoice simpleTemplateDeclarations = new OrderedChoice("([],[])", OPTIONAL | REPEAT, templateExpression, templateString);
    Sequence glueExpression = new Sequence("GlueExpression(,expressions,)", endDelimiter, simpleTemplateDeclarations, startCodeDelimiter);
    Sequence glueStatement = new Sequence("GlueStatement(,declarations,)", endDelimiter, simpleTemplateDeclarations, startCodeDelimiter);
@@ -109,11 +130,21 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
       templateBodyDeclarations.put(START_DECL_DELIMITER, templateDeclaration);
       templateBodyDeclarations.put(START_CODE_DELIMITER, templateStatement);
       templateBodyDeclarations.addDefault(templateString);
+      templateBodyDeclarations.skipOnErrorParselet = skipTypeDeclError;
    }
    Sequence glueDeclaration = new Sequence("GlueDeclaration(,declarations,)", endDelimiter, templateBodyDeclarations, startCodeDelimiter);
-   Sequence templateAnnotations = new Sequence("(,,imports, templateModifiers,)", OPTIONAL, new Symbol(START_IMPORT_DELIMITER), spacing, imports, modifiers, endDelimiter);
+   {
+      // Do not parse %>bodyText by itself.   We need to match a the open <% as well in partial values mode or else we consume the %>bodyText as part of 'classBodyDeclarations' so it's not there for the close template
+      glueDeclaration.minContentSlot = 2;
+   }
+   Sequence templateAnnotations = new Sequence("(,imports, templateModifiers,)", OPTIONAL, startImportDelimiter, imports, modifiers, endImportDelimiter);
    Sequence template = new Sequence("Template(, *, templateDeclarations,)", spacing, templateAnnotations, templateBodyDeclarations, new Symbol(EOF));
    {
+      // Disable partial values on exprStatement because of problems matching glueExpression in the template language in partial values mode.   In general though it seems like we may not want
+      // to match an expression by itself since it might be a part of something larger?  We're doing this for now in TemplateLanguage.  To really fix the bug, ideally glueExpression would not be
+      // the expression used by templateStatement since the end of the templatestatement gets missparsed as the start of the glue.
+      exprStatement.skipOnErrorSlot = 2;
+
       // Add this to the regular Java grammar.  It recognizes the %> followed by text or <%= %> statements
       statement.put(END_DELIMITER, glueStatement);
       statement.setName("<statement>(.,.,.,.,.,.,.,.,.,.,.,.,.,,.,.,.)"); // Forward
@@ -123,7 +154,7 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
 
       primary.put(END_DELIMITER, glueExpression);
 
-      binaryOperators.addExcludedValues("%>");
+      binaryOperators.addExcludedValues("%>", "</");
 
       // During transform of a compiled template, we'll transform the JavaModel back through compilationUnit.  In this case, the types have to match exactly so we need to redefine the grammar by just replacing the type name: JavaModel -> Template
       compilationUnit.setResultClassName("Template");
@@ -166,7 +197,7 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
    public boolean evalToString = false;
 
    /**
-    * Two types of templates: those evaluated during the build procesds to generate the source and
+    * Two types of templates: those evaluated during the build process to generate the source and
     * those which are compiled into Java files and compiled into the system as objects.
     */
    public boolean compiledTemplate = false;
@@ -197,6 +228,9 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
 
    /** Should we treat this file format as something we run through the template process - i.e. evaluate the template and store it in a file using the result suffix */
    public boolean processTemplate = false;
+
+   /** Is this a template that's only evaluated explicitly by Java code (usually to generate a snippet of code) - e.g. the objectTemplate in CompilerSettings */
+   public boolean runtimeTemplate = false;
 
    /** The HTML language disables processing of types which do not have URL or MainInit */
    public boolean processOnlyURLs = false;
@@ -279,6 +313,11 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
 
       public boolean needsCompile() {
          return compiledTemplate;
+      }
+
+      @Override
+      public boolean isRuntimeTemplate() {
+         return runtimeTemplate;
       }
 
       /**

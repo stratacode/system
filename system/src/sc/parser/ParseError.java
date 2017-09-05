@@ -18,7 +18,8 @@ public class ParseError implements Cloneable, IParseResult {
    public Object partialValue;
    public boolean eof;
    public Object continuationValue; // True for enablePartialValues when this error partially extends the list in the value
-   public boolean optionalContinuation; // True for optional errors which add additional info so we can string together the partial value of a parent
+   // True for optional errors which add additional info so we can string together the partial value of a parent
+   public boolean optionalContinuation;
 
    private final boolean debugErrors = false;
 
@@ -124,21 +125,41 @@ public class ParseError implements Cloneable, IParseResult {
    public Object getBestPartialValue() {
       if (partialValue != null)
          return partialValue;
+      int pvSz = -1;
+      Object pv = null;
       for (Object errArg : errorArgs) {
          if (errArg instanceof ParseError) {
             ParseError nestedErr = (ParseError) errArg;
-            // TODO: for now just return the first one - the errors are already known to have the same start/index and we should have filtered out
-            // errors that are parent/child of each other.
-            if (nestedErr.partialValue != null) {
-               return nestedErr.partialValue;
+            // Picking the largest error in the list
+            CharSequence nestedPv = (CharSequence) nestedErr.partialValue;
+            if (nestedPv != null) {
+               int newSz = nestedPv.length();
+               if (newSz > pvSz) {
+                  pv = nestedPv;
+                  pvSz = newSz;
+               }
             }
          }
       }
-      return null;
+      return pv;
    }
 
    public ParseError propagatePartialValue(Object pv) {
+      Parselet errParselet = null;
+      if (pv instanceof IParseNode) {
+         errParselet = ((IParseNode) pv).getParselet();
+         // If we are caching an error at a lower level, don't reuse the same error because then the cached
+         // results partial value will point to the wrong parselet and semantic value.
+         if (parselet.cacheResults) {
+            ParseError propError = this.clone();
+            propError.partialValue = pv;
+            propError.parselet = errParselet;
+            return propError;
+         }
+      }
       partialValue = pv;
+      if (errParselet != null)
+         parselet = errParselet;
       return this;
    }
 }

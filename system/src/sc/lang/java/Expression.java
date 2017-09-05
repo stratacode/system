@@ -18,12 +18,11 @@ import sc.type.TypeUtil;
 import sc.bind.BindingDirection;
 import sc.bind.Bind;
 import sc.bind.IBinding;
-import sc.util.StringUtil;
 
 import java.lang.reflect.Method;
 import java.util.*;
 
-public abstract class Expression extends Statement implements IValueNode, ITypedObject {
+public abstract class Expression extends Statement implements IValueNode, ITypedObject, IClassBodyStatement {
    transient public BindingDirection bindingDirection;
    transient public Statement bindingStatement;
    transient public boolean nestedBinding;
@@ -102,7 +101,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       bindingStatement = dest;
       nestedBinding = nested;
       if (bindingStatement instanceof AssignmentExpression) {
-         Statement from = ((AssignmentExpression) bindingStatement).getFromStatement();
+         Statement from = (Statement) ((AssignmentExpression) bindingStatement).getFromStatement();
          if (from != null)
             bindingStatement = from;
       }
@@ -284,6 +283,13 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
          if (fieldDef == null) {
             if (ae.lhs instanceof SelectorExpression)
                fieldDef = ((SelectorExpression)ae.lhs).getAssignedProperty();
+            else if (ae.lhs instanceof IdentifierExpression) {
+               fieldDef = ((IdentifierExpression)ae.lhs).getAssignedProperty();
+            }
+            if (fieldDef == null) {
+               System.err.println("*** Invalid model for binding in transformation - no assigned property");
+               throw new UnsupportedOperationException();
+            }
          }
          bd.dstProp = ModelUtil.getPropertyName(fieldDef);
          // Because this is an assignment, we'll get mapped to a setX method in some cases
@@ -341,6 +347,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
 
    public Object evalBinding(Class expectedType, ExecutionContext ctx) {
       String bindingType = getBindingTypeName();
+
 
       assert bindingStatement != null && bindingType != null;
 
@@ -465,10 +472,13 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
                CastExpression castExpr = CastExpression.create(ModelUtil.getTypeName(bd.dstPropType), bind);
                bindingExpr = castExpr;
             }
-            else {
+            else if (bd.dstPropType != null) {
                // Note: for primitives createObjectType will return a Class but we already ruled those out above
                CastExpression castExpr = CastExpression.create((JavaType) JavaType.createObjectType(bd.dstPropType), bind);
                bindingExpr = castExpr;
+            }
+            else {
+               return;
             }
          }
          else {
@@ -540,7 +550,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       type = ModelUtil.getVariableTypeDeclaration(type);
       // Need the dynamic type of the actual runtime type declaration - but cannot use getCompiledClass at this stage
       boolean dynamicType = ModelUtil.isDynamicType(ModelUtil.getRuntimeTypeDeclaration(type));
-      Object prop = ModelUtil.definesMember(type, identifier, MemberType.PropertyGetObj, null, null, false, true);
+      Object prop = ModelUtil.definesMember(type, identifier, MemberType.PropertyGetObj, null, null, false, true, getLayeredSystem());
       if (prop == null) {
          System.err.println("*** Can't resolve property for get property mapping: " + identifier);
          //prop = ModelUtil.definesMember(type, identifier, MemberType.PropertyGetSet, null, null);
@@ -590,6 +600,8 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       // IBinding: new IBinding[] { <arguments }
       NewExpression boundExpr = new NewExpression();
       ArrayInitializer boundProps = new ArrayInitializer();
+      if (sys == null) // Something failed to resolve properly?
+         return this;
       // When usePropertyMappers is false and this is potentially a property, it could be a String, not an IBeanMappoer so we need to use Object
       boundExpr.typeIdentifier = sys.usePropertyMappers || !includesProps ? "sc.bind.IBinding" : "Object";
       boundExpr.setProperty("arrayDimensions", new SemanticNodeList(0));
@@ -640,7 +652,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
          needsClass = true;
       }
       /** Check for the @Remote annotation - it can turn remoting on for this runtime even if the method is local. */
-      if (!isRemote && isRemoteMethod(sys, methObj))
+      if (!isRemote && methObj != null && ModelUtil.isRemoteMethod(sys, methObj))
          isRemote = true;
       String remote = isRemote ? "Remote" : "";
       // resolveMethod, resolveStaticMethod, resolveRemoteMethod, etc are formed here
@@ -657,44 +669,10 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       return getMethod;
    }
 
-   boolean isRemoteMethod(LayeredSystem sys, Object methObj) {
-      Object remoteAnnot = ModelUtil.getAnnotation(methObj, "sc.obj.Remote");
-      if (remoteAnnot != null) {
-         String remoteRts = (String) ModelUtil.getAnnotationValue(remoteAnnot, "remoteRuntimes");
-         String localRts = (String) ModelUtil.getAnnotationValue(remoteAnnot, "localRuntimes");
-         boolean remote = true;
-         String runtimeName = sys.getRuntimeName();
-         boolean alreadyMatched = false;
-         if (!StringUtil.isEmpty(remoteRts)) {
-            remote = false;
-            String[] remoteArr = StringUtil.split(remoteRts, ',');
-            for (int i = 0; i < remoteArr.length; i++) {
-               if (remoteArr[i].equals(runtimeName)) {
-                  alreadyMatched = true;
-                  remote = true;
-                  break;
-               }
-            }
-         }
-         if (!StringUtil.isEmpty(localRts)) {
-            String[] remoteArr = StringUtil.split(remoteRts, ',');
-            for (int i = 0; i < remoteArr.length; i++) {
-               if (remoteArr[i].equals(runtimeName)) {
-                  if (alreadyMatched)
-                     System.out.println("Warning: method " + methObj + " has conflicting definitions in remoteRuntime and localRuntime for: " + runtimeName + " - ignoring @Remote definition");
-                  remote = false;
-                  break;
-               }
-            }
-         }
-         return remote;
-      }
-      else
-         return false;
-   }
-
    Expression createChildMethodBinding(Object typeObj, String methodName, Object methObj, SemanticNodeList<Expression> arguments, boolean isRemote) {
       LayeredSystem sys = getLayeredSystem();
+      if (methObj == null)
+         return this;
       if (sys.runtimeProcessor != null)
          methodName = sys.runtimeProcessor.replaceMethodName(sys, methObj, methodName);
       IdentifierExpression methBindExpr = IdentifierExpression.create("sc", "bind", "Bind", "methodP");
@@ -913,6 +891,10 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
          res.nestedBinding = nestedBinding;
          res.replacedByStatement = replacedByStatement;
       }
+      // When we make a copy with CopyReplace set, make sure the copy can find the
+      if ((options & CopyReplace) != 0l) {
+         replacedByStatement = res;
+      }
       return res;
    }
 
@@ -946,7 +928,11 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       return null;
    }
 
-   public boolean setInferredType(Object type) {
+   public boolean isInferredFinal() {
+      return true;
+   }
+
+   public boolean setInferredType(Object type, boolean finalType) {
       return false;
    }
 
@@ -965,8 +951,12 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
             return true;
          if (parent instanceof VariableStatement)
             return true;
-         if (parent instanceof PropertyAssignment)
+         if (parent instanceof PropertyAssignment) {
+            // We do not set the inferredType for =: bindings which are reverse only
+            if (((PropertyAssignment) parent).isReverseOnlyExpression())
+               return false;
             return true;
+         }
          if (parent instanceof IBlockStatement)
             return false;
          if (parent instanceof ITypeDeclaration)
@@ -980,27 +970,35 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       return null;
    }
 
-   void displayRangeError(int fromIx, int toIx, String...args) {
-      displayTypeError(args);
-      if (errorArgs != null) {
-         ArrayList<Object> eargs = new ArrayList<Object>(Arrays.asList(errorArgs));
-         eargs.add(new ErrorRangeInfo(fromIx, toIx));
-         errorArgs = eargs.toArray();
-      }
+   public void clearInferredType() {
    }
 
-   public static class ErrorRangeInfo {
-      public int fromIx;
-      public int toIx;
+   public boolean isInferredSet() {
+      return true;
+   }
 
-      public ErrorRangeInfo(int fromIx, int toIx) {
-         this.fromIx = fromIx;
-         this.toIx = toIx;
-      }
+   public String getNodeErrorText() {
+      String res = super.getNodeErrorText();
+      if (res != null)
+         return res;
 
-      public String toString() {
-         return fromIx + ":" + toIx;
-      }
+      // This handles template expressions and other cases where we don't start the element in the language... we transform it and
+      // start the element which replaces it.  So errors for those statements apply to this element in the source.
+      if (replacedByStatement != null)
+         return replacedByStatement.getNodeErrorText();
+      return null;
+   }
+
+   public boolean isLeafStatement() {
+      return getBodyStatements() == null;
+   }
+
+   public List<Statement> getBodyStatements() {
+      return null;
+   }
+
+   public Object getPrimitiveValue() {
+      return eval(null, new ExecutionContext());
    }
 
 }

@@ -7,7 +7,7 @@ package sc.lang.java;
 import java.util.List;
 import java.util.Set;
 
-public class SynchronizedStatement extends Statement {
+public class SynchronizedStatement extends Statement implements IStatementWrapper {
    public Expression expression;
    public Statement statement;
 
@@ -53,5 +53,31 @@ public class SynchronizedStatement extends Statement {
          parentNode.replaceChild(this, bs);
          return bs;
       }
+   }
+
+   public void addReturnStatements(List<Statement> res, boolean incThrow) {
+      if (statement != null)
+         statement.addReturnStatements(res, incThrow);
+   }
+
+   public Statement findStatement(Statement in) {
+      if (statement != null) {
+         Statement out = statement.findStatement(in);
+         if (out != null)
+            return out;
+      }
+      return super.findStatement(in);
+   }
+
+   public Statement getWrappedStatement() {
+      return statement;
+   }
+
+   public boolean isLeafStatement() {
+      return false;
+   }
+
+   public String getFunctionEndString() {
+      return ")";
    }
 }

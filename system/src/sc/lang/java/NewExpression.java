@@ -45,6 +45,8 @@ public class NewExpression extends IdentifierExpression {
 
    private boolean anonTypeInited = false;
 
+   private int anonId = -1;
+
    public static NewExpression create(String identifier, SemanticNodeList<Expression> args) {
       NewExpression newExpr = new NewExpression();
       // this is not used... oops
@@ -69,11 +71,22 @@ public class NewExpression extends IdentifierExpression {
    public void init() {
       if (initialized) return;
 
+      super.init();
+   }
+
+   /* TODO: remove this method Previously we needed a first-pass to just initialize the type and the id without copying over the members.
+    * We would do this step during 'init' and then during 'start' we'd finish creating the type.  Because we init
+    * all body members in a layer before we've assembled the layers into one, we can't allocate the anonIds until
+    * the start phase.  So this method can probably be removed.
+    */
+   private void initAnonId() {
       LayeredSystem sys = getLayeredSystem();
 
       // First assign the anonId before we get into things so that if any children start creating anonymous types which
-      // ends up copying around NewExpressions, we have a consistnt anonId for the original and the copy.
-      if (anonId == -1 && classBody != null && sys != null && sys.getNeedsAnonymousConversion()) {
+      // ends up copying around NewExpressions, we have a consistent anonId for the original and the copy.
+      // NOTE: Now that we call initAnonymousType in start() no matter what, we are not doing the NeedsAnonymousConversion check
+      // Why are we initializing the anonymous type if we are not transforming them to JS?
+      if (anonId == -1 && classBody != null && sys != null /* && sys.getNeedsAnonymousConversion()*/) {
          BodyTypeDeclaration enclType = getEnclosingType();
          if (enclType != null) {
             // Need to create this up front so we can return it in getEnclosingType for any children of the class body
@@ -82,6 +95,8 @@ public class NewExpression extends IdentifierExpression {
             // maybe we do not need to do this afterall?   Right now it's a mix of both approaches.
             anonType = new AnonClassDeclaration();
             anonId = enclType.allocateAnonId();
+            if (enclType.typeName.equals("EditorModel"))
+               System.out.println("*** init setting anonId for: " + typeIdentifier + ": " + anonId);
             anonType.typeName = ANON_TYPE_PREFIX + anonId;
             anonType.operator = "class";
             anonType.newExpr = this;
@@ -89,8 +104,6 @@ public class NewExpression extends IdentifierExpression {
             enclType.addToHiddenBody(anonType);
          }
       }
-
-      super.init();
    }
 
    private transient boolean starting = false;
@@ -101,8 +114,10 @@ public class NewExpression extends IdentifierExpression {
       starting = true;
 
       JavaModel model = getJavaModel();
-      if (model == null || typeIdentifier == null)
+      if (model == null || typeIdentifier == null) {
+         super.start();
          return;
+      }
 
       // Need to define our type before our body so it can be used by statements in the body
       boundType = findType(typeIdentifier);
@@ -122,7 +137,7 @@ public class NewExpression extends IdentifierExpression {
       super.start();
 
       if (boundType != null && arguments != null) {
-         constructor = parameterizeMethod(this, ModelUtil.declaresConstructor(boundType, arguments, null), null, inferredType, arguments, getMethodTypeArguments());
+         constructor = parameterizeMethod(this, ModelUtil.declaresConstructor(getLayeredSystem(), boundType, arguments, null), null, inferredType, arguments, getMethodTypeArguments());
          propagateInferredTypes();
       }
 
@@ -137,9 +152,32 @@ public class NewExpression extends IdentifierExpression {
       //   System.out.println("***");
       //   ModelUtil.declaresConstructor(boundType, arguments, null);
       //}
-      if (constructor != null && arguments != null) {
+      if (constructor != null && arguments != null && (inferredType != null || !hasInferredType())) {
          propagateInferredArgs(this, constructor, arguments);
       }
+   }
+
+   public boolean setInferredType(Object inferredType, boolean finalType) {
+      if (constructor != null && arguments != null) {
+         if (constructor instanceof ParamTypedMethod) {
+            // Need to convert inferredType to an instance of boundType - which means mapping any type parameters
+            if (boundType != null && !ModelUtil.sameTypes(inferredType, boundType)) {
+               if (ModelUtil.isParameterizedType(inferredType) && ModelUtil.hasDefinedTypeParameters(boundType) && !ModelUtil.isTypeVariable(inferredType) && ModelUtil.isAssignableFrom(inferredType, boundType)) {
+                  List<?> typeParams = ModelUtil.getTypeParameters(boundType);
+                  LayeredSystem sys = getLayeredSystem();
+                  inferredType = new ParamTypeDeclaration(sys, typeParams, ModelUtil.resolveSubTypeParameters(boundType, inferredType), boundType);
+               }
+               else
+                  inferredType = boundType;
+            }
+            ((ParamTypedMethod) constructor).setInferredType(inferredType);
+            super.setInferredType(inferredType, finalType);
+         }
+         propagateInferredArgs(this, constructor, arguments);
+      }
+      else
+         super.setInferredType(inferredType, finalType);
+      return false;
    }
 
    public void validate() {
@@ -150,7 +188,7 @@ public class NewExpression extends IdentifierExpression {
       if (boundType != null && arguments != null) {
          if (constructor == null && arguments.size() > 0) {
             displayTypeError("Missing constructor in type: " + boundType + " for new expression: ");
-            ModelUtil.declaresConstructor(boundType, arguments, null);
+            ModelUtil.declaresConstructor(getLayeredSystem(), boundType, arguments, null);
          }
 
          if (constructor == null && arguments.size() == 0) {
@@ -173,7 +211,7 @@ public class NewExpression extends IdentifierExpression {
             return v;
 
          if (boundType != null) {
-            v = ModelUtil.definesMember(boundType, name, mtype, refType, ctx, skipIfaces, false);
+            v = ModelUtil.definesMember(boundType, name, mtype, refType, ctx, skipIfaces, false, getLayeredSystem());
             if (v != null)
                return v;
          }
@@ -203,7 +241,7 @@ public class NewExpression extends IdentifierExpression {
    public boolean transform(ILanguageModel.RuntimeType runtime) {
       boolean any = false;
 
-      if (classBody != null && getLayeredSystem().getNeedsAnonymousConversion()) {
+      if (classBody != null  && getLayeredSystem().getNeedsAnonymousConversion()) {
          // Need to create the anonymous type during the transform step, so that it shows up as an inner type even
          // if we never called transformToJS - cause needsSave is false.
          ClassDeclaration anonType = getAnonymousType(true);
@@ -322,7 +360,7 @@ public class NewExpression extends IdentifierExpression {
             type = Object.class;
 
          TypeDeclaration modelType = model == null ? null : model.getModelTypeDeclaration();
-         return new ArrayTypeDeclaration(modelType, type, StringUtil.repeat("[]", ndim));
+         return new ArrayTypeDeclaration(getLayeredSystem(), modelType, type, StringUtil.repeat("[]", ndim));
       }
    }
 
@@ -330,7 +368,7 @@ public class NewExpression extends IdentifierExpression {
       ArrayList<Object> res = new ArrayList<Object>();
       // Handle the diamond operator: <> when this is specified, we inherit the type arguments from the inferredType
       if (typeArguments.size() == 0) {
-         if (inferredType != null) {
+         if (inferredType != null && !ModelUtil.isTypeVariable(inferredType)) {
             int numTypeParams = ModelUtil.getNumTypeParameters(inferredType);
             for (int i = 0; i < numTypeParams; i++) {
                res.add(ModelUtil.getTypeParameter(inferredType, i));
@@ -359,7 +397,7 @@ public class NewExpression extends IdentifierExpression {
          return null;
       ITypeDeclaration enclType = getEnclosingType();
       if (enclType != null)
-         return new ParamTypeDeclaration(enclType, ModelUtil.getTypeParameters(type), evalTypeArguments(type), type);
+         return new ParamTypeDeclaration(enclType.getLayeredSystem(), enclType, ModelUtil.getTypeParameters(type), evalTypeArguments(type), type);
       else
          return new ParamTypeDeclaration(getLayeredSystem(), ModelUtil.getTypeParameters(type), evalTypeArguments(type), type);
    }
@@ -394,6 +432,8 @@ public class NewExpression extends IdentifierExpression {
       if (boundType == null) {
          throw new IllegalArgumentException("No type for " + toDefinitionString());
       }
+      if (!ctx.allowCreate(boundType))
+         throw new IllegalArgumentException("Not allowed to create new instance of type for " + toDefinitionString());
       if (arguments != null) {
          Object typeToCreate = classBody != null ? getAnonymousType(false) : boundType;
          boolean isDynamic = ModelUtil.isDynamicType(typeToCreate);
@@ -484,8 +524,6 @@ public class NewExpression extends IdentifierExpression {
       }
    }
 
-   private int anonId = -1;
-
    public ClassDeclaration getAnonymousType(boolean xform) {
       if (anonType == null) {
          initAnonymousType();
@@ -508,9 +546,22 @@ public class NewExpression extends IdentifierExpression {
       if (classBody == null)
          return;
 
+      /* This happens when styling nodes but we start the model properly below I think?
+      if (!started && !starting) {
+         System.err.println("*** Initializing anonymous type on an unstarted new expression");
+      }
+      */
+
       if (!anonTypeInited) {
-         if (!isStarted() && !starting)
-            ParseUtil.initAndStartComponent(this);
+         // It seems we can get here at least from refreshBoundTypes - when after an incremental compile we might not have started the model.
+         // always start models from the top-down, or weird problems show up - like anonIds getting allocated in an inconsistent order
+         // One place this can happen is getEnclosingType, which for a new expression will call this.
+         if (!isStarted() && !starting) {
+            JavaModel model = getJavaModel();
+            if (!model.isStarted())
+               ParseUtil.initAndStartComponent(model);
+         }
+
          BodyTypeDeclaration enclType = getEnclosingType();
          if (anonTypeInited)
             return;
@@ -536,6 +587,11 @@ public class NewExpression extends IdentifierExpression {
          if (boundType == null)
             boundType = Object.class;
          JavaType baseType = ClassType.create(ModelUtil.getTypeName(boundType));
+         if (typeArguments != null && baseType instanceof ClassType) {
+            ClassType classBaseType = (ClassType) baseType;
+            SemanticNodeList<JavaType> newArgs = (SemanticNodeList<JavaType>) typeArguments.deepCopy(CopyNormal, null);
+            classBaseType.setResolvedTypeArguments(newArgs);
+         }
          if (ModelUtil.isInterface(boundType)) {
             SemanticNodeList impl = new SemanticNodeList(2);
             impl.add(baseType);
@@ -859,6 +915,31 @@ public class NewExpression extends IdentifierExpression {
          for (Expression expr:arguments)
             expr.transformToJS();
       }
+
+      // A call to new String(char[] arr) or new String(char[] arr, int start, int end) - needs to be converted so we add a join('') on the array.
+      if (boundTypeName != null && boundTypeName.equals("java.lang.String") && arguments != null) {
+         int numArgs = arguments.size();
+         if (numArgs == 1 || numArgs == 3) {
+            Expression firstArg = arguments.get(0);
+            Object firstArgType = firstArg.getTypeDeclaration();
+            if (ModelUtil.isArray(firstArgType) && ModelUtil.isCharacter(ModelUtil.getArrayComponentType(firstArgType))) {
+               SemanticNodeList<Expression> joinArgs = new SemanticNodeList<Expression>();
+               joinArgs.add(StringLiteral.create(""));
+               VariableSelector joinSel = VariableSelector.create("join", joinArgs);
+               VariableSelector spliceSel;
+               if (numArgs == 3) {
+                  spliceSel = VariableSelector.createArgs("splice", arguments.get(1), arguments.get(2));
+                  arguments.remove(2);
+                  arguments.remove(1);
+                  arguments.set(0, SelectorExpression.create(firstArg, spliceSel, joinSel));
+               }
+               else {
+                  arguments.set(0, SelectorExpression.create(firstArg, joinSel));
+               }
+            }
+         }
+      }
+
       return this;
    }
 
@@ -972,5 +1053,40 @@ public class NewExpression extends IdentifierExpression {
             st.addBreakpointNodes(res, srcStatement);
          }
       }
+   }
+
+   public void stop() {
+      super.stop();
+
+      boundType = null;
+      classPropertyName = null;
+      boundTypeName = null;
+      anonType = null;
+      anonTypeTransformed = null;
+      anonTypeInited = false;
+      anonId = -1;
+      constructor = null;
+   }
+
+   // Don't let the IdentifierExpression implementation work on new expressions.  It can cause weird problems parsing
+   // partial values (see reparseTest/re70)
+   public boolean applyPartialValue(Object value) {
+      return false;
+   }
+
+   public boolean isLineStatement() {
+      return true;
+   }
+
+   @Override
+   public List<Statement> getBodyStatements() {
+      return classBody;
+   }
+
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
+      // TODO: for some reason this results in the completion including the 'new' keyword - e.g. "new Foo" rather than just "Foo".  Not sure how to remove that but it's better than it not completing at all.
+      if (extMatchPrefix.startsWith("new "))
+         extMatchPrefix = extMatchPrefix.substring(4);
+      return addStatementNodeCompletions(origModel, origNode, extMatchPrefix, offset, dummyIdentifier, candidates);
    }
 }

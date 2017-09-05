@@ -6,6 +6,8 @@ package sc.lang.java;
 
 import sc.lang.IUserDataNode;
 import sc.lang.js.JSFormatMode;
+import sc.lang.js.JSTypeParameters;
+import sc.parser.ParseUtil;
 import sc.util.StringUtil;
 
 import java.util.IdentityHashMap;
@@ -15,13 +17,13 @@ public class BlockStatement extends AbstractBlockStatement {
    // hook so we can get back to the variableDefinition we were created from in transformBinding.
    public transient JavaSemanticNode fromDefinition;
 
-   public CharSequence formatToJS(JSFormatMode mode) {
+   public CharSequence formatToJS(JSFormatMode mode, JSTypeParameters params, int extraLines) {
       StringBuilder res = new StringBuilder();
       res.append("{\n");
       if (statements != null) {
          for (Statement st:statements) {
             res.append(StringUtil.indent(getNestingDepth()+1));
-            res.append(st.formatToJS(mode));
+            res.append(st.formatToJS(mode, params, extraLines + ParseUtil.countLinesInNode(res)));
          }
       }
       res.append(StringUtil.indent(getNestingDepth()));
@@ -44,5 +46,17 @@ public class BlockStatement extends AbstractBlockStatement {
 
    public boolean needsEnclosingClass() {
       return true;
+   }
+
+   public String getStartBlockString() {
+      return (staticEnabled ? "static " : "") + "{";
+   }
+
+   public String getStartBlockToken() {
+      return staticEnabled ? "static" : "{";
+   }
+
+   public String getEndBlockString() {
+      return "}";
    }
 }

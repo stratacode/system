@@ -6,6 +6,7 @@ package sc.parser;
 
 import sc.lang.ISemanticNode;
 import sc.lang.java.IdentifierExpression;
+import sc.util.StringUtil;
 
 import java.util.IdentityHashMap;
 
@@ -277,6 +278,10 @@ public class ParseNode extends AbstractParseNode {
       return null;
    }
 
+   public int getChildStartOffset(Parselet matchParselet) {
+      return -1; // TODO: we could see if this matchParselet is the parselet of our propagated value and return the index of that?
+   }
+
    public Object getSkippedValue() {
       return value;
    }
@@ -372,6 +377,26 @@ public class ParseNode extends AbstractParseNode {
 
    public boolean isErrorNode() {
       return errorNode || (value instanceof IParseNode && ((IParseNode) value).isErrorNode());
+   }
+
+   @Override
+   public boolean isGeneratedTree() {
+      if (value instanceof IParseNode)
+         return ((IParseNode) value).isGeneratedTree();
+      return false; // Do we need a 'generated' flag here like in ParentParseNode?  I can't find a place where a ParseNode gets created in the 'generate' process
+   }
+
+   public void diffParseNode(IParseNode other, StringBuilder diffs) {
+      super.diffParseNode(other, diffs);
+      if (other instanceof ParseNode) {
+         ParseNode otherPN = (ParseNode) other;
+         if ((value instanceof IParseNode)) {
+            if (!(otherPN.value instanceof IParseNode))
+               diffs.append("Parse node values are different");
+            else
+               ((IParseNode) value).diffParseNode((IParseNode) otherPN.value, diffs);
+         }
+      }
    }
 }
 

@@ -19,10 +19,16 @@ import java.util.List;
 public abstract class ScopeDefinition {
    public static ArrayList<ScopeDefinition> scopes = new ArrayList<ScopeDefinition>(4);
 
-   public ScopeDefinition parentScope;
+   public ArrayList<ScopeDefinition> parentScopes;
    public int scopeId;
    public String name;
    public List<String> aliases;
+
+   /** High-level messages about object-level events */
+   public static boolean verbose;
+
+   /** Detailed messages about property-level events */
+   public static boolean trace;
 
    public ScopeDefinition(int scopeId) {
       this.scopeId = scopeId;
@@ -36,16 +42,31 @@ public abstract class ScopeDefinition {
       this(Math.max(1, scopes.size()));
    }
 
-   /** Each scope type has a way to find the current scopes through some thread-local storage. */
-   public abstract ScopeContext getScopeContext();
+   /**
+    * Use this base class method to retrieve a scope context from temporary scope context state that's pushed
+    * onto the stack (i.e. the CurrentScopeContext).   If this method returns null, each scope definition subclass
+    * should use it's normal mechanism for looking up the current scope context.
+    */
+   public ScopeContext getScopeContext(boolean create) {
+      CurrentScopeContext envCtx = CurrentScopeContext.getEnvScopeContextState();
+      if (envCtx != null)
+         return envCtx.getScopeContext(scopeId);
+      return null;
+   }
 
    public static ScopeContext getScope(int scopeId) {
       ScopeDefinition scopeDef = scopes.get(scopeId);
-      return scopeDef.getScopeContext();
+      return scopeDef.getScopeContext(true);
    }
 
-   public ScopeDefinition getParentScope() {
-      return parentScope;
+   public void addParentScope(ScopeDefinition parent) {
+      if (parentScopes == null)
+         parentScopes = new ArrayList<ScopeDefinition>();
+      parentScopes.add(parent);
+   }
+
+   public ArrayList<ScopeDefinition> getParentScopes() {
+      return parentScopes;
    }
 
    public static ScopeDefinition getScopeDefinition(int scopeId) {
@@ -53,10 +74,14 @@ public abstract class ScopeDefinition {
    }
 
    public boolean includesScope(ScopeDefinition other) {
-      if (parentScope == other || this == other)
-         return true;
-      if (parentScope != null)
-         return parentScope.includesScope(other);
+      if (parentScopes == null)
+         return false;
+      for (ScopeDefinition parentScope:parentScopes) {
+         if (parentScope == other || this == other)
+            return true;
+         if (parentScope != null)
+            return parentScope.includesScope(other);
+      }
       return false;
    }
 
@@ -65,7 +90,9 @@ public abstract class ScopeDefinition {
       int i = 0;
       // Optimize for the common case which all scopes are active.  just return the scopes list.
       for (ScopeDefinition scopeDef:scopes) {
-         if (scopeDef.getScopeContext() != null) {
+         if (scopeDef == null)
+            continue;
+         if (scopeDef.getScopeContext(false) != null) {
             if (res != null) {
                res.add(scopeDef);
             }
@@ -86,10 +113,14 @@ public abstract class ScopeDefinition {
    public static Object lookupName(String typeName) {
       // Optimize for the common case which all scopes are active.  just return the scopes list.
       for (ScopeDefinition scopeDef:scopes) {
-         ScopeContext ctx = scopeDef.getScopeContext();
-         Object res = ctx.getValue(typeName);
-         if (res != null)
-            return res;
+         if (scopeDef == null)
+            continue;
+         ScopeContext ctx = scopeDef.getScopeContext(false);
+         if (ctx != null) {
+            Object res = ctx.getValue(typeName);
+            if (res != null)
+               return res;
+         }
       }
       return null;
    }
@@ -135,7 +166,6 @@ public abstract class ScopeDefinition {
                         if (enumRes != null) {
                            value = enumRes;
                            enumFound = true;
-                           break;
                         }
                      }
                   }
@@ -144,13 +174,8 @@ public abstract class ScopeDefinition {
                         // TODO: the precedence here seems off.  We should be testing for an inner type, enum etc. before
                         // we look for a lower case property that does not exist.
                         propName = CTypeUtil.decapitalizePropertyName(propName);
-                        try {
-                           value = DynUtil.getPropertyValue(value, propName);
-                        }
-                        catch (IllegalArgumentException exc) {
-                           // This can happen since there may not be a property of that name.  Just return null.  Maybe use a hasProperty method to avoid the exception here?
-                           value = null;
-                        }
+                        // Will get back null here if the property does not exist
+                        value = DynUtil.getPropertyValue(value, propName, true);
                      }
                      else {
                         value = null;
@@ -171,9 +196,12 @@ public abstract class ScopeDefinition {
    }
 
    public static ScopeDefinition getScopeByName(String scopeName) {
-      for (ScopeDefinition scope:scopes)
+      for (ScopeDefinition scope:scopes) {
+         if (scope == null)
+            continue;
          if (DynUtil.equalObjects(scope.name, scopeName) || (scope.matchesScope(scopeName)))
             return scope;
+      }
       return null;
    }
 
@@ -188,15 +216,31 @@ public abstract class ScopeDefinition {
    }
 
    public void registerInstance(String typeName, Object inst) {
-      ScopeContext ctx = getScopeContext();
+      ScopeContext ctx = getScopeContext(true);
       ctx.setValue(typeName, inst);
    }
 
+   public String getExternalName() {
+      return name == null ? "global" : name;
+   }
+
    public String toString() {
-      return "scope<" + (name == null ? "global" : name) + ">";
+      return "scope<" + getExternalName() + ">";
    }
 
    public boolean isGlobal() {
       return this.name == null;
+   }
+
+   /** True for scopes like 'request' that only live for the duration of the operation. */
+   public boolean isTemporary() {
+      return false;
+   }
+
+   /** Initialize the scopes that are always available */
+   public static void initScopes() {
+      GlobalScopeDefinition.getGlobalScopeDefinition();
+      AppGlobalScopeDefinition.getAppGlobalScopeDefinition();
+      RequestScopeDefinition.getRequestScopeDefinition();
    }
 }

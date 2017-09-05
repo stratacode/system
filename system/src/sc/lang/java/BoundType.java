@@ -64,16 +64,16 @@ public class BoundType extends JavaType {
       return baseType;
    }
 
-   public Object getTypeDeclaration(ITypeParamContext ctx, ITypeDeclaration itd, boolean resolve, boolean refreshParams, boolean bindUnbound) {
+   public Object getTypeDeclaration(ITypeParamContext ctx, Object itd, boolean resolve, boolean refreshParams, boolean bindUnbound) {
       return getFirstType().getTypeDeclaration(ctx, itd, resolve, refreshParams, bindUnbound);
    }
 
-   public void initType(LayeredSystem sys, ITypeDeclaration itd, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer, Object typeParam) {
+   public void initType(LayeredSystem sys, Object itd, JavaSemanticNode node, ITypeParamContext ctx, boolean displayError, boolean isLayer, Object typeParam) {
       getFirstType().initType(sys, itd, node, ctx, displayError, isLayer, typeParam);
    }
 
-   public void convertToSrcReference() {
-      getFirstType().convertToSrcReference();
+   public boolean convertToSrcReference() {
+      return getFirstType().convertToSrcReference();
    }
 
    public String getBaseSignature() {
@@ -102,7 +102,10 @@ public class BoundType extends JavaType {
       if (boundTypes != null) {
          for (int i = 0; i < boundTypes.size(); i++) {
             JavaType t = boundTypes.get(i);
-            sb.append(" & ");
+            if (i != 0)
+               sb.append(" & ");
+            else
+               sb.append(" ");
             sb.append(t.toGenerateString());
          }
       }

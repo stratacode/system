@@ -36,6 +36,7 @@ public class CommandInterpreter extends AbstractInterpreter implements Runnable 
    }
 
    public boolean readParseLoop() {
+      initReadThread();
       boolean lastPending = false;
       try {
          String nextLine;
@@ -55,6 +56,8 @@ public class CommandInterpreter extends AbstractInterpreter implements Runnable 
                }
             }
             else {
+               execLaterJobs();
+
                System.out.print(prompt());
                lastPending = false;
             }

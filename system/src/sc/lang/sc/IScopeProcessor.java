@@ -33,6 +33,9 @@ public interface IScopeProcessor extends IDefinitionProcessor {
    /** Name type name for a template to apply when this scope is applied to a class */
    public String getNewTemplate();
 
+   /** True if this scope is not a lasting one - i.e. to turn off synchronization for objects in that scope */
+   public boolean isTemporaryScope();
+
    /** If non-null, requires that this scope be set on objects/classes/fields enclosed inside of the named parent type */
    public String getRequiredParentType();
 

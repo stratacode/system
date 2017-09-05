@@ -7,7 +7,11 @@ package sc.lang.java;
 import sc.lang.*;
 import sc.lang.js.JSFormatMode;
 import sc.lang.js.JSLanguage;
+import sc.lang.js.JSTypeParameters;
+import sc.lang.template.Template;
+import sc.layer.SrcEntry;
 import sc.parser.*;
+import sc.type.CTypeUtil;
 import sc.type.DynType;
 import sc.type.IBeanMapper;
 import sc.type.TypeUtil;
@@ -101,6 +105,29 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       }
    }
 
+   public static class ErrorRangeInfo {
+      public int fromIx;
+      public int toIx;
+
+      public ErrorRangeInfo(int fromIx, int toIx) {
+         this.fromIx = fromIx;
+         this.toIx = toIx;
+      }
+
+      public String toString() {
+         return fromIx + ":" + toIx;
+      }
+   }
+
+   void displayRangeError(int fromIx, int toIx, String...args) {
+      displayTypeError(args);
+      if (errorArgs != null) {
+         ArrayList<Object> eargs = new ArrayList<Object>(Arrays.asList(errorArgs));
+         eargs.add(new ErrorRangeInfo(fromIx, toIx));
+         errorArgs = eargs.toArray();
+      }
+   }
+
    public void displayFormatatedError(String arg) {
       if (errorArgs == null) {
          super.displayFormattedError(arg);
@@ -154,7 +181,7 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
 
    public abstract Statement transformToJS();
 
-   public CharSequence formatToJS(JSFormatMode mode) {
+   public CharSequence formatToJS(JSFormatMode mode, JSTypeParameters params, int extraLines) {
       SemanticNodeList<Statement> sts = new SemanticNodeList<Statement>();
       sts.parentNode = parentNode; // Plug it into the hierarchy so it gets the right nesting level
       sts.add(this, false, true);
@@ -162,14 +189,24 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       // Using blockStatements here to include VariableStatement.  Since it is a choice of items and an array it expects an array value so just wrap it here.
       String res = sts.toLanguageString(JSLanguage.getJSLanguage().blockStatements);
       if (res.contains("Generation error"))
-         System.out.println("*** Generation error for statmeent: " + this);
+         System.out.println("*** Generation error for statement: " + this);
+      IParseNode pn = getParseNode();
+      if (pn != null && params.lineIndex != null) {
+         // Update startIndex to be relative to the root node here
+         pn.resetStartIndex(0, false, false);
+         // This is the string version of the statement we are processing - to use for counting newlines for offsets of the generated statements
+         params.lineIndex.currentStatement = res;
+         addToFileLineIndex(params.lineIndex, params.getGenLineCount() + extraLines);
+         params.lineIndex.currentStatement = null;
+      }
+      //params.addGenLineMapping(this, res, extraLines);
       return res;
    }
 
    public void addInitStatements(List<Statement> res, InitStatementsMode mode) {
    }
 
-   public void addReturnStatements(List<Statement> res) {
+   public void addReturnStatements(List<Statement> res, boolean includeThrow) {
    }
 
    public void setComment(String s) {
@@ -204,8 +241,12 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
    public String getNodeErrorText() {
       if (errorArgs != null) {
          StringBuilder sb = new StringBuilder();
-         for (Object arg:errorArgs)
+         for (Object arg:errorArgs) {
+            // This is added on so we know which component of an identifier expression should display the error.  Don't display the toString of it to the user.
+            if (arg instanceof ErrorRangeInfo)
+               continue;
             sb.append(arg.toString());
+         }
          sb.append(this.toString());
          return sb.toString();
       }
@@ -264,7 +305,7 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
     * code.  You can provide a 'fromStatement' and a default statement.  If the from statement matches, this node is
     * updated.  If the fromStatement is null the defaultStatement is used.
     * <p>
-    * To determine whether the fromStatement matches this statememtn, we call matchesStatement.  For assignment expressions
+    * To determine whether the fromStatement matches this statement, we call matchesStatement.  For assignment expressions
     * right now, that allows us to match the right assignment statement in the list to the source from which it was generated from.
     * </p>
     */
@@ -304,6 +345,8 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       super.stop();
 
       errorArgs = null;
+      fromStatement = null;
+      childNestingDepth = -1;
    }
 
    /**
@@ -341,5 +384,188 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
          }
       }
       sts.add(this);
+   }
+
+   public Statement findStatement(Statement in) {
+      if (deepEquals(in))
+         return this;
+      return null;
+   }
+
+   public boolean isLeafStatement() {
+      return !(this instanceof IBlockStatement) && !(this instanceof IStatementWrapper);
+   }
+
+   public boolean isLineStatement() {
+      return isLeafStatement();
+   }
+
+   /** Returns the number of lines this statement occupies for means of navigation, breakpoints, debugging etc. */
+   public int getNumStatementLines() {
+      if (this instanceof IStatementWrapper) // e.g. synchronized, for, while, etc.  TODO: handle the case where the first part is split over more than one line - i.e. get the parse-node for the first part and count the lines there
+         return 1;
+      // While the TypeDeclarations are not leaf statements and so don't get added explicitly, we might point the generated
+      // line at the first line of the class declaration if it's generated as part of the definition for that type.
+      // This also handles NewExpression when there's a classBody
+      if (this instanceof IClassBodyStatement && !isLeafStatement())
+         return 1;
+      // Ignore trailing newlines and whitespace so we get a closer approximation to the code
+      // TODO: should we ignore comments here?  Maybe we should eliminate the 'spacing' parse-node in the count
+      return ParseUtil.countCodeLinesInNode(getParseNode());
+   }
+
+   /**
+    * Adds this statement to the generated file line index.  If you pass in rootStartGenLen = -1, the generated source file is used
+    * to compute the line number using this parse-node's offset into that file.  If you pass in a positive value, we count the lines
+    * in "currentStatement" of the index up until the parse-node's offset.  You can use this mode to incrementally generate an index,
+    * even when there's no complete transformed model for the entire file (such as with generating JS).  In that case, we have a generated
+    * model for each statement and are manually adding statements to the file, so we need to compute the line numbers relative to this "currentStatement"
+    * - i.e. the root statement.
+    */
+   public void addToFileLineIndex(GenFileLineIndex idx, int rootStartGenLine) {
+      if (isLineStatement()) {
+         ISrcStatement srcStatement = getSrcStatement(null);
+         if (srcStatement != null && srcStatement != this) {
+            ISemanticNode srcRoot = srcStatement.getRootNode();
+            if (srcRoot instanceof JavaModel) {
+               JavaModel srcModel = (JavaModel) srcRoot;
+               int startGenOffset = getParseNode().getStartIndex();
+               if (startGenOffset == -1) {
+                  System.out.println("*** Attempt to add statement to genLine index with a parse-node that's missing a startIndex");
+                  return;
+               }
+               int startGenLine;
+               if (rootStartGenLine == -1) {
+                  startGenLine = idx.genFileLineIndex.getLineForOffset(startGenOffset);
+               }
+               else {
+                  CharSequence cur = idx.currentStatement;
+                  startGenLine = rootStartGenLine + ParseUtil.countCodeLinesInNode(cur, startGenOffset+1);
+               }
+               int numGenLines = getNumStatementLines();
+               if (numGenLines > 0)
+                  numGenLines--;
+               int endGenLine = startGenLine + numGenLines;
+
+               addMappingForSrcStatement(idx, srcModel, srcStatement, startGenLine, endGenLine);
+            }
+            else {
+               System.err.println("*** Unrecognized root node for src statement in generated model");
+            }
+         }
+         // else - these statements are not generated with the fromStatement set - break here to improve the registration
+      }
+      if (this instanceof IBlockStatement) {
+         List<Statement> blockSts = ((IBlockStatement) this).getBlockStatements();
+         if (blockSts != null) {
+            for (Statement blockSt:blockSts) {
+               blockSt.addToFileLineIndex(idx, rootStartGenLine);
+            }
+         }
+      }
+      else if (this instanceof IStatementWrapper) {
+         Statement wrappedSt = ((IStatementWrapper) this).getWrappedStatement();
+         if (wrappedSt != null)
+            wrappedSt.addToFileLineIndex(idx, rootStartGenLine);
+      }
+      else if (this instanceof IBlockStatementWrapper) {
+         BlockStatement bst = ((IBlockStatementWrapper) this).getWrappedBlockStatement();
+         if (bst != null)
+            bst.addToFileLineIndex(idx, rootStartGenLine);
+      }
+      // NewExpression and TypeDeclaration
+      else if (this instanceof IClassBodyStatement) {
+         List<Statement> sts = ((IClassBodyStatement) this).getBodyStatements();
+         if (sts != null) {
+            for (Statement st:sts)
+               st.addToFileLineIndex(idx, rootStartGenLine);
+         }
+      }
+   }
+
+   public void setFromStatement(ISrcStatement from) {
+      fromStatement = from;
+   }
+
+   public static void addMappingForSrcStatement(GenFileLineIndex idx, JavaModel srcModel, ISrcStatement srcStatement, int startGenLine, int endGenLine) {
+      IParseNode srcParseNode = srcStatement.getParseNode();
+      if (srcParseNode == null) {
+         int ict = 0;
+         ISemanticNode srcParent = srcStatement.getParentNode();
+         while (srcParent != null && srcParseNode == null && ict < 2) {
+            srcParseNode = srcParent.getParseNode();
+            // TODO: should we have Template implement ISrcStatement for the empty src case?
+            if (srcParseNode == null || !(srcParent instanceof ISrcStatement))
+               srcParent = srcParent.getParentNode();
+            else
+               break;
+            ict++;
+         }
+         if (srcParseNode != null) {
+            if (srcParent instanceof ISrcStatement)
+               srcStatement = (ISrcStatement) srcParent;
+            if (srcParent == null) {  // this happens with Template which is not an
+               srcParseNode = null;
+            }
+         }
+      }
+      if (srcParseNode != null) {
+         int startSrcLine = idx.getSrcFileIndex(srcModel.getSrcFile()).srcFileLineIndex.getLineForOffset(srcParseNode.getStartIndex());
+         int numSrcLines = srcStatement.getNumStatementLines();
+         if (numSrcLines > 0)
+            numSrcLines--;
+         int endSrcLine = startSrcLine + numSrcLines;
+
+         idx.addMapping(srcModel.getSrcFile(), startGenLine, endGenLine, startSrcLine, endSrcLine);
+      }
+      else if (GenFileLineIndex.verbose) {
+         System.out.println("*** Warning - no source for src statement: " + srcStatement);
+      }
+   }
+
+   public static void addMappingForSrcStatement(GenFileLineIndex lineIndex, ISrcStatement srcStatement, int genStartLine, CharSequence genStatementCode) {
+      ISemanticNode srcRoot = srcStatement.getRootNode();
+      if (srcRoot instanceof JavaModel) {
+         JavaModel srcModel = (JavaModel) srcRoot;
+         SrcEntry srcFile = srcModel.getSrcFile();
+         if (srcFile != null) {
+            int genLine = genStartLine;
+            int numGenLines = ParseUtil.countLinesInNode(genStatementCode);
+            if (numGenLines != 0)
+               numGenLines--;
+            Statement.addMappingForSrcStatement(lineIndex, srcModel, srcStatement, genLine, genLine + numGenLines);
+         }
+      }
+   }
+
+   public static void addMappingForStatement(GenFileLineIndex lineIndex, Statement st, int genStartLine, CharSequence genStatementCode) {
+      ISrcStatement srcStatement = st.getSrcStatement(null);
+      if (srcStatement != null && srcStatement != st) {
+         addMappingForSrcStatement(lineIndex, srcStatement, genStartLine, genStatementCode);
+      }
+   }
+
+   public static String addStatementNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
+      String packagePrefix;
+      boolean isQualifiedType = false;
+      if (matchPrefix.contains(".")) {
+         packagePrefix = CTypeUtil.getPackageName(matchPrefix);
+         matchPrefix = CTypeUtil.getClassName(matchPrefix);
+         isQualifiedType = true;
+      }
+      else {
+         packagePrefix = origModel == null ? null : origModel.getPackagePrefix();
+      }
+      ModelUtil.suggestTypes(origModel, packagePrefix, matchPrefix, candidates, true);
+      if (origModel != null && !isQualifiedType) {
+         Object currentType = origNode == null ? origModel.getModelTypeDeclaration() : origNode.getEnclosingType();
+         if (currentType != null)
+            ModelUtil.suggestMembers(origModel, currentType, matchPrefix, candidates, true, true, true, true);
+      }
+      return matchPrefix;
+   }
+
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
+      return addStatementNodeCompletions(origModel, origNode, matchPrefix, offset, dummyIdentifier, candidates);
    }
 }

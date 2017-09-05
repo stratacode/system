@@ -10,10 +10,10 @@ public class SymbolChoice extends Parselet {
    private HashSet<IString> expectedValues = new HashSet<IString>();
    // Optional set of symbols that include the expectedValues but should not cause a match - e.g. %> for TemplateLanguage to not match the % for the modulo operator
    private HashSet<IString> excludedValues = null;
-   private HashMap<IString,List<IString>> valueIndex = new HashMap<IString,List<IString>>();
+   HashMap<IString,List<IString>> valueIndex = new HashMap<IString,List<IString>>();
 
    // index for excludedValues - foreach excluded symbol - e.g. %> this table stores remaining string to exclude - here >
-   private HashMap<IString,ArrString> excludedPeekString = null;
+   private HashMap<IString,ArrayList<ArrString>> excludedPeekString = null;
 
    // Specifies the number of characters to use as an index for choosing the choice
    public int keySize = -1;
@@ -24,7 +24,7 @@ public class SymbolChoice extends Parselet {
    // Match any character in the stream (or do not match if negated is true).
    private boolean matchANY = false;
 
-   // Optimizae the case where each pattern is only a single character
+   // Optimize the case where each pattern is only a single character
    private boolean allSingleCharPatterns = true;
 
    private char[] expectedChars;
@@ -178,14 +178,19 @@ public class SymbolChoice extends Parselet {
       expectedValues.remove(null); // this one messes up comparisons with strings that have a null char apparently!
 
       if (excludedValues != null) {
-         excludedPeekString = new HashMap<IString,ArrString>();
+         excludedPeekString = new HashMap<IString,ArrayList<ArrString>>();
          for (IString excludeValue:excludedValues) {
             boolean matched = false;
             for (IString expectedValue:expectedValues) {
                if (excludeValue.startsWith(expectedValue)) {
                   matched = true;
                   IString peekStr = excludeValue.substring(expectedValue.length());
-                  excludedPeekString.put(expectedValue, ArrString.toArrString(peekStr.toString()));
+                  ArrayList<ArrString> excludePeekList = excludedPeekString.get(expectedValue);
+                  if (excludePeekList == null) {
+                     excludePeekList = new ArrayList<ArrString>();
+                     excludedPeekString.put(expectedValue, excludePeekList);
+                  }
+                  excludePeekList.add(ArrString.toArrString(peekStr.toString()));
                }
             }
             if (!matched)
@@ -397,11 +402,13 @@ public class SymbolChoice extends Parselet {
          return customError;
       if (excludedValues != null) {
          // Some input symbols may be excluded e.g. %> will override %
-         ArrString excludedTokensToPeek = excludedPeekString.get(matchedValue);
+         ArrayList<ArrString> excludedTokensToPeek = excludedPeekString.get(matchedValue);
          if (excludedTokensToPeek != null) {
-            // If we match the excluded peek string for this symbol, it's not a match
-            if (parser.peekInputStr(excludedTokensToPeek, false) == 0)
-               return "excluded token";
+            for (ArrString excludeToken:excludedTokensToPeek) {
+               // If we match the excluded peek string for this symbol, it's not a match
+               if (parser.peekInputStr(excludeToken, false) == 0)
+                  return "excluded token";
+            }
          }
       }
       return null;
@@ -487,11 +494,17 @@ public class SymbolChoice extends Parselet {
       
       IString istr = PString.toIString(value);
 
-      if (istr == null)
-      {
+      if (istr == null) {
          if (optional)
             return null;
 
+         // If the symbol choice only has one value, we handle it like we do with 'symbol'
+         // This is a weird case in the grammar but useful because Symbol does not implement
+         // the excludedValues like SymbolChoice does.
+         if (!negated && !repeat && expectedValues.size() == 1)
+            return generateResult(ctx, expectedValues.iterator().next());
+
+         // There's not enough information here to generate which of the symbols should be generated
          return SYMBOL_CHOICE_ERROR;
       }
 
@@ -505,6 +518,7 @@ public class SymbolChoice extends Parselet {
       while (istr.length() > 0 && !stringMatches(istr))
          istr = istr.substring(0,istr.length()-1);
 
+      // TODO: use acceptTree here to validate the entire value?
       if (istr.length() > 0 && stringMatches(istr) && accept(ctx.semanticContext, istr, -1, -1) == null)
          return generateResult(ctx, istr); 
 
@@ -515,6 +529,10 @@ public class SymbolChoice extends Parselet {
       SymbolChoice newP = (SymbolChoice) super.clone();
       newP.expectedValues = (HashSet<IString>) newP.expectedValues.clone();
       newP.valueIndex = (HashMap<IString,List<IString>>) newP.valueIndex.clone();
+      if (newP.excludedValues != null)
+         newP.excludedValues = (HashSet<IString>) newP.excludedValues.clone();
+      if (newP.excludedPeekString != null)
+         newP.excludedPeekString = (HashMap<IString,ArrayList<ArrString>>) newP.excludedPeekString.clone();
       return newP;
    }
 }

@@ -171,16 +171,16 @@ public class MethodBinding extends AbstractMethodBinding implements IResponseLis
          }
       }
       catch (RuntimeException exc) {
-         if (info || trace)
+         if (info || trace) {
             System.err.println("Runtime exception from method binding: " + this + ": " + exc);
-         if (trace)
             exc.printStackTrace();
+         }
       }
       catch (Exception exc) {
-         if (info || trace)
+         if (info || trace) {
             System.err.println("Exception from method binding: " + this + ": " + exc);
-         if (trace)
             exc.printStackTrace();
+         }
       }
       return null;
    }

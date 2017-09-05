@@ -4,11 +4,13 @@
 
 package sc.lang.java;
 
+import sc.parser.GenFileLineIndex;
+
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
-public class CatchStatement extends NonIndentedStatement {
+public class CatchStatement extends NonIndentedStatement implements IBlockStatementWrapper {
    public Parameter parameters;
    public BlockStatement statements;
 
@@ -86,5 +88,15 @@ public class CatchStatement extends NonIndentedStatement {
       if (statements != null)
          sb.append(statements);
       return sb.toString();
+   }
+
+   public void addReturnStatements(List<Statement> res, boolean incThrow) {
+      if (statements != null)
+         statements.addReturnStatements(res, incThrow);
+   }
+
+   @Override
+   public BlockStatement getWrappedBlockStatement() {
+      return statements;
    }
 }

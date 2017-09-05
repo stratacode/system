@@ -339,4 +339,12 @@ public class ChainedResultSequence extends Sequence {
       // propagate the value to the first slot
       return ix == 0 || forceReparse ? oldParseNode : SKIP_CHILD;
    }
+
+   /**
+    * In partial values mode, if we get an error on slot 1, that's a match of slot 0 so even if there's a way to
+    * extend the error, do not do so
+    */
+   protected boolean disableExtendedErrors() {
+      return true;
+   }
 }

@@ -224,6 +224,81 @@ public class ParseUtil  {
       return new FilePosition(lineCt, column);
    }
 
+   /**
+    * Returns the number of spaces for the given line for the given file name.  Uses line numbers starting at 1.
+    * Warning - no caching or indexing - reads the file, counts the chars so don't put this into a loop.
+    * Returns 0 if the line number is found
+    */
+   public static int getIndentColumnForLine(String fileName, int lineNum) {
+      String fileStr = FileUtil.getFileAsString(fileName);
+      int len = fileStr.length();
+      int lineCt = 1;
+      for (int i = 0; i < len; i++) {
+         if (lineCt == lineNum) {
+            int spaceCt = 0;
+            while (i < len && Character.isWhitespace(fileStr.charAt(i++)))
+               spaceCt++;
+            return spaceCt;
+         }
+         if (fileStr.charAt(i) == '\n')
+            lineCt++;
+      }
+      return 0; // If we can't find the indent - just return 0 since this is used for UI navigation
+   }
+
+   /**
+    * Utility method to find a single contiguous error inside of a specified region of a parse node.
+    * If there are multiple errors, the 'error region' inside of the specified startIx and endIx params
+    * is returned.  This is used for identifying unparsed regions in building a formatting code model
+    * for this file to capture errors that exist between recognized parsed types.  It's not OK to just treat
+    * them as whitespace since IntelliJ complains.
+    */
+   public static ParseRange findErrorsInRange(IParseNode pn, int startIx, int endIx) {
+      int pnStart = pn.getStartIndex();
+      int pnLen = pn.length();
+      int pnEnd = pnStart + pnLen;
+
+      if (pnStart > endIx || pnEnd < startIx)
+         return null;
+
+      // NOTE: pn.isErrorNode() does not work here - we set the error node flag on the parent if any child has an error but the entire node is not an error node
+      if (pn instanceof ErrorParseNode) {
+         return new ParseRange(Math.max(pnStart,startIx), Math.min(pnEnd, endIx));
+      }
+      else if (pn instanceof ParseNode) {
+         ParseNode p = (ParseNode) pn;
+         if (p.value instanceof IParseNode) {
+            return findErrorsInRange((IParseNode) p.value, startIx, endIx);
+         }
+         return null;
+      }
+      else if (pn instanceof ParentParseNode) {
+         ParentParseNode p = (ParentParseNode) pn;
+         ParseRange errors = null;
+         if (p.children != null) {
+            for (int i = 0; i < p.children.size(); i++) {
+               Object child = p.children.get(i);
+               if (child instanceof IParseNode) {
+                  IParseNode childPN = (IParseNode) child;
+                  if (childPN.getStartIndex() > endIx)
+                     return errors;
+                  ParseRange range = findErrorsInRange(childPN, startIx, endIx);
+                  if (range != null) {
+                     if (errors == null)
+                        errors = range;
+                     else {
+                        errors.mergeInto(range.startIx, range.endIx);
+                     }
+                  }
+               }
+            }
+         }
+         return errors;
+      }
+      else // String based parse-node cannot be an error
+         return null;
+   }
+
    /** Given a parse node, returns either that parse node or a child of that parse node. */
    public static IParseNode findClosestParseNode(IParseNode parent, int offset) {
       if (parent.getStartIndex() > offset)
@@ -294,8 +369,7 @@ public class ParseUtil  {
       return parentNode;
    }
 
-   public static String getInputString(File file, int startIndex, int i)
-   {
+   public static String getInputString(File file, int startIndex, int i) {
       String str = readFileString(file);
       if (str == null)
          return "can't open file: " + file;
@@ -306,8 +380,7 @@ public class ParseUtil  {
       return str.substring(startIndex, startIndex + i);
    }
 
-   public static String escapeObject(Object value)
-   {
+   public static String escapeObject(Object value) {
       if (value == null)
          return "null";
       return escapeString(value.toString());
@@ -601,6 +674,22 @@ public class ParseUtil  {
       adapter.styleString(strVal, escape, styleName, null);
    }
 
+
+   public static void toStyledChild(IStyleAdapter adapter, ParentParseNode parent, Object child, int childIx) {
+      if (!(child instanceof IParseNode) && child != null) {
+         Parselet childParselet = ((NestedParselet) parent.getParselet()).getChildParselet(child, childIx);
+         if (childParselet != null) {
+            String styleName = null;
+            styleName = childParselet.styleName;
+            if (styleName != null) {
+               adapter.styleString((CharSequence) child, false, styleName, null);
+               return;
+            }
+         }
+      }
+      ParseUtil.toStyledString(adapter, child);
+   }
+
    public static void toStyledString(IStyleAdapter adapter, Object parseNode) {
       if (parseNode instanceof IParseNode)
          ((IParseNode) parseNode).styleNode(adapter, null, null, -1);
@@ -640,7 +729,7 @@ public class ParseUtil  {
             model.setLayeredSystem(sys);
          if (model instanceof JavaModel) {
             ((JavaModel) model).isLayerModel = isLayer;
-            ((JavaModel) model).temporary = true;
+            model.markAsTemporary();
          }
          if (fileName != null) {
             model.setLayer(layer);
@@ -656,6 +745,10 @@ public class ParseUtil  {
          ParseUtil.initAndStartComponent(semanticValue);
       }
 
+      return styleSemanticValue(semanticValue, result, dispLayerPath, fileName);
+   }
+
+   public static Object styleSemanticValue(Object semanticValue, Object result, String dispLayerPath, String fileName) {
       StringBuilder sb = new StringBuilder();
       if (dispLayerPath != null && fileName != null) {
          sb.append("<div class='filename'>");
@@ -701,16 +794,26 @@ public class ParseUtil  {
       return parseNodeObj;
    }
 
-   public static void reformatParseNode(IParseNode node) {
-      node.formatString(null, null, -1, true);
-   }
-
    /** Re-applies default spacing/new line rules to the parse node given.  The spacing and newline objects have their parse nodes replaced by the generateParseNode */
    public static void resetSpacing(ISemanticNode node) {
       IParseNode opn = node.getParseNode();
       IParseNode npn = opn.reformat();
       if (npn != opn)
          node.setParseNode(npn);
+   }
+
+   /**
+    * Removes the formatting parse-nodes, like SpacingParseNode and NewlineParseNode and replaces them with actual text based on the reformat algorithm.
+    * Some background on this: when we re-generate a model, i.e. update the parse-node representation for changes in the semantic node tree, we are unable to
+    * determine the spacing and other text which is generated based on the complete context.  Instead, we insert these formatting parse-nodes as placeholders.  The format process starts then
+    * from the top of the file and can accurately generate the indentation, newlines and spaces as per the formatting rules.   This method performs that global operation but also replaces
+    * the formatting parse-nodes with the actual formatting characters - e.g. the whitespace, newlines, etc.  so they can be more easily manipulated.   Operations like reparsing and generating
+    * the IDE representation of the parse-nodes requires that the spacing is all evaluated.
+    *
+    * See also ParseUtil.resetSpacing which does the opposite - replacing the explicit spacing nodes with generated nodes so you can reformat a file.
+    */
+   public static void reformatParseNode(IParseNode node) {
+      node.formatString(null, null, -1, true);
    }
 
 
@@ -811,26 +914,68 @@ public class ParseUtil  {
       return sb.toString();
    }
 
-   public static String getSpaceBefore(IParseNode parseNode, ISemanticNode value) {
+   public static class SpaceBeforeResult {
+      public boolean found;
+      public String spaceBefore;
+
+      SpaceBeforeResult(boolean found, String space) {
+         this.found = found;
+         this.spaceBefore = space;
+      }
+   }
+
+   /**
+    * Takes a parent child node and does a search through the parse-node tree looking for the semantic-value specified.  Returns the comments (aka whitespace) right
+    * before that node, i.e. javadoc style comments */
+   public static SpaceBeforeResult getSpaceBefore(IParseNode parseNode, ISemanticNode value, Parselet spacing) {
       StringBuilder sb = new StringBuilder();
       if (parseNode instanceof ParentParseNode) {
          ParentParseNode pp = (ParentParseNode) parseNode;
          if (pp.children != null) {
             for (Object childNode:pp.children) {
-               if (childNode instanceof ParentParseNode) {
-                  ParentParseNode childParent = (ParentParseNode) childNode;
-                  if (childParent.value == value)
-                     return sb.toString();
-
-                  Object childSB = getSpacingForNode(childParent);
-                  if (childSB != null) {
-                     sb.append(childSB);
+               if (childNode instanceof IParseNode) {
+                  IParseNode childPN = (IParseNode) childNode;
+                  Object childSemVal = childPN.getSemanticValue();
+                  // Ok, found the top-level parse-node which produced the value
+                  if (childSemVal == value) {
+                     if (childPN instanceof ParentParseNode) {
+                        // Check if there's a nested parse-node that also produced the same value.  if so, we'll include any comments here as well
+                        SpaceBeforeResult nestedResult = getSpaceBefore(childPN, value, spacing);
+                        if (nestedResult.found)
+                           sb.append(nestedResult.spaceBefore);
+                     }
+                     return new SpaceBeforeResult(true, sb.toString());
+                  }
+                  // Don't look at comments which precede another semantic value - only those directly before the node we are documenting
+                  else if (!(childSemVal instanceof CharSequence) && !(childSemVal instanceof SemanticNodeList))
+                     sb = new StringBuilder();
+                  if (childNode instanceof ParentParseNode) {
+                     ParentParseNode childParent = (ParentParseNode) childNode;
+                     SpaceBeforeResult childResult = getSpaceBefore(childParent, value, spacing);
+                     if (childResult.found) {
+                        childResult.spaceBefore = sb.toString() + childResult.spaceBefore;
+                        return childResult;
+                     }
+                     else
+                        sb.append(childResult.spaceBefore);
                   }
                }
+
+               if (pp.parselet == spacing)
+                  sb.append(childNode);
             }
          }
       }
-      return sb.toString();
+      // Did not find the child so don't return anything
+      return new SpaceBeforeResult(false, sb.toString());
+   }
+
+   public static String getCommentsBefore(IParseNode outerParseNode, ISemanticNode semNode, Parselet commentParselet) {
+      ParseUtil.SpaceBeforeResult spaceBefore = ParseUtil.getSpaceBefore(outerParseNode, semNode, commentParselet);
+      if (!spaceBefore.found) {
+         return "";
+      }
+      return ParseUtil.stripComments(spaceBefore.spaceBefore);
    }
 
    public static boolean isCollapsibleNode(Object currentParent) {
@@ -847,10 +992,35 @@ public class ParseUtil  {
 
    public static int countLinesInNode(CharSequence nodeStr) {
       int numLines = 0;
+      // TODO: we should probably just have a method which counts newlines in the parse-node strings since length is almost as expensive as just doing that and length is inside of charAt - or cache len in the parse node?
+      if (nodeStr instanceof IParseNode)
+         nodeStr = nodeStr.toString();
       for (int i = 0; i < nodeStr.length(); i++) {
          char c = nodeStr.charAt(i);
          if (c == '\n')
             numLines++;
+      }
+      return numLines;
+   }
+   public static int countCodeLinesInNode(CharSequence nodeStr) {
+      return countCodeLinesInNode(nodeStr, nodeStr.length());
+   }
+
+   public static int countCodeLinesInNode(CharSequence nodeStr, int len) {
+      int numLines = 0;
+      // TODO: we should probably just have a method which counts newlines in the parse-node strings since length is almost as expensive as just doing that and length is inside of charAt - or cache len in the parse node?
+      if (nodeStr instanceof IParseNode)
+         nodeStr = nodeStr.toString();
+      int nextLines = 0;
+      for (int i = 0; i < len; i++) {
+         char c = nodeStr.charAt(i);
+         if (c == '\n')
+            nextLines++;
+         // Do not count extra newlines after the node - those might be trailing comments or whatever which we do not track.
+         else if (!Character.isWhitespace(c)) {
+            numLines += nextLines;
+            nextLines = 0;
+         }
       }
       return numLines;
    }
@@ -878,18 +1048,23 @@ public class ParseUtil  {
       }
       if (origParseNode != null) {
          int startIx = origParseNode.getStartIndex();
-         if (startIx != -1) {
+         if (startIx != -1 && newModel != null && newModel.getParseNode() != null) {
             IParseNode newNode = newModel.getParseNode().findParseNode(startIx, origParseNode.getParselet());
             if (newNode != null) {
                Object semValue = newNode.getSemanticValue();
                if (semValue instanceof JavaSemanticNode)
                   return (JavaSemanticNode) semValue;
-               else
+               else {
                   System.err.println("*** Unrecognized return type");
+               }
+            }
+            else {
+               System.err.println("*** Failed to find new parse node in model");
+               newNode = newModel.getParseNode().findParseNode(startIx, origParseNode.getParselet());
             }
          }
       }
-      return null;
+      return oldNode;
    }
 
    /**
@@ -923,6 +1098,15 @@ public class ParseUtil  {
       int oldLen = pnode.length();
       int newLen = newText.length();
 
+      // Stop all of the nodes before we reparse to ensure we can cleanly start them up afterwards.
+      Object oldModel = pnode.getSemanticValue();
+      if (oldModel != null) {
+         if (oldModel instanceof JavaModel)
+            ((JavaModel) oldModel).stop(false); // faster to skip stopping the modified models
+         else
+            ParseUtil.stopComponent(oldModel);
+      }
+
       // First we make a pass over the parse node tree to find two mark points in the file - where the changes
       // start and where the text becomes the same again.  We are optimizing for the "single edit" case - global
       // edits currently will require a complete reparse (not that we could not handle this case - it will just be
@@ -955,7 +1139,6 @@ public class ParseUtil  {
          ctx.endChangeNewOffset = origNewLen;
          ctx.endChangeOldOffset = origOldLen;
          pnode.findEndDiff(ctx, null, null, -1);
-
 
          // If we are still on the last character we checked - there's no overlap in these files so advance the count beyond the last char
          if (ctx.endChangeNewOffset == origNewLen)

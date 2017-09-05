@@ -4,6 +4,8 @@
 
 package sc.lang.java;
 
+import java.util.List;
+
 public class ThrowStatement extends ExpressionStatement {
    
    public ExecResult eval(ExecutionContext ctx) {
@@ -24,5 +26,10 @@ public class ThrowStatement extends ExpressionStatement {
       st.setProperty("operator", "throw");
       st.setProperty("expression", ex);
       return st;
+   }
+
+   public void addReturnStatements(List<Statement> res, boolean includeThrow) {
+      if (includeThrow)
+         res.add(this);
    }
 }

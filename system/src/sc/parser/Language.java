@@ -4,6 +4,7 @@
 
 package sc.parser;
 
+import sc.lang.ILanguageModel;
 import sc.layer.*;
 import sc.type.DynType;
 import sc.type.IBeanMapper;
@@ -14,10 +15,7 @@ import sc.util.PerfMon;
 import sc.util.StringUtil;
 
 import java.io.*;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
 
 /** 
  * This is the abstract base class for all language grammars defined in the system (e.g. JavaLanguage, SCLanguage, HTMLLanguage, etc.  It implements some features shared by all languages.  For example,
@@ -440,6 +438,7 @@ public abstract class Language extends LayerFileComponent {
       LayeredSystem sys = LayeredSystem.getCurrent().getMainLayeredSystem();
       fileName = FileUtil.unnormalize(fileName);
       String absFileName = fileName;
+      boolean active = false;
       // TODO: this is a hack!  Add a new parameter or maybe disabled:layerName?
       if (layerName != null) {
          Layer layer = sys.getActiveOrInactiveLayerByPathSync(layerName, null, true, true, layerEnabled);
@@ -450,20 +449,29 @@ public abstract class Language extends LayerFileComponent {
          absFileName = FileUtil.concat(layer.getLayerPathName(), fileName);
          // Want to start the layer before we start loading types into it.  Otherwise, when it gets started we see that we have types to replace when we really don't.
          layer.checkIfStarted();
+         active = layer.activated;
       }
-      // TODO should we check the system.getCachedModel to see if we have this guy already?
-      File file = new File(absFileName);
-      try {
-         Object result = parse(file);
-         if (result instanceof ParseError) {
-            System.err.println("Error parsing string to be styled - no styling for this section: " + file + ": " + ((ParseError) result).errorStringWithLineNumbers(file));
-            return "";
+
+      // Don't load the model twice if we've already loaded it.  This is a little weird because sometimes in the styling we have the type already loaded in the active model
+      // so we just use it rather than loading it again.  If not, we might need to get it in an inactive layer.
+      ILanguageModel oldModel = sys.getCachedModelByPath(absFileName, active);
+      if (oldModel == null) {
+         File file = new File(absFileName);
+         try {
+            Object result = parse(file);
+            if (result instanceof ParseError) {
+               System.err.println("Error parsing string to be styled - no styling for this section: " + file + ": " + ((ParseError) result).errorStringWithLineNumbers(file));
+               return "";
+            }
+            return ParseUtil.styleParseResult(layerName, layerName, fileName, displayError, isLayer, result, layerEnabled);
          }
-         return ParseUtil.styleParseResult(layerName, layerName, fileName, displayError, isLayer, result, layerEnabled);
+         catch (IllegalArgumentException exc) {
+            System.err.println("Error reading file to be styled: " + absFileName + ": " + exc);
+            return "Missing file: " + absFileName;
+         }
       }
-      catch (IllegalArgumentException exc) {
-         System.err.println("Error reading file to be styled: " + absFileName + ": " + exc);
-         return "Missing file: " + absFileName;
+      else {
+         return ParseUtil.styleSemanticValue(oldModel, oldModel.getParseNode(), layerName, fileName);
       }
    }
 
@@ -582,8 +590,13 @@ public abstract class Language extends LayerFileComponent {
    /* Maintains the set of languages currently registered in this class loader */
 
    // TODO: move this into LayeredSystem - using LayeredSystem.getCurrent() - but we should not have static stuff that could change between layered systems
-   // if we have more than one in a runtime.
+
+
+   // This stores the default language
    public static Map<String,Language> languages = new HashMap<String,Language>();
+
+   // This stores all languages registered for a given extension, but only if there is more than one.
+   public static Map<String,List<Language>> extraLanguagesByExtension = new HashMap<String,List<Language>>();
 
    public String languageName;
 
@@ -591,7 +604,21 @@ public abstract class Language extends LayerFileComponent {
       l.initialize();
       if (l.defaultExtension == null)
          l.defaultExtension = extension;
-      languages.put(extension, l);
+      Language old = languages.put(extension, l);
+
+      // There's more than one language registered for a given extension.  The process will define a canonical instance
+      // for the built-in css but then a framework might install it's own customized language processor.  We want to be able
+      // parse using the semantics of the process defined in the layer but still be able to recognize the start parselet and
+      // things like that based on the extension.
+      if (old != null) {
+         List<Language> extra = extraLanguagesByExtension.get(extension);
+         if (extra == null) {
+            extra = new ArrayList<Language>();
+            extra.add(old);
+            extraLanguagesByExtension.put(extension, extra);
+         }
+         extra.add(l);
+      }
    }
 
    public static void removeLanguage(String extension) {
@@ -754,6 +781,10 @@ public abstract class Language extends LayerFileComponent {
       for (int i = 0; i < props.length; i++) {
          IBeanMapper mapper = props[i];
 
+         // This is a property built into the Language - it's weird when it shows up in the name of a parselet
+         if (mapper.getPropertyName().equals("startParselet"))
+            continue;
+
          Object val = TypeUtil.getPropertyValue(this, mapper.getField());
          if (val instanceof Parselet) {
             Parselet pl = (Parselet) val;
@@ -763,6 +794,10 @@ public abstract class Language extends LayerFileComponent {
       // Now set unnamed children based on their wrapping parselets.
       for (int i = 0; i < props.length; i++) {
          IBeanMapper mapper = props[i];
+         // This is a property built into the Language - it's weird when it shows up in the name of a parselet
+         if (mapper.getPropertyName().equals("startParselet"))
+            continue;
+
          Object val = TypeUtil.getPropertyValue(this, mapper.getField());
          if (val instanceof Parselet) {
             initName((Parselet) val, mapper.getPropertyName(), null, false);
@@ -877,4 +912,26 @@ public abstract class Language extends LayerFileComponent {
       }
    }
 
+   public List<Language> getCustomizedLanguages() {
+      List<Language> res = null;
+      if (extensions != null) {
+         for (String ext:extensions) {
+            List<Language> extList = extraLanguagesByExtension.get(ext);
+            if (extList != null) {
+               if (res == null)
+                  res = new ArrayList<Language>();
+               res.addAll(extList);
+            }
+         }
+      }
+      if (defaultExtension != null) {
+         List<Language> extList = extraLanguagesByExtension.get(defaultExtension);
+         if (extList != null) {
+            if (res == null)
+               res = new ArrayList<Language>();
+            res.addAll(extList);
+         }
+      }
+      return res;
+   }
 }

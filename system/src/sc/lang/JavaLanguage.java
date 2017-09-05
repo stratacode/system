@@ -59,6 +59,9 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    KeywordSpace finalKeyword = new KeywordSpace("final");
 
    Sequence openCloseSqBrackets = new Sequence("('','')", OPTIONAL | REPEAT, openSqBracket, closeSqBracket);
+   {
+      openCloseSqBrackets.minContentSlot = 1;
+   }
    Sequence dotStarTail = new Sequence("('','')", OPTIONAL, periodSpace, asterix);
 
    Sequence importDeclaration = new Sequence("ImportDeclaration(,staticImport,identifier,)",
@@ -92,7 +95,8 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
                              new Sequence("(operator,typeArgument)", OPTIONAL, new SemanticTokenChoice("extends", "super"), argType)));
 
    Sequence typeArgumentList = new Sequence("([],[])", OPTIONAL, typeArgument, new Sequence("(,[])", OPTIONAL | REPEAT, comma, typeArgument));
-   Sequence typeArguments = new Sequence("<typeArguments>(,.,)", lessThan, typeArgumentList, greaterThanSkipOnError);
+   // Note: not using greaterThanSkipOnError here and other type arg lists because it confuses the parsing of partial binary expressions
+   Sequence typeArguments = new Sequence("<typeArguments>(,.,)", lessThan, typeArgumentList, greaterThan);
    {
       typeArguments.ignoreEmptyList = false;
    }
@@ -118,12 +122,16 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       public Object generate(GenerateContext ctx, Object value) {
          if (!fastGenExpressions)
             return super.generate(ctx, value);
+
          //if (!ctx.finalGeneration)
          //   return super.generate(ctx, value);
          if (!(value instanceof Expression))
             return ctx.error(this, NO_MATCH_ERROR, value, 0);
 
-         return ((Expression) value).toGenerateString();
+         Expression expr = ((Expression) value);
+         if (expr.isLeafStatement())
+             return expr.toGenerateString();
+         return super.generate(ctx, value);
       }
    };
 
@@ -164,7 +172,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    OrderedChoice typeOrQuestion = new OrderedChoice(argType, new Sequence("ExtendsType(questionMark)", questionMark));
    Sequence simpleTypeArguments = new Sequence("(,[],)", OPTIONAL, lessThan,
            new Sequence("([],[])", OPTIONAL, typeOrQuestion, new Sequence("(,[])",OPTIONAL | REPEAT, comma, typeOrQuestion))
-           , greaterThanSkipOnError);
+           , greaterThan);
    Sequence innerCreator =
            new Sequence("NewExpression(typeArguments, typeIdentifier, *)", simpleTypeArguments, identifier, classCreatorRest);
 
@@ -202,7 +210,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    }
    Sequence decimalLiteral = new Sequence("(decimalValue)", new OrderedChoice(new Symbol("0"), new Sequence("('','')", nonZeroDigit, optDigits)));
 
-   public OrderedChoice floatingPointLiteral = new OrderedChoice(
+   public OrderedChoice floatingPointLiteral = new OrderedChoice("<floatingPointLiteral>",
          new Sequence("(,'','','','','')", notUnderscore, digits, period, new Sequence("(,'')", OPTIONAL, notUnderscore, digits), optExponent, optFloatTypeSuffix),
          new Sequence("('',,'','','')", period, notUnderscore, digits, optExponent, optFloatTypeSuffix),
          new Sequence("(,'','','')", notUnderscore, digits, exponent, optFloatTypeSuffix),
@@ -230,7 +238,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    public Sequence stringLiteral = new Sequence("StringLiteral(,value,)", doubleQuote, escapedString, doubleQuote);
 
-   Sequence characterLiteral =
+   public Sequence characterLiteral =
          new Sequence("CharacterLiteral(,value,)", singleQuote,
                       new OrderedChoice(escapeSequence,
                                         new SymbolChoice(NOT, "\\", "'", EOF)),
@@ -300,6 +308,10 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
         identifierSuffix);
 
    Sequence classValueExpression = new Sequence("ClassValueExpression(typeIdentifier, arrayBrackets, )", typeIdentifier, openCloseSqBrackets, new KeywordSpace(".class"));
+   {
+      // Don't allow just the type to parse as a class value expression in partial values mode - it should have .class at the end
+      classValueExpression.minContentSlot = 2;
+   }
 
    // Java8 Only
    Sequence methodReference = new Sequence("MethodReference(reference,,typeArguments, methodName)");
@@ -387,6 +399,9 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    }
 
    public SemanticTokenChoice binaryOperators = new SemanticTokenChoice(TypeUtil.binaryOperators);
+   {
+      binaryOperators.addExcludedValues("+=", "-=", "*=", "/=", "%=", "^=", "|=", "&=");
+   }
 
    public SymbolChoiceSpace assignmentOperator = new SemanticTokenChoice("=", "+=", "-=", "*=", "/=", "%=", "^=", "|=", "&=",
                                                            "<<=", ">>=", ">>>=");
@@ -432,7 +447,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       lambdaExpression.minContentSlot = 1;
    }
 
-   Sequence assignment = new Sequence("AssignmentExpression(operator, rhs)", OPTIONAL, assignmentOperator, expression);
+   public Sequence assignment = new Sequence("AssignmentExpression(operator, rhs)", OPTIONAL, assignmentOperator, expression);
 
    {
       assignmentExpression.set(conditionalExpression, assignment);
@@ -494,6 +509,10 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    {
       formalParameters.set(openParen, formalParameterDecls, closeParenSkipOnError);
       formalParameters.ignoreEmptyList = false;
+      // TODO: this handles the case of swallowing the '.' and '..' leading up to a repeating parameter definition
+      // but probably should be generalized to handle other errors
+      formalParameterDecls.skipOnErrorParselet = new SymbolChoice("..", ".");
+      formalParameterDecls.skipOnErrorSlot = 2;
    }
 
    // Java8 Only
@@ -502,7 +521,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
             variableModifiers, type, catchParameterExtraTypes, variableDeclaratorId, closeParenSkipOnError);
 
    // Exposed as part of the language api using this name
-   public Sequence parameters = formalParameterDecls;
+   public Sequence parameters = formalParameters;
 
    // Forward declarations
    public OrderedChoice variableInitializer = new OrderedChoice("<variableInitializer>");
@@ -519,6 +538,10 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    }
 
    public Sequence variableDefinition = new Sequence("(operator,initializer)", OPTIONAL, variableInitializerOperators, variableInitializer);
+   {
+      // If we match the initialization operators, we can't match anything else so this helps with partial parsing
+      variableDefinition.skipOnErrorSlot = 1;
+   }
    public Sequence variableDeclarator = new Sequence("VariableDefinition(*,*)", variableDeclaratorId, variableDefinition);
    public Sequence variableDeclarators =
        new Sequence("([],[])", variableDeclarator,
@@ -535,6 +558,11 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    OrderedChoice forInit = new OrderedChoice(OPTIONAL, new Sequence("([])", localVariableDeclaration), expressionList);
    Sequence forVarControl = new Sequence("ForVarStatement(variableModifiers,type,identifier,,expression)",
                                          variableModifiers, type, identifier, colon, expression);
+   {
+      // Until we hit the colon, it could also be a forControl so don't match a partial until then.  It does not matter
+      // much for a complete partial parse, but for reparse, it gets the model off track
+      forVarControl.minContentSlot = 3;
+   }
    Sequence forControlStatement = new Sequence("ForControlStatement(forInit,,condition,,repeat)", forInit, semicolon, optExpression, semicolon, optExpressionList);
    OrderedChoice forControl = new OrderedChoice(forVarControl,forControlStatement);
    Sequence forStatement =
@@ -542,12 +570,20 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    KeywordSpace defaultKeyword = new KeywordSpace("default");
 
-   OrderedChoice switchLabel = new OrderedChoice("<switchLabel>",
-         new Sequence("SwitchLabel(operator, expression,)", new KeywordSpace("case"), expression, colonEOL),
-         new Sequence("SwitchLabel(operator,)", defaultKeyword, colonEOL));
+   Sequence caseLabel = new Sequence("SwitchLabel(operator, expression,)", new KeywordSpace("case"), expression, colonEOL);
+   Sequence defaultLabel = new Sequence("SwitchLabel(operator,)", defaultKeyword, colonEOL);
+   OrderedChoice switchLabel = new OrderedChoice("<switchLabel>", caseLabel, defaultLabel);
+   {
+      caseLabel.skipOnErrorSlot = 1;
+      defaultLabel.skipOnErrorSlot = 1;
+   }
 
+   Sequence switchLabels = new Sequence("<switchLabels>([])", REPEAT, switchLabel);
    Sequence switchBlockStatementGroups =
-       new Sequence("<switchBlockStatementGroups>([],[])",  OPTIONAL | REPEAT, new Sequence("<switchLabels>([])", REPEAT, switchLabel), blockStatements);
+       new Sequence("<switchBlockStatementGroups>([],[])",  OPTIONAL | REPEAT, switchLabels, blockStatements);
+   {
+      switchLabels.skipOnErrorParselet = new Sequence("('')", OPTIONAL | REPEAT, new SymbolChoice(NOT, "case", "default", "break", "{", "}", EOF));
+   }
 
    private KeywordSpace whileKeyword = new KeywordSpace("while");
 
@@ -561,8 +597,8 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    Sequence whileStatement = new Sequence("WhileStatement(operator, expression, statement)", whileKeyword, parenExpression, statement);
    Sequence catchStatement = new Sequence("CatchStatement(,parameters,statements)",  new KeywordSpace("catch"), catchParameter, block);
-   Sequence finallyStatement = new Sequence("FinallyStatement(,statements)", OPTIONAL, new KeywordSpace("finally"), block);
-   Sequence tryStatement = new Sequence("TryStatement(, resources, statements,*)", new KeywordSpace("try"), tryResources, block,
+   Sequence finallyStatement = new Sequence("FinallyStatement(,block)", OPTIONAL, new KeywordSpace("finally"), block);
+   Sequence tryStatement = new Sequence("TryStatement(, resources, block,*)", new KeywordSpace("try"), tryResources, block,
                                         new Sequence("(catchStatements,finallyStatement)", OPTIONAL, new Sequence("([])", OPTIONAL | REPEAT, catchStatement), finallyStatement));
    Sequence switchStatement = new Sequence("SwitchStatement(,expression,,statements,)", new KeywordSpace("switch"), parenExpression, openBraceEOL, switchBlockStatementGroups, closeBraceEOL);
    Sequence returnStatement = new Sequence("ReturnStatement(operator,expression,)", new KeywordSpace("return"), optExpression, endStatement);
@@ -594,8 +630,8 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       statement.put("assert", assertStatement);
       statement.put(";", semicolonEOL);
 
-      // Default rules in case the indexed ones do not match
-      statement.addDefault(exprStatement, labelStatement);
+      // Default rules in case the indexed ones do not match - labelStatement needs to be in front for the partial values mode, otherwise an identifier: will match as identifier skipping the missed ;
+      statement.addDefault(labelStatement, exprStatement);
 
       localVariableDeclaration.set(variableModifiers, type, variableDeclarators);
 
@@ -621,7 +657,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
                                           new Sequence("(,.)", OPTIONAL, extendsKeyword, typeBound));
    Sequence typeParameters =
        new Sequence("<typeParameters>(,[],[],)", lessThan, typeParameter,
-                    new Sequence("(,[])", OPTIONAL | REPEAT, comma, typeParameter), greaterThanSkipOnError);
+                    new Sequence("(,[])", OPTIONAL | REPEAT, comma, typeParameter), greaterThan);
    Sequence optTypeParameters = new Sequence("([])", OPTIONAL, typeParameters);
 
 
@@ -724,14 +760,14 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    {
       // When parsing for errors, once we've seen the 'class' skip on error until we see the { so we can resume a misformed class definition
       normalClassDeclaration.skipOnErrorSlot = 1;
-      normalClassDeclaration.skipOnErrorParselet = new Sequence("('')", OPTIONAL | REPEAT, new SymbolChoice(NOT, "extends", "implements", "{", "}", "\n", EOF));
+      normalClassDeclaration.skipOnErrorParselet = new Sequence("('')", OPTIONAL | REPEAT, new SymbolChoice(NOT, "extends", "implements", "class", "static", "public", "private", "{", "}", "\n", EOF)); // TODO: add equals for html attribute
    }
 
    Sequence enumConstant = new Sequence("EnumConstant(modifiers,typeName,arguments,body)", annotations, identifier,
                                         optArguments,
                                         new Sequence("(.)", OPTIONAL, classBody));
 
-   Sequence enumBodyDeclaration = new Sequence("([],[],,[])", OPTIONAL, new Sequence("(.)", OPTIONAL, enumConstant), new Sequence("(,[])", OPTIONAL | REPEAT, comma, enumConstant),
+   public Sequence enumBodyDeclaration = new Sequence("([],[],,[])", OPTIONAL, new Sequence("(.)", OPTIONAL, enumConstant), new Sequence("(,[])", OPTIONAL | REPEAT, comma, enumConstant),
                    new Sequence(OPTIONAL, comma),
                    new Sequence("([],[])", OPTIONAL, new Sequence("EmptyStatement()", semicolon), classBodyDeclarations));
    Sequence enumBody = new Sequence("(,[],)", openBraceEOL, enumBodyDeclaration, closeBraceEOL);

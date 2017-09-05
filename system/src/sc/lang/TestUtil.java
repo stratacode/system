@@ -215,6 +215,9 @@ public class TestUtil {
                case 'q':
                   quietOutput = true;
                   break;
+               case 'P':
+                  diffParseNodes = true;
+                  break;
                case 'p':
                   if (opt.length() > 1)
                      usage(args);
@@ -297,8 +300,12 @@ public class TestUtil {
          Language.registerLanguage(JavaLanguage.INSTANCE, "java");
          Language.registerLanguage(JavaLanguage.INSTANCE, "scj");
          Language.registerLanguage(SCLanguage.INSTANCE, "sc");
-         // This one is just for templates we process from Java code, i.e. as part of framework definitions.
-         Language.registerLanguage(TemplateLanguage.INSTANCE, "sctd");
+         TemplateLanguage objDefTemplateLang = new TemplateLanguage();
+         objDefTemplateLang.compiledTemplate = false;
+         objDefTemplateLang.runtimeTemplate = true;
+         objDefTemplateLang.defaultExtendsType = "sc.lang.java.ObjectDefinitionParameters";
+         // This one is for object definition templates we process from Java code, i.e. as part of framework definitions from CompilerSettings, newTemplate, and objTemplate
+         Language.registerLanguage(objDefTemplateLang, "sctd");
          // This is a real template, treated as a regular type in the system, either dynamic or compiled
          Language.registerLanguage(TemplateLanguage.INSTANCE, "sct");
          Language.registerLanguage(JSLanguage.INSTANCE, "js");
@@ -370,6 +377,7 @@ public class TestUtil {
    static final FilenameFilter LANG_FILTER = new ExtensionFilenameFilter(Language.getLanguageExtensions(), true);
 
    static boolean verifyResults = true;
+   static boolean diffParseNodes = false;
    static boolean dumpStats = false;
    static boolean quietOutput = false;
 
@@ -472,14 +480,22 @@ public class TestUtil {
          long startTime = System.currentTimeMillis();
          int ct = opts.repeatCount;
          do {
-            TemplateLanguage.getTemplateLanguage().blockStatements.trace = true;
-
             // Parsing using the language directly - no layered system involved so we can only validate the grammar
             if (!opts.layerMode) {
                lang = Language.getLanguageByExtension(ext);
                if (lang == null)
                   throw new IllegalArgumentException("No language for: " + file.getPath());
                lang.debugReparse = true;
+
+               /*
+               SCLanguage.getSCLanguage().identifierExpression.trace = true;
+               SCLanguage.getSCLanguage().selectorExpression.trace = true;
+               */
+
+               //JavaLanguage.getJavaLanguage().switchStatement.trace = true;
+
+               //HTMLLanguage.getHTMLLanguage().templateBlockStatements.trace = true;
+
                result = lang.parse(fileName, new StringReader(input), lang.getStartParselet(), opts.enablePartialValues);
             }
             else {
@@ -537,16 +553,19 @@ public class TestUtil {
                      ParseError err = ((ParseError) result);
                      result = err.getBestPartialValue();
                   }
-                  /*
-                  if (reparseFile.contains("1")) {
-                     System.out.println("***");
-                     SCLanguage.getSCLanguage().classBodyDeclarations.trace = true;
+                  // 218 - is where we change from forVar to forControl
+                  // 250 - is where it should parse
+                  if (reparseFile.contains("9")) {
+                     //HTMLLanguage.getHTMLLanguage().blockStatements.trace = true;
+                     //SCLanguage.getSCLanguage().classBody.trace = true;
+                     //SCLanguage.getSCLanguage().blockStatements.trace = true;
                      //JavaLanguage.getJavaLanguage().classBodyDeclarations.trace = true;
-                     SemanticNode.debugDiffTrace = true;
-
+                     //HTMLLanguage.getHTMLLanguage().templateBodyDeclarations.trace = true;
+                     // Let's you set breakpoints easily for semantic nodes that don't match
+                     //SemanticNode.debugDiffTrace = true;
+                     // Enables breakpoints for finding the diffs in the old and new versions
                      //DiffContext.debugDiffContext = true;
                   }
-                  */
                   if (result == null)
                      out("*** FAILURE: No previous result for reparse");
 
@@ -589,7 +608,7 @@ public class TestUtil {
                      boolean exactMatch = false;
                      boolean modelErrorsOk = false;
                      if (parseComplete instanceof IParseNode) {
-                        Object reparseOrigObj = getTestResult(parseComplete);
+                        Object parseCompleteObj = getTestResult(parseComplete);
 
                         String newResStr = newRes.toString();
                         String parseStr = parseComplete.toString();
@@ -616,7 +635,8 @@ public class TestUtil {
                            else {
                               if (!reparseSameAsOrig)
                                  error("*** REPARSE FAILURE - reparsed text does not match");
-                              else if (!newResStr.startsWith(parseStr) || newResStr.length() - 1 != parseStr.length())
+                              // There are valid cases where the reparsed string is longer than the parse-string
+                              else if (!newResStr.startsWith(parseStr))
                                  error("*** REPARSE FAILURE - reparsed text does not match - parsed"); // is this possible?
                            }
                         }
@@ -625,13 +645,13 @@ public class TestUtil {
                         if (reparsedModelObj instanceof ISemanticNode) {
                            // These must be inited so some properties get set which are compared - it would be nice to have a way to compare just the parsed models but we need two categories of these
                            // semantic properties - cloned, parsed?
-                           ParseUtil.initComponent(reparseOrigObj);
+                           ParseUtil.initComponent(parseCompleteObj);
                            // Need to reinit so we catch the reparsed models - TODO: ideally we'd clear the inited flag of any parents who have children which are modified in the reparse so we only
                            // have to reinit those.
                            ParseUtil.reinitComponent(reparsedModelObj);
                            StringBuilder diffs = new StringBuilder();
                            ISemanticNode reparsedNode = (ISemanticNode) reparsedModelObj;
-                           reparsedNode.diffNode(reparseOrigObj, diffs);
+                           reparsedNode.diffNode(parseCompleteObj, diffs);
 
                            String modelNewErrorsFile = FileUtil.addExtension(FileUtil.removeExtension(reparseFile), "mismatch");
                            String modelOkErrorsFile = FileUtil.addExtension(FileUtil.removeExtension(reparseFile), "mismatchOK");
@@ -650,7 +670,7 @@ public class TestUtil {
                                  }
                               }
                               else {
-                                 error("*** New model errors for: " + reparseFile + " old:\n" + diffStr);
+                                 error("*** New model errors for: " + reparseFile + ":\n" + diffStr);
                                  saveNew = true;
                               }
                               if (saveNew) {
@@ -675,6 +695,25 @@ public class TestUtil {
                      }
                      else if (parseComplete != null)
                         error("*** Unrecognized return from reparse: " + parseComplete);
+
+                     if (diffParseNodes) {
+                        if (newRes instanceof IParseNode && !(parseComplete instanceof IParseNode)) {
+                           error("Parse node results are not the same");
+                        }
+                        else if (newRes instanceof ParseError && !(parseComplete instanceof ParseError)) {
+                           error("Parse node error is not the same");
+                        }
+                        else if (newRes instanceof IParseNode) {
+                           StringBuilder parseNodeDiffs = new StringBuilder();
+                           ((IParseNode) newRes).diffParseNode((IParseNode) parseComplete, parseNodeDiffs);
+                           if (parseNodeDiffs.length() > 0) {
+                              error("Parse nodes are not the same: " + parseNodeDiffs);
+                           }
+                        }
+                        else {
+                           // TODO: compare the ParseErrors here?
+                        }
+                     }
 
                      double reparsePer = 100.0 * lang.globalReparseCt / (double) lang.globalParseCt;
                      String per = new DecimalFormat("#").format(reparsePer);

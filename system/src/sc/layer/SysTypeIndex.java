@@ -15,10 +15,11 @@ import java.util.*;
 public class SysTypeIndex {
    LayerListTypeIndex activeTypeIndex;
    LayerListTypeIndex inactiveTypeIndex;
+   boolean needsSave = false;
 
-   public SysTypeIndex(LayeredSystem sys) {
-      activeTypeIndex = new LayerListTypeIndex(sys, sys == null ? null : sys.layers);
-      inactiveTypeIndex = new LayerListTypeIndex(sys, sys == null ? null : sys.inactiveLayers);
+   public SysTypeIndex(LayeredSystem sys, String typeIndexIdent) {
+      activeTypeIndex = new LayerListTypeIndex(sys, sys == null ? null : sys.layers, typeIndexIdent);
+      inactiveTypeIndex = new LayerListTypeIndex(sys, sys == null ? null : sys.inactiveLayers, typeIndexIdent);
    }
 
    public void clearReverseTypeIndex() {
@@ -26,16 +27,35 @@ public class SysTypeIndex {
       inactiveTypeIndex.clearReverseTypeIndex();
    }
 
-   public void buildReverseTypeIndex() {
-      // TODO: not used - we have this same info in the sub-types now
+   public void buildReverseTypeIndex(LayeredSystem sys) {
+      if (sys != null) {
+         if (sys.options.typeIndexMode == TypeIndexMode.Rebuild) {
+            LayerOrderIndex loi = inactiveTypeIndex.orderIndex;
+            loi.refreshAll(sys, true);
+         }
+      }
+
+      // TODO: not using the activeTypeIndex now... maybe just remove it?  We have this same info maintained in separate apis stored on the layered system.
       //activeTypeIndex.buildReverseTypeIndex();
-      inactiveTypeIndex.buildReverseTypeIndex();
+      inactiveTypeIndex.buildReverseTypeIndex(sys);
+   }
+
+   public boolean loadFromDir(String typeIndexDir) {
+      return inactiveTypeIndex.loadFromDir(typeIndexDir);
+   }
+
+   public void saveToDir(String typeDir) {
+      inactiveTypeIndex.saveToDir(typeDir);
+      needsSave = false;
    }
 
    public void setSystem(LayeredSystem sys) {
       activeTypeIndex.sys = sys;
       activeTypeIndex.layersList = sys.layers;
       inactiveTypeIndex.layersList = sys.inactiveLayers;
+
+      if (!inactiveTypeIndex.typeIndexIdent.equals(sys.getTypeIndexIdent()))
+         System.err.println("*** mismatching system and type index!");
    }
 
    /** Adds the TypeDeclarations of any matching types.  The LayeredSystem passed may be the system or the main system so be careful to use the system from the layer to retrieve the type. */
@@ -116,6 +136,7 @@ public class SysTypeIndex {
          System.err.println("*** Modifying type index without write lock");
          new Throwable().printStackTrace();
       }
+
       // For each type in the type index, add the type if it matches
       for (Map.Entry<String,LayerTypeIndex> typeIndexEnt:inactiveTypeIndex.typeIndex.entrySet()) {
          //String layerName = typeIndexEnt.getKey();
@@ -130,7 +151,7 @@ public class SysTypeIndex {
             // Using lookup here so we only look through layers that have been loaded.  Otherwise there's a concurrent modification exception as we modify this index
             Layer indexLayer = inactiveTypeIndex.sys.lookupInactiveLayer(layerName, true, true);
             // Only search layers which this layer can depend upon
-            if (indexLayer == null || (!refLayer.getLayerName().equals(indexLayer.getLayerName()) && !refLayer.extendsLayer(indexLayer)))
+            if (indexLayer == null || refLayer == Layer.ANY_INACTIVE_LAYER || refLayer == Layer.ANY_LAYER || (!refLayer.getLayerName().equals(indexLayer.getLayerName()) && !refLayer.extendsLayer(indexLayer)))
                continue;
          }
          HashMap<String,TypeIndexEntry> layerTypeMap = layerTypeIndex.layerTypeIndex;
@@ -168,6 +189,10 @@ public class SysTypeIndex {
       inactiveTypeIndex.updateTypeName(oldTypeName, newTypeName);
    }
 
+   public void fileRenamed(String oldFileName, String newFileName) {
+      inactiveTypeIndex.updateFileName(oldFileName, newFileName);
+   }
+
    public StringBuilder dumpCacheStats() {
       StringBuilder sb = new StringBuilder();
       if (activeTypeIndex != null) {
@@ -182,5 +207,33 @@ public class SysTypeIndex {
       }
       sb.append("\n");
       return sb;
+   }
+
+   public void addDisabledLayer(String layerName) {
+      if (inactiveTypeIndex != null)
+         inactiveTypeIndex.orderIndex.disabledLayers.add(layerName);
+   }
+
+   public void addExcludedLayer(String layerName) {
+      if (inactiveTypeIndex != null)
+         inactiveTypeIndex.orderIndex.excludedLayers.add(layerName);
+   }
+
+   public void removeExcludedLayer(String layerName) {
+      if (inactiveTypeIndex != null)
+         inactiveTypeIndex.orderIndex.removeExcludedLayer(layerName);
+   }
+
+   public void refreshLayerOrder(LayeredSystem sys) {
+      if (inactiveTypeIndex != null) {
+         if (inactiveTypeIndex.orderIndex.refreshAll(sys, false))
+            needsSave = true;
+      }
+   }
+
+   public boolean excludesLayer(String layerName) {
+      if (inactiveTypeIndex != null)
+         return inactiveTypeIndex.orderIndex.excludesLayer(layerName);
+      return false;
    }
 }

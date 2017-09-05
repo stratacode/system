@@ -6,11 +6,13 @@ package sc.lang.template;
 
 import sc.lang.ILanguageModel;
 import sc.lang.SemanticNodeList;
+import sc.lang.TemplateLanguage;
 import sc.lang.html.Element;
 import sc.lifecycle.ILifecycle;
 import sc.parser.IString;
 import sc.lang.java.*;
 import sc.parser.IStyleAdapter;
+import sc.util.StringUtil;
 
 import java.util.EnumSet;
 import java.util.List;
@@ -21,7 +23,7 @@ import java.util.Set;
  * in the template language in the context where we are expecting a Java statement.  We process template markup until we re-enter Java code.
  * We must reenter Java code to end the method or whatever.  To execute this markup, we effectively turn this into "out.append(x)" calls.
  */
-public class GlueStatement extends Statement {
+public class GlueStatement extends Statement implements ITemplateDeclWrapper {
    public List<Object> declarations; // Strings or expressions - all turn into "append" operations onto the StringBuffer
 
    public transient boolean methodReturnValue = false;
@@ -75,7 +77,9 @@ public class GlueStatement extends Statement {
       BlockStatement bl = methodReturnValue ? getEnclosingMethod().body : new BlockStatement();
       int i = 0;
       if (methodReturnValue) {
-         bl.addStatementAt(i++, createOutField());
+         VariableStatement vs = createOutField();
+         vs.fromStatement = this;
+         bl.addStatementAt(i++, vs);
       }
       else
          bl.parentNode = parentNode;
@@ -83,14 +87,18 @@ public class GlueStatement extends Statement {
       if (declarations != null) {
          for (Object o:declarations) {
             if (o instanceof IString) {
-               bl.addStatementAt(i++, Template.getConstStringOutputStatement(o.toString()));
+               Statement outSt = Template.getConstStringOutputStatement(o.toString());
+               outSt.fromStatement = this;
+               bl.addStatementAt(i++, outSt);
             }
             else if (o instanceof Expression) {
+               Expression srcExpr = (Expression) o;
                IdentifierExpression outExpr = IdentifierExpression.create("out", "append");
                SemanticNodeList<Expression> args = new SemanticNodeList<Expression>();
-               args.add((Expression) ((Expression) o).deepCopy(CopyNormal, null));
+               args.add(srcExpr.deepCopy(CopyNormal, null));
                outExpr.setProperty("arguments",  args);
                bl.addStatementAt(i++, outExpr);
+               outExpr.fromStatement = srcExpr;
             }
             else if (o instanceof Element) {
                Element elem = (Element) o;
@@ -118,7 +126,9 @@ public class GlueStatement extends Statement {
          }
       }
       if (methodReturnValue) {
-         bl.addStatementAt(bl.getNumStatements(), ReturnStatement.create(IdentifierExpression.create("out")));
+         Statement retSt = ReturnStatement.create(IdentifierExpression.create("out"));
+         bl.addStatementAt(bl.getNumStatements(), retSt);
+         retSt.fromStatement = this;
          parentNode.removeChild(this);
       }
       else {
@@ -163,4 +173,37 @@ public class GlueStatement extends Statement {
                ((Statement) d).transformToJS();
       return this;
    }
+
+   @Override
+   public List<Object> getTemplateDeclarations() {
+      return declarations;
+   }
+
+   public boolean isLeafStatement() {
+      return false;
+   }
+
+   public int getNumStatementLines() {
+      return 1;
+   }
+
+   public String getTemplateDeclStartString() {
+      return TemplateLanguage.END_DELIMITER; // NOTE: the start delimiter for the glue is really the end delimiter token so start/end are reversed intentionally
+   }
+
+   public String getTemplateDeclEndString() {
+      return TemplateLanguage.START_CODE_DELIMITER;
+   }
+
+   public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append(getTemplateDeclStartString());
+      if (declarations != null) {
+         for (Object decl:declarations)
+            sb.append(decl);
+      }
+      sb.append(getTemplateDeclEndString());
+      return sb.toString();
+   }
+
 }

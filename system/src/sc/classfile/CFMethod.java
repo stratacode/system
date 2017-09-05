@@ -11,7 +11,7 @@ import sc.lang.java.*;
 import java.lang.reflect.Method;
 import java.util.List;
 
-/** A Method definition that is extracted directly from the class file representation */
+/** A Method definition that is extracted from the class file representation. */
 public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IMethodDefinition {
    public JavaType returnType;
    public JavaType[] parameterJavaTypes;
@@ -37,7 +37,17 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
       returnType = methodSig.returnType;
       typeParameters = methodSig.typeParameters;
       List<JavaType> ptypes = methodSig.parameterTypes;
-      parameterJavaTypes = ptypes == null ? null : ptypes.toArray(new JavaType[ptypes.size()]);
+
+      int numParams = 0;
+      // To be consistent with the Class.getParameterTypes() method, we need to strip out the constructor for an inner type
+      if (ptypes != null) {
+         numParams = ptypes.size();
+         if (isConstructor() && ownerClass.getEnclosingType() != null && numParams > 1 && !ownerClass.hasModifier("static")) {
+            ptypes = ptypes.subList(1, numParams);
+            numParams--;
+         }
+      }
+      parameterJavaTypes = ptypes == null ? null : ptypes.toArray(new JavaType[numParams]);
 
       /** Note: this needs to be done in initialize so we can do resolves without accessing the property name */
       if ((propertyName = ModelUtil.isGetMethod(name, parameterJavaTypes, returnType)) != null)
@@ -126,23 +136,29 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
    
    public boolean hasGetMethod() {
       return isGetMethod() ||
-              ModelUtil.definesMember(ownerClass, propertyName, JavaSemanticNode.MemberType.GetMethodSet, null, null) != null;
+              ModelUtil.definesMember(ownerClass, propertyName, JavaSemanticNode.MemberType.GetMethodSet, null, null, null) != null;
    }
 
    public boolean hasSetMethod() {
       return isSetMethod() ||
-              ModelUtil.definesMember(ownerClass, propertyName, JavaSemanticNode.MemberType.SetMethodSet, null, null) != null;
+              ModelUtil.definesMember(ownerClass, propertyName, JavaSemanticNode.MemberType.SetMethodSet, null, null, null) != null;
    }
 
    public Object getSetMethodFromGet() {
       if (isGetMethod())
-        return ModelUtil.definesMember(ownerClass, propertyName, JavaSemanticNode.MemberType.SetMethodSet, null, null);
+        return ModelUtil.definesMember(ownerClass, propertyName, JavaSemanticNode.MemberType.SetMethodSet, null, null, getLayeredSystem());
       return null;
    }
 
    public Object getGetMethodFromSet() {
       if (isSetMethod())
-        return ModelUtil.definesMember(ownerClass, propertyName, JavaSemanticNode.MemberType.GetMethodSet, null, null);
+        return ModelUtil.definesMember(ownerClass, propertyName, JavaSemanticNode.MemberType.GetMethodSet, null, null, getLayeredSystem());
+      return null;
+   }
+
+   public Object getFieldFromGetSetMethod() {
+      if (isSetMethod() || isGetMethod())
+         return ModelUtil.definesMember(ownerClass, propertyName, JavaSemanticNode.MemberType.FieldSet, null, null, getLayeredSystem());
       return null;
    }
 
@@ -171,10 +187,11 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
 
    /** Returns only the signature of the parameters of the method - strips off the ( ) and return value - e.g. (I)V becomes I */
    public String getTypeSignature() {
-      if (typeSignature == null)
-         return null;
       if (!started)
          start();
+
+      if (typeSignature == null)
+         return null;
 
       // When type parameters are involved, we need to expand the types here - otherwise, we could try to substring this from typeSignature
       if (parameterJavaTypes != null) {
@@ -200,7 +217,7 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
       String[] tns = att.typeNames;
       JavaType[] types = new JavaType[tns.length];
       for (int i = 0; i < tns.length; i++) {
-         types[i] = JavaType.createJavaType(tns[i]);
+         types[i] = JavaType.createJavaType(getLayeredSystem(), tns[i]);
       }
       return types;
    }
@@ -216,9 +233,54 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
    }
 
    public String toString() {
+      StringBuilder sb = new StringBuilder();
+      String modifiers = modifiersToString(true, true, true, true, false, null);
+      if (modifiers != null) {
+         sb.append(modifiers);
+         sb.append(" ");
+      }
+      if (typeParameters != null) {
+         sb.append("<");
+         boolean first = true;
+         for (TypeParameter typeParam:typeParameters) {
+            if (!first) {
+               sb.append(", ");
+            }
+            else
+               first = false;
+            if (typeParam == null)
+               sb.append("<null>");
+            else
+               sb.append(typeParam.toString());
+         }
+         sb.append(">");
+      }
       if (name != null)
-         return name + "()";
-      return super.toString();
+         sb.append(name);
+      else
+         sb.append("<uninitialized method>");
+      sb.append("(");
+      if (parameterJavaTypes != null) {
+         boolean first = true;
+         for (JavaType paramJavaType:parameterJavaTypes) {
+            if (!first)
+               sb.append(", ");
+            else
+               first = false;
+            if (paramJavaType != null) {
+               sb.append(paramJavaType);
+            }
+            else
+               sb.append("<null>");
+         }
+      }
+      sb.append(")");
+
+      if (ownerClass != null) {
+         sb.append(" in: ");
+         sb.append(ownerClass.getTypeName());
+      }
+      return sb.toString();
    }
 
    public String getVariableName() {
@@ -258,5 +320,9 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
 
       Method res = RTypeUtil.getMethodFromTypeSignature(cl, name, getTypeSignature());
       return res;
+   }
+
+   public boolean isConstructor() {
+      return name != null && name.equals("<init>");
    }
 }

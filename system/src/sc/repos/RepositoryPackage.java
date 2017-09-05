@@ -311,20 +311,20 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
                   if (subPackages != null) {
                      for (RepositoryPackage subPkg:subPackages) {
                         if (!subPkg.installed)
-                           subPkg.preInstall(ctx, depCol, false);
+                           subPkg.preInstall(ctx == null ? null : ctx.child(subPkg), depCol, false);
                      }
                   }
                   if (preInstallDeps) {
                      if (subPackages != null) {
                         for (RepositoryPackage subPkg:subPackages) {
                            if (!subPkg.installed)
-                              subPkg.preInstall(ctx, depCol, true);
+                              subPkg.preInstall(ctx == null ? null : ctx.child(subPkg), depCol, true);
                         }
                      }
                      if (dependencies != null) {
                         for (RepositoryPackage depPkg : dependencies) {
                            if (!depPkg.installed)
-                              depPkg.preInstall(ctx, depCol, true);
+                              depPkg.preInstall(ctx == null ? null : ctx.child(depPkg), depCol, true);
                         }
                      }
                   }
@@ -903,5 +903,9 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
 
    public boolean sameParentURL(String url) {
       return sameURL(url);
+   }
+
+   // When creating a child package this method can be overridden to control how the child is initialized from the parent
+   public void initChildPackage(RepositoryPackage childPkg) {
    }
 }

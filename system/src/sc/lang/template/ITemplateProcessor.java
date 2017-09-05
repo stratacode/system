@@ -24,6 +24,9 @@ public interface ITemplateProcessor {
    /** True if this result needs to be compiled using javac */
    boolean needsCompile();
 
+   /** True for templates that are evaluated at runtime - not compiled or processed */
+   boolean isRuntimeTemplate();
+
    /** Returns the set of result processed files for dependency purposes. */
    List<SrcEntry> getProcessedFiles(Layer buildLayer, String buildDir, boolean generate);
 

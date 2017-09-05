@@ -5,6 +5,7 @@
 package sc.lang.java;
 
 import sc.lang.SemanticNodeList;
+import sc.layer.LayeredSystem;
 
 import java.util.*;
 
@@ -14,14 +15,14 @@ public class Parameter extends AbstractVariable implements IVariable {
    public boolean repeatingParameter;
    public Parameter nextParameter;
 
-   public static Parameter create(Object[] types, String[] names, ITypeParamContext ctx, ITypeDeclaration definedInType) {
+   public static Parameter create(LayeredSystem sys, Object[] types, String[] names, ITypeParamContext ctx, ITypeDeclaration definedInType) {
       if (types == null || types.length == 0)
           return null;
       Parameter curr = null, first = null;
       int i = 0;
       for (Object type:types) {
          Parameter next = new Parameter();
-         JavaType methType = JavaType.createFromParamType(type, ctx, definedInType);
+         JavaType methType = JavaType.createFromParamType(sys, type, ctx, definedInType);
          next.setProperty("type", methType);
          next.variableName = names[i++];
          if (curr == null)
@@ -57,7 +58,7 @@ public class Parameter extends AbstractVariable implements IVariable {
       if (type.contains(MemberType.Variable)) {
          if (nextParameter != null && (res = nextParameter.definesMember(name, type, refType, ctx, skipIfaces, isTransformed)) != null)
             return res;
-         if (variableName.equals(name))
+         if (variableName != null && variableName.equals(name))
             return this;
       }
       return super.definesMember(name, type, refType, ctx, skipIfaces, isTransformed);
@@ -75,7 +76,7 @@ public class Parameter extends AbstractVariable implements IVariable {
       if (baseType == null)
          return null;
       if (repeatingParameter)
-         baseType = new ArrayTypeDeclaration(getJavaModel().getModelTypeDeclaration(), baseType,"[]");
+         baseType = new ArrayTypeDeclaration(getLayeredSystem(), getJavaModel().getModelTypeDeclaration(), baseType,"[]");
       /*
        * This is now applied during init or when the parameter is first retrieved from the list
       if (arrayDimensions != null)
@@ -105,7 +106,7 @@ public class Parameter extends AbstractVariable implements IVariable {
           return null;
 
       if (repeatingParameter && arrayDimensions != null)
-         baseType = new ArrayTypeDeclaration(getJavaModel().getModelTypeDeclaration(), baseType,"[]");
+         baseType = new ArrayTypeDeclaration(getLayeredSystem(), getJavaModel().getModelTypeDeclaration(), baseType,"[]");
       return baseType;
    }
 

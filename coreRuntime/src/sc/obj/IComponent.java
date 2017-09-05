@@ -10,7 +10,7 @@ package sc.obj;
  * you can define initialize and start methods used in this interface.
  */
 @sc.js.JSSettings(jsLibFiles="js/scdyn.js", prefixAlias="sc_")
-public interface IComponent {
+public interface IComponent extends IStoppable {
    final static String COMPONENT_ANNOTATION = "sc.obj.Component";
 
    public byte getInitState();
@@ -24,7 +24,4 @@ public interface IComponent {
 
    /** You can optionally implement this method to receive a start hook */
    public void start();
-
-   /** You can optionally implement this method to receive a stop hook */
-   public void stop();
 }

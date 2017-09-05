@@ -25,6 +25,7 @@ public class RepositorySystem {
    public boolean updateSystem;
    public boolean reinstallSystem;
    public boolean installExisting;
+   public boolean debug;
 
    public HashSet<String> classPath = new HashSet<String>();
 
@@ -42,6 +43,8 @@ public class RepositorySystem {
       reinstallSystem = reinstall;
       updateSystem = update;
       this.installExisting = installExisting;
+      if (info)
+         debug = true;
 
       addRepositoryManager(new ScpRepositoryManager(this, "scp", store.packageRoot, handler, info));
       addRepositoryManager(new GitRepositoryManager(this, "git", store.packageRoot, handler, info));
@@ -85,6 +88,10 @@ public class RepositorySystem {
    }
 
    public RepositoryPackage addPackage(String url, boolean install) {
+      return addPackage(url, install, null);
+   }
+
+   public RepositoryPackage addPackage(String url, boolean install, DependencyContext ctx) {
       IRepositoryManager mgr = getManagerFromURL(url);
 
       // TODO: use getOrCreatePackage here?
@@ -102,7 +109,9 @@ public class RepositorySystem {
       else
          store.packages.put(pkg.packageName, pkg);
       if (install) {
-         installPackage(pkg, null);
+         if (ctx != null)
+            ctx.fromPkg = pkg;
+         installPackage(pkg, ctx);
       }
       return pkg;
    }

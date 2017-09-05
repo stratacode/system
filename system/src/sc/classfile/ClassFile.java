@@ -7,14 +7,13 @@ package sc.classfile;
 import sc.lang.java.*;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
+import sc.type.CTypeUtil;
 import sc.type.RTypeUtil;
 import sc.util.*;
 
 import java.io.*;
 import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
+import java.util.*;
 
 public class ClassFile {
    DataInputStream input;
@@ -52,6 +51,14 @@ public class ClassFile {
 
    Attribute[] attributes;
    CoalescedHashMap<String,Attribute> attributesByName;
+
+   String outerName;
+
+   InnerClasses theInnerClasses;
+   int innerAccessFlags; // Access flags that are stored in theInnerClasses attribute for this class (e.g. 'static')
+
+   public String classFileName;
+   public long lastModifiedTime;
 
    public ClassFile(InputStream is) {
       input = new DataInputStream(new BufferedInputStream(is));
@@ -181,6 +188,13 @@ public class ClassFile {
          if (aa == null)
             return null;
          return aa.getAnnotation(annotName);
+      }
+
+      public Map<String,Object> getAnnotations() {
+         AnnotationsAttribute aa = AnnotationsAttribute.getAttribute(attributes);
+         if (aa == null)
+            return null;
+         return aa.getAnnotations();
       }
 
       public boolean hasModifier(String modifierName) {
@@ -332,6 +346,10 @@ public class ClassFile {
 
       @Override
       public Object eval(Class expectedType, ExecutionContext ctx) {
+         return getValue();
+      }
+
+      public Object getPrimitiveValue() {
          return getValue();
       }
    }
@@ -614,9 +632,7 @@ public class ClassFile {
    }
 
    public String getOuterClassName() {
-      if (theInnerClasses == null)
-         return null;
-      return theInnerClasses.outerName;
+      return outerName;
    }
 
    public String getInnerClassName(int ix) {
@@ -632,8 +648,6 @@ public class ClassFile {
             return true;
       return false;
    }
-
-   InnerClasses theInnerClasses;
 
    public static class CFInnerClassInfo {
       String name;
@@ -679,15 +693,17 @@ public class ClassFile {
             // Name of the outer class
             int outerClassIndex = input.readUnsignedShort();
             ClassConstant pc = outerClassIndex == 0 ? null : (ClassConstant) file.constantPool[outerClassIndex];
-            // For a simple named inner class, this is just the parent's class name.
-            //outerName = pc == null ? null : file.getTypeNameFromIndex(pc.nameIndex);
+
+            // Each inner class will have an outer class.  We may see inner classes which are not for the type we are
+            // defining.  We also get an inner class entry to indicate our outer class
+            String innerOuterName = pc == null ? null : file.getTypeNameFromIndex(pc.nameIndex);
 
             // Name of inner class
             int innerNameIndex = input.readUnsignedShort();
             String innerName = innerNameIndex == 0 ? null : ((Utf8Constant) file.constantPool[innerNameIndex]).value;
 
             int innerAccessFlags = input.readUnsignedShort();
-            if (innerName != null) {
+            if (innerName != null && innerOuterName != null && innerOuterName.equals(file.cfClass.getFullTypeName())) {
                if (innerClasses == null) {
                   file.theInnerClasses = this;
                   innerClasses = new ArrayList<CFInnerClassInfo>();
@@ -695,6 +711,10 @@ public class ClassFile {
                innerClasses.add(new CFInnerClassInfo(innerName, innerAccessFlags));
             }
 
+            if (innerName != null && innerName.equals(file.cfClass.getTypeName())) {
+               file.outerName = innerOuterName;
+               file.innerAccessFlags = innerAccessFlags;
+            }
          }
       }
    }
@@ -815,6 +835,16 @@ public class ClassFile {
             return null;
          return annotations.get(name);
       }
+
+      public Map<String,Object> getAnnotations() {
+         if (annotations == null)
+            return null;
+         TreeMap<String,Object> res = new TreeMap<String,Object>();
+         for (CFAnnotation annot:annotations.values()) {
+            Annotation.addToAnnotationsMap(res, annot);
+         }
+         return res;
+      }
    }
 
    public Attribute readAttribute() throws IOException {
@@ -834,9 +864,20 @@ public class ClassFile {
       try {
          ClassFile file = new ClassFile(new FileInputStream(new File(args[0])));
          file.initialize();
+         file.classFileName = args[0];
       }
       catch (IOException exc) {
          System.out.println("**** Can't open file: " + exc);
       }
+   }
+
+   public String toString() {
+      if (classFileName != null)
+         return classFileName;
+      return super.toString();
+   }
+
+   public boolean fileChanged() {
+      return new File(classFileName).lastModified() > lastModifiedTime;
    }
 }

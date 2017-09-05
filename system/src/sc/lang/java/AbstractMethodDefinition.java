@@ -5,17 +5,15 @@
 package sc.lang.java;
 
 import sc.dyn.DynUtil;
-import sc.lang.INamedNode;
-import sc.lang.ISrcStatement;
-import sc.lang.SCLanguage;
-import sc.lang.SemanticNodeList;
+import sc.lang.*;
 import sc.lang.template.GlueStatement;
 import sc.layer.Layer;
 import sc.parser.ParseUtil;
+import sc.util.StringUtil;
 
 import java.util.*;
 
-public abstract class AbstractMethodDefinition extends TypedDefinition implements IMethodDefinition, INamedNode {
+public abstract class AbstractMethodDefinition extends TypedDefinition implements IMethodDefinition, INamedNode, IBlockStatementWrapper {
    public String name;
    public Parameter parameters;
    public String arrayDimensions;
@@ -40,6 +38,9 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
    transient String origName;
    private transient boolean templateBody;
 
+   /** If this method is used from a remote runtime and does not have the sc.obj.Remote annotation set explicitly, we'll add this annotation so we know it's safe to call this method during deserialization  */
+   private transient ArrayList<String> remoteRuntimes;
+
    public static final String METHOD_TYPE_PREFIX = "_M__";
 
    private transient int anonMethodId = 0;
@@ -50,6 +51,15 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       origName = name;
       templateBody = body != null && body.statements != null && body.statements.size() == 1 &&
                      body.statements.get(0) instanceof GlueStatement;
+   }
+
+   public boolean transform(ILanguageModel.RuntimeType type) {
+      if (remoteRuntimes != null) {
+         // Mark this method so it's accessible from the remote runtime
+         addModifier(Annotation.create("sc.obj.Remote", "remoteRuntimes", String.join(",",remoteRuntimes)));
+      }
+      boolean res = super.transform(type);
+      return res;
    }
 
    public AbstractMethodDefinition resolve(boolean modified) {
@@ -90,40 +100,29 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
 
    public Object definesMethod(String methodName, List<?> methParams, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
       if (name != null && methodName.equals(name)) {
-         if (parametersMatch(methParams, ctx)) {
+         Object meth = parametersMatch(methParams, ctx, inferredType, methodTypeArgs);
+         if (meth != null) {
             // In Java, it's possible to have static and non-static methods with the identical signature.  If we are calling this from a static
             // context, we need to disambiguate them by the context of the caller
             if (staticOnly && !hasModifier("static"))
                return null;
             if (refType == null || ModelUtil.checkAccess(refType, this)) {
-               // TODO: I think we may have to do this if the method has any unbound type parameters in any of it declared types
-               if (typeParameters != null) {
-                  ParamTypedMethod paramMethod = new ParamTypedMethod(this, ctx, getEnclosingType(), methParams, inferredType, methodTypeArgs);
-                  if (inferredType != null) {
-                     // Turn off the binding of parameter types while we do a match for this method.  We can't have the parameter types setting type parameters
-                     // here - only the inferred type to be sure it does not conflict with the parameter type match.
-                     paramMethod.bindParamTypes = false;
-                     if (!ModelUtil.parameterTypesMatch(paramMethod.getParameterTypes(true), ModelUtil.parametersToTypeArray(methParams, ctx), paramMethod, refType, ctx)) {
-                        return null;
-                     }
-                     paramMethod.bindParamTypes = true;
-                  }
-                  return paramMethod;
-               }
-               return this;
+               return meth;
             }
          }
       }
       return null;
    }
 
-   public boolean parametersMatch(List<? extends Object> otherParams, ITypeParamContext ctx) {
-      if (parameters == null)
-         return otherParams == null || otherParams.size() == 0;
+   public Object parametersMatch(List<? extends Object> otherParams, ITypeParamContext ctx, Object inferredType, List<JavaType> methodTypeArgs) {
+      if (parameters == null) {
+         return otherParams == null || otherParams.size() == 0 ? this : null;
+      }
+
       List<Parameter> params = parameters.getParameterList();
       int sz = params.size();
       if (otherParams == null)
-         return sz == 0;
+         return sz == 0 ? this : null;
 
       int otherSize = otherParams.size();
       int last = sz - 1;
@@ -132,7 +131,17 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
 
       if (otherSize != sz) {
          if (last < 0 || !repeatingLast || otherSize < sz-1)
-            return false;
+            return null;
+      }
+
+      Object[] boundParamTypes = null;
+      ParamTypedMethod paramMethod = null;
+
+      if (ModelUtil.isParameterizedMethod(this)) {
+         paramMethod = new ParamTypedMethod(getLayeredSystem(), this, ctx, getEnclosingType(), otherParams, inferredType, methodTypeArgs);
+         boundParamTypes = paramMethod.getParameterTypes(true);
+         if (paramMethod.invalidTypeParameter)
+            return null;
       }
 
       for (int i = 0; i < otherSize; i++) {
@@ -140,22 +149,38 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
          Parameter thisP;
          Object thisType;
          // Must be a repeating parameter because of the test above
+         int thisParamIx;
          if (i >= sz) {
-            thisP = params.get(last);
+            thisParamIx = last;
          }
          else {
-            thisP = params.get(i);
+            thisParamIx = i;
          }
-         thisType = thisP.getTypeDeclaration();
+
+         thisP = params.get(thisParamIx);
+         thisType = boundParamTypes == null ? thisP.getTypeDeclaration() : boundParamTypes[thisParamIx];
+
+         if (otherP instanceof Expression) {
+            Object paramType = thisType;
+            if (repeatingLast && i >= last && ModelUtil.isArray(paramType)) {
+               paramType = ModelUtil.getArrayComponentType(paramType);
+            }
+            if (paramType instanceof ParamTypeDeclaration)
+               paramType = ((ParamTypeDeclaration) paramType).cloneForNewTypes();
+            ((Expression) otherP).setInferredType(paramType, false);
+         }
 
          if (otherP instanceof ITypedObject)
              otherP = ((ITypedObject) otherP).getTypeDeclaration();
 
+         if (otherP instanceof BaseLambdaExpression.LambdaInvalidType)
+            return null;
+
          // If it's an unbound lambda expression, we still need to do some basic checks to see if this one is a match.
          if (otherP instanceof BaseLambdaExpression.LambdaInferredType) {
             BaseLambdaExpression.LambdaInferredType lambdaType = (BaseLambdaExpression.LambdaInferredType) otherP;
-            if (!lambdaType.rootExpr.lambdaParametersMatch(thisType, thisP.repeatingParameter))
-               return false;
+            if (!lambdaType.rootExpr.lambdaParametersMatch(thisType, thisP.repeatingParameter, null))
+               return null;
          }
 
          // Null entry means match
@@ -167,14 +192,14 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
          if (thisType != null && thisType != otherP && !ModelUtil.isAssignableFrom(thisType, otherP, false, ctx, allowUnbound, getLayeredSystem())) {
             if (i >= last && repeatingLast) {
                if (!ModelUtil.isAssignableFrom(ModelUtil.getArrayComponentType(thisType), otherP, false, ctx, getLayeredSystem())) {
-                  return false;
+                  return null;
                }
             }
             else
-               return false;
+               return null;
          }
       }
-      return true;
+      return paramMethod == null ? this : paramMethod;
    }
 
    public Object findType(String typeName, Object refType, TypeContext ctx) {
@@ -217,7 +242,7 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
             for (Statement st:statements) {
                if (st instanceof TypeDeclaration) {
                   TypeDeclaration td = (TypeDeclaration) st;
-                  if (td.typeName.equals(name))
+                  if (td.typeName != null && td.typeName.equals(name))
                      return td;
                }
             }
@@ -503,11 +528,11 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       if (compiledClass == null) {
          System.err.println("*** No compiled class for: " + getDeclaringType());
       }
-      Object res = ModelUtil.definesMethod(compiledClass, name, getParameterList(), null, null, false, false, null, null);
+      Object res = ModelUtil.definesMethod(compiledClass, name, getParameterList(), null, null, false, false, null, null, getLayeredSystem());
       if (res == null) {
          System.err.println("*** No runtime method for: " + name);
          boolean x = isDynMethod();
-         Object y = ModelUtil.definesMethod(compiledClass, name, getParameterList(), null, null, false, false, null, null);
+         Object y = ModelUtil.definesMethod(compiledClass, name, getParameterList(), null, null, false, false, null, null, getLayeredSystem());
       }
       return res;
    }
@@ -707,6 +732,7 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
 
          res.origName = origName;
          res.templateBody = templateBody;
+         res.remoteRuntimes = remoteRuntimes;
       }
       return res;
    }
@@ -720,11 +746,9 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
    }
 
    public AbstractMethodDefinition refreshNode() {
-      JavaModel oldModel = getJavaModel();
-      if (!oldModel.removed)
-         return this; // We are still valid
       if (replaced)
          return replacedByMethod.refreshNode();
+
       // Or we can look our replacement up...
       TypeDeclaration enclType = getEnclosingType();
       BodyTypeDeclaration newType = enclType == null ? null : enclType.refreshNode();
@@ -761,12 +785,65 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
    public void stop() {
       super.stop();
       parameterTypes = null;
+      overriddenMethod = null;
+      modified = false;
+      overriddenMethodName = null;
+      overriddenLayer = null;
    }
 
    public String getInnerTypeName() {
-      if (anonMethodId == 0)
-         anonMethodId = getEnclosingType().allocateAnonMethodId();
+      if (anonMethodId == 0) {
+         TypeDeclaration enclType = getEnclosingType();
+         if (enclType != null)
+            anonMethodId = enclType.allocateAnonMethodId();
+         else
+            anonMethodId = 123; // Don't think is really used when this is a fragment not in a type
+      }
       // Java names these just parentType$1InnerType
       return METHOD_TYPE_PREFIX + anonMethodId;
+   }
+
+   public Statement findStatement(Statement in) {
+      if (body != null) {
+         Statement out = body.findStatement(in);
+         if (out != null)
+            return out;
+      }
+      return super.findStatement(in);
+   }
+
+   public boolean isLeafStatement() {
+      return false;
+   }
+
+   public boolean isLineStatement() {
+      return true; // For JS we are returning true here so we can register the method's first line to use for the classInit call... TODO: for Java, should this be the last line though?
+   }
+
+   public int getNumStatementLines() {
+      return 1;
+   }
+
+   public BlockStatement getWrappedBlockStatement() {
+      return body;
+   }
+
+   public void setFromStatement(ISrcStatement from) {
+      fromStatement = from;
+      if (body != null)
+         body.setFromStatement(from);
+   }
+
+   public void addRemoteRuntime(String remoteRuntimeName) {
+      if (transformed) {
+         System.err.println("*** Unable to add remote runtime to transformed method");
+         return;
+      }
+      if (!ModelUtil.isRemoteMethod(getLayeredSystem(), this)) {
+         if (remoteRuntimes == null)
+            remoteRuntimes = new ArrayList<String>();
+         if (!remoteRuntimes.contains(remoteRuntimeName))
+            remoteRuntimes.add(remoteRuntimeName);
+      }
    }
 }

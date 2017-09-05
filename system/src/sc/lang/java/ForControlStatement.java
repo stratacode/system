@@ -119,12 +119,33 @@ public class ForControlStatement extends ForStatement {
       sb.append("; ");
       sb.append(condition);
       sb.append("; ");
-      sb.append(repeat);
+      if (repeat != null) {
+         boolean first = true;
+         for (Object robj:repeat) {
+            if (!first)
+               sb.append(", ");
+            sb.append(robj);
+            first = false;
+         }
+      }
       sb.append(") ");
 
       if (statement != null)
          sb.append(statement);
 
       return sb.toString();
+   }
+
+   public Statement findStatement(Statement in) {
+      if (forInit != null) {
+         for (Definition def:forInit) {
+            if (def instanceof Statement) {
+               Statement out = ((Statement) def).findStatement(in);
+               if (out != null)
+                  return out;
+            }
+         }
+      }
+      return super.findStatement(in);
    }
 }

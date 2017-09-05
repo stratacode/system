@@ -42,7 +42,9 @@ public class DynUtil {
 
    // A table which stores the automatically assigned id for a given object instance.
    //static Map<Object,String> objectIds = (Map<Object,String>) PTypeUtil.getWeakHashMap();
-   static Map<Object,String> objectIds = new WeakHashMap<Object,String>();
+   // This used to be WeakHashMap but we use IdentityWrapper as a key most of the time which causes this to get gc'd too quickly
+   // TODO: Can we use the WeakIdentityHashMap in sc.util?  It would need to be moved into coreRuntime  Right now, this is a memory leak unless we restrict it's use to objects that use dispose
+   static Map<Object,String> objectIds = new HashMap<Object,String>();
 
    public static void clearObjectIds() {
       objectIds.clear();
@@ -73,18 +75,33 @@ public class DynUtil {
 
    public static int getNumInnerTypeLevels(Object obj) {
       if (dynamicSystem == null) {
-         throw new IllegalArgumentException("Unable to determine object structure with no dynamic system");
+         if (!(obj instanceof Class))
+            throw new UnsupportedOperationException();
+         Class cl = (Class) obj;
+         int ct = 0;
+         do {
+            Class encl = cl.getEnclosingClass();
+            if (encl == null || hasModifier(cl, "static")) {
+               break;
+            }
+            ct++;
+            cl = encl;
+         } while (true);
+         return ct;
       }
       else
          return dynamicSystem.getNumInnerTypeLevels(obj);
    }
 
+   /** Walks up the object hierarchy until we hit a class or go off the top. */
    public static int getNumInnerObjectLevels(Object obj) {
-      if (dynamicSystem == null) {
-         throw new IllegalArgumentException("Unable to determine object structure with no dynamic system");
+      //if (!objectNameIndex.containsKey(obj))
+      //   return 0; // Not an outer object
+      Object outer = DynUtil.getOuterObject(obj);
+      if (outer == null) {
+         return 0; // Top level object - also not an inner object
       }
-      else
-         return dynamicSystem.getNumInnerObjectLevels(obj);
+      return 1 + getNumInnerObjectLevels(outer);
    }
 
    public static String getInnerTypeName(Object type) {
@@ -96,6 +113,11 @@ public class DynUtil {
       }
       else
          return dynamicSystem.getInnerTypeName(type);
+   }
+
+   public static Object getPropertyType(Object objType, String propName) {
+      IBeanMapper mapper = getPropertyMapping(objType, propName);
+      return mapper == null ? null : mapper.getPropertyType();
    }
 
    public static IBeanMapper getPropertyMapping(Object type, String dstPropName) {
@@ -208,7 +230,7 @@ public class DynUtil {
    }
 
    public static RemoteResult invokeRemote(Object obj, Object method, Object... paramValues) {
-      return SyncManager.invokeRemote(obj, DynUtil.getMethodName(method), paramValues);
+      return SyncManager.invokeRemote(obj, DynUtil.getMethodName(method), DynUtil.getTypeSignature(method), paramValues);
    }
 
    /** In Java this is the same method but in Javascript they are different */
@@ -253,6 +275,15 @@ public class DynUtil {
          return PTypeUtil.getMethodName(method);
    }
 
+   public static String getTypeSignature(Object method) {
+      if (method instanceof DynRemoteMethod)
+         return ((DynRemoteMethod) method).paramSig;
+      if (dynamicSystem != null)
+         return dynamicSystem.getMethodTypeSignature(method);
+      else
+         return null;
+   }
+
    public static Object evalCast(Object o, Object value) {
       if (o instanceof Class)
          return evalCast((Class) o, value);
@@ -275,8 +306,8 @@ public class DynUtil {
    }
 
    /**
-    * StrataCode uses some objects to implement dynamic types.  This method returns true if the given object is either
-    * a plain old Class type or a dynamic type.
+    * Unlike isType, treats TypeDeclaration's as non-types so they can be serialized across the wire as objects in
+    * the dynamic runtime in some cases
     */
    public static boolean isSType(Object obj) {
       if (obj instanceof Class)
@@ -414,6 +445,17 @@ public class DynUtil {
       } while(true);
    }
 
+   public static Object getPropertyValue(Object object, String propertyName, boolean ignoreError) {
+      try {
+         return getPropertyValue(object, propertyName);
+      }
+      catch (IllegalArgumentException exc) {
+         if (!ignoreError)
+            throw exc;
+      }
+      return null;
+   }
+
    public static Object getPropertyValue(Object object, String propertyName) {
       if (object instanceof IDynObject)
          return ((IDynObject) object).getProperty(propertyName);
@@ -502,6 +544,28 @@ public class DynUtil {
          throw new IllegalArgumentException("Invalid dynamic type: " + typeObj);
    }
 
+   public static Object newInnerInstance(Object typeObj, Object outerObj, String constrSig, Object...params) {
+      if (dynamicSystem != null)
+         return dynamicSystem.newInnerInstance(typeObj, outerObj, constrSig, params);
+      else if (typeObj instanceof Class) {
+         if (isComponentType(typeObj)) {
+            String typeName = getTypeName(typeObj, false);
+            String methodName = "new" + CTypeUtil.capitalizePropertyName(CTypeUtil.getClassName(typeName));
+            Object newMeth = resolveMethod(typeObj, methodName, constrSig);
+            if (newMeth !=  null) {
+               return invokeMethod(outerObj, newMeth, params);
+            }
+            else
+               throw new IllegalArgumentException("Missing new method for component type: " + typeName);
+         }
+         else {
+            return createInnerInstance(typeObj, outerObj, constrSig, params);
+         }
+      }
+      else
+         throw new UnsupportedOperationException();
+   }
+
    public static void addDynObject(String typeName, Object instObj) {
       if (dynamicSystem != null)
          dynamicSystem.addDynObject(typeName, instObj);
@@ -531,6 +595,11 @@ public class DynUtil {
          dynamicSystem.addDynInstance(typeName, instObj);
    }
 
+   public static void addDynListener(IDynListener listener) {
+      if (dynamicSystem != null) {
+         dynamicSystem.addDynListener(listener);
+      }
+   }
    public static void addDynInnerInstance(String typeName, Object innerObj, Object outerObj) {
       if (dynamicSystem != null)
          dynamicSystem.addDynInnerInstance(typeName, innerObj, outerObj);
@@ -643,15 +712,17 @@ public class DynUtil {
       return castType.evalCast(theClass, value);
    }
 
-   /** Returns a small but consistent id for each object under the microscope */
+   /** Returns a small but consistent id for each object - using the objectId if it's set just for consistency and ease of debugging */
    public static String getTraceId(Object obj) {
       Integer id;
-      if ((id = traceIds.get(new IdentityWrapper(obj))) == null)
-         traceIds.put(new IdentityWrapper(obj), id = new Integer(traceCt++));
+      IdentityWrapper wrap = new IdentityWrapper(obj);
+      if ((id = traceIds.get(wrap)) == null)
+         traceIds.put(wrap, id = new Integer(traceCt++));
 
       return String.valueOf(id);
    }
 
+   /** Gets the trace id without the identity wrapper, for things like session ids which should use 'equals' to find the same thing */
    public static String getTraceObjId(Object obj) {
       Integer id;
       if ((id = traceIds.get(obj)) == null)
@@ -719,6 +790,10 @@ public class DynUtil {
       return id;
    }
 
+   public static void setObjectId(Object obj, String name) {
+      objectIds.put(new IdentityWrapper(obj), name);
+   }
+
    public static Integer getTypeIdCount(String typeName) {
       Integer typeId = typeIdCounts.get(typeName);
       if (typeId == null) {
@@ -729,6 +804,10 @@ public class DynUtil {
          typeIdCounts.put(typeName, typeId + 1);
       }
       return typeId;
+   }
+
+   public static void updateTypeIdCount(String typeName, int val) {
+      typeIdCounts.put(typeName, val);
    }
 
    /**
@@ -754,6 +833,7 @@ public class DynUtil {
          else {
             Class objClass = obj.getClass();
             Type theType;
+            String res;
             if (PTypeUtil.isPrimitive(objClass) || (theType = Type.get(objClass)).isANumber() || theType.primitiveClass != null || objClass == Date.class)
                return obj.toString();
             else if (objClass == String.class)
@@ -761,12 +841,18 @@ public class DynUtil {
             else if (obj.getClass().isArray()) {
                return TypeUtil.getArrayName(obj);
             }
+            else if (isObject(obj) && (res = getObjectName(obj)) != null)
+               return res;
+
+            String objId = objectIds.get(new IdentityWrapper(obj));
+            if (objId != null)
+               return objId;
+
             else {
                String toStr = obj.toString();
                if (!PTypeUtil.useInstanceName(toStr))
                   return toStr;
             }
-
             typeName = cleanClassName(obj.getClass());
          }
          return CTypeUtil.getClassName(typeName).replace('$', '.') + "__" + getTraceId(obj);
@@ -797,6 +883,8 @@ public class DynUtil {
    }
 
    public static int getArrayLength(Object arrVal) {
+      if (arrVal == null)
+         return 0;
       if (arrVal instanceof Collection)
          return ((Collection) arrVal).size();
       return PTypeUtil.getArrayLength(arrVal);
@@ -1056,6 +1144,8 @@ public class DynUtil {
             }
          }
       }
+
+      objectIds.remove(new IdentityWrapper(obj));
    }
 
    public static void initComponent(Object comp) {
@@ -1099,6 +1189,13 @@ public class DynUtil {
    /** This is implemented only in the JS runtime */
    public static Object evalScript(String script) {
       throw new UnsupportedOperationException();
+   }
+
+   public static void applySyncLayer(String lang, String destName, String scopeName, String code, boolean isReset, boolean allowCodeEval) {
+      if (dynamicSystem != null)
+         dynamicSystem.applySyncLayer(lang, destName, scopeName, code, isReset, allowCodeEval);
+      else
+         throw new UnsupportedOperationException(("Attempt to evalCode without a dynamic runtime"));
    }
 
    public static boolean isObjectType(Object type) {
@@ -1161,6 +1258,21 @@ public class DynUtil {
          return obj instanceof java.lang.Enum;
    }
 
+   public static boolean isEnumType(Object type) {
+      if (type instanceof Class)
+         return ((Class<?>) type).isAssignableFrom(Enum.class);
+      if (dynamicSystem != null)
+         return dynamicSystem.isEnumType(type);
+      return false;
+   }
+
+   public static Object[] getEnumConstants(Object enumType) {
+      if (enumType instanceof Class)
+         return ((Class) enumType).getEnumConstants();
+      else
+         throw new UnsupportedOperationException();
+   }
+
    public static Object getEnumConstant(Object typeObj, String enumConstName) {
       if (dynamicSystem != null)
          return dynamicSystem.getEnumConstant(typeObj, enumConstName);
@@ -1174,8 +1286,18 @@ public class DynUtil {
    }
 
    public static IScheduler frameworkScheduler;
+   public static ThreadLocal<IScheduler> threadScheduler = new ThreadLocal<IScheduler>();
+
+   public static void setThreadScheduler(IScheduler sched) {
+      threadScheduler.set(sched);
+   }
 
    public static void invokeLater(Runnable r, int priority) {
+      IScheduler sched = threadScheduler.get();
+      if (sched != null) {
+         sched.invokeLater(r, priority);
+         return;
+      }
       if (frameworkScheduler == null)
          throw new IllegalArgumentException("Must set DynUtil.frameworkScheduler before calling invokeLater");
       frameworkScheduler.invokeLater(r, priority);
@@ -1199,6 +1321,20 @@ public class DynUtil {
       throw new UnsupportedOperationException();
    }
 
+   public static boolean hasAnnotation(Object typeObj, String annotName) {
+      return getAnnotation(typeObj, annotName) != null;
+   }
+
+   public static Object getAnnotation(Object typeObj, String annotName) {
+      if (typeObj instanceof Class) {
+         return PTypeUtil.getAnnotation((Class) typeObj, annotName);
+      }
+      else if (dynamicSystem != null) {
+         return dynamicSystem.getAnnotationByName(typeObj, annotName);
+      }
+      else throw new UnsupportedOperationException();
+   }
+
    public static Object getAnnotationValue(Object typeObj, String annotName, String attName) {
       if (typeObj instanceof Class) {
          return PTypeUtil.getAnnotationValue((Class) typeObj, annotName, attName);
@@ -1207,6 +1343,22 @@ public class DynUtil {
          return dynamicSystem.getAnnotationValue(typeObj, annotName, attName);
       }
       else throw new UnsupportedOperationException();
+   }
+
+   public static Object getPropertyAnnotationValue(Object typeObj, String propName, String annotName, String attName) {
+      if (dynamicSystem != null) {
+         return dynamicSystem.getPropertyAnnotationValue(typeObj, propName, annotName, attName);
+      }
+      else if (typeObj instanceof Class) {
+         Object prop = DynUtil.getPropertyMapping(typeObj, propName);
+         if (prop != null) {
+            Object annot = PTypeUtil.getAnnotation(prop, annotName);
+            if (annot != null) {
+               return PTypeUtil.getValueFromAnnotation(annot, attName);
+            }
+         }
+      }
+      throw new UnsupportedOperationException();
    }
 
    public static Object getInheritedAnnotationValue(Object typeObj, String annotName, String attName) {
@@ -1221,6 +1373,16 @@ public class DynUtil {
 
    public static String getScopeName(Object obj) {
       Object typeObj = DynUtil.getType(obj);
+      String res = getScopeNameForType(typeObj);
+      if (res != null)
+         return res;
+      Object outer = DynUtil.getOuterObject(obj);
+      if (outer != null)
+         return getScopeName(outer);
+      return null;
+   }
+
+   public static String getScopeNameForType(Object typeObj) {
       if (dynamicSystem != null) {
          // Need to check both the sc.obj.Scope and scope<name> in tandem so each can override the other
          String scopeName = dynamicSystem.getInheritedScopeName(typeObj);
@@ -1232,9 +1394,6 @@ public class DynUtil {
          if (scopeNameObj != null)
             return (String) scopeNameObj;
       }
-      Object outer = DynUtil.getOuterObject(obj);
-      if (outer != null)
-         return getScopeName(outer);
       return null;
    }
 
@@ -1310,6 +1469,57 @@ public class DynUtil {
          System.out.println("*** No DynChildManager registered for addChild on parent type: " + type);
       else
          childMgr.addChild(ix, parent, child);
+   }
+
+   public static int getLayerPosition(Object type) {
+      if (dynamicSystem == null)
+         return -1;
+      return dynamicSystem.getLayerPosition(type);
+   }
+
+   /** Call this method to be notified when dynamic types change */
+   public static void registerTypeChangeListener(ITypeChangeListener listener) {
+      if (dynamicSystem != null)
+         dynamicSystem.registerTypeChangeListener(listener);
+   }
+
+   public static boolean isComponentType(Object type) {
+      if (dynamicSystem != null)
+         return dynamicSystem.isComponentType(type);
+      else if (type instanceof Class) {
+         Class cl = (Class) type;
+         return IComponent.class.isAssignableFrom(cl) || IAltComponent.class.isAssignableFrom(cl);
+      }
+      else
+         throw new UnsupportedOperationException();
+   }
+
+   public static boolean isArray(Object type) {
+      if (dynamicSystem != null)
+         return dynamicSystem.isArray(type);
+      if (type instanceof Class) {
+         return PTypeUtil.isArray(type);
+      }
+      throw new UnsupportedOperationException();
+   }
+
+   public static Object getComponentType(Object type) {
+      if (dynamicSystem != null)
+         return dynamicSystem.getComponentType(type);
+      if (type instanceof Class) {
+         return PTypeUtil.getComponentType(type);
+      }
+      throw new UnsupportedOperationException();
+   }
+
+   public static boolean hasProperty(Object obj, String propName) {
+      if (obj == null)
+          return false;
+      return getPropertyMapping(getType(obj), propName) != null;
+   }
+
+   public static Object getTypeOfObj(Object changedObj) {
+      return DynUtil.isType(changedObj) ? changedObj.getClass() : DynUtil.getType(changedObj);
    }
 
 }

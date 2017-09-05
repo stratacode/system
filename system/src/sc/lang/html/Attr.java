@@ -17,7 +17,7 @@ import java.util.Set;
 
 public class Attr extends Node implements ISrcStatement {
    public String name;
-   // Can be either a String, TemplateExpression, or AttrExpr - which holds the op and expression
+   // Can be either an IString, TemplateExpression, or AttrExpr - which holds the op and expression
    public Object value;
 
    // The expression which should be used to compute the attribute's value
@@ -28,6 +28,8 @@ public class Attr extends Node implements ISrcStatement {
 
    // The Element tag which defined this attribute
    public transient Element declaringTag;
+
+   private transient boolean attInit = false;
 
    public boolean isString() {
       return PString.isString(value);
@@ -52,8 +54,6 @@ public class Attr extends Node implements ISrcStatement {
          return (Expression) value;
       return null;
    }
-
-   private transient boolean attInit = false;
 
    public void resetAttribute() {
       attInit = false;
@@ -260,6 +260,38 @@ public class Attr extends Node implements ISrcStatement {
       return -1;
    }
 
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
+      String matchPrefix = null;
+      if (name != null) {
+         int ix = name.indexOf(dummyIdentifier);
+         if (ix != -1) {
+            matchPrefix = name.substring(0, ix);
+            Element parent = getEnclosingTag();
+            String tagName = "html";
+            if (parent != null && parent.tagName != null) {
+               tagName = parent.tagName;
+            }
+            Element.addMatchingAttributeNames(tagName, matchPrefix, candidates);
+         }
+         else {
+            if (value != null && isString()) {
+               String valStr = value.toString();
+               ix = valStr.indexOf(dummyIdentifier);
+               if (ix != -1) {
+                  matchPrefix = valStr.substring(0, ix);
+                  if (name.equals("extends") || name.equals("implements")) {
+                     ModelUtil.suggestTypes(origModel, origModel.getPackagePrefix(), matchPrefix, candidates, true);
+                  }
+                  else if (name.equals("tagMerge")) {
+                     MergeMode.addMatchingModes(matchPrefix, candidates);
+                  }
+               }
+            }
+         }
+      }
+      return matchPrefix;
+   }
+
    /** This handles breakpoints at the tag level.  To find the matching source statement, need to check our attributes and sub-tags */
    public boolean getNodeContainsPart(ISrcStatement partNode) {
       if (partNode == this || sameSrcLocation(partNode))
@@ -278,4 +310,19 @@ public class Attr extends Node implements ISrcStatement {
       return false;
    }
 
+   @Override
+   public int getNumStatementLines() {
+      return 1;
+   }
+
+
+   public void stop() {
+      super.stop();
+      attInit = false;
+      valueExpr = null;
+      valueExprClone = null;
+      valueProp = null;
+      unknown = false;
+      declaringTag = null;
+   }
 }

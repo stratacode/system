@@ -9,7 +9,7 @@ import sc.util.FileUtil;
 import java.io.*;
 import java.util.*;
 
-/** For a given type, stores the references to the set of types which require bindable or dynamic behavior from this type */
+/** For a given type, stores the references to the set of types which require bindable or dynamic behavior from this type for a given build layer */
 public class ReverseDependencies implements Serializable {
    public static final String REVERSE_DEPENDENCIES_EXTENSION = "rdps";
    int typeCount = 0;
@@ -132,12 +132,12 @@ public class ReverseDependencies implements Serializable {
     * This removes any dependencies from types in our registry which were changed but did not add a new entry.
     * TODO: does this handle the case where we remove a file and do an incremental build?
     */
-   public void cleanStaleEntries(HashMap<String,IFileProcessorResult> changedModels) {
+   public void cleanStaleEntries(HashSet<String> changedTypes) {
       HashMap<Integer,Boolean> tocull = new HashMap<Integer,Boolean>();
       for (String typeName:typeRegistry.keySet()) {
          if (changedState == null)
             changedState = new HashMap<String, Boolean>();
-         if (changedModels.get(typeName) != null && changedState.get(typeName) == null)
+         if (changedTypes.contains(typeName) && changedState.get(typeName) == null)
             tocull.put(typeRegistry.get(typeName), Boolean.TRUE);
       }
       if (bindableDeps != null) {

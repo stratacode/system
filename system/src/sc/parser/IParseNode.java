@@ -57,6 +57,8 @@ public interface IParseNode extends CharSequence, IParseResult {
    /** Returns the index of the string relative to the start of this parse node */
    int indexOf(String subtr);
 
+   int indexOf(String subtr, int fromIndex);
+
    int lastIndexOf(String subtr);
 
    /** If you take a language string and reparse it this lets you advance the start index to where it originally existed in the file (e.g. for HTML attribute expressions which are not parsed as part of the original grammar) */
@@ -91,6 +93,8 @@ public interface IParseNode extends CharSequence, IParseResult {
    /** Find the parse node at the specified start index.  If matchParselet is not null the match is only returned if it is the same as the parselet specified */
    IParseNode findParseNode(int startIndex, Parselet matchParselet);
 
+   int getChildStartOffset(Parselet childParselet);
+
    /**
     * After updating some parse nodes, you may need to reset the start indexes.  This sets the start index to the one given and returns the start index to
     * continue after this parse node.
@@ -109,6 +113,25 @@ public interface IParseNode extends CharSequence, IParseResult {
    boolean isErrorNode();
 
    void setErrorNode(boolean val);
+
+   /** Returns true if any nodes in this tree have been through the 'generate' process.  These nodes might have formatting parse nodes that need to be replaced for some operations */
+   boolean isGeneratedTree();
+
+   /**
+    * Used for reparse only, this method determines how many semantic value elements were produced by this parse node.
+    *
+    * Returns 1 for scalar semantic values or for a repeat value, the number of elements in the semantic value array.
+    * It's not just the size of the semantic value List because during reparse, we combine all of the elements from
+    * multiple parse nodes into one List when there's one repeat array node which has a child parselet that's also a
+    * repeat array node.  Instead, we look at the number of child parse nodes and use that to determine how many
+    * array values came from the this node.
+    */
+   int getNumSemanticValues();
+
+   void diffParseNode(IParseNode other, StringBuilder diffs);
+
+   /** Returns true for error parse-nodes which are partial-parses - i.e. did not parse required chunks */
+   boolean isIncomplete();
 }
 
 

@@ -111,7 +111,7 @@ public class SwitchStatement extends Statement implements IBlockStatement {
       // Resolving the expression should not check for exposed variables in the switch itself
       if (fromChild != expression) {
          if (isEnum && mtype.contains(MemberType.Enum) && isFromSwitchLabel(fromChild)) {
-            v = ModelUtil.definesMember(expressionType, name, MemberType.EnumOnlySet, refType, ctx, skipIfaces, false);
+            v = ModelUtil.definesMember(expressionType, name, MemberType.EnumOnlySet, refType, ctx, skipIfaces, false, getLayeredSystem());
             if (v != null)
                return v;
          }
@@ -214,10 +214,52 @@ public class SwitchStatement extends Statement implements IBlockStatement {
       return statements;
    }
 
-   public void addReturnStatements(List<Statement> res) {
+   public void addReturnStatements(List<Statement> res, boolean incThrow) {
       if (statements != null) {
          for (Statement statement:statements)
-            statement.addReturnStatements(res);
+            statement.addReturnStatements(res, incThrow);
       }
+   }
+
+   public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append("switch");
+      if (expression != null) {
+         sb.append(expression);
+      }
+      else
+         sb.append("<null expression>");
+      if (statements != null)
+         sb.append(statements.toString());
+      else
+         sb.append("<null statement>");
+      return sb.toString();
+   }
+
+   public Statement findStatement(Statement in) {
+      if (statements != null) {
+         for (Statement st:statements) {
+            Statement out = st.findStatement(in);
+            if (out != null)
+               return out;
+         }
+      }
+      return null;
+   }
+
+   public boolean isLeafStatement() {
+      return false;
+   }
+
+   public String getStartBlockToken() {
+      return "switch";
+   }
+
+   public String getStartBlockString() {
+      return "{";
+   }
+
+   public String getEndBlockString() {
+      return "}";
    }
 }

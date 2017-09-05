@@ -12,6 +12,10 @@ import sc.bind.MethodBinding;
 import sc.dyn.IReverseMethodMapper;
 import sc.js.JSSettings;
 
+/** A version of the PTypeUtil class with minimum dependencies on core Java features.  Originally, this class was built for
+ * the GWT integration to separate out methods which did not exist in that runtime.  It now is primarily used to separate
+ * out a java-script only implementation of various type utilities.  This class is replaced in the JS runtime by scdyn.js.
+ */
 @JSSettings(jsLibFiles="js/scdyn.js")
 public class PTypeUtil {
    public static Map<String,Object> threadLocalMap = new HashMap<String,Object>();
@@ -325,8 +329,16 @@ public class PTypeUtil {
    }
 
    public static boolean isPrimitive(Class type) {
-      // TODO: anyway to identify primitive types in GWT?  Used by DynUtil.getInstanceName
-      return false;
+      return Type.get(type).primitiveClass != null;
+   }
+
+   public static boolean isANumber(Class type) {
+      return Type.get(type).isANumber();
+   }
+
+   public static boolean isStringOrChar(Class type) {
+      Type t = Type.get(type);
+      return t == Type.String || t == Type.Character;
    }
 
    public static Object getDefaultObjectValue(Class type) {
@@ -389,6 +401,10 @@ public class PTypeUtil {
       return false;
    }
 
+   public static Object getComponentType(Object cl) {
+      return cl instanceof Class ? ((Class) cl).getComponentType() : null;
+   }
+
    public static boolean isAssignableFrom(Class cl, Class other) {
       if (cl == other || cl.getName().equals(other.getName()))
          return true;
@@ -437,7 +453,15 @@ public class PTypeUtil {
       return null;
    }
 
+   public static Object getValueFromAnnotation(Object annotation, String annotValue) {
+      return null;
+   }
+
    public static Object getAnnotationValue(Class cl, String annotName, String annotValue) {
+      return null;
+   }
+
+   public static Object getAnnotation(Object cl, Object annotNameOrType) {
       return null;
    }
 
@@ -454,5 +478,10 @@ public class PTypeUtil {
       if (res == null)
          return -1;
       return res;
+   }
+
+   public static Object clone(Object o) {
+      Object meth = resolveMethod(o.getClass(), "clone", null);
+      return invokeMethod(o, meth);
    }
 }

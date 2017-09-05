@@ -4,13 +4,15 @@
 
 package sc.lang.java;
 
+import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
 
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
-public class VariableStatement extends TypedDefinition {
+public class VariableStatement extends TypedDefinition implements IClassBodyStatement {
    public SemanticNodeList<Object> variableModifiers;
    public List<VariableDefinition> definitions;
 
@@ -127,5 +129,61 @@ public class VariableStatement extends TypedDefinition {
 
    public String toString() {
       return toSafeLanguageString();
+   }
+
+   public ISrcStatement findFromStatement(ISrcStatement st) {
+      ISrcStatement fromSt = super.findFromStatement(st);
+      if (fromSt != null)
+         return fromSt;
+      return null;
+   }
+
+   public void addBreakpointNodes(List<ISrcStatement> res, ISrcStatement st) {
+      super.addBreakpointNodes(res, st);
+      if (fromStatement instanceof VariableStatement) {
+         VariableStatement fromVarSt = (VariableStatement) fromStatement;
+         if (fromVarSt.definitions != null) {
+            int ix = 0;
+            for (VariableDefinition varDef : fromVarSt.definitions) {
+               if (st.getNodeContainsPart(varDef)) {
+                  // Return the corresponding definition in the transformed model
+                  if (definitions != null && definitions.size() > ix)
+                     res.add(definitions.get(ix));
+               }
+               ix++;
+            }
+         }
+      }
+   }
+
+   public boolean getNodeContainsPart(ISrcStatement fromSt) {
+      if (super.getNodeContainsPart(fromSt))
+         return true;
+      if (definitions != null) {
+         for (VariableDefinition varDef:definitions)
+            if (varDef == fromSt || varDef.getNodeContainsPart(fromSt))
+               return true;
+      }
+      return false;
+   }
+
+   // TODO: code cleanup: this method (and probably some other methods) could be put into a new base class shared with FieldDefinition if we renamed variableDefinitions and definitions
+   public List<Statement> getBodyStatements() {
+      List<Statement> res = null;
+      if (definitions != null) {
+         for (VariableDefinition varDef:definitions) {
+            Expression initExpr = varDef.getInitializerExpr();
+            if (initExpr != null && !initExpr.isLeafStatement()) {
+               if (res == null)
+                  res = new ArrayList<Statement>();
+               res.add(initExpr);
+            }
+         }
+      }
+      return res;
+   }
+
+   public boolean isLeafStatement() {
+      return getBodyStatements() == null;
    }
 }

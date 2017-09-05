@@ -7,6 +7,7 @@ package sc.lang.java;
 import sc.lang.ISemanticNode;
 import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
+import sc.type.CTypeUtil;
 
 import java.util.EnumSet;
 import java.util.IdentityHashMap;
@@ -286,10 +287,10 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
       }
    }
 
-   public void addReturnStatements(List<Statement> res) {
+   public void addReturnStatements(List<Statement> res, boolean incThrow) {
       if (statements != null) {
          for (Statement st:statements) {
-            st.addReturnStatements(res);
+            st.addReturnStatements(res, incThrow);
          }
       }
    }
@@ -361,24 +362,61 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
       return true;
    }
 
-   private final static int STATEMENTS_IN_STRING = 6;
+   private final static int MAX_STATEMENTS_IN_TOSTRING = 6;
 
    public String toString() {
+      String start = getStartBlockString();
+      String end = getEndBlockString();
       if (statements == null) {
-         return "{}";
+         return (staticEnabled ? "static " : "") + start + end;
       }
       StringBuilder sb = new StringBuilder();
       if (staticEnabled)
          sb.append("static ");
-      sb.append("{\n");
-      for (int i = 0; i < Math.min(statements.size(), STATEMENTS_IN_STRING); i++) {
+      sb.append(start);
+      sb.append("\n");
+      boolean printEllipsis = false;
+      for (int i = 0; i < Math.min(statements.size(), MAX_STATEMENTS_IN_TOSTRING); i++) {
          Statement st = statements.get(i);
          sb.append("   ");
-         sb.append(statements.toString());
+         sb.append(st);
+         // In case we have long statements we should trim it earlier
+         if (sb.length() > 60) {
+            printEllipsis = true;
+            break;
+         }
       }
-      if (statements.size() > STATEMENTS_IN_STRING)
+      if (printEllipsis || statements.size() > MAX_STATEMENTS_IN_TOSTRING)
          sb.append("   ...\n");
-      sb.append("}\n");
+      sb.append(end);
+      sb.append("\n");
       return sb.toString();
    }
+
+   public Statement findStatement(Statement in) {
+      if (statements != null) {
+         for (Statement st:statements) {
+            Statement out = st.findStatement(in);
+            if (out != null)
+               return out;
+         }
+      }
+      return null;
+   }
+
+   public boolean isLeafStatement() {
+      return false;
+   }
+
+   public int getNumStatementLines() {
+      return 1;
+   }
+
+   public void setFromStatement(ISrcStatement from) {
+      if (statements != null) {
+         for (Statement st:statements)
+            st.setFromStatement(from);
+      }
+   }
+
 }

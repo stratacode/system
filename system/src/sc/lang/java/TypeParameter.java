@@ -106,7 +106,7 @@ public class TypeParameter extends JavaSemanticNode implements ITypedObject {
       else
          sb.append("<null-type-parameter>");
       if (extendsType != null) {
-         sb.append(" ? extends ");
+         sb.append(" extends ");
          sb.append(extendsType.toGenerateString());
       }
       return sb.toString();

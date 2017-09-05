@@ -126,8 +126,9 @@ public class DynBeanMapper extends AbstractBeanMapper {
                   IDynObject dynObj = (IDynObject) parent;
                   return dynObj.getProperty(getPropertyName());
                }
-               else
+               else {
                   return ((Field) getSelector).get(parent);
+               }
             }
             else {
                if ((attMask & GET_IS_DYN) != 0)
@@ -143,8 +144,11 @@ public class DynBeanMapper extends AbstractBeanMapper {
                   // TODO: need to deal with class here?
                   return ((BodyTypeDeclaration)ownerType).getDynStaticField(getPropertyName());
                }
-               else
+               else {
+                  if (!(getSelector instanceof Field))
+                     throw new IllegalArgumentException("No property: " + getSelector + " on: " + parent);
                   return ((Field) getSelector).get(null);
+               }
             }
             else {
                if ((attMask & GET_IS_DYN) != 0) {
@@ -270,6 +274,8 @@ public class DynBeanMapper extends AbstractBeanMapper {
             Object rm =  ((MethodDefinition) gs).getRuntimeMethod();
             if (rm != null)
                gs = rm;
+            else
+               isDyn = true;
          }
       }
       else if (gs instanceof VariableDefinition) {
@@ -278,6 +284,8 @@ public class DynBeanMapper extends AbstractBeanMapper {
             Object rf = ((VariableDefinition) gs).getRuntimeField();
             if (rf != null)
                gs = rf;
+            else
+               isDyn = true;
          }
       }
       else
@@ -298,6 +306,8 @@ public class DynBeanMapper extends AbstractBeanMapper {
             Object rm = ((MethodDefinition) ss).getRuntimeMethod();
             if (rm != null) // Interface methods won't have a runtime thing
                ss = rm;
+            else
+               isDyn = true;
          }
       }
       else if (ss instanceof VariableDefinition) {
@@ -306,6 +316,8 @@ public class DynBeanMapper extends AbstractBeanMapper {
             Object rf = ((VariableDefinition) ss).getRuntimeField();
             if (rf != null)
                ss = rf;
+            else
+               isDyn = true;
          }
       }
       else if (ss instanceof BodyTypeDeclaration)
@@ -326,8 +338,10 @@ public class DynBeanMapper extends AbstractBeanMapper {
          isDyn = ModelUtil.isDynamicType(ss);
          if (!isDyn) {
             Object rf = ((VariableDefinition) ss).getRuntimeField();
-            if (rf != null) // Interface fields are not dynamic but won't have a runtime description - just use the VarDef.
+            if (rf != null) // Interface fields are not dynamic but won't have a runtime description - just use the VarDef and treat them as dynamic
                ss = rf;
+            else
+               isDyn = true;
          }
       }
       else

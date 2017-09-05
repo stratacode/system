@@ -26,6 +26,10 @@ public class ZipSrcEntry extends SrcEntry {
       return new File(zipFileName).lastModified();
    }
 
+   public long getFileSize() {
+      return zipEntry.getSize();
+   }
+
    public InputStream getInputStream() {
       try {
          return zipFile.getInputStream(zipEntry);

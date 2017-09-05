@@ -1,9 +1,14 @@
 #!/bin/sh
 
-cd ../../../
-./makeSC.sh /jjv/vbuild/
+USE_IDEA_DIR="${IDEA_PLUGIN_DIR:=${HOME}/Library/Application Support/IntelliJIdea2016.2}"
+USE_SC_DIR="${SC_DIR:=/jjv/vbuild}"
 
-cd /jjv/vbuild
+echo "Rebuilding SC - installing into: $USE_SC_DIR"
+
+cd ../../../
+./makeSC.sh $USE_SC_DIR
+
+cd $USE_SC_DIR
 rm -rf bin
 rm -rf StrataCode
 unzip StrataCode.zip
@@ -13,6 +18,7 @@ mv StrataCode/bin bin
 # for now, it's finding it in the only place it knows it will be there - the plugin directory
 # perhaps, when we create the intellij project, we should make a copy of the sc.jar file?  Or point it
 # at the version of sc.jar that gets built from src in that intelliJ instance?
-cp /jjv/vbuild/bin/sc.jar ~/Library/Application\ Support/IntelliJIdea13/sc4idea/lib/sc.jar
-cp /jjv/vbuild/bin/sc.jar ~/Library/Application\ Support/IntelliJIdea14/sc4idea/lib/sc.jar
-cp /jjv/vbuild/bin/sc.jar ~/Library/Caches/IntelliJIdea13/plugins-sandbox/plugins/sc4idea/lib/sc.jar
+
+echo "Installing IDEA plugin dir: $USE_IDEA_DIR"
+cp "${USE_SC_DIR}/bin/sc.jar" "${USE_IDEA_DIR}/sc4idea/lib/sc.jar"
+cp "${USE_SC_DIR}/bin/scrt-core-src.jar" "${USE_IDEA_DIR}/sc4idea/lib/scrt-core-src.jar"

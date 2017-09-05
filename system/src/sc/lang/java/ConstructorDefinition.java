@@ -74,6 +74,10 @@ public class ConstructorDefinition extends AbstractMethodDefinition {
       return null;  //To change body of implemented methods use File | Settings | File Templates.
    }
 
+   public Object getFieldFromGetSetMethod() {
+      return null;
+   }
+
    public boolean isGetMethod() {
       return false;
    }
@@ -91,9 +95,7 @@ public class ConstructorDefinition extends AbstractMethodDefinition {
    }
 
    public Object definesConstructor(List<?> methParams, ITypeParamContext ctx, boolean isTransformed) {
-      if (parametersMatch(methParams, ctx))
-         return this;
-      return null;
+      return parametersMatch(methParams, ctx, null, null);
    }
 
    /** When overriding constructors, we need to convert them to a method */
