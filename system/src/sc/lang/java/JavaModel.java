@@ -2519,7 +2519,6 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             return;
          }
       }
-      System.err.println(error);
    }
 
    public void reportWarning(String error, ISemanticNode source) {

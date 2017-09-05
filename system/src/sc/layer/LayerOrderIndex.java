@@ -8,11 +8,17 @@ import sc.util.FileUtil;
 import sc.util.IMessageHandler;
 import sc.util.MessageType;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InvalidClassException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 
 /**
  * One instance per LayeredSystem, used for storing the set of layers that could be loaded into this system

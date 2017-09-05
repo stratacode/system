@@ -5,18 +5,17 @@
 package sc.lang.java;
 
 import sc.bind.ArraySelectorBinding;
+import sc.bind.Bind;
+import sc.bind.BindingDirection;
+import sc.bind.IBinding;
 import sc.dyn.DynUtil;
+import sc.lang.ILanguageModel;
 import sc.lang.ISrcStatement;
 import sc.lang.JavaLanguage;
-import sc.lang.ILanguageModel;
-import sc.lang.sc.PropertyAssignment;
-import sc.parser.*;
+import sc.lang.SemanticNodeList;
+import sc.parser.ParseUtil;
 import sc.type.CTypeUtil;
 import sc.type.RTypeUtil;
-import sc.bind.BindingDirection;
-import sc.bind.Bind;
-import sc.bind.IBinding;
-import sc.lang.SemanticNodeList;
 
 import java.util.ArrayList;
 import java.util.IdentityHashMap;

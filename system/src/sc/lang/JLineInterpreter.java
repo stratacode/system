@@ -4,10 +4,9 @@
 
 package sc.lang;
 
-import sc.layer.LayeredSystem;
-import jline.console.completer.Completer;
 import jline.console.ConsoleReader;
-import jline.Terminal;
+import jline.console.completer.Completer;
+import sc.layer.LayeredSystem;
 
 import java.io.EOFException;
 import java.io.IOException;
