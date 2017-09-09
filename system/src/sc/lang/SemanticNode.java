@@ -113,11 +113,12 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       ModelUtil.ensureStarted(this, true);
    }
 
-   public void invalidateParseNode() {
-      parseNodeInvalid = true;
+   public void setParseNodeValid(boolean val) {
+      parseNodeInvalid = !val;
    }
 
    public void validateParseNode(boolean finalGen) {
+
       boolean isCompressedNode = parseNode != null && parseNode.isCompressedNode();
       if (parseNodeInvalid || isCompressedNode) {
          PerfMon.start("validateParseNode");
@@ -873,7 +874,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
          if (parselet.language.trackChanges)
             parselet.regenerate((ParentParseNode) parseNode, finalGen);
          else
-            invalidateParseNode();
+            setParseNodeValid(false);
       }
    }
 

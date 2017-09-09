@@ -2635,8 +2635,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       clearTransformed();
    }
 
-   public void invalidateParseNode() {
-      super.invalidateParseNode();
+   public void setParseNodeValid(boolean val) {
+      super.setParseNodeValid(val);
    }
 
    /** After a JavaModel is replaced, this resolves the model which replaced it */

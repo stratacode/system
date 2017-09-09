@@ -692,7 +692,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                if (pl.language.trackChanges)
                   type.regenerate(false);
                else {
-                  type.invalidateParseNode();
+                  type.setParseNodeValid(false);
                   // Clear these out because the slots won't make sense with the new parselet
                   pn.children = null;
                }

@@ -395,8 +395,11 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       if (result instanceof IParseNode) {
          IParseNode resultNode = (IParseNode) result;
          Object value = resultNode.getSemanticValue();
-         if (value instanceof ISemanticNode)
-            ((ISemanticNode) value).setParseNode((IParseNode) result);
+         if (value instanceof ISemanticNode) {
+            ISemanticNode semVal = (ISemanticNode) value;
+            semVal.setParseNode((IParseNode) result);
+            semVal.setParseNodeValid(true);
+         }
       }
       if (GenerateContext.generateStats) {
          generatedBytes += ctx.progress(result);

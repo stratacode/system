@@ -87,8 +87,8 @@ public class HTMLElement<E> extends Element<E> {
       }
    }
 
-   Event pendingEvent;
-   EventType pendingType;
+   transient Event pendingEvent;
+   transient EventType pendingType;
 
    @Bindable(manual=true) public MouseEvent getClickEvent() {
       return (MouseEvent) getDOMEvent(EventType.Click);

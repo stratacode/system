@@ -2408,7 +2408,7 @@ public class SyncManager {
 
       if (syncCtx != null)
          return syncCtx.registerSyncInst(inst);
-      else
+      else if (scopeName != null)
          System.err.println("*** No sync context for scope: " + scopeName + " available to register instance: " + DynUtil.getInstanceName(inst));
       return false;
    }
@@ -2928,6 +2928,9 @@ public class SyncManager {
    }
 
    public static SyncContext getDefaultSyncContext() {
+      SyncDestination def = SyncDestination.defaultDestination;
+      if (def == null)
+         return null;
       return SyncDestination.defaultDestination.syncManager.getSyncContext(GlobalScopeDefinition.getGlobalScopeDefinition().scopeId, true);
    }
 

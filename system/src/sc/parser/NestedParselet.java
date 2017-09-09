@@ -1011,7 +1011,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       else {
          Object sv = pnode.getSemanticValue();
          if (sv instanceof ISemanticNode) {
-            ((ISemanticNode) sv).invalidateParseNode();
+            ((ISemanticNode) sv).setParseNodeValid(false);
 
             // Should always have a parse node right?
             if (((ISemanticNode) sv).getParseNode() == null)
@@ -1110,7 +1110,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       if (!(element instanceof ISemanticNode))
          return;
       ISemanticNode node = (ISemanticNode) element;
-      node.invalidateParseNode();
+      node.setParseNodeValid(false);
       Object currentParseNode = node.getParseNode();
       if (currentParseNode != null) {
          // This node could have been moved from one place to another.  In that case, we can't use the old node as the parselet is wrong and that will
@@ -1130,7 +1130,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       if (!(element instanceof ISemanticNode))
          return;
       ISemanticNode node = (ISemanticNode) element;
-      node.invalidateParseNode();
+      node.setParseNodeValid(false);
       Object childParseNode = node.getParseNode();
       if (childParseNode != null) {
          // This node could have been moved from one place to another.  In that case, we can't use the old node as the parselet is wrong and that will
@@ -1296,7 +1296,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       }
       if (childParseNode == null) {
          childParseNode = childParselet.newGeneratedParseNode(sv);
-         sv.invalidateParseNode();
+         sv.setParseNodeValid(false);
       }
       updateElement(pnode, childParseNode, element, parseNodeIx, changeType);
    }

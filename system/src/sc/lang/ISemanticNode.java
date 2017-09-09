@@ -127,7 +127,7 @@ public interface ISemanticNode {
 
    public CharSequence toModelString();
 
-   public void invalidateParseNode();
+   public void setParseNodeValid(boolean v);
 
    public boolean isParseNodeValid();
 

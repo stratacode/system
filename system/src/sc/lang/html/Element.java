@@ -44,7 +44,7 @@ import java.util.*;
  * the need for generating wrapper classes.  This makes the dynamic mode on the server faster, more flexible and efficient.</p>
  * <p>Currently, the api doc for this class is hard to wade through given all of these concerns implemented in one class.  When we implement SC in SC, we can fix this with layered doc :)</p>
  */
-// Turn off synchronization for all of the tag info etc.  This stuff gets compiled into the generated clases and so is state that already exists on the client.
+// Turn off synchronization by default for all of the tag types etc.  In general, you want to synchronize the view-model layers, not the view layers themselves.
 @Sync(syncMode=SyncMode.Disabled, includeSuper=true)
 // Using the js_ prefix for the tags.  Because tags.js uses the SyncManager in the JS file, we need to add this dependency explicitly.
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js")
@@ -3619,7 +3619,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
    }
 
 
-   public String HTMLClass;
+   transient public String HTMLClass;
 
    public String getHTMLClass() {
       return HTMLClass;
@@ -3632,7 +3632,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       Bind.sendChangedEvent(this, "HTMLClass");
    }
 
-   public String style;
+   transient public String style;
 
    public String getStyle() {
       return style;

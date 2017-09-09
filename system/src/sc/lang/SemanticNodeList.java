@@ -242,7 +242,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
                      parseNode = (IParseNode) parseNodeObj;
                }
                else
-                  invalidateParseNode();
+                  setParseNodeValid(false);
             }
          }
       }
@@ -312,7 +312,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
                      }
                   }
                   else {
-                     invalidateParseNode();
+                     setParseNodeValid(false);
                   }
                }
                return x;
@@ -327,7 +327,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
                   parseNode = (IParseNode) parseNodeObj;
             }
             else
-               invalidateParseNode();
+               setParseNodeValid(false);
          }
       }
       return super.remove(index);
@@ -631,8 +631,12 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       return snl;
    }
 
-   public void invalidateParseNode() {
-      parseNodeInvalid = true;
+   public void setParseNodeValid(boolean val) {
+      parseNodeInvalid = !val;
+   }
+
+   public boolean isParseNodeValid() {
+      return !parseNodeInvalid;
    }
 
    public void changeLanguage(Language l) {
@@ -646,10 +650,6 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
          if (node instanceof ISemanticNode)
             ((ISemanticNode) node).changeLanguage(l);
       }
-   }
-
-   public boolean isParseNodeValid() {
-      return !parseNodeInvalid;
    }
 
    public boolean deepEquals(Object o) {

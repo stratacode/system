@@ -260,7 +260,7 @@ public class ChainedResultSequence extends Sequence {
          // selector expression in front of it.  If we invalidate the SelectorExpression's expression property, it really need to
          // regenerate at the ChainResultSequence level to pick up the change to the expression/chainedExpression property.
          if (semanticValue instanceof ISemanticNode) {
-            ((ISemanticNode) semanticValue).invalidateParseNode();
+            ((ISemanticNode) semanticValue).setParseNodeValid(false);
             if (((ISemanticNode) semanticValue).getParseNode() == null)
                System.out.println("*** Error - need to replace parse node in parent in this case!");
          }
