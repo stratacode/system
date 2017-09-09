@@ -453,6 +453,26 @@ public class Bind {
    }
 
    /**
+    * Refreshes the bindings attached to a single named property of the supplied destination object.  You can use this to
+    * force a specific binding to be re-validated.  If the bound value has changed, the destination object's property is
+    * updated to the new value.
+    */
+   public static int refreshBinding(Object dstObj, String propName) {
+      DestinationListener[] bindings = getBindings(dstObj);
+      if (bindings == null)
+         return 0;
+      int sz = bindings.length;
+      int ct = 0;
+      for (int i = 0; i < sz; i++) {
+         DestinationListener binding = bindings[i];
+         if (PBindUtil.equalProps(binding.dstProp, propName)) {
+            ct += binding.refreshBinding();
+         }
+      }
+      return ct;
+   }
+
+   /**
     * Like addDynamicListener but takes an explicit type to use for this object.  In the case where you might select and
     * retrieve the static properties for a subtype and want to add a listener for those values, you pass in the subtype.
     */
@@ -957,8 +977,8 @@ public class Bind {
       sendEvent(event, obj, DynUtil.getPropertyMapping(DynUtil.getType(obj), prop), eventDetail);
    }
 
-   // TODO: it would be nice to validate that "obj" has "prop" but kind of expensive and also ensured at compile
-   // time when the call is injected.  
+   // TODO: it would be nice to validate that "obj" has "prop" but kind of expensive and if this call is generated
+   // the check will have performed then.
    public static void sendEvent(int event, Object obj, IBeanMapper prop, Object eventDetail) {
       boolean endLogIndent = false;
       try {

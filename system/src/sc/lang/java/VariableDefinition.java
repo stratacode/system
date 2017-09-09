@@ -746,9 +746,11 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          AbstractMethodDefinition newMeth = getEnclosingMethod();
          VariableStatement varSt;
          if (newMeth != null) {
-            varSt = (VariableStatement) newMeth.findStatement((Statement) def);
-            if (varSt == null)
+            varSt = (VariableStatement) newMeth.findStatement(def);
+            if (varSt == null) {
                System.err.println("*** Can't refresh VarStatement from method");
+               varSt = (VariableStatement) newMeth.findStatement(def);
+            }
          }
          else {
             TypeDeclaration enclType = getEnclosingType();

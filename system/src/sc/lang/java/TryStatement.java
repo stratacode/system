@@ -223,7 +223,7 @@ public class TryStatement extends Statement implements IBlockStatement {
          if (out != null)
             return out;
       }
-      return null;
+      return super.findStatement(in);
    }
 
    public boolean isLeafStatement() {

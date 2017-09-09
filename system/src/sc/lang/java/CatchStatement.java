@@ -99,4 +99,16 @@ public class CatchStatement extends NonIndentedStatement implements IBlockStatem
    public BlockStatement getWrappedBlockStatement() {
       return statements;
    }
+
+   public Statement findStatement(Statement in) {
+      Statement res = super.findStatement(in);
+      if (res != null)
+         return res;
+      if (statements != null) {
+         Statement out = statements.findStatement(in);
+         if (out != null)
+            return out;
+      }
+      return null;
+   }
 }

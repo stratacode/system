@@ -51,6 +51,7 @@ import java.util.*;
 public class SyncManager {
    // A SyncManager manages all traffic going out of a given channel type, i.e. per SyncDestination instance.
    private static Map<String,SyncManager> syncManagersByDest = new HashMap<String,SyncManager>();
+   private static List<SyncManager> syncManagers = new ArrayList<SyncManager>();
 
    private static HashMap<Object, Class> syncHandlerRegistry = new HashMap<Object, Class>();
 
@@ -93,7 +94,9 @@ public class SyncManager {
          // TODO: we have global objects stored in a per-page object variable e.g. index.body.editorMixin.editorModel and the dirEnts.  If we do not share the global context, the global object
          // state is not sent down.  The page objects which are not global, provide an indexing into the global name space when an inner object extends a global base class.
          rootCtx = newSyncContext(ctxId);
-         rootCtx.scope = GlobalScopeDefinition.getGlobalScopeDefinition().getScopeContext(true);
+         ScopeContext scopeCtx = GlobalScopeDefinition.getGlobalScopeDefinition().getScopeContext(true);
+         rootCtx.scope = scopeCtx;
+         scopeCtx.setValue(SC_SYNC_CONTEXT_SCOPE_KEY, rootCtx);
          rootContexts.put(ctxId, rootCtx);
       }
       return rootCtx;
@@ -1554,12 +1557,12 @@ public class SyncManager {
          return null;
       }
 
-      public void addDepNewObj(List<SyncLayer.SyncChange> depChanges, Object changedObj, InstInfo instInfo, boolean inherited, boolean queueObj, SyncLayer syncLayer) {
+      public void addDepNewObj(List<SyncLayer.SyncChange> depChanges, Object changedObj, InstInfo instInfo, boolean inherited, boolean queueObj, boolean newRemote, SyncLayer syncLayer) {
          if (!instInfo.fixedObject) {
             if (queueObj)
                SyncLayer.addDepNewObj(depChanges, changedObj, instInfo.args);
          }
-         initOnDemandInst(depChanges, changedObj, instInfo, inherited, true, syncLayer);
+         initOnDemandInst(depChanges, changedObj, instInfo, inherited, newRemote, syncLayer);
       }
 
       public void initOnDemandInst(List<SyncLayer.SyncChange> depChanges, Object changedObj, InstInfo instInfo, boolean inherited, boolean addPropChanges, SyncLayer syncLayer) {
@@ -1647,7 +1650,13 @@ public class SyncManager {
             }
             else
                curInstInfo = ii;
-            addDepNewObj(depChanges, changedObj, ii, curContext != this || ii.inherited, curInstInfo == null || !curInstInfo.nameQueued, syncLayer); // Adds the statement to create the object on the other side for this sync layer
+            boolean inheritedChange = curContext != this || ii.inherited;
+            // We need to queue this change to the remote side if we are inheriting it from another scope but only when those scopes are on the server.  If we
+            // are inheriting a global scope into app-global context on the client, we don't need to queue the change back to the server.   But if we are inherited
+            // a global into an app-global on the server, we do need to queue it to the client, since this is a new application for that global object.
+            boolean newRemote = !inheritedChange || needsInitialSync;
+            boolean queueObj = (curInstInfo == null || !curInstInfo.nameQueued) && newRemote;
+            addDepNewObj(depChanges, changedObj, ii, inheritedChange, queueObj, newRemote, syncLayer); // Adds the statement to create the object on the other side for this sync layer
 
             if (curInstInfo == null) {
                curInstInfo = instCtx.getInstInfo(changedObj);
@@ -1684,7 +1693,7 @@ public class SyncManager {
 
                if (newCtx != this) {
                   ii = newCtx.getInstInfo(changedObj);
-                  addDepNewObj(depChanges, changedObj, ii, true, !ii.nameQueued, syncLayer);
+                  addDepNewObj(depChanges, changedObj, ii, true, !ii.nameQueued, true, syncLayer);
                   // Mark this as queued here in this context
                   InstInfo thisCtx = getInstInfo(changedObj);
                   thisCtx.nameQueued = true;
@@ -2057,6 +2066,7 @@ public class SyncManager {
          throw new IllegalArgumentException("Must set the name property on the SyncDestination class: " + syncDest);
       syncDest.initSyncManager();
       syncManagersByDest.put(syncDest.name, syncDest.syncManager);
+      syncManagers.add(syncDest.syncManager);
    }
 
    public static SyncManager getSyncManager(String destName) {
@@ -2071,7 +2081,7 @@ public class SyncManager {
    }
 
    public static boolean isSyncedProperty(Object type, String propName) {
-      for (SyncManager mgr:syncManagersByDest.values()) {
+      for (SyncManager mgr:syncManagers) {
          if (mgr.isSynced(type, propName))
             return true;
       }
@@ -2133,7 +2143,7 @@ public class SyncManager {
       Object old = null;
       // If no specific destination is given, register it for all destinations
       if (props.destName == null) {
-         for (SyncManager mgr:syncManagersByDest.values()) {
+         for (SyncManager mgr:syncManagers) {
             old = mgr.syncTypes.put(type, props);
          }
       }
@@ -2370,7 +2380,7 @@ public class SyncManager {
 
       boolean found = false;
 
-      for (SyncManager syncMgr:syncManagersByDest.values()) {
+      for (SyncManager syncMgr:syncManagers) {
          SyncProperties syncProps = syncMgr.getSyncProperties(type);
          if (syncProps != null) {
             syncMgr.addSyncInst(inst, onDemand, initDefault, scopeId, syncProps, args);
@@ -2389,17 +2399,18 @@ public class SyncManager {
     * objects which are created outside of a sync operation will be "new" objects that get sent via an object tag, not a modify operator.
     * But for repeat nodes, etc. which are sync'd by the framework itself, those should not come across as new, just a modify. */
    public static boolean registerSyncInst(Object inst) {
-      boolean syncInst = false;
-      for (Map.Entry<String,SyncManager> ent:syncManagersByDest.entrySet()) {
-         String destName = ent.getKey();
+      String scopeName = DynUtil.getScopeName(inst);
+      SyncContext syncCtx;
+      if (scopeName == null)
+         syncCtx = getDefaultSyncContext();
+      else
+         syncCtx = getSyncContext(null, scopeName, true);
 
-         SyncContext ctx = getSyncContextForInst(destName, inst);
-         if (ctx == null)
-            ctx = getDefaultSyncContext();
-         if (ctx != null)
-            syncInst |= ctx.registerSyncInst(inst);
-      }
-      return syncInst;
+      if (syncCtx != null)
+         return syncCtx.registerSyncInst(inst);
+      else
+         System.err.println("*** No sync context for scope: " + scopeName + " available to register instance: " + DynUtil.getInstanceName(inst));
+      return false;
    }
 
    public static SyncContext getSyncContext(String destName, String scopeName, boolean create) {
@@ -2408,8 +2419,16 @@ public class SyncManager {
          System.err.println("*** No scope defined with name: " + scopeName);
          return null;
       }
-      SyncManager syncMgr = getSyncManager(destName);
-      return syncMgr.getSyncContext(def.scopeId, create);
+      if (destName != null) {
+         SyncManager syncMgr = getSyncManager(destName);
+         return syncMgr.getSyncContext(def.scopeId, create);
+      }
+      else {
+         ScopeContext scopeCtx = def.getScopeContext(create);
+         // TODO: do we need to create it here?
+         SyncContext res = (SyncContext) scopeCtx.getValue(SC_SYNC_CONTEXT_SCOPE_KEY);
+         return res;
+      }
    }
 
    SyncContext getSyncContext(int scopeId, boolean create) {
@@ -2473,7 +2492,7 @@ public class SyncManager {
    }
 
    public static void registerSyncInst(Object inst, String instName, int scopeId, boolean fixedName, boolean initInst) {
-      for (SyncManager syncMgr:syncManagersByDest.values()) {
+      for (SyncManager syncMgr:syncManagers) {
          SyncContext ctx = syncMgr.getSyncContext(scopeId, true);
          if (ctx != null) {
             // Here we've already been given the scope for the syncInst so just put it into that one.
@@ -2494,6 +2513,7 @@ public class SyncManager {
    }
 
    /** Returns the SyncContext to use for a sync instance which has already been added to the system. */
+   /*
    public static SyncContext getSyncContextForInst(String destName, Object inst) {
       int scopeId = getScopeIdForSyncInst(inst);
       if (scopeId == -1)
@@ -2503,38 +2523,46 @@ public class SyncManager {
          return null;
       return mgr.getSyncContext(scopeId, false);
    }
+   */
 
    public static int getScopeIdForSyncInst(Object inst) {
-      List<ScopeDefinition> scopeDefs = ScopeDefinition.getActiveScopes();
-      for (ScopeDefinition scopeDef:scopeDefs) {
-         for (SyncManager syncMgr:syncManagersByDest.values()) {
-            SyncContext syncCtx = syncMgr.getSyncContext(scopeDef.scopeId, false);
-            if (syncCtx != null)
-               if (syncCtx.syncInsts.get(inst) != null)
-                  return scopeDef.scopeId;
+      String scopeName = DynUtil.getScopeName(inst);
+      if (scopeName == null)
+         return getDefaultScope().scopeId;
+      else {
+         ScopeDefinition def = ScopeDefinition.getScopeByName(scopeName);
+         if (def == null) {
+            System.err.println("*** No scope: " + scopeName + " for getScopeIdForSyncInst");
+            return -1;
+         }
+         else
+            return def.scopeId;
+      }
+   }
+
+   public static SyncContext getSyncContextForInst(Object inst) {
+      ArrayList<ScopeDefinition> scopes = ScopeDefinition.scopes;
+      for (ScopeDefinition scopeDef:scopes) {
+         if (scopeDef != null) {
+            ScopeContext scopeCtx = scopeDef.getScopeContext(false);
+            if (scopeCtx != null) {
+               SyncContext syncCtx = (SyncContext) scopeCtx.getValue(SC_SYNC_CONTEXT_SCOPE_KEY);
+               if (syncCtx != null && syncCtx.hasSyncInst(inst))
+                  return syncCtx;
+            }
          }
       }
-      return -1;
+      return null;
    }
 
    public static void removeSyncInst(Object inst) {
-      List<ScopeDefinition> scopeDefs = ScopeDefinition.getActiveScopes();
-      if (scopeDefs == null)
-         return;
       Object type = DynUtil.getType(inst);
 
-      // We do not know the app ids which this instance is registered under right now so we have to do a bit of searching to find
-      // the sync contexts (if any) which have it registered.
-      for (ScopeDefinition scopeDef:scopeDefs) {
-         ScopeContext scopeCtx = scopeDef.getScopeContext(false);
-         if (scopeCtx != null) {
-            SyncContext syncCtx = (SyncContext) scopeCtx.getValue(SC_SYNC_CONTEXT_SCOPE_KEY);
-            if (syncCtx != null && syncCtx.hasSyncInst(inst)) {
-               SyncProperties syncProps = syncCtx.getSyncManager().getSyncProperties(type);
-               if (syncProps != null) {
-                  syncCtx.removeSyncInst(inst, syncProps);
-               }
-            }
+      SyncContext syncCtx = getSyncContextForInst(inst);
+      if (syncCtx != null) {
+         SyncProperties syncProps = syncCtx.getSyncManager().getSyncProperties(type);
+         if (syncProps != null) {
+            syncCtx.removeSyncInst(inst, syncProps);
          }
       }
    }
@@ -2560,7 +2588,7 @@ public class SyncManager {
             }
          }
          else if (scopeDef.isGlobal()) {
-            for (SyncManager syncMgr:syncManagersByDest.values()) {
+            for (SyncManager syncMgr:syncManagers) {
                syncCtx = syncMgr.getRootSyncContext();
                if (syncCtx != null && syncCtx.hasSyncInst(fromInst)) {
                   SyncProperties syncProps = syncCtx.getSyncManager().getSyncProperties(type);
@@ -2596,53 +2624,31 @@ public class SyncManager {
    }
 
    public static void fetchProperty(Object inst, String prop) {
-      Object type = DynUtil.getType(inst);
-
-      int scopeId = getScopeIdForSyncInst(inst);
-      if (scopeId == -1) {
-         System.err.println("No sync inst: " + DynUtil.getInstanceName(inst) + " registered for fetchProperty of: " + prop);
-         return;
+      SyncContext syncCtx = getSyncContextForInst(inst);
+      if (syncCtx != null) {
+         syncCtx.fetchProperty(inst, prop);
       }
-
-      for (SyncManager syncMgr:syncManagersByDest.values()) {
-         SyncProperties syncProps = syncMgr.getSyncProperties(type);
-         if (syncProps != null && syncProps.isSynced(prop))
-            syncMgr.fetchProperty(inst, scopeId, prop);
+      else {
+         System.err.println("No sync inst: " + DynUtil.getInstanceName(inst) + " registered for fetchProperty of: " + prop);
       }
    }
 
    public static void startSync(Object inst, String prop) {
-      Object type = DynUtil.getType(inst);
-
-      int scopeId = getScopeIdForSyncInst(inst);
-      // Not treating this as an error because we might use the same code with and without synchronization so this is only a debug message.
-      if (scopeId == -1) {
-         if (verbose)
-            System.out.println("No sync inst: " + DynUtil.getInstanceName(inst) + " registered for startSync of: " + prop);
-         return;
+      SyncContext syncCtx = getSyncContextForInst(inst);
+      if (syncCtx != null) {
+         syncCtx.startSync(inst, prop);
       }
-
-      for (SyncManager syncMgr:syncManagersByDest.values()) {
-         SyncProperties syncProps = syncMgr.getSyncProperties(type);
-         if (syncProps != null && syncProps.isSynced(prop))
-            syncMgr.startSync(inst, scopeId, prop);
-      }
+      else if (verbose) // Not treating this as an error because we might use the same code with and without synchronization so this is only a debug message.
+         System.out.println("No sync inst: " + DynUtil.getInstanceName(inst) + " registered for startSync of: " + prop);
    }
 
    public static void initProperty(Object inst, String prop) {
-      Object type = DynUtil.getType(inst);
-
-      int scopeId = getScopeIdForSyncInst(inst);
-      if (scopeId == -1) {
+      SyncContext syncCtx = getSyncContextForInst(inst);
+      if (syncCtx == null) {
          System.err.println("No sync inst: " + DynUtil.getInstanceName(inst) + " registered for initProperty of: " + prop);
-         return;
       }
-
-      for (SyncManager syncMgr:syncManagersByDest.values()) {
-         SyncProperties syncProps = syncMgr.getSyncProperties(type);
-         if (syncProps != null && syncProps.isSynced(prop))
-            syncMgr.initProperty(inst, scopeId, prop);
-      }
+      else
+         syncCtx.initProperty(inst, prop);
    }
 
    private void removeSyncInst(Object inst, int scopeId, SyncProperties syncProps) {
@@ -2670,8 +2676,7 @@ public class SyncManager {
    }
 
    public static void printAllSyncInsts(int scopeId) {
-      for (String destName:syncManagersByDest.keySet()) {
-         SyncManager syncManager = syncManagersByDest.get(destName);
+      for (SyncManager syncManager:syncManagers) {
          SyncContext ctx = syncManager.getSyncContext(scopeId, false);
          if (ctx != null)
             ctx.printAllSyncInsts();
@@ -2679,8 +2684,7 @@ public class SyncManager {
    }
 
    public static void resetContext(int scopeId) {
-      for (String destName:syncManagersByDest.keySet()) {
-         SyncManager syncManager = syncManagersByDest.get(destName);
+      for (SyncManager syncManager:syncManagers) {
          SyncContext ctx = syncManager.getSyncContext(scopeId, false);
          if (ctx != null)
             ctx.resetContext();
@@ -2689,8 +2693,7 @@ public class SyncManager {
 
    /** Used from the generated code for the browser to apply a sync layer to the default destination */
    public static void applySyncLayer(String language, String data) {
-      for (String destName:syncManagersByDest.keySet()) {
-         SyncManager syncManager = syncManagersByDest.get(destName);
+      for (SyncManager syncManager:syncManagers) {
          // TODO: compare language and syncDestination.receiveLanguage?
          syncManager.syncDestination.applySyncLayer(data, language, false);
       }

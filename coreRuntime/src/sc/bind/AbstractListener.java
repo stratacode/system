@@ -10,16 +10,7 @@ import sc.util.ISet;
 
 @JSSettings(jsLibFiles = "js/scbind.js", prefixAlias="sc_")
 public abstract class AbstractListener implements IListener {
-   boolean activated = true;  // Set to false on nested bindings deactic
-   protected ISet<Object> reads = null;
-   public ISet<Object> getReads() {
-      return reads;
-   }
-
-   protected ISet<Object> writes = null;
-   public ISet<Object> getWrites() {
-      return writes;
-   }
+   boolean activated = true;  // Set to false on nested bindings when they are not in an active code path (i.e. the not-chosen option for a ternary or part of a conditional that's not reached)
 
    // A thread-local lookup to determine whether the framework managing this object requires
    // queuing or not.  We do this to avoid thread-local lookups in each sendEvent method under the

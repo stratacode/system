@@ -57,12 +57,6 @@ public interface IListener {
    boolean arrayElementInvalidated(Object srcObj, Object srcProp, Object dims, boolean apply);
    boolean arrayElementValidated(Object srcObj, Object srcProp, Object dims, boolean apply);
 
-   // Returns the read dependencies
-   ISet<Object> getReads();
-
-   // Returns the write dependencies
-   ISet<Object> getWrites();
-
    // Returns the sync mode object.
    SyncType getSync();
 

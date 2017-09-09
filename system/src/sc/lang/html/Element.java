@@ -136,8 +136,10 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
 
    @Bindable(manual=true)
    public void setRepeatVar(RE rv) {
-      repeatVar = rv;
-      Bind.sendChangedEvent(this, "repeatVar");
+      if (rv != repeatVar) {
+         repeatVar = rv;
+         Bind.sendChangedEvent(this, "repeatVar");
+      }
    }
 
    public RE getRepeatVar() {
@@ -148,8 +150,10 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
 
    @Bindable(manual=true)
    public void setRepeatIndex(int ix) {
-      repeatIndex = ix;
-      Bind.sendChangedEvent(this, "repeatIndex");
+      if (ix != repeatIndex) {
+         repeatIndex = ix;
+         Bind.sendChangedEvent(this, "repeatIndex");
+      }
    }
 
    public int getRepeatIndex() {
@@ -197,6 +201,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          res = repeatElem;
       }
       if (res != null) {
+         res.parentNode = this;
          registerSyncInstAndChildren(res);
       }
       if (flush)
@@ -2668,8 +2673,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
    private String getExtendsDefaultTagNameForType(Object tagType) {
       String res = getNextExtendsDefaultTagNameForType(tagType);
       if (res == null) {
-         System.err.println("*** No default tag name for extends type for: " + tagType);
-         res = "";
+         res = ""; // Note: this is a valid case for tags like 'li' which map to the default HTMLElement class which has no specific tag name
       }
       return res;
    }
@@ -3162,8 +3166,12 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       }
    }
 
-   /** For application code to manually synchronize the repeat state of the tags */
-   public void refreshRepeat() {
+   /**
+    * For application code to manually synchronize the repeat state of the tags.  The noRefresh flag applies to the client
+    * which is doing incremental refresh... here on the server, we render the entire page at the end of the response so
+    * it has no effect.
+    */
+   public void refreshRepeat(boolean noRefresh) {
       if (repeat != null)
          syncRepeatTags(repeat);
    }

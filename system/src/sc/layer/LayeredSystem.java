@@ -2242,18 +2242,21 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       String path;
       if ((path = System.getProperty(propName)) != null)
          return path;
-      RuntimeRootInfo info = getRuntimeRootInfo();
-      if (info.zipFileName != null) {
-         String dir = FileUtil.getParentPath(info.zipFileName);
-         String res = FileUtil.concat(dir, "scrt" + (core ? "-core" : "") + (src ? "-src" : "") + ".jar");
-         if (new File(res).canRead())
-            return res;
-      }
-      if (info.buildDirName != null) {
-         String sysRoot;
-         if ((sysRoot = getSystemBuildLayer(info.buildDirName)) != null) {
-            if (!src)
-               return FileUtil.concat(sysRoot, core ? "coreRuntime" : "fullRuntime", !isIDEBuildLayer(info.buildDirName) ? "build" : null);
+      // We want scSourcePath to override the install directory if both are set
+      if (!src || scSourcePath == null) {
+         RuntimeRootInfo info = getRuntimeRootInfo();
+         if (info.zipFileName != null) {
+            String dir = FileUtil.getParentPath(info.zipFileName);
+            String res = FileUtil.concat(dir, "scrt" + (core ? "-core" : "") + (src ? "-src" : "") + ".jar");
+            if (new File(res).canRead())
+               return res;
+         }
+         if (info.buildDirName != null) {
+            String sysRoot;
+            if ((sysRoot = getSystemBuildLayer(info.buildDirName)) != null) {
+               if (!src)
+                  return FileUtil.concat(sysRoot, core ? "coreRuntime" : "fullRuntime", !isIDEBuildLayer(info.buildDirName) ? "build" : null);
+            }
          }
       }
 
@@ -3432,6 +3435,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       int lastRestartArg = -1;
       ArrayList<String> recursiveDynLayers = null;
       String scInstallDir = null;
+      String mainDir = null;
 
       for (int i = 0; i < args.length; i++) {
          restartArg = true;
@@ -3537,6 +3541,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                            usage("Invalid integer arg to -me (maxErrors) option: " + exc.toString(), args);
                         }
                      }
+                  }
+                  else if (opt.equals("md")) {
+                     if (args.length < i + 1)
+                        usage("Missing arg to main directory (-md) option", args);
+                     mainDir = args[++i];
                   }
                   break;
                case 'n':
@@ -3835,7 +3844,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             usage("The -dyn option was provided without a list of layers.  The -dyn option should be in front of the list of layer names you want to make dynamic.", args);
          }
 
-         sys = new LayeredSystem(buildLayerName, includeLayers, recursiveDynLayers, layerPath, classPath, options, null, null, startInterpreter, null, null, scInstallDir);
+         sys = new LayeredSystem(buildLayerName, includeLayers, recursiveDynLayers, layerPath, classPath, options, null, null, startInterpreter, null, mainDir, scInstallDir);
          if (defaultLayeredSystem == null)
             defaultLayeredSystem = sys;
          currentLayeredSystem.set(sys.systemPtr);
