@@ -2408,13 +2408,13 @@ public class SyncManager {
 
       if (syncCtx != null)
          return syncCtx.registerSyncInst(inst);
-      else if (scopeName != null)
+      else if (scopeName != null && verbose)
          System.err.println("*** No sync context for scope: " + scopeName + " available to register instance: " + DynUtil.getInstanceName(inst));
       return false;
    }
 
    public static SyncContext getSyncContext(String destName, String scopeName, boolean create) {
-      ScopeDefinition def = ScopeDefinition.getScopeByName(scopeName);
+      ScopeDefinition def = DynUtil.getScopeByName(scopeName);
       if (def == null) {
          System.err.println("*** No scope defined with name: " + scopeName);
          return null;

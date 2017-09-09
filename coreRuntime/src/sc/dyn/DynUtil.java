@@ -9,6 +9,7 @@ import sc.bind.MethodBinding;
 import sc.obj.IAltComponent;
 import sc.obj.IComponent;
 import sc.obj.IObjectId;
+import sc.obj.ScopeDefinition;
 import sc.sync.SyncManager;
 import sc.type.*;
 import sc.util.IdentityWrapper;
@@ -1395,6 +1396,12 @@ public class DynUtil {
             return (String) scopeNameObj;
       }
       return null;
+   }
+
+   public static ScopeDefinition getScopeByName(String scopeName) {
+      if (dynamicSystem != null)
+         return dynamicSystem.getScopeByName(scopeName);
+      return ScopeDefinition.getScopeByName(scopeName);
    }
 
    /** Returns the layered system class loader if there is one - null otherwise.  */

@@ -14784,6 +14784,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
+   public ScopeDefinition getScopeByName(String scopeName) {
+      if (buildLayer != null) {
+         String alias = getScopeAlias(buildLayer, scopeName);
+         if (alias != null && !alias.equals(scopeName))
+            return ScopeDefinition.getScopeByName(alias);
+      }
+      return ScopeDefinition.getScopeByName(scopeName);
+   }
+
    public String getScopeAlias(Layer refLayer, String scopeName) {
       int startIx;
       if (searchActiveTypesForLayer(refLayer)) {

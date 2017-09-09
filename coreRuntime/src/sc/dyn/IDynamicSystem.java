@@ -4,6 +4,7 @@
 
 package sc.dyn;
 
+import sc.obj.ScopeDefinition;
 import sc.type.IBeanMapper;
 
 import java.util.Iterator;
@@ -159,4 +160,6 @@ public interface IDynamicSystem {
    Object getPropertyAnnotationValue(Object typeObj, String propName, String annotName, String attName);
 
    void addDynListener(IDynListener listener);
+
+   ScopeDefinition getScopeByName(String scopeName);
 }

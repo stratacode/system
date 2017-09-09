@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import sc.dyn.DynUtil;
 import sc.lang.*;
 import sc.lang.sc.IScopeProcessor;
 import sc.lang.sc.ScopeModifier;
@@ -215,7 +216,7 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
       String scopeName = getScopeName();
       if (scopeName == null)
          return null;
-      return ScopeDefinition.getScopeByName(scopeName);
+      return DynUtil.getScopeByName(scopeName);
    }
 
    public ScopeModifier getScope() {
