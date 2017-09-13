@@ -6294,10 +6294,10 @@ public class ModelUtil {
     * Modifies the code for the current program model, setting the specified property called 'elem' to a text value specified.   This
     * operation is invoked when you update the initialization expression for a property, field, etc. in a program editor.
     */
-   public static Object setElementValue(Object type, Object instance, Object elem, String text, boolean updateInstances, boolean valueIsExpr) {
+   public static Object setElementValue(Object type, Object instance, Object elem, String text, boolean updateType, boolean updateInstances, boolean valueIsExpr) {
       String origText = text;
       if (elem instanceof IBeanMapper) {
-         return setElementValue(type, instance, ((IBeanMapper) elem).getPropertyMember(), text, updateInstances, valueIsExpr);
+         return setElementValue(type, instance, ((IBeanMapper) elem).getPropertyMember(), text, updateType, updateInstances, valueIsExpr);
       }
       if (type instanceof BodyTypeDeclaration && elem instanceof IVariableInitializer) {
          text = text.trim();
@@ -6347,104 +6347,114 @@ public class ModelUtil {
                op = null;
 
             Expression expr = (Expression) exprObj;
-
-            // PropetyAssignment or VariableDefinition
-            JavaSemanticNode node = (JavaSemanticNode) elem;
-
             PropertyAssignment newAssign = null;
 
-            // If we inherited this definition, we need to create a new one to set it
-            if (node.getEnclosingType() != type) {
-               String propName = ModelUtil.getPropertyName(node);
-               if (expr == null) {
-                  newAssign = OverrideAssignment.create(propName);
-               }
-               else {
-                  newAssign = PropertyAssignment.create(propName, expr, op);
-               }
-               elem = newAssign;
-               typeDef.addBodyStatementIndent(newAssign);
-            }
-            else {
-               // Need to convert "override name = x" to "name = x"
-               if (node instanceof OverrideAssignment && expr != null) {
-                  newAssign = (OverrideAssignment) node;
-                  elem = PropertyAssignment.create(newAssign.propertyName, expr, op);
-                  node.parentNode.replaceChild(node, elem);
-               }
-               // And convert name = x to override name when setting x = null;
-               else if (expr == null && node instanceof PropertyAssignment && !(node instanceof OverrideAssignment)) {
-                  newAssign = (PropertyAssignment) node;
-                  elem = OverrideAssignment.create(newAssign.propertyName);
-                  node.parentNode.replaceChild(node, elem);
-               }
-               else {
-                  ((IVariableInitializer) node).updateInitializer(op, expr);
+            if (updateType) {
+               // Because we parsed a variableInitializer, we expect either a PropertyAssignment or VariableDefinition
+               JavaSemanticNode node = (JavaSemanticNode) elem;
 
-                  if (node instanceof PropertyAssignment) {
-                     PropertyAssignment updateAssign = (PropertyAssignment) node;
-                     // If this definition was generated, also update the source statement
-                     PropertyAssignment fromAssign = (PropertyAssignment) updateAssign.fromStatement;
-                     if (fromAssign != null) {
-                        setElementValue(type, instance, updateAssign.fromStatement, origText, false, valueIsExpr);
-                     }
-                     Attr fromAttr = updateAssign.fromAttribute;
-                     if (fromAttr != null) {
-                        /** Node - this is SemanticNode.setProperty with a wrapper due to the name conflict with IDynObject */
-                        fromAttr.setSemanticProperty("value", op + " " + text);
-                     }
+               // If we inherited the definition of this property from a base class, we need to create a property assignment to override that one in this type
+               if (node.getEnclosingType() != type) {
+                  String propName = ModelUtil.getPropertyName(node);
+                  if (expr == null) {
+                     newAssign = OverrideAssignment.create(propName);
                   }
-                  // If this definition was generated and it was a field, need to find the original variable definition in the original field and update that
-                  else if (node instanceof VariableDefinition) {
-                     VariableDefinition updateVar = (VariableDefinition) node;
-                     Statement updateDef = updateVar.getDefinition();
-                     ISrcStatement fromStatement = updateDef.fromStatement;
-                     if (fromStatement != null) {
-                        if (fromStatement instanceof FieldDefinition) {
-                           FieldDefinition otherField = (FieldDefinition) fromStatement;
-                           for (VariableDefinition otherVar:otherField.variableDefinitions) {
-                              if (otherVar.variableName.equals(updateVar.variableName)) {
-                                 setElementValue(type, instance, otherVar, origText, false, valueIsExpr);
-                                 break;
+                  else {
+                     newAssign = PropertyAssignment.create(propName, expr, op);
+                  }
+                  elem = newAssign;
+                  typeDef.addBodyStatementIndent(newAssign);
+               }
+               else {
+                  // Need to convert "override name = x" to "name = x"
+                  if (node instanceof OverrideAssignment && expr != null) {
+                     newAssign = (OverrideAssignment) node;
+                     elem = PropertyAssignment.create(newAssign.propertyName, expr, op);
+                     node.parentNode.replaceChild(node, elem);
+                  }
+                  // And convert name = x to override name when setting x = null;
+                  else if (expr == null && node instanceof PropertyAssignment && !(node instanceof OverrideAssignment)) {
+                     newAssign = (PropertyAssignment) node;
+                     elem = OverrideAssignment.create(newAssign.propertyName);
+                     node.parentNode.replaceChild(node, elem);
+                  }
+                  else {
+                     ((IVariableInitializer) node).updateInitializer(op, expr);
+
+                     if (node instanceof PropertyAssignment) {
+                        PropertyAssignment updateAssign = (PropertyAssignment) node;
+                        // If this definition was generated, also update the source statement
+                        PropertyAssignment fromAssign = (PropertyAssignment) updateAssign.fromStatement;
+                        if (fromAssign != null) {
+                           setElementValue(type, instance, updateAssign.fromStatement, origText, true, false, valueIsExpr);
+                        }
+                        Attr fromAttr = updateAssign.fromAttribute;
+                        if (fromAttr != null) {
+                           /** Node - this is SemanticNode.setProperty with a wrapper due to the name conflict with IDynObject */
+                           fromAttr.setSemanticProperty("value", op + " " + text);
+                        }
+                     }
+                     // If this definition was generated and it was a field, need to find the original variable definition in the original field and update that
+                     else if (node instanceof VariableDefinition) {
+                        VariableDefinition updateVar = (VariableDefinition) node;
+                        Statement updateDef = updateVar.getDefinition();
+                        ISrcStatement fromStatement = updateDef.fromStatement;
+                        if (fromStatement != null) {
+                           if (fromStatement instanceof FieldDefinition) {
+                              FieldDefinition otherField = (FieldDefinition) fromStatement;
+                              for (VariableDefinition otherVar:otherField.variableDefinitions) {
+                                 if (otherVar.variableName.equals(updateVar.variableName)) {
+                                    setElementValue(type, instance, otherVar, origText, true, false, valueIsExpr);
+                                    break;
+                                 }
                               }
                            }
                         }
                      }
                   }
                }
+
+               if (ModelUtil.isProperty(elem)) {
+                  ExecutionContext ctx = new ExecutionContext(typeDef.getJavaModel());
+                  if (instance != null)
+                     ctx.pushCurrentObject(instance);
+
+                  LayeredSystem sys = model.getLayeredSystem();
+
+                  UpdateInstanceInfo info = null;
+                  if (updateInstances)
+                     info = sys.newUpdateInstanceInfo();
+                  typeDef.updatePropertyForType((JavaSemanticNode) elem, ctx, BodyTypeDeclaration.InitInstanceType.Init, updateInstances, info);
+
+                  // Need to rebuild here to be sure all transformed types are transformed before we try to generate the JS that updates the clients
+                  //sys.rebuildSystem();
+
+                  if (!typeDef.isDynamicType())
+                     model.transformModel();
+
+                  if (info != null)
+                     info.updateInstances(ctx);
+
+                  model.validateSavedModel(false);
+                  // Notify code that this model has changed by sending a binding event.
+                  model.markChanged();
+
+                  if (handler.err != null)
+                     throw new IllegalArgumentException(handler.err);
+               }
+               else
+                  throw new UnsupportedOperationException();
             }
-
-            if (ModelUtil.isProperty(elem)) {
-               ExecutionContext ctx = new ExecutionContext(typeDef.getJavaModel());
-               if (instance != null)
-                  ctx.pushCurrentObject(instance);
-
-               LayeredSystem sys = model.getLayeredSystem();
-
-               UpdateInstanceInfo info = null;
-               if (updateInstances)
-                  info = sys.newUpdateInstanceInfo();
-               typeDef.updatePropertyForType((JavaSemanticNode) elem, ctx, BodyTypeDeclaration.InitInstanceType.Init, updateInstances, info);
-
-               // Need to rebuild here to be sure all transformed types are transformed before we try to generate the JS that updates the clients
-               //sys.rebuildSystem();
-
-               if (!typeDef.isDynamicType())
-                  model.transformModel();
-
-               if (info != null)
-                  info.updateInstances(ctx);
-
-               model.validateSavedModel(false);
-               // Notify code that this model has changed by sending a binding event.
-               model.markChanged();
-
-               if (handler.err != null)
-                  throw new IllegalArgumentException(handler.err);
+            else if (expr != null) {
+               expr.setParentNode(typeDef.getJavaModel()); // Goal is to let the expression in this case refer to anything defined in this type
+               ParseUtil.initAndStartComponent(expr);
+               if (!expr.anyError() && ModelUtil.isProperty(elem)) {
+                  ExecutionContext ctx = new ExecutionContext(typeDef.getJavaModel());
+                  Object value = expr.eval(null, ctx);
+                  String propName = getPropertyName(elem);
+                  DynUtil.setPropertyValue(instance, propName, value);
+               }
             }
-            else
-               throw new UnsupportedOperationException();
-
             return newAssign;
          }
          finally {

@@ -337,6 +337,8 @@ public class TransformUtil {
       return bindableDefinitions = (List<Statement>) ParseUtil.nodeToSemanticValue(res);
    }
 
+   // TODO: This is not used currently but has the basic logic to add a bindable interface at the class level, so we do not have to use
+   // a weak hash-table to store the bindings for a given instance.
    public static void makeClassesBindable(JavaModel model)
    {
       if (model.types != null) {
@@ -348,9 +350,8 @@ public class TransformUtil {
 
    public static void makeClassBindable(ClassDeclaration cd)
    {
-      ClassType bindableType = (ClassType) ClassType.create(BINDABLE_INTERFACE);
-
       if (!ModelUtil.isAssignableFrom(IBindable.class, cd)) {
+         ClassType bindableType = (ClassType) ClassType.create(BINDABLE_INTERFACE);
          cd.addImplements(bindableType);
          cd.body.addAll(getBindableDefinitions());
       }

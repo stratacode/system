@@ -3853,4 +3853,8 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
          ix = pn.getChildStartOffset(((HTMLLanguage) pn.getParselet().getLanguage()).endTagChar);
       return ix;
    }
+
+   public TypeDeclaration getRepeatWrapperType() {
+      return repeatWrapper;
+   }
 }

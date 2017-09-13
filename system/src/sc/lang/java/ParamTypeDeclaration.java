@@ -815,4 +815,10 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       }
       return baseType;
    }
+
+   public static Object toBaseType(Object paramType) {
+      if (paramType instanceof ParamTypeDeclaration)
+         return ((ParamTypeDeclaration) paramType).baseType;
+      return paramType;
+   }
 }

@@ -140,6 +140,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       if (implementsBoundTypes != null) {
          JavaModel m = getJavaModel();
          for (Object implTypeObj:implementsBoundTypes) {
+            implTypeObj = ParamTypeDeclaration.toBaseType(implTypeObj);
             if (implTypeObj instanceof TypeDeclaration) {
                TypeDeclaration implType = (TypeDeclaration) implTypeObj;
                startExtendedType(implType, "implemented");

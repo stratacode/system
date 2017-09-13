@@ -49,6 +49,7 @@ public class InterfaceDeclaration extends TypeDeclaration {
       if (extendsBoundTypes != null) {
          JavaModel m = getJavaModel();
          for (Object extendsTypeObj:extendsBoundTypes) {
+            extendsTypeObj = ParamTypeDeclaration.toBaseType(extendsTypeObj);
             if (extendsTypeObj instanceof TypeDeclaration) {
                TypeDeclaration extendsTypeDecl = (TypeDeclaration) extendsTypeObj;
 

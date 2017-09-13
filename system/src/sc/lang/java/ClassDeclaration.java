@@ -98,6 +98,7 @@ public class ClassDeclaration extends TypeDeclaration {
 
             // Need to start the extends type as we need to dig into it
             Object extendsTypeDecl = getDerivedTypeDeclaration();
+            extendsTypeDecl = ParamTypeDeclaration.toBaseType(extendsTypeDecl);
 
             if (extendsTypeDecl instanceof TypeDeclaration) {
                TypeDeclaration extTypeDecl = (TypeDeclaration) extendsTypeDecl;

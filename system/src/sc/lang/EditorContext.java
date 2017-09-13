@@ -358,15 +358,16 @@ public class EditorContext extends ClientEditorContext {
    class ValueChangedOp implements IUndoOp {
       Object type, inst, elem, newElem;
       String text, oldText;
-      boolean updateInstances, valueIsExpr;
+      boolean updateType, updateInstances, valueIsExpr;
 
-      public ValueChangedOp (Object type, Object inst, Object elem, Object newElem, String text, String oldText, boolean updateInstances, boolean valueIsExpr) {
+      public ValueChangedOp (Object type, Object inst, Object elem, Object newElem, String text, String oldText, boolean updateType, boolean updateInstances, boolean valueIsExpr) {
          this.type = type;
          this.inst = inst;
          this.elem = elem;
          this.newElem = newElem;
          this.text = text;
          this.oldText = oldText;
+         this.updateType = updateType;
          this.updateInstances = updateInstances;
          this.valueIsExpr = valueIsExpr;
       }
@@ -374,7 +375,7 @@ public class EditorContext extends ClientEditorContext {
       public void undo() {
          // If we either updated the element or replaced it, just replace it back
          if (newElem == null || ModelUtil.getEnclosingType(newElem) == ModelUtil.getEnclosingType(elem))
-            setElementValueOnPeers(type, inst, elem, oldText, updateInstances, valueIsExpr, false);
+            setElementValueOnPeers(type, inst, elem, oldText, updateType, updateInstances, valueIsExpr, false);
          // If we had to create a new node, remove it then reset it.
          else {
             removeProperty((BodyTypeDeclaration) type, (JavaSemanticNode) newElem, false);
@@ -382,7 +383,7 @@ public class EditorContext extends ClientEditorContext {
       }
 
       public void redo() {
-         setElementValueOnPeers(type, inst, elem, text, updateInstances, valueIsExpr, false);
+         setElementValueOnPeers(type, inst, elem, text, updateType, updateInstances, valueIsExpr, false);
       }
    }
 
@@ -473,13 +474,13 @@ public class EditorContext extends ClientEditorContext {
       }
    }
 
-   public String setElementValueOnPeers(Object type, Object inst, Object elem, String text, boolean updateInstances, boolean valueIsExpr, boolean addOp) {
+   public String setElementValueOnPeers(Object type, Object inst, Object elem, String text, boolean updateType, boolean updateInstances, boolean valueIsExpr, boolean addOp) {
       String oldText = propertyValueString(type, inst, elem);
       String error = null;
       Object newElem = null;
       system.resetBuild(true);
       try {
-         newElem = ModelUtil.setElementValue(type, inst, elem, text, updateInstances, valueIsExpr);
+         newElem = ModelUtil.setElementValue(type, inst, elem, text, updateType, updateInstances, valueIsExpr);
          if (syncPeerSystems && type instanceof BodyTypeDeclaration) {
             BodyTypeDeclaration td = (BodyTypeDeclaration) type;
             LayeredSystem sys = td.getLayeredSystem();
@@ -490,7 +491,7 @@ public class EditorContext extends ClientEditorContext {
                      String propName = ModelUtil.getPropertyName(elem);
                      Object peerElem = peerType.declaresMember(propName, JavaSemanticNode.MemberType.PropertyAnySet, null, null);
                      if (peerElem != null) {
-                        Object newPeerElem = ModelUtil.setElementValue(peerType, inst, peerElem, text, updateInstances, valueIsExpr);
+                        Object newPeerElem = ModelUtil.setElementValue(peerType, inst, peerElem, text, updateType, updateInstances, valueIsExpr);
                         typeChanged(peerType);
                      }
                      else
@@ -511,13 +512,13 @@ public class EditorContext extends ClientEditorContext {
       typeChanged(type);
 
       if (addOp) {
-         addOp(new ValueChangedOp(type, inst, elem, newElem, text, oldText, updateInstances, valueIsExpr));
+         addOp(new ValueChangedOp(type, inst, elem, newElem, text, oldText, updateType, updateInstances, valueIsExpr));
       }
       return error;
    }
 
-   public String setElementValue(Object type, Object inst, Object elem, String text, boolean updateInstances, boolean valueIsExpr) {
-      return setElementValueOnPeers(type, inst, elem, text, updateInstances, valueIsExpr, true);
+   public String setElementValue(Object type, Object inst, Object elem, String text, boolean updateType, boolean updateInstances, boolean valueIsExpr) {
+      return setElementValueOnPeers(type, inst, elem, text, updateType, updateInstances, valueIsExpr, true);
    }
 
    public String addProperty(Object currentType, String propType, String propName, String op, String propValue) {

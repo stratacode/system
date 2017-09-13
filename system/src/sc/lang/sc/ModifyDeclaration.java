@@ -292,6 +292,7 @@ public class ModifyDeclaration extends TypeDeclaration {
 
      if (extendsBoundTypes != null) {
          for (Object extendsTypeDecl:extendsBoundTypes) {
+            extendsTypeDecl = ParamTypeDeclaration.toBaseType(extendsTypeDecl);
             if (extendsTypeDecl instanceof BodyTypeDeclaration) {
                BodyTypeDeclaration extTD = (BodyTypeDeclaration) extendsTypeDecl;
                startExtendedType(extTD, "extended");

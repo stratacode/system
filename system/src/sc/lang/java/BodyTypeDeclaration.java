@@ -7214,6 +7214,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          boolean converted = extType.convertToSrcReference();
          if (converted) {
             Object typeDecl = getDerivedTypeDeclaration();
+            typeDecl = ParamTypeDeclaration.toBaseType(typeDecl);
             if (typeDecl instanceof BodyTypeDeclaration)
                startExtendedType((BodyTypeDeclaration) typeDecl, "extends");
          }
@@ -7228,6 +7229,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                boolean converted = implType.convertToSrcReference();
                if (converted) {
                   Object newImplType = implType.getTypeDeclaration();
+                  newImplType = ParamTypeDeclaration.toBaseType(newImplType);
                   if (newImplType instanceof BodyTypeDeclaration) {
                      startExtendedType((BodyTypeDeclaration) newImplType, "implements");
                   }
