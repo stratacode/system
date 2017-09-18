@@ -406,7 +406,8 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
          // Must be done after adding so we get the full type name
          String typeName = ModelUtil.getTypeName(type);
-         boolean checkCurrentObject = parentType == null || hasCurrentObject();
+         boolean hasCurrentObject = hasCurrentObject();
+         boolean checkCurrentObject = parentType == null || hasCurrentObject;
 
          /*
          if (layer.packagePrefix != null && layer.packagePrefix.length() > 0) {
@@ -426,7 +427,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
          DeclarationType declType = type.getDeclarationType();
 
-         Object parentObj = getCurrentObject();
+         Object parentObj = getCurrentObjectWithDefault();
 
          if (type.getDefinesCurrentObject()) {
             boolean pushed = false;
@@ -434,7 +435,8 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             try {
                execContext.pushStaticFrame(type);
                // Using origTypeName here - grabbed before we do the "a.b" to a { b" conversion.   type.typeName now will just be "b".
-               obj = parentObj == null ? (checkCurrentObject ? system.resolveName(typeName, true) : null) : DynUtil.getPropertyPath(parentObj, origTypeName);
+               // Only do this if the current object is the parent object - not if it's already been resolved from the selectedInstances array
+               obj = parentObj == null ? (checkCurrentObject ? system.resolveName(typeName, true) : null) : (hasCurrentObject ? DynUtil.getPropertyPath(parentObj, origTypeName) : null);
                execContext.pushCurrentObject(obj);
                pushed = true;
             }
@@ -628,8 +630,8 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       return execContext.getCurrentObject() != null;
    }
 
-   public Object getCurrentObject() {
-      Object obj = execContext.getCurrentObject();
+   public Object getCurrentObjectWithDefault() {
+      Object obj = getCurrentObject();
       if (obj == null && currentTypes.size() > 0)
          obj = getDefaultCurrentObj(currentTypes.get(currentTypes.size()-1));
       return obj;

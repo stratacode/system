@@ -24,6 +24,7 @@ public abstract class ClientEditorContext {
    LinkedHashSet<JavaModel> changedModels = new LinkedHashSet<JavaModel>();
    LinkedHashMap<SrcEntry, Object> errorModels = new LinkedHashMap<SrcEntry, Object>();
 
+   // TODO: shouldn't the command line handle runtime types as well?
    ArrayList<BodyTypeDeclaration> currentTypes = new ArrayList<BodyTypeDeclaration>();
 
    boolean currentModelStale = false;

@@ -41,7 +41,7 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
 
    abstract boolean isVoid();
 
-   abstract String toCompiledString(Object refType);
+   abstract String toCompiledString(Object refType, boolean retNullForDynObj);
 
    // Returns the TypeDeclaration or Class for this type
    public Object getTypeDeclaration() {

@@ -362,6 +362,10 @@ public class ModifyDeclaration extends TypeDeclaration {
 
          // Start and validate the modified type
          ParseUtil.initAndStartComponent(modifyTypeDecl);
+
+         // If our modified type needs a dynamic stub we do too.   the propagateDynamicStub method only goes down the modify tree
+         if (modifyTypeDecl.needsDynamicStub && !modifyInherited)
+            needsDynamicStub = true;
       }
 
       if (modifyInherited && isDynamicType() && !ModelUtil.isDynamicType(modifyTypeDecl)) {

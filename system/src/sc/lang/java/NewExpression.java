@@ -490,8 +490,8 @@ public class NewExpression extends IdentifierExpression {
       }
       else {
          Class componentClass = ModelUtil.getCompiledClass(boundType);
-         int ndim = Math.max(1, arrayDimensions.size());
-         Class expectedtype = Type.get(componentClass).getArrayClass(componentClass, ndim);
+         //int ndim = Math.max(1, arrayDimensions.size());
+         //Class expectedType = Type.get(componentClass).getArrayClass(componentClass, ndim);
          if (arrayInitializer == null) {
             if (arrayDimensions.size() == 0) {
                displayError("Missing dimensions to new array: ");

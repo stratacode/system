@@ -1805,11 +1805,12 @@ public class IdentifierExpression extends ArgumentsExpression {
                break;
 
             case SuperExpression:
-               Object type = boundTypes[0];
+               Object constr = boundTypes[0];
+               Object type = null;
 
                // If this is super(x) for a constructor the type is the enclosing type of the constructor
-               if (sz == 1 && ModelUtil.isConstructor(type))
-                  type = ModelUtil.getEnclosingType(type);
+               if (sz == 1 && ModelUtil.isConstructor(constr))
+                  type = ModelUtil.getEnclosingType(constr);
 
                BodyTypeDeclaration pendingConstructor;
 
@@ -1843,6 +1844,14 @@ public class IdentifierExpression extends ArgumentsExpression {
                            else
                               throw new IllegalArgumentException(("Not allowed to invoke base constructor: " + baseConstr));
                         }
+                     }
+                     // When the original constructor is a dynamic stub and we are extending a dynamic type which is or is not a dynamic stub, we need to invoke the dynamic constructor because
+                     // we do not include the code for the constructor in the dynamic stub - only the super(..) call.   If this super refers to a compiled type, we run the base types constructor
+                     // automatically so we can return without invoking the constructor.
+                     else if (constr instanceof ConstructorDefinition && type instanceof TypeDeclaration && ((TypeDeclaration)type).isDynamicType()) {
+                        ConstructorDefinition baseConstr = (ConstructorDefinition) constr;
+                        if (ctx.allowInvoke(baseConstr))
+                           ModelUtil.invokeMethod(ctx.getCurrentObject(), baseConstr, arguments, null, ctx, false, false, null);
                      }
                      // when the super refers to the base class which is a compiled type, we'll have already executed the super in the DynamicStub.  The statement in the ConstructorDefinition can be ignored since it was run first thing in the stub.
                      return null;
@@ -3683,6 +3692,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             return;
          case IsVariable:
          case GetVariable:
+         case SetVariable:
          case FieldName:
          case GetSetMethodInvocation:
             srcObj = getRootFieldThis(this, boundTypes[0], ctx, false);

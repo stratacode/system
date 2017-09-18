@@ -1300,7 +1300,7 @@ public class ClassDeclaration extends TypeDeclaration {
       List declProps = super.getAllFields(modifier, hasModifier, dynamicOnly, includeObjs, includeAssigns, includeModified);
       List modProps;
       Object extendsObj = getDerivedTypeDeclaration();
-      if (extendsObj == null || (dynamicOnly && !ModelUtil.isDynamicType(extendsObj))) {
+      if (extendsObj == null || (dynamicOnly && !ModelUtil.isDynamicNew(extendsObj))) {
          if (dynamicOnly && extendsObj != null) {
             // If this is looking for dynamic properties only and the base type is compiled, we need to remove
             // any properties in the base type which are in the dynamic list.  This might occur if someone overrode

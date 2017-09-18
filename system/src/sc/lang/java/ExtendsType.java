@@ -62,15 +62,19 @@ public class ExtendsType extends JavaType {
    }
 
    @Override
-   String toCompiledString(Object refType) {
+   String toCompiledString(Object refType, boolean retNullForDynObj) {
       StringBuilder sb = new StringBuilder();
       sb.append("?");
       if (operator != null && typeArgument != null) {
          sb.append(" ");
          sb.append(operator);
          sb.append(" ");
-         if (typeArgument != null)
-            sb.append(typeArgument.toCompiledString(refType));
+         if (typeArgument != null) {
+            String argStr = typeArgument.toCompiledString(refType, retNullForDynObj);
+            if (argStr == null)
+               return null;
+            sb.append(argStr);
+         }
       }
       return sb.toString();
    }

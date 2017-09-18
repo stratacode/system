@@ -5,6 +5,7 @@
 package sc.lang.java;
 
 import sc.dyn.IDynObject;
+import sc.lang.ISemanticNode;
 import sc.lang.sc.ModifyDeclaration;
 import sc.lang.sc.PropertyAssignment;
 import sc.layer.Layer;
@@ -130,7 +131,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
       }
       else {
          extType = ModelUtil.getExtendsClass(objType);
-         baseClassName = extType == null || extType == IDynObject.class ? null : ModelUtil.javaTypeToCompiledString(objType, ModelUtil.getExtendsJavaType(objType));
+         baseClassName = extType == null || extType == IDynObject.class ? null : ModelUtil.javaTypeToCompiledString(objType, ModelUtil.getExtendsJavaType(objType), true);
       }
 
       // Only strip off static if thi sis a top-level inner stub
@@ -155,7 +156,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
             Object typeDecl = ModelUtil.getTypeDeclarationFromJavaType(type);
             if (!ModelUtil.isDynamicType(typeDecl)) {
                sb.append(", ");
-               sb.append(ModelUtil.javaTypeToCompiledString(objType, type));
+               sb.append(ModelUtil.javaTypeToCompiledString(objType, type, false));
             }
          }
          // Includes the separator comma cause we always implement IDynObject
@@ -1043,7 +1044,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
       }
 
       public String getReturnType() {
-         return ModelUtil.javaTypeToCompiledString(objType, ModelUtil.getReturnJavaType(method));
+         return ModelUtil.javaTypeToCompiledString(objType, ModelUtil.getReturnJavaType(method), false);
       }
 
       public String getModifiers() {
@@ -1081,9 +1082,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
             return new String[0];
          String[] ptNames = new String[types.length];
          for (int i = 0; i < types.length; i++) {
-            ptNames[i] = ModelUtil.javaTypeToCompiledString(objType, types[i]);
-            if (ptNames[i] == null)
-               ptNames[i] = "sc.dyn.IDynObject";
+            ptNames[i] = ModelUtil.javaTypeToCompiledString(objType, types[i], false);
          }
          return ptNames;
       }
@@ -1144,9 +1143,13 @@ public class DynStubParameters extends AbstractTemplateParameters {
       Object getSuperMethod() {
          Object meth = super.getSuperMethod();
          if (meth == null && methodEnclosingType instanceof BodyTypeDeclaration) {
-            Object pc = ((BodyTypeDeclaration) methodEnclosingType).getPropagatedConstructor();
-            if (pc != null && ModelUtil.methodsMatch(method, pc))
-               return pc;
+            BodyTypeDeclaration methEnclType = (BodyTypeDeclaration) methodEnclosingType;
+            Object extType = methEnclType.getExtendsTypeDeclaration();
+            if (extType != null) {
+               Object pc = ModelUtil.getPropagatedConstructor(sys, extType, objTypeDecl, objTypeDecl.getLayer());
+               if (pc != null && ModelUtil.methodsMatch(method, pc))
+                  return pc;
+            }
          }
          return meth;
       }
@@ -1174,6 +1177,13 @@ public class DynStubParameters extends AbstractTemplateParameters {
          if (method instanceof ConstructorDefinition) {
             ConstructorDefinition constr = (ConstructorDefinition) method;
             IdentifierExpression superExpr = constr.getSuperExpresssion();
+            if (getSuperIsDynamicStub()) {
+               if (superExpr != null) {
+                  IdentifierExpression superCopy = superExpr.deepCopy(ISemanticNode.CopyNormal, null);
+                  superCopy.arguments.add(0, IdentifierExpression.create("concreteType"));
+                  return superCopy.toLanguageString();
+               }
+            }
             if (superExpr == null)
                return null;
             return superExpr.toLanguageString();

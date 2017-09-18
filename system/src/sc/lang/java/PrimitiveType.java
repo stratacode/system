@@ -94,7 +94,7 @@ public class PrimitiveType extends JavaType {
    }
 
    @Override
-   String toCompiledString(Object refType) {
+   String toCompiledString(Object refType, boolean retNullForDynObj) {
       return typeName;
    }
 

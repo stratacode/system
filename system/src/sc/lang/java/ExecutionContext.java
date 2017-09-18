@@ -24,6 +24,7 @@ public class ExecutionContext {
    
    private static ThreadLocal<JavaSemanticNode> executingModelObject = new ThreadLocal<JavaSemanticNode>();
    private BodyTypeDeclaration pendingConstructor;
+   private BodyTypeDeclaration origConstructor;
 
    public static void setExecutingModelObject(JavaSemanticNode node) {
       executingModelObject.set(node);
@@ -173,12 +174,29 @@ public class ExecutionContext {
       return null;
    }
 
+   public BodyTypeDeclaration getOrigConstructor() {
+      return origConstructor;
+   }
+
+   /**
+    * Stores the original type declaration for a dynamic type being constructed through a 'super(x)' call chain.
+    * We pass through each of the super(x) calls which are in dynamic types until we reach a constructor with
+    * no super call, or we hit a compiled class.   Then we construct an instance of a dynamic type with the
+    * "origConstructor" set to the type.  Then we unwind and actually run all of the constructors from the
+    * inside out.
+    * */
+   public void setOrigConstructor(BodyTypeDeclaration origConstructor) {
+      this.origConstructor = origConstructor;
+   }
+
    public BodyTypeDeclaration getPendingConstructor() {
       return pendingConstructor;
    }
 
-   // TODO: does this need to be a stack?
+   /** Stores the most recent TypeDeclaration on the chain of "super(xxx)" calls that we make to construct a type. */
    public void setPendingConstructor(BodyTypeDeclaration pendingConstructor) {
+      if (pendingConstructor != null && origConstructor == null)
+         origConstructor = pendingConstructor;
       this.pendingConstructor = pendingConstructor;
    }
 

@@ -46,8 +46,11 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
          if (index == -1) {
             IBeanMapper mapper = DynUtil.getPropertyMapping(type, propName);
             // Note: DynBeanMapper, at least with the GET method thing wraps back around so don't vector of to it
-            if (mapper == null)
+            if (mapper == null) {
+               index = type.getDynInstPropertyIndex(propName);
+               mapper = DynUtil.getPropertyMapping(type, propName);
                throw new IllegalArgumentException("No property: " + propName + " for get value on type: " + type.typeName);
+            }
 
             Integer nestCt = nestCount.get();
             if (nestCt == null)

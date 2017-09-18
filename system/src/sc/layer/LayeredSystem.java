@@ -1549,7 +1549,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             layer.layerPosition = layers.size();
             registerLayer(layer);
             layers.add(layer);
-            // Separate layers should not be used in 'specifing' the process since they get started.
+            // Separate layers should not be used in 'specifying' the process since they get started.
             //specifiedLayers.add(layer);
             lastLayer = layer;
             if (toRemove == null)
@@ -1573,6 +1573,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    void removeExcludedLayers(boolean markOnly) {
+      boolean resetLastLayer = false;
       // Remove any layers that don't belong in the runtime.  The other runtimes are configured with the right
       // layers from the start in the active set.
       if (!peerMode) {
@@ -1586,6 +1587,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             boolean included = (needsDefaultProcess || layer.buildSeparate) && layer.includeForProcess(processDefinition);
             if (!included || layer.excludeForProcess(processDefinition)) {
                layer.excluded = true;
+               if (layer == lastLayer)
+                  resetLastLayer = true;
                if (!markOnly) {
                   if (activeRemoveIx == -1)
                      activeRemoveIx = i;
@@ -1602,6 +1605,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                layers.get(i).layerPosition = i;
             }
          }
+      }
+
+      if (resetLastLayer) {
+         int sz = layers.size();
+         if (sz > 0) {
+            lastLayer = layers.get(sz - 1);
+         }
+         else
+            lastLayer = null;
       }
 
       checkLayerPosition();

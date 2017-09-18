@@ -191,7 +191,8 @@ public class DynUtil {
       if (obj == null)
          return true;
 
-      Object type1 = DynUtil.getType(obj);
+      // Note: for the program editor, we use data binding expressions with TypeDeclaration... we can't have this returning 'obj' here as that will get confused as a type, not the instance we are actually using
+      Object type1 = DynUtil.getSType(obj);
       if (type1 instanceof Class && type instanceof Class)
          return PTypeUtil.isAssignableFrom((Class) type, (Class) type1);
       else if (dynamicSystem != null)

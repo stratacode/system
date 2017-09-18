@@ -7241,7 +7241,7 @@ public class ModelUtil {
       if (type instanceof Class)
          return PTypeUtil.getPropertyMapping((Class) type, propName);
       else if (type instanceof ITypeDeclaration) {
-         if (ModelUtil.isDynamicType(type))
+         if (ModelUtil.isDynamicNew(type)) // returns true for dynamicType or dynamicNew
             return ((ITypeDeclaration) type).getPropertyCache().getPropertyMapper(propName);
          else {
             ITypeDeclaration itype = (ITypeDeclaration) type;
@@ -7799,9 +7799,9 @@ public class ModelUtil {
       return res.toString();
    }
 
-   public static String javaTypeToCompiledString(Object refType, Object type) {
+   public static String javaTypeToCompiledString(Object refType, Object type, boolean retNullForDynObj) {
       if (type instanceof JavaType)
-         return ((JavaType) type).toCompiledString(refType);
+         return ((JavaType) type).toCompiledString(refType, retNullForDynObj);
       return ModelUtil.getCompiledTypeName(type);
    }
 
@@ -7822,7 +7822,7 @@ public class ModelUtil {
          if (ModelUtil.isTypeVariable(typeArg))
             return ModelUtil.getTypeParameterName(typeArg);
          else
-            return ModelUtil.javaTypeToCompiledString(type, typeArg);
+            return ModelUtil.javaTypeToCompiledString(type, typeArg, false);
       }
    }
 
@@ -8471,9 +8471,9 @@ public class ModelUtil {
                   else
                      System.err.println("Bad value to CompilerSettings.propagateConstructor annotation " + pConstructor + " no type: " + argTypeNames[i]);
                }
-               List constParams = Arrays.asList(propagateConstructorArgs);
-               return ModelUtil.definesConstructor(sys, type, constParams, null);
             }
+            List constParams = Arrays.asList(propagateConstructorArgs);
+            return ModelUtil.definesConstructor(sys, type, constParams, null);
          }
       }
       return null;

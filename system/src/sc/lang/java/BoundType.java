@@ -44,13 +44,17 @@ public class BoundType extends JavaType {
    }
 
    @Override
-   String toCompiledString(Object refType) {
+   String toCompiledString(Object refType, boolean retNullForDynObj) {
       StringBuilder sb = new StringBuilder();
-      sb.append(baseType.toCompiledString(refType));
+
+      String baseStr = baseType.toCompiledString(refType, retNullForDynObj);
+      if (baseStr == null)
+         return null;
+      sb.append(baseStr);
       for (int i = 0; i < boundTypes.size(); i++) {
          JavaType t = boundTypes.get(i);
          sb.append(" & ");
-         sb.append(t.toCompiledString(refType));
+         sb.append(t.toCompiledString(refType, false));
       }
       return sb.toString();
    }

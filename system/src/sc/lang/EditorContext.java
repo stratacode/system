@@ -86,9 +86,14 @@ public class EditorContext extends ClientEditorContext {
       return obj;
    }
 
+   public Object getCurrentObject() {
+      Object obj = execContext.getCurrentObject();
+      return obj;
+   }
+
    public void setDefaultCurrentObj(Object type, Object inst) {
       // Keep the execContext in sync with what's done in the UI.  So we are editing the same instance
-      if (currentTypes.size() > 0 && type == currentTypes.get(currentTypes.size()-1) && inst != execContext.getCurrentObject()) {
+      if (currentTypes.size() > 0 && type != null && ModelUtil.sameTypes(type, currentTypes.get(currentTypes.size()-1)) && inst != execContext.getCurrentObject()) {
          execContext.popCurrentObject();
          execContext.pushCurrentObject(inst);
       }
@@ -1474,9 +1479,15 @@ public class EditorContext extends ClientEditorContext {
          pushCurrentType(type);
          setPendingModelType(type);
       }
-      markCurrentTypeChanged();
+      // Turning this off because when we change this from the editor, we don't want the change event back again
+      //markCurrentTypeChanged();
    }
 
+   /**
+    * This is called after the user makes an action which changes the currentType - i.e. so it reflects when the
+    * user wants to explicitly change the currentType.  This should trigger a change in any UI reflecting the
+    * shared editor context with the command line or any other model editor.
+    */
    protected void markCurrentTypeChanged() {
       Bind.sendChangedEvent(this, "currentType");
    }

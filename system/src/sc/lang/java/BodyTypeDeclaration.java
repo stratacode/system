@@ -64,7 +64,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    /** Set to true for types which are modified dynamically.  Either because they have the dynamic keyword or because they're in or modified by a dynamic layer */
    public transient boolean dynamicType = false;
 
-   /** If we only set properties in a dynamic configuration, we only need to do "dynamicNew" - no stub is created - we configure the properties of the existing class */
+   /**
+    * If we only set properties in a dynamic type which extends a compiled type, we mark the type as "dynamicNew" - no stub is created.
+    * When constructing it, we treat it as a dynamic type which then creates an instance of the compiled class and sets properties
+    */
    public transient boolean dynamicNew = false;
 
    /** Set to true if this type is not to be made dynamic even if in a dynamic layer */
@@ -1858,7 +1861,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public boolean isCompiledProperty(String propName, boolean fieldMode, boolean interfaceMode) {
       // using FieldSet here because we use this to determine the dyn inst fields, not the properties.  if a class has a private dynamic field it is a dynamic property even though the get/set methods may be defined in a compiled interface.
-      return !isDynamicType() && declaresMember(propName, fieldMode ? MemberType.FieldEnumSet : MemberType.PropertyGetSetObj, null, null) != null;
+      return !isDynamicNew() && declaresMember(propName, fieldMode ? MemberType.FieldEnumSet : MemberType.PropertyGetSetObj, null, null) != null;
    }
 
    public void addAllFields(SemanticNodeList<Statement> body, List<Object> props, String modifier, boolean hasModifier, boolean dynamicOnly, boolean includeObjs, boolean includeAssigns, boolean includeModified) {
@@ -2929,13 +2932,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
          // Make sure we switch to the class version if we are compiled.  Since this is the runtime description
          // we don't want to get field references for things which have had get/set methods created.
-         if (extType != null && !ModelUtil.isDynamicType(extType)) {
+         if (extType != null && !ModelUtil.isDynamicNew(extType)) {
             extType = ModelUtil.getRuntimeType(extType);
             if (extType == null)
                System.err.println("*** No runtime type for extType!");
          }
 
-         if (modType != null && !ModelUtil.isDynamicType(modType))
+         if (modType != null && !ModelUtil.isDynamicNew(modType))
             modType = ModelUtil.getRuntimeType(modType);
 
          int ifaceCount = 0;
@@ -6542,7 +6545,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       //else
       argValues = getCompiledConstrArgs(argValues);
 
-      allValues = addTypeDeclToConstrArgs(compClass, argValues);
+      allValues = addTypeDeclToConstrArgs(this, compClass, argValues);
+      ctx.setOrigConstructor(null);
 
       if (outerObj != null && appendOuterObj)
          allValues = addObjectToArray(outerObj, allValues);
@@ -6570,17 +6574,17 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public final static String dynObjectSignature = RTypeUtil.getSignature(BodyTypeDeclaration.class);
    public final static String altDynObjectSignature = RTypeUtil.getSignature(TypeDeclaration.class);
 
-   private Object[] addTypeDeclToConstrArgs(Class compClass, Object[] argValues) {
+   private Object[] addTypeDeclToConstrArgs(BodyTypeDeclaration typeDecl, Class compClass, Object[] argValues) {
       Object[] allValues;
       /* Now add the TypeDeclaration if this is a DynObject type and has the right constructor.  In some cases we might implement the IDynObject interface but not define the constructor (like for a compiled template type) */
       if (IDynObject.class.isAssignableFrom(compClass) && (ModelUtil.needsTypeDeclarationParam(compClass))) {
          if (argValues != null && argValues.length > 0) {
             allValues = new Object[argValues.length+1];
             System.arraycopy(argValues, 0, allValues, 1, argValues.length);
-            allValues[0] = this;
+            allValues[0] = typeDecl;
          }
          else
-            allValues = new Object[] {this};
+            allValues = new Object[] {typeDecl};
       }
       else
          allValues = argValues;
@@ -6627,6 +6631,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             // First get the constructor values in the parent's context
             Object[] argValues = ModelUtil.constructorArgListToValues(this, args, ctx, outerObj);
             boolean success = false;
+            boolean isDynStub = isDynamicStub(false);
 
             try {
                if (ctx == null)
@@ -6635,19 +6640,21 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                if (con == null && origNumArgs > 0)
                   throw new IllegalArgumentException("No constructor matching " + args + " for: ");
 
-               // If there are constructors and a base class, we need to do some work here.  The super(xx) call is the first
-               // time we have the consructor/args to construct the instance.   In that case, mark the ctx,
+               // If there are constructors and a base class (but we are not a dynamic stub), we need to do some work here.  The super(xx) call is the first
+               // time we have the constructor/args to construct the instance.   In that case, mark the ctx,
                // set call the constructor.  when super is hit, it sees the flag in the ctx and creates the
                // instance (or propagates the pending constructor to the next super call).
                //
                // If there is a constructor and a base class but no super
                // call - using the implied zero arg constructor.  In that case, we do the init here.
 
-               if (con == null || !con.callsSuper()) {
+               if (con == null || !con.callsSuper() || isDynStub) {
                   // Was emptyObjectArray for the args
                   constructInstance(ctx, outerObj == null ? ModelUtil.getOuterObject(this, ctx) : outerObj, argValues, false);
                }
                else {
+                  if (ctx.getOrigConstructor() == null)
+                     ctx.setOrigConstructor(this);
                   ctx.setPendingConstructor(this);
                }
 
@@ -6688,6 +6695,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             Class cl = getCompiledClass();
             if (cl == null)
                System.out.println("*** No compiled class for type: " + typeName + " (compiled name:" + getCompiledClassName() + ")");
+
             inst = PTypeUtil.createInstance(cl, null, ModelUtil.constructorArgListToValues(cl, args, ctx, outerObj));
 
             // Set the slot before we populate so that we can resolve cycles
@@ -6737,7 +6745,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                needsInit = false;
             }
             else {
-               argValues = addTypeDeclToConstrArgs(cl, argValues);
+               argValues = addTypeDeclToConstrArgs(this, cl, argValues);
                // Need to add the outer instance - this is a compiled class that's an inner class.  There's probably a dynamic slot for this property as well
                // but we need to bypass it because that slot may not have the lazy init sentinel.
                if (outerObj != null && ModelUtil.getEnclosingInstType(cl) != null) {

@@ -935,7 +935,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
          return true;
 
       // A compiled class implementing an interface with non-static fields will generate these properties as compiled properties.
-      if (!isDynamicType()) {
+      if (!isDynamicNew()) {
          if (implementsBoundTypes != null) {
             for (Object impl:implementsBoundTypes) {
                if (ModelUtil.isCompiledProperty(impl, propName, fieldMode, true))

@@ -765,7 +765,7 @@ public class ClassType extends JavaType {
       }
    }
 
-   public String toCompiledString(Object refType) {
+   public String toCompiledString(Object refType, boolean retNullForDynObj) {
       StringBuilder sb = new StringBuilder();
       if (type instanceof TypeParameter) {
          if (refType == null)
@@ -778,9 +778,9 @@ public class ClassType extends JavaType {
          String runtimeTypeName = ((TypeDeclaration) type).getCompiledClassName();
          // As we skip classes in the extends hierarchy, we also may be eliminating one or all type args.
          typeArgs = td.getCompiledTypeArgs(typeArgs);
-         if (!runtimeTypeName.equals("sc.dyn.IDynObject"))
+         if (!retNullForDynObj || !runtimeTypeName.equals("sc.dyn.IDynObject"))
             sb.append(runtimeTypeName);
-         else
+         else // IDynObject - return null if we don't want the default
             return null;
       }
       else {
@@ -799,9 +799,7 @@ public class ClassType extends JavaType {
          StringBuilder argSB = new StringBuilder();
          int i = 0;
          for (JavaType ta:typeArgs) {
-            String res = ta.toCompiledString(refType);
-            if (res == null)
-               res = "sc.dyn.IDynObject";  // Or just Object?  We can't just drop the type arg as that ends up changing the classes signature in some weird way - see the paramTypeOverride test
+            String res = ta.toCompiledString(refType, false);
             if (i != 0)
                argSB.append(", ");
 
