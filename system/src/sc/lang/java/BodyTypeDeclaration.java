@@ -5807,6 +5807,25 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
       }
 
+      // Now we build the updateTypeContexts for each of the subtypes - need to do this before we have stopped and removed the parent type
+      // or else some of the logic there does not work right.
+      for (int i = 0; i < tctx.toUpdateObjs.size(); i++) {
+         TypeDeclaration oldInnerType = tctx.toUpdateObjs.get(i);
+         Object newFieldObj = null;
+         List<Object> newFieldObjs = tctx.newFieldIndex.get(oldInnerType.typeName);
+         if (newFieldObjs != null)
+            newFieldObj = newFieldObjs.get(0);
+         TypeDeclaration newInnerType = (TypeDeclaration) newFieldObj;
+         if (newInnerType == null)
+            newInnerType = (TypeDeclaration) tctx.newTypeIndex.get(oldInnerType.typeName);
+         if (oldInnerType != newInnerType) { // Not sure why this is necessary but clearly don't update if it's the same thing
+            UpdateTypeCtx innerTypeCtx = oldInnerType.buildUpdateTypeContext(newInnerType, updateMode, info);
+            tctx.toUpdateCtxs.add(innerTypeCtx);
+         }
+         else
+            tctx.toUpdateCtxs.add(null);
+      }
+
       return tctx;
    }
 
@@ -5943,6 +5962,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // That way, we have a clean new model in this new type before we resolve references when starting the new type
       for (int i = 0; i < tctx.toUpdateObjs.size(); i++) {
          TypeDeclaration oldInnerType = tctx.toUpdateObjs.get(i);
+         UpdateTypeCtx innerTypeCtx = tctx.toUpdateCtxs.get(i);
          Object newFieldObj = null;
          List<Object> newFieldObjs = tctx.newFieldIndex.get(oldInnerType.typeName);
          if (newFieldObjs != null)
@@ -5951,12 +5971,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if (newInnerType == null)
             newInnerType = (TypeDeclaration) tctx.newTypeIndex.get(oldInnerType.typeName);
          if (oldInnerType != newInnerType) { // Not sure why this is necessary but clearly don't update if it's the same thing
-            UpdateTypeCtx innerTypeCtx = oldInnerType.buildUpdateTypeContext(newInnerType, updateMode, info);
-            tctx.toUpdateCtxs.add(innerTypeCtx);
+            if (innerTypeCtx == null)
+               System.err.println("*** Mismatch for updateInnerType!");
             oldInnerType.updateTypeInternals(innerTypeCtx, newInnerType, ctx, updateMode, updateInstances, info, false);
          }
-         else
-            tctx.toUpdateCtxs.add(null);
       }
    }
 
@@ -7317,6 +7335,16 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
       }
    }
+
+   /** Gets the extends type name without trying to resolve the type */
+   /*
+   public String getUnresolvedExtendsTypeName() {
+      JavaType extType = getExtendsType();
+      if (extType == null)
+         return null;
+      return extType.getFullBaseTypeName();
+   }
+   */
 
    public String getExtendsTypeName() {
       JavaType extType = getExtendsType();

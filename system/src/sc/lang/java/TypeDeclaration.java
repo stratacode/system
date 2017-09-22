@@ -369,9 +369,12 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    public Object getExtendsTypeDeclaration() {
       JavaType t = getExtendsType();
       if (t != null) {
-         Object o = t.getTypeDeclaration();
+         Object o = resolveExtendsType(t);
          if (o instanceof BodyTypeDeclaration)
             return ((BodyTypeDeclaration) o).resolve(true);
+         /*
+         Object o = t.getTypeDeclaration();
+         */
          return o;
       }
       return null;
