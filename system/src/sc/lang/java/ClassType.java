@@ -722,6 +722,9 @@ public class ClassType extends JavaType {
          else if (ModelUtil.isCompiledClass(type)) {
             type = ModelUtil.refreshBoundType(getLayeredSystem(), type, flags);
          }
+         else if (ModelUtil.isParameterizedType(type)) {
+            type = ModelUtil.refreshBoundType(getLayeredSystem(), type, flags);
+         }
          else if (type == null) {
             ITypeDeclaration itype = getEnclosingIType();
             if (itype != null)
