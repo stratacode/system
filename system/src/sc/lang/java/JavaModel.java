@@ -1312,6 +1312,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       }
    }
 
+   public boolean isTheTransformedModel() {
+      return nonTransformedModel != null;
+   }
+
    /** Returns the transformed model for this model. */
    public JavaModel getTransformedModel() {
       // We are the transformed model...

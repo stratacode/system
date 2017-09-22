@@ -25,6 +25,7 @@ public class ExecutionContext {
    private static ThreadLocal<JavaSemanticNode> executingModelObject = new ThreadLocal<JavaSemanticNode>();
    private BodyTypeDeclaration pendingConstructor;
    private BodyTypeDeclaration origConstructor;
+   private boolean skipCompiledSuper = false;
 
    public static void setExecutingModelObject(JavaSemanticNode node) {
       executingModelObject.set(node);
@@ -198,6 +199,14 @@ public class ExecutionContext {
       if (pendingConstructor != null && origConstructor == null)
          origConstructor = pendingConstructor;
       this.pendingConstructor = pendingConstructor;
+   }
+
+   public void setSkipCompiledSuper(boolean v) {
+       skipCompiledSuper = v;
+   }
+
+   public boolean getSkipCompiledSuper() {
+      return skipCompiledSuper;
    }
 
    /**

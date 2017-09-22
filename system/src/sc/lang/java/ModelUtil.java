@@ -69,8 +69,11 @@ public class ModelUtil {
       if (model == null)
          return t;
       Object res = model.findTypeDeclaration(name, false);
-      if (res != null)
+      if (res != null) {
+         if (res != t && t.isPrimitive())
+            System.err.println("*** invalid optimization!"); // TODO: optimization - skip this whole thing for primitives which we never override
          return res;
+      }
       // certain array classes do not get resolved this way - e.g. [[Lsc.lang.java.DynStubParameters.DynConstructor;
       return t;
    }
@@ -3879,7 +3882,7 @@ public class ModelUtil {
    public static boolean isComponentType(Object type) {
       if (type instanceof Class) {
          Class cl = (Class) type;
-         return IComponent.class.isAssignableFrom(cl) || IAltComponent.class.isAssignableFrom(cl);
+         return IComponent.class.isAssignableFrom(cl) || IAltComponent.class.isAssignableFrom(cl) || IDynComponent.class.isAssignableFrom(cl);
       }
       else if (type instanceof ITypeDeclaration) {
          ITypeDeclaration td = (ITypeDeclaration) type;
@@ -5385,6 +5388,7 @@ public class ModelUtil {
          Class superClass = (Class) superType;
          Class annotationClass = RDynUtil.loadClass(annotationName);
          if (annotationClass == null) {
+            // TODO: is this still needed?  should remove
             annotationClass = RDynUtil.loadClass("sc.obj." + annotationName);
          }
 

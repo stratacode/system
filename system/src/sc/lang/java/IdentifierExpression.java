@@ -10,7 +10,6 @@ import sc.classfile.CFClass;
 import sc.dyn.DynUtil;
 import sc.dyn.IDynObject;
 import sc.lang.*;
-import sc.lang.html.Body;
 import sc.lang.js.JSRuntimeProcessor;
 import sc.lang.js.JSUtil;
 import sc.lang.sc.PropertyAssignment;
@@ -25,9 +24,7 @@ import sc.util.StringUtil;
 import sc.bind.BindingDirection;
 import sc.bind.IBinding;
 
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.util.*;
 
@@ -3698,6 +3695,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             srcObj = getRootFieldThis(this, boundTypes[0], ctx, false);
             if (srcObj == null) {
                System.err.println("*** Unable to resolve root property for: " + toDefinitionString());
+               srcObj = getRootFieldThis(this, boundTypes[0], ctx, false);
                return;
             }
             break;

@@ -13,7 +13,6 @@ import sc.lang.html.Element;
 import sc.lang.js.JSRuntimeProcessor;
 import sc.lang.sc.*;
 import sc.lang.template.Template;
-import sc.lang.template.TemplateStatement;
 import sc.layer.*;
 import sc.obj.*;
 import sc.parser.ParseUtil;
@@ -2441,7 +2440,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public Object[] getStaticFields() {
-      if (!isDynamicType())
+      if (!isDynamicNew())
          return TypeUtil.EMPTY_ARRAY;
 
       if (staticFields == null) {
@@ -3613,14 +3612,73 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public void initDynamicInstance(Object inst) {
       ExecutionContext ctx = new ExecutionContext(getJavaModel());
-      initDynInstance(inst, ctx, true, null);
+      initDynInstance(inst, ctx, true, true, null);
    }
 
+   public void constructDynamicInstance(Object inst, Object outerObj, ExecutionContext ctx, String constrSig, Object... params) {
+      boolean newCtx = false;
+      if (ctx == null) {
+         ctx = new ExecutionContext(getJavaModel());
+         newCtx = true;
+      }
+      // TODO: do we need something like this so we do not duplicate the super call?
+      //ctx.setSkipCompiledSuper(true);
+      Object conObj = getConstructorFromSignature(constrSig);
+      if (conObj == null) {
+         if (constrSig != null) {
+            Object propConstr = ModelUtil.getPropagatedConstructor(getLayeredSystem(), this, this, getLayer());
+            if (propConstr == null)
+               throw new NoSuchMethodError("No dynamic constructor matching: " + constrSig);
+            else
+               conObj = propConstr;
+         }
+         else // most likely using the default constructor -  TODO: should we check and be sure this type has a default constructor as this might be illegal in Java
+            return;
+      }
+      try {
+         if (newCtx)
+            ctx.pushCurrentObject(inst);
+         if (conObj instanceof ConstructorDefinition)
+            ((ConstructorDefinition) conObj).invoke(ctx, Arrays.asList(params));
+         // else - if we inherited a native constructor, we must have already run it when we constructed the instance
+
+         // If this type is marked as needing the live dynamic types feature, but is not a component type, we complete the dyn component here so the children are initialized (at least for wicket in dyn mode)
+         /*
+         if (ModelUtil.getLiveDynamicTypes(this) && !isComponentType()) {
+            initDynInstance(inst, ctx, false, true, outerObj);
+         }
+         */
+      }
+      finally {
+         if (newCtx)
+            ctx.popCurrentObject();
+      }
+   }
+
+   /*
    public void initDynamicInnerInstance(Object inst, Object outerObj) {
       ExecutionContext ctx = new ExecutionContext(getJavaModel());
       ctx.pushCurrentObject(outerObj);
       try {
-         initDynInstance(inst, ctx, true, outerObj);
+         initDynInstance(inst, ctx, true, true, outerObj);
+      }
+      finally {
+         ctx.popCurrentObject();
+      }
+   }
+   */
+
+   /** This is called from code generated in the dynamic stub to complete the dynamic portion of the initialization on the instance provided */
+   public void buildDynamicInstance(Object inst, Object outerObj, String constrSig, Object... params) {
+      ExecutionContext ctx = new ExecutionContext(getJavaModel());
+      try {
+         ctx.pushCurrentObject(inst);
+         // initialize the fields
+         initDynInstance(inst, ctx, true, false, outerObj);
+         // call the dynamic constructors if any
+         constructDynamicInstance(inst, outerObj, ctx, constrSig, params);
+         // initialize the component
+         initDynInstance(inst, ctx, false, true, outerObj);
       }
       finally {
          ctx.popCurrentObject();
@@ -3653,7 +3711,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             if (inst instanceof IDynObject) {
                ((IDynObject) inst).setProperty(DynObject.OUTER_INSTANCE_SLOT, outerObj, true);
             }
-            DynUtil.addDynInnerInstance(getFullTypeName(), inst, outerObj);
+            if (ModelUtil.getLiveDynamicTypes(this))
+               DynUtil.addDynInnerInstance(getFullTypeName(), inst, outerObj);
          }
 
          /*
@@ -3687,7 +3746,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public boolean getLiveDynamicTypesAnnotation() {
       Object setting = getCompilerSetting("liveDynamicTypes");
-      return setting == null || ((Boolean) setting);
+      // By default, only turn this on for components and objects so we are not tracking every class by default
+      if (setting == null)
+         return isComponentType() || getDeclarationType() == DeclarationType.OBJECT;
+      return ((Boolean) setting);
    }
 
    public void initDynamicFields(Object inst, ExecutionContext ctx) {
@@ -3705,7 +3767,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
    }
 
-   public void initDynInstance(Object inst, ExecutionContext ctx, boolean completeObj, Object outerObj) {
+   public void initDynInstance(Object inst, ExecutionContext ctx, boolean initClassPhase, boolean completeObj, Object outerObj) {
       LayeredSystem sys = getLayeredSystem();
       ClassLoader ctxLoader;
       ClassLoader sysLoader = sys.getSysClassLoader();
@@ -3721,25 +3783,27 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
       }
 
+      if (initClassPhase) {
+         // Need to populate the object's field before we call initDynComponent to avoid the cycle.  The problematic case comes from
+         // the code in the dyn stub template for dynCompiledObjects in the component case.  It now calls "createVirtual" which constructs and
+         // initializes the component all in one step.  It needs to construct the instance, set the field, then init the component.  Instead, we
+         // are setting the field here.
+         if (getDeclarationType() == DeclarationType.OBJECT && completeObj && outerObj != null && isComponentType()) {
+            DynUtil.setPropertyValue(outerObj, typeName, inst);
+         }
 
-      // Need to populate the object's field before we call initDynComponent to avoid the cycle.  The problematic case comes from
-      // the code in the dyn stub template for dynCompiledObjects in the component case.  It now calls "createVirtual" which constructs and
-      // initializes the component all in one step.  It needs to construct the instance, set the field, then init the component.  Instead, we
-      // are setting the field here.
-      if (getDeclarationType() == DeclarationType.OBJECT && completeObj && outerObj != null && isComponentType()) {
-         DynUtil.setPropertyValue(outerObj, typeName, inst);
-      }
+         initOuterInstanceSlot(inst, ctx, outerObj);
 
-      initOuterInstanceSlot(inst, ctx, outerObj);
-
-      if (!isLayerType && getLiveDynamicTypesAnnotation()) {
-         // Add this instance to the global table so we can do type -> inst mapping
-         getLayeredSystem().addDynInstanceInternal(this.getFullTypeName(), inst, getLayer());
+         if (!isLayerType && getLiveDynamicTypesAnnotation()) {
+            // Add this instance to the global table so we can do type -> inst mapping
+            getLayeredSystem().addDynInstanceInternal(this.getFullTypeName(), inst, getLayer());
+         }
       }
 
       ctx.pushCurrentObject(inst);
       try {
-         initDynamicFields(inst, ctx);
+         if (initClassPhase)
+            initDynamicFields(inst, ctx);
 
          if (completeObj)
             initDynComponent(inst, ctx, true, outerObj, true);
@@ -3773,23 +3837,27 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public static IDynChildManager getDynChildManager(LayeredSystem sys, JavaSemanticNode errNode, Object type, Layer refLayer, boolean layerResolve) {
-      Object compilerSettings = ModelUtil.getInheritedAnnotation(sys, type, "sc.obj.CompilerSettings", false, refLayer, layerResolve);
+      List<Object> compilerSettingsList = ModelUtil.getAllInheritedAnnotations(sys, type, "sc.obj.CompilerSettings", false, refLayer, layerResolve);
       IDynChildManager res = null;
-      if (compilerSettings != null) {
-         String dynChildMgrClass = (String) ModelUtil.getAnnotationValue(compilerSettings, "dynChildManager");
-         res = EMPTY_DYN_CHILD_MANAGER;
-         if (dynChildMgrClass != null && dynChildMgrClass.length() > 0) {
-            Class cl = sys.getCompiledClass(dynChildMgrClass);
-            if (cl == null) {
-               errNode.displayTypeError("No CompilerSettings.dynChildManager class: ", dynChildMgrClass, " for type: ");
+      if (compilerSettingsList != null) {
+         for (Object compilerSettings:compilerSettingsList) {
+            String dynChildMgrClass = (String) ModelUtil.getAnnotationValue(compilerSettings, "dynChildManager");
+            res = EMPTY_DYN_CHILD_MANAGER; // TODO: is this right?  what's the difference with returning null?
+            if (dynChildMgrClass != null && dynChildMgrClass.length() > 0) {
+               Class cl = sys.getCompiledClass(dynChildMgrClass);
+               if (cl == null) {
+                  errNode.displayTypeError("No CompilerSettings.dynChildManager class: ", dynChildMgrClass, " for type: ");
+               }
+               else if (!IDynChildManager.class.isAssignableFrom(cl))
+                  errNode.displayTypeError("Invalid CompilerSettings.dynChildManager class: ", dynChildMgrClass, "  Should implement IDynChildManager interface. Type: ");
+               else
+                  res = (IDynChildManager) RTypeUtil.createInstance(cl);
+
+               return res;
             }
-            else if (!IDynChildManager.class.isAssignableFrom(cl))
-               errNode.displayTypeError("Invalid CompilerSettings.dynChildManager class: ", dynChildMgrClass, "  Should implement IDynChildManager interface. Type: ");
-            else
-               res = (IDynChildManager) RTypeUtil.createInstance(cl);
          }
       }
-      return res;
+      return null;
    }
 
    public IDynChildManager getDynChildManager() {
@@ -4519,7 +4587,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
            "   }\n\n" +
            "<% } %>" +
            // Some types however require an explicit class for each type.   For these types, we also
-           // Define the regular constructors which do the complete initialization in the constructor.
+           // Define the regular constructors... these will explicitly call back into the TypeDeclaration to call the
+           // correct dynamic constructor and finish the initialization of the instance.
            "<% if (needsCompiledClass) { " +
            "      DynConstructor[] constrs = getConstructors();\n" +
            "      for (DynConstructor constr:constrs) {\n" +
@@ -4546,7 +4615,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
            "      if (!superIsDynamicStub) { %>" +
            "      dynObj = new sc.lang.DynObject(_td);\n<%" +
            "      } %>" +
-           "      _td.initDynamicInstance(this);\n" +
+           "      _td.constructDynamicInstance(this, null, null, <%= constr.forwardParams %>);\n" +
            "   }\n\n" +
            "<% } } %>" +
            // If the type is also a component, we need to provide the new X method with the type declaration argument.  We provide both
@@ -4565,9 +4634,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
            "      <%= typeName %> _inst = new <%= typeName %>(_type<%" +
            "         for (int pn = 0; pn < paramNames.length; pn++) { %>, <%=paramNames[pn]%><% } %>);\n" +
            "<%       if (dynInnerInstType || repeated) { %>" +
-           "      _type.initDynamicInnerInstance(_inst, _outerObj);\n" +
+           "      _type.buildDynamicInstance(_inst, _outerObj, <%= constr.forwardParams %>);\n" +
            "<%       } else { %>" +
-           "      _type.initDynamicInstance(_inst);\n" +
+           "      _type.buildDynamicInstance(_inst, null, <%= constr.forwardParams %>);\n" +
            "<%       } %>" +
            "      return _inst;\n" +
            "   }\n\n" +
@@ -4592,7 +4661,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
            "      sc.lang.java.TypeDeclaration _type = sc.lang.DynObject.getType(\"<%=fullTypeName%>\");\n" +
            "      <%= typeName %> _inst = new <%= typeName %>(_type<%" +
            "         for (int pn = 0; pn < paramNames.length; pn++) { %>, <%=paramNames[pn]%><% } %>);\n" +
-           "      _type.initDynamicInstance(_inst);\n" +
+           "      _type.buildDynamicInstance(_inst, null, <%= constr.forwardParams %>);\n" +
            "      return _inst;\n" +
            "   }\n\n" +
            "<% } } %>" +
@@ -4607,7 +4676,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
            "      sc.lang.java.TypeDeclaration _type = sc.lang.DynObject.getType(\"<%=constr.fullInnerTypeName%>\");\n" +
            "      <%= constr.compiledInnerTypeName %> _inst = new <%= constr.compiledInnerTypeName %>(_type<%" +
            "         for (int pn = 0; pn < paramNames.length; pn++) { %>, <%=paramNames[pn]%><% } %>);\n" +
-           "      _type.initDynamicInnerInstance(_inst, this);\n" +
+           "      _type.buildDynamicInstance(_inst, this, <%= constr.forwardParams %>);\n" +
            "      return _inst;\n" +
            "   }\n\n" +
            "<% } %>" +
@@ -4620,7 +4689,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
            "           %><%= s != 0 ? \", \" : \"\"%><%= paramTypeNames[s] %> <%= paramNames[s] %><% } %>) <%= constr.throwsClause %> {\n" +
            "      <%= constr.compiledInnerTypeName %> _inst = new <%= constr.compiledInnerTypeName %>(_type<%" +
            "         for (int pn = 0; pn < paramNames.length; pn++) { %>, <%=paramNames[pn]%><% } %>);\n" +
-           "      _type.initDynamicInnerInstance(_inst, this);\n" +
+           "      _type.buildDynamicInstance(_inst, this, <%= constr.forwardParams %>);\n" +
            "      return _inst;\n" +
            "   }\n\n" +
            "<% } %>" +
@@ -6553,7 +6622,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       Object inst = PTypeUtil.createInstance(compClass, null, allValues);
       if (inst != null)
-         initDynInstance(inst, ctx, false, outerObj);
+         initDynInstance(inst, ctx, true, false, outerObj);
 
       return inst;
    }
@@ -6775,7 +6844,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
 
          if (needsInit) { // TODO: this is always false now.  do we need it?
-            initDynInstance(inst, ctx, true, outerObj);
+            initDynInstance(inst, ctx, true, true, outerObj);
          }
 
          ScopeDefinition sd = getScopeDefinition();

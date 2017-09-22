@@ -19,10 +19,16 @@ public class ScopeModifier extends ErrorSemanticNode {
     * Print an error if the scopeName is not valid.  Putting in validate just out of caution to be sure all scopes are defined.
     */
    public void validate() {
+      if (validated)
+         return;
       super.validate();
 
       JavaModel model = getJavaModel();
       if (model == null || scopeName == null)
+         return;
+      // The layers have been compressed so the search for the scope processor does not work in the transformed model.
+      // TODO: should we cache the ScopeDefinition for this type during process so we have it during transform?
+      if (model.isTheTransformedModel())
          return;
       // Valid scopes may either be registerScopeProcessors (e.g. session) or defined statically and shared by the runtime and compilation environments (e.g. global and appGlobal)
       if (!isValidScope(model, scopeName)) {

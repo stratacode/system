@@ -430,7 +430,7 @@ public class ModifyDeclaration extends TypeDeclaration {
 
    private void checkModify() {
       if (getLayer() != null && modifyTypeDecl != null && modifyTypeDecl.getLayer() != null) {
-         if (getLayer().activated != modifyTypeDecl.getLayer().activated) {
+         if (!temporaryType && getLayer().activated != modifyTypeDecl.getLayer().activated) {
             System.out.println("*** Invalid modify type - mixing inactive and active layers");
             // TODO: debug only
             Object modType = getModifyType();
@@ -1664,6 +1664,8 @@ public class ModifyDeclaration extends TypeDeclaration {
          for (int i = 0; i < extendsBoundTypes.length; i++) {
             Object implType = extendsBoundTypes[i];
             if (implType instanceof ITypeDeclaration && ((ITypeDeclaration) implType).isAssignableTo(other))
+               return true;
+            else if (ModelUtil.isAssignableFrom(other, implType))
                return true;
          }
       }

@@ -528,6 +528,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       return true;
    }
 
+
    public void initDynamicInstance(Object inst, ExecutionContext ctx) {
       // ??? Test this - it was commented out for some reason?
       if (initializer == null)

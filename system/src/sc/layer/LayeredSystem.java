@@ -11594,6 +11594,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
+   // TODO: when we are in dynamic mode, everything gets created as a live dynamic type - even anonymous classes.  Maybe this
+   // should be false except for @Component by default?  In the generated code, we do not insert the addDynInstance calls into
+   // the generated code unless it's on explicitly
    public boolean getLiveDynamicTypes(String typeName) {
       if (!options.liveDynamicTypes)
          return false;
@@ -13559,10 +13562,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     */
    public void dispose(Object obj) {
       if (options.liveDynamicTypes) {
-         Object type = DynUtil.getType(obj);
-         if (type != null) {
-            String typeName = ModelUtil.getTypeName(type);
-            removeDynInstance(typeName, obj);
+         if (ModelUtil.getLiveDynamicTypes(this)) {
+            Object type = DynUtil.getType(obj);
+            if (type != null) {
+               String typeName = ModelUtil.getTypeName(type);
+               removeDynInstance(typeName, obj);
+            }
          }
       }
       innerToOuterIndex.remove(obj);

@@ -6,10 +6,7 @@ package sc.dyn;
 
 import sc.bind.Bind;
 import sc.bind.MethodBinding;
-import sc.obj.IAltComponent;
-import sc.obj.IComponent;
-import sc.obj.IObjectId;
-import sc.obj.ScopeDefinition;
+import sc.obj.*;
 import sc.sync.SyncManager;
 import sc.type.*;
 import sc.util.IdentityWrapper;
@@ -1496,7 +1493,7 @@ public class DynUtil {
          return dynamicSystem.isComponentType(type);
       else if (type instanceof Class) {
          Class cl = (Class) type;
-         return IComponent.class.isAssignableFrom(cl) || IAltComponent.class.isAssignableFrom(cl);
+         return IComponent.class.isAssignableFrom(cl) || IAltComponent.class.isAssignableFrom(cl) || IDynComponent.class.isAssignableFrom(cl);
       }
       else
          throw new UnsupportedOperationException();

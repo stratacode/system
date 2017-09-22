@@ -163,6 +163,17 @@ public class DynStubParameters extends AbstractTemplateParameters {
          otherInterfaces = sb.toString();
       }
 
+      // If we are a component type and our extends is not, add the marker interface IDynComponent so we can easily recognize the
+      // compiled type as requiring the newX method to construct it.
+      if (objTypeDecl != null && objTypeDecl.isComponentType() && (extType == null || !ModelUtil.isComponentType(extType))) {
+         String newIf = "sc.obj.IDynComponent";
+         if (otherInterfaces == null)
+            otherInterfaces = ", " + newIf;
+         else {
+            otherInterfaces += ", " + newIf;
+         }
+      }
+
       // Tack on any interfaces added by scopes.
       if (scopeInterfaces != null && scopeInterfaces.length > 0) {
          StringBuilder sb = new StringBuilder();
@@ -1129,6 +1140,24 @@ public class DynStubParameters extends AbstractTemplateParameters {
 
       public String getTypeName() {
          return ModelUtil.getTypeName(ModelUtil.getEnclosingType(method));
+      }
+
+      public String getForwardParams() {
+         StringBuilder sb = new StringBuilder();
+         String typeSig = getTypeSignature();
+         if (typeSig == null)
+            sb.append("null");
+         else {
+            sb.append('"');
+            sb.append(getTypeSignature());
+            sb.append('"');
+         }
+         String[] paramNames = getParamNames();
+         for (int pn = 0; pn < paramNames.length; pn++) {
+            sb.append(", ");
+            sb.append(paramNames[pn]);
+         }
+         return sb.toString();
       }
    }
 
