@@ -2992,7 +2992,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             }
             else if (idTypes[j] == IdentifierType.BoundObjectName || idTypes[j] == IdentifierType.GetVariable ||
                      idTypes[j] == IdentifierType.IsVariable ||
-                     (idTypes[j] == IdentifierType.FieldName && ModelUtil.needsGetSet(boundTypes[j]) && !isGetSetConversionDisabled(j) && (!isAssignment || j != sz-1))) {
+                     (idTypes[j] == IdentifierType.FieldName && ModelUtil.needsGetSet(boundTypes[j]) && !isGetSetConversionDisabled(j) && (!isAssignment || j != sz-1 || this instanceof ArrayElementExpression))) {
                boolean subDynamic = ModelUtil.isDynamicProperty(boundTypes[j]);
                SemanticNodeList<Expression> subArgs = new SemanticNodeList<Expression>(1);
                if (subDynamic) {
