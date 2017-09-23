@@ -235,7 +235,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public boolean serverEnabled = false;
 
-   public String url; // The system URL
+   //public String url; // The system URL
 
    /** If set, specifies the -source option to the javac compiler */
    public String javaSrcVersion;

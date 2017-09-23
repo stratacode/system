@@ -6,6 +6,7 @@ package sc.lang.sc;
 
 import sc.classfile.CFClass;
 import sc.dyn.DynUtil;
+import sc.dyn.IDynObject;
 import sc.lang.*;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
@@ -995,21 +996,23 @@ public class ModifyDeclaration extends TypeDeclaration {
 
    public int addChildNames(StringBuilder childNames, Map<String,StringBuilder> childNamesByScope, String prefix, boolean componentsOnly,
                             boolean thisClassOnly, boolean dynamicOnly,  Set<String> nameSet) {
-      Object extendsType = getDerivedTypeDeclaration();
       int ct = 0;
+
+      // Process the extends from the modify type first since it's part of the extends type of the result and it's children are first in the compiled version
+      if (extendsBoundTypes != null && !thisClassOnly) {
+         for (Object extBoundType:extendsBoundTypes) {
+            if (extBoundType instanceof TypeDeclaration)
+               ct += ((TypeDeclaration) extBoundType).addChildNames(childNames, childNamesByScope, prefix, componentsOnly,
+                       thisClassOnly, dynamicOnly, nameSet);
+         }
+      }
+
+      Object extendsType = getDerivedTypeDeclaration();
       if (extendsType instanceof TypeDeclaration) {
          ct += ((TypeDeclaration) extendsType).addChildNames(childNames, childNamesByScope, prefix, componentsOnly,
                                                              thisClassOnly, dynamicOnly, nameSet);
       }
 
-      // Also process the extends from the modify type
-      if (extendsBoundTypes != null && !thisClassOnly) {
-         for (Object extBoundType:extendsBoundTypes) {
-            if (extBoundType instanceof TypeDeclaration)
-               ct += ((TypeDeclaration) extBoundType).addChildNames(childNames, childNamesByScope, prefix, componentsOnly,
-                                                                     thisClassOnly, dynamicOnly, nameSet);
-         }
-      }
       if (body != null) {
          for (Statement statement:body) {
             TypeDeclaration typeDecl;
@@ -2765,4 +2768,22 @@ public class ModifyDeclaration extends TypeDeclaration {
       return "<modify>";
    }
 
+
+   public void clearDynFields(Object inst, ExecutionContext ctx) {
+      if (extendsTypes != null && !isLayerType) {
+         // No dynamic fields so nothing to initialize
+         if (!(inst instanceof IDynObject))
+            return;
+         // Need to process the extends types before we process the modify type - in the compiled version, this extends type's fields will be constructed before the base type's
+         if (extendsBoundTypes != null) {
+            for (int i = 0; i < extendsBoundTypes.length; i++) {
+               Object ext = extendsBoundTypes[i];
+               // Need to do even compiled interfaces in case there are any interface instance fields that were not compiled in
+               if (ext instanceof BodyTypeDeclaration)
+                  ((BodyTypeDeclaration) ext).clearDynFields(inst, ctx);
+            }
+         }
+      }
+      super.clearDynFields(inst, ctx);
+   }
 }
