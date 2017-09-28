@@ -847,7 +847,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
 
    public Object getTypeDeclarationForParam(String typeVarName, Object typeVar, boolean resolve) {
       Object def = typeVar != null ? ModelUtil.getTypeParameterDeclaration(typeVar) : null;
-      boolean isMethod = def != null && ModelUtil.isMethod(def);
+      boolean isMethod = def != null && (ModelUtil.isMethod(def) || ModelUtil.isConstructor(def));
       Object paramRes = null;
       Object inferredRes = null;
       if (def == null || isMethod) {

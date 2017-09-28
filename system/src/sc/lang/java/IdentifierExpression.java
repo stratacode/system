@@ -2486,7 +2486,18 @@ public class IdentifierExpression extends ArgumentsExpression {
                   // This converts position "i" to a get method.  It will either process all of the elements or
                   // we are on the last element anyway.
                   if (bindingStatement == null) { // for bindings we've already removed this expression so no need to transform it further
-                     if (convertToGetMethod(identifier, i, sz, incr, false))
+                     // This is not a common case because normally compiled types don't directly refer to dynamic types but
+                     // if we have a compiled Main, it can get dynamic types from the mainInit type group members.  We need to replace
+                     // the call with a dynamic lookup of that instance.
+                     if (ModelUtil.isDynamicNew(type) && !ModelUtil.isDynamicStub(type, false)) {
+                        SemanticNodeList<Expression> args = new SemanticNodeList<Expression>();
+                        args.add(StringLiteral.create(ModelUtil.getTypeName(type)));
+                        args.add(BooleanLiteral.create(true));
+                        IdentifierExpression resolveExpr = IdentifierExpression.createMethodCall(args, "sc.dyn.DynUtil.resolveName");
+                        parentNode.replaceChild(this, resolveExpr);
+                        return true;
+                     }
+                     else if (convertToGetMethod(identifier, i, sz, incr, false))
                         return true;
                   }
                }
@@ -3729,6 +3740,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                srcObj = getRootFieldThis(this, boundTypes[0], ctx, false);
             if (srcObj == null) {
                System.err.println("*** Unable to resolve root obj for: " + toDefinitionString());
+               srcObj = getRootFieldThis(this, boundTypes[0], ctx, false);
                return;
             }
             break;

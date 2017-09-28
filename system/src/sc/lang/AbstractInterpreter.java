@@ -19,6 +19,7 @@ import sc.layer.LayeredSystem;
 import sc.parser.*;
 import sc.type.CTypeUtil;
 import sc.type.TypeUtil;
+import sc.util.DialogManager;
 import sc.util.FileUtil;
 import sc.util.StringUtil;
 import sc.layer.Layer;
@@ -1153,5 +1154,9 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          ScheduledJob toRun = toRunLater.get(i);
          toRun.toInvoke.run();
       }
+   }
+
+   public void addDialogAnswer(String dialogName, Object value) {
+      DialogManager.addDialogAnswer(dialogName, value);
    }
 }

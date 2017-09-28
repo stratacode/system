@@ -2160,7 +2160,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // the choice of the buildDir for a given layer.
          for (int i = 0; i < layers.size(); i++) {
             Layer l = layers.get(i);
-            if (l.buildDir == null || l.buildSrcDir == null) // TODO: only for buildLayers?
+            if (l.isBuildLayer() && (l.buildDir == null || l.buildSrcDir == null))
                l.initBuildDir();
          }
 
@@ -4714,7 +4714,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             return "Main method missing 'static' modifier: " + runClass;
          else {
             if (options.info)
-               System.out.println("Running dynamic: " + runClass);
+               System.out.println("Running dynamic: " + runClass + "(" + StringUtil.arrayToString(args) + ")");
             runClassStarted = true;
             ModelUtil.callMethod(null, meth, args);
          }
@@ -4732,7 +4732,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             return "Main method missing 'static' modifier: " + runClass;
          else {
             if (options.info)
-               System.out.println("Running compiled main for class: " + runClass);
+               System.out.println("Running compiled main for class: " + runClass + "(" + StringUtil.arrayToString(args) + ")");
             runClassStarted = true;
             TypeUtil.invokeMethod(null, meth, args);
          }
@@ -5433,7 +5433,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    private static void usage(String[] args) {
-      System.err.println("Command line overview:\n" + "sc [-a -i -ni -nc -dyn -cp <classpath> -lp <layerPath>]\n" +
+      System.err.println("Command line overview:\n" + "scc [-a -i -ni -nc -dyn -cp <classpath> -lp <layerPath>]\n" +
                          "   [ -cd <defaultCommandDir/Path> ] [<layer1> ... <layerN-1>] <buildLayer>\n" +
                          "   [ -f <file-list> ] [-r <main-class-regex> ...app options...] [-t <test-class-regex>]\n" +
                          "   [ -d/-ds/-db buildOrSrcDir]\n\nOption details:");
@@ -11594,9 +11594,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
-   // TODO: when we are in dynamic mode, everything gets created as a live dynamic type - even anonymous classes.  Maybe this
-   // should be false except for @Component by default?  In the generated code, we do not insert the addDynInstance calls into
-   // the generated code unless it's on explicitly
    public boolean getLiveDynamicTypes(String typeName) {
       if (!options.liveDynamicTypes)
          return false;
@@ -11604,13 +11601,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // If it's a layer component it's always dynamic
       if (parentName != null && parentName.equals(Layer.LAYER_COMPONENT_FULL_TYPE_NAME))
          return true;
+
+      Object type = getSrcTypeDeclaration(typeName, null, true, false, false, null, false);
+      if (type != null)
+         return ModelUtil.getLiveDynamicTypes(type);
+
+      // TODO: I'm not sure this part is right
       SrcEntry srcEnt = getSrcFileFromTypeName(typeName, true, null, true, null);
       if (srcEnt == null) {
          if (parentName == null)
             return true;
          return getLiveDynamicTypes(parentName);
       }
-
       if (srcEnt.layer == null)
          return false;
       return srcEnt.layer.liveDynamicTypes;
@@ -12886,7 +12888,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
          // Don't resolve the Class for a dynamic stub or a dynamic type without a stub.  It won't have the top-level getX we're looking for,
          // or if there's no stub, we may get a previous compiled version of the class.
-         if (td.isDynamicType() || td.isDynamicStub(true)) {
+         if (td.isDynamicNew() || td.isDynamicStub(true)) {
             nextClassObj = rootType;
 
             if (create) {

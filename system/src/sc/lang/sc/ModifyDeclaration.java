@@ -2786,4 +2786,8 @@ public class ModifyDeclaration extends TypeDeclaration {
       }
       super.clearDynFields(inst, ctx);
    }
+
+   public boolean isEmpty() {
+      return body == null || body.size() == 0;
+   }
 }

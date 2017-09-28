@@ -102,6 +102,8 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
    }
 
    public void setPropertyFromWrapper(Object origObj, String propName, Object value, boolean setField) {
+      if (type.replaced) // This type might have been changed (and replaced) but the instance was not tracked in instancesByType so we failed to update it proactively.
+         type = type.resolve(true);
       int index = type.getDynInstPropertyIndex(propName);
       if (index == -1) {
          index = type.getDynStaticFieldIndex(propName);

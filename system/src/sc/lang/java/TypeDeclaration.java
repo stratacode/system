@@ -267,16 +267,17 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
    private Object resolveExtendsType(JavaType extendsType) {
       // We don't want to resolve from this type cause we get into a recursive loop in findType.
-      JavaSemanticNode resolver = getEnclosingType();
-      if (resolver == null)
-         resolver = getJavaModel();
-      extendsType.initType(getLayeredSystem(), this, resolver, null, false, isLayerType, null);
-
+      if (!extendsType.isBound()) {
+         JavaSemanticNode resolver = getEnclosingType();
+         if (resolver == null)
+            resolver = getJavaModel();
+         extendsType.initType(getLayeredSystem(), this, resolver, null, false, isLayerType, null);
+      }
 
       // Need to start the extends type as we need to dig into it
       Object extendsTypeDecl = extendsType.getTypeDeclaration();
       if (extendsTypeDecl == null) {
-         extendsType.displayTypeError("Implemented class not found: ", extendsType.getFullTypeName(), " for ");
+         extendsType.displayTypeError("Extends class not found: ", extendsType.getFullTypeName(), " for ");
          extendsTypeDecl = extendsType.getTypeDeclaration();
       }
       return extendsTypeDecl;

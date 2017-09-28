@@ -13,7 +13,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.util.List;
 
-// WARNING: this JSSetting is not picked up cause we do not compile this with SC so it is replicated in JSRuntimeProcessor manually.
+// WARNING: this JSSetting is not picked up because we do not compile this file with stratacode.   We actually set this in JSRuntimeProcessor manually.
 @sc.js.JSSettings(replaceWith="sc_EditorContext")
 public class JLineInterpreter extends AbstractInterpreter implements Runnable, Completer {
    ConsoleReader input;
@@ -37,6 +37,7 @@ public class JLineInterpreter extends AbstractInterpreter implements Runnable, C
    private void reset() {
       try {
          input = new ConsoleReader();
+         input.setExpandEvents(false); // Otherwise "!" and probably other special chars fail to expand in JLine (e.g. if (foo != bar) -> [ERROR] Could not expand event)
          input.addCompleter(this);
       }
       catch (EOFException exc) {

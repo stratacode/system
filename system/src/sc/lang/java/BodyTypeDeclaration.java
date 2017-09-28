@@ -348,7 +348,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                //
                // This is a tricky thing because for modify definitions, we need to find the modified type before we can determine whether
                // it is a class, object, or enum.  The latter two are resolved differently.
-               if (it.getTypeName().equals(name)) {
+               String statementTypeName = it.getTypeName();
+               if (statementTypeName != null && statementTypeName.equals(name)) {
                   // But do let EnumConstants through
                   if (mtype.contains(MemberType.Enum) && (s instanceof EnumConstant || (s instanceof ModifyDeclaration && ((ModifyDeclaration) s).isEnumConstant()))) {
                      return s;
@@ -1188,15 +1189,20 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public void addBodyStatementIndent(Statement s) {
       initBody();
       TransformUtil.appendIndentIfNecessary(body);
-      checkForStaleAdd();
+      checkForStaleAdd(s);
       body.add(s);
       if (isInitialized() && !s.isInitialized())
          s.init();
    }
 
+   public void checkForStaleAdd(Statement s) {
+      if (!(s instanceof ModifyDeclaration) || !((ModifyDeclaration) s).isEmpty()) // An empty modify will not affect the runtime class and is common just to navigate for the command line interface
+         checkForStaleAdd();
+   }
+
    public void addBodyStatement(Statement s) {
       initBody();
-      checkForStaleAdd();
+      checkForStaleAdd(s);
       body.add(s);
       if (isInitialized() && !s.isInitialized())
          s.init();
@@ -1204,7 +1210,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public void addBodyStatementAt(int ix, Statement s) {
       initBody();
-      checkForStaleAdd();
+      checkForStaleAdd(s);
       if (ix == body.size())
          body.add(s);
       else
@@ -1216,7 +1222,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public void addBodyStatementAtIndent(int ix, Statement s) {
       initBody();
       TransformUtil.appendIndentIfNecessary(body, ix);
-      checkForStaleAdd();
+      checkForStaleAdd(s);
       body.add(ix, s);
       if (isInitialized() && !s.isInitialized())
          s.init();
@@ -2666,7 +2672,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    protected boolean isDynObj(boolean getStatic) {
       if (isHiddenType())
          return false;
-      return isDynamicType() && getDeclarationType() == DeclarationType.OBJECT && isStaticType() == getStatic;
+      return isDynamicNew() && getDeclarationType() == DeclarationType.OBJECT && isStaticType() == getStatic;
    }
 
    private void initDynInstFieldMap() {
@@ -4127,7 +4133,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // If we're dynamic and our extends type is not, we need a stub to encapsulate the functionality of the
       // the extends class.
       else
-         return isDynamicType();
+         return isDynamicNew();
    }
 
    public boolean isDynInnerStub() {
@@ -5532,7 +5538,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       tctx.dynamicType = isDynamicType();
       tctx.dynamicStub = isDynamicStub(false);
-      tctx.dynamicNew = dynamicNew;
+      tctx.dynamicNew = isDynamicNew();
 
       // During initialization, this type might have been turned into a dynamic type from a subsequent layer.
       // Since we do not restart all of the other layers, we won't turn this new guy back into a dynamic type
@@ -6031,7 +6037,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          dynamicType = true;
       }
       // TODO: should we use sys.isClassLoaded here as well as hasInstancesOfType?
-      if (!tctx.dynamicType && (tctx.toAddObjs.size() > 0 || tctx.toAddFields.size() > 0) && sys.hasInstancesOfType(fullTypeName)) {
+      if (!tctx.dynamicNew && (tctx.toAddObjs.size() > 0 || tctx.toAddFields.size() > 0) && sys.hasInstancesOfType(fullTypeName)) {
          if (tctx.toAddFields.size() > 0)
             sys.setStaleCompiledModel(true, "Recompile needed to add fields: " + tctx.toAddFields + " to compiled type: " + fullTypeName);
          if (tctx.toAddObjs.size() > 0)
@@ -6039,7 +6045,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          skipAdd = true;
       }
       if (tctx.newConstructors) {
-         if (tctx.dynamicType && tctx.dynamicStub && sys.isClassLoaded(getCompiledClassName()))
+         if (tctx.dynamicNew && tctx.dynamicStub && sys.isClassLoaded(getCompiledClassName()))
             sys.setStaleCompiledModel(true, "Recompile needed - constructor added to dynamic stub class: " + fullTypeName);
       }
 
@@ -6057,7 +6063,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          boolean classLoaded = sys.isClassLoaded(fullTypeName);
          boolean hasInstances = sys.hasInstancesOfType(fullTypeName);
          // Only a problem if there are any instances of this type outstanding right now
-         if (!tctx.dynamicType) {
+         if (!tctx.dynamicNew) {
             sys.setStaleCompiledModel(true, "Recompile needed: " + typeName + " 's " + (prevExtends ? "previous " : "") + "extends type changed from: " + oldExtType + " to: " + newExtType);
             skipAdd = true;
             skipUpdate = true;
@@ -6191,8 +6197,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public void execBlockStatement(BlockStatement bs, ExecutionContext ctx) {
       // From the IDE at least, we get here with ctx = null and we need a frame to run the code
       if (ctx != null) {
-         if (bs.isStatic())
-            bs.exec(ctx);
+         if (bs.isStatic()) {
+            // We'll will rexecute the static block only if we've already initialized this class.  If not, it's quite
+            // likely we'll need to initialize the class when running the static code which will lead to double initialization
+            if (staticValues != null)
+               bs.exec(ctx);
+         }
          else
             updateInstBlockStatement(bs, ctx);
       }
@@ -6821,7 +6831,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
 
          if (inst == null) {
-            if (isDynamicType()) {
+            if (isDynamicNew()) {
                if (argValues == null)
                   argValues = new Object[0];
                if (outerObj != null)
@@ -6844,7 +6854,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                   else
                      inst = PTypeUtil.createInstance(cl, sig, argValues);
                }
-               needsInit = false;
+               needsInit = true; // TODO: is this right?
             }
          }
 
@@ -6861,7 +6871,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             */
          }
 
-         if (needsInit) { // TODO: this is always false now.  do we need it?
+         if (needsInit) { // TODO: not sure this is needed anymore
             initDynInstance(inst, ctx, true, true, outerObj);
          }
 
