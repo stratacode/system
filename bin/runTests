@@ -1,0 +1,44 @@
+#!/bin/bash
+
+if [ -z "TEST_HOME" ] ; then
+   if [ -z "$BASH_SOURCE" ] ; then 
+      echo "No default source for tests - must set TEST_HOME environment variable to path to test scripts"
+      exit -1
+   fi
+fi
+TEST_HOME=${TEST_HOME:-`dirname $BASH_SOURCE`}
+
+if [ ! -f $TEST_HOME/testEnv ] ; then
+   echo "No testEnv file in TEST_HOME: $TEST_HOME"
+   exit -1
+fi
+
+source $TEST_HOME/testEnv
+
+echo "Running ${SCRIPTS[*]} in ${SCRIPT_DIR} with results in: ${RESULTS_DIR}/${TEST_RUN_NAME} comparing against: $VALIDRESULTS"
+
+if [ ${#SCRIPTS[@]} == 0 ] ; then
+  SCRIPTS=( $(cat $SCRIPT_DIR/allScripts) )
+fi
+
+for SCRIPT in "${SCRIPTS[@]}"
+do
+   FILE="${SCRIPT_DIR}/${SCRIPT}"
+   if [ $f $FILE ] ; then
+      echo "Running test script: $FILE"
+      . "$FILE"
+      if [ $? != 0 ] ; then
+         if [ "$STOP_ON_ERROR" = "1" ] ; then
+            echo "Exiting due to errors running script: $SCRIPT"
+            exit 1
+         else
+            echo "Errors running script: $SCRIPT"
+         fi
+      fi
+   else
+      echo "Error - test script not found: $FILE"
+      exit 1
+   fi
+done
+
+export SCRIPT

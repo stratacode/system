@@ -1,0 +1,90 @@
+# Environment file to be source by runTests or runTest if it's run separately
+
+RESULTS_DIR="/jjv/testResults"
+VALID_RESULTS="/jjv/StrataCode/test/valid"
+# Create a unique name for this test - based on the date plus a suffix to ensure it's unique
+TEST_DATE_TAG=$(date +"%Y_%m_%d")
+
+UPDATE=0
+STOP_ON_ERROR=0
+SCRIPTS=()
+SCRIPT_DIR="/jjv/StrataCode/test/scripts"
+ECHO_ERRORS=0
+ECHO_OUTPUT=0
+INPUT_FILE=""
+
+if [ ! -d $VALIDRESULTS ] ; then
+   echo "Valid results directory: $VALIDRESULTS does not exist"
+   exit 1
+fi
+
+while [[ $# -gt 0 ]]
+do
+   case $1 in
+       --out)
+       RESULTS_DIR="$2"
+       shift 
+       shift 
+       ;;
+       --tag)
+       TEST_RUN_NAME="$2"
+       shift 
+       shift 
+       ;;
+       --input)
+       INPUT_FILE="$2"
+       shift 
+       shift 
+       ;;
+       -u|--update)
+       UPDATE=1
+       shift
+       ;;
+       -v|--echo)
+       ECHO_ERRORS=1
+       ECHO_OUTPUT=1
+       shift
+       ;;
+       -e|--errors)
+       ECHO_ERRORS=1
+       shift
+       ;;
+       -o|--output)
+       ECHO_OUTPUT=1
+       shift
+       ;;
+       -s|--stop)
+       STOP_ON_ERROR=1
+       shift
+       ;;
+       *)
+       echo "Adding script $1"
+       SCRIPTS+=("$1") 
+       shift
+       ;;
+   esac
+done
+
+if [ ! -d $RESULTS_DIR ] ; then
+   echo "Test results directory: $RESULTSDIR does not exist"
+   exit 1
+fi
+
+# Walk through the other tests run on this date to create a unique name
+runIx=0
+while [ -d ${RESULTS_DIR}/${TEST_DATE_TAG}_${runIx} ] ; do
+   ((runIx++))
+done
+
+TEST_RUN_NAME="${TEST_DATE_TAG}_${runIx}"
+
+OUT_DIR="$RESULTS_DIR/$TEST_RUN_NAME/$TEST_RESULTS_NAME"
+
+export RESULTS_DIR
+export VALID_RESULTS
+export TEST_RUN_NAME
+export ECHO_ERRORS
+export ECHO_OUTPUT
+export STOP_ON_ERROR
+export UPDATE
+

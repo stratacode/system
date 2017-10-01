@@ -6,7 +6,7 @@ USE_SC_DIR="${SC_DIR:=/jjv/vbuild}"
 echo "Rebuilding SC - installing into: $USE_SC_DIR"
 
 cd ../../../
-./makeSC.sh $USE_SC_DIR
+./bin/makeSC $USE_SC_DIR
 
 cd $USE_SC_DIR
 rm -rf bin

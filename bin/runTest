@@ -1,0 +1,118 @@
+#!/bin/bash
+
+if [ -z "$RESULTS_DIR" ] ; then
+   # Being run directly from command line
+   if [ -z "TEST_HOME" ] ; then
+      if [ -z "$BASH_SOURCE" ] ; then 
+         echo "No default source for tests - must set TEST_HOME environment variable to path to test scripts"
+         exit -1
+      fi
+   fi
+   TEST_HOME=${TEST_HOME:-`dirname $BASH_SOURCE`}
+
+   if [ ! -f $TEST_HOME/testEnv ] ; then
+      echo "No testEnv file in TEST_HOME: $TEST_HOME"
+      exit -1
+   fi
+
+   source $TEST_HOME/testEnv
+
+   TEST_NAME=${SCRIPTS[0]}
+   ARGS=("${SCRIPTS[@]:1}")
+else
+   # Being run from runTests so args have not been parsed yet
+   ARGS=()
+   TEST_NAME="$1"
+   shift
+
+   while [[ $# -gt 0 ]]
+   do
+      case $1 in
+          --input)
+          INPUT_FILE="$2"
+          shift 
+          shift 
+          ;;
+          *)
+          ARGS+=("$1") 
+          shift
+          ;;
+      esac
+   done
+fi
+
+if [ "${TEST_NAME}" == "" ] ; then
+   echo "Error: test name expected as first argument to runTest"
+   exit -1
+fi
+
+if [ "${#ARGS[@]}" == "0" ] ; then
+   echo "No arguments supplied to runTest: $TEST_NAME"
+   exit -1
+fi
+
+# if we're run from a script, organize the results according to the script for easier navigation
+if [ -z "$SCRIPT" ] ; then
+   TEST_RESULTS_NAME=$TEST_NAME
+else
+   TEST_RESULTS_NAME=$SCRIPT/$TEST_NAME
+fi
+
+OUT_DIR="$RESULTS_DIR/$TEST_RUN_NAME/$TEST_RESULTS_NAME"
+OUT_FILE="$OUT_DIR/out"
+ERR_FILE="$OUT_DIR/error"
+VALID_DIR="$VALID_RESULTS/$TEST_NAME"
+VALID_FILE="$VALID_DIR/valid"
+
+CMD=${ARGS[*]}
+if [ ! -d "$OUT_DIR" ] ; then
+   echo "Creating test output directory: $OUT_DIR"
+   mkdir -p "$OUT_DIR"
+fi
+
+if [ ! -d "$VALID_DIR" ] ; then
+   echo "Warning: creating valid directory"
+   mkdir -p "$VALID_DIR"
+fi
+
+echo "Running $CMD < $INPUT_FILE > $OUT_FILE"
+if [ "$ECHO_OUTPUT" = "1" ] ; then
+   if [ ! -z "$INPUT_FILE" ] ; then
+      $CMD 2>&1 < "$INPUT_FILE" | tee "$OUT_FILE" 
+   else
+      $CMD 2>&1 | tee "$OUT_FILE" 
+   fi
+else
+   if [ ! -z "$INPUT_FILE" ] ; then
+      $CMD 2>&1 < "$INPUT_FILE" &> "$OUT_FILE" 
+   else
+      $CMD 2>&1 &> "$OUT_FILE" 
+   fi
+fi
+
+if [ -f "$VALID_FILE" ] ; then 
+   if diff "$OUT_FILE" "$VALID_FILE" > /dev/null ; then 
+      echo "Success: $TEST_NAME"
+   else
+      echo "Fail: $TEST_NAME - diff $OUT_FILE $VALID_FILE"
+      if [ "$ECHO_ERRORS" = "1" ] ; then
+         diff "$OUT_FILE" "$VALID_FILE" > "$ERR_FILE"
+      fi
+   fi
+else
+   echo "First run for: $TEST_NAME"
+   acceptYN=""
+   while [[ "$acceptYN" != "y" && "$acceptYN" != "n" ]] ; 
+   do
+      read -p "Accept output? [yn] " acceptYN
+      if [[ ! "$acceptYN" =~ [yn] ]] ; then
+          echo "Invalid: $acceptYN - enter y or n"
+      fi
+   done
+   if [ "$acceptYN" = "y" ] ; then
+      cp "$OUT_FILE" "$VALID_FILE"
+      echo "Copied output file $OUT_FILE to valid file: $VALID_FILE"
+   else
+      echo "Not updating test valid file"
+   fi
+fi
