@@ -544,8 +544,15 @@ public class LayerUtil implements LayerConstants {
 
    public static boolean execCommands(List<ProcessBuilder> cmds, String directory, boolean info) {
       for (ProcessBuilder b:cmds) {
-         if (info)
-            System.out.println("Executing: '" + StringUtil.arrayToCommand(b.command().toArray()) + "' in: " + directory);
+         if (info) {
+            String redirStr = "";
+            ProcessBuilder.Redirect redirIn, redirOut;
+            if ((redirIn = b.redirectInput()) != ProcessBuilder.Redirect.PIPE)
+               redirStr = " < " + redirIn.file();
+            if ((redirOut = b.redirectOutput()) != ProcessBuilder.Redirect.PIPE)
+               redirStr += (b.redirectErrorStream() ? " &> " : " > ") + redirOut.file().getPath();
+            System.out.println("Executing: '" + StringUtil.arrayToCommand(b.command().toArray()) + redirStr + "' in: " + directory);
+         }
          if (execCommand(b, directory, null, null) != 0) {
             System.err.println("*** Exec of: " + StringUtil.arrayToCommand(b.command().toArray()) + " failed");
             return false;

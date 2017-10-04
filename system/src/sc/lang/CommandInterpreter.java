@@ -11,7 +11,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
-public class CommandInterpreter extends AbstractInterpreter implements Runnable {
+@sc.js.JSSettings(replaceWith="sc_EditorContext")
+public class CommandInterpreter extends AbstractInterpreter {
    BufferedReader input;
 
    public CommandInterpreter(LayeredSystem sys, BufferedReader inputStream) {

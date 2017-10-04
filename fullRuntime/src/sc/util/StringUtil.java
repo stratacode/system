@@ -5,6 +5,7 @@
 package sc.util;
 
 import java.io.*;
+import java.lang.reflect.Array;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.DecimalFormat;
@@ -115,7 +116,24 @@ public class StringUtil {
       for (int i = 0; i < list.length; i++) {
          if (i != 0)
             sb.append(", ");
-         sb.append(list[i]);
+         Object listElem = list[i];
+         if (listElem instanceof Object[]) {
+            sb.append("[");
+            sb.append(arrayToString((Object[]) listElem));
+            sb.append("]");
+         }
+         // for int[] etc
+         else if (listElem != null && listElem.getClass().isArray()) {
+            sb.append("[");
+            for (int j = 0; j < Array.getLength(listElem); j++) {
+               if (j != 0)
+                  sb.append(", ");
+               sb.append(Array.get(listElem, j));
+            }
+            sb.append("]");
+         }
+         else
+            sb.append(list[i]);
       }
       return sb.toString();
    }

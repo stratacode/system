@@ -201,6 +201,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    transient public boolean temporaryType;
 
+   /** Set to true for types manipulated in the command line, so we know to make them live-dynamic types by default */
+   transient public boolean liveDynType = false;
+
    public Layer getLayer() {
       return layer;
    }
@@ -2722,6 +2725,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if (index == 0)
             return obj;
          index--;
+         if (index >= locInstFields.length)
+            throw new IllegalArgumentException("*** Error - invalid field index"); // More of an internal error?  We did not update the type for some new field that was added?
          return locInstFields[index];
       }
       else {
@@ -3751,6 +3756,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public boolean getLiveDynamicTypesAnnotation() {
+      if (liveDynType)
+         return true;
       Object setting = getCompilerSetting("liveDynamicTypes");
       // By default, only turn this on for components and objects so we are not tracking every class by default
       if (setting == null)
@@ -4999,8 +5006,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                // For hidden types, it's already in the hiddenBody
                if (innerType.getEnclosingType() != this)
                    addBodyStatementIndent(innerType);
-               if (overridden instanceof BodyTypeDeclaration)
+               if (overridden instanceof BodyTypeDeclaration) {
                   ((BodyTypeDeclaration) overridden).updateType(innerType, ctx, TypeUpdateMode.Add, updateInstances, info);
+               }
                return innerType;
             }
             else {
@@ -5990,6 +5998,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
     * we are adding a new layered version of this type.  In other words, adding a new modify that modifies this type.
     */
    public void updateType(BodyTypeDeclaration newType, ExecutionContext ctx, TypeUpdateMode updateMode, boolean updateInstances, UpdateInstanceInfo info) {
+      if (info == null && updateInstances)
+         System.out.println("*** Error - no update instance info and updating instances");
       if (typeName == null || newType.typeName == null) {
          displayError("updateType - skipping update for type with no name.");
          return;

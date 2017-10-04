@@ -15,7 +15,7 @@ fi
 
 source $TEST_HOME/testEnv
 
-echo "Running ${SCRIPTS[*]} in ${SCRIPT_DIR} with results in: ${RESULTS_DIR}/${TEST_RUN_NAME} comparing against: $VALIDRESULTS"
+echo "Running ${SCRIPTS[*]} in ${SCRIPT_DIR} with results in: ${RESULTS_DIR}/${TEST_RUN_NAME} comparing against: $VALID_RESULTS"
 
 if [ ${#SCRIPTS[@]} == 0 ] ; then
   SCRIPTS=( $(cat $SCRIPT_DIR/allScripts) )
@@ -25,6 +25,7 @@ for SCRIPT in "${SCRIPTS[@]}"
 do
    FILE="${SCRIPT_DIR}/${SCRIPT}"
    if [ $f $FILE ] ; then
+      export SCRIPT
       echo "Running test script: $FILE"
       . "$FILE"
       if [ $? != 0 ] ; then
@@ -41,4 +42,66 @@ do
    fi
 done
 
-export SCRIPT
+if [ -d "$RUN_DIR" ] ; then
+   if [ -f "$RUN_DIR/new" ] ; then
+      echo "First run tests - `wc -l < $RUN_DIR/new` found:"
+      cat "$RUN_DIR/new"
+
+      acceptYN=""
+      while [[ "$acceptYN" != "y" && "$acceptYN" != "n" ]] ; 
+      do
+         read -p "Accept all new output? [yn] " acceptYN
+         if [[ ! "$acceptYN" =~ [yn] ]] ; then
+             echo "Invalid: $acceptYN - enter y or n"
+         fi
+      done
+
+      if [ "$acceptYN" = "y" ] ; then 
+         newTests=($(cat ${RUN_DIR}/new))
+
+         for newTest in "${newTests[@]}"
+         do
+            echo "Updating valid file for $newTest"
+            OUT_DIR="$RUN_DIR/$newTest"
+            VALID_DIR="$VALID_RESULTS/$newTest"
+            cp "$OUT_DIR/out" "$VALID_DIR/out"
+            cp "$OUT_DIR/status" "$VALID_DIR/status"
+            cp "$OUT_DIR/cmd" "$VALID_DIR/cmd"
+         done
+      fi
+
+   fi
+   if [ -f "$RUN_DIR/failed" ] ; then
+      echo "Passed: `wc -l < $RUN_DIR/passed` Errors: `wc -l < $RUN_DIR/failed` of total: `wc -l < $RUN_DIR/testsRun`"
+      echo "Failed tests ---- :"
+      cat "$RUN_DIR/failed"
+
+      acceptYN=""
+      while [[ "$acceptYN" != "y" && "$acceptYN" != "n" ]] ; 
+      do
+         read -p "Accept all new results? [yn] " acceptYN
+         if [[ ! "$acceptYN" =~ [yn] ]] ; then
+             echo "Invalid: $acceptYN - enter y or n"
+         fi
+      done
+
+      if [ "$acceptYN" = "y" ] ; then 
+         testArray=($(cat ${RUN_DIR}/failed))
+
+         for testName in "${testArray[@]}"
+         do
+            echo "Updating valid file for $testName"
+            OUT_DIR="$RUN_DIR/$testName"
+            VALID_DIR="$VALID_RESULTS/$testName"
+            cp "$OUT_DIR/out" "$VALID_DIR/out"
+            cp "$OUT_DIR/status" "$VALID_DIR/status"
+            cp "$OUT_DIR/cmd" "$VALID_DIR/cmd"
+         done
+      fi
+   elif [ -f "$RUN_DIR/passed" ] ; then 
+       echo "All passed: `wc -l < $RUN_DIR/passed`" 
+   fi
+else
+   echo "Something went wrong - no test run directory: $RUN_DIR"
+   exit 1
+fi

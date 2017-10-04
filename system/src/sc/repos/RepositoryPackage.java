@@ -613,6 +613,11 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
             if (!sources[i].equals(oldPkg.sources[i]))
                return false;
       }
+      // The current source changed
+      else if (!currentSource.equals(oldPkg.currentSource)) {
+         MessageHandler.info(getRepositorySystem().msg, "Package ", packageName, " - source changed from: " + oldPkg.currentSource + " to: " + currentSource);
+         return false;
+      }
 
       fileNames = oldPkg.fileNames;
       definesClasses = oldPkg.definesClasses;

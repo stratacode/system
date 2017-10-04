@@ -15,7 +15,7 @@ import java.util.List;
 
 // WARNING: this JSSetting is not picked up because we do not compile this file with stratacode.   We actually set this in JSRuntimeProcessor manually.
 @sc.js.JSSettings(replaceWith="sc_EditorContext")
-public class JLineInterpreter extends AbstractInterpreter implements Runnable, Completer {
+public class JLineInterpreter extends AbstractInterpreter implements Completer {
    ConsoleReader input;
 
    public JLineInterpreter(LayeredSystem sys) {
@@ -141,6 +141,8 @@ public class JLineInterpreter extends AbstractInterpreter implements Runnable, C
    }
 
    public int getTermWidth() {
+      if (system.options.testVerifyMode) // allow the logs to look the same
+         return super.getTermWidth();
       return input.getTerminal().getWidth();
    }
 }

@@ -294,7 +294,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** A global setting turned on when in the IDE.  If true the original runtime is always 'java' - the default.  In the normal build env, if there's only one runtime, we never create the default runtime. */
    public static boolean javaIsAlwaysDefaultRuntime = false;
 
-   JLineInterpreter cmd;
+   AbstractInterpreter cmd;
 
    public IExternalModelIndex externalModelIndex = null;
 
@@ -1186,11 +1186,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       // We only need to do this on Windows when run from IntelliJ or Cygwin.  It seems like jline works fine when you run from the cmd prompt
       // but not sure how to tell the difference.  The WindowsTerminal will hang on cygwin and when running in the debugger on windows.
+      // TODO: validate these problems now with JLine2
       if (FileUtil.PATH_SEPARATOR_CHAR == ';' && System.getProperty("jline.terminal") == null)
          System.setProperty("jline.terminal", "jline.UnsupportedTerminal");
 
-      if (startInterpreter)
+      if (startInterpreter) {
+         if (System.console() == null) {
+            jline.TerminalFactory.configure("off");
+         }
+
+         // Need to fix the CommandInterpreter - it cannot handle empty package names in dialogs
+         //cmd = System.console() != null ? new JLineInterpreter(this) : new CommandInterpreter(this, System.in);
          cmd = new JLineInterpreter(this);
+      }
 
       if (newLayerDir == null) {
          // If the layer path is explicitly specified, by default we store new files in the last
@@ -3329,6 +3337,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       /** Diagnose issues finding classes (e.g. to trace adding entries to the package index) */
       @Constant public boolean verboseClasses = false;
       @Constant public boolean verboseLocks = false;
+      /** Set to true when collecting the logs as a 'verification file' - a signal to not output dates, or other info that will vary from run to run */
+      @Constant public boolean testVerifyMode = false;
       @Constant public boolean info = true;
       /** Controls whether java files compiled by this system debuggable */
       @Constant public boolean debug = true;
@@ -3766,6 +3776,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   }
                   else if (opt.equals("vp"))
                      PerfMon.enabled = true;
+                  else if (opt.equals("vt"))
+                     options.testVerifyMode = true;
                   else if (opt.equals("v"))
                      traceNeedsGenerate = options.verbose = true;
                   else
@@ -3823,7 +3835,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          StringBuilder sb = new StringBuilder();
          sb.append("Running: scc ");
          for (String varg:args) {
-            sb.append(varg);
+            if (options.testVerifyMode && varg.matches("/tmp/restart\\d+.tmp"))
+               sb.append("/tmp/restart<pid>.tmp");
+            else
+               sb.append(varg);
             sb.append(" ");
          }
          System.out.println(sb);
@@ -4777,6 +4792,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          File f = new File(pathName);
          if (!f.isDirectory() && !f.canRead())
             break;
+         // Always use the same temp layer for test mode so we don't have different path names and layer names in
+         // the output to mess up the test verification.   Also keeps these temp layers from piling up
+         else if (options.testVerifyMode) {
+            FileUtil.removeDirectory(pathName);
+            break;
+         }
          ix++;
       } while (true);
       Layer layer = new Layer();
@@ -5285,7 +5306,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             startLayers(layer);
 
             if (saveModel) {
-               addNewModel(layer.model, null, null, true);
+               addNewModel(layer.model, null, null, null, true, true);
             }
 
             ArrayList<ModelToUpdate> res = updateLayers(newLayerPos, ctx);
@@ -5443,6 +5464,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                          "   [ -c ]: Generate and compile only - do not run any main methods\n" +
                          "   [ -v ]: Verbose info about the layered system.  [-vb ] [-vba] Trace data binding (or trace all) [-vs] [-vsa] [-vsv] [-vsp] Trace options for the sync system: trace, traceAll, verbose-inst, verbose-inst+props \n" +
                          "   [ -vh ]: verbose html [ -vha ]: trace html [ -vl ]: display initial layers [ -vp ] turn on performance monitoring [ -vc ]: info on loading of class files\n" +
+                         "   [ -vt ]: trace verify mode enabled - a flag to omit inconsistent data in the logged info - so the output becomes a trace verify file we can compare from run to run\n" +
                          "   [ -f <file-list>]: Process/compile only these files\n" +
                          "   [ -cp <classPath>]: Use this classpath for resolving compiled references.\n" +
                          "   [ -lp <layerPath>]: Set of directories to search in order for layer directories.\n" +
@@ -7563,8 +7585,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // Commands that specify a layer argument should only be run when building layers which extend that layer unless it's the final build layer
          if (definedInLayer == null || handler.definedInLayer == null || definedInLayer.extendsLayer(handler.definedInLayer) || definedInLayer == buildLayer) {
             String[] args = handler.getExecArgs(sys, templateArg);
-            if (args != null)
-               pbs.add(new ProcessBuilder(args));
+            String inputFile = handler.redirInputFile;
+            String outputFile = handler.redirOutputFile;
+            boolean redirErrors = handler.redirErrors;
+            if (args != null) {
+               ProcessBuilder pb = new ProcessBuilder(args);
+               if (inputFile != null)
+                  pb.redirectInput(new File(inputFile));
+               if (outputFile != null)
+                  pb.redirectOutput(new File(outputFile));
+               if (redirErrors)
+                  pb.redirectErrorStream(true);
+               pbs.add(pb);
+            }
          }
       }
       return pbs;
@@ -7766,7 +7799,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (!langModel.isInitialized())
                ParseUtil.initComponent(langModel);
             if (!langModel.isAdded())
-               addNewModel(langModel, genLayer.getNextLayer(), null, langModel instanceof JavaModel && ((JavaModel) langModel).isLayerModel);
+               addNewModel(langModel, genLayer.getNextLayer(), null, null, langModel instanceof JavaModel && ((JavaModel) langModel).isLayerModel, false);
 
             verbose("Preparing from model cache " + toGenEnt + ", runtime: " + getRuntimeName());
          }
@@ -8664,8 +8697,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
 
-      if (bd.numModelsToTransform > 0 && options.info)
-         info("Processing: " + bd.numModelsToTransform + " files in the " + getRuntimeName() + " runtime for build layer: " + genLayer.getLayerName());
+      if (bd.numModelsToTransform > 0 && options.info) {
+         info("Processing: " + (options.testVerifyMode ? "" : bd.numModelsToTransform) + " files in the " + getRuntimeName() + " runtime for build layer: " + genLayer.getLayerName());
+      }
 
       /** We also need to pre-compute the set of typeGroupChangedModels so that we can accurately determine the stale entries we have in the build info */
       /** TODO: This type group stuff is not quite right when dealing with incremental compiles
@@ -9233,8 +9267,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   if (messageHandler != null)
                      messageHandler.reportMessage("Compiling Java: " + bd.toCompile.size() + " files into " + genLayer.getBuildClassesDir(), null, -1, -1, MessageType.Info);
                }
-               else if (options.info)
-                  info("Compiling Java: " + bd.toCompile.size() + " files into " + genLayer.getBuildClassesDir());
+               else if (options.info) {
+                  if (options.testVerifyMode) // avoiding the # of files in the test verify output
+                     info("Compiling Java files into " + genLayer.getBuildClassesDir());
+                  else
+                     info("Compiling Java: " + bd.toCompile.size() + " files into " + genLayer.getBuildClassesDir());
+               }
 
                PerfMon.start("javaCompile");
                HashSet<String> errorFiles = new HashSet<String>();
@@ -10305,7 +10343,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
          beingLoaded.remove(copySrcEnt.absFileName);
 
-         addNewModel(copy, peerLayer.getNextLayer(), null, false);
+         addNewModel(copy, peerLayer.getNextLayer(), null, null, false, false);
       }
       else
          System.err.println("*** Error cloned model in layer not started");
@@ -10549,8 +10587,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
             buildSystem(null, false, false);
          }
-         else {
-            info("No changed files detected - skipping buildSystem");
+         else if (!options.testVerifyMode) {
+            verbose("No changed files detected - skipping buildSystem");
          }
 
          if (peerSystems != null && !peerMode) {
@@ -10885,12 +10923,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
             else if (newModel.modifiesModel()) {
                if (addModel)
-                  addNewModel(newModel, srcEnt.layer, null, false);
+                  addNewModel(newModel, srcEnt.layer, null, updateInfo, false, true);
                newModel.updateLayeredModel(ctx, activated, updateInfo);
             }
             // Make sure this gets added so we don't get keep doing it over and over again
             else if (addModel) {
-               addNewModel(newModel, srcEnt.layer, null, false);
+               addNewModel(newModel, srcEnt.layer, null, updateInfo, false, true);
                // Register the new type here so we can notify listeners when the type has been fully initialized
                if (updateInfo != null) {
                   Map<String,TypeDeclaration> types = newModel.getDefinedTypes();
@@ -10938,7 +10976,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (result instanceof ILanguageModel) {
          ILanguageModel model = (ILanguageModel) result;
 
-         addNewModel(model, fromLayer, null, isLayer);
+         addNewModel(model, fromLayer, null, null, isLayer, false);
       }
       else if (result instanceof ParseError) {
          addTypeByName(srcEnt.layer, srcEnt.getTypeName(), INVALID_TYPE_DECLARATION_SENTINEL, fromLayer);
@@ -10946,20 +10984,28 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return result;
    }
 
-   public void addNewModel(ILanguageModel model, Layer fromLayer, ExecutionContext ctx, boolean isLayer) {
+   public void addNewModel(ILanguageModel model, Layer fromLayer, ExecutionContext ctx, UpdateInstanceInfo updateInfo, boolean isLayer, boolean updateInstances) {
       model.setAdded(true);
       SrcEntry srcEnt = model.getSrcFile();
       Layer srcEntLayer = srcEnt.layer;
+      boolean active = false;
       if (srcEntLayer != null) {
          if (!isLayer && srcEntLayer.activated) {
             // Now we can get its types and info.
             addTypesByName(srcEntLayer, model.getPackagePrefix(), model.getDefinedTypes(), fromLayer);
+            active = true;
          }
          // Also register it in the layer model index
          srcEntLayer.layerModels.add(new IdentityWrapper(model));
       }
 
-      updateModelIndex(srcEnt, model, ctx);
+      if (updateInfo == null && active && updateInstances)
+         updateInfo = new UpdateInstanceInfo();
+
+      updateModelIndex(srcEnt, model, ctx, updateInfo);
+
+      if (updateInfo != null)
+         updateInfo.updateInstances(ctx);
    }
 
    public void addNewDirectory(String dirPath) {
@@ -11127,7 +11173,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   private void updateModelIndex(SrcEntry srcEnt, ILanguageModel model, ExecutionContext ctx) {
+   private void updateModelIndex(SrcEntry srcEnt, ILanguageModel model, ExecutionContext ctx, UpdateInstanceInfo updateInfo) {
       String absName = srcEnt.absFileName;
       ILanguageModel oldModel = getCachedModel(srcEnt, false);
       // getLanguageModel might load the model into the cache but not put it into the type system, even if it's active.  We call this again from addNew
@@ -11148,7 +11194,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             //newModel.replacesModel = (JavaModel) oldModel;
             if (!newModel.isLayerModel) {
                if (oldModel instanceof JavaModel && !batchingModelUpdates)
-                  ((JavaModel) oldModel).updateModel(newModel, ctx, TypeUpdateMode.Replace, false, null);
+                  ((JavaModel) oldModel).updateModel(newModel, ctx, TypeUpdateMode.Replace, false, updateInfo);
                else if (layer != null && layer.activated)
                   newModel.replacesModel = (JavaModel) oldModel;
             }
@@ -11156,7 +11202,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          else if (newModel.modifiesModel()) {
             if (ctx != null) {
                // We've found a change to a model not inside of a managed "addLayers" ooperation.  Maybe we're compiling a layer and we see a change at that point or maybe we've just created a new empty type from the command line.  Probably should change this to somehow batch up the UpdateInstanceInfo and apply that change when we hit the addLayer operation that triggered the build.  But in the empty case, there's no changes to apply
-               newModel.updateLayeredModel(ctx, true, null);
+               newModel.updateLayeredModel(ctx, true, updateInfo);
             }
          }
       }
@@ -11284,7 +11330,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             */
             if (isActivated(srcEnt.layer)) { System.err.println("*** not reached!!!");
                if (!extModel.isAdded())
-                  addNewModel(extModel, srcEnt.layer.getNextLayer(), null, extModel instanceof JavaModel && ((JavaModel) extModel).isLayerModel);
+                  addNewModel(extModel, srcEnt.layer.getNextLayer(), null, null, extModel instanceof JavaModel && ((JavaModel) extModel).isLayerModel, false);
             }
             else
                updateModelIndex(extModel.getLayer(), extModel, srcEnt.absFileName);
@@ -12343,7 +12389,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             model = (ILanguageModel) result;
             if (model.getLayer() != null && model.getLayer().activated)
                System.out.println("*** Error - adding activated model to inactive index");
-            addNewModel(model, null, null, (model instanceof JavaModel && ((JavaModel) model).isLayerModel));
+            addNewModel(model, null, null, null, (model instanceof JavaModel && ((JavaModel) model).isLayerModel), false);
          }
       }
       if (model instanceof JavaModel)
@@ -15061,7 +15107,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                JavaModel otherJavaModel = (JavaModel) otherModel;
                Layer otherLayer = otherModel.getLayer();
                ILanguageModel clonedModel = peerSys.cloneModel(otherLayer, (JavaModel) model);
-               peerSys.addNewModel(clonedModel, null, null, otherJavaModel.isLayerModel);
+               peerSys.addNewModel(clonedModel, null, null, null, otherJavaModel.isLayerModel, false);
             }
          }
       }

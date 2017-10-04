@@ -28,7 +28,7 @@ import java.io.*;
 import java.util.*;
 import sc.dyn.ScheduledJob;
 
-public abstract class AbstractInterpreter extends EditorContext implements IScheduler {
+public abstract class AbstractInterpreter extends EditorContext implements IScheduler, Runnable {
    static SCLanguage vlang = SCLanguage.INSTANCE;
 
    StringBuffer pendingInput = new StringBuffer();
@@ -392,6 +392,9 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
          String origTypeName = type.typeName;
 
+         // By default, we'd like to the live dynamic types feature for types manipulated in the command line
+         type.liveDynType = true;
+
          if (addToType) {
             BodyTypeDeclaration origType = type;
             type = addToCurrentType(model, parentType, type);
@@ -657,6 +660,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    private BodyTypeDeclaration addToCurrentType(JavaModel model, BodyTypeDeclaration parentType, BodyTypeDeclaration type) {
       if (parentType == null) {
          TypeDeclaration newTD = (TypeDeclaration) type;
+         newTD.liveDynType = true;
          model.addTypeDeclaration(newTD);
          // This optimization let's us avoid an extra dynamic stub for empty classes but in the interpreter we are likely
          // going to need that dynamic stub so just clear it to avoid a restart.
@@ -673,7 +677,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             vlang.generate(model, false);
 
          // Make sure others can resolve this new type
-         model.layeredSystem.addNewModel(model, null, execContext, false);
+         model.layeredSystem.addNewModel(model, null, execContext, null, false, true);
 
          return type;
       }
@@ -701,7 +705,10 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                }
             }
          }
-         return parentType.updateInnerType(type, execContext, true, null, true);
+         UpdateInstanceInfo info = new UpdateInstanceInfo();
+         BodyTypeDeclaration resType = parentType.updateInnerType(type, execContext, true, info, true);
+         info.updateInstances(execContext);
+         return resType;
       }
    }
 
@@ -1133,7 +1140,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    }
 
    public int getTermWidth() {
-      return 80;
+      return 100;
    }
 
    public void initReadThread() {
@@ -1159,4 +1166,6 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    public void addDialogAnswer(String dialogName, Object value) {
       DialogManager.addDialogAnswer(dialogName, value);
    }
+
+   public abstract boolean readParseLoop();
 }

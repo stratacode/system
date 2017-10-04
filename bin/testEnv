@@ -9,9 +9,10 @@ UPDATE=0
 STOP_ON_ERROR=0
 SCRIPTS=()
 SCRIPT_DIR="/jjv/StrataCode/test/scripts"
-ECHO_ERRORS=0
+ECHO_ERRORS=1
 ECHO_OUTPUT=0
 INPUT_FILE=""
+INTERACTIVE=0
 
 if [ ! -d $VALIDRESULTS ] ; then
    echo "Valid results directory: $VALIDRESULTS does not exist"
@@ -21,7 +22,7 @@ fi
 while [[ $# -gt 0 ]]
 do
    case $1 in
-       --out)
+       --results-dir)
        RESULTS_DIR="$2"
        shift 
        shift 
@@ -31,7 +32,7 @@ do
        shift 
        shift 
        ;;
-       --input)
+       -i|--input)
        INPUT_FILE="$2"
        shift 
        shift 
@@ -40,17 +41,19 @@ do
        UPDATE=1
        shift
        ;;
-       -v|--echo)
-       ECHO_ERRORS=1
-       ECHO_OUTPUT=1
+       -p|--prompt)
+       INTERACTIVE=1
        shift
        ;;
-       -e|--errors)
+       -v|--verbose)
        ECHO_ERRORS=1
+       ECHO_OUTPUT=1
+       echo "Verbose output and errors enabled"
        shift
        ;;
-       -o|--output)
-       ECHO_OUTPUT=1
+       -q|--quiet)
+       ECHO_ERRORS=0
+       echo "Quiet mode: no error or test output displayed"
        shift
        ;;
        -s|--stop)
@@ -58,15 +61,18 @@ do
        shift
        ;;
        *)
-       echo "Adding script $1"
-       SCRIPTS+=("$1") 
-       shift
+       # All test options must be in front - Rest of the args go for the list of scripts or the arguments to the command we are running
+       while [[ $# -gt 0 ]]
+       do
+          SCRIPTS+=("$1") 
+          shift
+       done
        ;;
    esac
 done
 
 if [ ! -d $RESULTS_DIR ] ; then
-   echo "Test results directory: $RESULTSDIR does not exist"
+   echo "Test results directory: $RESULTS_DIR does not exist"
    exit 1
 fi
 
@@ -77,14 +83,17 @@ while [ -d ${RESULTS_DIR}/${TEST_DATE_TAG}_${runIx} ] ; do
 done
 
 TEST_RUN_NAME="${TEST_DATE_TAG}_${runIx}"
+RUN_DIR="$RESULTS_DIR/$TEST_RUN_NAME"
 
 OUT_DIR="$RESULTS_DIR/$TEST_RUN_NAME/$TEST_RESULTS_NAME"
 
 export RESULTS_DIR
+export RUN_DIR
 export VALID_RESULTS
 export TEST_RUN_NAME
 export ECHO_ERRORS
 export ECHO_OUTPUT
+export INTERACTIVE
 export STOP_ON_ERROR
 export UPDATE
 

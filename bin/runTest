@@ -1,5 +1,12 @@
 #!/bin/bash
 
+TEST_NAME=$1
+if [ "${TEST_NAME}" == "" ] ; then
+   echo "Error: test name expected as first argument to: runTest <testName> [--input stdin file] [other test options] commands to run in test"
+   exit -1
+fi
+shift
+
 if [ -z "$RESULTS_DIR" ] ; then
    # Being run directly from command line
    if [ -z "TEST_HOME" ] ; then
@@ -17,19 +24,17 @@ if [ -z "$RESULTS_DIR" ] ; then
 
    source $TEST_HOME/testEnv
 
-   TEST_NAME=${SCRIPTS[0]}
-   ARGS=("${SCRIPTS[@]:1}")
+   ARGS=("${SCRIPTS[@]}")
+   INTERACTIVE=1
 else
    # Being run from runTests so args have not been parsed yet
    ARGS=()
-   TEST_NAME="$1"
-   shift
-
    while [[ $# -gt 0 ]]
    do
       case $1 in
           --input)
           INPUT_FILE="$2"
+          INPUT_FILE_REDIR=" < $2"
           shift 
           shift 
           ;;
@@ -41,41 +46,36 @@ else
    done
 fi
 
-if [ "${TEST_NAME}" == "" ] ; then
-   echo "Error: test name expected as first argument to runTest"
-   exit -1
-fi
-
 if [ "${#ARGS[@]}" == "0" ] ; then
    echo "No arguments supplied to runTest: $TEST_NAME"
    exit -1
 fi
 
-# if we're run from a script, organize the results according to the script for easier navigation
-if [ -z "$SCRIPT" ] ; then
-   TEST_RESULTS_NAME=$TEST_NAME
-else
-   TEST_RESULTS_NAME=$SCRIPT/$TEST_NAME
-fi
-
-OUT_DIR="$RESULTS_DIR/$TEST_RUN_NAME/$TEST_RESULTS_NAME"
+OUT_DIR="$RUN_DIR/$TEST_NAME"
 OUT_FILE="$OUT_DIR/out"
-ERR_FILE="$OUT_DIR/error"
+STATUS_FILE="$OUT_DIR/status"
+CMD_FILE="$OUT_DIR/cmd"
+DIFF_FILE="$OUT_DIR/diff"
 VALID_DIR="$VALID_RESULTS/$TEST_NAME"
-VALID_FILE="$VALID_DIR/valid"
+VALID_FILE="$VALID_DIR/out"
+VALID_STATUS_FILE="$VALID_DIR/status"
 
 CMD=${ARGS[*]}
 if [ ! -d "$OUT_DIR" ] ; then
-   echo "Creating test output directory: $OUT_DIR"
    mkdir -p "$OUT_DIR"
+else
+   echo "Error test output directory: $OUT_DIR already exists.  Duplicate test name: $TEST_NAME in script: $SCRIPT"
+   exit -1
 fi
 
 if [ ! -d "$VALID_DIR" ] ; then
-   echo "Warning: creating valid directory"
+   echo "Warning: new test found: $TEST_NAME - creating new directory to store valid results: $VALID_DIR"
    mkdir -p "$VALID_DIR"
 fi
 
-echo "Running $CMD < $INPUT_FILE > $OUT_FILE"
+echo "Running test $TEST_NAME: ${CMD}${INPUT_FILE_REDIR} > $OUT_FILE"
+echo "$TEST_NAME" >> "${RUN_DIR}/testsRun"
+touch "${RUN_DIR}/passed"
 if [ "$ECHO_OUTPUT" = "1" ] ; then
    if [ ! -z "$INPUT_FILE" ] ; then
       $CMD 2>&1 < "$INPUT_FILE" | tee "$OUT_FILE" 
@@ -90,29 +90,69 @@ else
    fi
 fi
 
+STATUS="$?"
+if [ "$STATUS" = 130 ] ; then
+   echo "Test $TEST_NAME interrupted"
+   exit 130
+fi
+
+if [ $STATUS != 0 ] ; then
+    echo "Warning: test exited with status: $STATUS"
+fi
+echo "$STATUS" > "$STATUS_FILE"
+
+if [ ! -z "$INPUT_FILE" ] ; then
+   echo "$CMD" > "$CMD_FILE"
+else
+   echo "$CMD > $INPUT_FILE" > "$CMD_FILE"
+fi
+
+SUCCESS=0
 if [ -f "$VALID_FILE" ] ; then 
    if diff "$OUT_FILE" "$VALID_FILE" > /dev/null ; then 
-      echo "Success: $TEST_NAME"
+      if diff "$STATUS_FILE" "$VALID_STATUS_FILE" > /dev/null ; then 
+         echo "Success: $TEST_NAME"
+         SUCCESS=1
+         echo "$TEST_NAME" >> "${RUN_DIR}/passed"
+      else
+         echo "Test exit status changed: $TEST_NAME - diff $STATUS_FILE $VALID_STATUS_FILE"
+         echo "$TEST_NAME" >> "${RUN_DIR}/failed"
+         if [ "$ECHO_ERRORS" = "1" ] ; then
+            diff "$STATUS_FILE" "$VALID_STATUS_FILE" 
+         fi
+      fi
    else
       echo "Fail: $TEST_NAME - diff $OUT_FILE $VALID_FILE"
+      echo "$TEST_NAME" >> "${RUN_DIR}/failed"
+      diff "$OUT_FILE" "$VALID_FILE" > "$DIFF_FILE"
       if [ "$ECHO_ERRORS" = "1" ] ; then
-         diff "$OUT_FILE" "$VALID_FILE" > "$ERR_FILE"
+         diff "$STATUS_FILE" "$VALID_STATUS_FILE"
+         diff "$OUT_FILE" "$VALID_FILE" 
       fi
    fi
 else
-   echo "First run for: $TEST_NAME"
+   echo "First run for: $TEST_NAME stored in $OUT_FILE"
+   echo "$TEST_NAME" >> "${RUN_DIR}/new"
+   if [ "$ECHO_ERRORS" = "1" ] ; then
+      cat "$OUT_FILE"
+   fi
+fi
+
+if [[ "$SUCCESS" = 0 && "$INTERACTIVE" = 1 ]] ; then
    acceptYN=""
    while [[ "$acceptYN" != "y" && "$acceptYN" != "n" ]] ; 
    do
-      read -p "Accept output? [yn] " acceptYN
+      read -p "Accept new output? [yn] " acceptYN
       if [[ ! "$acceptYN" =~ [yn] ]] ; then
           echo "Invalid: $acceptYN - enter y or n"
       fi
    done
    if [ "$acceptYN" = "y" ] ; then
       cp "$OUT_FILE" "$VALID_FILE"
-      echo "Copied output file $OUT_FILE to valid file: $VALID_FILE"
+      cp "$STATUS_FILE" "$VALID_STATUS_FILE"
+      cp "$CMD_FILE" "$VALID_CMD_FILE"
+      echo "Accepted new output file $OUT_FILE as valid: $VALID_FILE"
    else
-      echo "Not updating test valid file"
+      echo "Did not accept $OUT_FILE - valid file remains: $VALID_FILE"
    fi
 fi

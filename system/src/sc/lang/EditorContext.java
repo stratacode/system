@@ -717,7 +717,7 @@ public class EditorContext extends ClientEditorContext {
          ParseUtil.initAndStartComponent(newModel);
 
       // Make sure others can resolve this new type
-      system.addNewModel(newModel, null, execContext, false);
+      system.addNewModel(newModel, null, execContext, null, false, true);
 
       system.notifyModelListeners(newModel);
 

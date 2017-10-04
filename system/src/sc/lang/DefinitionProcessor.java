@@ -81,7 +81,7 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
    public void start(Definition def) {
       if (typeGroupName != null) {
          if (!(def instanceof TypeDeclaration)) {
-            if (!(def instanceof TypedDefinition))
+            if (!(def instanceof TypedDefinition) && !(def instanceof PropertyAssignment))
                 def.displayError(toErrorString() + " only allowed on class/object, field, method for: ");
          }
          else

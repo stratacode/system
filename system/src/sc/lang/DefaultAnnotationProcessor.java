@@ -9,6 +9,9 @@ import sc.lang.java.Definition;
 
 /** Extend the class to get default implementations of the IAnnotationProcessor interface */
 public class DefaultAnnotationProcessor extends DefinitionProcessor implements IAnnotationProcessor {
+   public boolean setOnField = true;
+   public boolean setOnGetMethod = false;
+   public boolean setOnSetMethod = false;
    // Not implemented
    //public void init(Definition def, Annotation annot) {
    //}
@@ -26,15 +29,15 @@ public class DefaultAnnotationProcessor extends DefinitionProcessor implements I
    }
 
    public boolean setOnField() {
-      return true;
+      return setOnField;
    }
 
    public boolean setOnGetMethod() {
-      return false;
+      return setOnGetMethod;
    }
 
    public boolean setOnSetMethod() {
-      return false;
+      return setOnSetMethod;
    }
 
    protected String toErrorString() {

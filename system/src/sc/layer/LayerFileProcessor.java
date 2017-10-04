@@ -299,5 +299,7 @@ public class LayerFileProcessor extends LayerFileComponent {
          newRes.addAll(Arrays.asList(toAdd));
          patterns = newRes.toArray(new String[newRes.size()]);
       }
+      else
+         patterns = toAdd;
    }
 }
