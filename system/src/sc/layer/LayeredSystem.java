@@ -4008,7 +4008,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             sys.buildInfo.runMatchingTests(options.testPattern);
          }
 
-         if (options.verbose) {
+         if (options.verbose && !options.testVerifyMode) {
             sys.verbose("Prepared runtime: " + StringUtil.formatFloat((System.currentTimeMillis() - sys.sysStartTime)/1000.0));
          }
 
@@ -4039,7 +4039,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             sys.runRunCommands();
          }
 
-         if (options.verbose) {
+         if (options.verbose && !options.testVerifyMode) {
             sys.verbose("Run completed in: " + StringUtil.formatFloat((System.currentTimeMillis() - sys.sysStartTime)/1000.0) + " at: " + new Date().toString());
          }
 
@@ -4543,7 +4543,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   // These object references also need to get reloaded into the new class loader scheme
                   buildInfo.reload();
 
-                  if (options.verbose)
+                  if (options.verbose && !options.testVerifyMode)
                      System.out.println("Build of the " + getRuntimeName() + " runtime completed in: " + StringUtil.formatFloat((System.currentTimeMillis() - buildStartTime)/1000.0));
                   if (options.verbose && Parser.ENABLE_STATS) {
                      System.out.println("Parser stats: tested: " + Parser.testedNodes + " matched: " + Parser.matchedNodes);
@@ -8757,7 +8757,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (phase == BuildPhase.Process) {
-         if (options.verbose) {
+         if (options.verbose && !options.testVerifyMode) {
             if (buildStartTime != -1)
                verbose("Parsed changes till layer: " + genLayer + " in: " + StringUtil.formatFloat((System.currentTimeMillis() - buildStartTime) / 1000.0));
          }
@@ -9250,7 +9250,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (!bd.anyError) {
          boolean compileFailed = false;
 
-         if (options.verbose) {
+         if (options.verbose && !options.testVerifyMode) {
             verbose("Generation completed in: " + StringUtil.formatFloat((System.currentTimeMillis() - buildStartTime)/1000.0));
          }
          if (phase == BuildPhase.Process && !skipBuild) {
