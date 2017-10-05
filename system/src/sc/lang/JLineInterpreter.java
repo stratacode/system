@@ -17,10 +17,12 @@ import java.util.List;
 @sc.js.JSSettings(replaceWith="sc_EditorContext")
 public class JLineInterpreter extends AbstractInterpreter implements Completer {
    ConsoleReader input;
+   private boolean consoleDisabled = false;
 
-   public JLineInterpreter(LayeredSystem sys) {
+   public JLineInterpreter(LayeredSystem sys, boolean consoleDisabled) {
       super(sys);
       reset();
+      this.consoleDisabled = consoleDisabled;
    }
 
    @Override
@@ -81,10 +83,13 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
                      remaining = remaining.substring(0, newLineIx);
                      remaining = remaining + " ";
                   }
-                  input.killLine();
-                  input.putString(remaining);
+                  // When we disable the terminal factor, this killLine does not put the string back so we need to keep it in pendingInput
+                  if (!consoleDisabled) {
+                     input.killLine();
+                     input.putString(remaining);
+                     pendingInput = new StringBuffer();
+                  }
                   nextPrompt = "";
-                  pendingInput = new StringBuffer();
                }
                else {
                   execLaterJobs();

@@ -1191,13 +1191,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          System.setProperty("jline.terminal", "jline.UnsupportedTerminal");
 
       if (startInterpreter) {
+         boolean consoleDisabled = false;
          if (System.console() == null) {
             jline.TerminalFactory.configure("off");
+            consoleDisabled = true;
          }
 
          // Need to fix the CommandInterpreter - it cannot handle empty package names in dialogs
          //cmd = System.console() != null ? new JLineInterpreter(this) : new CommandInterpreter(this, System.in);
-         cmd = new JLineInterpreter(this);
+         cmd = new JLineInterpreter(this, consoleDisabled);
       }
 
       if (newLayerDir == null) {
