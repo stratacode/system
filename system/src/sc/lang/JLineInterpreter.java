@@ -73,7 +73,8 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
                   }
                }
                if (pendingInput.length() > 0) {
-                  System.out.print("Incomplete statement: ");
+                  if (!consoleDisabled)
+                     System.out.print("Incomplete statement: ");
                   String remaining = pendingInput.toString();
                   int newLineIx = remaining.lastIndexOf("\n");
                   // Need to take away the newline for the prompt but put in a space in case the newline was the space separator in a command line input dump
