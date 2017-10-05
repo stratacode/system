@@ -89,8 +89,11 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    public boolean autoObjectSelect = true;
 
-   public AbstractInterpreter(LayeredSystem sys) {
+   boolean consoleDisabled = false;
+
+   public AbstractInterpreter(LayeredSystem sys, boolean consoleDisabled) {
       super(sys);
+      this.consoleDisabled = consoleDisabled;
       cmdlang.initialize();
 
       // TODO: make this an object which does a thread-local lookup to find the right interpreter if we need more than one or to keep this out of the global name space when the interpreter is enabled
@@ -122,6 +125,9 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    }
 
    protected String prompt() {
+      // We don't want to display the prompt when we've been redirected from another file
+      if (consoleDisabled)
+         return "";
       system.acquireDynLock(false); // TODO: should be read-only lock - why does that not work?  so that we wait till the main thread has finished.  This both ensures the prompt is the last message displayed and that main processing completes before we start reading the next command.
       try {
          if (currentWizard != null)

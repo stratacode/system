@@ -16,7 +16,7 @@ public class CommandInterpreter extends AbstractInterpreter {
    BufferedReader input;
 
    public CommandInterpreter(LayeredSystem sys, BufferedReader inputStream) {
-      super(sys);
+      super(sys, System.console() == null);
       input = inputStream;
    }
 

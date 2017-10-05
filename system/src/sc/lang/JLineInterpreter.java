@@ -17,12 +17,10 @@ import java.util.List;
 @sc.js.JSSettings(replaceWith="sc_EditorContext")
 public class JLineInterpreter extends AbstractInterpreter implements Completer {
    ConsoleReader input;
-   private boolean consoleDisabled = false;
 
    public JLineInterpreter(LayeredSystem sys, boolean consoleDisabled) {
-      super(sys);
+      super(sys, consoleDisabled);
       reset();
-      this.consoleDisabled = consoleDisabled;
    }
 
    @Override
