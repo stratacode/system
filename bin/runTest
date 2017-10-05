@@ -101,10 +101,10 @@ if [ $STATUS != 0 ] ; then
 fi
 echo "$STATUS" > "$STATUS_FILE"
 
-if [ ! -z "$INPUT_FILE" ] ; then
+if [ -z "$INPUT_FILE" ] ; then
    echo "$CMD" > "$CMD_FILE"
 else
-   echo "$CMD > $INPUT_FILE" > "$CMD_FILE"
+   echo "$CMD < $INPUT_FILE" > "$CMD_FILE"
 fi
 
 SUCCESS=0
