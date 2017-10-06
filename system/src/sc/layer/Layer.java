@@ -3672,7 +3672,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
          // For new layers, we do not have to build all files since there's nothing there
          if (missingBuildInfo && !newLayer) {
-            if (layeredSystem.options.info)
+            if (layeredSystem.options.info && !layeredSystem.options.testVerifyMode)
                System.out.println("Missing BuildInfo file - building all files");
             buildAllFiles = true;
          }
