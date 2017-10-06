@@ -3336,6 +3336,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       @Constant public boolean verbose = false;
       /** Print the basic layer stack info at startup.  Very useful for seeing which runtimes and layers are created for your app. */
       @Constant public boolean verboseLayers = false;
+      /** Print the diffs of the source for the same type in different build layers.  Interesting to see how types are modified - especially framework types */
+      @Constant public boolean verboseLayerTypes = false;
       /** Diagnose issues finding classes (e.g. to trace adding entries to the package index) */
       @Constant public boolean verboseClasses = false;
       @Constant public boolean verboseLocks = false;
@@ -3746,6 +3748,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   }
                   else if (opt.equals("vl"))
                      options.verboseLayers = true;
+                  else if (opt.equals("vlt")) {
+                     if (!SrcIndexEntry.debugSrcIndexEntry)
+                        System.out.println("*** -vlt option ignored - must recompile with SrcIndexEntry.debugSrcIndexEntry = true and clear out srcIndexes for this feature");
+                     options.verboseLayerTypes = true;
+                  }
                   else if (opt.equals("vh"))
                      Element.verbose = true;
                   else if (opt.equals("vha"))
@@ -9150,9 +9157,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                               if (sie != null) {
                                  sie.hash = hash;
                                  sie.inUse = true;
+                                 sie.updateDebugFileInfo(genFile.absFileName);
                               }
                               else
-                                 genLayer.addSrcFileIndex(genFile.relFileName, hash, toGenEnt.getExtension());
+                                 genLayer.addSrcFileIndex(genFile.relFileName, hash, toGenEnt.getExtension(), genFile.absFileName);
                            }
                            else {
                               sie.inUse = true;
@@ -9503,7 +9511,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public void setAutoSystemClassLoader(ClassLoader loader) {
       if (autoClassLoader) {
          if (options.verbose && loader != systemClassLoader)
-            verbose("Updating auto system class loader for thread: " + Thread.currentThread().getName());
+            verbose("Updating auto system class loader for thread: " + (options.testVerifyMode ? "<thread-name>" : Thread.currentThread().getName()));
 
          setSystemClassLoader(loader);
       }

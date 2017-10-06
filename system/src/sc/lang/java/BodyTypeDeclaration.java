@@ -4331,7 +4331,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       // Need to generate the inner stubs before we compile the outer one since it will depend on the inner ones.
       List<SrcEntry> innerStubs = doGen ? getInnerDynStubs(bd, lyr, true) : null;
-
+      if (innerStubs != null) {
+         for (SrcEntry innerStub:innerStubs) {
+            lyr.addSrcFileIndex(innerStub.relFileName, innerStub.hash, innerStub.getExtension(), innerStub.absFileName);
+         }
+      }
       /*
        * We compile these lazily as requested.  In order to compile them eagerly, we'd have to gather all of them up
        * include those in extends classes (at least0.
@@ -4354,7 +4358,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
             toCompileEnts.add(srcEnt);
 
-            lyr.addSrcFileIndex(stubRelName, hash, null);
+            lyr.addSrcFileIndex(stubRelName, hash, null, newFile);
 
             // This happens lazily as needed from the system... this is not super fast but we need to do it to record that we generated the java file
             // perhaps in a time-delayed thread in case we are doing lots for the same layer?
@@ -4449,7 +4453,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                   String newFile = FileUtil.concat(buildDir, stubRelName);
 
                   // The layered system processes hidden layer files backwards.  So generate will be true the for the
-                  // final layer's objects but an overriden component comes in afterwards... don't overwrite the new file
+                  // final layer's objects but an overridden component comes in afterwards... don't overwrite the new file
                   // with the previous one.  We really don't need to transform this but I think it is moot because it will
                   // have been transformed anyway.
                   SrcEntry resultEnt = new SrcEntry(buildLayer, newFile, stubRelName);
@@ -4461,8 +4465,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                      SrcIndexEntry thisStub = buildLayer.getSrcFileIndex(resultEnt.relFileName);
                      File classFile = new File(FileUtil.concat(buildLayer.getBuildClassesDir(), FileUtil.replaceExtension(stubRelName, "class")));
                      if (prevStub == null || !Arrays.equals(prevStub.hash, resultEnt.hash)) {
-                        if (thisStub == null || !Arrays.equals(thisStub.hash, resultEnt.hash) || !srcFile.canRead())
+                        if (thisStub == null || !Arrays.equals(thisStub.hash, resultEnt.hash) || !srcFile.canRead()) {
                            FileUtil.saveStringAsFile(newFile, stubResult, true);
+
+                           // The srcIndex is added in generateCode when this gets returned from getProcessedFiles or from the getInnerStubs call
+                           //buildLayer.addSrcFileIndex(resultEnt.relFileName, resultEnt.hash, resultEnt.getExtension(), newFile);
+                        }
                         // Stub Src file is up-to-date but if it's last modified is before the src file it will
                         // trigger re-processing next time so we need to advance it's LMT.  Same with the class file.
                         else {

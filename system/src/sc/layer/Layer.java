@@ -2128,8 +2128,16 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
             try {
                byte[] currentHash = StringUtil.computeHash(FileUtil.getFileAsBytes(fileName));
-               if (!Arrays.equals(currentHash, sie.hash))
+               if (!Arrays.equals(currentHash, sie.hash)) {
                   System.out.println("*** Warning generated file: " + fileName + " appears to have been changed.  Did you modify the generated file instead of the source file?");
+                  if (SrcIndexEntry.debugSrcIndexEntry) {
+                     byte[] newFileBytes = FileUtil.getFileAsBytes(fileName);
+                     if (Arrays.equals(newFileBytes, sie.fileBytes))
+                        System.out.println("*** Contents are the same!");
+                     else
+                        System.out.println("*** Index lastModified: " + new Date(sie.lastModified) + " size: " + sie.fileBytes.length + " current lastModified: " + new Date(new File(fileName).lastModified()) + " size: " + newFileBytes.length);
+                  }
+               }
                else {
                   LayerUtil.removeFileAndClasses(fileName);
                   LayerUtil.removeInheritFile(fileName);
@@ -3256,13 +3264,13 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    /** Register the source file in any build layers including or following this one */
-   public void addSrcFileIndex(String relFileName, byte[] hash, String ext) {
+   public void addSrcFileIndex(String relFileName, byte[] hash, String ext, String absFileName) {
       if (!activated)
          throw new UnsupportedOperationException();
       for (int i = layerPosition; i < layeredSystem.layers.size(); i++) {
          Layer l = layeredSystem.layers.get(i);
          if (l.isBuildLayer()) {
-            SrcIndexEntry sie;
+            SrcIndexEntry sie = null;
             // Layer may not have been started yet - if we are building one layer to produce classes needed to
             // start the next layer
             if (l.buildSrcIndex == null)
@@ -3270,15 +3278,32 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             else {
                sie = l.buildSrcIndex.get(relFileName);
                if (sie != null) {
-                  sie.inUse = true;
-                  continue;
+                  if (Arrays.equals(hash, sie.hash)) {
+                     sie.inUse = true;
+                     continue;
+                  }
+                  else {
+                     if (layeredSystem.options.verboseLayerTypes && SrcIndexEntry.debugSrcIndexEntry) {
+                        System.out.println("*** Adding mismatching entry in the same build layer?");
+                        String oldVersion = new String(sie.fileBytes);
+                        String newVersion = FileUtil.getFileAsString(absFileName);
+                     }
+                  }
                }
             }
-            sie = new SrcIndexEntry();
+            if (sie == null)
+               sie = new SrcIndexEntry();
             sie.hash = hash;
             sie.inUse = true;
             sie.extension = ext;
             sie.layerName = getLayerName();
+            sie.srcIndexLayer = l;
+
+            if (SrcIndexEntry.debugSrcIndexEntry) {
+               sie.updateDebugFileInfo(absFileName);
+               if (!Arrays.equals(hash, StringUtil.computeHash(sie.fileBytes)))
+                  System.err.println("*** internal error - hashes of file do no match from the start!");
+            }
 
             if (traceBuildSrcIndex)
                System.out.println("Adding buildSrcIndex " + relFileName + " : " + sie + " runtime: " + layeredSystem.getRuntimeName());
@@ -3319,8 +3344,13 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             if (l.buildSrcIndex == null) {
                return null;
             }
-            else
-               return l.buildSrcIndex.get(relFileName);
+            else {
+               SrcIndexEntry ent = l.buildSrcIndex.get(relFileName);
+               if (ent != null) {
+                  ent.srcIndexLayer = l;
+               }
+               return ent;
+            }
          }
       }
       return null;

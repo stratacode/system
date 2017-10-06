@@ -1,0 +1,3 @@
+#!/bin/sh
+
+scp -r /jjv/StrataCode/build/doc_core/web/ root@strataCode.com:/usr/local/scc/build/doc_core/web

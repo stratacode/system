@@ -1438,7 +1438,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             // Avoid rewriting unchanged files
             if (srcIndex == null || !Arrays.equals(srcIndex.hash, hash)) {
                FileUtil.saveStringAsReadOnlyFile(absPath, f.fileBody, true);
-               buildLayer.addSrcFileIndex(f.relFilePath, hash, null);
+               buildLayer.addSrcFileIndex(f.relFilePath, hash, null, absPath);
             }
 
             SrcEntry srcEnt = new SrcEntry(buildLayer, absPath, f.relFilePath);

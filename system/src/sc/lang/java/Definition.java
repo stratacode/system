@@ -333,6 +333,7 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
       return null;
    }
 
+   // For definitions on an interface, includes the implicit 'public' java inserts by definition
    public Object[] getExtraModifiers() {
       return null;
    }

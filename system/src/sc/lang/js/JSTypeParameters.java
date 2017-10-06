@@ -1051,7 +1051,11 @@ public class JSTypeParameters extends ObjectTypeParameters {
                   for (Object modifier:modifiers) {
                      if (modifier instanceof Annotation) {
                         Annotation annot = (Annotation) modifier;
+                        String annotTypeName = annot.getTypeName();
                         if (isRuntimeJSAnnotation(annot)) {
+                           if (visited.contains(annotTypeName))
+                              continue;
+                           visited.add(annotTypeName);
                            if (asb == null) {
                               asb = new StringBuilder();
                               asb.append(getShortJSTypeName());
@@ -1064,7 +1068,6 @@ public class JSTypeParameters extends ObjectTypeParameters {
                               asb.append(propName);
                               asb.append(":{");
                            }
-                           String annotTypeName = annot.getTypeName();
                            asb.append(CTypeUtil.getClassName(annotTypeName));
                            Object elementValue = annot.elementValue;
                            if (elementValue != null) {
