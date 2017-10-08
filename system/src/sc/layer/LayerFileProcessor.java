@@ -164,11 +164,11 @@ public class LayerFileProcessor extends LayerFileComponent {
       fileIndex.clear();
    }
 
-   public String getOutputDirToUse(LayeredSystem sys, String buildSrcDir, String layerBuildDir) {
+   public String getOutputDirToUse(LayeredSystem sys, String buildSrcDir, Layer buildLayer) {
       return outputDir == null ?
               (useSrcDir ? buildSrcDir :
-                      useClassesDir ? sys.buildClassesDir :
-                              (useCommonBuildDir ? sys.commonBuildDir : layerBuildDir)) : outputDir;
+                      useClassesDir ? (buildLayer.buildClassesDir != null ? buildLayer.buildClassesDir : sys.buildClassesDir):
+                              (useCommonBuildDir ? sys.commonBuildDir : buildLayer.buildDir)) : outputDir;
    }
 
    public FileEnabledState enabledForPath(String pathName, Layer fileLayer, boolean abs, boolean generatedFile) {

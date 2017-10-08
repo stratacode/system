@@ -364,7 +364,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    boolean newLayer = false;   // Set to true for layers which are created fresh
 
-   private boolean buildSrcIndexNeedsSave = false; // TODO: performance - this gets saved way too often now right - need to implement this flag
+   boolean buildSrcIndexNeedsSave = false; // TODO: performance - this gets saved way too often now right - need to implement this flag
 
    public HashMap<String, IScopeProcessor> scopeProcessors = null;
 
@@ -2017,6 +2017,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          try {
             ois = new ObjectInputStream(fis = new FileInputStream(buildSrcFile));
             HashMap<String, SrcIndexEntry> res = (HashMap<String, SrcIndexEntry>) ois.readObject();
+            //SrcIndexEntry tmp = res.get("js/types/sce_TypeTreeModel_TreeEnt.js");
+            //if (tmp != null)
+               //System.out.println("*** Reading TreeEnt srcIndexEntry: modified: " + new Date(tmp.lastModified) + ": " + tmp.fileBytes.length + " srcFile: " + buildSrcFile);
             if (traceBuildSrcIndex) {
                System.out.println("Read buildSrcIndex for: " + this + " runtime: " + this.layeredSystem.getRuntimeName());
                if (res != null) {
@@ -2076,7 +2079,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             srcLayer = layeredSystem.getLayerByDirName(layerName);
          }
          IFileProcessor proc = layeredSystem.getFileProcessorForFileName(path, srcLayer, BuildPhase.Process);
-         String srcDir = proc == null ? buildSrcDir : proc.getOutputDirToUse(layeredSystem, buildSrcDir, buildDir);
+         String srcDir = proc == null ? buildSrcDir : proc.getOutputDirToUse(layeredSystem, buildSrcDir, this);
          String fileName = FileUtil.concat(srcDir, path);
          if (!sie.inUse) {
 
@@ -2213,6 +2216,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (buildSrcIndex.size() == 0) {
          if (buildSrcFile.canRead())
             buildSrcFile.delete();
+         buildSrcIndexNeedsSave = false;
          return;
       }
 
@@ -2220,6 +2224,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       try {
          os = new ObjectOutputStream(new FileOutputStream(buildSrcFile));
          os.writeObject(buildSrcIndex);
+
+         //SrcIndexEntry tmp = buildSrcIndex.get("js/types/sce_TypeTreeModel_TreeEnt.js");
+         //if (tmp != null)
+         //   System.out.println("*** Writing TreeEnt srcIndexEntry: modified: " + new Date(tmp.lastModified) + ": " + tmp.fileBytes.length + " path: " + buildSrcFile);
 
          buildSrcIndexNeedsSave = false;
       }
@@ -2369,7 +2377,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    public int getSortPriority() {
       int ct = 0;
-      // The current implemntation gives us three tiers of layers - compiled-only framework layers (e.g. js.sys)
+      // The current implementation gives us three tiers of layers - compiled-only framework layers (e.g. js.sys)
       // compiled-only application layers, e.g. util and the rest - application layers which are always appended unless they
       // have a dependency.
       if (compiledOnly)

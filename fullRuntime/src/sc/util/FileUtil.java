@@ -24,6 +24,8 @@ public class FileUtil {
    public static final char FILE_SEPARATOR_CHAR = FILE_SEPARATOR.charAt(0);
 
    public static void saveStringAsFile(String fileName, String data, boolean mkdirs) {
+      //if (fileName.contains("TreeEnt.js"))
+      //   System.out.println("*** Saving: " + fileName + " with size: " + data.length() + " at: " + new Date());
       FileUtil.saveStringAsFile(new File(fileName), data, mkdirs);
    }
 

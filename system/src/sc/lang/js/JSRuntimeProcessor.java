@@ -596,7 +596,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
     *
     * Note that this also returns the src entry to get processed files and must have the hash code filled in.
     */
-   void saveJSTypeToFile(BodyTypeDeclaration td, Layer genLayer, String buildSrcDir, ArrayList<SrcEntry> resFiles) {
+   SrcEntry saveJSTypeToFile(BodyTypeDeclaration td, Layer genLayer, String buildSrcDir, ArrayList<SrcEntry> resFiles) {
+      //if (td.toString().equals("SyncLayer.SyncChange (layer:sys.sccore) (runtime: js) (transformed)"))
+      //   System.out.println("***");
       StringBuilder result = new StringBuilder();
 
       // First look for an existing one in the build-path - if not found, then create a new one for this buildDir
@@ -669,7 +671,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                      continue;
                   BodyTypeDeclaration innerType = (BodyTypeDeclaration) innerTypeObj;
 
-                  saveJSTypeToFile(innerType, genLayer, buildSrcDir, resFiles);
+                  SrcEntry innerSrcEnt = saveJSTypeToFile(innerType, genLayer, buildSrcDir, resFiles);
+                  // We only really have to update the srcFileIndex if we saved a new version above - in which case the hash is filled in.
+                  if (innerSrcEnt != null && innerSrcEnt.hash != null)
+                     genLayer.addSrcFileIndex(innerSrcEnt.relFileName, innerSrcEnt.hash, innerSrcEnt.getExtension(), innerSrcEnt.absFileName);
                }
             }
          }
@@ -679,6 +684,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       // For Java types specified in a final/compiled layer, we will never transform - need to set this here to enable incremental JS builds.
       if (javaModel.transformedInLayer == null)
          javaModel.transformedInLayer = system.currentBuildLayer;
+
+      return resEnt;
    }
 
    private void copyFileAndIndex(String srcFileName, String dstFileName) {
@@ -2520,6 +2527,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             addExtendsJSTypeToFile(type, typesInFile, rootLibFile, genLayer, typesInSameFile);
 
             boolean needsSave = false;
+            //if (type.toString().equals("TypeTreeModel (layer:test.editor2.js.core) (runtime: js)"))
+            //   System.out.println("***");
             // Is there an existing srcEnt in a previous build dir?
             SrcEntry srcEnt = findJSSrcEntry(genLayer, type);
             if (srcEnt == null) {
@@ -2541,7 +2550,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                // The process of converting to JS will introduce references to types like 'var' that are not defined so we turn off error reporting.  The errors will come out in the browser anyway :)
                type.getJavaModel().disableTypeErrors = true;
 
-               saveJSTypeToFile(type, genLayer, genLayer.buildSrcDir, null);
+               SrcEntry resEnt = saveJSTypeToFile(type, genLayer, genLayer.buildSrcDir, null);
+
+               if (resEnt != null)
+                  genLayer.addSrcFileIndex(srcEnt.relFileName, resEnt.hash, srcEnt.getExtension(), srcEnt.absFileName);
             }
 
             try {

@@ -47,7 +47,7 @@ public class LayerFileProcessorResult implements IFileProcessorResult {
          SrcEntry src = srcEnt;
          LayeredSystem sys = srcEnt.layer.layeredSystem;
          String newRelFile = processor.getOutputFileToUse(sys, this, src, buildLayer);
-         String newFile = FileUtil.concat(processor.getOutputDirToUse(sys, buildSrcDir, buildLayer.buildDir),  newRelFile);
+         String newFile = FileUtil.concat(processor.getOutputDirToUse(sys, buildSrcDir, buildLayer),  newRelFile);
 
          // The layered system processes hidden layer files backwards.  So generate will be true the for the
          // final layer's objects but an overriden component comes in afterwards... don't overwrite the new file

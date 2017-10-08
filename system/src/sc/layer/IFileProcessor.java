@@ -51,7 +51,7 @@ public interface IFileProcessor {
    String getOutputDir();
 
    /** Gets the output directory to use for the given system and buildDir  */
-   String getOutputDirToUse(LayeredSystem sys, String buildSrcDir, String layerBuildDir);
+   String getOutputDirToUse(LayeredSystem sys, String buildSrcDir, Layer buildLayer);
 
    String getOutputFileToUse(LayeredSystem sys, IFileProcessorResult result, SrcEntry srcEnt, Layer buildLayer);
 

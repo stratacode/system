@@ -763,7 +763,7 @@ public abstract class Language extends LayerFileComponent {
       return null;
    }
 
-   public String getOutputDirToUse(LayeredSystem sys, String buildSrcDir, String layerBuildDir) {
+   public String getOutputDirToUse(LayeredSystem sys, String buildSrcDir, Layer buildLayer) {
       return buildSrcDir;
    }
 

@@ -4498,7 +4498,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return true;
    }
 
-   /** Builds the system.  The newLayersOnly option looks for changed files only.  separateLayersOnly will only build layers with the buildSeparate=true option.  You can specify a list of files to build if you know exactly what needs to be processed and transformed to rebuild the system (not recommended). */
+   /**
+    * Builds the system.  The newLayersOnly option looks for changed files only.  separateLayersOnly will only build layers with the buildSeparate=true option.  That mode is typically run first - to build all
+    * separate layers, so their compiled results can be used for building the normal layers.
+    * You can specify the list of includeFiles to build a subset of files if you know exactly what needs to be processed and transformed but that mode is really only used for testing purposes and may not
+    * generate an accurate build.
+    */
    boolean buildSystem(List<String> includeFiles, boolean newLayersOnly, boolean separateLayersOnly) {
       setCurrent(this);
 
@@ -4596,6 +4601,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (!separateLayersOnly)
             buildingSystem = false;
       }
+
+      for (int i = 0; i < layers.size(); i++)
+         if (layers.get(i).buildSrcIndexNeedsSave)
+            System.out.println("*** Exiting build with unsaved buildSrcIndexes");
 
       return true;
    }
@@ -5773,6 +5782,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // We've already added a dynamic layer - now we're adding a compiled layer.  Because dynamic is inherited, we know
          // this layer does not depend on the dynamic layer so we'll add it just in front of the dynamic layer and slide
          // everyone else back.
+         /*
          if (layerDynStartPos != -1 && !layer.dynamic) {
             layer.layerPosition = layerDynStartPos;
 
@@ -5794,10 +5804,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
          }
          else {
+         */
             int numLayers = layers.size();
 
             // Make sure any layers which have features which this layer replaces are updated to know that this layer is present.
             layer.initReplacedLayers();
+
+            int startIx = numLayers - 1;
+
+            if (!layer.dynamic && layerDynStartPos != -1) {
+               startIx = layerDynStartPos;
+               layerDynStartPos++;
+            }
 
             // This is just a nicety but since compiledLayers tend to be framework layers, it's best to put them
             // in front of those that can be made dynamic.  That also means they won't jump positions when going
@@ -5805,7 +5823,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             int sortPriority = layer.getSortPriority();
             if (sortPriority != Layer.DEFAULT_SORT_PRIORITY) {
                int resortIx = -1;
-               for (int prevIx = numLayers - 1; prevIx >= 0; prevIx--) {
+               for (int prevIx = startIx; prevIx >= 0; prevIx--) {
                   Layer prevLayer = layers.get(prevIx);
                   // Should we move this layer up one past the prev layer - only if it does not extend it!
                   if (!layer.extendsLayer(prevLayer)) {
@@ -5831,6 +5849,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         lastStartedLayer = layer.getPreviousLayer();
                      if (lastBuiltLayer == prevLayer)
                         lastBuiltLayer = layer.getPreviousLayer();
+
+                     // We can't have any compiled layers extending dynamic layers - so enforce this with an error message here
+                     if (i >= layerDynStartPos && !layer.dynamic) {
+                        if (layer.extendsLayer(prevLayer))
+                           error("Layer configuration error.  Compiled layer: " + layer.layerDirName + " depends on dynamic layer: " + prevLayer.layerDirName);
+                     }
                   }
                }
                else {
@@ -5842,7 +5866,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                layer.layerPosition = numLayers;
                layers.add(layer);
             }
-         }
+         //}
       }
       else if (!layer.disabled)
          registerInactiveLayer(layer);
