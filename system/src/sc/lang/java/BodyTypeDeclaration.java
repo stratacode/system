@@ -4400,7 +4400,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          String cp = sys.getClassPathForLayer(lyr, true, bd, true);
          if (sys.options.verbose)
             System.out.println("Compiling: " + toCompileEnts + " into build dir: " + bd + " with classpath: " + cp);
-         else if (sys.options.info)
+         else if (sys.options.info && !sys.options.testVerifyMode)
             System.out.println("Compiling: " + toCompileEnts.size() + " stub files");
          HashSet<String> errorFiles = new HashSet<String>();
          if (doCompile && LayerUtil.compileJavaFilesInternal(toCompileEnts, bd, cp, sys.options.debug, sys.javaSrcVersion, sys.messageHandler, errorFiles) != 0) {
