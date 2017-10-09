@@ -73,7 +73,7 @@ if [ ! -d "$VALID_DIR" ] ; then
    mkdir -p "$VALID_DIR"
 fi
 
-echo "Running test $TEST_NAME: ${CMD}${INPUT_FILE_REDIR} > $OUT_FILE"
+echo "--- Running test $TEST_NAME: ${CMD}${INPUT_FILE_REDIR} > $OUT_FILE"
 echo "$TEST_NAME" >> "${RUN_DIR}/testsRun"
 touch "${RUN_DIR}/passed"
 if [ "$ECHO_OUTPUT" = "1" ] ; then
@@ -111,7 +111,7 @@ SUCCESS=0
 if [ -f "$VALID_FILE" ] ; then 
    if diff "$OUT_FILE" "$VALID_FILE" > /dev/null ; then 
       if diff "$STATUS_FILE" "$VALID_STATUS_FILE" > /dev/null ; then 
-         echo "Success: $TEST_NAME"
+         echo "- Success: $TEST_NAME"
          SUCCESS=1
          echo "$TEST_NAME" >> "${RUN_DIR}/passed"
       else
@@ -122,7 +122,7 @@ if [ -f "$VALID_FILE" ] ; then
          fi
       fi
    else
-      echo "Fail: $TEST_NAME - diff $OUT_FILE $VALID_FILE"
+      echo "*** Fail: $TEST_NAME - diff $OUT_FILE $VALID_FILE"
       echo "$TEST_NAME" >> "${RUN_DIR}/failed"
       diff "$OUT_FILE" "$VALID_FILE" > "$DIFF_FILE"
       if [ "$ECHO_ERRORS" = "1" ] ; then
