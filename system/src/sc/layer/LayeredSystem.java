@@ -1194,7 +1194,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          boolean consoleDisabled = false;
          if (System.console() == null) {
             jline.TerminalFactory.configure("off");
-            consoleDisabled = true;
+            try {
+               // Most likely redirected from stdin so turn off the prompt here.   TODO: is this accurate enough or do we need a native "istty" call to tell what stdin is redirected
+               // Or maybe just disable prompts when in testVerifyMode?
+               if (System.in.available() > 0)
+                  consoleDisabled = true;
+            }
+            catch (IOException exc) {
+            }
          }
 
          // Need to fix the CommandInterpreter - it cannot handle empty package names in dialogs

@@ -52,7 +52,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
            "   }                         To exit a type and return to the previous type or to the top-level with no type.\n" +
            "   cmd.save();               To save your changes\n" +
            "   cmd.list();               Display current objects, classes, field, methods etc. in the current context\n" +
-           "   <TAB>                     Comamnd line completion with terminals supported by JLine\n" +
+           "   <TAB>                     Command line completion with terminals supported by JLine\n" +
            "\n\n" +
            "The Prompt                   Displays your current context - layer, package, and where you are in the layer stack using # before or after the layer name:\n\nExamples:\n" +
            "  (example.unitConverter.model:sc.example.unitConverter##) ->\n" +
@@ -89,6 +89,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    public boolean autoObjectSelect = true;
 
+   /** When set to true, we turn off the prompt, mostly for auto tests but it's also not helpful when stdin is redirected */
    boolean consoleDisabled = false;
 
    public AbstractInterpreter(LayeredSystem sys, boolean consoleDisabled) {

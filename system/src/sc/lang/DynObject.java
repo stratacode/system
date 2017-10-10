@@ -574,9 +574,10 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
          }
       }
       else {
-         System.err.println("*** Missing old field mapping in set type for: " + type.getFullTypeName());
          if (newType.getDynInstFieldCount() == properties.length)
             newProperties = properties;
+         else
+            System.err.println("*** Missing old field mapping in set type for: " + type.getFullTypeName());
       }
       type = newType;
       properties = newProperties;

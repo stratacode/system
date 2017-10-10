@@ -127,7 +127,7 @@ if [ -f "$VALID_FILE" ] ; then
          fi
       fi
    elif [ "$IGNORE_ERRORS" == 0 ] ; then
-      echo "*** Fail: $TEST_NAME - diff $OUT_FILE $VALID_FILE"
+      echo "*** Fail - output changed: $TEST_NAME - diff $OUT_FILE $VALID_FILE"
       echo "$TEST_NAME" >> "${RUN_DIR}/failed"
       echo "$TEST_NAME - diff $OUT_FILE $VALID_FILE" >> ${RUN_DIR}/failedDetail
       diff "$OUT_FILE" "$VALID_FILE" > "$DIFF_FILE"
@@ -136,7 +136,7 @@ if [ -f "$VALID_FILE" ] ; then
          diff "$OUT_FILE" "$VALID_FILE" 
       fi
    else
-      echo "Ignored output for: $TEST_NAME"
+      echo "Ignored different output for: $TEST_NAME"
       echo "$TEST_NAME" >> "${RUN_DIR}/ignored"
    fi
 else
