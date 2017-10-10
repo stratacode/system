@@ -48,6 +48,10 @@ public class SrcIndexEntry implements Serializable {
 
    void updateDebugFileInfo(String fileName) {
       if (debugSrcIndexEntry) {
+         if (!new File(fileName).canRead()) {
+            System.out.println("*** Error - unable to read file in src index: " + fileName);
+            return;
+         }
          fileBytes = FileUtil.getFileAsBytes(fileName);
          lastModified = new File(fileName).lastModified();
       }
