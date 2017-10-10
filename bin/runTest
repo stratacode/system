@@ -38,6 +38,10 @@ else
           shift 
           shift 
           ;;
+          --ignore)
+          IGNORE_ERRORS=1
+          shift
+          ;;
           *)
           ARGS+=("$1") 
           shift
@@ -117,22 +121,27 @@ if [ -f "$VALID_FILE" ] ; then
       else
          echo "Test exit status changed: $TEST_NAME - diff $STATUS_FILE $VALID_STATUS_FILE"
          echo "$TEST_NAME" >> "${RUN_DIR}/failed"
+         echo "$TEST_NAME - status: diff $STATUS_FILE $VALID_STATUS_FILE" >> "${RUN_DIR}/failedDetail"
          if [ "$ECHO_ERRORS" = "1" ] ; then
             diff "$STATUS_FILE" "$VALID_STATUS_FILE" 
          fi
       fi
-   else
+   elif [ "$IGNORE_ERRORS" == 0 ] ; then
       echo "*** Fail: $TEST_NAME - diff $OUT_FILE $VALID_FILE"
       echo "$TEST_NAME" >> "${RUN_DIR}/failed"
+      echo "$TEST_NAME - diff $OUT_FILE $VALID_FILE" >> ${RUN_DIR}/failedDetail
       diff "$OUT_FILE" "$VALID_FILE" > "$DIFF_FILE"
       if [ "$ECHO_ERRORS" = "1" ] ; then
          diff "$STATUS_FILE" "$VALID_STATUS_FILE"
          diff "$OUT_FILE" "$VALID_FILE" 
       fi
+   else
+      echo "Ignored output for: $TEST_NAME"
+      echo "$TEST_NAME" >> "${RUN_DIR}/ignored"
    fi
 else
    echo "First run for: $TEST_NAME stored in $OUT_FILE"
-   echo "$TEST_NAME" >> "${RUN_DIR}/new"
+   echo "$TEST_NAME - $OUT_FILE" >> "${RUN_DIR}/new"
    if [ "$ECHO_ERRORS" = "1" ] ; then
       cat "$OUT_FILE"
    fi

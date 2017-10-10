@@ -425,7 +425,7 @@ public class PTypeUtil {
 
       int i = 0;
       char c;
-      while (i < len - 1 && Character.isJavaIdentifierPart(toStr.charAt(++i)))
+      while (i < len - 1 && (Character.isJavaIdentifierPart(c = toStr.charAt(++i)) || c == '.'))
          ;
 
       if (i == len - 1)

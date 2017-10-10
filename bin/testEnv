@@ -13,6 +13,7 @@ ECHO_ERRORS=1
 ECHO_OUTPUT=0
 INPUT_FILE=""
 INTERACTIVE=0
+IGNORE_ERRORS=0
 
 if [ ! -d $VALIDRESULTS ] ; then
    echo "Valid results directory: $VALIDRESULTS does not exist"
@@ -39,6 +40,10 @@ do
        ;;
        -u|--update)
        UPDATE=1
+       shift
+       ;;
+       --ignore)
+       IGNORE_ERRORS=1
        shift
        ;;
        -p|--prompt)
@@ -96,4 +101,5 @@ export ECHO_OUTPUT
 export INTERACTIVE
 export STOP_ON_ERROR
 export UPDATE
+export IGNORE_ERRORS
 
