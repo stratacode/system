@@ -97,7 +97,7 @@ import java.util.zip.ZipFile;
  * <p/>
  * -dynall: treat all layers named on the command line and all layers they include as dynamic even if they are not marked with the dynamic keyword.  Layers with compiledOnly=true are always compiled.
  * <p/>
- * -dynone: treat layers named on the command line as dynamic even if they are not marked with the dynamic keyword.
+ * -dynone treat layers following this option on the command line as dynamic even if they are not marked with the dynamic keyword.
  * <p/>
  * -nc: Skip the compilation.  Useful when you are compiling the Java files with an IDE
  * <p/>
@@ -2113,7 +2113,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
 
-   private void initLayersWithNames(List<String> initLayerNames, boolean dynamicByDefault, boolean allDynamic, List<String> recursiveDyn, boolean specifiedLayers, boolean explicitLayers) {
+   private void initLayersWithNames(List<String> initLayerNames, boolean dynamicByDefault, boolean allDynamic, List<String> explicitDyn, boolean specifiedLayers, boolean explicitLayers) {
       try {
          acquireDynLock(false);
          PerfMon.start("initLayers");
@@ -2129,20 +2129,21 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   lpi.explicitDynLayers.add("<all>");
             }
          }
-         if (recursiveDyn != null) {
+         if (explicitDyn != null) {
             ArrayList<String> aliases = new ArrayList<String>();
-            for (int i = 0; i < recursiveDyn.size(); i++) {
-               String exLayer = recursiveDyn.get(i);
+            for (int i = 0; i < explicitDyn.size(); i++) {
+               String exLayer = explicitDyn.get(i);
                exLayer = FileUtil.removeTrailingSlash(exLayer);
                aliases.add(exLayer.replace('.', '/'));
                aliases.add(exLayer.replace('/', '.'));
             }
-            aliases.addAll(recursiveDyn);
-            lpi.recursiveDynLayers = aliases;
-            if (lpi.explicitDynLayers == null) // Recursive layers should also be explicitly made dynamic
-               lpi.explicitDynLayers = lpi.recursiveDynLayers;
+            aliases.addAll(explicitDyn);
+            if (options.recursiveDynLayers)
+               lpi.recursiveDynLayers = aliases;
+            if (lpi.explicitDynLayers == null)
+               lpi.explicitDynLayers = aliases;
             else
-               lpi.explicitDynLayers.addAll(lpi.recursiveDynLayers);
+               lpi.explicitDynLayers.addAll(aliases);
          }
          List<Layer> resLayers = initLayers(initLayerNames, null, null, dynamicByDefault, lpi, specifiedLayers);
          if (resLayers == null || resLayers.contains(null)) {
@@ -3353,6 +3354,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       @Constant public boolean createNewLayer = false;
       @Constant public boolean dynamicLayers = false;
       @Constant public boolean anyDynamicLayers = false;
+      /** Set to true for the -dyn option, which applies the dynamic state to all extended layers that are not marked explicitly as compiledOnly */
+      @Constant public boolean recursiveDynLayers = false;
       /** -dynall: like -dyn but all layers included by the specified layers are also made dynamic */
       @Constant public boolean allDynamic = false;
       /** When true, we maintain the reverse mapping from type to object so that when certain type changes are made, we can propagate those changes to all instances.  This is set to true by default when the editor is enabled.  Turn it on with -dt  */
@@ -3459,7 +3462,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       boolean restartArg;
       ArrayList<String> restartArgs = new ArrayList<String>();
       int lastRestartArg = -1;
-      ArrayList<String> recursiveDynLayers = null;
+      ArrayList<String> explicitDynLayers = null;
       String scInstallDir = null;
       String mainDir = null;
 
@@ -3509,8 +3512,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      }
                   }
                   else if (opt.equals("dynone")) {
-                     options.dynamicLayers = true;
                      options.anyDynamicLayers = true;
+                     explicitDynLayers = new ArrayList<String>();
                   }
                   else if (opt.equals("dynall")) {
                      options.dynamicLayers = true;
@@ -3518,8 +3521,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      options.anyDynamicLayers = true;
                   }
                   else if (opt.equals("dyn")) {
-                     recursiveDynLayers = new ArrayList<String>();
+                     explicitDynLayers = new ArrayList<String>();
                      options.anyDynamicLayers = true;
+                     options.recursiveDynLayers = true;
                   }
                   else if (opt.equals("dt"))
                      options.liveDynamicTypes = true;
@@ -3804,8 +3808,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
                includeLayers.add(args[i]);
 
-               if (recursiveDynLayers != null)
-                  recursiveDynLayers.add(args[i]);
+               if (explicitDynLayers != null)
+                  explicitDynLayers.add(args[i]);
             }
             else {
                if (includeFiles == null)
@@ -3876,11 +3880,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             System.exit(-1);
          }
          */
-         if (recursiveDynLayers != null && recursiveDynLayers.size() == 0) {
-            usage("The -dyn option was provided without a list of layers.  The -dyn option should be in front of the list of layer names you want to make dynamic.", args);
+         if (explicitDynLayers != null && explicitDynLayers.size() == 0) {
+            String optName = options.recursiveDynLayers ? "dyn" : "dynone";
+            usage("The -" + optName + " option was provided without a list of layers.  The -" + optName + " option should be in front of the list of layer names you want to make dynamic.", args);
          }
 
-         sys = new LayeredSystem(buildLayerName, includeLayers, recursiveDynLayers, layerPath, classPath, options, null, null, startInterpreter, null, mainDir, scInstallDir);
+         sys = new LayeredSystem(buildLayerName, includeLayers, explicitDynLayers, layerPath, classPath, options, null, null, startInterpreter, null, mainDir, scInstallDir);
          if (defaultLayeredSystem == null)
             defaultLayeredSystem = sys;
          currentLayeredSystem.set(sys.systemPtr);
