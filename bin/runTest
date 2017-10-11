@@ -124,7 +124,7 @@ if [ -f "$VALID_FILE" ] ; then
             SUCCESS=1
             echo "$TEST_NAME" >> "${RUN_DIR}/passed"
          else 
-            echo "- Test pages changed: $TEST_NAME"
+            echo "*** Test pages changed: $TEST_NAME - diff -r $VALID_PAGES $PAGES "
             echo "$TEST_NAME" >> "${RUN_DIR}/failed"
             echo "$TEST_NAME - pages: diff -r $VALID_PAGES $PAGES " >> "${RUN_DIR}/failedDetail"
             if [ "$ECHO_ERRORS" = "1" ] ; then
@@ -132,7 +132,7 @@ if [ -f "$VALID_FILE" ] ; then
             fi
          fi
       else
-         echo "Test exit status changed: $TEST_NAME - diff $VALID_STATUS_FILE $STATUS_FILE"
+         echo "*** Test exit status changed: $TEST_NAME - diff $VALID_STATUS_FILE $STATUS_FILE"
          echo "$TEST_NAME" >> "${RUN_DIR}/failed"
          echo "$TEST_NAME - exit status : diff $VALID_STATUS_FILE $STATUS_FILE" >> "${RUN_DIR}/failedDetail"
          if [ "$ECHO_ERRORS" = "1" ] ; then
@@ -140,7 +140,7 @@ if [ -f "$VALID_FILE" ] ; then
          fi
       fi
    elif [ "$IGNORE_ERRORS" == 0 ] ; then
-      echo "*** Fail - output changed: $TEST_NAME - diff $VALID_FILE $OUT_FILE"
+      echo "*** Output changed: $TEST_NAME - diff $VALID_FILE $OUT_FILE"
       echo "$TEST_NAME" >> "${RUN_DIR}/failed"
       echo "$TEST_NAME - diff $VALID_FILE $OUT_FILE " >> ${RUN_DIR}/failedDetail
       diff "$VALID_FILE" "$OUT_FILE" > "$DIFF_FILE"

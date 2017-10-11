@@ -96,6 +96,15 @@ if [ -d "$RUN_DIR" ] ; then
             cp "$TEST_DIR/out" "$VALID_DIR/out"
             cp "$TEST_DIR/status" "$VALID_DIR/status"
             cp "$TEST_DIR/cmd" "$VALID_DIR/cmd"
+            if [ -d "$TEST_DIR/pages" ] ; then
+               if [ -d "$TEST_DIR/pages" ] ; then
+                  rm -rf "$VALID_DIR/pages" 
+               fi
+               cp -r "$TEST_DIR/pages" "$VALID_DIR/pages"
+               echo "Updated valid pages dir $VALID_DIR/pages"
+            else 
+               rm -rf "$VALID_DIR/pages" 
+            fi
          done
       fi
    elif [ -f "$RUN_DIR/passed" ] ; then 
