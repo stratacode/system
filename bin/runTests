@@ -45,7 +45,7 @@ done
 if [ -d "$RUN_DIR" ] ; then
    if [ -f "$RUN_DIR/new" ] ; then
       echo "First run tests - `wc -l < $RUN_DIR/new` found:"
-      cat "$RUN_DIR/new"
+      cat "$RUN_DIR/newDetail"
 
       acceptYN=""
       while [[ "$acceptYN" != "y" && "$acceptYN" != "n" ]] ; 
@@ -62,11 +62,11 @@ if [ -d "$RUN_DIR" ] ; then
          for newTest in "${newTests[@]}"
          do
             echo "Updating valid file for $newTest"
-            OUT_DIR="$RUN_DIR/$newTest"
+            TEST_DIR="$RUN_DIR/$newTest"
             VALID_DIR="$VALID_RESULTS/$newTest"
-            cp "$OUT_DIR/out" "$VALID_DIR/out"
-            cp "$OUT_DIR/status" "$VALID_DIR/status"
-            cp "$OUT_DIR/cmd" "$VALID_DIR/cmd"
+            cp "$TEST_DIR/out" "$VALID_DIR/out"
+            cp "$TEST_DIR/status" "$VALID_DIR/status"
+            cp "$TEST_DIR/cmd" "$VALID_DIR/cmd"
          done
       fi
 
@@ -91,11 +91,11 @@ if [ -d "$RUN_DIR" ] ; then
          for testName in "${testArray[@]}"
          do
             echo "Updating valid file for $testName"
-            OUT_DIR="$RUN_DIR/$testName"
+            TEST_DIR="$RUN_DIR/$testName"
             VALID_DIR="$VALID_RESULTS/$testName"
-            cp "$OUT_DIR/out" "$VALID_DIR/out"
-            cp "$OUT_DIR/status" "$VALID_DIR/status"
-            cp "$OUT_DIR/cmd" "$VALID_DIR/cmd"
+            cp "$TEST_DIR/out" "$VALID_DIR/out"
+            cp "$TEST_DIR/status" "$VALID_DIR/status"
+            cp "$TEST_DIR/cmd" "$VALID_DIR/cmd"
          done
       fi
    elif [ -f "$RUN_DIR/passed" ] ; then 

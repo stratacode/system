@@ -55,25 +55,29 @@ if [ "${#ARGS[@]}" == "0" ] ; then
    exit -1
 fi
 
-OUT_DIR="$RUN_DIR/$TEST_NAME"
-OUT_FILE="$OUT_DIR/out"
-STATUS_FILE="$OUT_DIR/status"
-CMD_FILE="$OUT_DIR/cmd"
-DIFF_FILE="$OUT_DIR/diff"
+TEST_DIR="$RUN_DIR/$TEST_NAME"
+
+OUT_FILE="$TEST_DIR/out"
+STATUS_FILE="$TEST_DIR/status"
+CMD_FILE="$TEST_DIR/cmd"
+DIFF_FILE="$TEST_DIR/diff"
+PAGES="$TEST_DIR/pages"
+
 VALID_DIR="$VALID_RESULTS/$TEST_NAME"
 VALID_FILE="$VALID_DIR/out"
 VALID_STATUS_FILE="$VALID_DIR/status"
+VALID_PAGES="$VALID_DIR/pages"
 
 CMD=${ARGS[*]}
-if [ ! -d "$OUT_DIR" ] ; then
-   mkdir -p "$OUT_DIR"
+if [ ! -d "$TEST_DIR" ] ; then
+   mkdir -p "$TEST_DIR"
 else
-   echo "Error test output directory: $OUT_DIR already exists.  Duplicate test name: $TEST_NAME in script: $SCRIPT"
+   echo "Error test output directory: $TEST_DIR already exists.  Duplicate test name: $TEST_NAME in script: $SCRIPT"
    exit -1
 fi
 
 if [ ! -d "$VALID_DIR" ] ; then
-   echo "Warning: new test found: $TEST_NAME - creating new directory to store valid results: $VALID_DIR"
+   echo "*** Running new test: $TEST_NAME"
    mkdir -p "$VALID_DIR"
 fi
 
@@ -113,27 +117,36 @@ fi
 
 SUCCESS=0
 if [ -f "$VALID_FILE" ] ; then 
-   if diff "$OUT_FILE" "$VALID_FILE" > /dev/null ; then 
-      if diff "$STATUS_FILE" "$VALID_STATUS_FILE" > /dev/null ; then 
-         echo "- Success: $TEST_NAME"
-         SUCCESS=1
-         echo "$TEST_NAME" >> "${RUN_DIR}/passed"
+   if diff "$VALID_FILE" "$OUT_FILE" > /dev/null ; then 
+      if diff "$VALID_STATUS_FILE" "$STATUS_FILE" > /dev/null ; then 
+         if [[ ! -d "$VALID_PAGES" ]] || diff -r "$VALID_PAGES" "$PAGES" > /dev/null ; then 
+            echo "- Success: $TEST_NAME"
+            SUCCESS=1
+            echo "$TEST_NAME" >> "${RUN_DIR}/passed"
+         else 
+            echo "- Test pages changed: $TEST_NAME"
+            echo "$TEST_NAME" >> "${RUN_DIR}/failed"
+            echo "$TEST_NAME - pages: diff -r $VALID_PAGES $PAGES " >> "${RUN_DIR}/failedDetail"
+            if [ "$ECHO_ERRORS" = "1" ] ; then
+               diff -r "$VALID_PAGES" "$PAGES" 
+            fi
+         fi
       else
-         echo "Test exit status changed: $TEST_NAME - diff $STATUS_FILE $VALID_STATUS_FILE"
+         echo "Test exit status changed: $TEST_NAME - diff $VALID_STATUS_FILE $STATUS_FILE"
          echo "$TEST_NAME" >> "${RUN_DIR}/failed"
-         echo "$TEST_NAME - status: diff $STATUS_FILE $VALID_STATUS_FILE" >> "${RUN_DIR}/failedDetail"
+         echo "$TEST_NAME - exit status : diff $VALID_STATUS_FILE $STATUS_FILE" >> "${RUN_DIR}/failedDetail"
          if [ "$ECHO_ERRORS" = "1" ] ; then
-            diff "$STATUS_FILE" "$VALID_STATUS_FILE" 
+            diff "$VALID_STATUS_FILE" "$STATUS_FILE" 
          fi
       fi
    elif [ "$IGNORE_ERRORS" == 0 ] ; then
-      echo "*** Fail - output changed: $TEST_NAME - diff $OUT_FILE $VALID_FILE"
+      echo "*** Fail - output changed: $TEST_NAME - diff $VALID_FILE $OUT_FILE"
       echo "$TEST_NAME" >> "${RUN_DIR}/failed"
-      echo "$TEST_NAME - diff $OUT_FILE $VALID_FILE" >> ${RUN_DIR}/failedDetail
-      diff "$OUT_FILE" "$VALID_FILE" > "$DIFF_FILE"
+      echo "$TEST_NAME - diff $VALID_FILE $OUT_FILE " >> ${RUN_DIR}/failedDetail
+      diff "$VALID_FILE" "$OUT_FILE" > "$DIFF_FILE"
       if [ "$ECHO_ERRORS" = "1" ] ; then
-         diff "$STATUS_FILE" "$VALID_STATUS_FILE"
-         diff "$OUT_FILE" "$VALID_FILE" 
+         diff "$VALID_STATUS_FILE" "$STATUS_FILE"
+         diff "$VALID_FILE" "$OUT_FILE" 
       fi
    else
       echo "Ignored different output for: $TEST_NAME"
@@ -141,9 +154,17 @@ if [ -f "$VALID_FILE" ] ; then
    fi
 else
    echo "First run for: $TEST_NAME stored in $OUT_FILE"
-   echo "$TEST_NAME - $OUT_FILE" >> "${RUN_DIR}/new"
+   echo "$TEST_NAME" >> "${RUN_DIR}/new"
+   echo "$TEST_NAME - $OUT_FILE" >> "${RUN_DIR}/newDetail"
    if [ "$ECHO_ERRORS" = "1" ] ; then
+      echo "--- New test output start:"
       cat "$OUT_FILE"
+      echo "- New test output end:"
+      if [ -d "$PAGES" ] ; then
+          echo "--- Page output starts:"
+          cat $PAGES/*
+          echo "- Page output ends"
+      fi
    fi
 fi
 
@@ -160,7 +181,14 @@ if [[ "$SUCCESS" = 0 && "$INTERACTIVE" = 1 ]] ; then
       cp "$OUT_FILE" "$VALID_FILE"
       cp "$STATUS_FILE" "$VALID_STATUS_FILE"
       cp "$CMD_FILE" "$VALID_CMD_FILE"
-      echo "Accepted new output file $OUT_FILE as valid: $VALID_FILE"
+      echo "Updated valid output: $VALID_FILE"
+      if [ -d "$PAGES" ] ; then
+         if [ -d "$VALID_PAGES" ] ; then
+            rm -rf "$VALID_PAGES" 
+         fi
+         cp -r "$PAGES" "$VALID_PAGES"
+         echo "Updated valid pages dir $VALID_PAGES"
+      fi
    else
       echo "Did not accept $OUT_FILE - valid file remains: $VALID_FILE"
    fi

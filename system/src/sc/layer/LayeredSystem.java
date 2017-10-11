@@ -3391,6 +3391,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       @Constant String testPattern = null;
 
+      /** Exit after running the tests */
+      @Constant boolean testExit = false;
+
       /** Argument to control what happens after the command is run, e.g. it can specify the URL of the page to open. */
       @Constant String openPattern = null;
 
@@ -3730,6 +3733,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                case 't':
                   if (opt.equals("ta")) {
                      options.testPattern = ".*";
+                  }
+                  else if (opt.equals("te")) {
+                     options.testExit = true;
                   }
                   else if (opt.equals("t")) {
                      if (i == args.length - 1)
@@ -4107,6 +4113,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          System.out.println("Stats for TemplateLanguage:");
          System.out.println(Parser.getStatInfo(TemplateLanguage.INSTANCE.getStartParselet()));
       }
+      if (options.testExit)
+         System.exit(sys.anyErrors ? -1 : 0);
    }
 
    private boolean syncInited = false;
