@@ -9,8 +9,11 @@ import sc.obj.Sync;
 import sc.obj.SyncMode;
 import sc.type.IResponseListener;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
+
+import static sc.sync.SyncManager.verbose;
 
 /** Represents the connection to the client, server or remote system */
 @sc.js.JSSettings(jsModuleFile="js/sync.js", prefixAlias="sc_")
@@ -41,12 +44,32 @@ public abstract class SyncDestination {
    /** Stores the runtime name used for determining what methods are exposed for this runtime. */ // TODO: would we ever want to use one destination for more than one runtime context?  Maybe this belongs in the Context object?
    public String remoteRuntimeName = "java";
 
+   /** The number of sync requests that are in progress against this destination */
+   public int numSendsInProgress = 0;
+
+   /** Should this destination implement real-time semantics - i.e. where the client receives changes from the server automatically */
+   public boolean realTime = true;
+
+   /** How much time should we wait on the client after completing a sync before we start the next sync in case the server has more changes */
+   public int pollTime = realTime ? 500 : -1;
+
+   /** Are we currently connected to the remote destination?  Set to true after a successful response and to false after a server error */
+   public boolean connected = false;
+
+   public int defaultReconnectTime = 500;
+
+   public int maxReconnectTime = 60*5*1000; // try to reconnect at least once every 5 minutes when in real time mode
+
+   public int currentReconnectTime = defaultReconnectTime;
+
    /** Set by components like ServletSyncDestination via the initOnStartup hook */
    public static SyncDestination defaultDestination;
 
    /**
     * Takes a sync request string, already converted to the format required by the destination (e.g. JS for JS).  There's an optional list of parameters, a listener
     * from which you can receive response events (if this is writing a client request), and an optional buffer of codeUpdates
+    *
+    * May thrown a RuntimeIOException if the write fails due to a connection problem.
     */
    public abstract void writeToDestination(String syncRequestStr, String syncGroup, IResponseListener listener, String paramStr, CharSequence codeUpdates);
 
@@ -57,9 +80,11 @@ public abstract class SyncDestination {
     */
    public abstract StringBuilder translateSyncLayer(String layerDef);
 
-   /** Applies the layer definition received from the remote definition.  For JS, we'll eval the returned Javascript.  For stratacode or json, we'll parse the layer definition and apply it as a set of changes to the instances.
+   /**
+    * Applies the changes received from the sync layers received from the remote definition.  When we receive JS, we'll just eval the returned Javascript.
+    * When receiving stratacode or json, we'll parse the layer definition and apply it as a set of changes to the instances.
     * The receiveLanguage may be specified or if null, we look for SYNC_LAYER_START and pull the receive language out of the text
-    * */
+    */
    public void applySyncLayer(String input, String receiveLanguage, boolean resetSync) {
       SyncManager.SyncState oldSyncState = SyncManager.getSyncState();
 
@@ -177,10 +202,12 @@ public abstract class SyncDestination {
          for (SyncLayer syncLayer:syncLayers) {
             syncLayer.completeSync(clientContext, error);
          }
+         postCompleteSync();
       }
 
       public void response(Object response) {
          String responseText = (String) response;
+         connected = true;
          completeSync(false);
          SyncManager.setCurrentSyncLayers(syncLayers);
          SyncManager.setSyncState(SyncManager.SyncState.ApplyingChanges);
@@ -197,6 +224,7 @@ public abstract class SyncDestination {
          // The server reset it's session which means it cannot respond to the sync.  We respond by sending the initial layer
          // to the server to reset it's data to what we have.
          if (errorCode == 205) {
+            connected = true;
             CharSequence initSync = SyncManager.getInitialSync(name, clientContext.scope.getScopeDefinition().scopeId, false, null);
             if (SyncManager.trace) {
                if (initSync.length() == 0) {
@@ -219,8 +247,28 @@ public abstract class SyncDestination {
             writeToDestination(sb.toString(), null, this, "reset=true", null);
          }
          else {
+            boolean serverError = errorCode == 500 || errorCode == 0;
+            if (serverError)
+               System.out.println("*** Server error - code: " + errorCode);
+            // If we're on the client and we get a server error, mark us as disconnected
+            if (serverError && isSendingSync()) {
+               if (connected) {
+                  connected = false;
+                  currentReconnectTime = defaultReconnectTime;
+               }
+               else {
+                  currentReconnectTime *= 2;
+                  if (currentReconnectTime > maxReconnectTime)
+                     currentReconnectTime = maxReconnectTime;
+               }
+
+               // And for real time situations, try to reconnect - doubling the waitTime with each attempt
+               if (realTime) {
+                  syncManager.scheduleConnectSync(currentReconnectTime);
+               }
+            }
             completeSync(true);
-            if (errorCode != 500)
+            if (!serverError)
                applySyncLayer((String) error, null, false);
          }
       }
@@ -228,11 +276,17 @@ public abstract class SyncDestination {
 
    public void updateInProgress(boolean start) {
       // TODO: do we need to sync here for thread safety?  Right now we are only sending on the client where it's not an issue
+      int incr = (start ? 1 : -1);
+      numSendsInProgress += incr;
       if (isSendingSync())
-         syncManager.setNumSendsInProgress(syncManager.getNumSendsInProgress() + (start ? 1 : -1));
+         syncManager.setNumSendsInProgress(syncManager.getNumSendsInProgress() + incr);
    }
 
-   public boolean sendSync(SyncManager.SyncContext parentContext, ArrayList<SyncLayer> layers, String syncGroup, boolean resetSync, CharSequence codeUpdates) {
+   /** Called after we've finished the entire sync.  For client destinations, this is the hook to see if we need to start another sync to obtain real-time changes */
+   public void postCompleteSync() {
+   }
+
+   public SyncResult sendSync(SyncManager.SyncContext parentContext, ArrayList<SyncLayer> layers, String syncGroup, boolean resetSync, CharSequence codeUpdates) {
       SyncSerializer lastSer = null;
       HashSet<String> createdTypes = new HashSet<String>();
       // Going in sorted order - e.g. global, then session.
@@ -247,9 +301,11 @@ public abstract class SyncDestination {
             lastSer.appendSerializer(nextSer);
       }
       boolean complete = false;
+      boolean anyChanges = false;
       String errorMessage = null;
       try {
          String layerDef = lastSer == null ? "" : lastSer.getOutput().toString();
+         anyChanges = layerDef.length() > 0;
          if (SyncManager.trace) {
             // For scn, want easy way to debug the sc version, not the JS code
             String debugDef = lastSer == null ? "" : lastSer.getDebugOutput().toString();
@@ -266,6 +322,12 @@ public abstract class SyncDestination {
          }
          complete = true;
       }
+      catch (RuntimeIOException ioexc) {
+         if (verbose)
+            System.out.println("RuntimeIOException writing to destination: " + ioexc);
+         complete = true; // don't want to log the error for this - just let the caller figure out how to reconnect or end the connection
+         throw ioexc;
+      }
       catch (Exception exc) {
          errorMessage = exc.toString();
          System.out.println("Error occurred sending sync: " + errorMessage);
@@ -281,7 +343,7 @@ public abstract class SyncDestination {
          if (errorMessage != null)
             System.err.println("*** Sync failed: " + errorMessage);
       }
-      return errorMessage != null;
+      return new SyncResult(anyChanges, errorMessage);
    }
 
    public int getDefaultSyncPropOptions() {

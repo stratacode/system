@@ -760,6 +760,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    public SrcEntry getSrcEntryForJSFile(Layer genLayer, String jsFile) {
+      if (!genLayer.isBuildLayer())
+         return null;
       String prefix = getJSPathPrefix(genLayer);
       String absFilePath = FileUtil.concat(genLayer.buildDir, prefix, jsFile);
       // These go into the buildSrcDir because there's no use for them in the web root.  Also, they are put into the .deps file - if they don't exist, they force
@@ -807,6 +809,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       if (td.getEnclosingType() == null) {
          registerPrefixAlias(td);
       }
+      else if (td.isAnonymousType())
+         return;
 
       //if (verboseJS && td.getEnclosingType() == null)
       //   system.verbose("Starting for JS: " + td.getFullTypeName());
@@ -2011,7 +2015,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                      // TODO: For incremental builds, do we need to keep track of which generated JS files are inherited?  It can get tricky to figure out
                      // because of a case where the module entry point's class extends a class which is overridden in the new layer.  That changes the JS file
                      // but currently does not modify the entry point so we don't know it's modified in the subsequent layer.
-                     if (!thisGenJSFile.canRead() || thisGenJSFile.lastModified() < baseFile.lastModified()) {
+                     if (!thisGenJSFile.canRead() || thisGenJSFile.lastModified() < baseFile.lastModified() || sys.options.buildAllFiles) {
                         if (sys.options.verbose)
                            System.out.println("Inheriting js file: " + jsFile + " from build layer: " + baseSrc.layer + " to: " + genLayer);
 

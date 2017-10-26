@@ -3423,7 +3423,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (!started)
          started = true;
 
-      if (arguments != null && arguments.contains(this)) {
+      if (arguments != null && arguments.identityIndexOf(this) != -1) {
          System.err.println("*** ERROR - invalid model - recursive identifier expression!");
          return;
       }

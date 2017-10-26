@@ -64,6 +64,7 @@ public class AppGlobalScopeDefinition extends ScopeDefinition {
          if (ctx == null) {
             ctx = new AppGlobalScopeContext(appId);
             appGlobalTable.put(appId, ctx);
+            ctx.init();
          }
          return ctx;
       }

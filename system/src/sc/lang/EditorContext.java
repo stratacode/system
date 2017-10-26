@@ -684,7 +684,7 @@ public class EditorContext extends ClientEditorContext {
       String relType = currentPackage.equals(layerPrefix) ? null : layerPrefix.length() == 0 ? currentPackage : currentPackage.substring(layerPrefix.length()+1);
       String relPath = relType == null ? null : relType.replace(".", FileUtil.FILE_SEPARATOR);
 
-      String relFile = FileUtil.concat(relPath, name + SCLanguage.STRATACODE_SUFFIX);
+      String relFile = FileUtil.concat(relPath, name + "." + SCLanguage.STRATACODE_SUFFIX);
       String absFile = FileUtil.concat(layer.getLayerPathName(), relFile);
       File abs = new File(absFile);
       if (abs.canRead())
@@ -1001,7 +1001,7 @@ public class EditorContext extends ClientEditorContext {
    public String validateNewLayerPath(String str) {
       String res = validateLayerPath(str);
       String pathName = FileUtil.concat(system.getNewLayerDir(), res);
-      String baseName = FileUtil.getFileName(pathName) + SCLanguage.STRATACODE_SUFFIX;
+      String baseName = FileUtil.getFileName(pathName) + "." + SCLanguage.STRATACODE_SUFFIX;
       pathName = FileUtil.concat(pathName, baseName);
       if (new File(pathName).canRead())
          throw new IllegalArgumentException("Layer already exists: " + pathName);

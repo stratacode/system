@@ -47,6 +47,8 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    public static boolean fastGenExpressions = true;
    public static boolean fastGenMethods = true;
 
+   public final static String SCJ_SUFFIX = "scj";
+
    public Set getKeywords() {
       return JAVA_KEYWORD_SET;
    }
@@ -871,7 +873,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       languageName = "SCJava";
       // We used to use java here for java files in layer directories but this makes the IDE registration difficult
       // since intelliJ does not let us register a processor for a file in special folder - they are global per suffix.
-      defaultExtension = "scj";
+      defaultExtension = SCJ_SUFFIX;
    }
 
    public String getJavaFileName(String fileName) {

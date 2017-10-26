@@ -2328,11 +2328,20 @@ public class ModelUtil {
             ClassLoader cl2Loader = cl2.getClassLoader();
             if (!res && cl1Loader != cl2Loader) {
                boolean deactivatedLoader = false;
-               if (cl1Loader instanceof TrackingClassLoader)
-                  deactivatedLoader = ((TrackingClassLoader) cl1Loader).deactivated;
-               if (cl2Loader instanceof TrackingClassLoader)
-                  deactivatedLoader |= ((TrackingClassLoader) cl2Loader).deactivated;
-               if (deactivatedLoader) {
+               LayeredSystem sys1 = null, sys2 = null;
+               if (cl1Loader instanceof TrackingClassLoader) {
+                  TrackingClassLoader tcl1 = ((TrackingClassLoader) cl1Loader);
+                  deactivatedLoader = tcl1.deactivated;
+                  sys1 = tcl1.getSystem();
+               }
+               if (cl2Loader instanceof TrackingClassLoader) {
+                  TrackingClassLoader tcl2 = ((TrackingClassLoader) cl2Loader);
+                  deactivatedLoader |= tcl2.deactivated;
+                  sys2 = tcl2.getSystem();
+               }
+               // It's possible we have the same class but different class loaders, either because one class loader was deactivated or we are dealing with two different layered systems - i.e.
+               // finding an assignment across runtimes like java and js.  If so we need to convert the classes into the same class loader before doing the isAssignableFrom test.
+               if (deactivatedLoader || sys1 != sys2) {
                   if (sys != null) {
                      Object ncl1, ncl2;
                      ncl1 = ModelUtil.refreshBoundClass(sys, cl1);

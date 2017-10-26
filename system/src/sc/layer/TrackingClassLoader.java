@@ -163,4 +163,8 @@ public class TrackingClassLoader extends URLClassLoader {
          parentTrackingLoader.deactivate();
       }
    }
+
+   public LayeredSystem getSystem() {
+      return layer == null ? null : layer.layeredSystem;
+   }
 }

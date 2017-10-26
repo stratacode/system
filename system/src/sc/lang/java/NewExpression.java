@@ -205,7 +205,7 @@ public class NewExpression extends IdentifierExpression {
    public Object findMember(String name, EnumSet<MemberType> mtype, Object fromChild, Object refType, TypeContext ctx, boolean skipIfaces) {
       // Don't search this types info unless coming from the body.  Any parameters to the constructors
       // should not see those values.
-      if (classBody != null && classBody.indexOf(fromChild) != -1) {
+      if (classBody != null && classBody.identityIndexOf(fromChild) != -1) {
          Object v = BodyTypeDeclaration.findMemberInBody(classBody, name, mtype, refType, ctx);
          if (v != null)
             return v;
@@ -220,7 +220,7 @@ public class NewExpression extends IdentifierExpression {
    }
 
    public Object findMethod(String name, List<? extends Object> params, Object fromChild, Object refType, boolean staticOnly, Object inferredType) {
-      if (classBody != null && classBody.indexOf(fromChild) != -1) {
+      if (classBody != null && classBody.identityIndexOf(fromChild) != -1) {
          Object v = BodyTypeDeclaration.findMethodInBody(classBody, name, params, null, refType, staticOnly, inferredType, null);
          if (v != null)
             return v;

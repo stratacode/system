@@ -517,6 +517,12 @@ public class PTypeUtil {
       throw new IllegalArgumentException("Unrecognized method: " + method);
    }
 
+   public static Object getMethodType(Object method) {
+      if (method instanceof Method)
+         return ((Method) method).getDeclaringClass();
+      throw new UnsupportedOperationException();
+   }
+
    public static IReverseMethodMapper getReverseMethodMapper(MethodBinding binding) {
       return new RuntimeReverseMethodMapper(binding);
    }
@@ -892,13 +898,26 @@ public class PTypeUtil {
       }
    }
 
-   public static boolean isInvokeLaterSupported() {
-      return false;
+   public static Object addScheduledJob(final Runnable toRun, long delay, boolean repeat) {
+      TimerTask task = new TimerTask() {
+         public void run() {
+            toRun.run();
+         }
+      };
+      Timer timer = new Timer("Timer: " + toRun.toString());
+      if (repeat)
+         timer.schedule(task, delay, delay);
+      else
+         timer.schedule(task, delay);
+      return task;
    }
 
-   // Implemented in Javascript only - TODO: shouldn't we replace this with the IScheduler interface and DynUtil.invokeLater?
-   public static void invokeLater(Runnable toRun, long delay) {
-      throw new UnsupportedOperationException();
+   public static void cancelScheduledJob(Object handle, boolean repeat) {
+      ((TimerTask) handle).cancel();
+   }
+
+   /** On the server, do nothing.  On the client, run the job after the initial page has loaded and been refreshed.  */
+   public static void addClientInitJob(Runnable r) {
    }
 
    public static void postHttpRequest(String url, String postData, String contentType, IResponseListener listener) {

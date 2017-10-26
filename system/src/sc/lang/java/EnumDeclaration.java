@@ -401,4 +401,11 @@ public class EnumDeclaration extends TypeDeclaration {
          return;
       throw new UnsupportedOperationException();
    }
+
+   public void stop() {
+      super.stop();
+
+      valueOfMethod = null;
+      valuesMethod = null;
+   }
 }

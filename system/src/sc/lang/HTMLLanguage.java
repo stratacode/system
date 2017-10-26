@@ -35,6 +35,8 @@ import java.util.Set;
 public class HTMLLanguage extends TemplateLanguage {
    public final static HTMLLanguage INSTANCE = new HTMLLanguage();
 
+   public final static String SC_HTML_SUFFIX = "schtml";
+
    /**
     * The parser lets you maintain additional parse-state so that you can match or reject any given element in the input stream.
     * This extension point is the SemanticContext.  For HTML, we need to maintain the tagStack so that we can match open and closed

@@ -799,9 +799,19 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                   while ((lix = rootTypeName.lastIndexOf(".")) != -1) {
                      String nextRoot = rootTypeName.substring(0,lix);
                      String tail = importedName.substring(lix+1);
-                     Object baseTD = findTypeDeclaration(nextRoot, addExternalReference, srcOnly);
-                     if (baseTD != null && (td = ModelUtil.getInnerType(baseTD, tail, null)) != null)
+                     if (nextRoot.equals(typeName)) {
+                        System.err.println("*** finTypeDeclaration - avoiding infinite loop - somehow came up with the same type name as the one we were passed - not good: " + typeName + " rootTypeName: " + rootTypeName);
                         break;
+                     }
+                     try {
+                        Object baseTD = findTypeDeclaration(nextRoot, addExternalReference, srcOnly);
+
+                        if (baseTD != null && (td = ModelUtil.getInnerType(baseTD, tail, null)) != null)
+                           break;
+                     }
+                     catch (StackOverflowError exc) {
+                        System.err.println("*** Error - findTypeDeclaration loop");
+                     }
                      rootTypeName = nextRoot;
                   }
                }

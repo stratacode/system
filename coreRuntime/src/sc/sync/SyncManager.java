@@ -188,7 +188,13 @@ public class SyncManager {
    @Sync(syncMode= SyncMode.Disabled)
    public class SyncContext implements ScopeDestroyListener, Comparable {
       String name;
+
+      // Stores the list of parent contexts - e.g. for a window scope, it will store the app session and for the app session, it will store the app-global and session.
       ArrayList<SyncContext> parentContexts;
+
+      // Stores the list of child sync contexts - e.g. based on the ScopeDefinition's parent/child relationship.  TODO: can we remove this now that we have this at the scope level and use that instead?
+      HashSet<SyncContext> childContexts;
+
       ScopeContext scope;
 
       protected boolean initialSync = false;  // Before we've sent our context remotely we're in the initial sync
@@ -221,9 +227,6 @@ public class SyncManager {
       // A table which stores the automatically assigned id for a given object instance.
       //static Map<Object,String> objectIds = (Map<Object,String>) PTypeUtil.getWeakHashMap();
       Map<Object,String> objectIds;
-
-      // A global sync context will have child contexts which are listening for it's objects
-      HashSet<SyncContext> childContexts;
 
       SyncLayer initialSyncLayer = new SyncLayer(this);
       {
@@ -1570,15 +1573,15 @@ public class SyncManager {
          initSyncInst(depChanges, changedObj, instInfo, instInfo == null ? props == null ? false : props.initDefault : instInfo.initDefault, scope == null ? 0 : scope.getScopeDefinition().scopeId, props, instInfo == null ? null : instInfo.args, false, inherited, addPropChanges, true, syncLayer);
       }
 
-      public RemoteResult invokeRemote(String syncGroup, Object obj, String methName, String paramSig, Object[] args) {
+      public RemoteResult invokeRemote(String syncGroup, Object obj, Object type, String methName, String paramSig, Object[] args) {
          SyncLayer changedLayer = getChangedSyncLayer(syncGroup);
          if (!needsSync) {
             setNeedsSync(true);
          }
          if (trace) {
-            System.out.println("Remote method call: " + DynUtil.getInstanceName(obj) + "." + methName + "(" + DynUtil.arrayToInstanceName(args) + ")");
+            System.out.println("Remote method call: " + (obj != null ? DynUtil.getInstanceName(obj) : DynUtil.getTypeName(type, false)) + "." + methName + "(" + DynUtil.arrayToInstanceName(args) + ")");
          }
-         return changedLayer.invokeRemote(obj, methName,  paramSig, args);
+         return changedLayer.invokeRemote(obj, type, methName,  paramSig, args);
       }
 
       public void addMethodResult(Object ctxObj, String objName, Object retValue) {
@@ -2656,12 +2659,12 @@ public class SyncManager {
       ctx.removeSyncInst(inst, syncProps);
    }
 
-   public static boolean sendSync() {
+   public static SyncResult sendSync() {
       return sendSync(null, false);
    }
 
    /** Start a synchronize operation for all destinations. Types which have registered a custom sync group are not synchronized. */
-   public static boolean sendSync(boolean resetSync) {
+   public static SyncResult sendSync(boolean resetSync) {
       return sendSync(null, resetSync);
    }
 
@@ -2806,11 +2809,16 @@ public class SyncManager {
     * Does a global sync across all destinations for all current sync contexts.  If you use SYNC_ALL as the sync group
     * it will synchronize all sync groups.  Specifying a null syncGroup will choose the default sync group only.
     */
-   public static boolean sendSync(String syncGroup, boolean resetSync) {
-      boolean sentAnything = false;
-      for (String destName:syncManagersByDest.keySet())
-         sentAnything = sendSync(destName, syncGroup, resetSync, null) || sentAnything;
-      return sentAnything;
+   public static SyncResult sendSync(String syncGroup, boolean resetSync) {
+      boolean anyChanges = false;
+      String errorMessage = null;
+      for (String destName:syncManagersByDest.keySet()) {
+         SyncResult res = sendSync(destName, syncGroup, resetSync, null);
+         anyChanges = anyChanges || res.anyChanges;
+         if (errorMessage == null)
+            errorMessage = res.errorMessage;
+      }
+      return new SyncResult(anyChanges, errorMessage);
    }
 
    public static Set<String> getDestinationNames() {
@@ -2821,13 +2829,13 @@ public class SyncManager {
       ScopeDefinition syncScope = null;
       List<ScopeDefinition> activeScopes = ScopeDefinition.getActiveScopes();
       for (ScopeDefinition def: activeScopes) {
-         if (syncScope == null || def.includesScope(syncScope))
+         if (syncScope == null || syncScope.includesScope(def))
             syncScope = def;
       }
       return syncScope;
    }
 
-   public static boolean sendSync(String destName, String syncGroup, boolean resetSync, CharSequence codeUpdates) {
+   public static SyncResult sendSync(String destName, String syncGroup, boolean resetSync, CharSequence codeUpdates) {
       ScopeDefinition syncScope = getDefaultScope();
       if (syncScope == null)
          throw new IllegalArgumentException("*** No active scopes to sync");
@@ -2835,7 +2843,7 @@ public class SyncManager {
          return sendSync(destName, syncGroup, syncScope.scopeId, resetSync, codeUpdates);
    }
 
-   public static boolean sendSync(String destName, String syncGroup, int scopeId, boolean resetSync, CharSequence codeUpdates) {
+   public static SyncResult sendSync(String destName, String syncGroup, int scopeId, boolean resetSync, CharSequence codeUpdates) {
       SyncManager syncMgr = syncManagersByDest.get(destName);
       return syncMgr.sendSync(syncGroup, scopeId, resetSync, codeUpdates);
    }
@@ -2860,7 +2868,7 @@ public class SyncManager {
       return null;
    }
 
-   public boolean sendSync(String syncGroup, int scopeId, boolean resetSync, CharSequence codeUpdates) {
+   public SyncResult sendSync(String syncGroup, int scopeId, boolean resetSync, CharSequence codeUpdates) {
       SyncContext ctx = getSyncContext(scopeId, false);
       if (ctx == null) {  // If the default scope does not have a context, check for a sync context on the parent scope
          ctx = getFirstParentSyncContext(scopeId, false);
@@ -2888,11 +2896,11 @@ public class SyncManager {
       else if (verbose) {
          System.out.println("No changes to synchronize for scope: " + ScopeDefinition.getScope(scopeId));
       }
-      return true;
+      return new SyncResult(false, null);
    }
 
-   public static RemoteResult invokeRemote(Object obj, String methName, String paramSig, Object...args) {
-      return invokeRemoteDest(SyncDestination.defaultDestination.name, null, obj, methName, paramSig, args);
+   public static RemoteResult invokeRemote(ScopeDefinition def, ScopeContext ctx, Object obj, Object type, String methName, String paramSig, Object...args) {
+      return invokeRemoteDest(def, ctx, SyncDestination.defaultDestination.name, null, obj, type, methName, paramSig, args);
    }
 
    public static void setCurrentSyncLayers(ArrayList<SyncLayer> current) {
@@ -2918,13 +2926,33 @@ public class SyncManager {
          System.err.println("processMethodReturn called when no current sync layer is registered");
    }
 
-   public static RemoteResult invokeRemoteDest(String destName, String syncGroup, Object obj, String methName, String paramSig, Object...args) {
+   /** Called either with a scopeDefinition - to choose the current context in that scope, an explicit ScopeContext or neither to choose the default scope, default context. */
+   public static RemoteResult invokeRemoteDest(ScopeDefinition def, ScopeContext scopeCtx, String destName, String syncGroup, Object obj, Object type, String methName, String paramSig, Object...args) {
       SyncManager mgr = getSyncManager(destName);
-      int scopeId = getScopeIdForSyncInst(obj);
-      if (scopeId == -1)
-         scopeId = GlobalScopeDefinition.getGlobalScopeDefinition().scopeId;
-      SyncContext ctx = obj == null ? mgr.getDefaultSyncContext() : mgr.getSyncContext(scopeId, true);
-      return ctx.invokeRemote(syncGroup, obj, methName, paramSig, args);
+      int scopeId;
+      SyncContext ctx = null;
+      if (scopeCtx == null) {
+         if (def == null && obj != null) {
+            scopeId = getScopeIdForSyncInst(obj);
+            if (scopeId == -1)
+               scopeId = GlobalScopeDefinition.getGlobalScopeDefinition().scopeId;
+         }
+         else if (def != null)
+            scopeId = def.scopeId;
+         else
+            scopeId = GlobalScopeDefinition.getGlobalScopeDefinition().scopeId;
+
+         ctx = obj == null ? mgr.getDefaultSyncContext() : mgr.getSyncContext(scopeId, true);
+      }
+      else {
+         ctx = (SyncContext) scopeCtx.getValue(SC_SYNC_CONTEXT_SCOPE_KEY);
+         if (ctx == null) {
+            // TODO: should we create it here?
+            System.err.println("*** No sync context for scope context: " + ctx);
+            return null;
+         }
+      }
+      return ctx.invokeRemote(syncGroup, obj, type, methName, paramSig, args);
    }
 
    public static SyncContext getDefaultSyncContext() {
@@ -3009,5 +3037,9 @@ public class SyncManager {
       SyncContext ctx;
    }
 
+   public void autoSync() {
+   }
 
+   void scheduleConnectSync(long waitToSyncTime) {
+   }
 }

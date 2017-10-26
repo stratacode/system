@@ -359,6 +359,12 @@ public class PTypeUtil {
       throw new UnsupportedOperationException();
    }
 
+   public static Object getMethodType(Object method) {
+      if (method instanceof CompMethodMapper)
+         return ((CompMethodMapper) method).type;
+      throw new UnsupportedOperationException();
+   }
+
    public static IReverseMethodMapper getReverseMethodMapper(MethodBinding binding) {
       return new CompReverseMethodMapper(binding);
    }
@@ -424,16 +430,27 @@ public class PTypeUtil {
       }
    }
 
-   // Implemented in Javascript
-   public static boolean isInvokeLaterSupported() {
-      return false;
+   public static Object addScheduledJob(final Runnable toRun, long delay, boolean repeat) {
+      TimerTask task = new TimerTask() {
+          public void run() {
+             toRun.run();
+          }
+      };
+      Timer timer = new Timer("Timer: " + toRun.toString());
+      if (repeat)
+         timer.schedule(task, delay, delay);
+      else
+         timer.schedule(task, delay);
+      return task;
    }
 
-   // Implemented in Javascript
-   public static void invokeLater(Runnable toRun, long delay) {
-      throw new UnsupportedOperationException();
+   public static void cancelScheduledJob(Object handle, boolean repeat) {
+      ((TimerTask) handle).cancel();
    }
 
+   /** On the server, do nothing.  On the client, run the job after the initial page has loaded and been refreshed.  */
+   public static void addClientInitJob(Runnable r) {
+   }
 
    public static void postHttpRequest(String url, String postData, String contentType, IResponseListener listener) {
       // TODO: maybe implement this or clean this API up.  Can we emulate XmlHttpRrequest in Java and so use that one API?

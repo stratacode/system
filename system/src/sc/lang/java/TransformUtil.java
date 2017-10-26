@@ -470,7 +470,7 @@ public class TransformUtil {
          parseClassBodySnippet(accessClass, codeToInsert, applyToHiddenBody, -1, assignments, objType);
          PerfMon.end("parseClassSnippet");
       }
-      // This is the case where it's not a component or an object so we do not use a templste to redefine the creation semantics of the type.
+      // This is the case where it's not a component or an object so we do not use a template to redefine the creation semantics of the type.
       // But we do have pre or post assignments.  They either get inserted into each constructor or
       else if (parameters.postAssignments != null || parameters.preAssignments != null) {
          parameters.noCreationTemplate = true;
@@ -500,6 +500,12 @@ public class TransformUtil {
                      cdef.body.addAllStatementsAt(cdef.body.getNumStatements(), toInsert);
                }
             }
+         }
+
+         if (parameters.getLiveDynamicTypes()) {
+            if (initString == null)
+               initString = new StringBuilder();
+            initString.append(parameters.getDynamicTypeDefinition("this", 2));
          }
 
          if (initString != null && initString.length() > 0) {

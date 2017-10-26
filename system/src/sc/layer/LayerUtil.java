@@ -538,7 +538,7 @@ public class LayerUtil implements LayerConstants {
    public static String getNewLayerDefinitionFileName(LayeredSystem sys, String layerName) {
       String res = fixLayerPathName(layerName);
       String pathName = FileUtil.concat(sys.getNewLayerDir(), res);
-      String baseName = FileUtil.getFileName(pathName) + SCLanguage.STRATACODE_SUFFIX;
+      String baseName = FileUtil.getFileName(pathName) + "." + SCLanguage.STRATACODE_SUFFIX;
       return FileUtil.concat(pathName, baseName);
    }
 

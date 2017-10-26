@@ -6,8 +6,7 @@ package sc.lang.java;
 
 import sc.classfile.CFClass;
 import sc.classfile.CFMethod;
-import sc.dyn.IDynObjManager;
-import sc.dyn.IDynObject;
+import sc.dyn.*;
 import sc.lang.*;
 import sc.lang.html.Element;
 import sc.lang.js.JSRuntimeProcessor;
@@ -22,8 +21,6 @@ import sc.sync.SyncPropOptions;
 import sc.sync.SyncProperties;
 import sc.type.*;
 import sc.util.*;
-import sc.dyn.DynUtil;
-import sc.dyn.IDynChildManager;
 
 import java.io.File;
 import java.io.Serializable;
@@ -3759,9 +3756,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (liveDynType)
          return true;
       Object setting = getCompilerSetting("liveDynamicTypes");
-      // By default, only turn this on for components and objects so we are not tracking every class by default
+      // By default, only turn this on for components and objects so we are not tracking every class by default.  Using IObjChildren here to pick up Element and because it seems like another good way to find 'components' even that do not have @Component
       if (setting == null)
-         return isComponentType() || getDeclarationType() == DeclarationType.OBJECT;
+         return isComponentType() || getDeclarationType() == DeclarationType.OBJECT || isAssignableFromClass(IObjChildren.class);
       return ((Boolean) setting);
    }
 
@@ -4881,15 +4878,16 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
       }
 
-      // Find all instances pointing to this type and replace them with the new one.  Update the inst/type index.
-      // Update the sub-type index so that all sub-types point to this new type
-      LayeredSystem sys = getJavaModel().layeredSystem;
-      if (sys.options.liveDynamicTypes && ModelUtil.getLiveDynamicTypes(this)) {
 
-         // Only do this for the most specific type in the hierarchy since we register type name
-         // Make sure to skip the replaced types though as we'll call this on an item which has just
-         // been replaced.
-         if (getRealReplacedByType() == null) {
+      // Only do this for the most specific type in the hierarchy since we register type name
+      // Make sure to skip the replaced types though as we'll call this on an item which has just
+      // been replaced.
+      LayeredSystem sys = getJavaModel().layeredSystem;
+
+      if (getRealReplacedByType() == null) {
+         // Find all instances pointing to this type and replace them with the new one.  Update the inst/type index.
+         // Update the sub-type index so that all sub-types point to this new type
+         if (sys.options.liveDynamicTypes && ModelUtil.getLiveDynamicTypes(this)) {
             String oldTypeName = getFullTypeName();
             Iterator insts = sys.getInstancesOfType(oldTypeName);
             if (insts != null) {
@@ -4913,9 +4911,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                }
             }
          }
+         else
+            sys.setStaleCompiledModel(true, "Type change of type ", typeName, " with liveDynamicTypes=false");
       }
-      else
-         sys.setStaleCompiledModel(true, "Type change of type ", typeName, " with liveDynamicTypes=false");
 
       if (sys.options.liveDynamicTypes) {
          if (isModifiedBySameType()) {
@@ -6484,7 +6482,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (ctx == null)
          return;
       // TODO: probably should mark things as stale if this object is not a singleton?
-      if (ModelUtil.isObjectType(this) && (currentObj = ctx.getCurrentObject()) != null) {
+      if ((currentObj = ctx.getCurrentObject()) != null) {
          initInstance(overriddenAssign, currentObj, ctx, iit);
       }
       else {
@@ -9395,8 +9393,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       syncProperties = null;
 
       super.stop();
-      if (hiddenBody != null)
+      if (hiddenBody != null) {
          hiddenBody.stop();
+         hiddenBody.clear();
+      }
    }
 
    public void updateReplacedByType(BodyTypeDeclaration repl) {

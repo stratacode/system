@@ -154,9 +154,9 @@ public class SCLanguage extends JavaLanguage {
       parseFiles(c, inputFileNames, false);
    }
 
-   public static final String STRATACODE_SUFFIX = ".sc";
+   public static final String STRATACODE_SUFFIX = "sc";
    
-   static final FilenameFilter STRATACODE_FILTER = new ExtensionFilenameFilter(STRATACODE_SUFFIX, true);
+   static final FilenameFilter STRATACODE_FILTER = new ExtensionFilenameFilter("." + STRATACODE_SUFFIX, true);
 
    static String [] inputFileNames = { "test1.sc" };
 

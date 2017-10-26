@@ -7,4 +7,5 @@ package sc.dyn;
 public interface IScheduler {
    void invokeLater(Runnable r, int priority);
    void execLaterJobs();
+   boolean hasPendingJobs();
 }

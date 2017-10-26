@@ -316,17 +316,32 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             if ((ix = baseFileName.indexOf(".")) != -1)
                baseFileName = baseFileName.substring(0, ix);
 
-            // TODO: if we are in persistent layer, a modify def should load the previous modify def.  A replace
-            // def should warn the user and then (re)move the previous model object in the layer.
-            String baseFile = baseFileName.replace(".", FileUtil.FILE_SEPARATOR) + SCLanguage.STRATACODE_SUFFIX;
-            String relFile;
-            if (filePrefix != null)
-               relFile = FileUtil.concat(filePrefix.replace(".", FileUtil.FILE_SEPARATOR), baseFile);
-            else
-               relFile = baseFile;
+            // TODO: maybe change this into a utility method and have it using the file processors?  I like that it's going right to the file
+            // system in case the layered system is not up-to-date but otherwise, it seems redundant to what's in LayeredSystem already
+            String[] suffixes = {
+               SCLanguage.STRATACODE_SUFFIX,
+               TemplateLanguage.SCT_SUFFIX,
+               JavaLanguage.SCJ_SUFFIX,
+               HTMLLanguage.SC_HTML_SUFFIX
+            };
 
-            String absFileName = FileUtil.concat(layer.getLayerPathName(), relFile);
-            File mFile = new File(absFileName);
+            int suffixIx = 0;
+            File mFile;
+            String relFile;
+            String absFileName;
+            do {
+               // TODO: if we are in persistent layer, a modify def should load the previous modify def.  A replace
+               // def should warn the user and then (re)move the previous model object in the layer.
+               String baseFile = FileUtil.addExtension(baseFileName.replace(".", FileUtil.FILE_SEPARATOR), suffixes[suffixIx]);
+               if (filePrefix != null)
+                  relFile = FileUtil.concat(filePrefix.replace(".", FileUtil.FILE_SEPARATOR), baseFile);
+               else
+                  relFile = baseFile;
+
+               absFileName = FileUtil.concat(layer.getLayerPathName(), relFile);
+               mFile = new File(absFileName);
+               suffixIx++;
+            } while (suffixIx < suffixes.length && !mFile.canRead());
 
             // If either there's a file in this layer or we may have unsaved changed to a file in this layer
             if (mFile.canRead() || isChangedModel(layer, relFile)) {
@@ -345,7 +360,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                   system.refreshRuntimes(true);
                   currentDef = system.getSrcTypeDeclaration(CTypeUtil.prefixPath(model.getPackagePrefix(), type.typeName), currentLayer.getNextLayer(), true);
                   if (currentDef == null) {
-                     System.err.println("No type (mismatching case?): " + type.typeName);
+                     System.err.println("No type: " + type.typeName + " in layer: " + currentLayer);
                      return;
                   }
                }
@@ -1164,10 +1179,16 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    }
 
    public void execLaterJobs() {
-      for (int i = 0; i < toRunLater.size(); i++) {
-         ScheduledJob toRun = toRunLater.get(i);
+      ArrayList<ScheduledJob> toRunNow = new ArrayList<ScheduledJob>(toRunLater);
+      toRunLater.clear();
+      for (int i = 0; i < toRunNow.size(); i++) {
+         ScheduledJob toRun = toRunNow.get(i);
          toRun.toInvoke.run();
       }
+   }
+
+   public boolean hasPendingJobs() {
+      return toRunLater.size() > 0;
    }
 
    public void addDialogAnswer(String dialogName, Object value) {

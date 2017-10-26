@@ -229,7 +229,7 @@ public class DynUtil {
    }
 
    public static RemoteResult invokeRemote(Object obj, Object method, Object... paramValues) {
-      return SyncManager.invokeRemote(obj, DynUtil.getMethodName(method), DynUtil.getTypeSignature(method), paramValues);
+      return SyncManager.invokeRemote(null, null, obj, DynUtil.getMethodType(method), DynUtil.getMethodName(method), DynUtil.getTypeSignature(method), paramValues);
    }
 
    /** In Java this is the same method but in Javascript they are different */
@@ -272,6 +272,15 @@ public class DynUtil {
          return dynamicSystem.getMethodName(method);
       else
          return PTypeUtil.getMethodName(method);
+   }
+
+   public static Object getMethodType(Object method) {
+      if (method instanceof DynRemoteMethod)
+         return ((DynRemoteMethod) method).type;
+      if (dynamicSystem != null)
+         return dynamicSystem.getDeclaringClass(method);
+      else
+         return PTypeUtil.getMethodType(method);
    }
 
    public static String getTypeSignature(Object method) {
@@ -1185,9 +1194,47 @@ public class DynUtil {
       return false;
    }
 
-   /** This is implemented only in the JS runtime */
+   private static class RemoteCallSyncListener implements sc.type.IResponseListener {
+      Object result = null;
+      Object error = null;
+      int errorCode = -1;
+      boolean success = false;
+      public synchronized void response(Object response) {
+         result = response;
+         success = true;
+         notify();
+      }
+      public synchronized void error(int errorCode, Object error) {
+         this.errorCode = errorCode;
+         this.error = error;
+         notify();
+      }
+   }
+
    public static Object evalScript(String script) {
-      throw new UnsupportedOperationException();
+      RemoteResult remoteRes = invokeRemote(null, DynUtil.resolveRemoteStaticMethod(DynUtil.class, "evalScript", "Ljava/lang/String;"), script);
+      RemoteCallSyncListener listener = new RemoteCallSyncListener();
+      remoteRes.listener = listener;
+
+      // Need to run scopeChanged jobs here - so we notify the threads which will process the request
+      DynUtil.execLaterJobs();
+
+      synchronized (listener) {
+         try {
+            listener.wait(500000);
+         }
+         catch (InterruptedException exc) {
+            System.err.println("*** evalScript interrupted: " + exc);
+         }
+      }
+      Object evalRes = listener.result;
+      if (listener.errorCode != -1) {
+         System.err.println("*** evalScript - returns error: " + listener.errorCode + ":" + listener.error);
+      }
+      else if (!listener.success) {
+         System.err.println("*** evalScript - timed out");
+      }
+      return evalRes;
    }
 
    public static void applySyncLayer(String lang, String destName, String scopeName, String code, boolean isReset, boolean allowCodeEval) {
@@ -1303,9 +1350,21 @@ public class DynUtil {
    }
 
    public static void execLaterJobs() {
+      IScheduler sched = threadScheduler.get();
+      if (sched != null) {
+         sched.execLaterJobs();
+         return;
+      }
       if (frameworkScheduler == null)
          return;
       frameworkScheduler.execLaterJobs();
+   }
+
+   public static boolean hasPendingJobs() {
+      IScheduler sched = threadScheduler.get();
+      if (sched != null)
+         return sched.hasPendingJobs();
+      return frameworkScheduler == null ? false : frameworkScheduler.hasPendingJobs();
    }
 
    public static String getPackageName(Object type) {

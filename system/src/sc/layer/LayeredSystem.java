@@ -1154,7 +1154,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       Language.registerLanguage(DependenciesLanguage.INSTANCE, "deps");
       Language.registerLanguage(JavaLanguage.INSTANCE, "java");
-      Language.registerLanguage(JavaLanguage.INSTANCE, "scj");  // Alternate suffix for java files in the SC tree
+      Language.registerLanguage(JavaLanguage.INSTANCE, JavaLanguage.SCJ_SUFFIX);  // Alternate suffix for java files in the SC tree
       Language.registerLanguage(SCLanguage.INSTANCE, SCLanguage.DEFAULT_EXTENSION);
       TemplateLanguage objDefTemplateLang = new TemplateLanguage();
       objDefTemplateLang.compiledTemplate = false;
@@ -1162,7 +1162,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       objDefTemplateLang.defaultExtendsType = "sc.lang.java.ObjectDefinitionParameters";
       // This one is for object definition templates we process from Java code, i.e. as part of framework definitions from CompilerSettings, newTemplate, and objTemplate
       Language.registerLanguage(objDefTemplateLang, "sctd");
-      Language.registerLanguage(TemplateLanguage.INSTANCE, "sct");
+      Language.registerLanguage(TemplateLanguage.INSTANCE, TemplateLanguage.SCT_SUFFIX);
 
       // Not registering Javascript yet because it is not complete.  In most projects we just copy the JS files as well so don't need to parse them as a language
       JSLanguage.INSTANCE.initialize();
@@ -4153,6 +4153,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       } while (true);
    }
 
+   public boolean commandLineEnabled() {
+      return cmd != null;
+   }
+
    // Called by any clients who need to use the LayeredSystem as a sync object.  Because this class is not compiled by StrataCode, we define the sync mappings
    // explicitly through the apis.
    public void initSync() {
@@ -5415,7 +5419,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          String pathName;
          String baseName;
          pathName = FileUtil.concat(rootFile, layerSlashName);
-         baseName = FileUtil.getFileName(pathName) + SCLanguage.STRATACODE_SUFFIX;
+         baseName = FileUtil.getFileName(pathName) + "." + SCLanguage.STRATACODE_SUFFIX;
          File file = new File(FileUtil.concat(pathName, baseName));
          if (file.exists())
             throw new IllegalArgumentException("Layer: " + layerName + " exists at: " + file);
@@ -5557,7 +5561,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          /* For flexibility, allow users to specify the package prefix or not */
       }
 
-      String layerBaseName = CTypeUtil.getClassName(layerTypeName) + SCLanguage.STRATACODE_SUFFIX;
+      String layerBaseName = CTypeUtil.getClassName(layerTypeName) + "." + SCLanguage.STRATACODE_SUFFIX;
 
       File layerFile = new File(FileUtil.concat(layerFileName, layerBaseName));
       if (layerFile.canRead())
@@ -5650,7 +5654,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          layerFileName = FileUtil.concat(layerDir, layerPathNamePath = LayerUtil.fixLayerPathName(layerPathName));
       }
 
-      String layerBaseName = CTypeUtil.getClassName(layerTypeName) + SCLanguage.STRATACODE_SUFFIX;
+      String layerBaseName = CTypeUtil.getClassName(layerTypeName) + "." + SCLanguage.STRATACODE_SUFFIX;
 
       String layerDefFile = FileUtil.concat(layerFileName, layerBaseName);
 
@@ -5724,7 +5728,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             return layer;
       }
 
-      String layerBaseName = CTypeUtil.getClassName(layerTypeName) + SCLanguage.STRATACODE_SUFFIX;
+      String layerBaseName = CTypeUtil.getClassName(layerTypeName) + "." + SCLanguage.STRATACODE_SUFFIX;
 
       String layerDefFile = FileUtil.concat(layerFileName, layerBaseName);
 
@@ -6103,7 +6107,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       if (layer == null) {
          origLayerPathName = origLayerPathName.replace('.',FileUtil.FILE_SEPARATOR_CHAR);
-         String layerBaseName = FileUtil.addExtension(FileUtil.getFileName(origLayerPathName), SCLanguage.STRATACODE_SUFFIX.substring(1));
+         String layerBaseName = FileUtil.addExtension(FileUtil.getFileName(origLayerPathName), SCLanguage.STRATACODE_SUFFIX);
          String layerFileName = FileUtil.concat(origLayerPathName, layerBaseName);
          File layerPathFile = new File(layerFileName);
          if (lpi.activate)
@@ -8752,7 +8756,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (bd.numModelsToTransform > 0 && options.info) {
-         info("Processing: " + (options.testVerifyMode ? "" : bd.numModelsToTransform) + " files in the " + getRuntimeName() + " runtime for build layer: " + genLayer.getLayerName());
+         info((options.testVerifyMode ? "Processing" : ("Processing: " + bd.numModelsToTransform)) + " files in the " + getRuntimeName() + " runtime for build layer: " + genLayer.getLayerName());
       }
 
       /** We also need to pre-compute the set of typeGroupChangedModels so that we can accurately determine the stale entries we have in the build info */
@@ -14560,7 +14564,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                String layerName = FileUtil.concat(prefix, fileName);
                String expectedName = layerName.replace(FileUtil.FILE_SEPARATOR_CHAR, '.');
                try {
-                  String relFile = fileName + SCLanguage.STRATACODE_SUFFIX;
+                  String relFile = fileName + "." + SCLanguage.STRATACODE_SUFFIX;
                   String absFile = FileUtil.concat(filePath, relFile);
                   Layer layer = new Layer();
                   layer.layeredSystem = this;

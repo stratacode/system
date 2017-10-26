@@ -31,6 +31,7 @@ public class RequestScopeDefinition extends ScopeDefinition {
       if (ctx == null && create) {
          ctx = new RequestScopeContext(Thread.currentThread().getName());
          PTypeUtil.setThreadLocal("requestScope", ctx);
+         ctx.init();
       }
       return ctx;
    }

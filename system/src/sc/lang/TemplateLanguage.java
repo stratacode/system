@@ -69,6 +69,8 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
 
    public final static TemplateLanguage INSTANCE = new TemplateLanguage();
 
+   public final static String SCT_SUFFIX = "sct";
+
    // Start must chew up space following the delimiter since it is the start of a code construct.
    public SymbolSpace startCodeDelimiter = new SymbolSpace(START_CODE_DELIMITER);
    {

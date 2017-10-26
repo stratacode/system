@@ -80,6 +80,10 @@ public class SyncLayer {
       public boolean sameChange(Object other) {
          return equals(other);
       }
+
+      public String getStaticTypeName() {
+         return null;
+      }
    }
 
    private static class SyncPropChange extends SyncChange {
@@ -161,6 +165,7 @@ public class SyncLayer {
    }
 
    public static class SyncMethodCall extends SyncChange {
+      Object type;
       Object[] args;
       String instName;
       String methName;
@@ -168,8 +173,11 @@ public class SyncLayer {
       String paramSig;
       RemoteResult result;
 
-      SyncMethodCall(Object obj, String instName, String methName, String paramSig, Object...args) {
+      SyncMethodCall(Object obj, Object type, String instName, String methName, String paramSig, Object...args) {
          super(obj);
+         this.type = type;
+         if (instName == null)
+            instName = DynUtil.getTypeName(type, false);
          this.instName = instName;
          this.methName = methName;
          this.paramSig = paramSig;
@@ -203,6 +211,10 @@ public class SyncLayer {
             sb.append(DynUtil.getInstanceName(obj));
             sb.append(".");
          }
+         else if (type != null) {
+            sb.append(DynUtil.getTypeName(type, false));
+            sb.append(".");
+         }
          sb.append(methName);
          if (args != null) {
             sb.append("(");
@@ -214,6 +226,10 @@ public class SyncLayer {
             sb.append(")");
          }
          return sb.toString();
+      }
+
+      public String getStaticTypeName() {
+         return type != null ? DynUtil.getTypeName(type, false) : null;
       }
    }
 
@@ -328,6 +344,10 @@ public class SyncLayer {
          syncChangeList = change;
       }
       syncChangeLast = change;
+
+      // This will schedule a refresh of any listeners to the scope in a 'do later' which should occur at the next
+      // opportunity after the current transaction is committed.
+      syncContext.scope.scopeChanged();
    }
 
    public Object removeChangedValue(Object obj, String propName) {
@@ -366,8 +386,8 @@ public class SyncLayer {
       return changeMap.get(propName);
    }
 
-   public RemoteResult invokeRemote(Object obj, String methName, String paramSig, Object[] args) {
-      SyncMethodCall change = new SyncMethodCall(obj, syncContext.findObjectName(obj), methName, paramSig, args);
+   public RemoteResult invokeRemote(Object obj, Object type, String methName, String paramSig, Object[] args) {
+      SyncMethodCall change = new SyncMethodCall(obj, type, obj == null ? null : syncContext.findObjectName(obj), methName, paramSig, args);
       addSyncChange(change);
       RemoteResult res = new RemoteResult();
       res.callId = change.getCallId();
@@ -579,107 +599,117 @@ public class SyncLayer {
    private void addChangedObject(SyncManager.SyncContext parentContext, SyncSerializer ser, SyncChange change, SyncChange prevChange,
                                    SyncChangeContext changeCtx, HashSet<String> createdTypes) {
       Object changedObj = change.obj;
-      String objName;
+      String objName = null;
 
       // As we add this change, we might encounter instances which are newly referenced in this sync layer.  This list accumulates those
       // objects so we can be sure to include their definition before we serialize this change.
       ArrayList<SyncChange> depChanges = new ArrayList<SyncChange>();
 
-      HashMap<String,Object> changeMap = changedValues.get(changedObj);
-      SyncHandler syncHandler = parentContext.getSyncHandler(changedObj);
-
-      String changedObjName = syncHandler.getObjectBaseName(null, this);
-      String changedObjFullName = syncHandler.getObjectName();
+      HashMap<String,Object> changeMap = null;
+      SyncHandler syncHandler = changedObj == null ? null : parentContext.getSyncHandler(changedObj);
 
       ArrayList<String> currentObjNames = changeCtx.currentObjNames;
-
-      // isNew should not be set for property changes when the current object is set or already serialized.
-      boolean isNew = (syncHandler.isNewInstance() || (initialLayer && change instanceof SyncNewObj)) && !currentObjNames.contains(changedObjName) && createdTypes != null && !createdTypes.contains(changedObjFullName) && !(change instanceof SyncMethodResult);
-      Object[] newArgs = change instanceof SyncNewObj ? ((SyncNewObj) change).args : isNew ? parentContext.getNewArgs(changedObj) : null;
-      Object changedObjType = syncHandler.getObjectType(changedObj);
-      String objTypeName = DynUtil.getTypeName(changedObjType, false);
-      objName = null;
-
-      // TODO: should we add an option to suppress redundant changes?  How can we tell when there are side effects or not?
-      // if change.value != changeMap.get(prop) this guy has been been overridden.
-      if (change instanceof SyncPropChange) {
-         if (changeMap == null) {
-            return;
-         }
-      }
-
-      // What object do we need to be current
-      Object newObj = changedObj;
-      String newObjName = null;
-      Object newObjType = DynUtil.getType(newObj);
       String newLastPackageName = changeCtx.lastPackageName;
-
+      boolean isNew = false;
+      String objTypeName;
       boolean useObjNameForPackage = true;
+      String newObjName = null;
+      Object[] newArgs = null;
+      String changedObjFullName = null;
 
-      // When we are creating a new type, the current object is the parent of the object itself
-      if (isNew) {
-         SyncManager.InstInfo instInfo = parentContext.getInstInfo(changedObj);
-         if (instInfo == null) {
-            SyncManager.InstInfo parentInstInfo = parentContext.getInheritedInstInfo(changedObj);
-            if (parentInstInfo == null) {
-               System.err.println("*** Invalid sync change - no inst info");
+      if (changedObj != null) {
+         String changedObjName = syncHandler.getObjectBaseName(null, this);
+         changedObjFullName = syncHandler.getObjectName();
+
+         // isNew should not be set for property changes when the current object is set or already serialized.
+         isNew = (syncHandler.isNewInstance() || (initialLayer && change instanceof SyncNewObj)) && !currentObjNames.contains(changedObjName) && createdTypes != null && !createdTypes.contains(changedObjFullName) && !(change instanceof SyncMethodResult);
+         newArgs = change instanceof SyncNewObj ? ((SyncNewObj) change).args : isNew ? parentContext.getNewArgs(changedObj) : null;
+         Object changedObjType = syncHandler.getObjectType(changedObj);
+         objTypeName = DynUtil.getTypeName(changedObjType, false);
+
+         // TODO: should we add an option to suppress redundant changes?  How can we tell when there are side effects or not?
+         // if change.value != changeMap.get(prop) this guy has been been overridden.
+         if (change instanceof SyncPropChange) {
+            changeMap = changedValues.get(changedObj);
+            if (changeMap == null) {
                return;
             }
-            instInfo = parentContext.createAndRegisterInheritedInstInfo(changedObj, parentInstInfo);
          }
-         if (!instInfo.nameQueued)
-            instInfo.nameQueued = true;
-         if (newArgs != null && newArgs.length > 0) {
-            // For objects that will turn into a field, need to go out one level for the modify operator
-            Object outer = DynUtil.getOuterObject(changedObj);
-            if (outer != null)
-               newObj = outer;
-            else {
-               // Some objects are not tracked so we don't know the outer object.  In this case, use the type to see if this is in an inner class and base the type to use for the container on the type name.
-               int numLevels = DynUtil.getNumInnerTypeLevels(newObjType);
-               if (numLevels > 0)
-                  newObjName = CTypeUtil.getPackageName(objTypeName);
-               else {
-                  // For SC serialization format, because it's like Java we can't omit the top-level name so we use the new obj type name but for JSON and other formats
-                  // we don't want this top-level thing
-                  if (ser.needsObjectForTopLevelNew()) {
-                     newObjName = CTypeUtil.getClassName(DynUtil.getTypeName(newObjType, false));
-                     useObjNameForPackage = false;
-                  }
-                  else {
-                     newObjName = "";
-                  }
+
+         // What object do we need to be current
+         Object newObj = changedObj;
+         Object newObjType = DynUtil.getType(newObj);
+
+         // When we are creating a new type, the current object is the parent of the object itself
+         if (isNew) {
+            SyncManager.InstInfo instInfo = parentContext.getInstInfo(changedObj);
+            if (instInfo == null) {
+               SyncManager.InstInfo parentInstInfo = parentContext.getInheritedInstInfo(changedObj);
+               if (parentInstInfo == null) {
+                  System.err.println("*** Invalid sync change - no inst info");
+                  return;
                }
+               instInfo = parentContext.createAndRegisterInheritedInstInfo(changedObj, parentInstInfo);
             }
-            objName = syncHandler.getObjectBaseName(depChanges, this);
-         }
-         else {
-            objName = newObjName = syncHandler.getObjectBaseName(depChanges, this);
-            if (newObjName.contains(".")) {
-               newObjName = CTypeUtil.getPackageName(objName);
-               Object outer = DynUtil.getOuterObject(newObj);
+            if (!instInfo.nameQueued)
+               instInfo.nameQueued = true;
+            if (newArgs != null && newArgs.length > 0) {
+               // For objects that will turn into a field, need to go out one level for the modify operator
+               Object outer = DynUtil.getOuterObject(changedObj);
                if (outer != null)
                   newObj = outer;
                else {
+                  // Some objects are not tracked so we don't know the outer object.  In this case, use the type to see if this is in an inner class and base the type to use for the container on the type name.
                   int numLevels = DynUtil.getNumInnerTypeLevels(newObjType);
-                  if (numLevels > 0) {
+                  if (numLevels > 0)
                      newObjName = CTypeUtil.getPackageName(objTypeName);
+                  else {
+                     // For SC serialization format, because it's like Java we can't omit the top-level name so we use the new obj type name but for JSON and other formats
+                     // we don't want this top-level thing
+                     if (ser.needsObjectForTopLevelNew()) {
+                        newObjName = CTypeUtil.getClassName(DynUtil.getTypeName(newObjType, false));
+                        useObjNameForPackage = false;
+                     }
+                     else {
+                        newObjName = "";
+                     }
                   }
-                  else
-                     newObjName = "";
                }
+               objName = syncHandler.getObjectBaseName(depChanges, this);
             }
-            // Treat top-level types as top-level.  Also treat TypeDeclarations as top-level even if they represent an inner type
-            else if (DynUtil.getNumInnerTypeLevels(newObjType) == 0 || objName.startsWith("sc_type_"))
-               newObjName = "";
+            else {
+               objName = newObjName = syncHandler.getObjectBaseName(depChanges, this);
+               if (newObjName.contains(".")) {
+                  newObjName = CTypeUtil.getPackageName(objName);
+                  Object outer = DynUtil.getOuterObject(newObj);
+                  if (outer != null)
+                     newObj = outer;
+                  else {
+                     int numLevels = DynUtil.getNumInnerTypeLevels(newObjType);
+                     if (numLevels > 0) {
+                        newObjName = CTypeUtil.getPackageName(objTypeName);
+                     }
+                     else
+                        newObjName = "";
+                  }
+               }
+               // Treat top-level types as top-level.  Also treat TypeDeclarations as top-level even if they represent an inner type
+               else if (DynUtil.getNumInnerTypeLevels(newObjType) == 0 || objName.startsWith("sc_type_"))
+                  newObjName = "";
+            }
          }
+
+         if (newObjName == null)
+            newObjName = parentContext.getObjectBaseName(newObj, depChanges, this);
+
+         if (objName == null)
+            objName = newObjName;
       }
-
-      if (newObjName == null)
-         newObjName = parentContext.getObjectBaseName(newObj, depChanges, this);
-
-      if (objName == null)
-         objName = newObjName;
+      else {
+         objTypeName = change.getStaticTypeName();
+         useObjNameForPackage = false;
+         objName = CTypeUtil.getPackageName(objTypeName);
+      }
 
       // First we compute the new obj name and new obj names for this change.  They are not getting applied yet though so we keep them as a copy.
       // We may need to add dependent objects first.

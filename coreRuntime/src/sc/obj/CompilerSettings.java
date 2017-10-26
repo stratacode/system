@@ -10,12 +10,18 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * CompilerSettings is placed on classes in sc layers to affect how they are compiled.  Some of these settings are inherited
- * or set on annotation layers so you can control the settings for an entire class hierarchy even when you do not have the source code for the object and without generating a new class for it.  The effects of the
- * CompilerSettings are broad.   You can specify code templates
- * for component definitions used in object tags or with the new expression.  You also can set a template for non-component definitions
- * used in object tags.  Specifiy framework classes to use for implementing dynamic features on sub-types.   Set the compiled-only feature,
- * disabling the dynamic type even when this type is in a dynamic layer.
+ * CompilerSettings is placed on classes in sc layers to affect the generated code for this class when it's processed by scc.
+ * Many of the attributes are inherited by a subclass.   So you can set it on a base-class to affect the whole type hierarchy - e.g. all
+ * swing components.   You can set this annotation for a compiled class using an annotation layers - a layer which only annotates classes
+ * for special processing during code-generation.  That way, you can control the code-generated for libraries even when you do not have the source code.
+ * <p>
+ * Via the objectTemplate and newTemplate attributes, you can specify code templates used to turn this class into a component or object instance.
+ * <p>
+ * Set the liveDynamicTypes attribute to enable or disable the liveDynamicTypes feature.
+ * <p>
+ * Set compiledOnly=true/false to disable the dynamic types feature entirely for this class.
+ * <p>
+ * Set needsCompiledClass to force a dynamic stub to be generated for this class if it's made dynamic.
  * <p>
  * CompilerSettings also lets you specify a set of packages to be placed into a jar file when this class is included in
  * a project.
@@ -23,7 +29,7 @@ import java.lang.annotation.Target;
  */
 @Target({ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
-public @interface CompilerSettings {
+public @interface CompilerSettings { // TODO: rename to GeneratorSettings?
    /** Specifies the type name for a template file to use for obj defs */
    String objectTemplate() default "";      
    /** Specifies the type name for a template file to use for class components */

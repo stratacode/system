@@ -765,4 +765,16 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
    public boolean isTrailingSrcStatement() {
       return false;
    }
+
+   public int indexOf(Object elem) {
+      return super.indexOf(elem);
+   }
+
+   public int identityIndexOf(Object elem) {
+      int sz = size();
+      for (int i = 0; i < sz; i++)
+         if (get(i) == elem)
+            return i;
+      return -1;
+   }
 }
