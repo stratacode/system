@@ -3309,7 +3309,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
             if (SrcIndexEntry.debugSrcIndexEntry) {
                sie.updateDebugFileInfo(absFileName);
-               if (!Arrays.equals(hash, StringUtil.computeHash(sie.fileBytes)))
+               if (sie.fileBytes == null)
+                  System.err.println("*** No data for index entry for: " + absFileName);
+               else if (!Arrays.equals(hash, StringUtil.computeHash(sie.fileBytes)))
                   System.err.println("*** internal error - hashes of file do no match from the start!");
             }
 

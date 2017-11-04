@@ -65,6 +65,22 @@ do
        STOP_ON_ERROR=1
        shift
        ;;
+       -h|--help)
+       echo "StrataCode test help: run test scripts or individual tests using: "
+       echo "runTests [test-options] [list of script names to run from SCRIPT_DIR: $SCRIPT_DIR - defaults to contents of 'allScripts']"
+       echo " - or - "
+       echo "runTest <test-name> [test-options] testCommand testArgs"
+       echo ""
+       echo "--- Test Options:"
+       echo "  -p/--prompt - interactive mode"
+       echo "  -v/--verbose - verbose output and errors enabled"
+       echo "  ---ignore - ignore errors"
+       echo "  --tag - name of directory to store results in: $RESULTS_DIR"
+       echo "  -q/--quiet - No error or test output displayed"
+       echo "  -s/--stop - Stop on error"
+       echo "  --results-dir <dir> - change results dir from default: $RESULTS_DIR"
+       exit 1
+       ;;
        *)
        # All test options must be in front - Rest of the args go for the list of scripts or the arguments to the command we are running
        while [[ $# -gt 0 ]]

@@ -22,6 +22,7 @@ import sc.type.Type;
 import sc.type.TypeUtil;
 import sc.util.LineCountStringBuilder;
 import sc.util.StringUtil;
+import sun.tools.java.Identifier;
 
 import java.util.*;
 
@@ -261,7 +262,7 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
                if (v.initializer instanceof IdentifierExpression && !(v.initializer instanceof NewExpression)) {
                   IdentifierExpression ie = (IdentifierExpression) v.initializer;
                   if (ie.arguments != null) {
-                     syncCtx.addMethodResult(inst == null ? enclType : inst, v.variableName, newValue);
+                     syncCtx.addMethodResult(inst, inst == null ? enclType : null, v.variableName, newValue);
                   }
                }
             }
@@ -435,6 +436,40 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
       boolean any = type != null && type.transform(runtime);
       if (super.transform(runtime))
          any = true;
+
+      /** When serializing a remote method call to the client */
+      JavaModel model = getJavaModel();
+      if (model != null && !model.mergeDeclaration && variableDefinitions.size() == 1) {
+         VariableDefinition varDef = variableDefinitions.get(0);
+         if (varDef.initializer instanceof IdentifierExpression) {
+            IdentifierExpression expr = (IdentifierExpression) varDef.initializer;
+            if (expr.arguments != null) {
+               TypeDeclaration enclType = getEnclosingType();
+               int ix = enclType.getBodyStatements().indexOf(this);
+               if (ix != -1) {
+                  SemanticNodeList<Expression> methArgs = new SemanticNodeList<Expression>(4);
+                  BlockStatement addRemBlock = new BlockStatement();
+                  if (enclType.getDefinesCurrentObject()) {
+                     methArgs.add(IdentifierExpression.create("this"));
+                     methArgs.add(NullLiteral.create());
+                  }
+                  else {
+                     methArgs.add(NullLiteral.create());
+                     methArgs.add(ClassValueExpression.create(enclType.getFullTypeName()));
+                     //addRemBlock.staticEnabled = true;
+                  }
+                  methArgs.add(StringLiteral.create(varDef.variableName));
+                  methArgs.add(IdentifierExpression.create(varDef.variableName));
+                  IdentifierExpression addRemCall = IdentifierExpression.createMethodCall(methArgs, "sc.sync.SyncManager.addMethodResult");
+                  addRemBlock.addStatementAt(0, addRemCall);
+                  enclType.addBodyStatementAt(ix+1, addRemBlock);
+               }
+               else
+                  System.err.println("*** Did not find field for addMethodResult call in serialization");
+            }
+         }
+      }
+
       return any;
    }
 

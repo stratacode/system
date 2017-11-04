@@ -70,15 +70,24 @@ public class ModelStream extends SemanticNode implements ICustomResolver {
          throw new IllegalArgumentException("Failed to find a sync context for destination: " + destName + " scope: " + defaultScope);
       }
 
-      ParseUtil.initAndStartComponent(this);
+      // TODO: maybe we should have a current sync context rather than the set of layers?   Basically because we are code-generating the
+      // call to processMethodReturn, we need to pass this syncCtx into that call so doing it with a thread-local
+      SyncManager.setCurrentSyncLayers(syncCtx.getChangedSyncLayers(null));
+      try {
 
-      for (JavaModel model:modelList) {
-         if (model.hasErrors()) {
-            System.err.println("*** Failed to update runtime for modelStream due to errors in the model");
+         ParseUtil.initAndStartComponent(this);
+
+         for (JavaModel model:modelList) {
+            if (model.hasErrors()) {
+               System.err.println("*** Failed to update runtime for modelStream due to errors in the model");
+            }
          }
+         for (JavaModel model:modelList)
+            model.updateRuntimeModel(syncCtx);
       }
-      for (JavaModel model:modelList)
-         model.updateRuntimeModel(syncCtx);
+      finally {
+         SyncManager.setCurrentSyncLayers(null);
+      }
    }
 
    public void setLayeredSystem(LayeredSystem sys) {

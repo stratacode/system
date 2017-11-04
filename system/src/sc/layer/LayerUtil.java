@@ -524,6 +524,32 @@ public class LayerUtil implements LayerConstants {
       return -1;
    }
 
+   public static AsyncResult execAsync(ProcessBuilder cmd, String dir, String inputFile, String outputFile) {
+      if (dir != null)
+         cmd.directory(new File(dir));
+
+      if (inputFile != null)
+         cmd.redirectInput(new File(inputFile));
+      if (outputFile != null) {
+         cmd.redirectError(new File(outputFile + ".err"));
+         cmd.redirectOutput(new File(outputFile));
+      }
+
+      try {
+         Process p = cmd.start();
+
+         InputStream in = p.getInputStream();
+         InputStream err = p.getErrorStream();
+
+         return new AsyncResult(p);
+      }
+      catch (IOException exc) {
+         if (cmd.command() != null)
+            System.err.println("*** execAsync: " + StringUtil.arrayToCommand(cmd.command().toArray()) + " inputFile: " + inputFile + " outputFile: " + outputFile + " failed: " + exc);
+      }
+      return null;
+   }
+
    public static boolean isLayerDir(String dirName) {
       File dir = new File(dirName);
       if (dir.isDirectory()) {

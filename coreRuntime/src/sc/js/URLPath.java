@@ -32,4 +32,27 @@ public class URLPath {
 
       return url.equals(op.url) && name.equals(op.name);
    }
+
+   public String cleanURL(boolean expandIndex) {
+      String res = url;
+      if (res.equals("") && expandIndex)
+         res = "index.html";
+      if (res.startsWith("/"))
+         res = res.substring(1);
+      return res;
+   }
+
+   /** Cleans the first / and extension out of the URL and handles the default case */
+   public static String getAppNameFromURL(String url) {
+      String app = url;
+      int ix = app.indexOf("/");
+      if (ix != -1)
+         app = app.substring(ix + 1);
+      if (app.length() == 0)
+         app = "index";
+      ix = app.lastIndexOf(".");
+      if (ix != -1)
+         app = app.substring(0, ix);
+      return app;
+   }
 }

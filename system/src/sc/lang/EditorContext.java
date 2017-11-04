@@ -156,7 +156,9 @@ public class EditorContext extends ClientEditorContext {
    }
 
    synchronized void addChangedModel(JavaModel model) {
+      // TODO: need to synchronize around this method?
       model.validateSavedModel(false);
+
       // Notify code that this model has changed by sending a binding event.
       model.markChanged();
 

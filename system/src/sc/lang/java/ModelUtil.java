@@ -3825,7 +3825,7 @@ public class ModelUtil {
 
          if (!rtmeth.isDynMethod()) {
             Object realRTMethod = rtmeth.getRuntimeMethod();
-            if (realRTMethod != rtmeth) {
+            if (realRTMethod != rtmeth && realRTMethod != null) {
                return invokeMethodWithValues(thisObject, realRTMethod, arguments, expectedType, ctx, repeatArgs, findMethodOnThis, pmeth, argValues);
             }
          }

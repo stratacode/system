@@ -6,22 +6,29 @@ package sc.lang;
 
 import sc.layer.LayeredSystem;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 
 @sc.js.JSSettings(replaceWith="sc_EditorContext")
 public class CommandInterpreter extends AbstractInterpreter {
    BufferedReader input;
 
-   public CommandInterpreter(LayeredSystem sys, BufferedReader inputStream) {
-      super(sys, System.console() == null);
-      input = inputStream;
+   public CommandInterpreter(LayeredSystem sys, BufferedReader inputStream, String inputFileName) {
+      super(sys, inputFileName != null || System.console() == null, inputFileName);
+      updateInputSource(inputStream, inputFileName);
    }
 
-   public CommandInterpreter(LayeredSystem system, InputStream inputStream) {
-      this(system, new BufferedReader(new InputStreamReader(inputStream)));
+   void updateInputSource(BufferedReader inputStream, String inputFileName) {
+      try {
+         input = inputStream != null ? inputStream : new BufferedReader(new FileReader(inputFileName));
+      }
+      catch (FileNotFoundException exc) {
+         System.err.println("*** CommandInterpreter failed to open inputFileName: " + inputFileName + ": " + exc);
+         input = new BufferedReader(new InputStreamReader(System.in));
+      }
+   }
+
+   void resetInput() {
+      updateInputSource(inputFileName == null ? input : null, inputFileName);
    }
 
    @Override

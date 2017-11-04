@@ -36,6 +36,10 @@ public class RequestScopeDefinition extends ScopeDefinition {
       return ctx;
    }
 
+   static void removeCurrentRequestScopeContext() {
+      PTypeUtil.setThreadLocal("requestScope", null);
+   }
+
    public ScopeDefinition getScopeDefinition() {
       return RequestScopeDefinition.getRequestScopeDefinition();
    }

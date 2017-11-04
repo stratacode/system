@@ -920,6 +920,11 @@ public class PTypeUtil {
    public static void addClientInitJob(Runnable r) {
    }
 
+   /** Used in JS to differentiate between a site loaded from a file versus a server */
+   public static String getServerName() {
+      return null;
+   }
+
    public static void postHttpRequest(String url, String postData, String contentType, IResponseListener listener) {
       // TODO: maybe implement this or clean this API up.  Can we emulate XmlHttpRrequest in Java and so use that one API?
       throw new UnsupportedOperationException();

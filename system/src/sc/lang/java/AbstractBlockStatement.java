@@ -368,11 +368,9 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
       String start = getStartBlockString();
       String end = getEndBlockString();
       if (statements == null) {
-         return (staticEnabled ? "static " : "") + start + end;
+         return start + end;
       }
       StringBuilder sb = new StringBuilder();
-      if (staticEnabled)
-         sb.append("static ");
       sb.append(start);
       sb.append("\n");
       boolean printEllipsis = false;

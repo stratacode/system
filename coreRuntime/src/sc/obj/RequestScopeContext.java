@@ -24,4 +24,9 @@ public class RequestScopeContext extends BaseScopeContext {
    public boolean isCurrent() {
       return RequestScopeDefinition.getRequestScopeDefinition().getScopeContext(false) == this;
    }
+
+   public void scopeDestroyed() {
+      RequestScopeDefinition.removeCurrentRequestScopeContext();
+      super.scopeDestroyed();
+   }
 }

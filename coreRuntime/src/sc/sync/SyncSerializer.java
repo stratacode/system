@@ -333,6 +333,7 @@ public class SyncSerializer {
 
       statementSB.append(Bind.indent(indentSize + 1));
       statementSB.append("sc.sync.SyncManager.processMethodReturn(");
+      statementSB.append("null, ");
       statementSB.append("\"");
       statementSB.append(mres.callId);
       statementSB.append("\", ");

@@ -1335,7 +1335,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       // Once we've finished processing, during the transform don't bother checking for remote methods.  Sometimes
       // we find them due to the problem that we don't transform getX/setX until after we've transformed the reference.
       // Remote methods should be resolved before the transform anyway.
-      if (expr.isProcessed() || exprModel == null || exprModel.inTransform || exprModel.isLayerModel || exprModel.disableTypeErrors)
+      if (expr.isProcessed() || exprModel == null || exprModel.inTransform || exprModel.isLayerModel || exprModel.disableTypeErrors || !exprModel.mergeDeclaration)
          return null;
 
       List<LayeredSystem> syncSystems = sys.getSyncSystems();
@@ -2079,14 +2079,19 @@ public class IdentifierExpression extends ArgumentsExpression {
                   method = ModelUtil.definesMethod(ModelUtil.getCompiledClass(DynUtil.getType(value)), methodName, arguments, null, null, false, false, null, getMethodTypeArguments(), sys);
                }
             }
-            else
+            else if (value != null)
                method = ModelUtil.definesMethod(DynUtil.getType(value), methodName, arguments, null, null, false, false, null, getMethodTypeArguments(), getLayeredSystem());
+            else
+               method = null;
 
             /*
               Java ignores anyway?
             if (i != 0 && idTypes[i-1] == IdentifierType.BoundTypeName)
                value = null;
             */
+            if (method == null) {
+               throw new IllegalArgumentException("No method: " + methodName + " for invoke");
+            }
             return ModelUtil.invokeMethod(value, method, arguments, expectedType, ctx, true, i == 0 || idTypes[i-1] != IdentifierType.SuperExpression, null);
          }
          return value;

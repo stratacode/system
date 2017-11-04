@@ -311,9 +311,7 @@ public abstract class SyncDestination {
             String debugDef = lastSer == null ? "" : lastSer.getDebugOutput().toString();
             if (resetSync)
                System.out.println("Reset sync to destination: " + name + " size: " + debugDef.length() + "\n" + debugDef);
-            else if (layerDef.trim().length() == 0)
-               System.out.println("Empty sync to destination: " + name);
-            else
+            else if (layerDef.trim().length() > 0)
                System.out.println("Sending sync to destination: " + name + " size: " + debugDef.length() + "\n" + debugDef);
          }
          if (!resetSync) {

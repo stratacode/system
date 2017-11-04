@@ -228,8 +228,9 @@ public class DynUtil {
         return TypeUtil.invokeMethod(obj, method, paramValues);
    }
 
-   public static RemoteResult invokeRemote(Object obj, Object method, Object... paramValues) {
-      return SyncManager.invokeRemote(null, null, obj, DynUtil.getMethodType(method), DynUtil.getMethodName(method), DynUtil.getTypeSignature(method), paramValues);
+   // TODO: Should this be pluggable so we can use other RPC frameworks with data binding?
+   public static RemoteResult invokeRemote(ScopeDefinition def, ScopeContext ctx, Object obj, Object method, Object... paramValues) {
+      return SyncManager.invokeRemote(def, ctx, obj, DynUtil.getMethodType(method), DynUtil.getMethodName(method), DynUtil.getTypeSignature(method), paramValues);
    }
 
    /** In Java this is the same method but in Javascript they are different */
@@ -1211,8 +1212,9 @@ public class DynUtil {
       }
    }
 
-   public static Object evalScript(String script) {
-      RemoteResult remoteRes = invokeRemote(null, DynUtil.resolveRemoteStaticMethod(DynUtil.class, "evalScript", "Ljava/lang/String;"), script);
+   /** Executes the supplied java script by making an RPC call targeted towards all clients with the lifecycle identified by ScopeContext */
+   public static Object evalRemoteScript(ScopeContext ctx, String script) {
+      RemoteResult remoteRes = invokeRemote(null, ctx, null, DynUtil.resolveRemoteStaticMethod(DynUtil.class, "evalScript", "Ljava/lang/String;"), script);
       RemoteCallSyncListener listener = new RemoteCallSyncListener();
       remoteRes.listener = listener;
 
@@ -1235,6 +1237,10 @@ public class DynUtil {
          System.err.println("*** evalScript - timed out");
       }
       return evalRes;
+   }
+
+   public static Object evalScript(String script) {
+      return evalRemoteScript(null, script);
    }
 
    public static void applySyncLayer(String lang, String destName, String scopeName, String code, boolean isReset, boolean allowCodeEval) {

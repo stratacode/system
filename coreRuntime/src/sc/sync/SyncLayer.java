@@ -164,8 +164,19 @@ public class SyncLayer {
       }
    }
 
-   public static class SyncMethodCall extends SyncChange {
+   public static abstract class SyncMethodBase extends SyncChange {
       Object type;
+      public SyncMethodBase(Object obj, Object type) {
+         super(obj);
+         this.type = type;
+      }
+
+      public String getStaticTypeName() {
+         return type != null ? DynUtil.getTypeName(type, false) : null;
+      }
+   }
+
+   public static class SyncMethodCall extends SyncMethodBase {
       Object[] args;
       String instName;
       String methName;
@@ -174,8 +185,7 @@ public class SyncLayer {
       RemoteResult result;
 
       SyncMethodCall(Object obj, Object type, String instName, String methName, String paramSig, Object...args) {
-         super(obj);
-         this.type = type;
+         super(obj, type);
          if (instName == null)
             instName = DynUtil.getTypeName(type, false);
          this.instName = instName;
@@ -228,9 +238,6 @@ public class SyncLayer {
          return sb.toString();
       }
 
-      public String getStaticTypeName() {
-         return type != null ? DynUtil.getTypeName(type, false) : null;
-      }
    }
 
    public static class SyncFetchProperty extends SyncChange {
@@ -258,12 +265,12 @@ public class SyncLayer {
       }
    }
 
-   public static class SyncMethodResult extends SyncChange {
+   public static class SyncMethodResult extends SyncMethodBase {
       String callId = null;
       Object retValue;
 
-      SyncMethodResult(Object ctxObj, String callId, Object retValue) {
-         super(ctxObj);
+      SyncMethodResult(Object ctxObj, Object type, String callId, Object retValue) {
+         super(ctxObj, type);
          this.callId = callId;
          this.retValue = retValue;
       }
@@ -277,7 +284,7 @@ public class SyncLayer {
       }
 
       public String toString() {
-         return "method result: " + (obj == null ? "" : DynUtil.getInstanceName(obj)) + " for: " + callId + " = " + DynUtil.getInstanceName(retValue);
+         return (obj == null ? "static " : "") + "method result: " + (obj == null ? DynUtil.getTypeName(type, false) : DynUtil.getInstanceName(obj)) + " for: " + callId + " = " + DynUtil.getInstanceName(retValue);
       }
    }
 
@@ -398,8 +405,8 @@ public class SyncLayer {
       return res;
    }
 
-   public void addMethodResult(Object ctxObj, String objName, Object retValue) {
-      SyncMethodResult change = new SyncMethodResult(ctxObj, objName, retValue);
+   public void addMethodResult(Object ctxObj, Object type, String objName, Object retValue) {
+      SyncMethodResult change = new SyncMethodResult(ctxObj, type, objName, retValue);
       addSyncChange(change);
    }
 
@@ -708,7 +715,7 @@ public class SyncLayer {
       else {
          objTypeName = change.getStaticTypeName();
          useObjNameForPackage = false;
-         objName = CTypeUtil.getPackageName(objTypeName);
+         newObjName = objName = CTypeUtil.getClassName(objTypeName);
       }
 
       // First we compute the new obj name and new obj names for this change.  They are not getting applied yet though so we keep them as a copy.

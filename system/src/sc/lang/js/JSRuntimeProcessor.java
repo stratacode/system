@@ -812,6 +812,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       else if (td.isAnonymousType())
          return;
 
+      // If we're modified by another type we do not want to add the typeLibs first on a base type
+      if (td.replacedByType != null)
+         return;
+
       //if (verboseJS && td.getEnclosingType() == null)
       //   system.verbose("Starting for JS: " + td.getFullTypeName());
 

@@ -284,7 +284,8 @@ public class JSONDeserializer {
 
    public void invokeMethod(CharSequence methName, CharSequence typeSig, List args, CharSequence callIdSeq) {
       Object curObj = getCurObj();
-      Object curType = DynUtil.isSType(curObj) ? curObj : DynUtil.getSType(curObj);
+      boolean isType = DynUtil.isSType(curObj);
+      Object curType = isType ? curObj : DynUtil.getSType(curObj);
       String callId = callIdSeq.toString();
       Object meth = DynUtil.resolveMethod(curType, methName.toString(), typeSig == null ? null : typeSig.toString());
       if (meth == null) {
@@ -323,7 +324,7 @@ public class JSONDeserializer {
             if (returnVal != null) {
                syncCtx.registerObjName(returnVal, callId, false, false);
             }
-            syncCtx.addMethodResult(curObj, callId, returnVal);
+            syncCtx.addMethodResult(isType ? null : curObj, isType ? curType : null, callId, returnVal);
          }
          finally {
             if (flushQueue)
@@ -335,7 +336,7 @@ public class JSONDeserializer {
    public void applyMethodResult(String callId, Object returnValue, Object retType) {
       if (retType != null)
          returnValue = convertRemoteType(returnValue, retType);
-      SyncManager.processMethodReturn(callId, returnValue);
+      SyncManager.processMethodReturn(syncCtx, callId, returnValue);
    }
 
    public void fetchProperty(String propName) {

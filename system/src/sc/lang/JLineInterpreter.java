@@ -10,6 +10,8 @@ import jline.console.ConsoleReader;
 import jline.Terminal;
 
 import java.io.EOFException;
+import java.io.FileDescriptor;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.List;
 
@@ -18,9 +20,9 @@ import java.util.List;
 public class JLineInterpreter extends AbstractInterpreter implements Completer {
    ConsoleReader input;
 
-   public JLineInterpreter(LayeredSystem sys, boolean consoleDisabled) {
-      super(sys, consoleDisabled);
-      reset();
+   public JLineInterpreter(LayeredSystem sys, boolean consoleDisabled, String inputFileName) {
+      super(sys, consoleDisabled, inputFileName);
+      resetInput();
    }
 
    @Override
@@ -34,9 +36,10 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
       }
    }
 
-   private void reset() {
+   void resetInput() {
       try {
-         input = new ConsoleReader();
+         FileInputStream inStream = inputFileName == null ? new FileInputStream(FileDescriptor.in) : new FileInputStream(inputFileName);
+         input = new ConsoleReader("scc", inStream, System.out, null);
          input.setExpandEvents(false); // Otherwise "!" and probably other special chars fail to expand in JLine (e.g. if (foo != bar) -> [ERROR] Could not expand event)
          input.addCompleter(this);
       }
@@ -115,7 +118,7 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
             else {
                try {
                   input.getTerminal().reset();
-                  reset();
+                  resetInput();
                }
                // Shutdown in progress...
                catch (IllegalStateException ise) {

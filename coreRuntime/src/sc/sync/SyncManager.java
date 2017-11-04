@@ -174,7 +174,7 @@ public class SyncManager {
    }
 
    /**
-    * The SyncContext stores the set of synchronized instances.  It listens for changes to synchronized
+    * The SyncContext stores the set of synchronized instances for a given life-cycle, or scope.  It listens for changes to synchronized
     * properties of these instances and stores the changes it collects in a SyncLayer identified by the
     * sync-group (if any) the property is apart of.  Sync-groups allow you to synchronize different groups of
     * properties at different times but is not a feature we use commonly.
@@ -404,11 +404,7 @@ public class SyncManager {
 
       public void addChangedValue(List<SyncLayer.SyncChange> depChanges, Object obj, String propName, Object val, String syncGroup, SyncLayer syncLayer) {
          SyncLayer changedLayer = syncLayer == null ? getChangedSyncLayer(syncGroup) : syncLayer;
-         if (!needsSync) {
-            if (verbose)
-               System.out.println("Setting needsSync=true for " + DynUtil.getInstanceName(obj) + "." + propName);
-            setNeedsSync(true);
-         }
+         markChanged();
          if (verboseValues) {
             System.out.println("Changed value: " + DynUtil.getInstanceName(obj) + "." + propName + " = " + DynUtil.getInstanceName(val));
          }
@@ -931,6 +927,14 @@ public class SyncManager {
          this.needsSync = newNeedsSync;
       }
 
+      public void markChanged() {
+         if (!needsSync) {
+            if (verbose)
+               System.out.println("Setting needsSync=true for first change");
+            setNeedsSync(true);
+         }
+      }
+
       public boolean getNeedsSync() {
          return needsSync;
       }
@@ -1292,9 +1296,7 @@ public class SyncManager {
          SyncLayer useLayer = getChangedSyncLayer(syncProps.syncGroup);
          useLayer.addFetchProperty(inst, propName);
 
-         if (!needsSync) {
-            setNeedsSync(true);
-         }
+         markChanged();
       }
 
       /**
@@ -1575,18 +1577,18 @@ public class SyncManager {
 
       public RemoteResult invokeRemote(String syncGroup, Object obj, Object type, String methName, String paramSig, Object[] args) {
          SyncLayer changedLayer = getChangedSyncLayer(syncGroup);
-         if (!needsSync) {
-            setNeedsSync(true);
-         }
+         markChanged();
          if (trace) {
-            System.out.println("Remote method call: " + (obj != null ? DynUtil.getInstanceName(obj) : DynUtil.getTypeName(type, false)) + "." + methName + "(" + DynUtil.arrayToInstanceName(args) + ")");
+            System.out.println("Remote method call: " + (obj != null ? DynUtil.getInstanceName(obj) : DynUtil.getTypeName(type, false)) + "." + methName + "(" + DynUtil.arrayToInstanceName(args) + ") scope: " + name);
          }
          return changedLayer.invokeRemote(obj, type, methName,  paramSig, args);
       }
 
-      public void addMethodResult(Object ctxObj, String objName, Object retValue) {
+      public void addMethodResult(Object ctxObj, Object type, String callId, Object retValue) {
          SyncLayer changedLayer = getChangedSyncLayer(null);
-         changedLayer.addMethodResult(ctxObj, objName, retValue);
+         markChanged();
+
+         changedLayer.addMethodResult(ctxObj, type, callId, retValue);
       }
 
       public void setInitialSync(boolean value) {
@@ -1973,6 +1975,26 @@ public class SyncManager {
          return parCtxList;
       }
 
+      public ArrayList<SyncLayer> getChangedSyncLayers(String syncGroup) {
+         ArrayList<SyncContext> ctxList = getSortedParentList();
+         ctxList.add(this);
+         ArrayList<SyncLayer> changedLayers = new ArrayList<SyncLayer>();
+         for (int i = 0; i < ctxList.size(); i++) {
+            SyncContext nextCtx = ctxList.get(i);
+            if (syncGroup == SYNC_ALL) {
+               for (String group:getSyncGroups()) {
+                  SyncLayer changedLayer = nextCtx.getChangedSyncLayer(group);
+                  changedLayers.add(changedLayer);
+               }
+            }
+            else {
+               SyncLayer changedLayer = nextCtx.getChangedSyncLayer(syncGroup);
+               changedLayers.add(changedLayer);
+            }
+         }
+         return changedLayers;
+      }
+
       /** Returns the object instance with the given name - for runtime lookup. */
       public Object resolveObject(String currentPackage, String name, boolean create, boolean unwrap) {
          Object inst = getObjectByName(name, unwrap);
@@ -2052,6 +2074,8 @@ public class SyncManager {
             if (remoteRuntime.equals(syncDestination.remoteRuntimeName))
                return true;
       }
+      else
+         return true; // The server is free to call any method on the client
       return false;
    }
 
@@ -2434,7 +2458,7 @@ public class SyncManager {
       }
    }
 
-   SyncContext getSyncContext(int scopeId, boolean create) {
+   private SyncContext getSyncContext(int scopeId, boolean create) {
       if (scopeId == 0)
          return getRootSyncContext();
       ScopeDefinition scopeDef = ScopeDefinition.getScopeDefinition(scopeId);
@@ -2443,12 +2467,17 @@ public class SyncManager {
          return null;
       }
       ScopeContext scopeCtx = scopeDef.getScopeContext(create);
-      SyncContext syncCtx = scopeCtx == null ? null : (SyncContext) scopeCtx.getValue(SC_SYNC_CONTEXT_SCOPE_KEY);
+      return getSyncContextFromScopeContext(scopeCtx, create);
+   }
+
+   private SyncContext getSyncContextFromScopeContext(ScopeContext scopeCtx, boolean create) {
+      if (scopeCtx == null) {
+         System.err.println("*** No scope to create sync context");
+         return null;
+      }
+      ScopeDefinition scopeDef = scopeCtx.getScopeDefinition();
+      SyncContext syncCtx = (SyncContext) scopeCtx.getValue(SC_SYNC_CONTEXT_SCOPE_KEY);
       if (syncCtx == null && create) {
-         if (scopeCtx == null) {
-            System.err.println("*** No scope: " + scopeDef.name + " to create sync context");
-            return null;
-         }
          syncCtx = newSyncContext(scopeDef.name);
          syncCtx.scope = scopeCtx;
          scopeCtx.setValue(SC_SYNC_CONTEXT_SCOPE_KEY, syncCtx);
@@ -2875,22 +2904,7 @@ public class SyncManager {
       }
 
       if (ctx != null) {
-         ArrayList<SyncContext> ctxList = ctx.getSortedParentList();
-         ctxList.add(ctx);
-         ArrayList<SyncLayer> toSend = new ArrayList<SyncLayer>();
-         for (int i = 0; i < ctxList.size(); i++) {
-            SyncContext nextCtx = ctxList.get(i);
-            if (syncGroup == SYNC_ALL) {
-               for (String group:ctx.getSyncGroups()) {
-                  SyncLayer changedLayer = nextCtx.getChangedSyncLayer(group);
-                  toSend.add(changedLayer);
-               }
-            }
-            else {
-               SyncLayer changedLayer = nextCtx.getChangedSyncLayer(syncGroup);
-               toSend.add(changedLayer);
-            }
-         }
+         ArrayList<SyncLayer> toSend = ctx.getChangedSyncLayers(syncGroup);
          return syncDestination.sendSync(ctx, toSend, syncGroup, resetSync, codeUpdates);
       }
       else if (verbose) {
@@ -2911,8 +2925,14 @@ public class SyncManager {
       return (ArrayList<SyncLayer>) PTypeUtil.getThreadLocal("currentSyncLayer");
    }
 
-   public static void processMethodReturn(String callId, Object retValue) {
-      ArrayList<SyncLayer> currentSyncLayers = getCurrentSyncLayers();
+   public static void processMethodReturn(SyncContext ctx, String callId, Object retValue) {
+      ArrayList<SyncLayer> currentSyncLayers;
+      if (ctx == null) {
+         currentSyncLayers = getCurrentSyncLayers();
+      }
+      else
+         currentSyncLayers = ctx.getChangedSyncLayers(null);
+
       boolean handled = false;
       if (currentSyncLayers != null) {
          for (SyncLayer currentSyncLayer:currentSyncLayers) {
@@ -2924,6 +2944,19 @@ public class SyncManager {
       }
       if (!handled)
          System.err.println("processMethodReturn called when no current sync layer is registered");
+   }
+
+   /**
+    * Used when the server invokes a remote change against the client.  We need to code generate this call in using
+    * the result of the method call performed by the client.
+    * The curObj is the current object, or null for a static method.
+    * The type is the type for a static method call.
+    * The callId is the name to use for storing the remote result - to represent a unique invocation of this method.
+    * The retValue is the return value of the method.
+    */
+   public static void addMethodResult(Object curObj, Object type, String callId, Object retValue) {
+      SyncContext ctx  = getDefaultSyncContext();
+      ctx.addMethodResult(curObj, type, callId, retValue);
    }
 
    /** Called either with a scopeDefinition - to choose the current context in that scope, an explicit ScopeContext or neither to choose the default scope, default context. */
@@ -2942,15 +2975,13 @@ public class SyncManager {
          else
             scopeId = GlobalScopeDefinition.getGlobalScopeDefinition().scopeId;
 
-         ctx = obj == null ? mgr.getDefaultSyncContext() : mgr.getSyncContext(scopeId, true);
+         ctx = obj == null ? SyncManager.getDefaultSyncContext() : mgr.getSyncContext(scopeId, true);
       }
       else {
-         ctx = (SyncContext) scopeCtx.getValue(SC_SYNC_CONTEXT_SCOPE_KEY);
-         if (ctx == null) {
-            // TODO: should we create it here?
-            System.err.println("*** No sync context for scope context: " + ctx);
-            return null;
-         }
+         ctx = mgr.getSyncContextFromScopeContext(scopeCtx, true);
+      }
+      if (ctx == null) {
+         throw new IllegalArgumentException("No SyncContext for scope ctx: " + scopeCtx);
       }
       return ctx.invokeRemote(syncGroup, obj, type, methName, paramSig, args);
    }

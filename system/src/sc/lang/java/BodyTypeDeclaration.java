@@ -5465,9 +5465,18 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public JavaSemanticNode updateProperty(PropertyAssignment assign, ExecutionContext ctx, boolean updateInstances, UpdateInstanceInfo info) {
       JavaModel model = getJavaModel();
       assign.parentNode = model;
-      // This property assignment modifies any existing definition we might have for this property
-      // Can return a VariableDefinition here
-      JavaSemanticNode overriddenAssign = assign.modifyDefinition(this, false, false);
+
+      LayeredSystem sys = model.getLayeredSystem();
+      JavaSemanticNode overriddenAssign;
+      sys.acquireDynLock(false);
+      try {
+         // This property assignment modifies any existing definition we might have for this property
+         // Can return a VariableDefinition here
+         overriddenAssign = assign.modifyDefinition(this, false, false);
+      }
+      finally {
+         sys.releaseDynLock(false);
+      }
 
       if (!model.hasErrors) {
          // If this is a method, we need to use this assignment to do the update.  Otherwise, use the overridden assignment

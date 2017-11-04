@@ -18,7 +18,7 @@ import java.util.*;
 /** This is the part of the editor context we share on the client. It's a workaround for the fact that we don't depend on the modify operator to build SC (so the IDE can build it directly) */
 public abstract class ClientEditorContext {
    @Constant
-   LayeredSystem system;
+   public LayeredSystem system;
 
    JavaModel pendingModel = null;
    LinkedHashSet<JavaModel> changedModels = new LinkedHashSet<JavaModel>();

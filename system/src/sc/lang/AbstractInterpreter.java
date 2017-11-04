@@ -13,16 +13,13 @@ import sc.lang.sc.EndTypeDeclaration;
 import sc.lang.sc.ModifyDeclaration;
 import sc.lang.java.Package;
 import sc.lang.java.*;
-import sc.layer.LayerUtil;
-import sc.layer.SrcEntry;
-import sc.layer.LayeredSystem;
+import sc.layer.*;
 import sc.parser.*;
 import sc.type.CTypeUtil;
 import sc.type.TypeUtil;
 import sc.util.DialogManager;
 import sc.util.FileUtil;
 import sc.util.StringUtil;
-import sc.layer.Layer;
 
 import java.io.*;
 import java.util.*;
@@ -30,6 +27,8 @@ import sc.dyn.ScheduledJob;
 
 public abstract class AbstractInterpreter extends EditorContext implements IScheduler, Runnable {
    static SCLanguage vlang = SCLanguage.INSTANCE;
+
+   String inputFileName = null; // Defaults to use standard input
 
    StringBuffer pendingInput = new StringBuffer();
 
@@ -92,8 +91,9 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    /** When set to true, we turn off the prompt, mostly for auto tests but it's also not helpful when stdin is redirected */
    boolean consoleDisabled = false;
 
-   public AbstractInterpreter(LayeredSystem sys, boolean consoleDisabled) {
+   public AbstractInterpreter(LayeredSystem sys, boolean consoleDisabled, String inputFileName) {
       super(sys);
+      this.inputFileName = inputFileName;
       this.consoleDisabled = consoleDisabled;
       cmdlang.initialize();
 
@@ -243,7 +243,6 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       // Use this as a quick way to detect any errors that happen during this process.
       model.hasErrors = false;
 
-
       String recordString = null;
       int origIndent = 0;
 
@@ -310,7 +309,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             }
 
             String filePrefix = path;
-            
+
             String baseFileName = type.typeName;
             int ix;
             if ((ix = baseFileName.indexOf(".")) != -1)
@@ -319,10 +318,10 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             // TODO: maybe change this into a utility method and have it using the file processors?  I like that it's going right to the file
             // system in case the layered system is not up-to-date but otherwise, it seems redundant to what's in LayeredSystem already
             String[] suffixes = {
-               SCLanguage.STRATACODE_SUFFIX,
                TemplateLanguage.SCT_SUFFIX,
                JavaLanguage.SCJ_SUFFIX,
-               HTMLLanguage.SC_HTML_SUFFIX
+               HTMLLanguage.SC_HTML_SUFFIX,
+               SCLanguage.STRATACODE_SUFFIX  // This should be last - we need to check for the existence of all suffixes, but only create ".sc" files from the command-line
             };
 
             int suffixIx = 0;
@@ -343,73 +342,87 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                suffixIx++;
             } while (suffixIx < suffixes.length && !mFile.canRead());
 
-            // If either there's a file in this layer or we may have unsaved changed to a file in this layer
-            if (mFile.canRead() || isChangedModel(layer, relFile)) {
+            boolean modelChanged = false;
+            boolean currentDefChanged = false;
+            TypeDeclaration currentDef = null;
 
-               boolean restart = model.isStarted();
-               model.removeSrcFiles();
-               model.addSrcFile(new SrcEntry(layer, absFileName, relFile));
-               if (restart)
-                  ParseUtil.restartComponent(model);
+            try {
+               system.acquireDynLock(false);
+               // If either there's a file in this layer or we may have unsaved changed to a file in this layer
+               if (mFile.canRead() || isChangedModel(layer, relFile)) {
+                  boolean restart = model.isStarted();
+                  model.removeSrcFiles();
+                  model.addSrcFile(new SrcEntry(layer, absFileName, relFile));
+                  if (restart)
+                     ParseUtil.restartComponent(model);
 
-               if (!model.isStarted()) // make sure the model
-                  ParseUtil.initAndStartComponent(model);
-               
-               TypeDeclaration currentDef = system.getSrcTypeDeclaration(CTypeUtil.prefixPath(model.getPackagePrefix(), type.typeName), currentLayer.getNextLayer(), true);
-               if (currentDef == null || currentDef.getLayer() != layer) {
-                  system.refreshRuntimes(true);
+                  if (!model.isStarted()) // make sure the model
+                     ParseUtil.initAndStartComponent(model);
+
                   currentDef = system.getSrcTypeDeclaration(CTypeUtil.prefixPath(model.getPackagePrefix(), type.typeName), currentLayer.getNextLayer(), true);
-                  if (currentDef == null) {
-                     System.err.println("No type: " + type.typeName + " in layer: " + currentLayer);
-                     return;
+                  if (currentDef == null || currentDef.getLayer() != layer) {
+                     system.refreshRuntimes(true);
+                     currentDef = system.getSrcTypeDeclaration(CTypeUtil.prefixPath(model.getPackagePrefix(), type.typeName), currentLayer.getNextLayer(), true);
+                     if (currentDef == null) {
+                        System.err.println("No type: " + type.typeName + " in layer: " + currentLayer);
+                        return;
+                     }
                   }
-               }
 
-               if (currentDef.getLayer() != layer) {
-                  System.err.println("*** definition has wrong layer");
-               }
-               if (type instanceof ModifyDeclaration) {
-                  ModifyDeclaration modType = (ModifyDeclaration) type;
-                  type.parentNode = currentDef.parentNode;
-                  // We're going to throw this away so this tells the system not to consider it part of the type
-                  // system.
-                  modType.markAsTemporary();
-                  ParseUtil.initAndStartComponent(type);
-                  if (modType.mergeDefinitionsInto(currentDef, false))
-                     addChangedModel(currentDef.getJavaModel());
+                  if (currentDef.getLayer() != layer) {
+                     System.err.println("*** definition has wrong layer");
+                  }
+                  if (type instanceof ModifyDeclaration) {
+                     ModifyDeclaration modType = (ModifyDeclaration) type;
+                     type.parentNode = currentDef.parentNode;
+                     // We're going to throw this away so this tells the system not to consider it part of the type
+                     // system.
+                     modType.markAsTemporary();
+                     ParseUtil.initAndStartComponent(type);
+                     if (modType.mergeDefinitionsInto(currentDef, false))
+                        currentDefChanged = true;
+                  }
+                  else {
+                     System.err.println("*** Definition of type: " + type.typeName + " already exists in layer: " + layer);
+                  }
+
+                  // Proceed using this object as the type to push onto the stack
+                  type = currentDef;
+                  addToType = false;
+                  List oldImports = pendingModel.imports;
+                  sc.lang.java.Package oldPkg = pendingModel.packageDef;
+
+                  pendingModel = type.getJavaModel();
+                  pendingModel.setCommandInterpreter(this);
+
+                  // Copy over any definitions added before we switched into this type
+                  if (oldImports != null) {
+                     for (Object imp:oldImports) {
+                        pendingModel.addImport(((ImportDeclaration) imp));
+                        currentDefChanged = true;
+                     }
+                  }
+                  if (oldPkg != null) {
+                     pendingModel.setProperty("packageDef", oldPkg);
+                     currentDefChanged = true;
+                  }
                }
                else {
-                  System.err.println("*** Definition of type: " + type.typeName + " already exists in layer: " + layer);
-               }
-
-               // Proceed using this object as the type to push onto the stack
-               type = currentDef;
-               addToType = false;
-               List oldImports = pendingModel.imports;
-               sc.lang.java.Package oldPkg = pendingModel.packageDef;
-
-               pendingModel = type.getJavaModel();
-               pendingModel.setCommandInterpreter(this);
-
-               // Copy over any definitions added before we switched into this type
-               if (oldImports != null) {
-                  for (Object imp:oldImports) {
-                     pendingModel.addImport(((ImportDeclaration) imp));
-                     addChangedModel(pendingModel);
-                  }
-               }
-               if (oldPkg != null) {
-                  pendingModel.setProperty("packageDef", oldPkg);
-                  addChangedModel(pendingModel);
+                  model.removeSrcFiles();
+                  newSrcEnt = new SrcEntry(layer, absFileName, relFile);
+                  model.addSrcFile(newSrcEnt);
+                  ParseUtil.restartComponent(model);
+                  modelChanged = true;
                }
             }
-            else {
-               model.removeSrcFiles();
-               newSrcEnt = new SrcEntry(layer, absFileName, relFile);
-               model.addSrcFile(newSrcEnt);
-               ParseUtil.restartComponent(model);
+            finally {
+               system.releaseDynLock(false);
+            }
+
+            if (currentDefChanged)
+               addChangedModel(currentDef.getJavaModel());
+            if (modelChanged)
                addChangedModel(model);
-            }
          }
 
          String origTypeName = type.typeName;
@@ -520,6 +533,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
             // TODO: if noInstance = true and assign.assignedProperty is an instance property we should not try to update the instances
 
+            // synchronization done inside updateProperty - we grab the lock to update the model but release it to update the property in case that triggers events back into the system
             JavaSemanticNode newDefinition = current.updateProperty(assign, execContext, !skipEval, null);
             addChangedModel(pendingModel);
 
@@ -534,11 +548,17 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       else if (statement instanceof TypedDefinition) {
          BodyTypeDeclaration current = currentTypes.get(currentTypes.size()-1);
 
-         // We do not generate unless the component is started
-         if (!model.isStarted())
-            ParseUtil.initAndStartComponent(model);
+         try {
+            system.acquireDynLock(false);
+            // We do not generate unless the component is started
+            if (!model.isStarted())
+               ParseUtil.initAndStartComponent(model);
 
-         current.updateBodyStatement((TypedDefinition)statement, execContext, true, null);
+            current.updateBodyStatement((TypedDefinition)statement, execContext, true, null);
+         }
+         finally {
+            system.releaseDynLock(false);
+         }
          addChangedModel(pendingModel);
       }
       else if (statement instanceof EndTypeDeclaration) {
@@ -790,11 +810,12 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       }
    }
 
-
+   /* TODO: add this back in again?
    public void gui() {
       String[] editorLayers = {"gui/editor"};
       system.addLayers(editorLayers, false, execContext);
    }
+   */
 
    public void createLayer() {
       CreateLayerWizard.start(this, false);
@@ -1071,9 +1092,20 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    /** Directory to run commands - defaults to the current directory */
    public String execDir = null;
 
-   // TODO: should we use a more complete shell environment - support with JLine 3.x or Crashub.org to get complete shell features, remote access, etc?
-   /** Run a system command */
+   /** Run a system command synchronously - returns the exit status of the command */
    public int exec(String argStr) {
+      return (int) execCommand(argStr, false);
+   }
+
+   /**
+    * Run a system command asynchronously.  Returns an AsyncResult object which has a "process" field you can use
+    * to control the exec'd process - i.e. call waitFor or destroy.
+    */
+   public AsyncResult execAsync(String argStr) {
+      return (AsyncResult) execCommand(argStr, true);
+   }
+
+   private Object execCommand(String argStr, boolean async) {
       String[] args = StringUtil.splitQuoted(argStr);
       String outputFile = null;
       String inputFile = null;
@@ -1092,8 +1124,14 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          }
       }
       ProcessBuilder pb = new ProcessBuilder(args);
-      return LayerUtil.execCommand(pb, execDir, inputFile, outputFile);
+      if (async) {
+         return LayerUtil.execAsync(pb, execDir, inputFile, outputFile);
+      }
+      else {
+         return LayerUtil.execCommand(pb, execDir, inputFile, outputFile);
+      }
    }
+
 
    public void quit() {
       System.exit(system.anyErrors ? 1 : 0);
@@ -1196,4 +1234,11 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    }
 
    public abstract boolean readParseLoop();
+
+   public void loadScript(String inputFileName) {
+      this.inputFileName = inputFileName;
+      resetInput();
+   }
+
+   abstract void resetInput();
 }

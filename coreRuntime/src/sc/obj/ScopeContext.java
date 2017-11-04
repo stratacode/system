@@ -56,9 +56,11 @@ public abstract class ScopeContext {
                System.err.println("*** Failed to remove child context");
          }
       }
-      if (childContexts != null) {
-         System.out.println("*** not destroying child contexts for: " + this);
-         // TODO: should we destroy child contexts here?
+      if (childContexts != null && childContexts.size() > 0) {
+         ArrayList<ScopeContext> childrenToRemove = new ArrayList<ScopeContext>(childContexts);
+         childContexts = null;
+         for (ScopeContext child:childrenToRemove)
+            child.scopeDestroyed();
       }
    }
 

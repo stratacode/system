@@ -1191,23 +1191,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          System.setProperty("jline.terminal", "jline.UnsupportedTerminal");
 
       if (startInterpreter) {
-         boolean consoleDisabled = false;
-         if (System.console() == null) {
-            jline.TerminalFactory.configure("off");
-            try {
-               // In.available an attempt to test for when redirected from stdin so turn off the prompt here.
-               // Also turn off when testVerifyMode is on because the prompts just make output harder to read
-               // and potentially interleave with other output and so mess up the 'diff'
-               if (options.testVerifyMode || System.in.available() > 0)
-                  consoleDisabled = true;
-            }
-            catch (IOException exc) {
-            }
-         }
-
-         // Need to fix the CommandInterpreter - it cannot handle empty package names in dialogs
-         //cmd = System.console() != null ? new JLineInterpreter(this) : new CommandInterpreter(this, System.in);
-         cmd = new JLineInterpreter(this, consoleDisabled);
+         initConsole();
       }
 
       if (newLayerDir == null) {
@@ -1311,6 +1295,34 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          for (int i = 0; i < excludedFiles.size(); i++)
             excludedPatterns.add(Pattern.compile(excludedFiles.get(i)));
       }
+   }
+
+   private void initConsole() {
+      boolean consoleDisabled = false;
+      String testInputName = null;
+      // TODO: it would be nice to customize this in the layer def file but right now we create the interpreter before
+      // we init the layers because we might run the "installSystem" wizard runs before we init the layers but that would be easy to fix
+      // We could check systemInstalled here and create an interpreter, then destroy it and recreate it later if test-script-name is set
+      if (options.testMode && options.testScriptName != null) {
+         //testInputName = options.testScriptName;
+         consoleDisabled = true;
+      }
+      else if (System.console() == null) {
+         jline.TerminalFactory.configure("off");
+         try {
+            // In.available an attempt to test for when redirected from stdin so turn off the prompt here.
+            // Also turn off when testVerifyMode is on because the prompts just make output harder to read
+            // and potentially interleave with other output and so mess up the 'diff'
+            if (options.testVerifyMode || System.in.available() > 0)
+               consoleDisabled = true;
+         }
+         catch (IOException exc) {
+         }
+      }
+
+      // Need to fix the CommandInterpreter - it cannot handle empty package names in dialogs
+      //cmd = System.console() != null ? new JLineInterpreter(this) : new CommandInterpreter(this, System.in);
+      cmd = new JLineInterpreter(this, consoleDisabled, testInputName);
    }
 
    private void initBuildSystem(boolean initPeers, boolean fromScratch) {
@@ -2052,6 +2064,25 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return serverEnabled ? ("http://" + serverName + (serverPort == 80 ? "" : ":" + serverPort)) + "/" : "file:" + buildDir + "/web/";
       else
          return main.getServerURL();
+   }
+
+   public String getURLForPath(String path) {
+      String serverPart = null;
+      if (serverEnabled)
+         return FileUtil.concatNormalized(getServerURL(), path);
+      else {
+         for (int lix = layers.size() - 1; lix >= 0; lix--) {
+            Layer curLayer = layers.get(lix);
+            if (curLayer.isBuildLayer() && curLayer.buildDir != null) {
+               String filePath = FileUtil.concatNormalized(curLayer.buildDir, "web", path);
+               if (new File(filePath).canRead()) {
+                  return "file://" + filePath;
+               }
+            }
+         }
+         System.err.println("*** Unable to find URL for path: " + path + " in web directory of the buildDirs");
+         return null;
+      }
    }
 
    public boolean testPatternMatches(String value) {
@@ -3394,6 +3425,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       /** Exit after running the tests */
       @Constant boolean testExit = false;
 
+      /** General flag for when we are running tests  */
+      @Constant boolean testMode = false;
+
       /** Argument to control what happens after the command is run, e.g. it can specify the URL of the page to open. */
       @Constant String openPattern = null;
 
@@ -3456,6 +3490,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       /** Treat warnings as errors - to stop builds and exit with error status - use true for most test and even production scenarios */
       @Constant public boolean treatWarningsAsErrors = true;
+
+      /** Test script to run as input to command line interpreter after execution.  */
+      @Constant public String testScriptName = null;
+
+      /** Directory to store test results */
+      @Constant public String testResultsDir = null;
    }
 
    @MainSettings(produceJar = true, produceScript = true, produceBAT = true, execName = "bin/scc", jarFileName="bin/sc.jar", debug = false, maxMemory = 2048, defaultArgs = "-restartArgsFile <%= getTempDir(\"restart\", \"tmp\") %>")
@@ -3733,11 +3773,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                case 't':
                   if (opt.equals("ta")) {
                      options.testPattern = ".*";
+                     options.testMode = true;
                   }
                   else if (opt.equals("te")) {
                      options.testExit = true;
+                     options.testMode = true;
                   }
                   else if (opt.equals("t")) {
+                     options.testMode = true;
                      if (i == args.length - 1)
                         System.err.println("*** missing arg to run -t option");
                      else {
@@ -3803,8 +3846,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   }
                   else if (opt.equals("vp"))
                      PerfMon.enabled = true;
-                  else if (opt.equals("vt"))
+                  else if (opt.equals("vt")) {
                      options.testVerifyMode = true;
+                     options.testMode = true;
+                  }
                   else if (opt.equals("v"))
                      traceNeedsGenerate = options.verbose = true;
                   else
@@ -3843,6 +3888,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          lastRestartArg = i;
       }
+
+      if (options.testResultsDir == null) {
+         options.testResultsDir = System.getenv("TEST_DIR");
+         if (options.testResultsDir == null)
+            options.testResultsDir = "/tmp";
+      }
+
+      // When testing we don't want the normal run - open page to open - it's up to the test script to decide what to open to test
+      if (options.testMode)
+         options.openPageAtStartup = false;
 
       PerfMon.start("main", true, true);
 
@@ -3993,6 +4048,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       try {
          Thread commandThread = null;
          if (startInterpreter) {
+            if (options.testScriptName != null && options.testMode && !sys.peerMode) {
+               System.out.println("Running test script: " + options.testScriptName);
+               sys.cmd.loadScript(FileUtil.concat(sys.buildDir, options.testScriptName));
+
+               // We need to add the temp layer so the testScriptName is not evaluated in a compiled layer - it has to be dynamic
+               editLayer = false;
+            }
 
             // If we are adding a temporary layer, we can put it at the specified path.  If we are editing the
             // last layer, we can't switch the directory.  In this case, it is treated as relative to the layer's
@@ -4000,6 +4062,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (!editLayer) {
                sys.addTemporaryLayer(commandDirectory, false);
                commandDirectory = null;
+
+               // Update the current layer to the temp layer so it's the default for scripts - we may need that to be a dynamic layer if we are doing test things in there
+               sys.cmd.updateLayerState();
             }
 
             if (commandDirectory != null)
@@ -4016,7 +4081,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             else if (sys.layers.size() == 0) {
                sys.cmd.askCreateLayer();
             }
-            // TODO: we should hold up this thread until after the main thread has tripped a sentinel that it's been fully initialized
+            // If we have stuff to do on this thread, we can't use it for the command interpreter so we spawn a new one.
+            // Since we have the dyn lock, the prompt() method in the cmd object will block there until we're finished.
             if (options.runClass != null || options.testPattern != null) {
                commandThread = new Thread(sys.cmd);
                commandThread.setName("StrataCode command interpreter");
@@ -4113,8 +4179,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          System.out.println("Stats for TemplateLanguage:");
          System.out.println(Parser.getStatInfo(TemplateLanguage.INSTANCE.getStartParselet()));
       }
-      if (options.testExit)
-         System.exit(sys.anyErrors ? -1 : 0);
+      if (options.testExit) {
+         // When there's a script, the EOF of the script will trigger the exit I think?
+         if (options.testMode && options.testScriptName == null)
+            System.exit(sys.anyErrors ? -1 : 0);
+      }
    }
 
    private boolean syncInited = false;
@@ -4848,7 +4917,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       layer.layerDirName = "temp." + TEMP_LAYER_BASE_NAME + ix;
       layer.layerBaseName = baseName;
       layer.layerPathName = pathName;
-      layer.dynamic = !getCompiledOnly();
+      // We need the temp layer to be dynamic if we're loading a dynamic test script which creates objects and stuff.  TODO: should this always be true? There were maybe some advantages to having compiledOnly not have a dynamic layer at all?
+      layer.dynamic = !getCompiledOnly() || (options.testMode && options.testScriptName != null);
       layer.defaultModifier = "public";
       layer.tempLayer = true;
       layer.newLayer = true;
