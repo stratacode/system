@@ -3787,6 +3787,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         options.testPattern = args[++i];
                      }
                   }
+                  else if (opt.equals("ts")) {
+                     options.testMode = true;
+                     if (i == args.length - 1)
+                        System.err.println("*** missing arg to run -t option");
+                     else {
+                        options.testScriptName = args[++i];
+                     }
+                  }
                   else
                      usage("Unrecognized options: " + opt, args);
                   break;
@@ -4049,8 +4057,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          Thread commandThread = null;
          if (startInterpreter) {
             if (options.testScriptName != null && options.testMode && !sys.peerMode) {
-               System.out.println("Running test script: " + options.testScriptName);
-               sys.cmd.loadScript(FileUtil.concat(sys.buildDir, options.testScriptName));
+               String pathName = options.testScriptName;
+               if (!pathName.startsWith(".") && !FileUtil.isAbsolutePath(pathName))
+                  pathName = FileUtil.concat(sys.buildDir, pathName);
+               System.out.println("Running test script: " + pathName);
+               sys.cmd.loadScript(pathName);
 
                // We need to add the temp layer so the testScriptName is not evaluated in a compiled layer - it has to be dynamic
                editLayer = false;
