@@ -22,7 +22,6 @@ import sc.type.Type;
 import sc.type.TypeUtil;
 import sc.util.LineCountStringBuilder;
 import sc.util.StringUtil;
-import sun.tools.java.Identifier;
 
 import java.util.*;
 
