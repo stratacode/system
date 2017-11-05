@@ -11532,7 +11532,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (!types.remove(type)) {
             if (type instanceof AnonClassDeclaration)
                return;
-            System.err.println("*** Can't find entry in root name list to remove: " + rootName);
+            // For some reason, when restarting a model we only add the most specified type to this list
+            // but when stopping the model we remove all of them and so get a bunch of these errors (and those
+            // in removeTypeByName too)
+            //System.err.println("*** Can't find entry in root name list to remove: " + rootName);
          }
          else if (types.size() == 0)
             typesByRootName.remove(rootName);
@@ -11652,8 +11655,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          else {
             // We don't consistently add the anonymous types to this list so don't warn when we try to remove them.
-            if (!(toRem instanceof AnonClassDeclaration))
-               warning("*** remove type by name not in list");
+            //if (!(toRem instanceof AnonClassDeclaration))
+               // And when restarting a model we don't consistently add all modified types but we do try to remove all of them - see refreshStyle test
+               //warning("*** remove type by name not in list");
          }
       }
    }
