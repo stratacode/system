@@ -324,8 +324,10 @@ public class NewExpression extends IdentifierExpression {
             int last = ie.identifiers.size() - 1;
             // If we are not able to resolve the newX method, it's because the component has not been transformed yet.  We store the enclosing type
             // so that when we transformToJS this identifier expression, we know the type for property 'this' and 'outer' generation.
-            if (ie.boundTypes[last] == null)
+            if (ie.boundTypes[last] == null) {
                ie.boundTypes[last] = boundType;
+               ie.idTypes[last] = IdentifierType.NewMethodInvocation;
+            }
          }
          any = true;
       }

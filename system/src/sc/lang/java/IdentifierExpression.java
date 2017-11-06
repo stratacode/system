@@ -58,6 +58,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       GetSetMethodInvocation, // A weird case - we have a getX or setX which matches a field not yet converted
       GetObjectMethodInvocation, // Another weird case - we have a getX which matches an object not yet converted
       EnumName,          // Bound to an EnumConstant or object implementing java.lang.Enum
+      NewMethodInvocation,
       Unknown
     }
 

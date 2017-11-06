@@ -442,29 +442,37 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
          VariableDefinition varDef = variableDefinitions.get(0);
          if (varDef.initializer instanceof IdentifierExpression) {
             IdentifierExpression expr = (IdentifierExpression) varDef.initializer;
-            if (expr.arguments != null) {
-               TypeDeclaration enclType = getEnclosingType();
-               int ix = enclType.getBodyStatements().indexOf(this);
-               if (ix != -1) {
-                  SemanticNodeList<Expression> methArgs = new SemanticNodeList<Expression>(4);
-                  BlockStatement addRemBlock = new BlockStatement();
-                  if (enclType.getDefinesCurrentObject()) {
-                     methArgs.add(IdentifierExpression.create("this"));
-                     methArgs.add(NullLiteral.create());
+
+            if (expr instanceof NewExpression)
+               System.out.println("***");
+
+
+            if (!(expr instanceof NewExpression) && expr.arguments != null) {
+               int lastIx = expr.identifiers.size() - 1;
+               if (expr.idTypes[lastIx] != IdentifierExpression.IdentifierType.NewMethodInvocation) {
+                  TypeDeclaration enclType = getEnclosingType();
+                  int ix = enclType.getBodyStatements().indexOf(this);
+                  if (ix != -1) {
+                     SemanticNodeList<Expression> methArgs = new SemanticNodeList<Expression>(4);
+                     BlockStatement addRemBlock = new BlockStatement();
+                     if (enclType.getDefinesCurrentObject()) {
+                        methArgs.add(IdentifierExpression.create("this"));
+                        methArgs.add(NullLiteral.create());
+                     }
+                     else {
+                        methArgs.add(NullLiteral.create());
+                        methArgs.add(ClassValueExpression.create(enclType.getFullTypeName()));
+                        //addRemBlock.staticEnabled = true;
+                     }
+                     methArgs.add(StringLiteral.create(varDef.variableName));
+                     methArgs.add(IdentifierExpression.create(varDef.variableName));
+                     IdentifierExpression addRemCall = IdentifierExpression.createMethodCall(methArgs, "sc.sync.SyncManager.addMethodResult");
+                     addRemBlock.addStatementAt(0, addRemCall);
+                     enclType.addBodyStatementAt(ix+1, addRemBlock);
                   }
-                  else {
-                     methArgs.add(NullLiteral.create());
-                     methArgs.add(ClassValueExpression.create(enclType.getFullTypeName()));
-                     //addRemBlock.staticEnabled = true;
-                  }
-                  methArgs.add(StringLiteral.create(varDef.variableName));
-                  methArgs.add(IdentifierExpression.create(varDef.variableName));
-                  IdentifierExpression addRemCall = IdentifierExpression.createMethodCall(methArgs, "sc.sync.SyncManager.addMethodResult");
-                  addRemBlock.addStatementAt(0, addRemCall);
-                  enclType.addBodyStatementAt(ix+1, addRemBlock);
+                  else
+                     System.err.println("*** Did not find field for addMethodResult call in serialization");
                }
-               else
-                  System.err.println("*** Did not find field for addMethodResult call in serialization");
             }
          }
       }
