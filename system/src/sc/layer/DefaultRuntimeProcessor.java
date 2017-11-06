@@ -164,6 +164,12 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor, Serializable 
       return null;
    }
 
+   public String runStopMethod(Object type, String runClass, String stopMethod) {
+      if (system.options.verbose)
+         System.out.println("Warning: - not running stopMethod for: " + runClass + " in runtime: " + getRuntimeName());
+      return null;
+   }
+
    protected ArrayList<IRuntimeProcessor> syncRuntimes = new ArrayList<IRuntimeProcessor>();
 
    /** The list of runtimes that we are synchronizing with from this runtime.  In Javascript this is the default runtime */

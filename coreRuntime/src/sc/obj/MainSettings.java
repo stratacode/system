@@ -45,4 +45,9 @@ public @interface MainSettings {
    boolean debug() default false;
    /** If produceJar is true, should we also include dependent classes in the jar file (excluding system classes) */
    boolean includeDepsInJar() default true;
+   /**
+    * The name of a static method on the same class to call when shutting down the process.  You do not have to supply this method
+    * if live dynamic types are enabled for the main type and the type implements the IStoppable interface.
+    */
+   String stopMethod() default "";
 }

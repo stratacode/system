@@ -1716,6 +1716,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public void performExitCleanup() {
       if (options.clearOnExit) {
+         // Any mainMethods which implement IStoppable get stopped before we shutdown.  This should stop the server etc. and all requests that will come back in
+         // to access the layered system after it's been stopped.
+         buildInfo.stopMainInstances();
+
          acquireDynLock(false);
          try {
             destroySystem();
@@ -4822,6 +4826,28 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return runMainMethod(type, runClass, runClassArgs);
    }
 
+   String runStopMethod(String runClass, String stopMethod) {
+      Object type = getRuntimeTypeDeclaration(runClass);
+      return runStopMethod(type, runClass, stopMethod);
+   }
+
+   void stopMainInstances(String typeName) {
+      Iterator insts = getInstancesOfType(typeName);
+      while (insts.hasNext()) {
+         Object inst = insts.next();
+         if (inst instanceof IStoppable) {
+            if (options.verbose)
+               verbose("Stopping main instance of type: " + typeName);
+            ((IStoppable) inst).stop();
+         }
+         else if (inst instanceof IAltStoppable) {
+            if (options.verbose)
+               verbose("Stopping main instance of type: " + typeName);
+            ((IAltStoppable) inst)._stop();
+         }
+      }
+   }
+
    String runMainMethod(String runClass, String[] runClassArgs, List<Layer> theLayers) {
       Object type = getRuntimeTypeDeclaration(runClass);
       if (theLayers != null) {
@@ -4866,11 +4892,55 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          Class rcClass = (Class) rc;
          Method meth = RTypeUtil.getMethod(rcClass, "main", MAIN_ARG);
+         if (meth == null)
+            return "No main(String[]) method to run on class: " + runClass;
          if (!PTypeUtil.hasModifier(meth, "static"))
             return "Main method missing 'static' modifier: " + runClass;
          else {
             if (options.info)
                System.out.println("Running compiled main for class: " + runClass + "(" + StringUtil.arrayToString(args) + ")");
+            runClassStarted = true;
+            TypeUtil.invokeMethod(null, meth, args);
+         }
+      }
+      return null;
+   }
+
+   String runStopMethod(Object type, String runClass, String stopMethod) {
+      if (runtimeProcessor != null) {
+         return runtimeProcessor.runStopMethod(type, runClass, stopMethod);
+      }
+      Object[] args = new Object[] {};
+      if (type != null && ModelUtil.isDynamicType(type)) {
+         Object meth = ModelUtil.getMethod(this, type, stopMethod, null, null, null, false, null, null, new Object[] {});
+         if (meth == null)
+            return "No stopMethod named: " + stopMethod + " on type: " + ModelUtil.getTypeName(type);
+         if (!ModelUtil.hasModifier(meth, "static"))
+            return "Main stopMethod missing 'static' modifier: " + runClass;
+         else {
+            if (options.info)
+               System.out.println("Running dynamic stopMethod for: " + runClass);
+            runClassStarted = true;
+            ModelUtil.callMethod(null, meth, args);
+         }
+      }
+      else if (type instanceof Class && IDynObject.class.isAssignableFrom((Class) type)) {
+      }
+      else {
+         Object rc = getCompiledClass(runClass);
+         if (rc == null) {
+            return "No main class to run stopMethod: " + runClass + "." + stopMethod;
+         }
+         Class rcClass = (Class) rc;
+         Method meth = RTypeUtil.getMethod(rcClass, stopMethod);
+         if (meth == null) {
+            return "No main method: " + stopMethod + " on type: " + runClass;
+         }
+         else if (!PTypeUtil.hasModifier(meth, "static"))
+            return "Main stopMethod missing 'static' modifier: " + runClass + "." + stopMethod;
+         else {
+            if (options.info)
+               System.out.println("Running compiled main stopMethod for class: " + runClass + "." + stopMethod + "()");
             runClassStarted = true;
             TypeUtil.invokeMethod(null, meth, args);
          }

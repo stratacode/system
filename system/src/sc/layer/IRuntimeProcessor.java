@@ -56,6 +56,8 @@ public interface IRuntimeProcessor {
 
    public String runMainMethod(Object type, String runClass, String[] runClassArgs);
 
+   public String runStopMethod(Object type, String runClass, String stopMethod);
+
    public String getDestinationName();
 
    public List<IRuntimeProcessor> getSyncRuntimes();

@@ -73,17 +73,13 @@ public class BuildInfo {
       testProcessors = newProcs;
    }
 
-   public void addMainCommand(JavaModel model, String execName) {
-      addMainCommand(model, execName, null);
-   }
-
    private void initMainMethods() {
       if (mainMethods == null)
          mainMethods = new ArrayList<MainMethod>();
    }
 
-   public void addMainCommand(Layer modelLayer, String typeName, String execName, String[] args) {
-      MainMethod newMM = new MainMethod(typeName, execName, args);
+   public void addMainCommand(Layer modelLayer, String typeName, String execName, String[] args, String stopMethod) {
+      MainMethod newMM = new MainMethod(typeName, execName, args, stopMethod);
       if (mainMethods != null && mainMethods.contains(newMM))
          return;
       initMainMethods();
@@ -95,18 +91,18 @@ public class BuildInfo {
                // We may be compiling a previous layer but still need to add to a layer who's start method has not been called (since we start just before compiling so that we can pick up previous layers libs in the "start" method of the Layer)
                if (l.buildInfo == null)
                   l.loadBuildInfo();
-               l.buildInfo.addMainCommand(modelLayer, typeName, execName, args);
+               l.buildInfo.addMainCommand(modelLayer, typeName, execName, args, stopMethod);
             }
          }
       }
    }
 
-   public void addMainCommand(JavaModel model, String execName, String[] args) {
+   public void addMainCommand(JavaModel model, String execName, String[] args, String stopMethod) {
       Layer modelLayer = model.getLayer();
       changed = true;
       String typeName = model.getModelTypeName();
 
-      addMainCommand(modelLayer, typeName, execName, args);
+      addMainCommand(modelLayer, typeName, execName, args, stopMethod);
    }
 
    public void runMatchingMainMethods(String runClass, String[] runClassArgs, List<Layer> theLayers) {
@@ -159,6 +155,22 @@ public class BuildInfo {
       }
       if (!any)
          System.out.println("No main methods match pattern: " + runClass + " in: " + mainMethods);
+   }
+
+   public void stopMainInstances() {
+      if (mainMethods == null || mainMethods.size() == 0) {
+         return;
+      }
+      boolean any = false;
+      for (int i = 0; i < mainMethods.size(); i++) {
+         MainMethod m = mainMethods.get(i);
+         system.stopMainInstances(m.typeName);
+         if (m.stopMethod != null) {
+            String res = system.runStopMethod(m.typeName, m.stopMethod);
+            if (res != null)
+               System.err.println("*** Failed to run stopMethod: " + res);
+         }
+      }
    }
 
    public void runMatchingScripts(String runClass, String[] runClassArgs, List<Layer> theLayers) {
@@ -273,14 +285,20 @@ public class BuildInfo {
       public String typeName;
       public String execName;
       public String[] args;
-      public MainMethod(String typeName, String e) {
-         this.typeName = typeName;
-         execName = e;
-      }
+      public String stopMethod;
+
+      // TODO: remove me!  Needed for old build info files only
       public MainMethod(String typeName, String e, String[] a) {
          this.typeName = typeName;
          execName = e;
          args = a;
+      }
+
+      public MainMethod(String typeName, String e, String[] a, String stopMethod) {
+         this.typeName = typeName;
+         execName = e;
+         args = a;
+         this.stopMethod = stopMethod;
       }
       public String toString() {
          return typeName;
@@ -293,13 +311,15 @@ public class BuildInfo {
                return false;
             if (!StringUtil.equalStrings(execName, otherMM.execName))
                return false;
+            if (!StringUtil.equalStrings(stopMethod, otherMM.stopMethod))
+               return false;
             return true;
          }
          return false;
       }
 
       public int hashCode() {
-         return typeName.hashCode() + (execName != null ? execName.hashCode() : 0);
+         return typeName.hashCode() + (execName != null ? execName.hashCode() : 0) + (stopMethod != null ? stopMethod.hashCode() : 0);
       }
    }
 

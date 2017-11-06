@@ -246,6 +246,12 @@ public abstract class SyncDestination {
             */
             writeToDestination(sb.toString(), null, this, "reset=true", null);
          }
+         // Server went away and told us it wasn't coming back so turn off realTime and we are now disconnected
+         else if (errorCode == 410) {
+            connected = false;
+            realTime = false;
+            System.out.println("*** Server shutdown");
+         }
          else {
             boolean serverError = errorCode == 500 || errorCode == 0;
             if (serverError)

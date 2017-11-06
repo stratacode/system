@@ -290,6 +290,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       Integer minMem;
       String scriptSuffix;
       Boolean includeDepsInJar;
+      String stopMethod;
 
       JavaModel model;
       String fullTypeName;
@@ -320,6 +321,9 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          maxMem = (Integer) ModelUtil.getAnnotationValue(mainSettings, "maxMemory");
          minMem = (Integer) ModelUtil.getAnnotationValue(mainSettings, "minMemory");
          includeDepsInJar = (Boolean) ModelUtil.getAnnotationValue(mainSettings, "includeDepsInJar");
+         stopMethod = (String) ModelUtil.getAnnotationValue(mainSettings, "stopMethod");
+         if (stopMethod != null && stopMethod.length() == 0)
+            stopMethod = null;
       }
 
       /**
@@ -401,7 +405,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                     " -jar \"" + varString("DIRNAME") + sepStr + getFileNamePart(jarFileName, "/") + "\"";
          }
          else {
-            lsys.buildInfo.addMainCommand(model, execName, defaultArgList);
+            lsys.buildInfo.addMainCommand(model, execName, defaultArgList, stopMethod);
             sharedArgs = "java" + debugStr + vmParams + memStr + " -cp \"" + lsys.userClassPath + "\" " + dynStr + fullTypeName + " ";
          }
          sharedArgs += extraArgs;
