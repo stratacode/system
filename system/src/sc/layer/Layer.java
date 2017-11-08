@@ -4276,16 +4276,13 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (baseLayers != null) {
          //boolean converted = false;
          // If this file is in this layer, before we check the base layers, make sure to strip turn it into a relative search
-         if (abs && fileName.startsWith(layerPathName)) {
+         if (abs && fileName.startsWith(layerPathName) && !fileName.equals(layerPathName)) {
             fileName = fileName.substring(layerPathName.length() + 1);
             abs = false;
-            //converted = true;
          }
          for (Layer baseLayer:baseLayers) {
             SrcPathType res = baseLayer.getSrcPathType(fileName, abs);
             if (res != null) {
-               //if (converted)
-               //   System.out.println("***");
                return res;
             }
          }

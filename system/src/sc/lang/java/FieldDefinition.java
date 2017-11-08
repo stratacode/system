@@ -443,10 +443,6 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
          if (varDef.initializer instanceof IdentifierExpression) {
             IdentifierExpression expr = (IdentifierExpression) varDef.initializer;
 
-            if (expr instanceof NewExpression)
-               System.out.println("***");
-
-
             if (!(expr instanceof NewExpression) && expr.arguments != null) {
                int lastIx = expr.identifiers.size() - 1;
                if (expr.idTypes[lastIx] != IdentifierExpression.IdentifierType.NewMethodInvocation) {

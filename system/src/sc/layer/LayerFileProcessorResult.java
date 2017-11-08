@@ -50,7 +50,7 @@ public class LayerFileProcessorResult implements IFileProcessorResult {
          String newFile = FileUtil.concat(processor.getOutputDirToUse(sys, buildSrcDir, buildLayer),  newRelFile);
 
          // The layered system processes hidden layer files backwards.  So generate will be true the for the
-         // final layer's objects but an overriden component comes in afterwards... don't overwrite the new file
+         // final layer's objects but an overridden component comes in afterwards... don't overwrite the new file
          // with the previous one.  We really don't need to transform this but I think it is moot because it will
          // have been transformed anyway.
          if (generate) {

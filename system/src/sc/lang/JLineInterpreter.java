@@ -39,6 +39,7 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
    void resetInput() {
       try {
          FileInputStream inStream = inputFileName == null ? new FileInputStream(FileDescriptor.in) : new FileInputStream(inputFileName);
+         consoleDisabled = inputFileName != null;
          input = new ConsoleReader("scc", inStream, System.out, null);
          input.setExpandEvents(false); // Otherwise "!" and probably other special chars fail to expand in JLine (e.g. if (foo != bar) -> [ERROR] Could not expand event)
          input.addCompleter(this);
