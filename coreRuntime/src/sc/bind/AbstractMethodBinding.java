@@ -351,8 +351,11 @@ public abstract class AbstractMethodBinding extends DestinationListener {
             }
          }
          else if (srcProp == null) {
-            if (apply)
+            if (apply) {
+               if (direction.doForward())
+                  applyBinding(null, null, null);
                applyReverseBinding(methObj, boundValue, srcProp);
+            }
             return true;
          }
          return false;

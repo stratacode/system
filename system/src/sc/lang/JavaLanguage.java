@@ -706,12 +706,12 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       memberDeclaration.addDefault(genericMethodOrConstructorDecl, typedMemberDeclaration, constructorDeclaration);
    }
 
-   public Sequence memberDeclarationWithModifiers = new Sequence("(modifiers,.)", modifiers, memberDeclaration);
+   public Sequence memberDeclarationWithModifiers = new Sequence("<memberDeclarationWithModifiers>(modifiers,.)", modifiers, memberDeclaration);
 
    /** exposed as a hook point for parsing class member definitions */
    public OrderedChoice classBodyDeclarations = new OrderedChoice("<classBodyDeclarations>([],[],)", OPTIONAL | REPEAT,
                 memberDeclarationWithModifiers,
-                new Sequence("(staticEnabled,.)", new SemanticToken("static", OPTIONAL), block), semicolonEOL);
+                new Sequence("<classBodyBlock>(staticEnabled,.)", new SemanticToken("static", OPTIONAL), block), semicolonEOL);
 
    {
       // One of the switch points from HTML spacing context to Java

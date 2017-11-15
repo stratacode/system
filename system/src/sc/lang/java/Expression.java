@@ -1001,4 +1001,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       return eval(null, new ExecutionContext());
    }
 
+   public boolean isVoidType() {
+      return ModelUtil.typeIsVoid(getTypeDeclaration());
+   }
 }

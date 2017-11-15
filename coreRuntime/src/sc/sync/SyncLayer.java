@@ -268,11 +268,13 @@ public class SyncLayer {
    public static class SyncMethodResult extends SyncMethodBase {
       String callId = null;
       Object retValue;
+      String exceptionStr;
 
-      SyncMethodResult(Object ctxObj, Object type, String callId, Object retValue) {
+      SyncMethodResult(Object ctxObj, Object type, String callId, Object retValue, String exceptionStr) {
          super(ctxObj, type);
          this.callId = callId;
          this.retValue = retValue;
+         this.exceptionStr = exceptionStr;
       }
 
       public int hashCode() {
@@ -284,7 +286,7 @@ public class SyncLayer {
       }
 
       public String toString() {
-         return (obj == null ? "static " : "") + "method result: " + (obj == null ? DynUtil.getTypeName(type, false) : DynUtil.getInstanceName(obj)) + " for: " + callId + " = " + DynUtil.getInstanceName(retValue);
+         return (obj == null ? "static " : "") + "method result: " + (obj == null ? DynUtil.getTypeName(type, false) : DynUtil.getInstanceName(obj)) + " for: " + callId + " = " + (exceptionStr == null ? DynUtil.getInstanceName(retValue) : "Exception: " + exceptionStr);
       }
    }
 
@@ -405,18 +407,22 @@ public class SyncLayer {
       return res;
    }
 
-   public void addMethodResult(Object ctxObj, Object type, String objName, Object retValue) {
-      SyncMethodResult change = new SyncMethodResult(ctxObj, type, objName, retValue);
+   public void addMethodResult(Object ctxObj, Object type, String objName, Object retValue, String exceptionStr) {
+      SyncMethodResult change = new SyncMethodResult(ctxObj, type, objName, retValue, exceptionStr);
       addSyncChange(change);
    }
 
-   public boolean processMethodReturn(String callId, Object retValue) {
+   public boolean processMethodReturn(String callId, Object retValue, String exceptionStr) {
       RemoteResult res = pendingMethods.remove(callId);
       if (res == null)
          return false;
       res.setValue(retValue);
-      if (res.listener != null)
-         res.listener.response(retValue);
+      if (res.listener != null) {
+         if (exceptionStr == null)
+            res.listener.response(retValue);
+         else
+            res.listener.error(-1, exceptionStr);
+      }
       return true;
    }
 
@@ -437,13 +443,13 @@ public class SyncLayer {
       syncContext.markSyncPending();
    }
 
-   public void completeSync(SyncManager.SyncContext clientContext, boolean error) {
+   public void completeSync(SyncManager.SyncContext clientContext, Integer errorCode, String message) {
       if (!pendingSync) {
          return;
       }
       pendingSync = false;
       // If there's no error - clear the pendingValues - reset any changedValues back to the server's version.
-      if (!error) {
+      if (errorCode == null) {
          // Did any changes come in when the system was pending?
          if (changedValues.size() > 0) {
             ArrayList<Object> toCullObjs = new ArrayList<Object>();
@@ -498,7 +504,7 @@ public class SyncLayer {
       else {
          for (RemoteResult res:pendingMethods.values()) {
             if (res.listener != null)
-               res.listener.error(1, null);
+               res.listener.error(errorCode, message);
          }
 
          if (changedValues.size() > 0) {
@@ -530,7 +536,7 @@ public class SyncLayer {
             syncChangeLast = pendingChangeLast;
          }
       }
-      syncContext.completeSync(clientContext, error);
+      syncContext.completeSync(clientContext, errorCode, message);
       pendingValues = null;
       pendingChangeList = null;
       pendingChangeLast = null;

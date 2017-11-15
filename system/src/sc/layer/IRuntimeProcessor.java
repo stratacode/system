@@ -4,9 +4,7 @@
 
 package sc.layer;
 
-import sc.lang.java.BodyTypeDeclaration;
-import sc.lang.java.JavaSemanticNode;
-import sc.lang.java.UpdateInstanceInfo;
+import sc.lang.java.*;
 
 import java.util.List;
 
@@ -97,4 +95,6 @@ public interface IRuntimeProcessor {
     * that is not part of the project, but instead gets pulled in via a src.jar file like scrt.jar).
     */
    public List<SrcEntry> buildCompleted();
+
+   public String transformStatement(BodyTypeDeclaration currentType, Object inst, Statement expr);
 }

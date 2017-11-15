@@ -3410,7 +3410,7 @@ public class ModelUtil {
 
       if (!message.contains("Compiled stack")) {
          message += "Compiled stack:\n";
-         message += LayerUtil.getExceptionStack(exc);
+         message += PTypeUtil.getStackTrace(exc);
          newExc = true;
       }
 
@@ -5393,6 +5393,9 @@ public class ModelUtil {
    public static Object getInheritedAnnotation(LayeredSystem system, Object superType, String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
       if (superType instanceof ITypeDeclaration)
          return ((ITypeDeclaration) superType).getInheritedAnnotation(annotationName, skipCompiled, refLayer, layerResolve);
+      else if (superType instanceof IBeanMapper || ModelUtil.isMethod(superType) || ModelUtil.isField(superType)) {
+         return getAnnotation(superType, annotationName);
+      }
       else {
          Class superClass = (Class) superType;
          Class annotationClass = RDynUtil.loadClass(annotationName);
@@ -5434,11 +5437,15 @@ public class ModelUtil {
             for (Class iface:ifaces) {
                Object nextIface = findTypeDeclaration(system, iface.getName(), refLayer, layerResolve);
                if (nextIface != null) {
-                  if (nextIface instanceof TypeDeclaration)
-                     return ((TypeDeclaration) nextIface).getInheritedAnnotation(annotationName, skipCompiled, refLayer, layerResolve);
-                  else if (!skipCompiled) {
-                     return getInheritedAnnotation(system, nextIface, annotationName, skipCompiled, refLayer, layerResolve);
+                  Object annotRes = null;
+                  if (nextIface instanceof TypeDeclaration) {
+                     annotRes = ((TypeDeclaration) nextIface).getInheritedAnnotation(annotationName, skipCompiled, refLayer, layerResolve);
                   }
+                  else if (!skipCompiled) {
+                     annotRes = getInheritedAnnotation(system, nextIface, annotationName, skipCompiled, refLayer, layerResolve);
+                  }
+                  if (annotRes != null)
+                     return annotRes;
                }
             }
             superClass = next;
@@ -8677,5 +8684,41 @@ public class ModelUtil {
          return res;
       }
       return null;
+   }
+
+   public static boolean execForRuntime(LayeredSystem refSys, Layer refLayer, Object refType, LayeredSystem runtimeSys) {
+      Object execAnnot = ModelUtil.getInheritedAnnotation(refSys, refType, "sc.obj.Exec", false, refLayer, false);
+      if (execAnnot != null) {
+         String execRuntimes = (String) ModelUtil.getAnnotationValue(execAnnot, "runtimes");
+         if (execRuntimes != null && execRuntimes.length() > 0) {
+            String[] rtNames = execRuntimes.split(",");
+            for (String rtName:rtNames)
+               if (rtName.equals(runtimeSys.getRuntimeName()) || rtName.equals(runtimeSys.getProcessName()))
+                  return true;
+         }
+         Boolean serverOnly = (Boolean) ModelUtil.getAnnotationValue(execAnnot, "serverOnly");
+         Boolean clientOnly = (Boolean) ModelUtil.getAnnotationValue(execAnnot, "clientOnly");
+         if (serverOnly != null && serverOnly) {
+            if (clientOnly != null && clientOnly)
+               System.err.println("Exec annotation for type: " + ModelUtil.getTypeName(refType) + " has both clientOnly and serverOnly");
+            return runtimeSys.serverEnabled;
+         }
+         if (clientOnly != null && clientOnly) {
+            return !runtimeSys.serverEnabled;
+         }
+      }
+      if (ModelUtil.isMethod(refType) || ModelUtil.isField(refType) || refType instanceof IBeanMapper)
+         return execForRuntime(refSys, refLayer, getEnclosingType(refType), runtimeSys);
+
+      if (refType instanceof ParamTypeDeclaration)
+         refType = ((ParamTypeDeclaration) refType).getBaseType();
+      if (refType instanceof BodyTypeDeclaration) {
+         if (refSys != runtimeSys)
+            System.out.println("*** Note: found mismatching runtime in execForRuntime - make sure this is right!");
+         return refSys == runtimeSys;
+      }
+      else
+         return true;
+
    }
 }

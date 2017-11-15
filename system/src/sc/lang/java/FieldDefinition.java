@@ -18,6 +18,7 @@ import sc.parser.IString;
 import sc.parser.PString;
 import sc.sync.SyncManager;
 import sc.type.CTypeUtil;
+import sc.type.PTypeUtil;
 import sc.type.Type;
 import sc.type.TypeUtil;
 import sc.util.LineCountStringBuilder;
@@ -205,12 +206,17 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
          boolean flushQueue = SyncManager.beginSyncQueue();
 
          try {
-
             Expression initializer = v.initializer;
-            Object newValue;
+            Object newValue = null;
+            Throwable initException = null;
 
             if (initializer != null) {
-               newValue = initializer.eval(rtClass, ctx);
+               try {
+                  newValue = initializer.eval(rtClass, ctx);
+               }
+               catch (Throwable t) {
+                  initException = t;
+               }
 
                if (newValue == null) {
                   Class rc = v.getRuntimeClass();
@@ -261,10 +267,15 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
                if (v.initializer instanceof IdentifierExpression && !(v.initializer instanceof NewExpression)) {
                   IdentifierExpression ie = (IdentifierExpression) v.initializer;
                   if (ie.arguments != null) {
-                     syncCtx.addMethodResult(inst, inst == null ? enclType : null, v.variableName, newValue);
+                     syncCtx.addMethodResult(inst, inst == null ? enclType : null, v.variableName, newValue, initException == null ? null : "Exception: " + initException.getMessage() + ":\n" + PTypeUtil.getStackTrace(initException));
                   }
                }
             }
+
+            if (initException instanceof RuntimeException)
+               throw (RuntimeException) initException;
+            else
+               throw new RuntimeInvocationTargetException(initException);
          }
          finally {
             if (flushQueue)

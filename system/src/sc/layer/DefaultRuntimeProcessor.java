@@ -4,9 +4,7 @@
 
 package sc.layer;
 
-import sc.lang.java.BodyTypeDeclaration;
-import sc.lang.java.JavaSemanticNode;
-import sc.lang.java.UpdateInstanceInfo;
+import sc.lang.java.*;
 import sc.util.FileUtil;
 
 import java.io.*;
@@ -255,5 +253,9 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor, Serializable 
       finally {
          FileUtil.safeClose(os);
       }
+   }
+
+   public String transformStatement(BodyTypeDeclaration type, Object inst, Statement expr) {
+      throw new UnsupportedOperationException();
    }
 }

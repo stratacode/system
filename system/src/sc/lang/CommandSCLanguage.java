@@ -33,25 +33,8 @@ public class CommandSCLanguage extends SCLanguage {
    public Sequence startModifyDeclaration = new Sequence("ModifyDeclaration(modifiers,typeName,extendsTypes,implementsTypes,)",
                                                   modifiers, qualifiedIdentifier, extendsTypes, implementsTypes, openBraceEOL);
 
-   Sequence expressionStatement = new Sequence("(.,)", expression, semicolonEOL);
-
    Sequence endTypeDeclaration = new Sequence("EndTypeDeclaration", closeBraceEOL);
 
-   // These are optional in Java but for the command line we need to make them required
-   Sequence reqPackageDeclaration = (Sequence) packageDeclaration.clone();
-   Sequence reqImport = (Sequence) imports.clone();
-   OrderedChoice reqClassBodyDeclaration = (OrderedChoice) classBodyDeclarations.clone();
-   Sequence optOpenBraceEOL = (Sequence) openBraceEOL.clone();
-   {
-      reqPackageDeclaration.optional = false;
-      reqImport.repeat = false;
-      reqImport.optional = false;
-      reqClassBodyDeclaration.setName(reqClassBodyDeclaration.getName().replace("<classBodyDeclarations>", "<reqClassBodyDeclaration>"));
-      reqClassBodyDeclaration.repeat = false;
-      reqClassBodyDeclaration.skipOnErrorParselet = null;
-      reqClassBodyDeclaration.optional = false;
-      optOpenBraceEOL.optional = true;
-   }
    /*
     * Need a way to parse comments from the command line?   Right now they go into spacing which gets ignored and
     * it is hard to preserve them by adding them into the model.  This attempt failed because I think the NOT

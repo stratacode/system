@@ -11,6 +11,8 @@ import sc.util.WeakIdentityHashMap;
 import sc.dyn.DynUtil;
 import sc.dyn.RDynUtil;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.lang.reflect.Modifier;
@@ -1039,4 +1041,11 @@ public class PTypeUtil {
       return invokeMethod(o, meth);
    }
 
+
+   public static String getStackTrace(Throwable exc) {
+      StringWriter sw = new StringWriter();
+      PrintWriter out = new PrintWriter(sw);
+      exc.printStackTrace(out);
+      return sw.toString();
+   }
 }

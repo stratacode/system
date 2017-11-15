@@ -70,9 +70,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    public String typeTemplateName;
    public Template typeTemplate;
 
-   /** The syncMergeTemplate nad updateMergeTemplates are used when sending incremental changes during the sync process or type update process (respectively) */
-   public String syncMergeTemplateName, updateMergeTemplateName;
-   public Template syncMergeTemplate, updateMergeTemplate;
+   /** The syncMergeTemplate, updateMergeTemplates and evalTemplates are used when sending incremental changes during the sync process, type update, or eval expression processes (respectively) */
+   public String syncMergeTemplateName, updateMergeTemplateName, evalTemplateName;
+   public Template syncMergeTemplate, updateMergeTemplate, evalTemplate;
 
    /** In addition to generating Javascript should we also compile the equivalent Java files?  Though it takes longer, the Java compiler performs more error detection.  Also to generate the initial .html files (when just running the client layers, not using a server), you need the .java files there and compiled so we can use them to evaluate the template. */
    public boolean compileJavaFiles = true;
@@ -2730,6 +2730,12 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
    }
 
+   Template getEvalTemplate(BodyTypeDeclaration td) {
+      if (evalTemplate == null)
+         evalTemplate = td.findTemplatePath(evalTemplateName, "JSRuntimeProcessor evalTemplate", JSTypeParameters.class);
+      return evalTemplate;
+   }
+
    Template getMergeJSTemplate(BodyTypeDeclaration td, boolean isSync) {
       Template useTemplate = isSync ? syncMergeTemplate : updateMergeTemplate;
       if (useTemplate == null) {
@@ -3035,7 +3041,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       srcPathType = null;
       templatePrefix = null;
       genJSPrefix = null;
-      typeTemplateName = syncMergeTemplateName = updateMergeTemplateName = null;
+      evalTemplateName = typeTemplateName = syncMergeTemplateName = updateMergeTemplateName = null;
    }
 
    public class JSUpdateInstanceInfo extends UpdateInstanceInfo {
@@ -3192,5 +3198,33 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
    public boolean getLoadClassesInRuntime() {
       return false;
+   }
+
+   public String transformStatement(BodyTypeDeclaration currentType, Object instance, Statement st) {
+      JSTypeParameters exprParams = new JSTypeParameters(currentType);
+
+      // We need to wrap the statement in a model so we can use that code to manage the transform.  When you try to transform an
+      // individual statement, it may need to replace itself so there needs to be a context for the transform.
+      ModifyDeclaration modDecl = ModifyDeclaration.create(currentType.typeName);
+      ModifyDeclaration root = modDecl;
+      ModifyDeclaration cur = modDecl;
+      TypeDeclaration enclType = currentType.getEnclosingType();
+      while (enclType != null) {
+         root = ModifyDeclaration.create(enclType.typeName);
+         root.addBodyStatement(cur);
+         cur = root;
+         enclType = enclType.getEnclosingType();
+      }
+      JavaModel model = SCModel.create(currentType.getJavaModel().getPackagePrefix(), root);
+      model.setMergeDeclaration(false);
+      model.setLayeredSystem(system);
+      modDecl.addBodyStatement(st);
+      ParseUtil.initAndStartComponent(model);
+      if (!st.execForRuntime(system))
+         return null;
+      model.transform(ILanguageModel.RuntimeType.JAVA);
+      exprParams.evalStatements = modDecl.body;
+      exprParams.currentInstance = instance;
+      return TransformUtil.evalTemplate(exprParams, getEvalTemplate(currentType));
    }
 }

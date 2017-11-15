@@ -19,6 +19,7 @@ import java.util.List;
 @sc.js.JSSettings(replaceWith="sc_EditorContext")
 public class JLineInterpreter extends AbstractInterpreter implements Completer {
    ConsoleReader input;
+   boolean smartTerminal;
 
    public JLineInterpreter(LayeredSystem sys, boolean consoleDisabled, String inputFileName) {
       super(sys, consoleDisabled, inputFileName);
@@ -39,10 +40,11 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
    void resetInput() {
       try {
          FileInputStream inStream = inputFileName == null ? new FileInputStream(FileDescriptor.in) : new FileInputStream(inputFileName);
-         consoleDisabled = inputFileName != null;
+         consoleDisabled = inputFileName != null || System.console() == null; // System.console() == null when either input or output is redirected - either case, it's not interactive right?
          input = new ConsoleReader("scc", inStream, System.out, null);
          input.setExpandEvents(false); // Otherwise "!" and probably other special chars fail to expand in JLine (e.g. if (foo != bar) -> [ERROR] Could not expand event)
          input.addCompleter(this);
+         smartTerminal = input.getTerminal().isSupported(); // Or isAnsiSupported?  Or isEchoEnabled()?  These also are different between the dumb IntelliJ terminal and the real command line
       }
       catch (EOFException exc) {
          System.exit(1);
@@ -87,7 +89,7 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
                      remaining = remaining + " ";
                   }
                   // When we disable the terminal factor, this killLine does not put the string back so we need to keep it in pendingInput
-                  if (!consoleDisabled) {
+                  if (!consoleDisabled && smartTerminal) {
                      input.killLine();
                      input.putString(remaining);
                      pendingInput = new StringBuffer();

@@ -939,7 +939,7 @@ public class SyncManager {
          return needsSync;
       }
 
-      public void completeSync(SyncContext clientContext, boolean error) {
+      public void completeSync(SyncContext clientContext, Integer errorCode, String message) {
          if (pendingSyncs == 0)
             System.err.println("*** unmatched complete sync call");
          else {
@@ -1584,11 +1584,11 @@ public class SyncManager {
          return changedLayer.invokeRemote(obj, type, methName,  paramSig, args);
       }
 
-      public void addMethodResult(Object ctxObj, Object type, String callId, Object retValue) {
+      public void addMethodResult(Object ctxObj, Object type, String callId, Object retValue, String exceptionStr) {
          SyncLayer changedLayer = getChangedSyncLayer(null);
          markChanged();
 
-         changedLayer.addMethodResult(ctxObj, type, callId, retValue);
+         changedLayer.addMethodResult(ctxObj, type, callId, retValue, exceptionStr);
       }
 
       public void setInitialSync(boolean value) {
@@ -2925,7 +2925,7 @@ public class SyncManager {
       return (ArrayList<SyncLayer>) PTypeUtil.getThreadLocal("currentSyncLayer");
    }
 
-   public static void processMethodReturn(SyncContext ctx, String callId, Object retValue) {
+   public static void processMethodReturn(SyncContext ctx, String callId, Object retValue, String exceptionStr) {
       ArrayList<SyncLayer> currentSyncLayers;
       if (ctx == null) {
          currentSyncLayers = getCurrentSyncLayers();
@@ -2936,7 +2936,7 @@ public class SyncManager {
       boolean handled = false;
       if (currentSyncLayers != null) {
          for (SyncLayer currentSyncLayer:currentSyncLayers) {
-            if (currentSyncLayer.processMethodReturn(callId, retValue)) {
+            if (currentSyncLayer.processMethodReturn(callId, retValue, exceptionStr)) {
                handled = true;
                break;
             }
@@ -2954,9 +2954,9 @@ public class SyncManager {
     * The callId is the name to use for storing the remote result - to represent a unique invocation of this method.
     * The retValue is the return value of the method.
     */
-   public static void addMethodResult(Object curObj, Object type, String callId, Object retValue) {
+   public static void addMethodResult(Object curObj, Object type, String callId, Object retValue, String exceptionStr) {
       SyncContext ctx  = getDefaultSyncContext();
-      ctx.addMethodResult(curObj, type, callId, retValue);
+      ctx.addMethodResult(curObj, type, callId, retValue, exceptionStr);
    }
 
    /** Called either with a scopeDefinition - to choose the current context in that scope, an explicit ScopeContext or neither to choose the default scope, default context. */

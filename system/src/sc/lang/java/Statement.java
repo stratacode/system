@@ -9,6 +9,7 @@ import sc.lang.js.JSFormatMode;
 import sc.lang.js.JSLanguage;
 import sc.lang.js.JSTypeParameters;
 import sc.lang.template.Template;
+import sc.layer.LayeredSystem;
 import sc.layer.SrcEntry;
 import sc.parser.*;
 import sc.type.CTypeUtil;
@@ -567,5 +568,10 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
 
    public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
       return addStatementNodeCompletions(origModel, origNode, matchPrefix, offset, dummyIdentifier, candidates);
+   }
+
+   /** When choosing in which runtimes to run this statement, returns the member or type of the method or field used in the expression.  Not always possible to determine so return null in those other cases. */
+   public boolean execForRuntime(LayeredSystem sys) {
+      return true;
    }
 }

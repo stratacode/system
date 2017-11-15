@@ -2200,11 +2200,11 @@ public class ModifyDeclaration extends TypeDeclaration {
          super.updatePropertyForType(overriddenAssign, ctx, iit, updateInstances, info);
    }
 
-   public void updateBlockStatement(BlockStatement bs, ExecutionContext ctx) {
+   public void updateBlockStatement(BlockStatement bs, ExecutionContext ctx, UpdateInstanceInfo info) {
       if (modifyTypeDecl != null && !modifyInherited)
-         modifyTypeDecl.updateBlockStatement(bs, ctx);
+         modifyTypeDecl.updateBlockStatement(bs, ctx, info);
       else
-         super.updateBlockStatement(bs, ctx);
+         super.updateBlockStatement(bs, ctx, info);
    }
 
    public void updateBaseType(BodyTypeDeclaration newType) {

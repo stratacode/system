@@ -13,6 +13,7 @@ public class Input extends HTMLElement {
    private final static sc.type.IBeanMapper _disabledProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Input.class, "disabled");
    private final static sc.type.IBeanMapper _valueProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Input.class, "value");
    public final static sc.type.IBeanMapper _changeEventProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Input.class, "changeEvent");
+   public static sc.type.IBeanMapper _clickCountProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Input.class, "clickCount");
 
    public Input() {
       super();
@@ -59,5 +60,14 @@ public class Input extends HTMLElement {
    }
    @Bindable(manual=true) public void setChangeEvent(Event changeEvent) {
       setDOMEvent(EventType.Change, changeEvent, _changeEventProp);
+   }
+
+   private int clickCount;
+   @Bindable(manual=true) public Object getClickCount() {
+      return clickCount;
+   }
+   @Bindable(manual=true) public void setClickCount(int _clickCount) {
+      clickCount = _clickCount;
+      Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _clickCountProp, _clickCount);
    }
 }

@@ -754,14 +754,6 @@ public class LayerUtil implements LayerConstants {
        usrPathsField.set(null, newPaths);
    }
 
-   public static String getExceptionStack(Throwable t) {
-      StringWriter sw = new StringWriter();
-      PrintWriter out = new PrintWriter(sw);
-
-      t.printStackTrace(out);
-      return sw.toString();
-   }
-
    public static String errorsToString(LinkedHashSet<String> viewedErrors) {
       StringBuilder sb = new StringBuilder();
       for (String error:viewedErrors) {

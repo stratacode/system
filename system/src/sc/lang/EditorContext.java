@@ -7,7 +7,6 @@ package sc.lang;
 import sc.bind.Bind;
 import sc.bind.Bindable;
 import sc.bind.IListener;
-import sc.dyn.DynUtil;
 import sc.lang.sc.PropertyAssignment;
 import sc.lang.sc.SCModel;
 import sc.layer.*;
@@ -39,8 +38,14 @@ public class EditorContext extends ClientEditorContext {
 
    static protected CommandSCLanguage cmdlang = CommandSCLanguage.INSTANCE;
 
-   static boolean syncPeerSystems = true;
+   /** Global flag set to true when this context should interpret property changes as editing the types, rather than just editing the instances or current instance */
+   public boolean edit = true;
 
+   /** Global flag set to true when this context should sync changes to peer runtimes (e.g. Java to Javascript) */
+   public boolean sync = true;
+
+   /** Set this to either the runtimeName or processName of a target system.  In that case, we only perform updates on the selected target process or runtime. */
+   public String targetSystem = null;
    /**
     * Lets frameworks replace the code which processes a command statement.  Specifically you can ensure all commands are processed
     * on a specific thread, e.g. the swing event dispatcher thread
@@ -128,7 +133,6 @@ public class EditorContext extends ClientEditorContext {
       }
       return ret;
    }
-
 
    public EditorContext(LayeredSystem sys) {
       system = sys;
@@ -488,7 +492,7 @@ public class EditorContext extends ClientEditorContext {
       system.resetBuild(true);
       try {
          newElem = ModelUtil.setElementValue(type, inst, elem, text, updateType, updateInstances, valueIsExpr);
-         if (syncPeerSystems && type instanceof BodyTypeDeclaration) {
+         if (sync && type instanceof BodyTypeDeclaration) {
             BodyTypeDeclaration td = (BodyTypeDeclaration) type;
             LayeredSystem sys = td.getLayeredSystem();
             if (sys.peerSystems != null) {

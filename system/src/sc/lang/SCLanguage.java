@@ -128,6 +128,31 @@ public class SCLanguage extends JavaLanguage {
               closeBrace);
    }
 
+   // These are used in CommandLineSCLanguage but needed here to allow us to convert this to JS
+   Sequence expressionStatement = new Sequence("(.,)", expression, semicolonEOL);
+
+   // These are optional in Java but for the command line we need to make them required
+   Sequence reqPackageDeclaration = (Sequence) packageDeclaration.clone();
+   Sequence reqImport = (Sequence) imports.clone();
+   OrderedChoice reqClassBodyDeclaration = (OrderedChoice) classBodyDeclarations.clone();
+   Sequence optOpenBraceEOL = (Sequence) openBraceEOL.clone();
+   {
+      reqPackageDeclaration.optional = false;
+      reqImport.repeat = false;
+      reqImport.optional = false;
+      reqClassBodyDeclaration.setName(reqClassBodyDeclaration.getName().replace("<classBodyDeclarations>", "<reqClassBodyDeclaration>"));
+      reqClassBodyDeclaration.repeat = false;
+      reqClassBodyDeclaration.skipOnErrorParselet = null;
+      reqClassBodyDeclaration.optional = false;
+      optOpenBraceEOL.optional = true;
+
+      expressionStatement.setLanguage(this); // These are not used in this grammar by a top-level parselet so we need to init them here
+      reqPackageDeclaration.setLanguage(this);
+      reqImport.setLanguage(this);
+      reqClassBodyDeclaration.setLanguage(this);
+      optOpenBraceEOL.setLanguage(this);
+   }
+
    @Constant
    public static SCLanguage INSTANCE = new SCLanguage();
 

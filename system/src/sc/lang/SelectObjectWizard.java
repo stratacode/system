@@ -89,24 +89,24 @@ public class SelectObjectWizard extends CommandWizard {
                   int ix = -1;
                   try {
                      if (inputStr.length() == 0)
-                        ix = 1;
+                        ix = 0;
                      else
                         ix = Integer.parseInt(inputStr);
 
-                     ix--;
                      if (ix >= 0 && ix < instances.size()) {
                         Object inst = instances.get(ix).getInstance();
                         // Once the default current object is set, we can just process the statement.  It will then
                         // pull out the current object from the hash table and set it in the execContext.
                         commandInterpreter.setDefaultCurrentObj(type, inst);
-                        commandInterpreter.processStatement(statement, false);
+                        if (statement != null)
+                           commandInterpreter.processStatement(statement, false);
                      }
                   }
                   catch (NumberFormatException exc) {
                      break; // Do not advance the step
                   }
                }
-               else
+               else if (statement != null)
                   commandInterpreter.processStatement(statement, true);
                commandInterpreter.currentWizard = null;
                break;

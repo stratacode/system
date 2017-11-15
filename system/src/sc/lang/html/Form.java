@@ -40,4 +40,8 @@ public class Form extends HTMLElement {
    @Bindable(manual=true) public void setSubmitEvent(Event submitEvent) {
       setDOMEvent(EventType.Submit, submitEvent, _submitEventProp);
    }
+
+   /** Implemented on the client to simulate a click on the submit button */
+   public void submit() {
+   }
 }

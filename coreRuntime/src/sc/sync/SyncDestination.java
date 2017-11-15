@@ -22,6 +22,9 @@ public abstract class SyncDestination {
    public final static String SYNC_LAYER_START = "sync:";
    public final static int SYNC_LAYER_START_LEN = SYNC_LAYER_START.length();
 
+   /** General error for sync failure */
+   public final int SYNC_FAILED_ERROR = -2;
+
    public String name;
 
    public SyncManager syncManager;
@@ -197,10 +200,10 @@ public abstract class SyncDestination {
          clientContext = sls.get(0).syncContext;
       }
 
-      public void completeSync(boolean error) {
+      public void completeSync(Integer errorCode, String message) {
          updateInProgress(false);
          for (SyncLayer syncLayer:syncLayers) {
-            syncLayer.completeSync(clientContext, error);
+            syncLayer.completeSync(clientContext, errorCode, message);
          }
          postCompleteSync();
       }
@@ -208,7 +211,7 @@ public abstract class SyncDestination {
       public void response(Object response) {
          String responseText = (String) response;
          connected = true;
-         completeSync(false);
+         completeSync(null, null);
          SyncManager.setCurrentSyncLayers(syncLayers);
          SyncManager.setSyncState(SyncManager.SyncState.ApplyingChanges);
          try {
@@ -273,7 +276,7 @@ public abstract class SyncDestination {
                   syncManager.scheduleConnectSync(currentReconnectTime);
                }
             }
-            completeSync(true);
+            completeSync(errorCode, error == null ? null : error.toString());
             if (!serverError)
                applySyncLayer((String) error, null, false);
          }
@@ -342,7 +345,7 @@ public abstract class SyncDestination {
             errorMessage = "Sync failed.";
          SyncManager.SyncContext clientContext = layers.get(0).syncContext;
          for (SyncLayer syncLayer:layers) {
-            syncLayer.completeSync(clientContext, errorMessage != null);
+            syncLayer.completeSync(clientContext, errorMessage == null ? null : SYNC_FAILED_ERROR, errorMessage);
          }
          if (errorMessage != null)
             System.err.println("*** Sync failed: " + errorMessage);

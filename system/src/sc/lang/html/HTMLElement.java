@@ -97,6 +97,10 @@ public class HTMLElement<E> extends Element<E> {
       setDOMEvent(EventType.Click, clickEvent, _clickEventProp);
    }
 
+   /** Method implemented on the client only to generate a simulated DOM event that behaves like a click */
+   public void click() {
+   }
+
    @Bindable(manual=true) public MouseEvent getDblClickEvent() {
       return (MouseEvent) getDOMEvent(EventType.DblClick);
    }

@@ -1198,7 +1198,7 @@ public class DynUtil {
    private static class RemoteCallSyncListener implements sc.type.IResponseListener {
       Object result = null;
       Object error = null;
-      int errorCode = -1;
+      Integer errorCode = null;
       boolean success = false;
       public synchronized void response(Object response) {
          result = response;
@@ -1230,7 +1230,7 @@ public class DynUtil {
          }
       }
       Object evalRes = listener.result;
-      if (listener.errorCode != -1) {
+      if (listener.errorCode != null) {
          System.err.println("*** evalScript - returns error: " + listener.errorCode + ":" + listener.error);
       }
       else if (!listener.success) {

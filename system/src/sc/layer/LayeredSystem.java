@@ -890,6 +890,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    private List<IModelListener> modelListeners = new ArrayList<IModelListener>();
    private List<ITypeChangeListener> typeChangeListeners = new ArrayList<ITypeChangeListener>();
+   private final List<ICodeUpdateListener> codeUpdateListeners = new ArrayList<ICodeUpdateListener>();
    private List<IDynListener> dynListeners = null;
 
    EditorContext editorContext;
@@ -3227,6 +3228,22 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       typeChangeListeners.add(type);
    }
 
+   public void registerCodeUpdateListener(ICodeUpdateListener type) {
+      synchronized (codeUpdateListeners) {
+         codeUpdateListeners.add(type);
+      }
+   }
+
+   public void notifyCodeUpdateListeners() {
+      ArrayList<ICodeUpdateListener> listenerList;
+      synchronized (codeUpdateListeners) {
+         listenerList = new ArrayList<ICodeUpdateListener>(codeUpdateListeners);
+      }
+      for (ICodeUpdateListener l:listenerList) {
+         l.codeUpdated();
+      }
+   }
+
    public int getLayerPosition(Object type) {
       if (type instanceof ITypeDeclaration) {
          Layer l = ((ITypeDeclaration) type).getLayer();
@@ -3305,6 +3322,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public List<ITypeChangeListener> getTypeChangeListeners() {
       return typeChangeListeners;
+   }
+
+   public void removeCodeUpdateListener(ICodeUpdateListener type) {
+      synchronized (codeUpdateListeners) {
+         codeUpdateListeners.remove(type);
+      }
    }
 
    public Object getStaticProperty(Object object, String propertyName) {
@@ -12000,7 +12023,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // We may not have loaded all of the files for this type.  Currently we load all types we need to process during the build but then may just grab the most specific one when resolving a global type.  If there are gaps created the fromPosition thing does not protect us from returning a stale entry.
             if (decl.getEnclosingType() == null) {
                srcFile = getSrcFileFromTypeName(typeName, true, fromLayer, prependPackage, null);
-               if (srcFile == null || decl.getLayer() != srcFile.layer) {
+               // Added the canRead test here because the command line interpreter first adds the file to the layer before it saves the actual file.  We end up with the pending srcFile here which does not match the cached one so we return null rather than the one we want
+               // which is the current version of the type in the cache.
+               if (srcFile == null || (decl.getLayer() != srcFile.layer && new File(srcFile.absFileName).canRead())) {
                   skippedDecl = decl; // We know there's a file more specific than this decl
                   decl = null;
                }

@@ -25,6 +25,7 @@ import java.io.*;
 import java.util.*;
 import sc.dyn.ScheduledJob;
 
+@sc.obj.Exec(runtimes="java")
 public abstract class AbstractInterpreter extends EditorContext implements IScheduler, Runnable {
    static SCLanguage vlang = SCLanguage.INSTANCE;
 
@@ -33,8 +34,9 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    StringBuffer pendingInput = new StringBuffer();
 
    public static String USAGE =  "Command Line Interface Help:\n\n" +
-           "In the command line editor, you can examine and modify your application like an ordinarily REPL (read-eval-print-loop). Most REPLs start with commands but for the StrataCode REPL imagine that you are editing a Java file from the command line.  You do have commands but those are implemented by calling methods on a special 'cmd' object.  Because you already know Java, you can learn the StrataCode REPL quickly, without having to learn the details of each command.\n" +
-           "You have one context in which you navigate layers, set your package, define imports, and find or create your current Java class or SC object.  Once you have a current class or instance, or method you need to complete that operation to return to the previous context.\n\n" +
+           "In the command line editor, you can examine and modify your application like an ordinarily REPL (read-eval-print-loop).  There are two modes - in 'script mode' you essentially have a management UI for your application from the command line.  Navigate the object hierarchy," +
+           "select an instance, set properties on that instance.  In edit mode, you have the power to edit or build from scratch a Java file using structured editing commands.  There's a built-in 'cmd' object to provide control over the editor state.  You can use StrataCode's extended Java syntax from the command line and in supported terminal, there's TAB-completion of the available types and methods\n" +
+           "In edit mode, you navigate layers, set the current package, define imports, and find or create your current Java class or SC object.  Once you have a current class or instance, or method you need to complete that operation to return to the previous context.\n\n" +
            "No Current Type:\n" +
            "   layerName {                Change context to layerName.  \n" +
            "   typeName {                 Change context to the typeName specified.  If the type is defined in this layer, you are at this point editing that file from the command line incrementally.  Be careful!  If there is no definition of that type in this layer, a 'modify defineition' is automatically created and your changes are recorded in the new layer.\n" +
@@ -52,12 +54,15 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
            "   cmd.save();               To save your changes\n" +
            "   cmd.list();               Display current objects, classes, field, methods etc. in the current context\n" +
            "   <TAB>                     Command line completion with terminals supported by JLine\n" +
+           "   cmd.edit = true/false;    Switch back and forth between edit and script modes\n" +
            "\n\n" +
-           "The Prompt                   Displays your current context - layer, package, and where you are in the layer stack using # before or after the layer name:\n\nExamples:\n" +
+           /*
+           "The Prompt                   Displays your current context - edit or script mode, the layer, package, and where you are in the layer stack using # before or after the layer name:\n\nExamples:\n" +
            "  (example.unitConverter.model:sc.example.unitConverter##) ->\n" +
            "   ^ current layer             ^ current package       ^^ 2 layers below this layer in the stack\n\n" +
            "  (doc.core:sc.doc#(15)#) ->\n" +
            "                    ^ 15 layers below\n\n" +
+           */
 
            "The cmd object is used to control the interpreter:\n" +
            "   cmd.list();         - Lists the types (if at the top level) or the current objects and properties if inside of a type.\n" +
@@ -78,7 +83,10 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
            "   cmd.rebuild();     - Rebuild the system after you've made code changes.\n" +
            "   cmd.rebuildAll();  - Rebuild the system from scratch.\n" +
            "   cmd.restart();     - Restart the process.\n" +
-           "   cmd.<TAB>          - list the remaining properties and methods\n\n";
+           "   cmd.<TAB>          - list the remaining properties and methods\n\n" +
+           "Runtimes/Processes: " +
+           "   By default, the commands you enter are automatically targeted towards all matching runtimes.\n" +
+           "   Set cmd.targetSystem = 'js' or 'java' to target a specific runtime.  Or 'java_Server' to target a specific process.";
 
    /** For commands like createLayer, we add a wizard which processes input temporarily */
    CommandWizard currentWizard = null;
@@ -101,7 +109,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       sys.addGlobalObject("cmd", this);
    }
 
-   private final static int MAX_PREFIX = 4;
+   private final static int MAX_PREFIX = 3;
 
    public abstract String readLine(String nextPrompt);
 
@@ -125,6 +133,17 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       }
    }
 
+   private String getSyncPromptStr() {
+      List<LayeredSystem> syncSystems = system.getSyncSystems();
+      if (!sync || syncSystems == null)
+         return "";
+      else {
+         if (syncSystems.size() == 1)
+            return system.getRuntimeName() + "," + syncSystems.get(0).getRuntimeName();
+         return "*";
+      }
+   }
+
    protected String prompt() {
       // We don't want to display the prompt when we've been redirected from another file
       if (consoleDisabled)
@@ -135,39 +154,58 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             return currentWizard.prompt();
 
          JavaModel model = pendingModel;
-         String hdr = system.staleCompiledModel ? "*" : "";
+         String hdr = edit ? "edit" : "scr" + (system.staleCompiledModel ? "*" : "");
+         hdr += ":";
+         boolean displayLayer = edit;
+
+         String basePrompt = getSyncPromptStr() + " -> ";
 
          if (currentTypes.size() == 0) {
-            String prefix = currentLayer == null ? "" : (currentLayer.getLayerName() + (getPrefix() == null ? "" : ":" + getPrefix()));
-            StringBuilder upPrefix = new StringBuilder();
-            StringBuilder downPrefix = new StringBuilder();
-            if (currentLayer != null) {
-               for (int c = currentLayer.getLayerPosition(); c < currentLayer.getLayersList().size()-1; c++)
-                  upPrefix.append("#");
-               for (int c = 0; c < currentLayer.getLayerPosition(); c++)
-                  downPrefix.append("#");
+            String prefix = "";
+            if (displayLayer) {
+               prefix = currentLayer == null ? "<no layer>" : (currentLayer.getLayerName() + (getPrefix() == null ? "" : ":" + getPrefix()));
+               StringBuilder upPrefix = new StringBuilder();
+               StringBuilder downPrefix = new StringBuilder();
+               if (currentLayer != null) {
+                  for (int c = currentLayer.getLayerPosition(); c < currentLayer.getLayersList().size()-1; c++)
+                     upPrefix.append("#");
+                  for (int c = 0; c < currentLayer.getLayerPosition(); c++)
+                     downPrefix.append("#");
+               }
+               if (prefix.length() > 0 || upPrefix.length() > 0 || downPrefix.length() > 0) {
+                  if (upPrefix.length() > MAX_PREFIX)
+                     upPrefix = new StringBuilder("#...#");
+                  if (downPrefix.length() > MAX_PREFIX)
+                     downPrefix = new StringBuilder("#...#");
+                  prefix = upPrefix + prefix + downPrefix;
+               }
             }
-            if (prefix.length() > 0 || upPrefix.length() > 0 || downPrefix.length() > 0) {
-               if (upPrefix.length() > MAX_PREFIX)
-                  upPrefix = new StringBuilder("#(" + upPrefix.length() + ")#");
-               if (downPrefix.length() > MAX_PREFIX)
-                  downPrefix = new StringBuilder("#(" + downPrefix.length() + ")#");
-               prefix = "(" + upPrefix + prefix + downPrefix + ") ";
-            }
-            return hdr + prefix + "-> ";
+            return hdr + prefix + basePrompt;
          }
          else {
             BodyTypeDeclaration type = currentTypes.get(currentTypes.size()-1);
-            StringBuilder upPrefix = new StringBuilder(), downPrefix = new StringBuilder();
-            BodyTypeDeclaration otherType = type;
-            while ((otherType = otherType.getModifiedByType()) != null) {
-               upPrefix.append("#");
+
+            Object curObj = getCurrentObject();
+            String objOrTypeName;
+            if (curObj != null) {
+               objOrTypeName = "I:" + DynUtil.getInstanceName(curObj);
             }
-            otherType = type;
-            while ((otherType = otherType.getModifiedType()) != null) {
-               downPrefix.append("#");
+            else
+               objOrTypeName = "T:" + CTypeUtil.getClassName(ModelUtil.getTypeName(type));
+            String layerPrefix = "";
+            if (edit) {
+               StringBuilder upPrefix = new StringBuilder(), downPrefix = new StringBuilder();
+               BodyTypeDeclaration otherType = type;
+               while ((otherType = otherType.getModifiedByType()) != null) {
+                  upPrefix.append("#");
+               }
+               otherType = type;
+               while ((otherType = otherType.getModifiedType()) != null) {
+                  downPrefix.append("#");
+               }
+               layerPrefix = upPrefix + currentLayer.getLayerName() + downPrefix + ":";
             }
-            return hdr + "(" + upPrefix + currentLayer.getLayerName() + downPrefix + ":" + (hasCurrentObject() ? "object " : "class ") + ModelUtil.getTypeName(currentTypes.get(currentTypes.size()-1)) + ") -> ";
+            return hdr + layerPrefix + objOrTypeName + " -> ";
          }
       }
       finally {
@@ -242,6 +280,8 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
       // Use this as a quick way to detect any errors that happen during this process.
       model.hasErrors = false;
+
+      List<LayeredSystem> syncSystems = getSyncSystems();
 
       String recordString = null;
       int origIndent = 0;
@@ -473,9 +513,21 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             Object obj = null;
             try {
                execContext.pushStaticFrame(type);
+
+               // For top-level types, we'll select the current object instance so we can use it to resolve sub-objects
+               if (parentObj == null && parentType == null && !hasCurrentObject() && autoObjectSelect) {
+                  Object res = SelectObjectWizard.start(this, null);
+                  if (res == null)
+                     return;
+                  if (res != SelectObjectWizard.NO_INSTANCES_SENTINEL && res != null) {
+                     obj = res;
+                  }
+               }
+
                // Using origTypeName here - grabbed before we do the "a.b" to a { b" conversion.   type.typeName now will just be "b".
                // Only do this if the current object is the parent object - not if it's already been resolved from the selectedInstances array
-               obj = parentObj == null ? (checkCurrentObject ? system.resolveName(typeName, true) : null) : (hasCurrentObject ? DynUtil.getPropertyPath(parentObj, origTypeName) : null);
+               if (obj == null)
+                  obj = parentObj == null ? (checkCurrentObject ? system.resolveName(typeName, true) : null) : (hasCurrentObject ? DynUtil.getPropertyPath(parentObj, origTypeName) : null);
                execContext.pushCurrentObject(obj);
                pushed = true;
             }
@@ -504,10 +556,11 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          markCurrentTypeChanged();
       }
       else if (statement instanceof PropertyAssignment) {
-         Object curObj;
+         Object curObj = null;
          boolean pushed = false;
          boolean noInstance = false;
          PropertyAssignment pa = (PropertyAssignment) statement;
+
          if (!pa.isStatic() && autoObjectSelect) {
             if (!hasCurrentObject() || (curObj = getCurrentObject()) == null) {
                Object res = SelectObjectWizard.start(this, statement);
@@ -531,14 +584,66 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             BodyTypeDeclaration current = currentTypes.get(currentTypes.size()-1);
             PropertyAssignment assign = (PropertyAssignment) statement;
 
-            // TODO: if noInstance = true and assign.assignedProperty is an instance property we should not try to update the instances
+            if (current == null)
+               assign.parentNode = getModel();
+            else
+               assign.parentNode = current;
 
-            // synchronization done inside updateProperty - we grab the lock to update the model but release it to update the property in case that triggers events back into the system
-            JavaSemanticNode newDefinition = current.updateProperty(assign, execContext, !skipEval, null);
-            addChangedModel(pendingModel);
+            ParseUtil.initAndStartComponent(assign);
 
-            if (model.hasErrors() && newDefinition != assign)
-               removeFromCurrentObject(model, current, assign);
+            if (!assign.anyError() && performUpdatesToSystem(system) && !ignoreRemoteStatement(system, assign)) {
+               if (edit) {
+                  // synchronization done inside updateProperty - we grab the lock to update the model but release it to update the property in case that triggers events back into the system
+                  JavaSemanticNode newDefinition = current.updateProperty(assign, execContext, !skipEval, null);
+                  addChangedModel(pendingModel);
+
+                  if (model.hasErrors() && newDefinition != assign) {
+                     removeFromCurrentObject(model, current, assign);
+                  }
+               }
+               else if (curObj != null) {
+                  DynUtil.setProperty(curObj, assign.propertyName, assign.initializer.eval(null, execContext));
+               }
+               else
+                  System.err.println("*** No object for property update: " + current.typeName + ". " + assign.propertyName);
+            }
+
+            if (!assign.anyError() && sync && syncSystems != null && currentLayer != null && !skipEval) {
+               boolean any = false;
+               for (LayeredSystem peerSys:syncSystems) {
+                  if (performUpdatesToSystem(peerSys)) {
+                     Layer peerLayer = peerSys.getPeerLayerFromRemote(currentLayer);
+                     if (peerLayer != null) {
+                        BodyTypeDeclaration peerType = peerSys.getSrcTypeDeclaration(current.getFullTypeName(), peerLayer.getNextLayer(), true);
+                        if (peerType != null) {
+                           PropertyAssignment peerAssign = assign.deepCopy(ISemanticNode.CopyAll, null);
+                           peerAssign.parentNode = peerType;
+
+                           if (!ignoreRemoteStatement(peerSys, peerAssign)) {
+                              if (edit) {
+                                 UpdateInstanceInfo peerUpdateInfo = peerSys.newUpdateInstanceInfo();
+                                 // TODO: is it right to pass execContext here and to updateInstances - isn't the currentObj stacks are not for the peer runtime
+                                 // But maybe we want to do all eval's required on the local runtime
+                                 peerType.updateProperty(peerAssign, execContext, true, peerUpdateInfo);
+                                 peerUpdateInfo.updateInstances(execContext);
+                              }
+                              else {
+                                 peerAssign.parentNode = peerType;
+                                 String res = peerSys.runtimeProcessor.transformStatement(peerType, curObj, peerAssign);
+                                 if (res != null && res.length() > 0) {
+                                    String remoteExprRes = (String) DynUtil.evalScript(res);
+                                    System.out.println(remoteExprRes);
+                                 }
+                              }
+                              any = true;
+                           }
+                        }
+                     }
+                  }
+               }
+               if (any)
+                  system.notifyCodeUpdateListeners();
+            }
          }
          finally {
             if (pushed)
@@ -594,10 +699,14 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       }
       else if (statement instanceof Expression) {
          boolean pushed = false;
-         Object curObj;
+         Object curObj = null;
 
          Expression expr = (Expression) statement;
-         expr.parentNode = currentTypes.size() == 0 ? getModel() : currentTypes.get(currentTypes.size()-1);
+         BodyTypeDeclaration currentType = currentTypes.size() == 0 ? null : currentTypes.get(currentTypes.size() - 1);
+         if (currentType == null)
+            expr.parentNode = getModel();
+         else
+            expr.parentNode = currentType;
 
          ParseUtil.initAndStartComponent(model);
          ParseUtil.initAndStartComponent(expr);
@@ -625,13 +734,35 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
             try {
                if (!skipEval) {
-                  Object exprResult = expr.eval(null, execContext);
-                  if (exprResult == null) {
-                     if (!ModelUtil.typeIsVoid(expr.getTypeDeclaration()))
-                        System.out.println("null");
+                  if (performUpdatesToSystem(system) && !ignoreRemoteStatement(system, expr)) {
+                     Object exprResult = expr.eval(null, execContext);
+                     if (exprResult == null) {
+                        if (!ModelUtil.typeIsVoid(expr.getTypeDeclaration()))
+                           System.out.println("null");
+                     }
+                     else
+                        System.out.println(exprResult);
                   }
-                  else
-                     System.out.println(exprResult);
+
+                  if (sync && syncSystems != null && currentLayer != null && currentType != null) {
+                     for (LayeredSystem peerSys:syncSystems) {
+                        if (performUpdatesToSystem(peerSys)) {
+                           Layer peerLayer = peerSys.getPeerLayerFromRemote(currentLayer);
+                           if (peerLayer != null) {
+                              BodyTypeDeclaration peerType = peerSys.getSrcTypeDeclaration(currentType.getFullTypeName(), peerLayer.getNextLayer(), true);
+                              if (peerType != null) {
+                                 Expression peerExpr = expr.deepCopy(ISemanticNode.CopyNormal, null);
+                                 peerExpr.parentNode = peerType;
+                                 String res = peerSys.runtimeProcessor.transformStatement(peerType, curObj, peerExpr);
+                                 if (res != null && res.length() > 0) {
+                                    Object remoteExprRes = DynUtil.evalScript(res);
+                                    System.out.println(remoteExprRes);
+                                 }
+                              }
+                           }
+                        }
+                     }
+                  }
                }
             }
             finally {
@@ -641,13 +772,71 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          }
       }
       else if (statement instanceof BlockStatement) {
-         BodyTypeDeclaration current = currentTypes.get(currentTypes.size()-1);
+         BodyTypeDeclaration currentType = currentTypes.get(currentTypes.size()-1);
+         BlockStatement block = (BlockStatement) statement;
 
          // We do not generate unless the component is started
          if (!model.isStarted())
             ParseUtil.initAndStartComponent(model);
 
-         current.updateBlockStatement((BlockStatement)statement, execContext);
+         Object curObj = null;
+         boolean pushed = false;
+
+         if (!block.staticEnabled && autoObjectSelect) {
+            if (!hasCurrentObject() || (curObj = getCurrentObject()) == null) {
+               Object res;
+               res = SelectObjectWizard.start(this, statement);
+               if (res == SelectObjectWizard.NO_INSTANCES_SENTINEL)
+                  skipEval = true;
+               else if (res == null)
+                  return;
+               else {
+                  curObj = res;
+                  execContext.pushCurrentObject(curObj);
+                  pushed = true;
+               }
+            }
+            else {
+               execContext.pushCurrentObject(curObj);
+               pushed = true;
+            }
+         }
+
+         try {
+            if (performUpdatesToSystem(system))
+               currentType.updateBlockStatement((BlockStatement)statement, execContext, null);
+
+            if (sync && syncSystems != null && currentLayer != null && !skipEval) {
+               for (LayeredSystem peerSys:syncSystems) {
+                  if (performUpdatesToSystem(system)) {
+                     Layer peerLayer = peerSys.getPeerLayerFromRemote(currentLayer);
+                     if (peerLayer != null) {
+                        BodyTypeDeclaration peerType = peerSys.getSrcTypeDeclaration(currentType.getFullTypeName(), peerLayer.getNextLayer(), true);
+                        if (peerType != null) {
+                           BlockStatement peerBlock = block.deepCopy(ISemanticNode.CopyNormal, null);
+                           if (edit) {
+                              UpdateInstanceInfo peerUpdateInfo = peerSys.newUpdateInstanceInfo();
+                              peerType.updateBlockStatement(peerBlock, execContext, peerUpdateInfo);
+                              peerUpdateInfo.updateInstances(execContext);
+                           }
+                           else {
+                              peerBlock.parentNode = peerType;
+                              String res = peerSys.runtimeProcessor.transformStatement(peerType, curObj, peerBlock);
+                              if (res != null && res.length() > 0) {
+                                 String remoteExprRes = (String) DynUtil.evalScript(res);
+                                 System.out.println(remoteExprRes);
+                              }
+                           }
+                        }
+                     }
+                  }
+               }
+            }
+         }
+         finally {
+            if (pushed)
+               execContext.popCurrentObject();
+         }
       }
       else
          System.err.println("*** Unrecognized type of statement in command interpreter: " + statement);
@@ -661,6 +850,20 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
       if (pauseTime != 0)
          sleep(pauseTime);
+   }
+
+   private static boolean ignoreRemoteStatement(LayeredSystem sys, Statement st) {
+      return !st.execForRuntime(sys);
+   }
+
+   private boolean performUpdatesToSystem(LayeredSystem sys) {
+      if (targetSystem == null) {
+         return true;
+      }
+
+      if (targetSystem.equals(sys.getProcessIdent()) || targetSystem.equals(sys.getRuntimeName()))
+         return true;
+      return false;
    }
 
    private void recordOutput(String recordString, int indent) {
@@ -1238,6 +1441,10 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    public void loadScript(String inputFileName) {
       this.inputFileName = inputFileName;
       resetInput();
+   }
+
+   private List<LayeredSystem> getSyncSystems() {
+      return system.getSyncSystems();
    }
 
    abstract void resetInput();

@@ -4,6 +4,8 @@
 
 package sc.type;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.*;
 
 import sc.dyn.IDynObject;
@@ -505,5 +507,12 @@ public class PTypeUtil {
    public static Object clone(Object o) {
       Object meth = resolveMethod(o.getClass(), "clone", null);
       return invokeMethod(o, meth);
+   }
+
+   public static String getStackTrace(Throwable exc) {
+      StringWriter sw = new StringWriter();
+      PrintWriter out = new PrintWriter(sw);
+      exc.printStackTrace(out);
+      return sw.toString();
    }
 }

@@ -1232,8 +1232,15 @@ public class IdentifierExpression extends ArgumentsExpression {
    public Object getReferenceType() {
       List<IString> idents = getAllIdentifiers();
       int last = idents.size()-2;
-      if (last == -1)
-         return findMemberOwner(idents.get(0).toString(), MemberType.PropertyGetSet);
+      if (last == -1) {
+         if (arguments != null) { // For methods we are using a more direct approach.  Not sure why we need to go back to find the member again for properties but prior to using this in execForRuntime, this was only used for properties
+            if (boundTypes[0] == null)
+               return null;
+            return ModelUtil.getEnclosingType(boundTypes[0]);
+         }
+         else
+            return findMemberOwner(idents.get(0).toString(), MemberType.PropertyGetSet);
+      }
       else
          return getTypeForIdentifier(idTypes, boundTypes, arguments, last, getJavaModel(), null, inferredType, getEnclosingType());
    }
@@ -5461,4 +5468,14 @@ public class IdentifierExpression extends ArgumentsExpression {
       return true;
    }
 
+   public boolean execForRuntime(LayeredSystem runtimeSys) {
+      Object refType = getReferenceType();
+      if (refType != null) {
+         JavaModel model = getJavaModel();
+         Layer refLayer = model == null ? null : model.getLayer();
+         return ModelUtil.execForRuntime(getLayeredSystem(), refLayer, refType, runtimeSys);
+      }
+      System.err.println("*** No type for: " + this + " failed to select proper runtime");
+      return true;
+   }
 }

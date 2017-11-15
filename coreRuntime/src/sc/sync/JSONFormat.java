@@ -111,8 +111,13 @@ public class JSONFormat extends SerializerFormat {
             CharSequence callIdVal = dser.parser.parseString(false);
             dser.parser.expectNextName(JSONSerializer.MethodReturnArgs.retType.name());
             CharSequence retTypeName = dser.parser.parseString(true);
+            String exceptionStr = null;
+            if (retTypeName != null && retTypeName.equals(JSONSerializer.MethodReturnExceptionType)) {
+               exceptionStr = returnValue.toString();
+               returnValue = null;
+            }
             if (callIdVal != null) {
-               dser.applyMethodResult(callIdVal.toString(), returnValue, retTypeName == null ? null : DynUtil.findType(retTypeName.toString()));
+               dser.applyMethodResult(callIdVal.toString(), returnValue, retTypeName == null ? null : DynUtil.findType(retTypeName.toString()), exceptionStr);
             }
             else
                throw new IllegalArgumentException("Invalid remote method result in JSON: " + dser.parser);

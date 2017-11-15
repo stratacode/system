@@ -5071,7 +5071,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return innerType;
    }
 
-   public void updateBlockStatement(BlockStatement bs, ExecutionContext ctx) {
+   public void updateBlockStatement(BlockStatement bs, ExecutionContext ctx, UpdateInstanceInfo info) {
       needsDynamicType();
       //
       // We can just interpret these block statements so it does not make the system stale
@@ -5080,17 +5080,22 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       //   model.layeredSystem.setStaleCompiledModel(true, "Adding block statement to compiled type", typeName);
       addBodyStatementIndent(bs);
 
-      if (bs.staticEnabled) {
-         try {
-            ctx.pushStaticFrame(this);
-            bs.exec(ctx);
-         }
-         finally {
-            ctx.popStaticFrame();
-         }
+      if (info != null) {
+         info.addBlockStatement(this, bs);
       }
-      else
-         updateInstBlockStatementLeaf(bs, ctx);
+      else {
+         if (bs.staticEnabled) {
+            try {
+               ctx.pushStaticFrame(this);
+               bs.exec(ctx);
+            }
+            finally {
+               ctx.popStaticFrame();
+            }
+         }
+         else
+            updateInstBlockStatementLeaf(bs, ctx);
+      }
    }
 
    private void needsDynamicType() {
@@ -6223,7 +6228,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // From the IDE at least, we get here with ctx = null and we need a frame to run the code
       if (ctx != null) {
          if (bs.isStatic()) {
-            // We'll will rexecute the static block only if we've already initialized this class.  If not, it's quite
+            // We'll will re-execute the static block only if we've already initialized this class.  If not, it's quite
             // likely we'll need to initialize the class when running the static code which will lead to double initialization
             if (staticValues != null)
                bs.exec(ctx);

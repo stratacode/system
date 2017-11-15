@@ -13,6 +13,7 @@ import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
 import sc.lang.html.Attr;
 import sc.layer.Layer;
+import sc.layer.LayeredSystem;
 import sc.obj.IObjectId;
 import sc.type.CTypeUtil;
 import sc.type.IBeanMapper;
@@ -1033,5 +1034,13 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       if (props == null)
          return propMap;
       return props;
+   }
+
+   public boolean execForRuntime(LayeredSystem runtimeSys) {
+      if (assignedProperty == null)
+         return false;
+      JavaModel model = getJavaModel();
+      Layer refLayer = model == null ? null : model.getLayer();
+      return ModelUtil.execForRuntime(getLayeredSystem(), refLayer, assignedProperty, runtimeSys);
    }
 }

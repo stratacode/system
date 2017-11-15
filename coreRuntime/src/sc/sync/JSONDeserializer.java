@@ -314,7 +314,14 @@ public class JSONDeserializer {
                }
             }
             // See FieldDefinition for the same code using SC layers
-            Object returnVal = DynUtil.invokeMethod(curObj, meth, args.toArray());
+            String exceptionStr = null;
+            Object returnVal = null;
+            try {
+               returnVal = DynUtil.invokeMethod(curObj, meth, args.toArray());
+            }
+            catch (Throwable methError) {
+               exceptionStr = methError + ":\n" + PTypeUtil.getStackTrace(methError);
+            }
 
             if (flushQueue) {
                SyncManager.flushSyncQueue();
@@ -324,7 +331,7 @@ public class JSONDeserializer {
             if (returnVal != null) {
                syncCtx.registerObjName(returnVal, callId, false, false);
             }
-            syncCtx.addMethodResult(isType ? null : curObj, isType ? curType : null, callId, returnVal);
+            syncCtx.addMethodResult(isType ? null : curObj, isType ? curType : null, callId, returnVal, exceptionStr);
          }
          finally {
             if (flushQueue)
@@ -333,10 +340,10 @@ public class JSONDeserializer {
       }
    }
 
-   public void applyMethodResult(String callId, Object returnValue, Object retType) {
+   public void applyMethodResult(String callId, Object returnValue, Object retType, String exceptionStr) {
       if (retType != null)
          returnValue = convertRemoteType(returnValue, retType);
-      SyncManager.processMethodReturn(syncCtx, callId, returnValue);
+      SyncManager.processMethodReturn(syncCtx, callId, returnValue, exceptionStr);
    }
 
    public void fetchProperty(String propName) {

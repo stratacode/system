@@ -51,6 +51,11 @@ public class JSTypeParameters extends ObjectTypeParameters {
 
    public GenFileLineIndex lineIndex = null;
 
+   /** Set for evalExpression - the expression itself and the optional currentInstance if we're updating a specific instance */
+   public List<Statement> evalStatements = null;
+   List<JSStatement> jsEvalStatements = null;
+   public Object currentInstance;
+
    public JSTypeParameters() {
    }
 
@@ -1292,5 +1297,42 @@ public class JSTypeParameters extends ObjectTypeParameters {
 
    public String getJSTypeName() {
       return getTypeName() + getJSRuntimeProcessor().typeNameSuffix;
+   }
+
+   public boolean getStaticExpr() {
+      return currentInstance == null;
+   }
+
+   public CharSequence getEvalExpression() {
+      int num = evalStatements.size();
+      if (num == 1 && evalStatements.get(0) instanceof Expression)
+         return JSUtil.convertAndFormatExpression((Expression) evalStatements.get(0));
+      else {
+         if (jsEvalStatements == null) {
+            jsEvalStatements = convertStatements(evalStatements, JSFormatMode.InstInit);
+         }
+         StringBuilder sb = new StringBuilder();
+         for (JSStatement st:jsEvalStatements) {
+            sb.append(replaceIndent(1, st.toString()));
+         }
+         return sb.toString();
+      }
+   }
+
+   public boolean getEvalHasReturnValue() {
+      int num = evalStatements.size();
+      if (num == 1 && evalStatements.get(0) instanceof Expression)
+         return !((Expression) evalStatements.get(0)).isVoidType();
+      /*
+      List<Statement> toEval = evalStatements;
+      do {
+         int last = toEval.size() - 1;
+         Statement lastSt = last == -1 ? null : toEval.get(last);
+         if (!(lastSt instanceof BlockStatement))
+            return lastSt == null || ((lastSt instanceof Expression) && !((Expression) lastSt).isVoidType());
+         toEval = ((BlockStatement) lastSt).getBlockStatements();
+      } while (toEval != null);
+      */
+      return false;
    }
 }

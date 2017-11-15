@@ -11,6 +11,7 @@ import sc.lang.ISemanticNode;
 import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
 import sc.lang.sc.PropertyAssignment;
+import sc.layer.LayeredSystem;
 import sc.parser.Language;
 
 import java.util.IdentityHashMap;
@@ -472,5 +473,8 @@ public class AssignmentExpression extends TwoOperatorExpression {
       return true;
    }
 
+   public boolean execForRuntime(LayeredSystem sys) {
+      return lhs != null && lhs.execForRuntime(sys);
+   }
 }
 
