@@ -86,7 +86,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
            "   cmd.<TAB>          - list the remaining properties and methods\n\n" +
            "Runtimes/Processes: " +
            "   By default, the commands you enter are automatically targeted towards all matching runtimes.\n" +
-           "   Set cmd.targetSystem = 'js' or 'java' to target a specific runtime.  Or 'java_Server' to target a specific process.";
+           "   Set cmd.targetRuntime = 'js' or 'java' to target a specific runtime.  Or 'java_Server' to target a specific process.";
 
    /** For commands like createLayer, we add a wizard which processes input temporarily */
    CommandWizard currentWizard = null;
@@ -857,11 +857,11 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    }
 
    private boolean performUpdatesToSystem(LayeredSystem sys) {
-      if (targetSystem == null) {
+      if (targetRuntime == null) {
          return true;
       }
 
-      if (targetSystem.equals(sys.getProcessIdent()) || targetSystem.equals(sys.getRuntimeName()))
+      if (targetRuntime.equals(sys.getProcessIdent()) || targetRuntime.equals(sys.getRuntimeName()))
          return true;
       return false;
    }

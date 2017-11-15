@@ -45,7 +45,7 @@ public class EditorContext extends ClientEditorContext {
    public boolean sync = true;
 
    /** Set this to either the runtimeName or processName of a target system.  In that case, we only perform updates on the selected target process or runtime. */
-   public String targetSystem = null;
+   public String targetRuntime = null;
    /**
     * Lets frameworks replace the code which processes a command statement.  Specifically you can ensure all commands are processed
     * on a specific thread, e.g. the swing event dispatcher thread
