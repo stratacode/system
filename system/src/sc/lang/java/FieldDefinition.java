@@ -473,6 +473,7 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
                      }
                      methArgs.add(StringLiteral.create(varDef.variableName));
                      methArgs.add(IdentifierExpression.create(varDef.variableName));
+                     methArgs.add(NullLiteral.create()); // TODO: In the code we generate, we are invoking the method without a try/catch - we should be catching the runtime exception from the method and passing it in place of this null
                      IdentifierExpression addRemCall = IdentifierExpression.createMethodCall(methArgs, "sc.sync.SyncManager.addMethodResult");
                      addRemBlock.addStatementAt(0, addRemCall);
                      enclType.addBodyStatementAt(ix+1, addRemBlock);

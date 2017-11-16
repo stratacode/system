@@ -516,7 +516,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
                // For top-level types, we'll select the current object instance so we can use it to resolve sub-objects
                if (parentObj == null && parentType == null && !hasCurrentObject() && autoObjectSelect) {
-                  Object res = SelectObjectWizard.start(this, null);
+                  Object res = SelectObjectWizard.start(this, null, false);
                   if (res == null)
                      return;
                   if (res != SelectObjectWizard.NO_INSTANCES_SENTINEL && res != null) {
@@ -563,7 +563,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
          if (!pa.isStatic() && autoObjectSelect) {
             if (!hasCurrentObject() || (curObj = getCurrentObject()) == null) {
-               Object res = SelectObjectWizard.start(this, statement);
+               Object res = SelectObjectWizard.start(this, statement, true);
                if (res == SelectObjectWizard.NO_INSTANCES_SENTINEL)
                   noInstance = true; // TODO: see below - used to set skipEval = true here
                else if (res == null)
@@ -715,7 +715,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             if (!expr.isStaticTarget() && autoObjectSelect) {
                if (!hasCurrentObject() || (curObj = getCurrentObject()) == null) {
                   Object res;
-                  res = SelectObjectWizard.start(this, statement);
+                  res = SelectObjectWizard.start(this, statement, true);
                   if (res == SelectObjectWizard.NO_INSTANCES_SENTINEL)
                      skipEval = true;
                   else if (res == null)
@@ -785,7 +785,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          if (!block.staticEnabled && autoObjectSelect) {
             if (!hasCurrentObject() || (curObj = getCurrentObject()) == null) {
                Object res;
-               res = SelectObjectWizard.start(this, statement);
+               res = SelectObjectWizard.start(this, statement, true);
                if (res == SelectObjectWizard.NO_INSTANCES_SENTINEL)
                   skipEval = true;
                else if (res == null)

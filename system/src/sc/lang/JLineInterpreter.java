@@ -9,10 +9,7 @@ import jline.console.completer.Completer;
 import jline.console.ConsoleReader;
 import jline.Terminal;
 
-import java.io.EOFException;
-import java.io.FileDescriptor;
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.util.List;
 
 // WARNING: this JSSetting is not picked up because we do not compile this file with stratacode.   We actually set this in JSRuntimeProcessor manually.
@@ -20,6 +17,7 @@ import java.util.List;
 public class JLineInterpreter extends AbstractInterpreter implements Completer {
    ConsoleReader input;
    boolean smartTerminal;
+   InputStream inputStream;
 
    public JLineInterpreter(LayeredSystem sys, boolean consoleDisabled, String inputFileName) {
       super(sys, consoleDisabled, inputFileName);
@@ -40,10 +38,11 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
    void resetInput() {
       try {
          FileInputStream inStream = inputFileName == null ? new FileInputStream(FileDescriptor.in) : new FileInputStream(inputFileName);
-         consoleDisabled = inputFileName != null || System.console() == null; // System.console() == null when either input or output is redirected - either case, it's not interactive right?
+         consoleDisabled = inputFileName != null; // System.console() == null when either input or output is redirected - either case, it's not interactive right?
          input = new ConsoleReader("scc", inStream, System.out, null);
          input.setExpandEvents(false); // Otherwise "!" and probably other special chars fail to expand in JLine (e.g. if (foo != bar) -> [ERROR] Could not expand event)
          input.addCompleter(this);
+         inputStream = inStream;
          smartTerminal = input.getTerminal().isSupported(); // Or isAnsiSupported?  Or isEchoEnabled()?  These also are different between the dumb IntelliJ terminal and the real command line
       }
       catch (EOFException exc) {
@@ -60,7 +59,7 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
       do {
          try {
             String nextLine;
-            String nextPrompt = prompt();
+            String nextPrompt = inputStream.available() > 0 ? "" : prompt();
             while ((nextLine = input.readLine(nextPrompt)) != null) {
                Object result = null;
                if (currentWizard != null || nextLine.trim().length() != 0) {
@@ -99,7 +98,7 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
                else {
                   execLaterJobs();
 
-                  nextPrompt = prompt();
+                  nextPrompt = inputStream.available() > 0 ? "" : prompt();
                }
             }
             if (nextLine == null) {

@@ -5,6 +5,7 @@
 package sc.lang;
 
 import sc.layer.LayeredSystem;
+import sc.util.FileUtil;
 
 import java.io.*;
 
@@ -13,13 +14,14 @@ public class CommandInterpreter extends AbstractInterpreter {
    BufferedReader input;
 
    public CommandInterpreter(LayeredSystem sys, BufferedReader inputStream, String inputFileName) {
-      super(sys, inputFileName != null || System.console() == null, inputFileName);
+      super(sys, inputFileName != null, inputFileName);
       updateInputSource(inputStream, inputFileName);
    }
 
    void updateInputSource(BufferedReader inputStream, String inputFileName) {
       try {
          input = inputStream != null ? inputStream : new BufferedReader(new FileReader(inputFileName));
+
       }
       catch (FileNotFoundException exc) {
          System.err.println("*** CommandInterpreter failed to open inputFileName: " + inputFileName + ": " + exc);

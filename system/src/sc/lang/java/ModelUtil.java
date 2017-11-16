@@ -8695,6 +8695,7 @@ public class ModelUtil {
             for (String rtName:rtNames)
                if (rtName.equals(runtimeSys.getRuntimeName()) || rtName.equals(runtimeSys.getProcessName()))
                   return true;
+            return false;
          }
          Boolean serverOnly = (Boolean) ModelUtil.getAnnotationValue(execAnnot, "serverOnly");
          Boolean clientOnly = (Boolean) ModelUtil.getAnnotationValue(execAnnot, "clientOnly");

@@ -335,9 +335,17 @@ public class SyncSerializer {
       statementSB.append("sc.sync.SyncManager.processMethodReturn(");
       statementSB.append("null, ");
       statementSB.append("\"");
-      statementSB.append(mres.callId);
+      statementSB.append(CTypeUtil.escapeJavaString(mres.callId, false));
       statementSB.append("\", ");
       parentContext.formatExpression(statement, statementSB, mres.retValue, newObjNames, newLastPackageName, preBlockCode, postBlockCode, null, true, "", depChanges, syncLayer);
+      statementSB.append(", ");
+      if (mres.exceptionStr == null)
+         statementSB.append("null");
+      else {
+         statementSB.append("\"");
+         statementSB.append(CTypeUtil.escapeJavaString(mres.exceptionStr, false));
+         statementSB.append("\"");
+      }
       statementSB.append(");\n");
 
       sb.append(Bind.indent(indentSize));
