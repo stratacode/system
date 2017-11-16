@@ -1662,6 +1662,8 @@ public class ModifyDeclaration extends TypeDeclaration {
    public boolean isAssignableTo(ITypeDeclaration other) {
       if (other == this)
          return true;
+      if (other.getFullTypeName().equals(getFullTypeName()))
+         return true;
 
       if (extendsBoundTypes != null) {
          for (int i = 0; i < extendsBoundTypes.length; i++) {

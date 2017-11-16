@@ -154,8 +154,9 @@ public class CycleInfo extends IdentityHashMap<JavaSemanticNode, List<CycleInfo.
       for (int i = cycle.size()-1; i >= 0; i--) {
          JavaSemanticNode node = cycle.get(i);
          sb.append("   ");
+         sb.append(node.toDefinitionString(1, false, false));
+         sb.append(" at ");
          sb.append(node.toFileString());
-         sb.append(node.toDefinitionString(1, true, true));
          sb.append("\n");
       }
       return sb.toString();

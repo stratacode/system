@@ -587,11 +587,12 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       if (bindingDirection != null && !bindingDirection.doForward())
          return;
 
-      if (info.context == null || info.context.parentVar == null) {
-         thisCtx = new CycleInfo.ThisContext(getEnclosingType(), null);
-         // Need this set for the first addToVisitedList...
-         info.context = thisCtx;
-      }
+
+      // Used to do this only if we did not already have a this.context but at least in the case when we're processing a property
+      // reference through the argument of a method call we need to replace the existing thisContext to the one expected by this property's expression
+      thisCtx = new CycleInfo.ThisContext(getEnclosingType(), null);
+      // Need this set for the first addToVisitedList...
+      info.context = thisCtx;
 
       // Add the property to the visited list if this starts the cycle.  we don't want to visit its initializer here
       // as it may have been overridden so we just add it manually to the visited list.

@@ -630,7 +630,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
 
    public String toDefinitionString(int indent, boolean addAt, boolean addNear) {
       StringBuilder sb = new StringBuilder();
-      sb.append(toDeclarationString());
+      sb.append(toDeclarationString().trim());
       if (addAt)
          appendAtString(sb, indent, false, true, addNear, null);
       else if (addNear)

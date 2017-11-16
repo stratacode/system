@@ -65,6 +65,8 @@ public class CastBinding extends AbstractMethodBinding {
          sb.append(Bind.arrayToString(boundParams));
          sb.append(" = ");
       }
+      sb.append(toBindingString(false));
+      sb.append(" = " );
       sb.append(toBindingString(true));
       if (valid && displayValue && dstObj != dstProp && !(boundParams[0] instanceof VariableBinding)) {
          sb.append(" = ");

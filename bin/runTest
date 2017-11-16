@@ -124,7 +124,7 @@ if [ -f "$VALID_FILE" ] ; then
       pagesChanged=0
    fi
    if diff "$VALID_FILE" "$OUT_FILE" > /dev/null ; then 
-      outputChange=0
+      outputChanged=0
    fi
    if diff "$VALID_STATUS_FILE" "$STATUS_FILE" > /dev/null ; then 
       statusChanged=0
