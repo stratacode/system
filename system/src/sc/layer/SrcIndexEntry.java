@@ -13,7 +13,7 @@ public class SrcIndexEntry implements Serializable {
    public byte[] hash;
    public String extension;
 
-   public static boolean debugSrcIndexEntry = true;
+   public static boolean debugSrcIndexEntry = false;
 
    /** Not persisted - used to track entries which are no longer needed by the project */
    public transient boolean inUse;
