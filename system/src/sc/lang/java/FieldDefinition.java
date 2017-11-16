@@ -274,7 +274,7 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
 
             if (initException instanceof RuntimeException)
                throw (RuntimeException) initException;
-            else
+            else if (initException != null)
                throw new RuntimeInvocationTargetException(initException);
          }
          finally {
