@@ -488,21 +488,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          boolean hasCurrentObject = hasCurrentObject();
          boolean checkCurrentObject = parentType == null || hasCurrentObject;
 
-         /*
-         if (layer.packagePrefix != null && layer.packagePrefix.length() > 0) {
-            if (!typeName.startsWith(layer.packagePrefix))
-               System.err.println("*** Error - typeName does not start with package prefix:");
-            else
-               typeName = typeName.substring(layer.packagePrefix.length()+1);
-         }
-         */
-
          currentTypes.add(type);
-
-         // Modify declarations need to start things up so their type is obtained correctly.
-         //if (type instanceof ModifyDeclaration) {
-         //   ParseUtil.initAndStartComponent(model);
-         //}
 
          DeclarationType declType = type.getDeclarationType();
 
@@ -524,7 +510,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                   }
                }
 
-               // Using origTypeName here - grabbed before we do the "a.b" to a { b" conversion.   type.typeName now will just be "b".
+               // Using origTypeName here - grabbed before we do the "a.b" to a as a parent of b" conversion.   type.typeName now will just be "b".
                // Only do this if the current object is the parent object - not if it's already been resolved from the selectedInstances array
                if (obj == null)
                   obj = parentObj == null ? (checkCurrentObject ? system.resolveName(typeName, true) : null) : (hasCurrentObject ? DynUtil.getPropertyPath(parentObj, origTypeName) : null);
@@ -612,31 +598,29 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                boolean any = false;
                for (LayeredSystem peerSys:syncSystems) {
                   if (performUpdatesToSystem(peerSys)) {
-                     Layer peerLayer = peerSys.getPeerLayerFromRemote(currentLayer);
-                     if (peerLayer != null) {
-                        BodyTypeDeclaration peerType = peerSys.getSrcTypeDeclaration(current.getFullTypeName(), peerLayer.getNextLayer(), true);
-                        if (peerType != null) {
-                           PropertyAssignment peerAssign = assign.deepCopy(ISemanticNode.CopyAll, null);
-                           peerAssign.parentNode = peerType;
+                     Layer peerLayer = peerSys.getLayerByName(currentLayer.layerUniqueName);
+                     BodyTypeDeclaration peerType = peerSys.getSrcTypeDeclaration(current.getFullTypeName(), peerLayer == null ? null : peerLayer.getNextLayer(), true);
+                     if (peerType != null) {
+                        PropertyAssignment peerAssign = assign.deepCopy(ISemanticNode.CopyAll, null);
+                        peerAssign.parentNode = peerType;
 
-                           if (!ignoreRemoteStatement(peerSys, peerAssign)) {
-                              if (edit) {
-                                 UpdateInstanceInfo peerUpdateInfo = peerSys.newUpdateInstanceInfo();
-                                 // TODO: is it right to pass execContext here and to updateInstances - isn't the currentObj stacks are not for the peer runtime
-                                 // But maybe we want to do all eval's required on the local runtime
-                                 peerType.updateProperty(peerAssign, execContext, true, peerUpdateInfo);
-                                 peerUpdateInfo.updateInstances(execContext);
-                              }
-                              else {
-                                 peerAssign.parentNode = peerType;
-                                 String res = peerSys.runtimeProcessor.transformStatement(peerType, curObj, peerAssign);
-                                 if (res != null && res.length() > 0) {
-                                    String remoteExprRes = (String) DynUtil.evalScript(res);
-                                    System.out.println(remoteExprRes);
-                                 }
-                              }
-                              any = true;
+                        if (!ignoreRemoteStatement(peerSys, peerAssign)) {
+                           if (edit) {
+                              UpdateInstanceInfo peerUpdateInfo = peerSys.newUpdateInstanceInfo();
+                              // TODO: is it right to pass execContext here and to updateInstances - isn't the currentObj stacks are not for the peer runtime
+                              // But maybe we want to do all eval's required on the local runtime
+                              peerType.updateProperty(peerAssign, execContext, true, peerUpdateInfo);
+                              peerUpdateInfo.updateInstances(execContext);
                            }
+                           else {
+                              peerAssign.parentNode = peerType;
+                              String res = peerSys.runtimeProcessor.transformStatement(peerType, curObj, peerAssign);
+                              if (res != null && res.length() > 0) {
+                                 String remoteExprRes = (String) DynUtil.evalScript(res);
+                                 System.out.println(remoteExprRes);
+                              }
+                           }
+                           any = true;
                         }
                      }
                   }
@@ -712,7 +696,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          ParseUtil.initAndStartComponent(expr);
 
          if (expr.errorArgs == null && !model.hasErrors) {
-            if (!expr.isStaticTarget() && autoObjectSelect) {
+            if (!expr.isStaticTarget() && autoObjectSelect && currentType != null) {
                if (!hasCurrentObject() || (curObj = getCurrentObject()) == null) {
                   Object res;
                   res = SelectObjectWizard.start(this, statement, true);
@@ -744,20 +728,18 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                         System.out.println(exprResult);
                   }
 
-                  if (sync && syncSystems != null && currentLayer != null && currentType != null) {
+                  if (sync && syncSystems != null && currentType != null && currentLayer != null) {
                      for (LayeredSystem peerSys:syncSystems) {
                         if (performUpdatesToSystem(peerSys)) {
-                           Layer peerLayer = peerSys.getPeerLayerFromRemote(currentLayer);
-                           if (peerLayer != null) {
-                              BodyTypeDeclaration peerType = peerSys.getSrcTypeDeclaration(currentType.getFullTypeName(), peerLayer.getNextLayer(), true);
-                              if (peerType != null) {
-                                 Expression peerExpr = expr.deepCopy(ISemanticNode.CopyNormal, null);
-                                 peerExpr.parentNode = peerType;
-                                 String res = peerSys.runtimeProcessor.transformStatement(peerType, curObj, peerExpr);
-                                 if (res != null && res.length() > 0) {
-                                    Object remoteExprRes = DynUtil.evalScript(res);
-                                    System.out.println(remoteExprRes);
-                                 }
+                           Layer peerLayer = peerSys.getLayerByName(currentLayer.layerUniqueName);
+                           BodyTypeDeclaration peerType = peerSys.getSrcTypeDeclaration(currentType.getFullTypeName(), peerLayer == null ? null : peerLayer.getNextLayer(), true);
+                           if (peerType != null) {
+                              Expression peerExpr = expr.deepCopy(0, null);
+                              peerExpr.parentNode = peerType;
+                              String res = peerSys.runtimeProcessor.transformStatement(peerType, curObj, peerExpr);
+                              if (res != null && res.length() > 0) {
+                                 Object remoteExprRes = DynUtil.evalScript(res);
+                                 System.out.println(remoteExprRes);
                               }
                            }
                         }
@@ -809,23 +791,21 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             if (sync && syncSystems != null && currentLayer != null && !skipEval) {
                for (LayeredSystem peerSys:syncSystems) {
                   if (performUpdatesToSystem(system)) {
-                     Layer peerLayer = peerSys.getPeerLayerFromRemote(currentLayer);
-                     if (peerLayer != null) {
-                        BodyTypeDeclaration peerType = peerSys.getSrcTypeDeclaration(currentType.getFullTypeName(), peerLayer.getNextLayer(), true);
-                        if (peerType != null) {
-                           BlockStatement peerBlock = block.deepCopy(ISemanticNode.CopyNormal, null);
-                           if (edit) {
-                              UpdateInstanceInfo peerUpdateInfo = peerSys.newUpdateInstanceInfo();
-                              peerType.updateBlockStatement(peerBlock, execContext, peerUpdateInfo);
-                              peerUpdateInfo.updateInstances(execContext);
-                           }
-                           else {
-                              peerBlock.parentNode = peerType;
-                              String res = peerSys.runtimeProcessor.transformStatement(peerType, curObj, peerBlock);
-                              if (res != null && res.length() > 0) {
-                                 String remoteExprRes = (String) DynUtil.evalScript(res);
-                                 System.out.println(remoteExprRes);
-                              }
+                     Layer peerLayer = peerSys.getLayerByName(currentLayer.layerUniqueName);
+                     BodyTypeDeclaration peerType = peerSys.getSrcTypeDeclaration(currentType.getFullTypeName(), peerLayer == null ? null : peerLayer.getNextLayer(), true);
+                     if (peerType != null) {
+                        BlockStatement peerBlock = block.deepCopy(ISemanticNode.CopyNormal, null);
+                        if (edit) {
+                           UpdateInstanceInfo peerUpdateInfo = peerSys.newUpdateInstanceInfo();
+                           peerType.updateBlockStatement(peerBlock, execContext, peerUpdateInfo);
+                           peerUpdateInfo.updateInstances(execContext);
+                        }
+                        else {
+                           peerBlock.parentNode = peerType;
+                           String res = peerSys.runtimeProcessor.transformStatement(peerType, curObj, peerBlock);
+                           if (res != null && res.length() > 0) {
+                              String remoteExprRes = (String) DynUtil.evalScript(res);
+                              System.out.println(remoteExprRes);
                            }
                         }
                      }

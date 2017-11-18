@@ -2129,7 +2129,8 @@ public class ModifyDeclaration extends TypeDeclaration {
    protected void initDynamicType() {
       super.initDynamicType();
 
-      if (dynamicType) {
+      boolean clearedDyn = false;
+      if (dynamicType || dynamicNew) {
          if (modifyTypeDecl != null) {
             Layer modLayer = modifyTypeDecl.getLayer();
             LayeredSystem sys = modLayer.layeredSystem;
@@ -2140,10 +2141,12 @@ public class ModifyDeclaration extends TypeDeclaration {
                dynamicNew = false;
                if (modifyNeedsClass())
                   sys.setStaleCompiledModel(true, "Modify of type: ", compiledClass, " already loaded as compiled type and needs to add definitions");
+
+               clearedDyn = true;
             }
          }
          // NOTE: modifyTypeDecl is null here when called from initialize so this fails.  It gets reset in "start"
-         if (!modifyNeedsClass()) {
+         if (!modifyNeedsClass() && !clearedDyn) {
             dynamicType = false;
             dynamicNew = true;
          }

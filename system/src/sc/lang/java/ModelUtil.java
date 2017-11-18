@@ -8250,6 +8250,7 @@ public class ModelUtil {
          try {
             Class.forName(DynUtil.getTypeName(type, false), true, cl.getClassLoader());
          }
+         catch (NoClassDefFoundError exc2) {}
          catch (ClassNotFoundException exc) {}
       }
       else {

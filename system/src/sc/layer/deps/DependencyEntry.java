@@ -54,4 +54,12 @@ public class DependencyEntry extends SemanticNode {
             break;
       fileDeps.add(i,layerDeps);
    }
+
+   public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append(fileName);
+      sb.append(" -> ");
+      sb.append(genFileNames);
+      return sb.toString();
+   }
 }

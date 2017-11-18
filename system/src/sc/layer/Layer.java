@@ -2817,6 +2817,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    public List<Layer> getLayersList() {
+      if (layeredSystem == null)
+         System.out.println("*** Invalid layer: " + this);
       if (disabled)
          return layeredSystem.disabledLayers;
       return activated ? layeredSystem.layers : layeredSystem.inactiveLayers;

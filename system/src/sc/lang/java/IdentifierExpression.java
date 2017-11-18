@@ -42,6 +42,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       PackageName,      // This identifier is a component in a package name.  Preceded either BoundType or BoundObjectName
       BoundTypeName,    // This slot refers to an actual type - referencedObject is either a type declaration or class.
       BoundObjectName,  // This slot refers to an "object" definition.  Otherwise similar to the above.
+      BoundInstanceName, // Special case - the 'cmd' object in command interpreter binds to an instance not a type
       ResolvedObjectName, // A special type of object that we resolved via a customResolver.
       UnboundName,      // Did not find a name for this slot
       VariableName,     // Bound to a local var, param, for var, etc.
@@ -359,7 +360,11 @@ public class IdentifierExpression extends ArgumentsExpression {
                   typeObj = model.findTypeDeclaration(firstIdentifier, varObj == null);
                }
 
-               if (typeObj != null && ModelUtil.isObjectType(typeObj)) {
+               if (typeObj instanceof AbstractInterpreter) {
+                  idTypes[0] = IdentifierType.BoundInstanceName;
+                  boundTypes[0] = typeObj;
+               }
+               else if (typeObj != null && ModelUtil.isObjectType(typeObj)) {
                   idTypes[0] = IdentifierType.BoundObjectName;
                   boundTypes[0] = typeObj;
                   if (varObj != null && varObj instanceof IVariable) {
@@ -1908,6 +1913,9 @@ public class IdentifierExpression extends ArgumentsExpression {
                isType = false;
                break;
 
+            case BoundInstanceName:
+               return boundTypes[0];
+
             case BoundObjectName:
                isType = false;
                if (isThisExpression()) {
@@ -2462,10 +2470,12 @@ public class IdentifierExpression extends ArgumentsExpression {
 
                   Object type = boundTypes[i];
 
+                  JavaModel model = getJavaModel();
+
                   // Don't convert ObjectName.this since in that case, it is a class or this reference
                   // Also don't convert if this is the lhs of an AssignmentExpression since that will
                   // go through convertToSet.  That only applies to the last component of the identifier expression of course
-                  if (isThisExpression() || isSuperExpression() || !getJavaModel().enableExtensions() || (isAssignment && i == sz-1) || isGetSetConversionDisabled(i))
+                  if (isThisExpression() || isSuperExpression() || !model.enableExtensions() || (isAssignment && i == sz-1) || isGetSetConversionDisabled(i))
                      break;
 
                   // For ObjectName.staticVar, do not convert this to getObjectName().staticVar!
@@ -2502,7 +2512,14 @@ public class IdentifierExpression extends ArgumentsExpression {
                      // This is not a common case because normally compiled types don't directly refer to dynamic types but
                      // if we have a compiled Main, it can get dynamic types from the mainInit type group members.  We need to replace
                      // the call with a dynamic lookup of that instance.
-                     if (ModelUtil.isDynamicNew(type) && !ModelUtil.isDynamicStub(type, false)) {
+                     // If we are generating JS
+                     // TODO: if we need this case, it needs to handle the case where we have more ".x" after the dynamic type - i.e. it creates a selector expression with this
+                     // method call as the base and the reset of the selectors get added from this expression
+                     if (ModelUtil.isDynamicNew(type) && !ModelUtil.isDynamicStub(type, false) && model.mergeDeclaration) {
+                        if (i != sz - 1) {
+                           System.err.println("*** Unhandled case for transforming dynamic types");
+                           return true;
+                        }
                         SemanticNodeList<Expression> args = new SemanticNodeList<Expression>();
                         args.add(StringLiteral.create(ModelUtil.getTypeName(type)));
                         args.add(BooleanLiteral.create(true));
@@ -3331,6 +3348,8 @@ public class IdentifierExpression extends ArgumentsExpression {
                if (ModelUtil.isConstructor(boundTypes[ix]))
                   return resolveType(ModelUtil.getEnclosingType(boundTypes[ix]), ix, idTypes);
                break;
+            case BoundInstanceName:
+               return DynUtil.getType(boundTypes[ix]);
          }
       }
       Object type = resolveType(boundTypes[ix], ix, idTypes);
@@ -5475,7 +5494,6 @@ public class IdentifierExpression extends ArgumentsExpression {
          Layer refLayer = model == null ? null : model.getLayer();
          return ModelUtil.execForRuntime(getLayeredSystem(), refLayer, refType, runtimeSys);
       }
-      System.err.println("*** No type for: " + this + " failed to select proper runtime");
-      return true;
+      return false; // Did not resolve properly for this runtime - maybe the variable is not defined?
    }
 }

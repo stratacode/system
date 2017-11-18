@@ -14,6 +14,8 @@ package sc.layer;
  * versa.
  */
 public interface IFileProcessor {
+   final static Object FILE_OVERRIDDEN_SENTINEL = new String("<file-overridden-sentinel>");
+
    void validate();
    Object process(SrcEntry file, boolean enablePartialValues);
 

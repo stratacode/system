@@ -125,14 +125,17 @@ public class LayerFileProcessor extends LayerFileComponent {
    }
 
    public Object process(SrcEntry srcEnt, boolean enablePartialValues) {
-      LayerFileProcessorResult res = null;
+      LayerFileProcessorResult res;
       LayerFileProcessorResult current = fileIndex.get(srcEnt.relFileName);
       int cpos, spos;
       // If processInAllLayers is set, we put the generated file in all build layers.  That means every time this gets called with the right file, we
       // process it.
-      if (current == null || (cpos = current.srcEnt.layer.layerPosition) < (spos = srcEnt.layer.layerPosition) || (processInAllLayers && cpos == spos))
+      if (current == null || (cpos = current.srcEnt.layer.layerPosition) < (spos = srcEnt.layer.layerPosition) || (processInAllLayers && cpos == spos)) {
          fileIndex.put(srcEnt.relFileName, res = new LayerFileProcessorResult(this, srcEnt));
-      return res;
+         return res;
+      }
+      else
+         return new LayerFileProcessorResult(this, srcEnt); //FILE_OVERRIDDEN_SENTINEL;
    }
 
    public boolean getInheritFiles() {

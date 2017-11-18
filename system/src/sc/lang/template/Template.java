@@ -579,8 +579,9 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
          setProperty("types", new SemanticNodeList());
       if (rootType != null && rootType instanceof TypeDeclaration) {
          TypeDeclaration rootDecl = (TypeDeclaration) rootType;
-         if (dynamicType)
+         if (dynamicType) {
             rootDecl.dynamicType = true;
+         }
 
          // Added in convertToObject for singleElementTypes to set the parent
          if (!singleElementType)
