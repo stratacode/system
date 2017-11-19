@@ -5,7 +5,6 @@
 package sc.lang.java;
 
 import sc.bind.BindSettings;
-import sc.bind.Bindable;
 import sc.bind.IChangeable;
 import sc.classfile.CFClass;
 import sc.classfile.CFMethod;
@@ -6468,7 +6467,7 @@ public class ModelUtil {
             else if (expr != null) {
                expr.setParentNode(typeDef.getJavaModel()); // Goal is to let the expression in this case refer to anything defined in this type
                ParseUtil.initAndStartComponent(expr);
-               if (!expr.anyError() && ModelUtil.isProperty(elem)) {
+               if (!expr.hasErrors() && ModelUtil.isProperty(elem)) {
                   ExecutionContext ctx = new ExecutionContext(typeDef.getJavaModel());
                   Object value = expr.eval(null, ctx);
                   String propName = getPropertyName(elem);

@@ -553,7 +553,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       Object prop = ModelUtil.definesMember(type, identifier, MemberType.PropertyGetObj, null, null, false, true, getLayeredSystem());
       if (prop == null) {
          System.err.println("*** Can't resolve property for get property mapping: " + identifier);
-         //prop = ModelUtil.definesMember(type, identifier, MemberType.PropertyGetSet, null, null);
+         prop = ModelUtil.definesMember(type, identifier, MemberType.PropertyGetObj, null, null, false, true, getLayeredSystem());
       }
       else if (ModelUtil.hasModifier(prop, "static")) {
          type = ModelUtil.getEnclosingType(prop);

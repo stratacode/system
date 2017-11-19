@@ -8,7 +8,6 @@ import sc.lang.*;
 import sc.lang.js.JSFormatMode;
 import sc.lang.js.JSLanguage;
 import sc.lang.js.JSTypeParameters;
-import sc.lang.template.Template;
 import sc.layer.LayeredSystem;
 import sc.layer.SrcEntry;
 import sc.parser.*;
@@ -141,7 +140,7 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
    }
 
    /** Returns true if there are errors in this node or any child node of this node */
-   public boolean anyError() {
+   public boolean hasErrors() {
       if (errorArgs != null)
          return true;
 
@@ -151,7 +150,7 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       for (int i = 0; i < semanticProps.length; i++) {
          IBeanMapper prop = semanticProps[i];
          Object thisProp = TypeUtil.getPropertyValue(this, prop);
-         if (thisProp instanceof Statement && ((Statement) thisProp).anyError())
+         if (thisProp instanceof Statement && ((Statement) thisProp).hasErrors())
             return true;
       }
       return false;

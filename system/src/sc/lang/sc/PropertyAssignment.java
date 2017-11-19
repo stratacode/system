@@ -15,7 +15,6 @@ import sc.lang.html.Attr;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.obj.IObjectId;
-import sc.type.CTypeUtil;
 import sc.type.IBeanMapper;
 import sc.type.TypeUtil;
 import sc.lang.java.*;
@@ -454,7 +453,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
                if (initializer != null) {
                   Expression oldInit = oldAssign.initializer;
                   oldAssign.setProperty("initializer", initializer);
-                  if (initializer.anyError()) {
+                  if (initializer.hasErrors()) {
                       oldAssign.setProperty("initializer", oldInit);
                       return null;
                   }

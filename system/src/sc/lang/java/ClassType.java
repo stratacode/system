@@ -1054,6 +1054,10 @@ public class ClassType extends JavaType {
       return null;
    }
 
+   public boolean hasErrors() {
+      return errorArgs != null;
+   }
+
    public boolean isCollapsibleNode() {
       if (typeArguments != null)
          return false;

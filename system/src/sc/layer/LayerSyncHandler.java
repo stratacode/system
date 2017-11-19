@@ -5,6 +5,7 @@
 package sc.layer;
 
 import sc.dyn.DynUtil;
+import sc.lang.AbstractInterpreter;
 import sc.lang.java.*;
 import sc.lang.pattern.VariableDef;
 import sc.sync.ClassSyncWrapper;
@@ -75,6 +76,10 @@ public class LayerSyncHandler extends SyncHandler {
    public Object getObjectType(Object changedObj) {
       if (changedObj instanceof Layer)
          return Layer.class;
+      // The cmd interpreter object implements IDynObject which has CmdClassDeclaration as it's type.  But the sync system
+      // should see it as a normal class so it can create the remote side
+      if (changedObj instanceof AbstractInterpreter)
+         return changedObj.getClass();
       return super.getObjectType(changedObj);
    }
 }

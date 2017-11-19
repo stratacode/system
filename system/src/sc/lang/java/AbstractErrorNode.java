@@ -44,4 +44,8 @@ public class AbstractErrorNode extends JavaSemanticNode {
          errorArgs = args;
       }
    }
+
+   public boolean hasErrors() {
+      return errorArgs != null;
+   }
 }

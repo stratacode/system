@@ -192,12 +192,16 @@ public class EditorContext extends ClientEditorContext {
       model.layer.addNewSrcFile(model.getSrcFile(), true);
    }
 
+   protected void initPendingModel() {
+      pendingModel = new SCModel();
+      pendingModel.setLayeredSystem(system);
+      pendingModel.setLayer(currentLayer);
+      execContext.resolver = pendingModel;
+   }
+
    protected JavaModel getModel() {
       if (pendingModel == null) {
-         pendingModel = new SCModel();
-         pendingModel.setLayeredSystem(system);
-         pendingModel.setLayer(currentLayer);
-         execContext.resolver = pendingModel;
+         initPendingModel();
       }
       return pendingModel;
    }
@@ -964,7 +968,7 @@ public class EditorContext extends ClientEditorContext {
       Object rootType = ModelUtil.getRootType(propType);
       String rootName = ModelUtil.getTypeName(rootType);
 
-      Object curType = getCurrentType();
+      Object curType = getCurrentType(false);
       if (system.isImported(rootName))
          rootName = CTypeUtil.getClassName(rootName);
 
@@ -1328,7 +1332,7 @@ public class EditorContext extends ClientEditorContext {
 
       // Empty string is a special case - suggest all names available here
       if (command.trim().length() == 0) {
-         Object curObj = getCurrentType();
+         Object curObj = getCurrentType(true);
          if (curObj != null) {
             ModelUtil.suggestMembers(getModel(), curObj, "", collector, true, true, true, true);
             convertCollectorToCandidates(collector, candidates);
@@ -1375,7 +1379,7 @@ public class EditorContext extends ClientEditorContext {
 
    public int completeCommand(String defaultPackage, Object semanticValue, String command, int cursor, List candidates, BodyTypeDeclaration currentType, Object continuationValue) {
       if (currentType == null)
-         currentType = getCurrentType();
+         currentType = getCurrentType(true);
       JavaSemanticNode defaultParent = currentType;
       if (currentType == null)
          defaultParent = currentTypes.size() == 0 ? getModel() : currentTypes.get(currentTypes.size()-1);
@@ -1451,8 +1455,14 @@ public class EditorContext extends ClientEditorContext {
       return completeCommand(getPrefix(), semanticValue, command, cursor, candidates, null, false);
    }
 
+   /** Note - this is exposed as a property and used by the data binding code in the editor */
    public BodyTypeDeclaration getCurrentType() {
-      return currentTypes.size() == 0 ? null : currentTypes.get(currentTypes.size()-1);
+      return getCurrentType(false);
+   }
+
+   /** Returns the current type - excluding the default cmdObject which collects classBodyDeclarations at the top-level */
+   public BodyTypeDeclaration getCurrentType(boolean includeDefault) {
+      return currentTypes.size() == (includeDefault ? 0 : 1) ? null : currentTypes.get(currentTypes.size()-1);
    }
 
    public void pushCurrentType(BodyTypeDeclaration type) {
@@ -1564,6 +1574,7 @@ public class EditorContext extends ClientEditorContext {
       // Manually adding these (roughly based on the generated code from js/layer/lang/EditorContext.java - so we sync the same properties
       int globalScopeId = GlobalScopeDefinition.getGlobalScopeDefinition().scopeId;
       SyncManager.addSyncType(getClass(), new sc.sync.SyncProperties(null, null, new Object[]{"currentLayer", "currentType", "needsSave", "canUndo", "canRedo"}, null, SyncOptions.SYNC_INIT_DEFAULT, globalScopeId));
+      SyncManager.addSyncHandler(getClass(), LayerSyncHandler.class);
       SyncManager.addSyncType(MemoryEditSession.class, new sc.sync.SyncProperties(null, null, new Object[] {"origText", "text", "model", "saved", "caretPosition"}, null, SyncOptions.SYNC_INIT_DEFAULT, globalScopeId));
       SyncManager.addSyncInst(this, true, true, null);
    }

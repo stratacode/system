@@ -5126,109 +5126,129 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public Statement updateBodyStatement(Statement def, ExecutionContext ctx, boolean updateInstances, UpdateInstanceInfo info) {
       needsDynamicType();
 
-      JavaModel model = getJavaModel();
-      if (def instanceof AbstractMethodDefinition) {
-         AbstractMethodDefinition newDef = (AbstractMethodDefinition) def;
-         if (!isDynamicType())
-            model.layeredSystem.setStaleCompiledModel(true, "Adding method to compiled type: ", newDef.name, " for type: ", typeName);
+      boolean lockAcquired = false;
 
-         // Look for a method in this type specifically.  Anything in a modified type or extended type should not
-         // get replaced since we are overriding that method in that case.
-         AbstractMethodDefinition overridden = (AbstractMethodDefinition) declaresMethod(newDef.name, newDef.getParameterList(), null, null, false, null, null, false);
-         if (overridden != null) {
-            overridden.parentNode.replaceChild(overridden, newDef);
-            if (overridden.overriddenMethod != null) {
-               if (newDef == overridden.overriddenMethod)
+      JavaModel model = getJavaModel();
+
+      LayeredSystem sys = model.layeredSystem;
+
+      try {
+         sys.acquireDynLock(false);
+         lockAcquired = true;
+         if (def instanceof AbstractMethodDefinition) {
+            AbstractMethodDefinition newDef = (AbstractMethodDefinition) def;
+            if (!isDynamicType())
+               model.layeredSystem.setStaleCompiledModel(true, "Adding method to compiled type: ", newDef.name, " for type: ", typeName);
+
+            // Look for a method in this type specifically.  Anything in a modified type or extended type should not
+            // get replaced since we are overriding that method in that case.
+            AbstractMethodDefinition overridden = (AbstractMethodDefinition) declaresMethod(newDef.name, newDef.getParameterList(), null, null, false, null, null, false);
+            if (overridden != null) {
+               overridden.parentNode.replaceChild(overridden, newDef);
+               if (overridden.overriddenMethod != null) {
+                  if (newDef == overridden.overriddenMethod)
+                     System.out.println("*** REPLACING A METHOD WITH ITSELF!");
+                  overridden.overriddenMethod.replacedByMethod = newDef;
+                  newDef.overriddenMethod = overridden.overriddenMethod;
+               }
+
+               if (newDef == overridden)
                   System.out.println("*** REPLACING A METHOD WITH ITSELF!");
-               overridden.overriddenMethod.replacedByMethod = newDef;
-               newDef.overriddenMethod = overridden.overriddenMethod;
+               overridden.replacedByMethod = newDef;
+               overridden.replaced = true;
+               return overridden;
             }
 
-            if (newDef == overridden)
-               System.out.println("*** REPLACING A METHOD WITH ITSELF!");
-            overridden.replacedByMethod = newDef;
-            overridden.replaced = true;
-            return overridden;
+            MethodDefinition newMethod;
+            if ((newDef instanceof MethodDefinition) && (newMethod = (MethodDefinition) newDef).overridesCompiled) {
+               model.layeredSystem.setStaleCompiledModel(true, "Overriding compiled method: ", newMethod.name, " in type: ", typeName);
+            }
+            addBodyStatementIndent(def);
          }
+         else if (def instanceof FieldDefinition) {
+            FieldDefinition newDef = (FieldDefinition) def;
+            FieldDefinition replacedField = null;
+            boolean replaced = false;
+            boolean addField = true;
+            for (VariableDefinition varDef:newDef.variableDefinitions) {
+               Object overridden = definesMember(varDef.variableName, MemberType.PropertyGetSet, null, null);
+               if (overridden instanceof VariableDefinition) {
+                  VariableDefinition overriddenDef = (VariableDefinition) overridden;
+                  FieldDefinition overriddenField = (FieldDefinition) overriddenDef.getDefinition();
+                  // If this field was already defined in this same type, we don't have to add it - instead we just
+                  // update it.
+                  if (overriddenField.getEnclosingType() == this) {
+                     addField = false;
+                     if (!replaced) {
+                        overriddenField.parentNode.replaceChild(overriddenField, newDef);
+                        replacedField = overriddenField;
+                        replaced = true;
 
-         MethodDefinition newMethod;
-         if ((newDef instanceof MethodDefinition) && (newMethod = (MethodDefinition) newDef).overridesCompiled) {
-            model.layeredSystem.setStaleCompiledModel(true, "Overriding compiled method: ", newMethod.name, " in type: ", typeName);
-         }
-         addBodyStatementIndent(def);
-      }
-      else if (def instanceof FieldDefinition) {
-         FieldDefinition newDef = (FieldDefinition) def;
-         FieldDefinition replacedField = null;
-         boolean replaced = false;
-         boolean addField = true;
-         for (VariableDefinition varDef:newDef.variableDefinitions) {
-            Object overridden = definesMember(varDef.variableName, MemberType.PropertyGetSet, null, null);
-            if (overridden instanceof VariableDefinition) {
-               VariableDefinition overriddenDef = (VariableDefinition) overridden;
-               FieldDefinition overriddenField = (FieldDefinition) overriddenDef.getDefinition();
-               // If this field was already defined in this same type, we don't have to add it - instead we just
-               // update it.
-               if (overriddenField.getEnclosingType() == this) {
-                  addField = false;
-                  if (!replaced) {
-                     overriddenField.parentNode.replaceChild(overriddenField, newDef);
-                     replacedField = overriddenField;
-                     replaced = true;
+                        for (VariableDefinition otherOverVar:overriddenField.variableDefinitions) {
+                           if (otherOverVar == overriddenDef)
+                              continue;
 
-                     for (VariableDefinition otherOverVar:overriddenField.variableDefinitions) {
-                        if (otherOverVar == overriddenDef)
-                           continue;
-
-                        int foundIx;
-                        int sz = newDef.variableDefinitions.size();
-                        for (foundIx = 0; foundIx < sz; foundIx++) {
-                           VariableDefinition varDef2 = newDef.variableDefinitions.get(foundIx);
-                           if (varDef2.variableName.equals(otherOverVar.variableName))
-                              break;
-                        }
-                        if (foundIx == sz) {
-                           // TODO: this variable is not presenet in the field def we need to remove this field
-                           // from the dynamic model.  If it is present, we'll just come back around here again with
-                           // replaced = true and update its initializer then.
-                           System.err.println("*** Unimplemented: Not removing field from dynamic model!");
+                           int foundIx;
+                           int sz = newDef.variableDefinitions.size();
+                           for (foundIx = 0; foundIx < sz; foundIx++) {
+                              VariableDefinition varDef2 = newDef.variableDefinitions.get(foundIx);
+                              if (varDef2.variableName.equals(otherOverVar.variableName))
+                                 break;
+                           }
+                           if (foundIx == sz) {
+                              // TODO: this variable is not presenet in the field def we need to remove this field
+                              // from the dynamic model.  If it is present, we'll just come back around here again with
+                              // replaced = true and update its initializer then.
+                              System.err.println("*** Unimplemented: Not removing field from dynamic model!");
+                           }
                         }
                      }
+                     // equals but checks for null
+                     if (!DynUtil.equalObjects(overriddenDef.initializer, varDef.initializer)) {
+                        lockAcquired = false;
+                        sys.releaseDynLock(false);
+                        updatePropertyForType(varDef, ctx, InitInstanceType.Init, updateInstances, info);
+                     }
                   }
-                  // equals but checks for null
-                  if (!DynUtil.equalObjects(overriddenDef.initializer, varDef.initializer))
-                     updatePropertyForType(varDef, ctx, InitInstanceType.Init, updateInstances, info);
+               }
+
+               if (addField) {
+                  if (lockAcquired) {
+                     lockAcquired = false;
+                     sys.releaseDynLock(false);
+                  }
+                  if (overridden != null) {
+                     displayError("Field of that name already exists: ", overridden.toString());
+                     return replacedField;
+                  }
+                  else {
+                     addBodyStatementIndent(def);
+
+                     addStaticOrInstField(varDef, ctx);
+                  }
                }
             }
-
-            if (addField) {
-               if (overridden != null) {
-                  displayError("Field of that name already exists: ", overridden.toString());
-                  return replacedField;
-               }
-               else {
-                  addBodyStatementIndent(def);
-
-                  addStaticOrInstField(varDef, ctx);
-               }
-            }
+            return replacedField;
          }
-         return replacedField;
+         else if (def instanceof BodyTypeDeclaration) {
+            return updateInnerType((BodyTypeDeclaration) def, ctx, updateInstances, info, false);
+         }
+         else if (def instanceof PropertyAssignment) {
+            Object replacedObj = updateProperty((PropertyAssignment) def, ctx, true, info);
+            Statement replacedStatement;
+            if (replacedObj instanceof VariableDefinition)
+               replacedStatement = ((VariableDefinition) replacedObj).getDefinition();
+            else
+               replacedStatement = (Statement) replacedObj;
+            return replacedStatement;
+         }
+         else {
+            System.err.println("*** Unrecognized def in update body statement");
+         }
       }
-      else if (def instanceof BodyTypeDeclaration) {
-         return updateInnerType((BodyTypeDeclaration) def, ctx, updateInstances, info, false);
-      }
-      else if (def instanceof PropertyAssignment) {
-         Object replacedObj = updateProperty((PropertyAssignment) def, ctx, true, info);
-         Statement replacedStatement;
-         if (replacedObj instanceof VariableDefinition)
-            replacedStatement = ((VariableDefinition) replacedObj).getDefinition();
-         else
-            replacedStatement = (Statement) replacedObj;
-         return replacedStatement;
-      }
-      else {
-         System.err.println("*** Unrecognized def in update body statement");
+      finally {
+         if (lockAcquired)
+            sys.releaseDynLock(false);
       }
       return null;
    }

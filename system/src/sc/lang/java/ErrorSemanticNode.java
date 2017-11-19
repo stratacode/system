@@ -38,4 +38,8 @@ public abstract class ErrorSemanticNode extends JavaSemanticNode {
       errorArgs = null;
    }
 
+   public boolean hasErrors() {
+      return errorArgs != null;
+   }
+
 }

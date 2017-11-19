@@ -7,6 +7,7 @@ package sc.lang;
 import sc.bind.Bind;
 import sc.bind.DestinationListener;
 import sc.dyn.DynUtil;
+import sc.dyn.IDynObject;
 import sc.dyn.IScheduler;
 import sc.lang.sc.PropertyAssignment;
 import sc.lang.sc.EndTypeDeclaration;
@@ -26,12 +27,44 @@ import java.util.*;
 import sc.dyn.ScheduledJob;
 
 @sc.obj.Exec(runtimes="java")
-public abstract class AbstractInterpreter extends EditorContext implements IScheduler, Runnable {
+public abstract class AbstractInterpreter extends EditorContext implements IScheduler, Runnable, IDynObject {
    static SCLanguage vlang = SCLanguage.INSTANCE;
 
    String inputFileName = null; // Defaults to use standard input
 
    StringBuffer pendingInput = new StringBuffer();
+
+   // The script starts out in the context of a global 'cmd' object which is a dynamic type so you can add fields, etc.
+   // in a dynamic context even if you are running a fully compiled application.  Inner types however are not added to this
+   // type - in that case, you are defining real types in the application.
+   DynObject dynObj;
+
+   public class CmdClassDeclaration extends ClassDeclaration {
+      public boolean isDynamicStub(boolean includeExt) {
+         return false;
+      }
+
+      public Class getCompiledClass() {
+         return AbstractInterpreter.this.getClass();
+      }
+   }
+
+   public ClassDeclaration cmdObject = new CmdClassDeclaration();
+   {
+      cmdObject.fullTypeName = cmdObject.typeName = "cmd";
+      cmdObject.operator = "class"; // If we use object, this becomes a 'rooted object' in the sync system and we won't construct it during sync
+      cmdObject.setProperty("extendsType", ClassType.create(getClass().getTypeName()));
+      cmdObject.setDynamicType(true);
+      // We used to not have this scriptObject and disallowed classBodyDeclarations from the top-level - as though you were editing a Java file.  But when writing scripts,
+      // it's really useful to be able to just define fields, and methods, and not save them - you are already authoring them in the script.  So now, the idea is that we have
+      // a 'cmd' object which stores all of the script stuff which is thrown away.  The downside is that we may need some way to limit references to persistent edited code to
+      // these 'cmd' fields, methods, etc since they won't be there unless the script is running.
+      currentTypes.add(cmdObject);
+
+      // TODO: will there ever be more than one?
+      DynUtil.addDynInstance("cmd", this);
+      dynObj = new DynObject(cmdObject);
+   }
 
    public static String USAGE =  "Command Line Interface Help:\n\n" +
            "In the command line editor, you can examine and modify your application like an ordinarily REPL (read-eval-print-loop).  There are two modes - in 'script mode' you essentially have a management UI for your application from the command line.  Navigate the object hierarchy," +
@@ -101,6 +134,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    public AbstractInterpreter(LayeredSystem sys, boolean consoleDisabled, String inputFileName) {
       super(sys);
+      cmdObject.parentNode = getModel();
       this.inputFileName = inputFileName;
       this.consoleDisabled = consoleDisabled;
       cmdlang.initialize();
@@ -160,7 +194,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
          String basePrompt = getSyncPromptStr() + " -> ";
 
-         if (currentTypes.size() == 0) {
+         if (currentTypes.size() == 1) {
             String prefix = "";
             if (displayLayer) {
                prefix = currentLayer == null ? "<no layer>" : (currentLayer.getLayerName() + (getPrefix() == null ? "" : ":" + getPrefix()));
@@ -214,7 +248,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    }
 
    protected Parselet getParselet() {
-      if (currentTypes.size() == 0)
+      if (currentTypes.size() == 1)
          return cmdlang.topLevelCommands;
       else
          return cmdlang.typeCommands;
@@ -315,7 +349,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       }
       else if (statement instanceof BodyTypeDeclaration) {
          BodyTypeDeclaration type = (BodyTypeDeclaration) statement;
-         BodyTypeDeclaration parentType = getCurrentType();
+         BodyTypeDeclaration parentType = getCurrentType(false);
          Layer layer = currentLayer;
 
          if (layer == null) {
@@ -577,7 +611,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
             ParseUtil.initAndStartComponent(assign);
 
-            if (!assign.anyError() && performUpdatesToSystem(system) && !ignoreRemoteStatement(system, assign)) {
+            if (!assign.hasErrors() && performUpdatesToSystem(system) && !ignoreRemoteStatement(system, assign)) {
                if (edit) {
                   // synchronization done inside updateProperty - we grab the lock to update the model but release it to update the property in case that triggers events back into the system
                   JavaSemanticNode newDefinition = current.updateProperty(assign, execContext, !skipEval, null);
@@ -594,7 +628,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                   System.err.println("*** No object for property update: " + current.typeName + ". " + assign.propertyName);
             }
 
-            if (!assign.anyError() && sync && syncSystems != null && currentLayer != null && !skipEval) {
+            if (!assign.hasErrors() && sync && syncSystems != null && currentLayer != null && !skipEval) {
                boolean any = false;
                for (LayeredSystem peerSys:syncSystems) {
                   if (performUpdatesToSystem(peerSys)) {
@@ -637,21 +671,23 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       else if (statement instanceof TypedDefinition) {
          BodyTypeDeclaration current = currentTypes.get(currentTypes.size()-1);
 
-         try {
-            system.acquireDynLock(false);
-            // We do not generate unless the component is started
-            if (!model.isStarted())
-               ParseUtil.initAndStartComponent(model);
+         // We do not generate unless the component is started
+         if (!model.isStarted())
+            ParseUtil.initAndStartComponent(model);
+         TypedDefinition def = (TypedDefinition) statement;
 
-            current.updateBodyStatement((TypedDefinition)statement, execContext, true, null);
+         def.parentNode = current;
+         ParseUtil.initAndStartComponent(statement);
+         if (!def.hasErrors()) {
+            current.updateBodyStatement(def, execContext, true, null);
          }
-         finally {
-            system.releaseDynLock(false);
-         }
+         else
+            System.err.println("*** Errors resolving: " + def.getNodeErrorText());
+         // TODO: handle other systems here
          addChangedModel(pendingModel);
       }
       else if (statement instanceof EndTypeDeclaration) {
-         if (currentTypes.size() == 0) {
+         if (currentTypes.size() == 1) {
             if (path == null || path.equals("")) {
                if (currentLayer == null)
                   System.err.println("No current layer to go up");
@@ -675,7 +711,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             }
             else if (oldType.getDeclarationType() != DeclarationType.UNKNOWN)
                execContext.popStaticFrame();
-            if (currentTypes.size() == 0)
+            if (currentTypes.size() == 1)
                clearPendingModel();
             origIndent--;
             markCurrentTypeChanged();
@@ -969,6 +1005,14 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          refresh();
    }
 
+   public void updateLayerState() {
+      super.updateLayerState();
+      if (pendingModel != null && pendingModel.layer != currentLayer) {
+         clearPendingModel();
+         initPendingModel();
+      }
+   }
+
    public void setCurrentType(BodyTypeDeclaration newType) {
       super.setCurrentType(newType);
       if (pendingModel != null) {
@@ -1125,7 +1169,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    }
 
    public void list() {
-      if (currentTypes.size() == 0) {
+      if (currentTypes.size() == 1) {
          listLayers();
       }
       else {
@@ -1337,7 +1381,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    /** Move down the layer stack */
    public void down() {
-      if (currentTypes.size() == 0) {
+      if (currentTypes.size() == 1) {
          int pos;
          if (currentLayer == null) {
             System.err.println("No current layer");
@@ -1361,7 +1405,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    /** Move up the layer stack */
    public void up() {
-      if (currentTypes.size() == 0) {
+      if (currentTypes.size() == 1) {
          int pos;
          if (currentLayer == null) {
             System.err.println("No current layer");
@@ -1428,4 +1472,41 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    }
 
    abstract void resetInput();
+
+   // ---- Begin the DynObject redirection boilerplate
+   public Object getProperty(String propName) {
+      return dynObj.getPropertyFromWrapper(this, propName);
+   }
+   public Object getProperty(int propIndex) {
+      return dynObj.getPropertyFromWrapper(this, propIndex);
+   }
+   public <_TPROP> _TPROP getTypedProperty(String propName, Class<_TPROP> propType) {
+      return (_TPROP) dynObj.getPropertyFromWrapper(this, propName);
+   }
+   public void setProperty(String propName, Object value, boolean setField) {
+      dynObj.setPropertyFromWrapper(this, propName, value, setField);
+
+   }
+   public void setProperty(int propIndex, Object value, boolean setField) {
+      dynObj.setProperty(propIndex, value, setField);
+   }
+   public Object invoke(String methodName, String paramSig, Object... args) {
+      return dynObj.invokeFromWrapper(this, methodName, paramSig, args);
+   }
+   public Object invoke(int methodIndex, Object... args) {
+      return dynObj.invokeFromWrapper(this, methodIndex, args);
+   }
+   public Object getDynType() {
+      return dynObj.getDynType();
+   }
+   public void setDynType(Object type) {
+      dynObj.setTypeFromWrapper(this, type);
+   }
+   public void addProperty(Object propType, String propName, Object initValue) {
+      dynObj.addProperty(propType, propName, initValue);
+   }
+   public boolean hasDynObject() {
+      return dynObj.hasDynObject();
+   }
+   // ---- End DynObject redirection boilerplate
 }

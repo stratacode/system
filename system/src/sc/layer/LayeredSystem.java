@@ -3546,6 +3546,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       ArrayList<String> explicitDynLayers = null;
       String scInstallDir = null;
       String mainDir = null;
+      boolean headlessSet = false;
 
       for (int i = 0; i < args.length; i++) {
          restartArg = true;
@@ -3676,6 +3677,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   }
                   else if (opt.equals("nh")) {
                      options.headless = true;
+                     headlessSet = true;
                      break;
                   }
                   else if (opt.equals("ni"))
@@ -3832,6 +3834,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   else
                      usage("Unrecognized options: " + opt, args);
                   break;
+               case 'y':
+                  if (opt.equals("yh"))
+                     headlessSet = true;
+                  break;
                case 'u':
                   if (opt.equals("u"))
                      options.updateSystem = true;
@@ -3938,8 +3944,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       // When testing we don't want the normal run - open page to open - it's up to the test script to decide what to open to test
-      if (options.testMode)
+      if (options.testMode) {
          options.openPageAtStartup = false;
+         // By default test modes should not display unless you use -yh
+         if (!headlessSet)
+            options.headless = true;
+      }
 
       PerfMon.start("main", true, true);
 
@@ -13204,16 +13214,24 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
             if (create) {
                if (rootType.getDeclarationType() == DeclarationType.OBJECT) {
-                  String scopeName = rootType.getScopeName();
+                  String scopeName = rootType.getInheritedScopeName();
                   if (scopeName == null || scopeName.equals("global"))
                      nextObj = rootType.createInstance();
                   else {
+                     String typeName = rootType.getFullTypeName();
                      ScopeDefinition scope = ScopeDefinition.getScopeByName(scopeName);
-                     ScopeContext ctx = scope.getScopeContext(true);
-                     if (ctx == null)
+                     ScopeContext scopeCtx = scope == null ? null : scope.getScopeContext(true);
+                     if (scopeCtx == null)
                         return null;
                      else {
-                        System.err.println("*** TODO: need to create dynamic type: " + rootType + " with scope: " + scopeName);
+                        Object inst = scopeCtx.getValue(typeName);
+                        if (inst == null) {
+                           inst = ModelUtil.getObjectInstance(rootType);
+                           scopeCtx.setValue(typeName, inst);
+                           // Register this instance by name but don't initialize it.
+                           SyncManager.registerSyncInst(inst, typeName, scope.scopeId, false);
+                        }
+                        nextObj = inst;
                      }
                   }
                   if (nextObj == null)

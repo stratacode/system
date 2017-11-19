@@ -980,6 +980,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (res != null)
          return res;
 
+      // Yikes - this returns an instance when we are expecting a type!
+      // TODO: can we fold this into a definesMember for cmdObject and just configure it's 'getInstance' method to return the interpreter?
       if (commandInterpreter != null && typeName.equals("cmd"))
          return commandInterpreter;
 
@@ -2146,7 +2148,15 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                return type;
          }
       }
-      return super.definesMember(name, mtype, refType, ctx, skipIfaces, isTransformed);
+      Object res = super.definesMember(name, mtype, refType, ctx, skipIfaces, isTransformed);
+      if (res != null)
+         return res;
+      if (commandInterpreter != null) {
+         res = commandInterpreter.cmdObject.definesMember(name, mtype, refType, ctx, skipIfaces, nonTransformedModel != null);
+         if (res != null)
+            return res;
+      }
+      return null;
    }
 
    public Object findMethod(String name, List<? extends Object> params, Object fromChild, Object refType, boolean staticOnly, Object inferredType) {
@@ -2187,7 +2197,12 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                return v;
          }
       }
-      return super.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
+      Object res = super.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
+      if (res != null)
+         return res;
+      if (commandInterpreter != null)
+         return commandInterpreter.cmdObject.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
+      return null;
    }
 
    public boolean needsCompile() {
@@ -2450,6 +2465,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
     */
    public void setCommandInterpreter(AbstractInterpreter interp) {
       commandInterpreter = interp;
+      // We will just use the latest model here as the root
+      interp.cmdObject.parentNode = this;
+      ParseUtil.initAndStartComponent(interp.cmdObject);
       JavaModel replacedModel = resolveModel();
       if (replacedModel != this)
          replacedModel.setCommandInterpreter(interp);

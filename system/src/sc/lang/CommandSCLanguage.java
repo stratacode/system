@@ -47,8 +47,8 @@ public class CommandSCLanguage extends SCLanguage {
     */
 
    public Sequence topLevelCommands = new Sequence("(,.,)", spacing,
-           new OrderedChoice("([],[],[],[],[],[])", REPEAT | OPTIONAL, reqPackageDeclaration, reqImport, startClassDeclaration,
-                             startModifyDeclaration, expressionStatement, endTypeDeclaration),
+           new OrderedChoice("([],[],[],[],[],[],[])", REPEAT | OPTIONAL, reqPackageDeclaration, reqImport, startClassDeclaration,
+                             startModifyDeclaration, reqClassBodyDeclaration, expressionStatement, endTypeDeclaration),
            new Symbol(EOF));
 
    public Sequence typeCommands = new Sequence("(,.,)", spacing,
