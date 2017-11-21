@@ -13140,7 +13140,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public static class NullClassSentinel {
    }
 
-   public Object resolveRuntimeName(String name, boolean create) {
+
+   public Object resolveRuntimeName(String name, boolean create, boolean returnTypes) {
       if (systemCompiled) {
          Object c = getClassWithPathName(name);
          if (c != null) {
@@ -13151,7 +13152,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                RTypeUtil.loadClass(cl.getClassLoader(), name, true);
 
                if (IDynObject.class.isAssignableFrom((Class) cl)) {
-                  Object srcName = resolveName(name, create);
+                  Object srcName = resolveName(name, create, true);
                   if (srcName != null)
                      return srcName;
                }
@@ -13159,15 +13160,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             return c;
          }
       }
-      return resolveName(name, create);
+      return resolveName(name, create, returnTypes);
    }
 
-   public Object resolveName(String name, boolean create) {
+   public Object resolveName(String name, boolean create, boolean returnTypes) {
       // Using last layer here as the refLayer so we pick up active objects
-      return resolveName(name, create, lastLayer, false);
+      return resolveName(name, create, lastLayer, false, returnTypes);
    }
 
-   public Object resolveName(String name, boolean create, Layer refLayer, boolean layerResolve) {
+   public Object resolveName(String name, boolean create, Layer refLayer, boolean layerResolve, boolean returnTypes) {
       Object val = globalObjects.get(name);
       if (val != null)
          return val;
@@ -13247,8 +13248,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             nextClassObj = getClassWithPathName(rootName);
             Class nextClass = nextClassObj instanceof Class ? (Class) nextClassObj : null;
             // Look for pkg.Type.getType() if it exists
-            if (nextClass != null)
-               nextObj = TypeUtil.getPossibleStaticValue(nextClass, CTypeUtil.decapitalizePropertyName(CTypeUtil.getClassName(rootName)));
+            if (nextClass != null) {
+               try {
+                  nextObj = TypeUtil.getPossibleStaticValue(nextClass, CTypeUtil.decapitalizePropertyName(CTypeUtil.getClassName(rootName)));
+                  if (nextObj != TypeUtil.NO_PROPERTY_SENTINEL)
+                     return nextObj;
+                  else
+                     nextObj = null;
+               }
+               // Not a static property
+               catch (IllegalArgumentException exc) {
+               }
+            }
             if (nextClass == null) {
                if (create) {
                   // Only try to create the instance if the root type is an object.
@@ -13297,7 +13308,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             } while (nextIx != -1);
          }
 
-         Object result = nextObj != null ? nextObj : nextClassObj;
+         Object result = nextObj != null ? nextObj : (returnTypes ? nextClassObj : null);
 
          ScopeDefinition scope = td.getScopeDefinition();
          if (scope == null || scope.isGlobal())
@@ -13818,7 +13829,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return null;
       Object[] res = new Object[tgms.size()];
       for (int i = 0; i < res.length; i++) {
-         res[i] = resolveName(tgms.get(i).typeName, true);
+         res[i] = resolveName(tgms.get(i).typeName, true, true);
       }
       return res;
    }

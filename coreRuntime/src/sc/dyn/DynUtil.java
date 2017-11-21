@@ -1171,9 +1171,9 @@ public class DynUtil {
          ((IAltComponent) comp)._start();
    }
 
-   public static Object resolveName(String name, boolean create) {
+   public static Object resolveName(String name, boolean create, boolean returnTypes) {
       if (dynamicSystem != null)
-         return dynamicSystem.resolveRuntimeName(name, create);
+         return dynamicSystem.resolveRuntimeName(name, create, returnTypes);
       else {
          // TODO: this is not right!
          Object type = findType(name);

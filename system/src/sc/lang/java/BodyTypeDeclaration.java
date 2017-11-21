@@ -680,7 +680,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                  // Need addExternalReference for "findType" which uses this to lookup a ClassType.  Maybe need to propagate addExtReference through
                  // findType and definesMemberInternal?   This should only be true when the definesMemberInternal originates from a node within the
                  // current model.
-                 (objDecl = model.resolveName(extendsTypeName, false, true)) != null)
+                 (objDecl = model.resolveName(extendsTypeName, false, true, true)) != null)
             res = ModelUtil.definesMember(objDecl.getClass(), name, mtype, refType, ctx, skipIfaces, isTransformed, getLayeredSystem());
       }
       if (res != null)
@@ -5398,12 +5398,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    private static Object getVariableInitValue(LayeredSystem sys, VariableDefinition varDef, ExecutionContext ctx) {
       Object initValue = null;
-      try {
-         initValue = varDef.getInitialValue(ctx);
-      }
+      initValue = varDef.getInitialValue(ctx);
+      // Don't want to catch the error here - let it bubble up so we catch it higher up - like in the eval of the statement or updateType call
+      //try {
+      /*
       catch (RuntimeException exc) {
          sys.setStaleCompiledModel(true, "Runtime error adding new field: ", varDef.variableName, " for instance: ", DynUtil.getInstanceName(ctx.getCurrentObject()));
       }
+      */
       return initValue;
    }
 
@@ -5415,14 +5417,15 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if (insts != null) {
             while (insts.hasNext()) {
                Object inst = insts.next();
+               Object initValue = null;
                ctx.pushCurrentObject(inst);
                try {
-                  Object initValue = getVariableInitValue(sys, varDef, ctx);
-                  // Add the field even if we get an RTE here
-                  if (inst instanceof IDynObject)
-                      ((IDynObject) inst).addProperty(varDef.getTypeDeclaration(), varDef.variableName, initValue);
+                  initValue = getVariableInitValue(sys, varDef, ctx);
                }
                finally {
+                  // Add the field even if we get an RTE trying to evaluate the value... perhaps ideally case, we could cleanly roll back the add of the field but that's not the case now so we add it with null.
+                  if (inst instanceof IDynObject)
+                     ((IDynObject) inst).addProperty(varDef.getTypeDeclaration(), varDef.variableName, initValue);
                   ctx.popCurrentObject();
                }
             }

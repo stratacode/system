@@ -109,7 +109,7 @@ public interface IDynamicSystem {
 
    String getInnerTypeName(Object type);
 
-   Object resolveRuntimeName(String name, boolean create);
+   Object resolveRuntimeName(String name, boolean create, boolean returnTypes);
 
    Object findType(String typeName);
 

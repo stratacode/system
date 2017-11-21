@@ -584,7 +584,7 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
          return TemplateLanguage.this.evalToString;
       }
 
-      public Object resolveName(String name, boolean create) {
+      public Object resolveName(String name, boolean create, boolean returnTypes) {
          Object t = template.findTypeDeclaration(name, false);
          if (t instanceof ClassDeclaration) {
             JavaModel model = ((ClassDeclaration) t).getJavaModel();
@@ -592,7 +592,7 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
                return model;
             }
          }
-         return template.resolveName(name, create);
+         return template.resolveName(name, create, returnTypes);
       }
    }
 

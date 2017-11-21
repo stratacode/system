@@ -28,6 +28,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.util.*;
 
+import static sc.lang.java.IdentifierExpression.IdentifierType.BoundObjectName;
+
 public class IdentifierExpression extends ArgumentsExpression {
    public List<IString> identifiers;
    public NewExpression innerCreator;
@@ -308,7 +310,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   }
                }
                if (boundTypes[0] instanceof ITypeDeclaration) {
-                  idTypes[0] = IdentifierType.BoundObjectName;
+                  idTypes[0] = BoundObjectName;
                }
                // TODO: When this identifier expression is inside of of a Template, the enclType is the rootType but this expression still lives in the
                // template hierarchy.  So when it does the findMethod inside of the Template it never checks the root type.  If the enclType is the Template
@@ -365,7 +367,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   boundTypes[0] = typeObj;
                }
                else if (typeObj != null && ModelUtil.isObjectType(typeObj)) {
-                  idTypes[0] = IdentifierType.BoundObjectName;
+                  idTypes[0] = BoundObjectName;
                   boundTypes[0] = typeObj;
                   if (varObj != null && varObj instanceof IVariable) {
                      IVariable var = (IVariable) varObj;
@@ -419,7 +421,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                      if (propObj instanceof ParamTypedMember)
                         varObj = propObj = ((ParamTypedMember) propObj).getMemberObject();
                      if (propObj != null && ModelUtil.isObjectType(propObj))
-                        idTypes[0] = IdentifierType.BoundObjectName;
+                        idTypes[0] = BoundObjectName;
                      else {
                         boolean needsGetSet = isAssignment ? ModelUtil.hasSetMethod(propObj) : ModelUtil.isPropertyGetSet(propObj);
                         if (!useExtensions) {
@@ -458,7 +460,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                     ((model = getJavaModel()) != null && (boundTypes[0] = model.findTypeDeclaration(firstIdentifier, true)) != null)) {
                if (boundTypes[0] instanceof ITypeDeclaration) {
                   if (((ITypeDeclaration)boundTypes[0]).getDeclarationType() == DeclarationType.OBJECT)
-                     idTypes[0] = IdentifierType.BoundObjectName;
+                     idTypes[0] = BoundObjectName;
                      // If we can resolve this identifier through the custom resolver, it's an object.  This handles class types which are top-level types like
                      // pages etc. which are created as objects.
                   else if (model == null || model.customResolver == null || model.customResolver.resolveType(model.getPackagePrefix(), firstIdentifier, false, null) == null)
@@ -469,7 +471,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                // TODO: detect "object" types from the class
                else if (boundTypes[0] instanceof Class || boundTypes[0] instanceof CFClass) {
                   if (ModelUtil.isObjectType(boundTypes[0]))
-                     idTypes[0] = IdentifierType.BoundObjectName;
+                     idTypes[0] = BoundObjectName;
                   else
                      idTypes[0] = IdentifierType.BoundTypeName;
                }
@@ -528,12 +530,12 @@ public class IdentifierExpression extends ArgumentsExpression {
                            // of another parent, since the parent will need transforming too.
                            else {
                               idTypes[k] = ModelUtil.isObjectType(rootType) ?
-                                      IdentifierType.BoundObjectName : IdentifierType.BoundTypeName;
+                                      BoundObjectName : IdentifierType.BoundTypeName;
                               boundTypes[k] = rootType;
                            }
                         }
                         idTypes[k] = ModelUtil.isObjectType(resolvedType) ?
-                                IdentifierType.BoundObjectName : IdentifierType.BoundTypeName;
+                                BoundObjectName : IdentifierType.BoundTypeName;
 
                         // Explicitly disallow a.b.c where c is a class unless it is an object
                         if (k == sz-1 && !allowClassBinding() && idTypes[k] == IdentifierType.BoundTypeName) {
@@ -589,7 +591,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                // If we resolved the last entry as an object but its a static member, treat that as a class, not an object.
                // It's also a type if it's an unbound method name at that spot - i.e. ObjectType.getObjectType() where getObjectType() won't exist as a method
                int last;
-               if (i > 0 && idTypes[last = (i - 1)] == IdentifierType.BoundObjectName && (isStaticTarget(i) || idTypes[i] == IdentifierType.UnboundMethodName)) {
+               if (i > 0 && idTypes[last = (i - 1)] == BoundObjectName && (isStaticTarget(i) || idTypes[i] == IdentifierType.UnboundMethodName)) {
                   idTypes[last] = IdentifierType.BoundTypeName;
                }
             }
@@ -783,7 +785,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          ret = IdentifierType.EnumName;
       else if (boundType instanceof ITypeDeclaration) {
          if (((ITypeDeclaration)boundType).getDeclarationType() == DeclarationType.OBJECT)
-            ret = IdentifierType.BoundObjectName;
+            ret = BoundObjectName;
          else
             ret = IdentifierType.BoundTypeName;
       }
@@ -1166,7 +1168,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       else if (idType == IdentifierExpression.IdentifierType.MethodInvocation) {
          checkForDynMethod(boundType, referenceType, (Expression) expr);
       }
-      else if (idType == IdentifierExpression.IdentifierType.BoundObjectName) {
+      else if (idType == BoundObjectName) {
          if (boundType instanceof BodyTypeDeclaration)
             ModelUtil.markNeedsDynAccess(boundType);
          // We can have an object which is in compiled form, not anything we need to do
@@ -1410,7 +1412,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             if (methVar != null) {
                // getX() can return a ClassDeclaration in some cases
                if (methVar instanceof ITypeDeclaration) {
-                  idTypes[i] = IdentifierType.BoundObjectName;
+                  idTypes[i] = BoundObjectName;
                }
                else {
                   methVar = parameterizeMethod(expr, methVar, currentTypeDecl, inferredType, arguments, methodTypeArgs);
@@ -1428,7 +1430,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   if (newCurrentType != null && newCurrentType != currentType) {
                      methVar = ModelUtil.definesMethod(newCurrentType, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs, enclosingType.getLayeredSystem());
                      if (methVar != null) {
-                        idTypes[i] = methVar instanceof ITypeDeclaration ? IdentifierType.BoundObjectName : IdentifierType.MethodInvocation;
+                        idTypes[i] = methVar instanceof ITypeDeclaration ? BoundObjectName : IdentifierType.MethodInvocation;
                         boundTypes[i] = methVar;
                         // Now the "super" really refers to this type.  This is important to get right for JS conversion, so it points to the right type.
                         boundTypes[i-1] = ModelUtil.getEnclosingType(methVar);
@@ -1485,7 +1487,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   else {
                      if ((boundTypes[i] = currentTypeDecl.getInnerType(nextName, null)) != null) {
                         if (ModelUtil.getDeclarationType(boundTypes[i]) == DeclarationType.OBJECT)
-                           idTypes[i] = IdentifierType.BoundObjectName;
+                           idTypes[i] = BoundObjectName;
                         else
                            idTypes[i] = IdentifierType.BoundTypeName;
                      }
@@ -1736,8 +1738,14 @@ public class IdentifierExpression extends ArgumentsExpression {
       String varName = idents.get(i).toString();
       Object boundType = boundTypes[i];
       if (boundType != ArrayTypeDeclaration.LENGTH_FIELD && isStaticTarget(i)) {
-         // This will not look at extends types so can't use the current static type here (i.e. thisObj)
-         value = ModelUtil.getStaticPropertyValue(ModelUtil.getEnclosingType(boundType), varName);
+         Object enclType = ModelUtil.getEnclosingType(boundType);
+         // Better error for this case
+         if (idTypes[i] == BoundObjectName && enclType == null)
+            throw new NullPointerException("Null object: " + varName + " evaluating: " + this.toSafeLanguageString());
+         else {
+            // This will not look at extends types so can't use the current static type here (i.e. thisObj)
+            value = ModelUtil.getStaticPropertyValue(enclType, varName);
+         }
       }
       else if (thisObj instanceof IDynObject) {
          if (isDynGetMethod(i)) {
@@ -1770,6 +1778,9 @@ public class IdentifierExpression extends ArgumentsExpression {
       String methodName = null;
       boolean superMethod = false;
       boolean isType = false;
+
+      if (this.toString().equals("RemoteMethod.output()"))
+         System.out.println("***");
 
       ensureValidated();
       resolve();
@@ -1873,7 +1884,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   if (type == null)
                      value = null;
                   else
-                     value = ctx.resolveName(ModelUtil.getTypeName(type));
+                     value = ctx.resolveName(ModelUtil.getTypeName(type), true);
                   isType = true;
                }
                break;
@@ -1922,7 +1933,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   value = ModelUtil.getRuntimeType(boundTypes[0]);
                   break;
                }
-               value = evalRootObjectValue(ctx);
+               value = evalRootObjectValue(ctx, false);
                if (value != null)
                   break;
                // else FALL THROUGH
@@ -2288,7 +2299,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             break;
 
          case BoundObjectName:
-            obj = evalRootObjectValue(ctx);
+            obj = evalRootObjectValue(ctx, false);
             if (obj != null)
                break;
             // else FALL THROUGH
@@ -2499,7 +2510,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                       * the containing classes identifier.
                      */
                      if (!enclosingTypeExtends(accessClass)) {
-                        addIdentifier(i, ModelUtil.getClassName(accessClass), IdentifierType.BoundObjectName, type);
+                        addIdentifier(i, ModelUtil.getClassName(accessClass), BoundObjectName, type);
                         sz++;
                         i++;
                      }
@@ -3031,7 +3042,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                }
                v.setProperty("arguments", arguments);
             }
-            else if (idTypes[j] == IdentifierType.BoundObjectName || idTypes[j] == IdentifierType.GetVariable ||
+            else if (idTypes[j] == BoundObjectName || idTypes[j] == IdentifierType.GetVariable ||
                      idTypes[j] == IdentifierType.IsVariable ||
                      (idTypes[j] == IdentifierType.FieldName && ModelUtil.needsGetSet(boundTypes[j]) && !isGetSetConversionDisabled(j) && (!isAssignment || j != sz-1 || this instanceof ArrayElementExpression))) {
                boolean subDynamic = ModelUtil.isDynamicProperty(boundTypes[j]);
@@ -3600,7 +3611,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             srcObj = pType;
          }
          else
-            srcObj = ctx.resolveName(ModelUtil.getTypeName(srcType));
+            srcObj = ctx.resolveName(ModelUtil.getTypeName(srcType), true);
       }
       else {
          /**
@@ -3690,7 +3701,7 @@ public class IdentifierExpression extends ArgumentsExpression {
 
    /** Determines whether the first part of an object reference is part of a "this" expression or not */
    private boolean isThisObjectReference() {
-      assert idTypes[0] == IdentifierType.BoundObjectName;
+      assert idTypes[0] == BoundObjectName;
       Object enclType = ModelUtil.getEnclosingType(boundTypes[0]);
       return enclType != null && !ModelUtil.hasModifier(boundTypes[0], "static") && !(enclType instanceof Template);
    }
@@ -3699,10 +3710,10 @@ public class IdentifierExpression extends ArgumentsExpression {
     * Retrieves the value of a top level object reference.  Could be static or a property of one of the objects
     * on the "this" stack of the current definition.
     */
-   private Object evalRootObjectValue(ExecutionContext ctx) {
+   private Object evalRootObjectValue(ExecutionContext ctx, boolean returnTypes) {
       Object enclType = ModelUtil.getEnclosingType(boundTypes[0]);
       if (!isThisObjectReference()) {
-         return ctx.resolveName(ModelUtil.getTypeName(boundTypes[0]));
+         return ctx.resolveName(ModelUtil.getTypeName(boundTypes[0]), returnTypes);
       }
       else {
          return evalThisReference(ModelUtil.getRuntimeType(enclType), ctx);
@@ -3763,7 +3774,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             // If there's no enclosing type for our resolved object, it must be a global object reference, not
             // relative to "this".  So we just resolve the type name.
             if (boundTypes[0] != null && ModelUtil.getEnclosingType(boundTypes[0]) == null) {
-               srcObj = ctx.resolveName(ModelUtil.getTypeName(boundTypes[0]));
+               srcObj = ctx.resolveName(ModelUtil.getTypeName(boundTypes[0]), true);
                if (srcObj == null)
                   System.out.println("*** Can't resolve object instance for binding expression");
                startPropertyIndex = 1;
@@ -3791,14 +3802,14 @@ public class IdentifierExpression extends ArgumentsExpression {
                   if (idTypes[pi] == IdentifierType.BoundTypeName) {
                      startPropertyIndex = pi+1;
                      if (pi == idents.size()-1 || (idTypes[pi+1] != IdentifierType.MethodInvocation && idTypes[pi+1] != IdentifierType.RemoteMethodInvocation))
-                        srcObj = ctx.resolveName(getIdentifierPathName(startPropertyIndex));
+                        srcObj = ctx.resolveName(getIdentifierPathName(startPropertyIndex), true);
                      else {
                         srcObj = null;
                      }
                   }
                   else {
                      startPropertyIndex = pi;
-                     srcObj = ctx.resolveName(getIdentifierPathName(pi+1));
+                     srcObj = ctx.resolveName(getIdentifierPathName(pi+1), true);
                   }
                   break;
                }

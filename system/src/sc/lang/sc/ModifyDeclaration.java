@@ -501,10 +501,10 @@ public class ModifyDeclaration extends TypeDeclaration {
                TypeDeclaration enclType = getEnclosingType();
                // If this is the top-level type in the layer, resolve it as a layer
                if (thisModel != null && thisModel.isLayerModel && enclType == null) {
-                  Object obj = thisModel.resolveName(fullTypeName, false);
+                  Object obj = thisModel.resolveName(fullTypeName, false, true);
                   // Originally the layer is initially registered under its type name - it gets renamed once after init
                   if (obj == null)
-                     obj = thisModel.resolveName(typeName, false);
+                     obj = thisModel.resolveName(typeName, false, true);
                   if (obj == this)
                      obj = null;
                   if (obj instanceof Layer) {
@@ -1569,7 +1569,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       // Special initialization for layer instances
       else {
          JavaModel m = getJavaModel();
-         inst = m.resolveName(CTypeUtil.prefixPath(m.getPackagePrefix(), typeName), false);
+         inst = m.resolveName(CTypeUtil.prefixPath(m.getPackagePrefix(), typeName), false, true);
          if (inst == null) {
             if (m.isLayerModel)
                throw new IllegalArgumentException("Layer definition file refers to: " + typeName + " which does not match it's path: " + getJavaModel().getSrcFile());
@@ -2692,7 +2692,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       Object inst = syncCtx.getObjectByName(typeName);
 
       if (inst == null) {
-         inst = ScopeDefinition.resolveName(typeName, true);
+         inst = ScopeDefinition.resolveName(typeName, true, true);
       }
       if (inst == null) {
          System.err.println("*** No object of name: " + typeName + " found in the current context to apply change: " + modelType);

@@ -548,7 +548,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                // Using origTypeName here - grabbed before we do the "a.b" to a as a parent of b" conversion.   type.typeName now will just be "b".
                // Only do this if the current object is the parent object - not if it's already been resolved from the selectedInstances array
                if (obj == null)
-                  obj = parentObj == null ? (checkCurrentObject ? system.resolveName(typeName, true) : null) : (hasCurrentObject ? DynUtil.getPropertyPath(parentObj, origTypeName) : null);
+                  obj = parentObj == null ? (checkCurrentObject ? system.resolveName(typeName, true, false) : null) : (hasCurrentObject ? DynUtil.getPropertyPath(parentObj, origTypeName) : null);
                execContext.pushCurrentObject(obj);
                pushed = true;
             }

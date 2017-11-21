@@ -2002,9 +2002,9 @@ public class SyncManager {
          if (inst == null && currentPackage != null)
             inst = getObjectByName(fullPathName = CTypeUtil.prefixPath(currentPackage, name), unwrap);
          if (inst == null) {
-            inst = ScopeDefinition.resolveName(name, true);
+            inst = ScopeDefinition.resolveName(name, true, false);
             if (inst == null && fullPathName != null) {
-               inst = ScopeDefinition.resolveName(fullPathName, true);
+               inst = ScopeDefinition.resolveName(fullPathName, true, false);
             }
          }
          if (inst != null) {
@@ -2101,7 +2101,7 @@ public class SyncManager {
    }
 
    public static boolean isSyncedPropertyForTypeName(String typeName, String propName) {
-      Object type = DynUtil.resolveName(typeName, false);
+      Object type = DynUtil.resolveName(typeName, false, true);
       if (type != null)
          return isSyncedProperty(type, propName);
       return false;
@@ -3015,7 +3015,7 @@ public class SyncManager {
       SyncContext defaultCtx = getDefaultSyncContext();
       Object obj = defaultCtx.getObjectByName(name, true);
       if (obj == null)
-         obj = DynUtil.resolveName(name, true);
+         obj = DynUtil.resolveName(name, true, false);
       return obj;
    }
 

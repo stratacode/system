@@ -299,14 +299,14 @@ public class ExecutionContext {
          if (res != null)
             return res;
       }
-      return resolveName(name);
+      return resolveName(name, true);
    }
 
-   public Object resolveName(String name) {
+   public Object resolveName(String name, boolean returnTypes) {
       if (resolver != null)
-         return resolver.resolveName(name, createObjects);
+         return resolver.resolveName(name, createObjects, returnTypes);
       if (system != null)
-         return system.resolveName(name, createObjects);
+         return system.resolveName(name, createObjects, returnTypes);
       return null;
    }
 

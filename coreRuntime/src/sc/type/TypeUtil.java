@@ -247,22 +247,21 @@ public class TypeUtil  {
          setProperty(parent, mapping, value);
    }
 
+   public static final String NO_PROPERTY_SENTINEL = "<no-property>";
+
    /**
     * Unfortunately during name resolution, there are times we need to test if a property exists.  This may mean
     * trying to access a real property without an object etc.  In these cases we swallow the exception.   If this
     * becomes a performance issue, we just need to add a variant to not throw the exception.
     */
    public static Object getPossibleStaticValue(Class parent, Object mapping) {
-      try {
-         if (mapping instanceof String) {
-            Object newMapping = getPropertyMapping(parent, (String) mapping, null, null);
-            if (newMapping == null)
-               return null;
-         }
-         return getStaticValue(parent, mapping);
+      if (mapping instanceof String) {
+         Object newMapping = getPropertyMapping(parent, (String) mapping, null, null);
+         if (newMapping == null)
+            return NO_PROPERTY_SENTINEL;
+         mapping = newMapping;
       }
-      catch (IllegalArgumentException exc) {}
-      return null;
+      return getStaticValue(parent, mapping);
    }
 
    public static Object getStaticValue(Class parent, Object mapping) {

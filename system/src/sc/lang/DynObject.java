@@ -218,7 +218,7 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
    }
 
    public static <T> T resolveName(String typeName, Class<T> valClass) {
-      return (T) LayeredSystem.getCurrent().resolveName(typeName, true);
+      return (T) LayeredSystem.getCurrent().resolveName(typeName, true, true);
    }
 
    public static TypeDeclaration getType(String typeName) {

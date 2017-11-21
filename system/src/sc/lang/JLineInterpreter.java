@@ -72,9 +72,14 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
                      statementProcessor.processStatement(this, result);
                   }
                   catch (Throwable exc) {
-                     System.err.println(exc);
+                     Object errSt = result;
+                     if (errSt instanceof List && ((List) errSt).size() == 1)
+                        errSt = ((List) errSt).get(0);
+                     System.err.println("Exception executing: " + errSt);
                      if (system.options.verbose)
                         exc.printStackTrace();
+                     else
+                        System.err.println(exc);
                   }
                }
                if (pendingInput.length() > 0) {

@@ -47,7 +47,7 @@ public class InstanceWrapper implements IObjectId {
          return theInstance;
 
       if (canCreate)
-         return theInstance = DynUtil.resolveName(typeName, true);
+         return theInstance = DynUtil.resolveName(typeName, true, false);
 
       return null;
    }

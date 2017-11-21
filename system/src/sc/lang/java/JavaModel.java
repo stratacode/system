@@ -1836,15 +1836,15 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return super.toLanguageString();
    }
 
-   public Object resolveName(String name, boolean create) {
-      return resolveName(name, create, create);
+   public Object resolveName(String name, boolean create, boolean returnTypes) {
+      return resolveName(name, create, create, returnTypes);
    }
 
    /**
-    * This is called when evaluating an expression and we want to evaluate an identifer expression.  It first
+    * This is called when evaluating an expression and we want to evaluate an identifier expression.  It first
     * looks for a local type in this file, then will go resolve a global one from the system.
     */
-   public Object resolveName(String name, boolean create, boolean addExternalReference) {
+   public Object resolveName(String name, boolean create, boolean addExternalReference, boolean returnTypes) {
       if (!initialized)
          return null;
       Object type = findType(name);
@@ -1853,19 +1853,21 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             TypeDeclaration td = (TypeDeclaration) type;
             if (!td.isLayerType) {
                if (ModelUtil.isObjectType(td)) {
-                  Object sysObj = layeredSystem != null ? layeredSystem.resolveName(name, create, getLayer(), isLayerModel) : null;
+                  Object sysObj = layeredSystem != null ? layeredSystem.resolveName(name, create, getLayer(), isLayerModel, returnTypes) : null;
                   if (sysObj != null)
                      return sysObj;
                   else
                      System.err.println("*** Object type has no globally registered instance");
                }
-               Class cl = td.getCompiledClass();
-               if (cl != null)
-                  return cl;
+               if (returnTypes) {
+                  Class cl = td.getCompiledClass();
+                  if (cl != null)
+                     return cl;
+               }
             }
          }
       }
-      Object sysObj = layeredSystem != null ? layeredSystem.resolveName(name, create, getLayer(), isLayerModel) : null;
+      Object sysObj = layeredSystem != null ? layeredSystem.resolveName(name, create, getLayer(), isLayerModel, returnTypes) : null;
       if (sysObj != null)
          return sysObj;
 
@@ -1881,7 +1883,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                return layer;
          }
       }
-      return findTypeDeclaration(name, addExternalReference);
+      if (returnTypes)
+         return findTypeDeclaration(name, addExternalReference);
+      return null;
    }
 
    public void addGlobalObject(String name, Object obj) {

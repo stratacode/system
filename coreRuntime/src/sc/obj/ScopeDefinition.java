@@ -125,7 +125,7 @@ public abstract class ScopeDefinition {
       return null;
    }
 
-   public static Object resolveName(String typeName, boolean create) {
+   public static Object resolveName(String typeName, boolean create, boolean returnTypes) {
       String rootName = typeName;
       String childPath = "";
       Object res = lookupName(typeName);
@@ -135,7 +135,7 @@ public abstract class ScopeDefinition {
          String parentName = CTypeUtil.getPackageName(rootName);
          childPath = CTypeUtil.prefixPath(CTypeUtil.getClassName(rootName), childPath);
          if (parentName != null) {
-            Object parentObj = resolveName(parentName, create);
+            Object parentObj = resolveName(parentName, create, returnTypes);
             if (parentObj != null) {
                String nextPath = childPath;
                Object value = parentObj;
@@ -192,7 +192,7 @@ public abstract class ScopeDefinition {
          rootName = parentName;
       } while (rootName != null);
 
-      return DynUtil.resolveName(typeName, create);
+      return DynUtil.resolveName(typeName, create, returnTypes);
    }
 
    public static ScopeDefinition getScopeByName(String scopeName) {
