@@ -1779,9 +1779,6 @@ public class IdentifierExpression extends ArgumentsExpression {
       boolean superMethod = false;
       boolean isType = false;
 
-      if (this.toString().equals("RemoteMethod.output()"))
-         System.out.println("***");
-
       ensureValidated();
       resolve();
 
@@ -3667,6 +3664,13 @@ public class IdentifierExpression extends ArgumentsExpression {
                      outerObj = DynObject.getParentInstance(srcObj);
                   srcObj = outerObj;
                } while (srcObj != null && !ModelUtil.isAssignableFrom(srcType,  pType = DynUtil.getType(srcObj)));
+            }
+            else {
+               // From the command line, we inherit properties from the commandInterpreter object
+               JavaModel model = expr.getJavaModel();
+               if (model.commandInterpreter != null && srcType == model.commandInterpreter.cmdObject) {
+                  return model.commandInterpreter;
+               }
             }
          }
       }

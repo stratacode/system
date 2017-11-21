@@ -523,11 +523,11 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          boolean hasCurrentObject = hasCurrentObject();
          boolean checkCurrentObject = parentType == null || hasCurrentObject;
 
+         Object parentObj = getCurrentObjectWithDefault();
+
          currentTypes.add(type);
 
          DeclarationType declType = type.getDeclarationType();
-
-         Object parentObj = getCurrentObjectWithDefault();
 
          if (type.getDefinesCurrentObject()) {
             boolean pushed = false;
@@ -898,7 +898,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    public Object getCurrentObjectWithDefault() {
       Object obj = getCurrentObject();
-      if (obj == null && currentTypes.size() > 0)
+      if (obj == null && currentTypes.size() > 1)
          obj = getDefaultCurrentObj(currentTypes.get(currentTypes.size()-1));
       return obj;
    }

@@ -69,7 +69,10 @@ public class EditorContext extends ClientEditorContext {
    HashMap<String,Object> selectedInstances = new HashMap<String,Object>();
 
    public Object getDefaultCurrentObj(Object type) {
-      Object obj = selectedInstances.get(ModelUtil.getTypeName(type));
+      if (type instanceof ClientTypeDeclaration)
+         type = ((ClientTypeDeclaration) type).getOriginal();
+      String typeName = ModelUtil.getTypeName(type);
+      Object obj = selectedInstances.get(typeName);
       if (obj == null) {
          // Also check the sub-types.  When inherit is true in particular, it makes sense to see if we've navigated
          // to a type from a sub-type.  If so, the current instance of that sub-type is the most relevant one for this
@@ -81,6 +84,18 @@ public class EditorContext extends ClientEditorContext {
                String subTypeName = subType.getFullTypeName();
                obj = selectedInstances.get(subTypeName);
             }
+         }
+      }
+
+      // Choose the singleton if there is one
+      if (obj == null) {
+         Iterator it = system.getInstancesOfTypeAndSubTypes(typeName);
+         if (it.hasNext()) {
+            Object inst = it.next();
+            return inst;
+         }
+         if (ModelUtil.isEnum(type)) {
+            return ModelUtil.getRuntimeEnum(type);
          }
       }
 

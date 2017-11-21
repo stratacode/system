@@ -1883,9 +1883,18 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                return layer;
          }
       }
-      if (returnTypes)
-         return findTypeDeclaration(name, addExternalReference);
-      return null;
+      if (!returnTypes && commandInterpreter == null)
+         return null;
+      type = findTypeDeclaration(name, addExternalReference);
+
+      // This implements the ability to refer to a non-static object in the command interpreter - either we select
+      // a singleton or the wizard may have chosen a default instance for this type.
+      if (commandInterpreter != null && type != null) {
+         sysObj = commandInterpreter.getDefaultCurrentObj(type);
+         if (sysObj != null)
+            return sysObj;
+      }
+      return type;
    }
 
    public void addGlobalObject(String name, Object obj) {
