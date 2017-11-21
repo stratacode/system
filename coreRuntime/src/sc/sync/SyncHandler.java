@@ -121,7 +121,7 @@ public class SyncHandler {
       }
       else {
          Type literalType;
-         if (changedObj instanceof String) {
+         if (changedObj instanceof String || changedObj instanceof StringBuilder) {
             literalType = Type.String;
          }
          else {

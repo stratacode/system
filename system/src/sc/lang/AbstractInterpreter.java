@@ -55,6 +55,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       cmdObject.operator = "class"; // If we use object, this becomes a 'rooted object' in the sync system and we won't construct it during sync
       cmdObject.setProperty("extendsType", ClassType.create(getClass().getTypeName()));
       cmdObject.setDynamicType(true);
+      cmdObject.liveDynType = true;
       // We used to not have this scriptObject and disallowed classBodyDeclarations from the top-level - as though you were editing a Java file.  But when writing scripts,
       // it's really useful to be able to just define fields, and methods, and not save them - you are already authoring them in the script.  So now, the idea is that we have
       // a 'cmd' object which stores all of the script stuff which is thrown away.  The downside is that we may need some way to limit references to persistent edited code to

@@ -3218,6 +3218,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       JavaModel model = SCModel.create(currentType.getJavaModel().getPackagePrefix(), root);
       model.setMergeDeclaration(false);
       model.setLayeredSystem(system);
+      // TODO: should we enable type errors if this is the selected runtime or do we always properly report them against the main runtime?
+      model.setDisableTypeErrors(true);
       modDecl.addBodyStatement(st);
       ParseUtil.initAndStartComponent(model);
       if (!st.execForRuntime(system))
