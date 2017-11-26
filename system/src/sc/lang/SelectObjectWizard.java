@@ -118,7 +118,7 @@ public class SelectObjectWizard extends CommandWizard {
          System.err.println(exc.getMessage());
          commandInterpreter.currentWizard = null;
       }
-      commandInterpreter.pendingInput = new StringBuffer();
+      commandInterpreter.pendingInput = new StringBuilder();
       PrintWriter recWriter;
       // Record these commands
       if ((recWriter = commandInterpreter.recordOutputWriter) != null) {

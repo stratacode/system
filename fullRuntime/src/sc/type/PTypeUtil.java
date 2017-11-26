@@ -384,7 +384,7 @@ public class PTypeUtil {
       }
    }
 
-   public static Object resolveMethod(Class resultClass, String methodName, String paramSig) {
+   public static Object resolveMethod(Class resultClass, String methodName, Object returnType, String paramSig) {
       return RTypeUtil.resolveMethod(resultClass, methodName, paramSig);
    }
 
@@ -1037,7 +1037,7 @@ public class PTypeUtil {
    }
 
    public static Object clone(Object o) {
-      Object meth = resolveMethod(o.getClass(), "clone", null);
+      Object meth = resolveMethod(o.getClass(), "clone", null, null);
       return invokeMethod(o, meth);
    }
 

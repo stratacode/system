@@ -255,7 +255,11 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor, Serializable 
       }
    }
 
-   public String transformStatement(BodyTypeDeclaration type, Object inst, Statement expr) {
+   public Object invokeRemoteStatement(BodyTypeDeclaration type, Object inst, Statement expr) {
       throw new UnsupportedOperationException();
+   }
+
+   public boolean supportsSyncRemoteCalls() {
+      return true;
    }
 }

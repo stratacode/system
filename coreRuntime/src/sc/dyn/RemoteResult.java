@@ -18,6 +18,8 @@ import sc.type.IResponseListener;
 public class RemoteResult {
    public String callId;
 
+   public Object returnType;
+
    /** Set this property to an implementation class to be notified of success/errors in the method call. */
    public IResponseListener listener;
 

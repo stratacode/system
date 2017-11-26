@@ -33,7 +33,7 @@ public class CommandSCLanguage extends SCLanguage {
    public Sequence startModifyDeclaration = new Sequence("ModifyDeclaration(modifiers,typeName,extendsTypes,implementsTypes,)",
                                                   modifiers, qualifiedIdentifier, extendsTypes, implementsTypes, openBraceEOL);
 
-   Sequence endTypeDeclaration = new Sequence("EndTypeDeclaration", closeBraceEOL);
+   Sequence endTypeDeclaration = new Sequence("EndTypeDeclaration", closeBrace); // Don't want skipOnError set here like is done with closeBraceEOL
 
    /*
     * Need a way to parse comments from the command line?   Right now they go into spacing which gets ignored and
@@ -48,7 +48,7 @@ public class CommandSCLanguage extends SCLanguage {
 
    public Sequence topLevelCommands = new Sequence("(,.,)", spacing,
            new OrderedChoice("([],[],[],[],[],[],[])", REPEAT | OPTIONAL, reqPackageDeclaration, reqImport, startClassDeclaration,
-                             startModifyDeclaration, reqClassBodyDeclaration, expressionStatement, endTypeDeclaration),
+                             startModifyDeclaration, reqClassBodyDeclaration, statement, endTypeDeclaration),
            new Symbol(EOF));
 
    public Sequence typeCommands = new Sequence("(,.,)", spacing,

@@ -264,4 +264,10 @@ public class ClassValueExpression extends Expression {
       }
       return res;
    }
+
+   public void stop() {
+      super.stop();
+      boundType = null;
+      paramType = null;
+   }
 }

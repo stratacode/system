@@ -471,9 +471,18 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
                         methArgs.add(ClassValueExpression.create(enclType.getFullTypeName()));
                         //addRemBlock.staticEnabled = true;
                      }
+                     Object boundType = expr.boundTypes[lastIx];
+                     boolean typeIsVoid = false;
+                     if (ModelUtil.isMethod(boundType))  {
+                        Object retType = ModelUtil.getReturnType(boundType, true);
+                        typeIsVoid = retType == null || ModelUtil.typeIsVoid(retType);
+                     }
                      methArgs.add(StringLiteral.create(varDef.variableName));
-                     methArgs.add(IdentifierExpression.create(varDef.variableName));
-                     methArgs.add(NullLiteral.create()); // TODO: In the code we generate, we are invoking the method without a try/catch - we should be catching the runtime exception from the method and passing it in place of this null
+                     if (typeIsVoid)
+                        methArgs.add(NullLiteral.create());
+                     else
+                        methArgs.add(IdentifierExpression.create(varDef.variableName));
+                     methArgs.add(NullLiteral.create()); // TODO: For the exception argument, here passing null for now.  In the code we generate, we are invoking the method without a try/catch - we should be catching the runtime exception from the method and passing it in place of this null
                      IdentifierExpression addRemCall = IdentifierExpression.createMethodCall(methArgs, "sc.sync.SyncManager.addMethodResult");
                      addRemBlock.addStatementAt(0, addRemCall);
                      enclType.addBodyStatementAt(ix+1, addRemBlock);

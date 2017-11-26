@@ -18,7 +18,7 @@ public class RequestScopeContext extends BaseScopeContext {
    }
 
    public String getId() {
-      return id;
+      return "request:" + DynUtil.getTraceObjId(id);
    }
 
    public boolean isCurrent() {

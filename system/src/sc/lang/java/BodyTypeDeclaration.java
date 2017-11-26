@@ -8941,7 +8941,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public void addInitStatements(List<Statement> res, InitStatementsMode mode) {
       JavaModel model = getJavaModel();
       // When we are merging changes from the server, an inner type such an object or modify operation is added
-      // as an init statement so we preserve the order of exeuction of the inner type with respect to its parent.
+      // as an init statement so we preserve the order of execution of the inner type with respect to its parent.
       if (!model.mergeDeclaration && mode == InitStatementsMode.Init) {
          res.add(this);
       }

@@ -103,7 +103,7 @@ public interface IDynamicSystem {
 
    Class loadClass(String className);
 
-   Object resolveMethod(Object type, String methodName, String paramSig);
+   Object resolveMethod(Object type, String methodName, Object returnType, String paramSig);
 
    void dispose(Object obj);
 

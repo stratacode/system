@@ -41,7 +41,8 @@ public class Form extends HTMLElement {
       setDOMEvent(EventType.Submit, submitEvent, _submitEventProp);
    }
 
-   /** Implemented on the client to simulate a click on the submit button */
+   /** Implemented on the client to simulate form submit */
+   @sc.obj.Exec(clientOnly=true)
    public void submit() {
    }
 }

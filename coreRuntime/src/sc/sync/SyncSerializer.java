@@ -317,6 +317,15 @@ public class SyncSerializer {
          }
       }
       statementSB.append(");\n");
+      /*
+      if (smc.returnType == null) { // void type method - the JS method will not return anything so we can't use that as the result.  ModelStream does not allow just an expression so there's some duplication here
+         statementSB.append(Bind.indent(indentSize));
+         statementSB.append("Object ");
+         statementSB.append(smc.callId);
+         statementSB.append(" = ");
+         statementSB.append("null;");
+      }
+      */
 
       sb.append(preBlockCode);
       appendSerializer(statement);

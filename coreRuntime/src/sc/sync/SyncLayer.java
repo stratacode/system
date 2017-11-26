@@ -181,16 +181,18 @@ public class SyncLayer {
       String instName;
       String methName;
       String callId = null;
+      Object returnType;
       String paramSig;
       RemoteResult result;
 
-      SyncMethodCall(Object obj, Object type, String instName, String methName, String paramSig, Object...args) {
+      SyncMethodCall(Object obj, Object type, String instName, String methName, Object retType, String paramSig, Object...args) {
          super(obj, type);
          if (instName == null)
             instName = DynUtil.getTypeName(type, false);
          this.instName = instName;
          this.methName = methName;
          this.paramSig = paramSig;
+         this.returnType = retType;
          this.args = args;
       }
 
@@ -395,11 +397,12 @@ public class SyncLayer {
       return changeMap.get(propName);
    }
 
-   public RemoteResult invokeRemote(Object obj, Object type, String methName, String paramSig, Object[] args) {
-      SyncMethodCall change = new SyncMethodCall(obj, type, obj == null ? null : syncContext.findObjectName(obj), methName, paramSig, args);
+   public RemoteResult invokeRemote(Object obj, Object type, String methName, Object retType, String paramSig, Object[] args) {
+      SyncMethodCall change = new SyncMethodCall(obj, type, obj == null ? null : syncContext.findObjectName(obj), methName, retType, paramSig, args);
       addSyncChange(change);
       RemoteResult res = new RemoteResult();
       res.callId = change.getCallId();
+      res.returnType = retType;
       change.result = res;
 
       pendingMethods.put(res.callId, res);
@@ -416,6 +419,9 @@ public class SyncLayer {
       RemoteResult res = pendingMethods.remove(callId);
       if (res == null)
          return false;
+      if (res.returnType != null)
+         retValue = SyncHandler.convertRemoteType(retValue, res.returnType);
+
       res.setValue(retValue);
       if (res.listener != null) {
          if (exceptionStr == null)

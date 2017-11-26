@@ -663,7 +663,13 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
          getMethodArgs.add(methodClass);
       if (sys.runtimeProcessor != null)
          methName = sys.runtimeProcessor.replaceMethodName(sys, methObj, methName);
+      Object retType = ModelUtil.getReturnType(methObj, true);
+      if (ModelUtil.isParameterizedType(retType))
+         retType = ModelUtil.getParamTypeBaseType(retType);
+      if (ModelUtil.isTypeVariable(retType))
+         retType = ModelUtil.getTypeParameterDefault(retType);
       getMethodArgs.add(StringLiteral.create(methName));
+      getMethodArgs.add(retType == null || ModelUtil.typeIsVoid(retType) ? NullLiteral.create() : ClassValueExpression.create(ModelUtil.getTypeName(retType)));
       getMethodArgs.add(StringLiteral.create(ModelUtil.getTypeSignature(methObj)));
       getMethod.setProperty("arguments",getMethodArgs);
       return getMethod;

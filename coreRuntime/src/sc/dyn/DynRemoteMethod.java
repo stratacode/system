@@ -6,8 +6,9 @@ package sc.dyn;
 
 /** A descriptor used as a placeholder for a remote method.  Returned by DynUtil.resolveMethod and used to feed metadata into the call to the SyncManager.invokeRemote */
 public class DynRemoteMethod {
-   Object type;
-   String methodName;
-   String paramSig;
-   boolean isStatic;
+   public Object type;
+   public String methodName;
+   public Object returnType;
+   public String paramSig;
+   public boolean isStatic;
 }

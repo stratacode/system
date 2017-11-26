@@ -15,6 +15,7 @@ import sc.obj.Remote;
 import sc.parser.*;
 import sc.sync.SyncManager;
 import sc.sync.SyncOptions;
+import sc.sync.SyncProperties;
 import sc.type.CTypeUtil;
 import sc.type.TypeUtil;
 import sc.util.FileUtil;
@@ -46,6 +47,9 @@ public class EditorContext extends ClientEditorContext {
 
    /** Set this to either the runtimeName or processName of a target system.  In that case, we only perform updates on the selected target process or runtime. */
    public String targetRuntime = null;
+
+   /** Set this to false so that we only redirect expressions, statements, etc. to the first matching runtime */
+   public boolean targetAllRuntimes = true;
    /**
     * Lets frameworks replace the code which processes a command statement.  Specifically you can ensure all commands are processed
     * on a specific thread, e.g. the swing event dispatcher thread
@@ -67,6 +71,8 @@ public class EditorContext extends ClientEditorContext {
    //
    // TODO: need to make the references to these instances "weak" so we don't hang onto them
    HashMap<String,Object> selectedInstances = new HashMap<String,Object>();
+
+   boolean syncInited = false;
 
    public Object getDefaultCurrentObj(Object type) {
       if (type instanceof ClientTypeDeclaration)
@@ -158,6 +164,11 @@ public class EditorContext extends ClientEditorContext {
    public void updateLayerState() {
       currentLayer = system.lastLayer;
       layerPrefix = currentLayer != null ? currentLayer.packagePrefix : null;
+   }
+
+   public void runtimeInitialized() {
+      if (!syncInited && (system.syncInited || system.getNeedsSync()))
+         initSync();
    }
 
    synchronized void clearPendingModel() {
@@ -1584,14 +1595,18 @@ public class EditorContext extends ClientEditorContext {
       return pos;
    }
 
-
    public void initSync() {
+      if (syncInited)
+         return;
+      syncInited = true;
       // Manually adding these (roughly based on the generated code from js/layer/lang/EditorContext.java - so we sync the same properties
       int globalScopeId = GlobalScopeDefinition.getGlobalScopeDefinition().scopeId;
       SyncManager.addSyncType(getClass(), new sc.sync.SyncProperties(null, null, new Object[]{"currentLayer", "currentType", "needsSave", "canUndo", "canRedo"}, null, SyncOptions.SYNC_INIT_DEFAULT, globalScopeId));
       SyncManager.addSyncHandler(getClass(), LayerSyncHandler.class);
       SyncManager.addSyncType(MemoryEditSession.class, new sc.sync.SyncProperties(null, null, new Object[] {"origText", "text", "model", "saved", "caretPosition"}, null, SyncOptions.SYNC_INIT_DEFAULT, globalScopeId));
       SyncManager.addSyncInst(this, true, true, null);
+
+      SyncManager.addSyncType(InstanceWrapper.class, new SyncProperties(null, null, new Object[] {}, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, globalScopeId));
    }
 
    /** Rebuilds the system */

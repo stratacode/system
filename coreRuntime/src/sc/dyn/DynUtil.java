@@ -7,6 +7,7 @@ package sc.dyn;
 import sc.bind.Bind;
 import sc.bind.MethodBinding;
 import sc.obj.*;
+import sc.sync.SyncDestination;
 import sc.sync.SyncManager;
 import sc.type.*;
 import sc.util.IdentityWrapper;
@@ -230,38 +231,72 @@ public class DynUtil {
 
    // TODO: Should this be pluggable so we can use other RPC frameworks with data binding?
    public static RemoteResult invokeRemote(ScopeDefinition def, ScopeContext ctx, Object obj, Object method, Object... paramValues) {
-      return SyncManager.invokeRemote(def, ctx, obj, DynUtil.getMethodType(method), DynUtil.getMethodName(method), DynUtil.getTypeSignature(method), paramValues);
+      return SyncManager.invokeRemote(def, ctx, obj, DynUtil.getMethodType(method), DynUtil.getMethodName(method), DynUtil.getReturnType(method), DynUtil.getTypeSignature(method), paramValues);
+   }
+
+   public static Object invokeRemoteSync(ScopeDefinition def, ScopeContext ctx, long timeout, Object obj, Object method, Object... paramValues) {
+      RemoteResult remoteRes = invokeRemote(def, ctx, obj, method, paramValues);
+      RemoteCallSyncListener listener = new RemoteCallSyncListener();
+      remoteRes.listener = listener;
+
+      long startTime = System.currentTimeMillis();
+
+      // Need to run scopeChanged jobs here - so we notify the threads which will process the request
+      DynUtil.execLaterJobs();
+
+      synchronized (listener) {
+         try {
+            if (!listener.complete)
+               listener.wait(timeout);
+         }
+         catch (InterruptedException exc) {
+            System.err.println("*** invokeRemoteSync of method: " + getMethodName(method) + " interrupted: " + exc);
+         }
+      }
+      Object evalRes = listener.result;
+      long now = System.currentTimeMillis();
+      if (listener.errorCode != null) {
+         System.err.println("*** invokeRemoteSync of method: " + getMethodName(method) + " - returns error: " + listener.errorCode + ":" + listener.error + " after: " + (now - startTime) + " millis");
+         throw new IllegalArgumentException("invokeRemoteSync of method returns error: " + listener.errorCode);
+      }
+      else if (!listener.success) {
+         System.err.println("*** invokeRemoteSync of method: " + getMethodName(method) + " - timed out after: " + (now - startTime) + " millis");
+         throw new IllegalArgumentException("invokeRemoteSync of method timed out: " + listener.errorCode);
+      }
+      return evalRes;
    }
 
    /** In Java this is the same method but in Javascript they are different */
-   public static Object resolveStaticMethod(Object type, String methodName, String paramSig) {
-      return resolveMethod(type, methodName, paramSig);
+   public static Object resolveStaticMethod(Object type, String methodName, Object returnType, String paramSig) {
+      return resolveMethod(type, methodName, returnType, paramSig);
    }
 
-   public static Object resolveRemoteMethod(Object type, String methodName, String paramSig) {
+   public static Object resolveRemoteMethod(Object type, String methodName, Object retType, String paramSig) {
       DynRemoteMethod rm = new DynRemoteMethod();
       rm.type = type;
       rm.methodName = methodName;
+      rm.returnType = retType;
       rm.paramSig = paramSig;
       return rm;
    }
 
-   public static Object resolveRemoteStaticMethod(Object type, String methodName, String paramSig) {
+   public static Object resolveRemoteStaticMethod(Object type, String methodName, Object retType, String paramSig) {
       DynRemoteMethod rm = new DynRemoteMethod();
       rm.type = type;
       rm.methodName = methodName;
+      rm.returnType = retType;
       rm.paramSig = paramSig;
       rm.isStatic = true;
       return rm;
    }
 
-   public static Object resolveMethod(Object type, String methodName, String paramSig) {
+   public static Object resolveMethod(Object type, String methodName, Object returnType, String paramSig) {
       if (type instanceof Class)
-         return PTypeUtil.resolveMethod((Class) type, methodName, paramSig);
+         return PTypeUtil.resolveMethod((Class) type, methodName, returnType, paramSig);
       else if (type instanceof DynType)
          return ((DynType) type).getMethod(methodName, paramSig);
       else if (dynamicSystem != null)
-         return dynamicSystem.resolveMethod(type, methodName, paramSig);
+         return dynamicSystem.resolveMethod(type, methodName, returnType, paramSig);
       else
          throw new IllegalArgumentException("Unrecognized type to resolveMethod: " + type);
    }
@@ -560,7 +595,7 @@ public class DynUtil {
          if (isComponentType(typeObj)) {
             String typeName = getTypeName(typeObj, false);
             String methodName = "new" + CTypeUtil.capitalizePropertyName(CTypeUtil.getClassName(typeName));
-            Object newMeth = resolveMethod(typeObj, methodName, constrSig);
+            Object newMeth = resolveMethod(typeObj, methodName, null, constrSig);
             if (newMeth !=  null) {
                return invokeMethod(outerObj, newMeth, params);
             }
@@ -1171,6 +1206,10 @@ public class DynUtil {
          ((IAltComponent) comp)._start();
    }
 
+   public static Object resolveName(String name, boolean create) {
+      return resolveName(name, create, true);
+   }
+
    public static Object resolveName(String name, boolean create, boolean returnTypes) {
       if (dynamicSystem != null)
          return dynamicSystem.resolveRuntimeName(name, create, returnTypes);
@@ -1200,43 +1239,24 @@ public class DynUtil {
       Object error = null;
       Integer errorCode = null;
       boolean success = false;
+      boolean complete = false;
       public synchronized void response(Object response) {
          result = response;
          success = true;
+         complete = true;
          notify();
       }
       public synchronized void error(int errorCode, Object error) {
          this.errorCode = errorCode;
          this.error = error;
+         complete = true;
          notify();
       }
    }
 
    /** Executes the supplied java script by making an RPC call targeted towards all clients with the lifecycle identified by ScopeContext */
    public static Object evalRemoteScript(ScopeContext ctx, String script) {
-      RemoteResult remoteRes = invokeRemote(null, ctx, null, DynUtil.resolveRemoteStaticMethod(DynUtil.class, "evalScript", "Ljava/lang/String;"), script);
-      RemoteCallSyncListener listener = new RemoteCallSyncListener();
-      remoteRes.listener = listener;
-
-      // Need to run scopeChanged jobs here - so we notify the threads which will process the request
-      DynUtil.execLaterJobs();
-
-      synchronized (listener) {
-         try {
-            listener.wait(500000);
-         }
-         catch (InterruptedException exc) {
-            System.err.println("*** evalScript interrupted: " + exc);
-         }
-      }
-      Object evalRes = listener.result;
-      if (listener.errorCode != null) {
-         System.err.println("*** evalScript - returns error: " + listener.errorCode + ":" + listener.error);
-      }
-      else if (!listener.success) {
-         System.err.println("*** evalScript - timed out");
-      }
-      return evalRes;
+      return invokeRemoteSync(null, ctx, SyncDestination.defaultDestination.defaultTimeout, null, DynUtil.resolveRemoteStaticMethod(DynUtil.class, "evalScript", null, "Ljava/lang/String;"), script);
    }
 
    public static Object evalScript(String script) {

@@ -96,5 +96,8 @@ public interface IRuntimeProcessor {
     */
    public List<SrcEntry> buildCompleted();
 
-   public String transformStatement(BodyTypeDeclaration currentType, Object inst, Statement expr);
+   public Object invokeRemoteStatement(BodyTypeDeclaration currentType, Object inst, Statement expr);
+
+   /** For JS or other async environments, return false - this means, remote method calls not in data binding statements generate errors at compile time */
+   public boolean supportsSyncRemoteCalls();
 }

@@ -29,6 +29,7 @@ import java.lang.reflect.ParameterizedType;
 import java.util.*;
 
 import static sc.lang.java.IdentifierExpression.IdentifierType.BoundObjectName;
+import static sc.lang.java.IdentifierExpression.IdentifierType.RemoteMethodInvocation;
 
 public class IdentifierExpression extends ArgumentsExpression {
    public List<IString> identifiers;
@@ -287,7 +288,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                Object foundMeth = findMethod(firstIdentifier, arguments, this, enclType, isStatic, inferredType);
                if (foundMeth != null) {
                   foundMeth = parameterizeMethod(this, foundMeth, null, inferredType, arguments, getMethodTypeArguments());
-                  idTypes[0] = IdentifierType.MethodInvocation;
+                  idTypes[0] = getIdTypeForMethod(this, foundMeth);
                   boundTypes[0] = foundMeth;
                }
                if (boundTypes[0] == null) {
@@ -330,7 +331,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   foundMeth = findMethod(firstIdentifier, arguments, this, enclType, isStatic, inferredType);
                }
                if (idTypes[0] == null) {
-                  idTypes[0] = IdentifierType.MethodInvocation;
+                  idTypes[0] = getIdTypeForMethod(this, boundTypes[0]);
                }
             }
             else {
@@ -750,17 +751,21 @@ public class IdentifierExpression extends ArgumentsExpression {
             continue;
 
          // Remote methods must be in a binding expression
-         if (idTypes[i] == IdentifierType.RemoteMethodInvocation) {
+         if (idTypes[i] == RemoteMethodInvocation) {
             // When we validate the expressions inside of the tag itself, we won't have set up binding so just defer this error to the other version which is in the tag object.
             if (bindingDirection == null && getEnclosingTag() == null) {
                LayeredSystem sys = getLayeredSystem();
-               Layer remoteLayer = boundTypes == null ? null : ModelUtil.getLayerForMember(sys, boundTypes[i]);
-               String remoteIdent;
-               if (remoteLayer == null)
-                  remoteIdent = "<compiled class>";
-               else
-                  remoteIdent = remoteLayer.getLayeredSystem().getProcessIdent();
-               displayTypeError("Method call to remote method - from: " + sys.getProcessIdent() + " to: " + remoteIdent + " - only allowed in binding expression: ");
+
+               if (sys.runtimeProcessor != null && !sys.runtimeProcessor.supportsSyncRemoteCalls()) {
+                  Object boundType = boundTypes == null ? null : boundTypes[i];
+                  Layer remoteLayer = boundType == null ? null : ModelUtil.getLayerForMember(sys, boundType);
+                  String remoteIdent;
+                  if (remoteLayer == null)
+                     remoteIdent = boundType == null ? "<compiled class>" : "<compiled class: " + ModelUtil.getTypeName(boundType) + ">";
+                  else
+                     remoteIdent = remoteLayer.getLayeredSystem().getProcessIdent();
+                  displayTypeError("Method call to remote method - from: " + sys.getProcessIdent() + " to: " + remoteIdent + " - only allowed in binding expression: ");
+               }
             }
          }
 
@@ -790,7 +795,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             ret = IdentifierType.BoundTypeName;
       }
       else if (ModelUtil.isMethod(boundType))
-         ret = IdentifierType.MethodInvocation;
+         ret = IdentifierType.MethodInvocation; // TODO: need to do RemoteMethodInvocation here?  - call
       else if (boundType instanceof ParamTypedMember)
          return getIdentifierTypeFromType(((ParamTypedMember) boundType).getMemberObject());
       else if (boundType == null)
@@ -1375,7 +1380,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             meth = ModelUtil.definesMethod(peerType, methodName, arguments, null, enclPeerType, false, isStatic, inferredType, expr.getMethodTypeArguments(), expr.getLayeredSystem());
          if (meth != null) {
             boundTypes[ix] = meth;
-            idTypes[ix] = IdentifierType.RemoteMethodInvocation;
+            idTypes[ix] = RemoteMethodInvocation;
             if (meth instanceof AbstractMethodDefinition) {
                ((AbstractMethodDefinition) meth).addRemoteRuntime(sys.getRuntimeName());
             }
@@ -1416,7 +1421,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                }
                else {
                   methVar = parameterizeMethod(expr, methVar, currentTypeDecl, inferredType, arguments, methodTypeArgs);
-                  idTypes[i] = IdentifierType.MethodInvocation;
+                  idTypes[i] = getIdTypeForMethod(expr, methVar);
                }
                boundTypes[i] = methVar;
                // Also need to map the super type here, just like below when we can't resolve the method on the type.
@@ -1527,7 +1532,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             Object methObj = ModelUtil.definesMethod(currentClass, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs, sys);
             if (methObj != null) {
                Object meth = parameterizeMethod(expr, methObj, currentClass, inferredType, arguments, methodTypeArgs);
-               idTypes[i] = IdentifierType.MethodInvocation;
+               idTypes[i] = getIdTypeForMethod(expr, methObj);
                boundTypes[i] = meth;
             }
             else {
@@ -1545,8 +1550,8 @@ public class IdentifierExpression extends ArgumentsExpression {
             }
          }
          else {
-            // The parser won't generate these where 'this' is not in the first position but we do
-            // sometimes create them programatically since it is easier than doing the selector expression
+            // The parser won't create an IdentifierExpression where 'this' is not in the first position but we do
+            // sometimes create them in code since it is easier than creating the selector expression and identifier expression combo the parser would create.
             if (nextName.equals("this"))
                idTypes[i] = IdentifierType.ThisExpression;
             else {
@@ -1600,6 +1605,17 @@ public class IdentifierExpression extends ArgumentsExpression {
          expr.displayRangeError(i, i, "Non static ", idTypes[i] == IdentifierType.MethodInvocation ? "method " : "property ", nextName, " accessed from a static context in : ", nextName, " for ");
          ModelUtil.hasModifier(getMemberForIdentifier(expr, i, idTypes, boundTypes, model), "static");
       }
+   }
+
+   static IdentifierType getIdTypeForMethod(Expression expr, Object meth) {
+      boolean remote = false;
+      if (meth != null) {
+         LayeredSystem sys = expr.getLayeredSystem();
+         ITypeDeclaration enclType = expr.getEnclosingIType();
+         if (enclType != null)
+            remote = !ModelUtil.execForRuntime(sys, enclType.getLayer(), meth, sys);
+      }
+      return remote ? IdentifierType.RemoteMethodInvocation : IdentifierType.MethodInvocation;
    }
 
    /**
@@ -1952,6 +1968,7 @@ public class IdentifierExpression extends ArgumentsExpression {
 
             case GetObjectMethodInvocation:
             case MethodInvocation:
+            case RemoteMethodInvocation:
                Object methThis;
                Object methToInvoke = boundTypes[0];
                if (methToInvoke == null)
@@ -1965,11 +1982,10 @@ public class IdentifierExpression extends ArgumentsExpression {
                if (!ctx.allowInvoke(methToInvoke))
                   throw new IllegalArgumentException("Not allowed to invoke method: " + methToInvoke);
 
-               return ModelUtil.invokeMethod(methThis, methToInvoke, arguments, expectedType, ctx, true, true, null);
-
-            case RemoteMethodInvocation:
-               System.err.println("*** Remote method in dynamic code not yet supported");
-               return null;
+               if (idTypes[0] == RemoteMethodInvocation)
+                  return ModelUtil.invokeRemoteMethod(getLayeredSystem(), methThis, methToInvoke, arguments, expectedType, ctx, true, null);
+               else
+                  return ModelUtil.invokeMethod(methThis, methToInvoke, arguments, expectedType, ctx, true, true, null);
 
             case UnboundMethodName:
                String methName = idents.get(0).toString();
@@ -2084,7 +2100,14 @@ public class IdentifierExpression extends ArgumentsExpression {
                checkNull(value, methodName);
 
             Object method;
-            if (idTypes[i] == IdentifierType.MethodInvocation && !superMethod) {
+            if (idTypes[i] == RemoteMethodInvocation) {
+               if (superMethod) {
+                  System.err.println("*** Error - super() not supported for remote methods"); // this error should be caught earlier!
+                  throw new UnsupportedOperationException();
+               }
+               return ModelUtil.invokeRemoteMethod(getLayeredSystem(), value, boundTypes[i], arguments, expectedType, ctx, true, null);
+            }
+            else if (idTypes[i] == IdentifierType.MethodInvocation && !superMethod) {
                method = boundTypes[i];
                if (method instanceof AbstractMethodDefinition) {
                   Object rtMethod = ((AbstractMethodDefinition) method).getRuntimeMethod();
@@ -3517,7 +3540,7 @@ public class IdentifierExpression extends ArgumentsExpression {
 
       Object boundType = boundTypes[i];
 
-      return idType == IdentifierType.MethodInvocation || idType == IdentifierType.RemoteMethodInvocation ?
+      return idType == IdentifierType.MethodInvocation || idType == RemoteMethodInvocation ?
               (nestedBinding ? "methodP" : "method") :
               idType == IdentifierType.EnumName || isFinal(boundType)  ?
                    (nestedBinding ? "constantP" : "constant") :
@@ -3758,7 +3781,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             }
             break;
          case BoundTypeName:
-            if (idents.size() == 1 || (idTypes[1] != IdentifierType.MethodInvocation && idTypes[1] != IdentifierType.RemoteMethodInvocation)) {
+            if (idents.size() == 1 || (idTypes[1] != IdentifierType.MethodInvocation && idTypes[1] != RemoteMethodInvocation)) {
                srcObj = ModelUtil.getRuntimeType(boundTypes[0]);
                startPropertyIndex = 1;// Consumes the first name
                if (srcObj == null) {
@@ -3805,7 +3828,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                if (idTypes[pi] != IdentifierType.PackageName) {
                   if (idTypes[pi] == IdentifierType.BoundTypeName) {
                      startPropertyIndex = pi+1;
-                     if (pi == idents.size()-1 || (idTypes[pi+1] != IdentifierType.MethodInvocation && idTypes[pi+1] != IdentifierType.RemoteMethodInvocation))
+                     if (pi == idents.size()-1 || (idTypes[pi+1] != IdentifierType.MethodInvocation && idTypes[pi+1] != RemoteMethodInvocation))
                         srcObj = ctx.resolveName(getIdentifierPathName(startPropertyIndex), true);
                      else {
                         srcObj = null;
@@ -4006,7 +4029,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                }
             }
             // If it is an expression based off of the class itself, do a class value expression
-            else if (idents.size() == typeIx || (idTypes[typeIx] != IdentifierType.MethodInvocation && idTypes[typeIx] != IdentifierType.RemoteMethodInvocation)) {
+            else if (idents.size() == typeIx || (idTypes[typeIx] != IdentifierType.MethodInvocation && idTypes[typeIx] != RemoteMethodInvocation)) {
                // TODO: Shouldn't we use identifiers.get(0) as below?
                srcObj = ClassValueExpression.create(ModelUtil.getTypeName(srcType = boundTypes[0]));
             }
@@ -4049,7 +4072,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                      }
 
                      startPropertyIndex = pi+1;
-                     if (pi == idents.size()-1 || (idTypes[pi+1] != IdentifierType.MethodInvocation && idTypes[pi+1] != IdentifierType.RemoteMethodInvocation))
+                     if (pi == idents.size()-1 || (idTypes[pi+1] != IdentifierType.MethodInvocation && idTypes[pi+1] != RemoteMethodInvocation))
                         srcObj = ClassValueExpression.create(ModelUtil.getTypeName(srcType));
                      else {
                         srcObj = null;
@@ -4123,7 +4146,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                identifier = idents.get(i).toString();
             if (i == idents.size()-1 && arguments != null) {
                // Bind.methodP(getMethod call, arguments converted to IBinding[])
-               props.add(createChildMethodBinding(getTypeForIdentifier(i-1), identifier, boundTypes[i], arguments, idTypes[i] == IdentifierType.RemoteMethodInvocation));
+               props.add(createChildMethodBinding(getTypeForIdentifier(i-1), identifier, boundTypes[i], arguments, idTypes[i] == RemoteMethodInvocation));
             }
             else {
                props.add(createGetPropertyMappingCall(lastObj, identifier));
@@ -4144,7 +4167,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          Object methodDeclaringClass;
          int ix = idents.size()-1;
          Object methodType = boundTypes[ix];
-         boolean isRemote = idTypes[ix] == IdentifierType.RemoteMethodInvocation;
+         boolean isRemote = idTypes[ix] == RemoteMethodInvocation;
          if (idents.size() == 1) {
 
             if (methodType == null) {
@@ -4863,7 +4886,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                idents.set(i, new PString(JSUtil.ShadowedPropertyPrefix + ident));
          }
 
-         if (idTypes[i] == IdentifierType.MethodInvocation || idTypes[i] == IdentifierType.RemoteMethodInvocation) {
+         if (idTypes[i] == IdentifierType.MethodInvocation || idTypes[i] == RemoteMethodInvocation) {
             Object meth = boundTypes[i];
             // Meth here is TypeDeclaration when we have a newX method that we could not resolve
             if (meth != null && !(meth instanceof TypeDeclaration)) {

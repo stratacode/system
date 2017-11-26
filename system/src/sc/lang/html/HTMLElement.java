@@ -98,6 +98,7 @@ public class HTMLElement<E> extends Element<E> {
    }
 
    /** Method implemented on the client only to generate a simulated DOM event that behaves like a click */
+   @sc.obj.Exec(clientOnly=true)
    public void click() {
    }
 

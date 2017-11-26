@@ -59,7 +59,7 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
       do {
          try {
             String nextLine;
-            String nextPrompt = inputStream.available() > 0 ? "" : prompt();
+            String nextPrompt = inputBytesAvailable() ? "" : prompt();
             while ((nextLine = input.readLine(nextPrompt)) != null) {
                Object result = null;
                if (currentWizard != null || nextLine.trim().length() != 0) {
@@ -80,6 +80,8 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
                         exc.printStackTrace();
                      else
                         System.err.println(exc);
+                     if (exitOnError)
+                        System.exit(-1);
                   }
                }
                if (pendingInput.length() > 0) {
@@ -96,14 +98,14 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
                   if (!consoleDisabled && smartTerminal) {
                      input.killLine();
                      input.putString(remaining);
-                     pendingInput = new StringBuffer();
+                     pendingInput = new StringBuilder();
                   }
                   nextPrompt = "";
                }
                else {
                   execLaterJobs();
 
-                  nextPrompt = inputStream.available() > 0 ? "" : prompt();
+                  nextPrompt = inputBytesAvailable() ? "" : prompt();
                }
             }
             if (nextLine == null) {
@@ -152,6 +154,15 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
     */
    public void run() {
       System.exit(readParseLoop() && !system.anyErrors ? 0 : 1);
+   }
+
+   public boolean inputBytesAvailable() {
+      try {
+         return inputStream.available() > 0;
+      }
+      catch (IOException exc) {
+         return false;
+      }
    }
 
    public int getTermWidth() {

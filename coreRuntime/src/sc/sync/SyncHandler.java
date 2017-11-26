@@ -176,5 +176,29 @@ public class SyncHandler {
    /** A hook so you can replace the base type used for recreating the type on the other side.  It can return a TypeDeclaration or Class */
    public Object getObjectType(Object changedObj) {
       return DynUtil.isType(changedObj) ? changedObj.getClass() : DynUtil.getType(changedObj);
+    }
+
+   public static Object convertRemoteType(Object value, Object type) {
+      if (type == Object.class)
+         return value;
+      if (type == StringBuilder.class)
+         return new StringBuilder((String) value);
+      if (value instanceof List) {
+         List propValList = (List) value;
+         // Convert if necessary to get the correct array type - e.g. a String[] instead of just an Object[]
+         if (DynUtil.isArray(type)) {
+            value = propValList.toArray((Object[]) PTypeUtil.newArray((Class) DynUtil.getComponentType(type), propValList.size()));
+         }
+         // Call the constructor to create the right type of collection, i.e. Collection((Collection a))
+         else {
+            if (type == List.class) // TODO: need to handle more of these - use the SyncHandler interface here?
+               type = ArrayList.class;
+            // TODO - security: validate this type is allowed to be deserialized
+            value = DynUtil.createInstance(type, null, value);
+         }
+      }
+      return value;
    }
-}
+
+
+ }

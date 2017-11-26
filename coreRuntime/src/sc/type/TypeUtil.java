@@ -34,8 +34,8 @@ public class TypeUtil  {
    }
 
 
-   public static Object resolveMethod(Class resultClass, String methodName, String paramSig) {
-      return PTypeUtil.resolveMethod(resultClass, methodName, paramSig);
+   public static Object resolveMethod(Class methClass, String methodName, String paramSig) {
+      return PTypeUtil.resolveMethod(methClass, methodName, null, paramSig);
    }
 
    public static IBeanMapper resolvePropertyMapping(Class resultClass, String propName) {

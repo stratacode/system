@@ -230,7 +230,7 @@ public class PTypeUtil {
       throw new IllegalArgumentException("Unrecognized type of method to TypeUtil.invokeMethod: " + method);
    }
 
-   public static Object resolveMethod(Class resultClass, String methodName, String paramSig) {
+   public static Object resolveMethod(Class resultClass, String methodName, Object returnType, String paramSig) {
       DynType type = DynType.getDynType(resultClass);
       return type.getMethod(methodName, paramSig);
    }
@@ -505,7 +505,7 @@ public class PTypeUtil {
    }
 
    public static Object clone(Object o) {
-      Object meth = resolveMethod(o.getClass(), "clone", null);
+      Object meth = resolveMethod(o.getClass(), "clone", null, null);
       return invokeMethod(o, meth);
    }
 

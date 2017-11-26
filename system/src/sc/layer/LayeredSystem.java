@@ -39,6 +39,7 @@ import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.*;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Pattern;
@@ -1324,6 +1325,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // Need to fix the CommandInterpreter - it cannot handle empty package names in dialogs
       //cmd = System.console() != null ? new JLineInterpreter(this) : new CommandInterpreter(this, System.in);
       cmd = new JLineInterpreter(this, consoleDisabled, testInputName);
+   }
+
+   public boolean getNeedsSync() {
+      List<LayeredSystem> ss = getSyncSystems();
+      return ss != null && ss.size() > 0;
    }
 
    private void initBuildSystem(boolean initPeers, boolean fromScratch) {
@@ -3447,19 +3453,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       @Constant public boolean retryAfterFailedBuild = false;
 
-      @Constant String testPattern = null;
+      @Constant public String testPattern = null;
 
       /** Exit after running the tests */
-      @Constant boolean testExit = false;
+      @Constant public boolean testExit = false;
 
       /** General flag for when we are running tests  */
-      @Constant boolean testMode = false;
+      @Constant public boolean testMode = false;
 
       /** Argument to control what happens after the command is run, e.g. it can specify the URL of the page to open. */
-      @Constant String openPattern = null;
+      @Constant public String openPattern = null;
 
       /** Controls whether or not the start URL is opened */
-      @Constant boolean openPageAtStartup = true;
+      @Constant public boolean openPageAtStartup = true;
 
       @Constant /** An internal option for how we implement the transform.  When it's true, we clone the model before doing the transform.  This is the new way and makes for a more robust system.  false is deprecated and probably should be removed */
       public boolean clonedTransform = true;
@@ -4241,7 +4247,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   private boolean syncInited = false;
+   public boolean syncInited = false;
 
    private boolean promptUserRetry() {
       if (cmd == null || !options.retryAfterFailedBuild)
@@ -4342,7 +4348,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          SyncManager.addSyncHandler(Template.class, LayerSyncHandler.class);
          SyncManager.addSyncHandler(Layer.class, LayerSyncHandler.class);
 
-         SyncManager.addSyncType(InstanceWrapper.class, new SyncProperties(null, null, new Object[] {}, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, globalScopeId));
+         //SyncManager.addSyncType(InstanceWrapper.class, new SyncProperties(null, null, new Object[] {}, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, globalScopeId));
 
          SyncManager.addSyncType(Layer.class,
                  new SyncProperties(null, null,
@@ -9780,7 +9786,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return getCompiledClassWithPathName(className);
    }
 
-   public Object resolveMethod(Object type, String methodName, String paramSig) {
+   public Object resolveMethod(Object type, String methodName, Object returnType, String paramSig) {
       return ModelUtil.getMethodFromSignature(type, methodName, paramSig, true);
    }
 
@@ -13163,6 +13169,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return resolveName(name, create, returnTypes);
    }
 
+   public Object resolveName(String name, boolean create) {
+      return resolveName(name, create, true);
+   }
+
    public Object resolveName(String name, boolean create, boolean returnTypes) {
       // Using last layer here as the refLayer so we pick up active objects
       return resolveName(name, create, lastLayer, false, returnTypes);
@@ -15445,6 +15455,36 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    @sc.obj.Remote(remoteRuntimes="js")
    public BodyTypeDeclaration getSrcTypeDeclaration(String typeName) {
       return getSrcTypeDeclaration(typeName, null, true);
+   }
+
+   private Object runtimeInitLock = new Object();
+   private boolean runtimeInited = false;
+
+   // Once the SyncManager and destinations have been registered, we might need to init the sync types for the command interpreter
+   public void runtimeInitialized() {
+      if (cmd != null)
+         cmd.runtimeInitialized();
+      synchronized (runtimeInitLock) {
+         runtimeInited = true;
+         runtimeInitLock.notify();
+      }
+   }
+
+   public boolean waitForRuntime(long timeout) {
+      long startTime = System.currentTimeMillis();
+      do {
+         synchronized (runtimeInitLock) {
+            long now = System.currentTimeMillis();
+            if (runtimeInited)
+               return true;
+            if (now - startTime > timeout)
+               return false;
+            try {
+               runtimeInitLock.wait(timeout - (now - startTime));
+            }
+            catch (InterruptedException exc) {}
+         }
+      } while (true);
    }
 }
 

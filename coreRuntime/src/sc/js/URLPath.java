@@ -55,4 +55,13 @@ public class URLPath {
          app = app.substring(0, ix);
       return app;
    }
+
+   // TODO: this only works for the most rudimentary cases and should do escaping etc.
+   public static String addQueryParam(String url, String param, String value) {
+      if (url.contains("?"))
+         url = url + "&" + param + "=" + value;
+      else
+         url = url + "?" + param + "=" + value;
+      return url;
+   }
 }

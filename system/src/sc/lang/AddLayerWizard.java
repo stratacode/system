@@ -61,7 +61,7 @@ public class AddLayerWizard extends CommandWizard {
          System.err.println(exc.getMessage());
          commandInterpreter.currentWizard = null;
       }
-      commandInterpreter.pendingInput = new StringBuffer();
+      commandInterpreter.pendingInput = new StringBuilder();
       return Boolean.TRUE;
    }
 

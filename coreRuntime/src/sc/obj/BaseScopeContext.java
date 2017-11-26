@@ -49,4 +49,9 @@ public abstract class BaseScopeContext extends ScopeContext {
       // Destroy the sync context after we dispose of any items directly in the attributes list so they are not disposed of twice.
       super.scopeDestroyed();
    }
+
+
+   public String toString() {
+      return getId();
+   }
 }

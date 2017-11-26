@@ -1856,6 +1856,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    public String getStaticPrefix(Object typeObj, JavaSemanticNode refNode) {
       JavaModel model = refNode != null ? refNode.getJavaModel() : null;
 
+      if (typeObj instanceof ArrayTypeDeclaration)
+         return "jv_Array" + typeNameSuffix;
+
       boolean useRuntime = model != null && model.customResolver != null && model.customResolver.useRuntimeResolution();
       typeObj = ModelUtil.resolveSrcTypeDeclaration(system, typeObj, useRuntime, false);
       if (!useRuntime) {
@@ -3228,5 +3231,17 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       exprParams.evalStatements = modDecl.body;
       exprParams.currentInstance = instance;
       return TransformUtil.evalTemplate(exprParams, getEvalTemplate(currentType));
+   }
+
+   public Object invokeRemoteStatement(BodyTypeDeclaration currentType, Object instance, Statement st) {
+      String jsScript = transformStatement(currentType, instance, st);
+      if (jsScript != null && jsScript.length() > 0) {
+         return DynUtil.evalScript(jsScript);
+      }
+      return null;
+   }
+
+   public boolean supportsSyncRemoteCalls() {
+      return true;
    }
 }

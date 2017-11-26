@@ -404,10 +404,10 @@ public class SyncManager {
 
       public void addChangedValue(List<SyncLayer.SyncChange> depChanges, Object obj, String propName, Object val, String syncGroup, SyncLayer syncLayer) {
          SyncLayer changedLayer = syncLayer == null ? getChangedSyncLayer(syncGroup) : syncLayer;
-         markChanged();
-         if (verboseValues) {
-            System.out.println("Changed value: " + DynUtil.getInstanceName(obj) + "." + propName + " = " + DynUtil.getInstanceName(val));
+         if (verboseValues || (verbose && !needsSync)) {
+            System.out.println("Changed value: " + DynUtil.getInstanceName(obj) + "." + propName + " = " + DynUtil.getInstanceName(val) + (!needsSync ? " *** first change in sync" : ""));
          }
+         markChanged();
          // When we are processing the initial sync, we are not recording changes.
          // TODO: do we need to record separate versions when dealing with sync contexts shared by more than one client?
          // to track versions, so we can respond to sync requests from more than one client
@@ -929,8 +929,6 @@ public class SyncManager {
 
       public void markChanged() {
          if (!needsSync) {
-            if (verbose)
-               System.out.println("Setting needsSync=true for first change");
             setNeedsSync(true);
          }
       }
@@ -1296,6 +1294,9 @@ public class SyncManager {
          SyncLayer useLayer = getChangedSyncLayer(syncProps.syncGroup);
          useLayer.addFetchProperty(inst, propName);
 
+         if (trace || verbose || verboseValues) {
+            System.out.println("Fetch property: " + DynUtil.getInstanceName(inst)  + " scope: " + name + (!needsSync ? " *** first change in sync" : ""));
+         }
          markChanged();
       }
 
@@ -1575,17 +1576,21 @@ public class SyncManager {
          initSyncInst(depChanges, changedObj, instInfo, instInfo == null ? props == null ? false : props.initDefault : instInfo.initDefault, scope == null ? 0 : scope.getScopeDefinition().scopeId, props, instInfo == null ? null : instInfo.args, false, inherited, addPropChanges, true, syncLayer);
       }
 
-      public RemoteResult invokeRemote(String syncGroup, Object obj, Object type, String methName, String paramSig, Object[] args) {
+      public RemoteResult invokeRemote(String syncGroup, Object obj, Object type, String methName, Object retType, String paramSig, Object[] args) {
          SyncLayer changedLayer = getChangedSyncLayer(syncGroup);
-         markChanged();
-         if (trace) {
-            System.out.println("Remote method call: " + (obj != null ? DynUtil.getInstanceName(obj) : DynUtil.getTypeName(type, false)) + "." + methName + "(" + DynUtil.arrayToInstanceName(args) + ") scope: " + name);
+         if (trace || verbose || verboseValues) {
+            System.out.println("Remote method call: " + (obj != null ? DynUtil.getInstanceName(obj) : DynUtil.getTypeName(type, false)) + "." + methName + "(" + DynUtil.arrayToInstanceName(args) + ") scope: " + name +
+                               (!needsSync ? " *** first change in sync" : ""));
          }
-         return changedLayer.invokeRemote(obj, type, methName,  paramSig, args);
+         markChanged();
+         return changedLayer.invokeRemote(obj, type, methName, retType, paramSig, args);
       }
 
       public void addMethodResult(Object ctxObj, Object type, String callId, Object retValue, String exceptionStr) {
          SyncLayer changedLayer = getChangedSyncLayer(null);
+         if (trace || verbose || verboseValues) {
+            System.out.println("Add method result: " + callId + " scope: " + name + (!needsSync ? " *** first change in sync" : ""));
+         }
          markChanged();
 
          changedLayer.addMethodResult(ctxObj, type, callId, retValue, exceptionStr);
@@ -2002,9 +2007,9 @@ public class SyncManager {
          if (inst == null && currentPackage != null)
             inst = getObjectByName(fullPathName = CTypeUtil.prefixPath(currentPackage, name), unwrap);
          if (inst == null) {
-            inst = ScopeDefinition.resolveName(name, true, false);
+            inst = ScopeDefinition.resolveName(name, true, true);
             if (inst == null && fullPathName != null) {
-               inst = ScopeDefinition.resolveName(fullPathName, true, false);
+               inst = ScopeDefinition.resolveName(fullPathName, true, true);
             }
          }
          if (inst != null) {
@@ -2913,8 +2918,8 @@ public class SyncManager {
       return new SyncResult(false, null);
    }
 
-   public static RemoteResult invokeRemote(ScopeDefinition def, ScopeContext ctx, Object obj, Object type, String methName, String paramSig, Object...args) {
-      return invokeRemoteDest(def, ctx, SyncDestination.defaultDestination.name, null, obj, type, methName, paramSig, args);
+   public static RemoteResult invokeRemote(ScopeDefinition def, ScopeContext ctx, Object obj, Object type, String methName, Object retType, String paramSig, Object...args) {
+      return invokeRemoteDest(def, ctx, SyncDestination.defaultDestination.name, null, obj, type, methName, retType, paramSig, args);
    }
 
    public static void setCurrentSyncLayers(ArrayList<SyncLayer> current) {
@@ -2960,7 +2965,7 @@ public class SyncManager {
    }
 
    /** Called either with a scopeDefinition - to choose the current context in that scope, an explicit ScopeContext or neither to choose the default scope, default context. */
-   public static RemoteResult invokeRemoteDest(ScopeDefinition def, ScopeContext scopeCtx, String destName, String syncGroup, Object obj, Object type, String methName, String paramSig, Object...args) {
+   public static RemoteResult invokeRemoteDest(ScopeDefinition def, ScopeContext scopeCtx, String destName, String syncGroup, Object obj, Object type, String methName, Object retType, String paramSig, Object...args) {
       SyncManager mgr = getSyncManager(destName);
       int scopeId;
       SyncContext ctx = null;
@@ -2983,7 +2988,7 @@ public class SyncManager {
       if (ctx == null) {
          throw new IllegalArgumentException("No SyncContext for scope ctx: " + scopeCtx);
       }
-      return ctx.invokeRemote(syncGroup, obj, type, methName, paramSig, args);
+      return ctx.invokeRemote(syncGroup, obj, type, methName, retType, paramSig, args);
    }
 
    public static SyncContext getDefaultSyncContext() {
@@ -3015,7 +3020,7 @@ public class SyncManager {
       SyncContext defaultCtx = getDefaultSyncContext();
       Object obj = defaultCtx.getObjectByName(name, true);
       if (obj == null)
-         obj = DynUtil.resolveName(name, true, false);
+         obj = DynUtil.resolveName(name, true, true);
       return obj;
    }
 

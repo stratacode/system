@@ -8,6 +8,7 @@ import sc.bind.BindSettings;
 import sc.bind.IChangeable;
 import sc.classfile.CFClass;
 import sc.classfile.CFMethod;
+import sc.dyn.DynRemoteMethod;
 import sc.dyn.IDynObject;
 import sc.lang.*;
 import sc.lang.html.Attr;
@@ -19,6 +20,7 @@ import sc.lang.template.Template;
 import sc.lang.template.TemplateStatement;
 import sc.layer.*;
 import sc.obj.*;
+import sc.sync.SyncDestination;
 import sc.type.*;
 import sc.util.*;
 import sc.bind.BindingDirection;
@@ -990,7 +992,7 @@ public class ModelUtil {
          return ((ITypeDeclaration) type).getConstructorFromSignature(sig);
       }
       else if (type instanceof Class) {
-         return PTypeUtil.resolveMethod((Class) type, ModelUtil.getTypeName(type), sig);
+         return PTypeUtil.resolveMethod((Class) type, ModelUtil.getTypeName(type), null, sig);
       }
       else
          throw new UnsupportedOperationException();
@@ -1001,7 +1003,7 @@ public class ModelUtil {
          return ((ITypeDeclaration) type).getMethodFromSignature(methodName, paramSig, resolveLayer);
       }
       else if (type instanceof Class)
-         return PTypeUtil.resolveMethod((Class) type, methodName, paramSig);
+         return PTypeUtil.resolveMethod((Class) type, methodName, null, paramSig);
       else if (type instanceof DynType)
          return ((DynType) type).getMethod(methodName, paramSig);
       else if (type instanceof String) {
@@ -3777,6 +3779,16 @@ public class ModelUtil {
       }
       else
          throw new UnsupportedOperationException();
+   }
+
+   public static Object invokeRemoteMethod(LayeredSystem locSys, Object methThis, Object methToInvoke, SemanticNodeList<Expression> arguments, Class expectedType, ExecutionContext ctx,
+                                           boolean repeatArgs, ParamTypedMethod pmeth) {
+      Object[] argValues = expressionListToValues(arguments, ctx);
+
+      if (repeatArgs && argValues.length > 0) {
+         argValues = convertArgsForRepeating(methToInvoke, pmeth, arguments, argValues);
+      }
+      return DynUtil.invokeRemoteSync(null, null, SyncDestination.defaultDestination.defaultTimeout, methThis, methToInvoke, argValues);
    }
 
    private static Object[] convertArgsForRepeating(Object meth, ParamTypedMethod pmeth, List<Expression> arguments, Object[] argValues) {
@@ -6781,6 +6793,8 @@ public class ModelUtil {
          else
             return meth.getReturnType();
       }
+      else if (method instanceof DynRemoteMethod)
+         return ((DynRemoteMethod) method).returnType;
       else
          throw new UnsupportedOperationException();
    }
@@ -8686,8 +8700,8 @@ public class ModelUtil {
       return null;
    }
 
-   public static boolean execForRuntime(LayeredSystem refSys, Layer refLayer, Object refType, LayeredSystem runtimeSys) {
-      Object execAnnot = ModelUtil.getInheritedAnnotation(refSys, refType, "sc.obj.Exec", false, refLayer, false);
+   public static boolean execForRuntime(LayeredSystem refSys, Layer refLayer, Object refTypeOrMember, LayeredSystem runtimeSys) {
+      Object execAnnot = ModelUtil.getInheritedAnnotation(refSys, refTypeOrMember, "sc.obj.Exec", false, refLayer, false);
       if (execAnnot != null) {
          String execRuntimes = (String) ModelUtil.getAnnotationValue(execAnnot, "runtimes");
          if (execRuntimes != null && execRuntimes.length() > 0) {
@@ -8701,19 +8715,19 @@ public class ModelUtil {
          Boolean clientOnly = (Boolean) ModelUtil.getAnnotationValue(execAnnot, "clientOnly");
          if (serverOnly != null && serverOnly) {
             if (clientOnly != null && clientOnly)
-               System.err.println("Exec annotation for type: " + ModelUtil.getTypeName(refType) + " has both clientOnly and serverOnly");
+               System.err.println("Exec annotation for type: " + ModelUtil.getTypeName(refTypeOrMember) + " has both clientOnly and serverOnly");
             return runtimeSys.serverEnabled;
          }
          if (clientOnly != null && clientOnly) {
             return !runtimeSys.serverEnabled;
          }
       }
-      if (ModelUtil.isMethod(refType) || ModelUtil.isField(refType) || refType instanceof IBeanMapper)
-         return execForRuntime(refSys, refLayer, getEnclosingType(refType), runtimeSys);
+      if (ModelUtil.isMethod(refTypeOrMember) || ModelUtil.isField(refTypeOrMember) || refTypeOrMember instanceof IBeanMapper)
+         return execForRuntime(refSys, refLayer, getEnclosingType(refTypeOrMember), runtimeSys);
 
-      if (refType instanceof ParamTypeDeclaration)
-         refType = ((ParamTypeDeclaration) refType).getBaseType();
-      if (refType instanceof BodyTypeDeclaration) {
+      if (refTypeOrMember instanceof ParamTypeDeclaration)
+         refTypeOrMember = ((ParamTypeDeclaration) refTypeOrMember).getBaseType();
+      if (refTypeOrMember instanceof BodyTypeDeclaration) {
          if (refSys != runtimeSys)
             System.out.println("*** Note: found mismatching runtime in execForRuntime - make sure this is right!");
          return refSys == runtimeSys;
@@ -8722,4 +8736,5 @@ public class ModelUtil {
          return true;
 
    }
+
 }

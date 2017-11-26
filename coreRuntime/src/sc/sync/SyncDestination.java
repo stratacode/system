@@ -65,6 +65,8 @@ public abstract class SyncDestination {
 
    public int currentReconnectTime = defaultReconnectTime;
 
+   public int defaultTimeout = 60000;
+
    /** Set by components like ServletSyncDestination via the initOnStartup hook */
    public static SyncDestination defaultDestination;
 

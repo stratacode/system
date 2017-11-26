@@ -32,12 +32,17 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    String inputFileName = null; // Defaults to use standard input
 
-   StringBuffer pendingInput = new StringBuffer();
+   StringBuilder pendingInput = new StringBuilder();
 
    // The script starts out in the context of a global 'cmd' object which is a dynamic type so you can add fields, etc.
    // in a dynamic context even if you are running a fully compiled application.  Inner types however are not added to this
    // type - in that case, you are defining real types in the application.
    DynObject dynObj;
+
+   // Are we in the midst of a slash-star style comment - i.e. ignoring all lines
+   boolean inBlockComment = false;
+
+   public boolean exitOnError = true;
 
    public class CmdClassDeclaration extends ClassDeclaration {
       public boolean isDynamicStub(boolean includeExt) {
@@ -148,6 +153,8 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    public abstract String readLine(String nextPrompt);
 
+   public abstract boolean inputBytesAvailable();
+
    public void processCommand(String nextLine) {
       Object result = null;
       if (nextLine.trim().length() != 0) {
@@ -255,34 +262,72 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          return cmdlang.typeCommands;
    }
 
-   protected Object parseCommand(String command, Parselet start) {
+   protected Object parseCommand(String command, Parselet startParselet) {
+      // TODO: fixme!
+      if (inBlockComment) {
+         pendingInput = new StringBuilder();
+         int endIx = command.lastIndexOf("*/");
+         if (endIx != -1) {
+            command = command.substring(endIx + 2);
+            inBlockComment = false;
+         }
+         else {
+            return null;
+         }
+      }
       if (currentWizard != null) {
          currentWizard.parseCommand(command);
          return null;
       }
 
       // Skip empty lines, though make sure somewhitespace gets in there
-      if (command.trim().length() == 0) {
+      String tcommand = command.trim();
+      if (tcommand.length() == 0) {
          return null;
       }
 
       if (command.equals("help") || command.equals("?")) {
          System.out.println(StringUtil.insertLinebreaks(USAGE, 80));
-         pendingInput = new StringBuffer();
+         pendingInput = new StringBuilder();
          return null;
       }
 
-      if (!start.initialized) {
-         ParseUtil.initAndStartComponent(start);
+      // TODO: fixme - this is rudimentary support for block commands and will fail for cases like multiple block comments on one line or block comments embedded in strings
+      if (tcommand.startsWith("/*")) {
+         int endIx = tcommand.lastIndexOf("*/");
+         if (endIx == -1) {
+            inBlockComment = true;
+            pendingInput = new StringBuilder();
+            return null;
+         }
+         else {
+            String newCommand = tcommand.substring(endIx + 2);
+            if (newCommand.trim().length() == 0)
+               return null;
+            pendingInput = new StringBuilder(newCommand);
+         }
+      }
+
+      if (!startParselet.initialized) {
+         ParseUtil.initAndStartComponent(startParselet);
       }
       Parser p = new Parser(cmdlang, new StringReader(command));
-      Object parseTree = p.parseStart(start);
+      Object parseTree = p.parseStart(startParselet);
       if (parseTree instanceof ParseError) {
          ParseError err = (ParseError) parseTree;
-         // We have to both hit EOF and leave the current index at EOF
-         if (!p.eof || p.getInputChar(p.currentErrorEndIndex) != '\0') {
-            pendingInput = new StringBuffer();
-            System.err.println(err.errorStringWithLineNumbers(command));
+         // If we're reading from a script, we'll just accumulate the stuff to parse like we would if reading from a file
+         if (!inputBytesAvailable() && (!p.eof || p.getInputChar(p.currentErrorEndIndex) != '\0')) {
+            p = new Parser(cmdlang, new StringReader(command));
+            p.enablePartialValues = true;
+            parseTree = p.parseStart(startParselet);
+
+            // Once we enable partial values and still can't parse it, we are ready to consider it junk and throw it away
+            if (parseTree instanceof ParseError && (!p.eof || p.getInputChar(p.currentErrorEndIndex) != '\0')) {
+               pendingInput = new StringBuilder();
+               System.err.println(err.errorStringWithLineNumbers(command));
+            }
+            else
+               pendingInput.append("\n");
          }
          else
             pendingInput.append("\n");
@@ -292,11 +337,11 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       // we'll just save the extra stuff for the next go around.
       else if (!p.eof || p.peekInputChar(0) != '\0') {
          int consumed = p.getCurrentIndex();
-         pendingInput = new StringBuffer(pendingInput.toString().substring(consumed));
+         pendingInput = new StringBuilder(pendingInput.toString().substring(consumed));
       }
       // Parsed it all - zero out the pending input
       else
-         pendingInput = new StringBuffer();
+         pendingInput = new StringBuilder();
       return ParseUtil.nodeToSemanticValue(parseTree);
    }
 
@@ -604,6 +649,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          try {
             BodyTypeDeclaration current = currentTypes.get(currentTypes.size()-1);
             PropertyAssignment assign = (PropertyAssignment) statement;
+            boolean performedOnce = false;
 
             if (current == null)
                assign.parentNode = getModel();
@@ -612,7 +658,8 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
             ParseUtil.initAndStartComponent(assign);
 
-            if (!assign.hasErrors() && performUpdatesToSystem(system) && !ignoreRemoteStatement(system, assign)) {
+            if (!assign.hasErrors() && performUpdatesToSystem(system, false) && !ignoreRemoteStatement(system, assign)) {
+               performedOnce = true;
                if (edit) {
                   // synchronization done inside updateProperty - we grab the lock to update the model but release it to update the property in case that triggers events back into the system
                   JavaSemanticNode newDefinition = current.updateProperty(assign, execContext, !skipEval, null);
@@ -632,7 +679,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             if (!assign.hasErrors() && sync && syncSystems != null && currentLayer != null && !skipEval) {
                boolean any = false;
                for (LayeredSystem peerSys:syncSystems) {
-                  if (performUpdatesToSystem(peerSys)) {
+                  if (performUpdatesToSystem(peerSys, performedOnce)) {
                      Layer peerLayer = peerSys.getLayerByName(currentLayer.layerUniqueName);
                      BodyTypeDeclaration peerType = peerSys.getSrcTypeDeclaration(current.getFullTypeName(), peerLayer == null ? null : peerLayer.getNextLayer(), true);
                      if (peerType != null) {
@@ -649,10 +696,9 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                            }
                            else {
                               peerAssign.parentNode = peerType;
-                              String res = peerSys.runtimeProcessor.transformStatement(peerType, curObj, peerAssign);
-                              if (res != null && res.length() > 0) {
-                                 String remoteExprRes = (String) DynUtil.evalScript(res);
-                                 System.out.println(remoteExprRes);
+                              Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerAssign);
+                              if (remoteRes != null) {
+                                 System.out.println(remoteRes);
                               }
                            }
                            any = true;
@@ -755,8 +801,10 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
             try {
                if (!skipEval) {
-                  if (performUpdatesToSystem(system) && !ignoreRemoteStatement(system, expr)) {
+                  boolean evalPerformed = false;
+                  if (performUpdatesToSystem(system, false) && !ignoreRemoteStatement(system, expr)) {
                      Object exprResult = expr.eval(null, execContext);
+                     evalPerformed = true;
                      if (exprResult == null) {
                         if (!ModelUtil.typeIsVoid(expr.getTypeDeclaration()))
                            System.out.println("null");
@@ -765,19 +813,16 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                         System.out.println(exprResult);
                   }
 
-                  if (sync && syncSystems != null && currentType != null && currentLayer != null) {
+                  if (syncSystems != null && currentType != null && currentLayer != null) {
                      for (LayeredSystem peerSys:syncSystems) {
-                        if (performUpdatesToSystem(peerSys)) {
+                        if (performUpdatesToSystem(peerSys, evalPerformed)) {
                            Layer peerLayer = peerSys.getLayerByName(currentLayer.layerUniqueName);
                            BodyTypeDeclaration peerType = peerSys.getSrcTypeDeclaration(currentType.getFullTypeName(), peerLayer == null ? null : peerLayer.getNextLayer(), true);
                            if (peerType != null) {
                               Expression peerExpr = expr.deepCopy(0, null);
                               peerExpr.parentNode = peerType;
-                              String res = peerSys.runtimeProcessor.transformStatement(peerType, curObj, peerExpr);
-                              if (res != null && res.length() > 0) {
-                                 Object remoteExprRes = DynUtil.evalScript(res);
-                                 System.out.println(remoteExprRes);
-                              }
+                              Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerExpr);
+                              System.out.println(remoteRes);
                            }
                         }
                      }
@@ -822,12 +867,15 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          }
 
          try {
-            if (performUpdatesToSystem(system))
+            boolean updatedAlready = false;
+            if (performUpdatesToSystem(system, false)) {
                currentType.updateBlockStatement((BlockStatement)statement, execContext, null);
+               updatedAlready = true;
+            }
 
             if (sync && syncSystems != null && currentLayer != null && !skipEval) {
                for (LayeredSystem peerSys:syncSystems) {
-                  if (performUpdatesToSystem(system)) {
+                  if (performUpdatesToSystem(system, updatedAlready)) {
                      Layer peerLayer = peerSys.getLayerByName(currentLayer.layerUniqueName);
                      BodyTypeDeclaration peerType = peerSys.getSrcTypeDeclaration(currentType.getFullTypeName(), peerLayer == null ? null : peerLayer.getNextLayer(), true);
                      if (peerType != null) {
@@ -839,10 +887,9 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                         }
                         else {
                            peerBlock.parentNode = peerType;
-                           String res = peerSys.runtimeProcessor.transformStatement(peerType, curObj, peerBlock);
-                           if (res != null && res.length() > 0) {
-                              String remoteExprRes = (String) DynUtil.evalScript(res);
-                              System.out.println(remoteExprRes);
+                           Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerBlock);
+                           if (remoteRes != null) {
+                              System.out.println(remoteRes);
                            }
                         }
                      }
@@ -853,6 +900,73 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          finally {
             if (pushed)
                execContext.popCurrentObject();
+         }
+      }
+      else if (statement instanceof Statement) {
+         boolean pushed = false;
+         Object curObj = null;
+
+         Statement expr = (Statement) statement;
+         BodyTypeDeclaration currentType = currentTypes.size() == 0 ? null : currentTypes.get(currentTypes.size() - 1);
+         if (currentType == null)
+            expr.parentNode = getModel();
+         else
+            expr.parentNode = currentType;
+
+         ParseUtil.initAndStartComponent(model);
+         ParseUtil.initAndStartComponent(expr);
+
+         if (expr.errorArgs == null && !model.hasErrors) {
+            if (autoObjectSelect && currentType != null) {
+               if (!hasCurrentObject() || (curObj = getCurrentObject()) == null) {
+                  Object res;
+                  res = SelectObjectWizard.start(this, statement, true);
+                  if (res == SelectObjectWizard.NO_INSTANCES_SENTINEL)
+                     skipEval = true;
+                  else if (res == null)
+                     return;
+                  else {
+                     curObj = res;
+                     execContext.pushCurrentObject(curObj);
+                     pushed = true;
+                  }
+               }
+               else {
+                  execContext.pushCurrentObject(curObj);
+                  pushed = true;
+               }
+            }
+
+            try {
+               if (!skipEval) {
+                  boolean evalPerformed = false;
+                  if (performUpdatesToSystem(system, false) && !ignoreRemoteStatement(system, expr)) {
+                     ExecResult execResult = expr.exec(execContext);
+                     if (execResult != ExecResult.Next)
+                        System.err.println("*** Statement flow control at top-level not supported: " + expr);
+                     evalPerformed = true;
+                  }
+
+                  if (!evalPerformed && syncSystems != null && currentType != null && currentLayer != null) {
+                     for (LayeredSystem peerSys:syncSystems) {
+                        if (performUpdatesToSystem(peerSys, evalPerformed)) {
+                           Layer peerLayer = peerSys.getLayerByName(currentLayer.layerUniqueName);
+                           BodyTypeDeclaration peerType = peerSys.getSrcTypeDeclaration(currentType.getFullTypeName(), peerLayer == null ? null : peerLayer.getNextLayer(), true);
+                           if (peerType != null) {
+                              Statement peerExpr = expr.deepCopy(0, null);
+                              peerExpr.parentNode = peerType;
+                              Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerExpr);
+                              System.out.println(remoteRes);
+                           }
+                        }
+                     }
+                  }
+               }
+            }
+            finally {
+               if (pushed)
+                  execContext.popCurrentObject();
+            }
          }
       }
       else
@@ -873,7 +987,11 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       return !st.execForRuntime(sys);
    }
 
-   private boolean performUpdatesToSystem(LayeredSystem sys) {
+   private boolean performUpdatesToSystem(LayeredSystem sys, boolean performedOnce) {
+      // Only targeting the first runtime and this statement was already invoked once
+      if (performedOnce && !targetAllRuntimes)
+         return false;
+
       if (targetRuntime == null) {
          return true;
       }

@@ -2999,6 +2999,12 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
       return sb;
    }
 
+   /** Just like output but when invoked on the server, evaluates the output on the client as a remote method call */
+   @sc.obj.Exec(clientOnly=true)
+   public StringBuilder output_c() {
+      return output();
+   }
+
    private int repeatElementIndexOf(Object repeat, int startIx, Object repeatVar) {
       int sz = PTypeUtil.getArrayLength(repeat);
       for (int i = startIx; i < sz; i++) {

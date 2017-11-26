@@ -45,6 +45,16 @@ public class CommandInterpreter extends AbstractInterpreter {
       }
    }
 
+   @Override
+   public boolean inputBytesAvailable() {
+      try {
+         return input.ready();
+      }
+      catch (IOException exc) {
+         return false;
+      }
+   }
+
    public boolean readParseLoop() {
       initReadThread();
       boolean lastPending = false;
