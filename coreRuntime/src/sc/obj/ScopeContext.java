@@ -119,9 +119,14 @@ public abstract class ScopeContext {
 
    private void notifyListeners() {
       refreshPending = false;
-      if (changeListeners != null)
-         for (IScopeChangeListener listener:changeListeners)
+      if (changeListeners != null) {
+         ArrayList<IScopeChangeListener> listenersToNotify;
+         synchronized (this) {
+            listenersToNotify = new ArrayList<IScopeChangeListener>(changeListeners);
+         }
+         for (IScopeChangeListener listener:listenersToNotify)
             listener.scopeChanged();
+      }
    }
 
    public synchronized void addChangeListener(IScopeChangeListener listener) {

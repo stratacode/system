@@ -4796,16 +4796,24 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private void initPostBuildModels() {
       Thread.currentThread().setContextClassLoader(getSysClassLoader());
 
-      PerfMon.start("postBuildFiles");
-      for (Map.Entry<String,ModelToPostBuild> ent:modelsToPostBuild.entrySet()) {
-         ModelToPostBuild m = ent.getValue();
-         IFileProcessorResult model = m.model;
-         if (options.verbose)
-            System.out.println("PostBuild processing: " + model.getProcessedFileId());
+      // Turn off sync for the page objects when they are being rendered statically - just removes some errors because we may create synchronized instances here
+      SyncManager.SyncState oldState = SyncManager.setSyncState(SyncManager.SyncState.Disabled);
+      try {
 
-         model.postBuild(m.genLayer, m.genLayer.buildSrcDir);
+         PerfMon.start("postBuildFiles");
+         for (Map.Entry<String,ModelToPostBuild> ent:modelsToPostBuild.entrySet()) {
+            ModelToPostBuild m = ent.getValue();
+            IFileProcessorResult model = m.model;
+            if (options.verbose)
+               System.out.println("PostBuild processing: " + model.getProcessedFileId());
+
+            model.postBuild(m.genLayer, m.genLayer.buildSrcDir);
+         }
+         PerfMon.end("postBuildFiles");
       }
-      PerfMon.end("postBuildFiles");
+      finally {
+         SyncManager.restoreOldSyncState(oldState);
+      }
    }
 
    private int runRunCommands() {

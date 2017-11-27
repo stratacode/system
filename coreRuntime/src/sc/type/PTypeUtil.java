@@ -45,7 +45,7 @@ public class PTypeUtil {
       return res;
    }
 
-   /** Abstraction around thread local cause GWT does not implement it */
+   /** Abstraction around thread local because GWT and JS do not support thread local */
    public static Object setThreadLocal(String key, Object value) {
       return threadLocalMap.put(key, value);
    }

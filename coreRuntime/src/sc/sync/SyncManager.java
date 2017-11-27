@@ -2440,8 +2440,10 @@ public class SyncManager {
 
       if (syncCtx != null)
          return syncCtx.registerSyncInst(inst);
-      else if (scopeName != null && verbose)
-         System.err.println("*** No sync context for scope: " + scopeName + " available to register instance: " + DynUtil.getInstanceName(inst));
+      else if (scopeName != null && verbose) {
+         if (getSyncState() != SyncState.Disabled)
+            System.err.println("*** No sync context for scope: " + scopeName + " available to register instance: " + DynUtil.getInstanceName(inst));
+      }
       return false;
    }
 
