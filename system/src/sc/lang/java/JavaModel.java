@@ -1950,6 +1950,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (modModel != null) {
          if (modModel.transformedModel != null)
             modModel = modModel.transformedModel;
+         if (modModel == this) {
+            System.err.println("*** Modified model is same as this model?");
+            return;
+         }
          modModel.setResultSuffix(resultSuffix);
       }
    }

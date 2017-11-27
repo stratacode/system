@@ -10614,9 +10614,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (peerLayer.started) {
          beingLoaded.put(copySrcEnt.absFileName, copy);
 
-         initModel(peerLayer, modTimeStart, copy, false, true);
-
-         beingLoaded.remove(copySrcEnt.absFileName);
+         try {
+            initModel(peerLayer, modTimeStart, copy, false, true);
+         }
+         finally {
+            beingLoaded.remove(copySrcEnt.absFileName);
+         }
 
          addNewModel(copy, peerLayer.getNextLayer(), null, null, false, false);
       }
@@ -14929,43 +14932,50 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    /** Returns all of the declared URL top-level system types, including those in the mainInit and URLTypes type groups. */
    public List<URLPath> getURLPaths() {
-      List<TypeGroupMember> mainInitMembers = buildInfo.getTypeGroupMembers("mainInit");
-      List<TypeGroupMember> urlTypes = buildInfo.getTypeGroupMembers("URLTypes");
-      if (mainInitMembers == null && urlTypes == null)
-         return null;
-      ArrayList<URLPath> res = new ArrayList<URLPath>();
-      if (mainInitMembers != null) {
-         for (TypeGroupMember memb:mainInitMembers) {
-            // Skip mainInit types which also have URL since we'll process them below
-            if (memb.hasAnnotation("sc.html.URL"))
-               continue;
-            URLPath path = new URLPath(CTypeUtil.getClassName(memb.typeName));
-            if (!res.contains(path))
-               res.add(path);
+      ArrayList<URLPath> res = null;
+      try {
+         acquireDynLock(false);
+         List<TypeGroupMember> mainInitMembers = buildInfo.getTypeGroupMembers("mainInit");
+         List<TypeGroupMember> urlTypes = buildInfo.getTypeGroupMembers("URLTypes");
+         if (mainInitMembers == null && urlTypes == null)
+            return null;
+         res = new ArrayList<URLPath>();
+         if (mainInitMembers != null) {
+            for (TypeGroupMember memb:mainInitMembers) {
+               // Skip mainInit types which also have URL since we'll process them below
+               if (memb.hasAnnotation("sc.html.URL"))
+                  continue;
+               URLPath path = new URLPath(CTypeUtil.getClassName(memb.typeName));
+               if (!res.contains(path))
+                  res.add(path);
+            }
+         }
+         if (urlTypes != null) {
+            for (TypeGroupMember memb:urlTypes) {
+               // Skip the Html and Page types
+               Object sto = memb.getAnnotationValue("sc.html.URL", "subTypesOnly");
+               if (sto != null && (Boolean) sto)
+                  continue;
+               // Skip CSS types
+               Object resource = memb.getAnnotationValue("sc.html.URL", "resource");
+               if (resource != null && (Boolean) resource)
+                  continue;
+               // Skip types which may not be loaded yet
+               if (memb.getType() == null)
+                  continue;
+               URLPath path = new URLPath(CTypeUtil.getClassName(memb.typeName));
+               // TODO: when the pattern is in the pattern language, we can init the pattern, find the variables and build
+               // a form for testing the URL?
+               String annotURL = (String) memb.getAnnotationValue("sc.html.URL", "pattern");
+               if (annotURL != null)
+                  path.url = annotURL;
+               if (!res.contains(path))
+                  res.add(path);
+            }
          }
       }
-      if (urlTypes != null) {
-         for (TypeGroupMember memb:urlTypes) {
-            // Skip the Html and Page types
-            Object sto = memb.getAnnotationValue("sc.html.URL", "subTypesOnly");
-            if (sto != null && (Boolean) sto)
-               continue;
-            // Skip CSS types
-            Object resource = memb.getAnnotationValue("sc.html.URL", "resource");
-            if (resource != null && (Boolean) resource)
-               continue;
-            // Skip types which may not be loaded yet
-            if (memb.getType() == null)
-               continue;
-            URLPath path = new URLPath(CTypeUtil.getClassName(memb.typeName));
-            // TODO: when the pattern is in the pattern language, we can init the pattern, find the variables and build
-            // a form for testing the URL?
-            String annotURL = (String) memb.getAnnotationValue("sc.html.URL", "pattern");
-            if (annotURL != null)
-               path.url = annotURL;
-            if (!res.contains(path))
-               res.add(path);
-         }
+      finally {
+         releaseDynLock(false);
       }
       return res;
    }

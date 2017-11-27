@@ -2548,8 +2548,16 @@ public class IdentifierExpression extends ArgumentsExpression {
                      // method call as the base and the reset of the selectors get added from this expression
                      if (ModelUtil.isDynamicNew(type) && !ModelUtil.isDynamicStub(type, false) && model.mergeDeclaration) {
                         if (i != sz - 1) {
-                           System.err.println("*** Unhandled case for transforming dynamic types");
-                           return true;
+                           // Resolving A.B.C where they are all objects - we can just resolve the leaf node
+                           while (i < sz - 1 && idTypes[i+1] == BoundObjectName) {
+                              i++;
+                              type = boundTypes[i];
+                           }
+                           // TODO: But here, we need to create the SelectorExpression that does the resolve and then create the identifier expression for the rest and transform that, like we do
+                           // in converting to a getX method in some cases. This is not hard but just need a test-case
+                           if (i != sz - 1) {
+                              throw new UnsupportedOperationException("*** Unhandled case for transforming dynamic types");
+                           }
                         }
                         SemanticNodeList<Expression> args = new SemanticNodeList<Expression>();
                         args.add(StringLiteral.create(ModelUtil.getTypeName(type)));

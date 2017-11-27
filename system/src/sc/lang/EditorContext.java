@@ -1488,6 +1488,8 @@ public class EditorContext extends ClientEditorContext {
 
    /** Returns the current type - excluding the default cmdObject which collects classBodyDeclarations at the top-level */
    public BodyTypeDeclaration getCurrentType(boolean includeDefault) {
+      if (currentTypes.size() == 0)
+         return null;
       return currentTypes.size() == (includeDefault ? 0 : 1) ? null : currentTypes.get(currentTypes.size()-1);
    }
 
