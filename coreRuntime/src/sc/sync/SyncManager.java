@@ -944,7 +944,7 @@ public class SyncManager {
             --pendingSyncs;
             if (pendingSyncs == 0) {
                commitNewObjNames(clientContext);
-               needsSync = false;  // TODO: should this be done as soon as we've sent a commit when there are no more unsent commits?
+               setNeedsSync(false);
             }
          }
       }
@@ -3060,7 +3060,7 @@ public class SyncManager {
 
    public int numSendsInProgress = 0;
 
-   /** The number of sendSync's that have not been ackowledged yet - i.e. the number of requests outstanding */
+   /** The number of sendSync's with data that have not been acknowledged yet - i.e. the number of requests outstanding */
    @Bindable(manual=true)
    public void setNumSendsInProgress(int newNum) {
       numSendsInProgress = newNum;

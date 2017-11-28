@@ -47,8 +47,11 @@ public abstract class SyncDestination {
    /** Stores the runtime name used for determining what methods are exposed for this runtime. */ // TODO: would we ever want to use one destination for more than one runtime context?  Maybe this belongs in the Context object?
    public String remoteRuntimeName = "java";
 
-   /** The number of sync requests that are in progress against this destination */
+   /** The number of sync requests that send changes that are in progress against this destination */
    public int numSendsInProgress = 0;
+
+   /** Number of sync requests which have the 'waitTime' set - i.e. the number of syncs where we are only receiving changes */
+   public int numWaitsInProgress = 0;
 
    /** Should this destination implement real-time semantics - i.e. where the client receives changes from the server automatically */
    public boolean realTime = true;
@@ -197,13 +200,15 @@ public abstract class SyncDestination {
    public class SyncListener implements IResponseListener {
       ArrayList<SyncLayer> syncLayers;
       SyncManager.SyncContext clientContext;
-      public SyncListener(ArrayList<SyncLayer> sls) {
+      boolean anyChanges;
+      public SyncListener(ArrayList<SyncLayer> sls, boolean anyChanges) {
          syncLayers = sls;
          clientContext = sls.get(0).syncContext;
+         this.anyChanges = anyChanges;
       }
 
       public void completeSync(Integer errorCode, String message) {
-         updateInProgress(false);
+         updateInProgress(false, anyChanges);
          for (SyncLayer syncLayer:syncLayers) {
             syncLayer.completeSync(clientContext, errorCode, message);
          }
@@ -285,12 +290,18 @@ public abstract class SyncDestination {
       }
    }
 
-   public void updateInProgress(boolean start) {
+   public void updateInProgress(boolean start, boolean anyChanges) {
       // TODO: do we need to sync here for thread safety?  Right now we are only sending on the client where it's not an issue
       int incr = (start ? 1 : -1);
-      numSendsInProgress += incr;
-      if (isSendingSync())
-         syncManager.setNumSendsInProgress(syncManager.getNumSendsInProgress() + incr);
+
+      if (anyChanges) {
+         numSendsInProgress += incr;
+         if (isSendingSync())
+            syncManager.setNumSendsInProgress(syncManager.getNumSendsInProgress() + incr);
+      }
+      else {
+         numWaitsInProgress += incr;
+      }
    }
 
    /** Called after we've finished the entire sync.  For client destinations, this is the hook to see if we need to start another sync to obtain real-time changes */
@@ -326,8 +337,8 @@ public abstract class SyncDestination {
                System.out.println("Sending sync to destination: " + name + " size: " + debugDef.length() + "\n" + debugDef);
          }
          if (!resetSync) {
-            updateInProgress(true);
-            writeToDestination(layerDef, syncGroup, new SyncListener(layers), null, codeUpdates);
+            updateInProgress(true, anyChanges);
+            writeToDestination(layerDef, syncGroup, new SyncListener(layers, anyChanges), null, codeUpdates);
          }
          complete = true;
       }
