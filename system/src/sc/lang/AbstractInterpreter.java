@@ -43,6 +43,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    boolean inBlockComment = false;
 
    public boolean exitOnError = true;
+   public boolean noPrompt = false;
 
    public class CmdClassDeclaration extends ClassDeclaration {
       public boolean isDynamicStub(boolean includeExt) {
@@ -188,7 +189,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    protected String prompt() {
       // We don't want to display the prompt when we've been redirected from another file
-      if (consoleDisabled)
+      if (consoleDisabled || noPrompt)
          return "";
       system.acquireDynLock(false); // TODO: should be read-only lock - why does that not work?  so that we wait till the main thread has finished.  This both ensures the prompt is the last message displayed and that main processing completes before we start reading the next command.
       try {
