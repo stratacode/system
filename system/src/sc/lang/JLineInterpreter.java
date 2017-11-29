@@ -55,6 +55,12 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
    }
 
    public boolean readParseLoop() {
+      // The main system starts the command interpreter before it's finished with the initialization but we don't want it
+      // to start before the initialization has completed.  It's cleanest that way and keeps the messages in a consistent
+      // order.  So by grabbing and releasing the system lock, we are basically just waiting for the system to complete.
+      system.acquireDynLock(false);
+      system.releaseDynLock(false);
+
       initReadThread();
       do {
          try {
