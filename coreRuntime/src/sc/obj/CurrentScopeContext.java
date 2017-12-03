@@ -111,6 +111,14 @@ public class CurrentScopeContext {
       }
    }
 
+   public static CurrentScopeContext get(String alias) {
+      synchronized (aliasLock) {
+         if (scopeAliases == null)
+            scopeAliases = new HashMap<String,CurrentScopeContext>();
+         return scopeAliases.get(alias);
+      }
+   }
+
    public static boolean remove(String alias) {
       synchronized (aliasLock) {
          if (scopeAliases == null)
@@ -119,7 +127,7 @@ public class CurrentScopeContext {
       }
    }
 
-   public static CurrentScopeContext waitFor(String alias, long timeout) {
+   public static CurrentScopeContext waitForCreate(String alias, long timeout) {
       synchronized (aliasLock) {
          if (scopeAliases == null)
             scopeAliases = new HashMap<String,CurrentScopeContext>();
@@ -127,46 +135,44 @@ public class CurrentScopeContext {
       long now = System.currentTimeMillis();
       long startTime = now;
       do {
-         CurrentScopeContext ctx = scopeAliases.get(alias);
-         if (ctx == null) {
-            if (now - startTime > timeout) {
-               if (ScopeDefinition.verbose)
-                  System.out.println("waitFor(" + alias + ", " + timeout + ") - timed out in " + (now - startTime) + " millis");
-               return null;
-            }
-            try {
-               synchronized (aliasLock) {
+         synchronized (aliasLock) {
+            CurrentScopeContext ctx = scopeAliases.get(alias);
+            if (ctx == null) {
+               if (now - startTime > timeout) {
+                  break;
+               }
+               try {
                   aliasLock.wait(timeout);
                }
+               catch (InterruptedException exc) {}
             }
-            catch (InterruptedException exc) {}
+            else
+               return ctx;
          }
-         else
-            return ctx;
          now = System.currentTimeMillis();
       } while (true);
+
+      if (ScopeDefinition.verbose)
+         System.out.println("waitForCreate(" + alias + ", " + timeout + ") - timed out in " + (now - startTime) + " millis");
+      return null;
    }
 
    public static CurrentScopeContext waitForIdle(String alias, long timeout) {
       long startTime = System.currentTimeMillis();
-      CurrentScopeContext ctx = waitFor(alias, timeout);
+      CurrentScopeContext ctx = waitForCreate(alias, timeout);
       if (ctx == null) {
          return null;
       }
+      long now;
       do {
+         now = System.currentTimeMillis();
          synchronized (ctx) {
-            long now = System.currentTimeMillis();
             if (ctx.contextIsReady) { // A thread is already waiting on this scopeAlias
-               if (ScopeDefinition.verbose)
-                  System.out.println("waitForIdle(" + alias + ", " + timeout + ") returns idle scope ctx: " + ctx + " after: " + (now - startTime) + " millis");
-               // Should we do the push outside of this method?  Will we ever need to pop it?
-               pushCurrentScopeContext(ctx);
-               return ctx;
+               break;
             }
             if (now - startTime > timeout) {
-               if (ScopeDefinition.verbose)
-                  System.out.println("waitForIdle(" + alias + ", " + timeout + ") - timed out: found scopeAlias but no contextIsReady in " + (now - startTime) + " millis");
-               return null;
+               ctx = null;
+               break;
             }
             try {
                ctx.wait(timeout - (now - startTime));
@@ -174,6 +180,18 @@ public class CurrentScopeContext {
             catch (InterruptedException exc) {}
          }
       } while (true);
+
+      if (ctx != null) {
+         if (ScopeDefinition.verbose)
+            System.out.println("waitForIdle(" + alias + ", " + timeout + ") returns idle scope ctx: " + ctx + " after: " + (now - startTime) + " millis");
+         // Should we do the push outside of this method?  Will we ever need to pop it?
+         pushCurrentScopeContext(ctx);
+      }
+      else {
+         if (ScopeDefinition.verbose)
+            System.out.println("waitForIdle(" + alias + ", " + timeout + ") - timed out: found scopeAlias but no contextIsReady in " + (now - startTime) + " millis");
+      }
+      return ctx;
    }
 
    public static void markReady(String scopeAlias, boolean val) {

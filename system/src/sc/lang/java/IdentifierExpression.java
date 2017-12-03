@@ -5534,12 +5534,20 @@ public class IdentifierExpression extends ArgumentsExpression {
    }
 
    public boolean execForRuntime(LayeredSystem runtimeSys) {
+      Object boundType = getBoundType(identifiers.size()-1);
+      if (boundType != null) {
+         JavaModel model = getJavaModel();
+         Layer refLayer = model == null ? null : model.getLayer();
+         return ModelUtil.execForRuntime(getLayeredSystem(), refLayer, boundType, runtimeSys);
+      }
+      /*
       Object refType = getReferenceType();
       if (refType != null) {
          JavaModel model = getJavaModel();
          Layer refLayer = model == null ? null : model.getLayer();
          return ModelUtil.execForRuntime(getLayeredSystem(), refLayer, refType, runtimeSys);
       }
+      */
       return false; // Did not resolve properly for this runtime - maybe the variable is not defined?
    }
 }

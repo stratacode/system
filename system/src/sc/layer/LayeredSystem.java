@@ -47,7 +47,8 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /**
- * The layered system manages the collection of layers which make up the system.  Each layer contains a slice
+ * The layered system manages the collection of layers which make up the system - for reading and editing project files (inactive layers)
+ * compiling and running the system (active layers).  Each layer contains a slice
  * of application code - a single tree organized in a hierarchical name space of definitions.  Definitions
  * create classes, objects, or modify classes or objects.  These layers are merged together to create the
  * current application's program state.
@@ -55,25 +56,28 @@ import java.util.zip.ZipFile;
  * The program state can be processed to produce Java code, then compiled to produce .class files.
  * This class has a main method which implements command line functionality to process and compile Java files.
  * <p/>
- * The layered system is provided with a primary layer which is used as the most specific layer.  You can also
+ * The last layer in the layer stack is considered the primary 'build layer', which is used to store the compiled result.  You can also
  * specify additional layers to include in the application ahead of the primary layer.  All of the layers
  * extended by these layers are expanded, duplicates are removed and the list is sorted into dependency order
- * producing the list of layers that define the application's initial state.
+ * producing the list of layers that define the application's initial state.  Typically the last layer is the last one you specify
+ * on the command line, unless you specify an additional layer which depends on that layer (in this case, specifying the last layer
+ * is redundant anyway since it's picked up automatically when you include a layer which extends it).
  * <p/>
  * The layered system is used at build time to
  * generate the class path for the compiler, find source files to be compiled, and manage the compilation
  * process.  Tools also use the layered system to read and manage program elements, and (eventually) interpret layers.
  * Generated applications typically do not depend on the layered system unless they need to interpret code,
- * use the command line interpreter, or ohter tools to edit the program.
+ * use the command line interpreter, or other tools to edit the program.
  * <p/>
  * The layered system has a main for processing and compiling applications.  The processing phase generates Java
  * code as needed for any language extensions encountered and places these files into the build directory.  At
  * any given time, the layered system is modifying files in a single build directory.  By default, this is the
  * directory named build in the top-level layer's directory.  This goes counter to standard Java convention which
  * is to have src and build directories at the same level.  In this approach, a layer is completely self-contained
- * in a single directory reducing the need for Jar files in making it easy to compartmentalize components.  Because
- * these packages are exposed to higher level programmers, the Java programmers make a concession in cleanliness for
- * the ease of use of all.
+ * in a single directory reducing the need for Jar files in making it easy to compartmentalize components.  For large
+ * java projects, you can also build layers with traditional Java project file organizations.  The framework lets you
+ * copy, override, and replace files and generates a corresponding traditional Java project.  It's straightforward to import
+ * an existing project, and split it apart into more reusable layers which can then be reassembled into broader configurations.
  * <p/>
  * If a Java file does not use any language extensions
  * it can optionally be copied to the build directory along with the generated code so that you have one complete
@@ -125,13 +129,13 @@ import java.util.zip.ZipFile;
  * <p/>
  * -ni: Disable the command interpreter
  * <p/>
- * -t <test-class-patterh>:  Run test classes matching this pattern.
+ * -t <test-class-pattern>:  Run test classes matching this pattern.
  * <p/>
  * -ta: Run all tests
  * <p/>
- * -r <main-class-pattern>:  Run main classses matching this pattern.  All -r options pass remaining args to the main program.
+ * -r <main-class-pattern>:  Run main classes matching this pattern.  All -r options pass remaining args to the main program.
  * <p/>
- * -rs <main-class-pattern>:  Run main classses matching this pattern by executing the script in a new process
+ * -rs <main-class-pattern>:  Run main classes matching this pattern by executing the script in a new process
  * <p/>
  * -ra: Run all main classes.
  * <p/>
@@ -142,6 +146,32 @@ import java.util.zip.ZipFile;
  * -vh, -vha - verbose HTML and very verbose HTML
  * <p/>
  * -vl - show the initial layers as in verbose
+ *
+ * Note that the LayeredSystem is also used in two other contexts - in the dynamic runtime and when using a program editor such as an IDE or
+ * dynamic application editing system.
+ * <p>
+ * When you run an application which uses the dynamic runtime, the LayeredSystem
+ * serves the same purposes.  It compiles the compiled layers, and then manages the interpretation of the dynamic layers.  Dynamic layers are stored
+ * at the end of the 'layers' list, always after the compiled layers.
+ * </p>
+ * For an IDE, typically the LayeredSystem is constructed by the IDE to form a StrataCode project.  The LayeredSystem provides the ability to
+ * manage a set of inactiveLayers, which it lazily populates as layers are required to satisfy editing operations.  It maintains a type index
+ * for all of the layers in the layer path so it can still do global structured editing operations without having to parse all of the source to satisfy
+ * "find usages" type queries or walk backwards in the type inheritance tree.
+ * <p>
+ * LayeredSystems can optionally have "peer LayeredSystems" which represent the set of layers for a separate process, possibly in a separate runtime.
+ * This is helpful both when using an IDE because we have models of all of the processes and can combine them or separate them as needed.
+ * It's helpful in the code-generation phase because we have knowledge of the overlapping parts of the model, and can access the meta-data from both
+ * versions when compiling the code - e.g. the initSyncProperties feature.
+ * </p>
+ *
+ *  TODO: this is a massive class and should be broken into more manageable pieces.  At some point we could separate aspects of the LayeredSystem into layers (e.g. sync, data binding,
+ *  schtml support) and use StrataCode to build itself without breaking any public APIs but it's nice to have Java while SC is still in active development.
+ *  In the short-term, inner classes could be broken out as separate classes and we could possibly modularize things better (e.g.
+ *  move the phases for the code-generation preInit, init, start, etc. into the BuildState class.  It would be nice to move all state managed by the Layer into
+ *  a separate class so we can control the public API of the layer definition.
+ *  Unfortunately it's probably never going to be small... there's a lot of code to customize and manage at the system level.   Once you understand the keywords
+ *  to search for, you can find the chunks of code dealing with that feature as it's somewhat modularized by location in the file.
  */
 public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSystem, IClassResolver {
    {
@@ -276,6 +306,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public RepositorySystem repositorySystem;
 
    public boolean useCanonicalPaths = false;
+
+   // TODO: do we need something like this to filter the bundles directory?
+   //List<String> excludedBundles = null;
 
    private Set<String> changedDirectoryIndex = new HashSet<String>();
    private Map<String,Object> otherClassCache; // Only used for CFClass - when crossCompile is true
@@ -6611,6 +6644,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             File bundleDir = new File(bundleDirName);
             if (!bundleDir.isDirectory())
                continue;
+            /*
+            if (excludedBundles != null && excludedBundles.contains(bundleName)) {
+               if (options.verbose)
+                  System.out.println("Excluding bundle: " + bundleName);
+               continue;
+            }
+            */
             if (layerPathBuf.length() > 0)
                layerPathBuf.append(FileUtil.PATH_SEPARATOR_CHAR);
             layerPathBuf.append(bundleDirName);

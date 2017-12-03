@@ -26,6 +26,7 @@ public abstract class ClientEditorContext {
 
    // TODO: shouldn't the command line handle runtime types as well?
    ArrayList<BodyTypeDeclaration> currentTypes = new ArrayList<BodyTypeDeclaration>();
+   int startTypeIndex = 0;
 
    boolean currentModelStale = false;
 

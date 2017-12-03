@@ -15,6 +15,7 @@ import sc.lang.sc.ModifyDeclaration;
 import sc.lang.java.Package;
 import sc.lang.java.*;
 import sc.layer.*;
+import sc.obj.CurrentScopeContext;
 import sc.parser.*;
 import sc.type.CTypeUtil;
 import sc.type.TypeUtil;
@@ -67,6 +68,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       // a 'cmd' object which stores all of the script stuff which is thrown away.  The downside is that we may need some way to limit references to persistent edited code to
       // these 'cmd' fields, methods, etc since they won't be there unless the script is running.
       currentTypes.add(cmdObject);
+      startTypeIndex = 1;
 
       // TODO: will there ever be more than one?
       DynUtil.addDynInstance("cmd", this);
@@ -203,7 +205,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
          String basePrompt = getSyncPromptStr() + " -> ";
 
-         if (currentTypes.size() == 1) {
+         if (currentTypes.size() == startTypeIndex) {
             String prefix = "";
             if (displayLayer) {
                prefix = currentLayer == null ? "<no layer>" : (currentLayer.getLayerName() + (getPrefix() == null ? "" : ":" + getPrefix()));
@@ -257,7 +259,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    }
 
    protected Parselet getParselet() {
-      if (currentTypes.size() == 1)
+      if (currentTypes.size() == startTypeIndex)
          return cmdlang.topLevelCommands;
       else
          return cmdlang.typeCommands;
@@ -563,6 +565,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          // before it is on the file system and that leads to an error trying to find the type
          if (newSrcEnt != null)
             layer.addNewSrcFile(newSrcEnt, true);
+         boolean pushedCtx = pushCurrentScopeContext();
 
          // Must be done after adding so we get the full type name
          String typeName = ModelUtil.getTypeName(type);
@@ -575,7 +578,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
          DeclarationType declType = type.getDeclarationType();
 
-         if (type.getDefinesCurrentObject()) {
+         if (type.getDefinesCurrentObject() || parentType == null) {
             boolean pushed = false;
             Object obj = null;
             try {
@@ -584,8 +587,11 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                // For top-level types, we'll select the current object instance so we can use it to resolve sub-objects
                if (parentObj == null && parentType == null && !hasCurrentObject() && autoObjectSelect) {
                   Object res = SelectObjectWizard.start(this, null, false);
-                  if (res == null)
+                  if (res == null) {
+                     if (pushedCtx)
+                        popCurrentScopeContext();
                      return;
+                  }
                   if (res != SelectObjectWizard.NO_INSTANCES_SENTINEL && res != null) {
                      obj = res;
                   }
@@ -607,6 +613,10 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                // Avoid stack problems
                if (!pushed)
                   execContext.pushCurrentObject(null);
+               if (pushedCtx) {
+                  popCurrentScopeContext();
+                  pushedCtx = false;
+               }
             }
             if (obj == null && checkCurrentObject) {
                System.err.println("*** Unable to resolve object: " + typeName);
@@ -620,11 +630,14 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          else {
             execContext.pushStaticFrame(type);
          }
+         if (pushedCtx)
+            popCurrentScopeContext();
          markCurrentTypeChanged();
       }
       else if (statement instanceof PropertyAssignment) {
          Object curObj = null;
          boolean pushed = false;
+         boolean pushedCtx = pushCurrentScopeContext();
          boolean noInstance = false;
          PropertyAssignment pa = (PropertyAssignment) statement;
 
@@ -633,8 +646,11 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                Object res = SelectObjectWizard.start(this, statement, true);
                if (res == SelectObjectWizard.NO_INSTANCES_SENTINEL)
                   noInstance = true; // TODO: see below - used to set skipEval = true here
-               else if (res == null)
+               else if (res == null) {
+                  if (pushedCtx)
+                     popCurrentScopeContext();
                   return;
+               }
                else {
                   curObj = res;
                   execContext.pushCurrentObject(curObj);
@@ -714,6 +730,8 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          finally {
             if (pushed)
                execContext.popCurrentObject();
+            if (pushedCtx)
+               popCurrentScopeContext();
          }
       }
       else if (statement instanceof TypedDefinition) {
@@ -735,7 +753,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          addChangedModel(pendingModel);
       }
       else if (statement instanceof EndTypeDeclaration) {
-         if (currentTypes.size() == 1) {
+         if (currentTypes.size() == startTypeIndex) {
             if (path == null || path.equals("")) {
                if (currentLayer == null)
                   System.err.println("No current layer to go up");
@@ -759,7 +777,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             }
             else if (oldType.getDeclarationType() != DeclarationType.UNKNOWN)
                execContext.popStaticFrame();
-            if (currentTypes.size() == 1)
+            if (currentTypes.size() == startTypeIndex)
                clearPendingModel();
             origIndent--;
             markCurrentTypeChanged();
@@ -767,6 +785,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       }
       else if (statement instanceof Expression) {
          boolean pushed = false;
+         boolean pushedCtx = false;
          Object curObj = null;
 
          Expression expr = (Expression) statement;
@@ -780,14 +799,18 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          ParseUtil.initAndStartComponent(expr);
 
          if (expr.errorArgs == null && !model.hasErrors) {
+            pushedCtx = pushCurrentScopeContext();
             if (!expr.isStaticTarget() && autoObjectSelect && currentType != null) {
                if (!hasCurrentObject() || (curObj = getCurrentObject()) == null) {
                   Object res;
                   res = SelectObjectWizard.start(this, statement, true);
                   if (res == SelectObjectWizard.NO_INSTANCES_SENTINEL)
                      skipEval = true;
-                  else if (res == null)
+                  else if (res == null) {
+                     if (pushedCtx)
+                        popCurrentScopeContext();
                      return;
+                  }
                   else {
                      curObj = res;
                      execContext.pushCurrentObject(curObj);
@@ -822,8 +845,10 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                            if (peerType != null) {
                               Expression peerExpr = expr.deepCopy(0, null);
                               peerExpr.parentNode = peerType;
-                              Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerExpr);
-                              System.out.println(remoteRes);
+                              if (!ignoreRemoteStatement(peerSys, peerExpr)) {
+                                 Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerExpr);
+                                 System.out.println(remoteRes);
+                              }
                            }
                         }
                      }
@@ -833,6 +858,8 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             finally {
                if (pushed)
                   execContext.popCurrentObject();
+               if (pushedCtx)
+                  popCurrentScopeContext();
             }
          }
       }
@@ -846,6 +873,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
          Object curObj = null;
          boolean pushed = false;
+         boolean pushedCtx = pushCurrentScopeContext();
 
          if (!block.staticEnabled && autoObjectSelect) {
             if (!hasCurrentObject() || (curObj = getCurrentObject()) == null) {
@@ -853,8 +881,11 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                res = SelectObjectWizard.start(this, statement, true);
                if (res == SelectObjectWizard.NO_INSTANCES_SENTINEL)
                   skipEval = true;
-               else if (res == null)
+               else if (res == null) {
+                  if (pushedCtx)
+                     popCurrentScopeContext();
                   return;
+               }
                else {
                   curObj = res;
                   execContext.pushCurrentObject(curObj);
@@ -901,10 +932,13 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          finally {
             if (pushed)
                execContext.popCurrentObject();
+            if (pushedCtx)
+               popCurrentScopeContext();
          }
       }
       else if (statement instanceof Statement) {
          boolean pushed = false;
+         boolean pushedCtx = false;
          Object curObj = null;
 
          Statement expr = (Statement) statement;
@@ -919,13 +953,17 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
          if (expr.errorArgs == null && !model.hasErrors) {
             if (autoObjectSelect && currentType != null) {
+               pushedCtx = pushCurrentScopeContext();
                if (!hasCurrentObject() || (curObj = getCurrentObject()) == null) {
                   Object res;
                   res = SelectObjectWizard.start(this, statement, true);
                   if (res == SelectObjectWizard.NO_INSTANCES_SENTINEL)
                      skipEval = true;
-                  else if (res == null)
+                  else if (res == null) {
+                     if (pushedCtx)
+                        popCurrentScopeContext();
                      return;
+                  }
                   else {
                      curObj = res;
                      execContext.pushCurrentObject(curObj);
@@ -956,8 +994,11 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                            if (peerType != null) {
                               Statement peerExpr = expr.deepCopy(0, null);
                               peerExpr.parentNode = peerType;
-                              Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerExpr);
-                              System.out.println(remoteRes);
+
+                              if (!ignoreRemoteStatement(peerSys, peerExpr)) {
+                                 Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerExpr);
+                                 System.out.println(remoteRes);
+                              }
                            }
                         }
                      }
@@ -967,6 +1008,8 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             finally {
                if (pushed)
                   execContext.popCurrentObject();
+               if (pushedCtx)
+                  popCurrentScopeContext();
             }
          }
       }
@@ -1017,10 +1060,34 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    public Object getCurrentObjectWithDefault() {
       Object obj = getCurrentObject();
-      if (obj == null && currentTypes.size() > 1)
+      if (obj == null && currentTypes.size() > startTypeIndex)
          obj = getDefaultCurrentObj(currentTypes.get(currentTypes.size()-1));
       return obj;
    }
+
+   /**
+    * Before we run any object resolveName methods or expressions from the command, we may need to select a CurrentScopeContext that's
+    * been registered by the framework, to select the specific context these commands operate in.  For example, when the command
+    * line is enabled, each time we render a window, we switch the defaultCmdContext to that window's contexts so we can control
+    * the last browser window opened by default.   Some scripts will explicitly open a named scope context and call waitForIdle on that
+    * which prevents us from needing to use the default one.
+    */
+   public boolean pushCurrentScopeContext() {
+      CurrentScopeContext ctx = CurrentScopeContext.getEnvScopeContextState();
+      if (ctx == null) {
+         ctx = CurrentScopeContext.get("defaultCmdContext");
+         if (ctx != null) {
+            CurrentScopeContext.pushCurrentScopeContext(ctx);
+            return true;
+         }
+      }
+      return false;
+   }
+
+   public void popCurrentScopeContext() {
+      CurrentScopeContext.popCurrentScopeContext();
+   }
+
 
    private void removeFromCurrentObject(JavaModel model, BodyTypeDeclaration parentType, Statement type) {
       if (parentType == null) {
@@ -1289,7 +1356,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    }
 
    public void list() {
-      if (currentTypes.size() == 1) {
+      if (currentTypes.size() == startTypeIndex) {
          listLayers();
       }
       else {
@@ -1501,7 +1568,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    /** Move down the layer stack */
    public void down() {
-      if (currentTypes.size() == 1) {
+      if (currentTypes.size() == startTypeIndex) {
          int pos;
          if (currentLayer == null) {
             System.err.println("No current layer");
@@ -1525,7 +1592,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    /** Move up the layer stack */
    public void up() {
-      if (currentTypes.size() == 1) {
+      if (currentTypes.size() == startTypeIndex) {
          int pos;
          if (currentLayer == null) {
             System.err.println("No current layer");
@@ -1564,11 +1631,18 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    }
 
    public void execLaterJobs() {
-      ArrayList<ScheduledJob> toRunNow = new ArrayList<ScheduledJob>(toRunLater);
-      toRunLater.clear();
-      for (int i = 0; i < toRunNow.size(); i++) {
-         ScheduledJob toRun = toRunNow.get(i);
-         toRun.toInvoke.run();
+      boolean pushed = pushCurrentScopeContext(); // TODO: maybe we should just set this and leave it in place rather than popping in processStatement?  We do need to update it each time in case the scope we are using has been changed
+      try {
+         ArrayList<ScheduledJob> toRunNow = new ArrayList<ScheduledJob>(toRunLater);
+         toRunLater.clear();
+         for (int i = 0; i < toRunNow.size(); i++) {
+            ScheduledJob toRun = toRunNow.get(i);
+            toRun.toInvoke.run();
+         }
+      }
+      finally {
+         if (pushed)
+            popCurrentScopeContext();
       }
    }
 

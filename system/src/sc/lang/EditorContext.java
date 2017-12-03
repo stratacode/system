@@ -12,6 +12,7 @@ import sc.lang.sc.SCModel;
 import sc.layer.*;
 import sc.obj.GlobalScopeDefinition;
 import sc.obj.Remote;
+import sc.obj.Scope;
 import sc.parser.*;
 import sc.sync.SyncManager;
 import sc.sync.SyncOptions;
@@ -31,6 +32,8 @@ import java.io.File;
 import java.io.StringReader;
 import java.util.*;
 
+// Labelling this scope so bindings to this type know they are shared
+@Scope(name="global")
 public class EditorContext extends ClientEditorContext {
    static IBeanMapper canUndoProperty = TypeUtil.getPropertyMapping(EditorContext.class, "canUndo");
    static IBeanMapper canRedoProperty = TypeUtil.getPropertyMapping(EditorContext.class, "canRedo");
@@ -119,7 +122,7 @@ public class EditorContext extends ClientEditorContext {
 
    public void setDefaultCurrentObj(Object type, Object inst) {
       // Keep the execContext in sync with what's done in the UI.  So we are editing the same instance
-      if (currentTypes.size() > 0 && type != null && ModelUtil.sameTypes(type, currentTypes.get(currentTypes.size()-1)) && inst != execContext.getCurrentObject()) {
+      if (currentTypes.size() > startTypeIndex && type != null && ModelUtil.sameTypes(type, currentTypes.get(currentTypes.size()-1)) && inst != execContext.getCurrentObject()) {
          execContext.popCurrentObject();
          execContext.pushCurrentObject(inst);
       }
@@ -930,7 +933,7 @@ public class EditorContext extends ClientEditorContext {
                   }
                   // Remap the types in the current types list as well.  Maybe these could be folded into frames in
                   // exec context?
-                  for (int i = 0; i < currentTypes.size(); i++) {
+                  for (int i = startTypeIndex; i < currentTypes.size(); i++) {
                      currentType = currentTypes.get(i);
                      currentTypes.set(i, system.getSrcTypeDeclaration(ModelUtil.getTypeName(currentType), null, false));
                   }
@@ -1486,11 +1489,9 @@ public class EditorContext extends ClientEditorContext {
       return getCurrentType(false);
    }
 
-   /** Returns the current type - excluding the default cmdObject which collects classBodyDeclarations at the top-level */
+   /** Returns the current type - with an option to include the default cmdObject which collects classBodyDeclarations at the top-level */
    public BodyTypeDeclaration getCurrentType(boolean includeDefault) {
-      if (currentTypes.size() == 0)
-         return null;
-      return currentTypes.size() == (includeDefault ? 0 : 1) ? null : currentTypes.get(currentTypes.size()-1);
+      return currentTypes.size() == (includeDefault ? 0 : startTypeIndex) ? null : currentTypes.get(currentTypes.size()-1);
    }
 
    public void pushCurrentType(BodyTypeDeclaration type) {
@@ -1505,6 +1506,8 @@ public class EditorContext extends ClientEditorContext {
    }
 
    public void popCurrentType() {
+      if (currentTypes.size() == startTypeIndex)
+         throw new IllegalArgumentException("Popping current type with no user-defined type in place!");
       BodyTypeDeclaration lastType = currentTypes.remove(currentTypes.size()-1);
       if (lastType.getDefinesCurrentObject())
          execContext.popCurrentObject();
@@ -1517,7 +1520,8 @@ public class EditorContext extends ClientEditorContext {
       if (type != null)
          setCurrentLayer(type.getLayer());
       clearPendingModel();
-      while (currentTypes.size() > 0)
+      // The first type in the currentTypes list is the
+      while (currentTypes.size() > startTypeIndex)
          popCurrentType();
       if (type != null) {
          pushCurrentType(type);

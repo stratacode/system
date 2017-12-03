@@ -162,8 +162,18 @@ public abstract class JavaSemanticNode extends SemanticNode {
 
    public LayeredSystem getLayeredSystem() {
       JavaModel m = getJavaModel();
-      if (m == null)
+      if (m == null) {
+         ISemanticNode par = parentNode;
+         // The CFClassSignature object is the parent for an ClassType but is not
+         while (par != null) {
+            if (par instanceof JavaSemanticNode)
+               return ((JavaSemanticNode) par).getLayeredSystem();
+            if (par instanceof ITypeDeclaration) // To find a CFClass which is a parent
+               return ((ITypeDeclaration) par).getLayeredSystem();
+            par = par.getParentNode();
+         }
          return null;
+      }
       return m.getLayeredSystem();
    }
 
