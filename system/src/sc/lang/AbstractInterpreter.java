@@ -1028,6 +1028,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    }
 
    private static boolean ignoreRemoteStatement(LayeredSystem sys, Statement st) {
+      ParseUtil.initAndStartComponent(st);
       return !st.execForRuntime(sys);
    }
 
