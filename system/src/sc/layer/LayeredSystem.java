@@ -12669,7 +12669,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          return null;
       }
-      return getInnerClassDeclaration(typeName, fromLayer, false, srcOnly, refLayer, layerResolve);
+      return getInnerClassDeclaration(CTypeUtil.prefixPath(packagePrefix, typeName), fromLayer, false, srcOnly, refLayer, layerResolve);
    }
 
    public Object parseInactiveFile(SrcEntry srcEnt) {
