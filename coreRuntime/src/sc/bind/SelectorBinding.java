@@ -34,11 +34,12 @@ public class SelectorBinding extends DestinationListener {
    }
 
    /** Use this form for a top level binding */
-   public SelectorBinding(Object dstObject, Object dstProperty, Object[] boundProperties, BindingDirection bindingDirection) {
+   public SelectorBinding(Object dstObject, Object dstProperty, Object[] boundProperties, BindingDirection bindingDirection, int flags, BindOptions opts) {
       this(boundProperties);
       dstObj = dstObject;
       dstProp = dstProperty;
       direction = bindingDirection;
+      initFlags(flags, opts);
    }
 
    /** Called by the parent when this is a hierarchical binding - i.e. one expression in another */
@@ -58,7 +59,7 @@ public class SelectorBinding extends DestinationListener {
       addListeners();
       if (direction.doForward()) {
          Object result = getBoundValue();
-         if (Bind.trace)
+         if (Bind.trace || (flags & Bind.TRACE) != 0)
             System.out.println("Init:" + toString());
          if (result == UNSET_VALUE_SENTINEL)
             result = null;

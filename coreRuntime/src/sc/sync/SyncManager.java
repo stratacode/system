@@ -1956,7 +1956,11 @@ public class SyncManager {
          if (ii != null)
             return ii.args;
          return null;
-      } public String toString() { return name == null ? super.toString() : name; } // FIXME!
+      }
+
+      public String toString() {
+         return "syncCtx:" + (scope == null ? super.toString() : scope.toString());
+      }
 
       public int compareTo(Object o) {
          if (!(o instanceof SyncContext))
@@ -2465,6 +2469,8 @@ public class SyncManager {
       }
    }
 
+   // TODO: should this be called "getCurrentSyncContext" - it takes the scopeId and looks up using the thread-local scope definition
+   // to find the current scope and then find the SyncContext from the scope (if any).
    private SyncContext getSyncContext(int scopeId, boolean create) {
       if (scopeId == 0)
          return getRootSyncContext();
@@ -2514,10 +2520,26 @@ public class SyncManager {
 
    private void addSyncInst(Object inst, boolean onDemand, boolean initDefault, int scopeId, SyncProperties syncProps, Object...args) {
       SyncContext ctx;
+
       ctx = getSyncContext(scopeId, true);
 
-      if (ctx != null)
+      if (ctx != null) {
+         /*
+         Object outer = DynUtil.getOuterObject(inst);
+         if (outer != null) {
+            Object outerType = DynUtil.getType(outer);
+            SyncProperties outerProps = getSyncProperties(outerType);
+            // If the parent is synchronized and is not synchronized in this context, is it perhaps not supposed to be added here?
+            if (outerProps != null && !ctx.hasSyncInst(outer)) {
+               if (verbose || trace)
+                  System.out.println("addSyncInst - not adding instance to current context: " + ctx + " because parent instance is not sync'd here: " + DynUtil.getInstanceName(inst) + " with outer: " + DynUtil.getInstanceName(outer));
+               return;
+            }
+         }
+         */
+
          ctx.addSyncInst(null, inst, !onDemand, onDemand, initDefault, true, true, scopeId, syncProps, args);
+      }
       else {
          if (trace)
             System.err.println("Ignoring addSyncInst - not in scope: " + ScopeDefinition.getScope(scopeId));

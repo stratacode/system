@@ -10,8 +10,8 @@ public class TernaryBinding extends AbstractMethodBinding {
    public TernaryBinding(IBinding[] parameterBindings) {
       super(parameterBindings);
    }
-   public TernaryBinding(Object dstObject, IBinding dstBinding, IBinding[] parameterBindings, BindingDirection dir) {
-      super(dstObject, dstBinding, dstObject, parameterBindings, dir);
+   public TernaryBinding(Object dstObject, IBinding dstBinding, IBinding[] parameterBindings, BindingDirection dir, int flags, BindOptions opts) {
+      super(dstObject, dstBinding, dstObject, parameterBindings, dir, flags, opts);
    }
 
    protected void initParams() {
@@ -35,7 +35,7 @@ public class TernaryBinding extends AbstractMethodBinding {
    protected Object invokeMethod(Object obj) {
       Object val = boundParams[0].getPropertyValue(obj);
       if (val == null || val == UNSET_VALUE_SENTINEL) {
-         if (Bind.trace)
+         if (Bind.trace || (flags & Bind.TRACE) != 0)
             System.out.println("Unset condition: " + this);
          return UNSET_VALUE_SENTINEL;
       }

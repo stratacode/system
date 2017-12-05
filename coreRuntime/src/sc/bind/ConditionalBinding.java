@@ -14,8 +14,8 @@ public class ConditionalBinding extends AbstractMethodBinding {
       super(parameterBindings);
       operator = op;
    }
-   public ConditionalBinding(Object dstObject, IBinding dstBinding, String op, IBinding[] parameterBindings, BindingDirection dir) {
-      super(dstObject, dstBinding, dstObject, parameterBindings, dir);
+   public ConditionalBinding(Object dstObject, IBinding dstBinding, String op, IBinding[] parameterBindings, BindingDirection dir, int flags, BindOptions opts) {
+      super(dstObject, dstBinding, dstObject, parameterBindings, dir, flags, opts);
       operator = op;
    }
 
@@ -50,7 +50,7 @@ public class ConditionalBinding extends AbstractMethodBinding {
                res = DynUtil.evalConditionalExpression(operator, lhsVal, rhsVal);
             }
             catch (RuntimeException exc) {
-               if (info || trace) {
+               if (info || trace || (flags & Bind.TRACE) != 0) {
                   System.err.println("Runtime exception from conditional binding: " + this + ": " + exc);
                   exc.printStackTrace();
                }

@@ -29,19 +29,21 @@ public class AssignmentBinding extends DestinationListener {
    }
 
    public AssignmentBinding(Object dstObject, IBinding dstProperty, Object srcObject, VariableBinding lhsBinding, IBinding rhsBinding,
-                       BindingDirection bindingDirection) {
+                       BindingDirection bindingDirection, int flags, BindOptions opts) {
       this(srcObject, lhsBinding, rhsBinding);
       dstObj = dstObject;
       dstProp = dstProperty;
       direction = bindingDirection;
+      initFlags(flags, opts);
    }
 
    public AssignmentBinding(Object dstObject, IBinding dstProperty, Object srcObject, VariableBinding lhsBinding, Object rhsValue,
-                            BindingDirection bindingDirection) {
+                            BindingDirection bindingDirection, int flags, BindOptions opts) {
       this(srcObject, lhsBinding, rhsValue);
       dstObj = dstObject;
       dstProp = dstProperty;
       direction = bindingDirection;
+      initFlags(flags, opts);
    }
 
    @Override

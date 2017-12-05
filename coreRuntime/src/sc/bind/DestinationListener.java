@@ -12,6 +12,15 @@ public abstract class DestinationListener extends AbstractListener implements IB
    Object dstObj;    // The object whose property is set by a forward binding
    Object dstProp;   // The property/binding set by a forward binding.  dstProp == dstObj for nested bindings
    BindingDirection direction;
+   int flags;
+   BindOptions opts;
+
+   protected void initFlags(int flags, BindOptions opts) {
+      this.flags = flags;
+      this.opts = opts;
+      if ((flags & Bind.INACTIVE) != 0)
+         activated = false;
+   }
 
    public String toString(String operation, boolean displayValue) {
       if (dstProp != dstObj) {
@@ -54,5 +63,13 @@ public abstract class DestinationListener extends AbstractListener implements IB
    }
 
    protected void applyPendingChildValue(Object val, IBinding src) {
+   }
+
+   public boolean getTrace() {
+      return (flags & Bind.TRACE) != 0;
+   }
+
+   public boolean getVerbose() {
+      return (flags & Bind.VERBOSE) != 0;
    }
 }

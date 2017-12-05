@@ -15,8 +15,8 @@ public class NewBinding extends AbstractMethodBinding {
       newClass = theClass;
       this.paramSig = paramSig;
    }
-   public NewBinding(Object dstObject, IBinding dstBinding, Object theClass, String paramSig, IBinding[] parameterBindings, BindingDirection dir) {
-      super(dstObject, dstBinding, dstObject, parameterBindings, dir);
+   public NewBinding(Object dstObject, IBinding dstBinding, Object theClass, String paramSig, IBinding[] parameterBindings, BindingDirection dir, int flags, BindOptions opts) {
+      super(dstObject, dstBinding, dstObject, parameterBindings, dir, flags, opts);
       newClass = theClass;
       this.paramSig = paramSig;
    }

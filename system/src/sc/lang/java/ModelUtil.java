@@ -2687,9 +2687,11 @@ public class ModelUtil {
             return null;
       }
       Object targetAnnot = ModelUtil.getAnnotation(annot, "java.lang.annotation.Target");
-      targetAnnot = ModelUtil.getAnnotationSingleValue(targetAnnot);
-      if (targetAnnot instanceof java.lang.annotation.ElementType[]) {
-         return EnumSet.copyOf(Arrays.asList((ElementType[]) targetAnnot));
+      if (targetAnnot != null) {
+         targetAnnot = ModelUtil.getAnnotationSingleValue(targetAnnot);
+         if (targetAnnot instanceof java.lang.annotation.ElementType[]) {
+            return EnumSet.copyOf(Arrays.asList((ElementType[]) targetAnnot));
+         }
       }
       return null;
    }

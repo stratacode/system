@@ -332,9 +332,9 @@ public abstract class SyncDestination {
             // For scn, want easy way to debug the sc version, not the JS code
             String debugDef = lastSer == null ? "" : lastSer.getDebugOutput().toString();
             if (resetSync)
-               System.out.println("Reset sync to destination: " + name + " size: " + debugDef.length() + "\n" + debugDef);
+               System.out.println("Reset sync for " + parentContext + " to: " + name + " size: " + debugDef.length() + "\n" + debugDef);
             else if (layerDef.trim().length() > 0)
-               System.out.println("Sending sync to destination: " + name + " size: " + debugDef.length() + "\n" + debugDef);
+               System.out.println("Sending sync from " + parentContext + " to: " + name + " size: " + debugDef.length() + "\n" + debugDef);
          }
          if (!resetSync) {
             updateInProgress(true, anyChanges);

@@ -40,8 +40,8 @@ public class MethodBinding extends AbstractMethodBinding implements IResponseLis
    }
 
    /** A top level method binding */
-   public MethodBinding(Object dstObject, IBinding dstBinding, Object methObj, Object meth, IBinding[] parameterBindings, BindingDirection dir) {
-      super(dstObject, dstBinding, methObj, parameterBindings, dir);
+   public MethodBinding(Object dstObject, IBinding dstBinding, Object methObj, Object meth, IBinding[] parameterBindings, BindingDirection dir, int flags, BindOptions opts) {
+      super(dstObject, dstBinding, methObj, parameterBindings, dir, flags, opts);
       setMethod(meth);
    }
 
@@ -140,7 +140,7 @@ public class MethodBinding extends AbstractMethodBinding implements IResponseLis
          return null;
       }
       if (paramValues == null) {
-         if (trace)
+         if (trace || (flags & Bind.TRACE) != 0)
             System.out.println("Null value for method invocation: " + this);
          return null;
       }
@@ -171,13 +171,13 @@ public class MethodBinding extends AbstractMethodBinding implements IResponseLis
          }
       }
       catch (RuntimeException exc) {
-         if (info || trace) {
+         if (info || trace || (flags & Bind.TRACE) != 0) {
             System.err.println("Runtime exception from method binding: " + this + ": " + exc);
             exc.printStackTrace();
          }
       }
       catch (Exception exc) {
-         if (info || trace) {
+         if (info || trace || (flags & Bind.TRACE) != 0) {
             System.err.println("Exception from method binding: " + this + ": " + exc);
             exc.printStackTrace();
          }
@@ -251,7 +251,7 @@ public class MethodBinding extends AbstractMethodBinding implements IResponseLis
       // Do not apply the return value when this is a top-level method on a reverse-only method.
       if ((direction.doForward() || !direction.doReverse()) || dstObj == dstProp)
          applyPendingValue(value);
-      else if (trace)
+      else if (trace || (flags & Bind.TRACE) != 0)
          System.out.println("Remote method returned value: " + objectToString(value) + " not used in binding: " + this);
    }
 

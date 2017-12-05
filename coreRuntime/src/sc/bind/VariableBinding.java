@@ -49,7 +49,7 @@ public class VariableBinding extends DestinationListener {
    public VariableBinding(Object srcObject, Object[] boundProperties) {
       boundProps = boundProperties;
       srcObj = srcObject;   // The object which holds boundProperties chain - may be == dstObj.
-      if (trace) {
+      if (trace || (this.flags & Bind.TRACE) != 0) {
          if (srcObj == null)
             System.err.println("Warning: VariableBinding - null src object " + this);
          if (boundProps == null)
@@ -64,11 +64,12 @@ public class VariableBinding extends DestinationListener {
 
    /** Use this form for a top level binding */
    public VariableBinding(Object dstObject, IBinding dstProperty, Object srcObject, Object[] boundProperties,
-                          BindingDirection bindingDirection) {
+                          BindingDirection bindingDirection, int flags, BindOptions opts) {
       this(srcObject, boundProperties);
       dstObj = dstObject;
       dstProp = dstProperty;
       direction = bindingDirection;
+      initFlags(flags, opts);
    }
 
    /** Called by the parent when this is a hierarchical binding - i.e. one expression in another */

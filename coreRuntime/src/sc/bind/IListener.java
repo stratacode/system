@@ -61,4 +61,9 @@ public interface IListener {
    SyncType getSync();
 
    float getPriority();
+
+   /** Override and return true if trace is enabled to get tracing of property-set for any property using this listener */
+   boolean getTrace();
+
+   boolean getVerbose();
 }

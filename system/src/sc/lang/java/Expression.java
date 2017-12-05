@@ -4,7 +4,7 @@
 
 package sc.lang.java;
 
-import sc.bind.ConstantBinding;
+import sc.bind.*;
 import sc.lang.*;
 import sc.lang.js.JSLanguage;
 import sc.lang.sc.PropertyAssignment;
@@ -15,9 +15,6 @@ import sc.parser.ParseUtil;
 import sc.type.CTypeUtil;
 import sc.type.RTypeUtil;
 import sc.type.TypeUtil;
-import sc.bind.BindingDirection;
-import sc.bind.Bind;
-import sc.bind.IBinding;
 
 import java.lang.reflect.Method;
 import java.util.*;
@@ -376,6 +373,8 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
 
       if (!nestedBinding) {
          bindArgs.add(bindingDirection);
+
+         addBindFlagsAndOptionsVal(bindArgs);
       }
       return RTypeUtil.invokeMethod(Bind.class, null, bindingType, bindArgs.toArray());
    }
@@ -455,6 +454,8 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       if (!nestedBinding) {
          bindArgs.add(IdentifierExpression.create("sc","bind","BindingDirection", bindingDirection.toString()));
 
+         addBindFlagsAndOptionsExpr(bindArgs);
+
          bind.setProperty("arguments", bindArgs);
 
          if (bd.needsCast) {
@@ -494,6 +495,77 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       replacedByStatement = bindingExpr;
       bindingExpr.fromStatement = this;
       bindingExpr.transform(runtime);
+   }
+
+   private final static String[] bindFlagAnnotNames = {"inactive", "trace", "verbose", "queued", "immediate", "history", "origin"};
+   private final static String [] bindFlagConstNames = {"sc.bind.Bind.INACTIVE", "sc.bind.Bind.TRACE", "sc.bind.Bind.VERBOSE", "sc.bind.Bind.QUEUED", "sc.bind.Bind.IMMEDIATE", "sc.bind.Bind.HISTORY", "sc.bind.Bind.ORIGIN"};
+
+   void addBindFlagsAndOptionsExpr(SemanticNodeList<Expression> bindArgs) {
+      Expression flagsExpr = null;
+      Expression optsExpr = null;
+
+      if (bindingStatement != null) {
+         ArrayList<String> flagConstNames = new ArrayList<String>();
+         Object annotObj = ModelUtil.getAnnotation(bindingStatement, "sc.bind.Bindable");
+         if (annotObj != null) {
+            for (int i = 0; i < bindFlagAnnotNames.length; i++) {
+               String annotName = bindFlagAnnotNames[i];
+               String constName = bindFlagConstNames[i];
+               addFlagConstName(flagConstNames, annotObj, annotName, constName);
+            }
+            // TODO: set optsExpr here
+         }
+         // For references, we might need to add 'cross scope' - if the bindingStatement and
+         //addExtraBindFlags(flagConstNames);
+         int numFlags = flagConstNames.size();
+         if (numFlags > 0) {
+            for (int i = 0; i < numFlags; i++) {
+               String flagConstName = flagConstNames.get(0);
+               Expression nextExpr = IdentifierExpression.create(flagConstName);
+               if (flagsExpr == null)
+                  flagsExpr = nextExpr;
+               else {
+                  flagsExpr = ConditionalExpression.create(nextExpr, "|", flagsExpr);
+               }
+            }
+         }
+      }
+      if (flagsExpr == null)
+         flagsExpr = IntegerLiteral.create(0);
+      bindArgs.add(flagsExpr); // flags
+      if (optsExpr == null)
+         optsExpr = NullLiteral.create();
+      bindArgs.add(optsExpr); // bind options
+   }
+
+   void addBindFlagsAndOptionsVal(List<Object> bindArgs) {
+      BindOptions opts = null;
+
+      int flags = 0;
+      if (bindingStatement != null) {
+         ArrayList<String> flagNames = new ArrayList<String>();
+         Object annotObj = ModelUtil.getAnnotation(bindingStatement, "sc.bind.Bindable");
+         if (annotObj != null) {
+            String[] bindFlagAnnotNames = {"activated", "trace", "verbose", "queued", "immediate", "history", "origin"};
+            int[] bindFlagConstVals = {sc.bind.Bind.INACTIVE, sc.bind.Bind.TRACE, sc.bind.Bind.VERBOSE, sc.bind.Bind.QUEUED, sc.bind.Bind.IMMEDIATE, sc.bind.Bind.HISTORY, sc.bind.Bind.ORIGIN};
+            for (int i = 0; i < bindFlagAnnotNames.length; i++) {
+               String annotName = bindFlagAnnotNames[i];
+               Boolean isSet = (Boolean) ModelUtil.getAnnotationValue(annotObj, annotName);
+               if (isSet != null && isSet)
+                  flags |= bindFlagConstVals[i];
+            }
+            // TODO: set BindSettings opts argument here
+         }
+      }
+      bindArgs.add(flags); // flags
+      bindArgs.add(opts);
+   }
+
+   private void addFlagConstName(ArrayList<String> flagConstNames, Object annotObj, String flagAnnotName, String flagConstName) {
+      Boolean isSet = (Boolean) ModelUtil.getAnnotationValue(annotObj, flagAnnotName);
+      if (isSet != null && isSet) {
+         flagConstNames.add(flagConstName);
+      }
    }
 
    /**
@@ -1010,4 +1082,5 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
    public boolean isVoidType() {
       return ModelUtil.typeIsVoid(getTypeDeclaration());
    }
+
 }

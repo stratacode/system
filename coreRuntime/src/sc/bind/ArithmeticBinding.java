@@ -19,8 +19,10 @@ public class ArithmeticBinding extends AbstractMethodBinding {
       super(parameterBindings);
       operator = op;
    }
-   public ArithmeticBinding(Object dstObject, IBinding dstBinding, String op, IBinding[] parameterBindings, BindingDirection dir) {
-      super(dstObject, dstBinding, dstObject, parameterBindings, dir);
+
+   public ArithmeticBinding(Object dstObject, IBinding dstBinding, String op, IBinding[] parameterBindings, BindingDirection dir, int flags, BindOptions opts) {
+      super(dstObject, dstBinding, dstObject, parameterBindings, dir, flags, opts);
+
       operator = op;
    }
 
@@ -50,7 +52,7 @@ public class ArithmeticBinding extends AbstractMethodBinding {
             lhsVal = DynUtil.evalArithmeticExpression(operator, isString ? String.class : null, lhsVal, paramValues[i]);
          }
          catch (ArithmeticException exc) {
-            if (Bind.trace)
+            if (Bind.trace || ((this.flags & Bind.TRACE) != 0))
                System.out.println("Binding: " + this + " caught arithmetic error: " + exc);
 
             return UNSET_VALUE_SENTINEL;

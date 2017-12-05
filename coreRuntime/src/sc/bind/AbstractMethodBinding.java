@@ -23,13 +23,14 @@ public abstract class AbstractMethodBinding extends DestinationListener {
       boundParams = params;
    }
 
-   public AbstractMethodBinding(Object dstObject, Object dstBinding, Object methodObject, IBinding[] parameterBindings, BindingDirection dir) {
+   public AbstractMethodBinding(Object dstObject, Object dstBinding, Object methodObject, IBinding[] parameterBindings, BindingDirection dir, int flags, BindOptions opts) {
       this(parameterBindings);
       dstObj = dstObject;
       setMethObj(methodObject);
       methObjSet = methodObject != null;
       dstProp = dstBinding;
       direction = dir;
+      initFlags(flags, opts);
    }
 
    abstract protected Object invokeMethod(Object obj);
@@ -303,7 +304,7 @@ public abstract class AbstractMethodBinding extends DestinationListener {
    public void applyReverseBinding(Object obj, Object value, Object src) {
       boolean endLogIndent = false;
       try {
-         if (Bind.trace)
+         if (Bind.trace || (flags & Bind.TRACE) != 0)
             endLogIndent = Bind.logBindingMessage("reverse", this, obj, value, src);
 
          // Have to set boundValue here, not after invokeReverseMethod because that can in turn retrigger lots of stuff like

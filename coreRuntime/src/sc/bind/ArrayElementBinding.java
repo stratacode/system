@@ -17,8 +17,8 @@ public class ArrayElementBinding extends VariableBinding {
       lastDim = new int[arrayBindings.length];
    }
    public ArrayElementBinding(Object dstObject, IBinding dstBinding, Object srcObj, Object[] parameterBindings,
-                              IBinding[] arrayElementBindings, BindingDirection dir) {
-      super(dstObject, dstBinding, srcObj, parameterBindings, dir);
+                              IBinding[] arrayElementBindings, BindingDirection dir, int flags, BindOptions opts) {
+      super(dstObject, dstBinding, srcObj, parameterBindings, dir, flags, opts);
       arrayBindings = arrayElementBindings;
       lastDim = new int[arrayBindings.length];
    }
