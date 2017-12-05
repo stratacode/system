@@ -8454,7 +8454,7 @@ public class ModelUtil {
          }
          else
             throw new UnsupportedOperationException();
-         String wrapperTypeName = ClassType.getPrimitiveWrapperName(primTypeName);
+         String wrapperTypeName = RTypeUtil.getPrimitiveWrapperName(primTypeName);
          return RTypeUtil.loadClass(null, "java.lang." + wrapperTypeName, true);
       }
       else

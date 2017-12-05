@@ -578,7 +578,11 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
          DeclarationType declType = type.getDeclarationType();
 
-         if (type.getDefinesCurrentObject() || parentType == null) {
+         boolean definesCurrentObject = type.getDefinesCurrentObject();
+         if (!definesCurrentObject)
+            checkCurrentObject = false;
+
+         if (definesCurrentObject || parentType == null) {
             boolean pushed = false;
             Object obj = null;
             try {
@@ -1028,8 +1032,20 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    }
 
    private static boolean ignoreRemoteStatement(LayeredSystem sys, Statement st) {
-      ParseUtil.initAndStartComponent(st);
-      return !st.execForRuntime(sys);
+      JavaModel stModel = st.getJavaModel();
+      if (stModel == null)
+         return true;
+      boolean oldDisable = stModel.disableTypeErrors;
+      try {
+         stModel.disableTypeErrors = true;
+         ParseUtil.initAndStartComponent(st);
+         if (st.errorArgs != null) // An error starting this statement means not to run it - the
+            return true;
+         return !st.execForRuntime(sys);
+      }
+      finally {
+         stModel.disableTypeErrors = oldDisable;
+      }
    }
 
    private boolean performUpdatesToSystem(LayeredSystem sys, boolean performedOnce) {

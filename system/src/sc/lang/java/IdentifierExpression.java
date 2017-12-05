@@ -3288,6 +3288,8 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (type instanceof ITypedObject) {
          return ((ITypedObject) type).getTypeDeclaration();
       }
+      if (type instanceof java.lang.reflect.Method)
+         System.out.println("*** Warning - returning method when type is expected here!"); // Get the type of the method here like we'd do for MethodDefinition above?  Hit this case but due to an oddity in the JS conversion that's now fixed
       return type;
    }
 
@@ -4703,6 +4705,9 @@ public class IdentifierExpression extends ArgumentsExpression {
 
 
    public boolean callsSuper() {
+      // We now convert the JS super(x) into a MethodInvocation in JS so it's return value should reflect the fromStatement.
+      if (fromStatement instanceof Statement && ((Statement)fromStatement).callsSuper())
+         return true;
       // Need to catch both the normal case: super(x) and the JS case: typeName.call(...)
       if (idTypes != null && (idTypes[0] == IdentifierType.SuperExpression || (idTypes.length == 2 && idTypes[1] == IdentifierType.SuperExpression && idTypes[0] == IdentifierType.BoundTypeName)) && arguments != null) {
          AbstractMethodDefinition method = getEnclosingMethod();
@@ -5216,6 +5221,11 @@ public class IdentifierExpression extends ArgumentsExpression {
             // convert from super.x(..) to JSType.call(this, ..)
             setIdentifier(0, JSUtil.convertTypeName(getLayeredSystem(), ModelUtil.getTypeName(superType)), IdentifierType.BoundTypeName, boundTypes[0]);
          }
+         // Need to use MethodInvocation here - not idType because SuperExpression is treated differently in getGenericType - to not get the type of the method we are putting in this slot
+         if (idType == IdentifierType.SuperExpression)
+            idType = IdentifierType.MethodInvocation;
+         if (idType == IdentifierType.ThisExpression)
+            idType = IdentifierType.MethodInvocation;
          addIdentifier(sz, "call", idType, boundTypes[sz-1]);
          arguments.add(0, IdentifierExpression.create(new NonKeywordString("this")));
          if (addOuter) {

@@ -6,17 +6,15 @@ package sc.lang.java;
 
 import sc.lang.ILanguageModel;
 import sc.lang.JavaLanguage;
-import sc.lang.SemanticNode;
 import sc.lang.SemanticNodeList;
 import sc.lang.js.JSUtil;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.type.CTypeUtil;
+import sc.type.RTypeUtil;
 import sc.type.Type;
 import sc.util.StringUtil;
 
-import java.lang.reflect.TypeVariable;
-import java.lang.reflect.WildcardType;
 import java.util.*;
 
 public class ClassType extends JavaType {
@@ -637,49 +635,13 @@ public class ClassType extends JavaType {
 
    public static String getWrapperClassFromTypeName(String typeName) {
       if (ModelUtil.isPrimitiveNumberType(typeName))
-         return getPrimitiveWrapperName(CTypeUtil.getClassName(typeName));
+         return RTypeUtil.getPrimitiveWrapperName(CTypeUtil.getClassName(typeName));
       else
          return typeName;
    }
 
-   public static String getPrimitiveWrapperName(String prim) {
-      String name;
-      switch (prim.charAt(0)) {
-         case 'i':
-            name = "Integer";
-            break;
-         case 'b':
-            if (prim.charAt(1) == 'o')
-               name = "Boolean";
-            else
-               name = "Byte";
-            break;
-         case 's':
-            name = "Short";
-            break;
-         case 'd':
-            name = "Double";
-            break;
-         case 'c':
-            name = "Character";
-            break;
-         case 'f':
-            name = "Float";
-            break;
-         case 'l':
-            name = "Long";
-            break;
-         case 'v':
-            name = "Void";
-            break;
-         default:
-            throw new UnsupportedOperationException();
-      }
-      return name;
-   }
-
    public static Object createPrimitiveWrapper(String prim) {
-      return create(getPrimitiveWrapperName(prim));
+      return create(RTypeUtil.getPrimitiveWrapperName(prim));
    }
 
    public String getBaseSignature() {
