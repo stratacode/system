@@ -211,6 +211,42 @@ public class RTypeUtil {
       return result.toArray(new Class[result.size()]);
    }
 
+   public static String getPrimitiveWrapperName(String prim) {
+      String name;
+      switch (prim.charAt(0)) {
+         case 'i':
+            name = "Integer";
+            break;
+         case 'b':
+            if (prim.charAt(1) == 'o')
+               name = "Boolean";
+            else
+               name = "Byte";
+            break;
+         case 's':
+            name = "Short";
+            break;
+         case 'd':
+            name = "Double";
+            break;
+         case 'c':
+            name = "Character";
+            break;
+         case 'f':
+            name = "Float";
+            break;
+         case 'l':
+            name = "Long";
+            break;
+         case 'v':
+            name = "Void";
+            break;
+         default:
+            throw new UnsupportedOperationException();
+      }
+      return name;
+   }
+
    public static class MethodCache {
       public CoalescedHashMap<String,Method[]> methodsByName;
       // The the complete method list for each class.  This preserves the 'native class file order' of the class,
@@ -1114,8 +1150,16 @@ public class RTypeUtil {
                int i = 0;
                for (Class pt:ptypes) {
                   Object argValue = argValues[i++];
-                  if (argValue != null && !pt.isInstance(argValue))
-                     break;
+                  if (argValue != null && !pt.isInstance(argValue)) {
+                     if (pt.isPrimitive()) {
+                        String wrapTypeName = getPrimitiveWrapperName(pt.getTypeName());
+                        Class wrapType = loadClass("java.lang." + wrapTypeName);
+                        if (!DynUtil.isAssignableFrom(wrapType, argValue.getClass()))
+                           break;
+                     }
+                     else
+                        break;
+                  }
                }
                if (i == ptypes.length) {
                   method = m;
