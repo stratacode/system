@@ -21,7 +21,7 @@ import sc.layer.LayeredSystem;
 import sc.lifecycle.ILifecycle;
 import sc.obj.*;
 import sc.parser.*;
-import sc.sync.ISyncInit;
+import sc.obj.IChildInit;
 import sc.sync.SyncManager;
 import sc.type.CTypeUtil;
 import sc.type.PTypeUtil;
@@ -50,7 +50,7 @@ import java.util.*;
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js")
 @CompilerSettings(dynChildManager="sc.lang.html.TagDynChildManager")
 @ResultSuffix("html")
-public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjChildren, ITypeUpdateHandler, ISrcStatement, IStoppable {
+public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObjChildren, ITypeUpdateHandler, ISrcStatement, IStoppable {
    public static boolean trace = false, verbose = false;
 
    public String tagName;
@@ -3166,7 +3166,7 @@ public class Element<RE> extends Node implements ISyncInit, IStatefulPage, IObjC
    }
 
    /** Before we can run the sync code this method gets called so we can populate any components */
-   public void initSync() {
+   public void initChildren() {
       if (repeat != null || this instanceof IRepeatWrapper) {
          syncRepeatTags(repeat);
       }

@@ -3029,9 +3029,9 @@ public class SyncManager {
 
    public static void initChildren(Object obj) {
       // Some components need to do some initialization to create other components - i.e. the children created by the repeat attribute
-      // This hook lets them do that... maybe it should be merged with starting the component?
-      if (obj instanceof ISyncInit)
-         ((ISyncInit) obj).initSync();
+      // This hook lets them do that...
+      if (obj instanceof IChildInit)
+         ((IChildInit) obj).initChildren();
       Object[] children = DynUtil.getObjChildren(obj, null, true);
       if (children != null) {
          for(Object child:children) {
