@@ -31,7 +31,13 @@ public class SelectObjectWizard extends CommandWizard {
       wizard.statement = st;
       wizard.type = cmd.currentTypes.get(cmd.currentTypes.size()-1);
       int max = 10;
-      wizard.instances = cmd.getInstancesOfType(wizard.type, max, false);
+      try {
+         cmd.system.acquireDynLock(false);
+         wizard.instances = cmd.getInstancesOfType(wizard.type, max, false);
+      }
+      finally {
+         cmd.system.releaseDynLock(false);
+      }
       // Nothing to do - just skip the eval
       if (wizard.instances.size() == 0) {
          if (!cmd.consoleDisabled && needsInstance)

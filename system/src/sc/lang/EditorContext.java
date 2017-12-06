@@ -170,8 +170,15 @@ public class EditorContext extends ClientEditorContext {
    }
 
    public void runtimeInitialized() {
-      if (!syncInited && (system.syncInited || system.getNeedsSync()))
-         initSync();
+      if (!syncInited && (system.syncInited || system.getNeedsSync())) {
+         system.acquireDynLock(false);
+         try {
+            initSync();
+         }
+         finally {
+            system.releaseDynLock(false);
+         }
+      }
    }
 
    synchronized void clearPendingModel() {
