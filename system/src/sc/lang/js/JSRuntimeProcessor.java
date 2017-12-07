@@ -219,7 +219,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    public boolean needsSrcForBuildAll(Object cl) {
-      String jsModuleFile = getJSModuleFile(cl, false);
+      // Passing create as false here because this can get called for types in the inheritance chain beyond which we've referenced.  For example,
+      // IChildInit is implemented by Element which is a 'native' class in JS and so we never process that reference.  But if we try to resolve the type
+      // to check for annotations, we'll call this method and don't want to add it to the module based on that reference.
+      String jsModuleFile = getJSModuleFile(cl, false, false);
       return jsModuleFile != null && jsModuleFile.length() > 0;
    }
 
@@ -830,7 +833,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       String typeLibFilesStr = getJSLibFiles(type);
       String typeLibFile;
       if (typeLibFilesStr == null) {
-         typeLibFile = getJSModuleFile(type, true);
+         typeLibFile = getJSModuleFile(type, true, true);
       }
       else {
          String[] typeLibFiles = StringUtil.split(typeLibFilesStr,',');
@@ -929,7 +932,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          String[] typeLibFiles = null;
          String typeLibFile;
          if (typeLibFilesStr == null) {
-            typeLibFile = jsModuleFile = getJSModuleFile(type, true);
+            typeLibFile = jsModuleFile = getJSModuleFile(type, true, true);
             if (typeLibFile == null)
                typeLibFile = rootLibFile;
             addLibFile(typeLibFile, rootLibFile, type, parentType, relation);
@@ -962,7 +965,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             ArrayList<BodyTypeDeclaration> prevDeps = jti.prevDepTypes;
             if (prevDeps != null && typeLibFile != null) {
                for (BodyTypeDeclaration prevDep:prevDeps) {
-                  String prevFile = getJSModuleFile(prevDep, true);
+                  String prevFile = getJSModuleFile(prevDep, true, true);
                   if (prevFile != null)
                      addLibFile(typeLibFile, prevFile, type, prevDep, " type - updated by layer");
                }
@@ -1003,73 +1006,11 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
             Set<Object> depTypes = type.getDependentTypes();
             for (Object depType:depTypes) {
-               depType = resolveBaseType(depType);
-
-               if (filteredDepType(type, depType))
-                  continue;
-
-               if (!(depType instanceof BodyTypeDeclaration)) {
-                  while (ModelUtil.isParameterizedType(depType)) {
-                     Object nextDepType = ModelUtil.getParamTypeBaseType(depType);
-                     if (nextDepType == depType)
-                        break;
-                     depType = nextDepType;
-                  }
-                  if (ModelUtil.isCompiledClass(depType)) {
-                     if (!ModelUtil.isPrimitive(depType)) {
-                        depType = resolveSrcTypeDeclaration(depType);
-                        String depModuleFile = getJSModuleFile(depType, false);
-
-                        // The dependent type is in the same file with us.  When pulling pre-compiled files from the source
-                        // path, which we are not transforming initially this is the first time we end up pulling in the source.
-                        // If we get
-                        if (depModuleFile != null && depModuleFile.equals(typeLibFile)) {
-                           if (!(depType instanceof BodyTypeDeclaration))
-                              System.err.println("Warning: no source for type: " + ModelUtil.getTypeName(depType) + " to resolve dependency for type: " + type);
-                        }
-
-                        if (hasAlias(depType))
-                           continue;
-
-                        if (ModelUtil.isCompiledClass(depType)) {
-                           if (addJSLibFiles(depType, true, typeLibFilesStr == null ? null : typeLibFiles[0], type, "uses") == null && !hasJSCompiled(type)) {
-                              String warnTypeName = type.typeName;
-                              if (!warnedCompiledTypes.contains(warnTypeName)) {
-                                 System.err.println("*** Warning: js type: " + warnTypeName + " in layer: " + type.layer + " depends on compiled class: " + depType);
-                                 warnedCompiledTypes.add(warnTypeName);
-                              }
-                           }
-                        }
-                     }
-                  }
-                  else if (!isCompiledInType(depType)) // Note: if there is a bug we don't match a source method but do match the compiled method, we can see this error even when there's source available.  In this case, the source method should match (or the compiled one should not)
-                     System.err.println("*** Warning: unrecognized js type: " + type.typeName + " depends on compiled thing: " + depType);
-               }
-
-               if (depType instanceof BodyTypeDeclaration) {
-                  BodyTypeDeclaration depTD = (BodyTypeDeclaration) depType;
-                  depTD = depTD.resolve(true);
-                  ParseUtil.initComponent(depTD);
-                  ParseUtil.startComponent(depTD);
-
-                  // If depTD extends type, do not add it here.  Instead, we need to add type before depTD in this case
-                  if (!type.isAssignableFrom(depTD, false) && !ModelUtil.isOuterType(type.getEnclosingType(), depTD))
-                     addTypeLibsToFile(depTD, typesInFile, typeLibFile, type, "uses");
-               }
-
-               if (ModelUtil.getCompileLiveDynamicTypes(type) && (type.isComponentType() || type.getDeclarationType() == DeclarationType.OBJECT)) {
-                  addJSLibFiles(DynUtil.class, true, typeLibFile, type, "uses components");
-               }
-               if (type.needsDataBinding()) {
-                  addJSLibFiles(Bind.class, true, typeLibFile, type, "uses data binding");
-               }
-               if (type.needsSync()) {
-                  //type.needsSync(); // TODO: remove for debugging
-                  addJSLibFiles(SyncManager.class, true, typeLibFile, type, "uses the sync features");
-               }
+               addDependentType(type, depType, typeLibFile, typesInFile);
             }
          }
          else {
+            // TODO: should we recursively process this types dependencies and add any jsLibFiles we find along the way?  That seems safe, just computationally expensive.  Given the small number of lib files, manually adding them for now.
             String depJSFilesStr = getDependentJSLibFiles(type);
             if (depJSFilesStr != null) {
                if (verboseJS)
@@ -1080,7 +1021,18 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                for (String depFile:depJSFiles)
                   addDependency(typeLibFile == null ? defaultLib : typeLibFile, depFile, type, null, "dependentJSLibFiles");
             }
-            // TODO: should we recursively process this types dependencies and add any jsLibFiles we find along the way?  That seems safe, just computationally expensive.  Given the small number of lib files, manually adding them for now.
+            // TODO: same thing for type depend
+            String depTypesStr = getDependentJSTypes(type);
+            if (depTypesStr != null) {
+               String[] depTypeNames = StringUtil.split(depTypesStr, ',');
+               for (String depTypeName:depTypeNames) {
+                  BodyTypeDeclaration depType = system.getSrcTypeDeclaration(depTypeName, null, true);
+                  if (depType != null)
+                     addDependentType(type, depType, typeLibFile, typesInFile);
+                  else
+                     system.error("No src type found for type: " + depTypeName + " in JSSettings annotation on: " + type);
+               }
+            }
          }
 
          // Since MainInit is in src form here, need to skip checking on compiled types or the runtime method barfs
@@ -1112,7 +1064,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                   addEntryPoint(ent);
                }
                ent.needsInit = true;
-               ent.isDefault = jsFile == null && getJSModuleFile(type, true) == null;
+               ent.isDefault = jsFile == null && getJSModuleFile(type, true, true) == null;
                jsBuildInfo.addJSGenFile(ent.jsFile, type);
                if (!jsBuildInfo.jsFiles.contains(ent.jsFile))
                   jsBuildInfo.jsFiles.add(ent.jsFile);
@@ -1194,6 +1146,72 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          if (!errorFiles.contains(errorSrc))
             errorFiles.add(errorSrc);
          anyErrors = true;
+      }
+   }
+
+   private void addDependentType(BodyTypeDeclaration type, Object depType, String typeLibFile, Map<JSFileEntry,Boolean> typesInFile) {
+      depType = resolveBaseType(depType);
+
+      if (filteredDepType(type, depType))
+         return;
+
+      if (!(depType instanceof BodyTypeDeclaration)) {
+         while (ModelUtil.isParameterizedType(depType)) {
+            Object nextDepType = ModelUtil.getParamTypeBaseType(depType);
+            if (nextDepType == depType)
+               break;
+            depType = nextDepType;
+         }
+         if (ModelUtil.isCompiledClass(depType)) {
+            if (!ModelUtil.isPrimitive(depType)) {
+               depType = resolveSrcTypeDeclaration(depType);
+               String depModuleFile = getJSModuleFile(depType, false, true);
+
+               // The dependent type is in the same file with us.  When pulling pre-compiled files from the source
+               // path, which we are not transforming initially this is the first time we end up pulling in the source.
+               // If we get
+               if (depModuleFile != null && typeLibFile != null && depModuleFile.equals(typeLibFile)) {
+                  if (!(depType instanceof BodyTypeDeclaration))
+                     System.err.println("Warning: no source for type: " + ModelUtil.getTypeName(depType) + " to resolve dependency for type: " + type);
+               }
+
+               if (hasAlias(depType))
+                  return;
+
+               if (ModelUtil.isCompiledClass(depType)) {
+                  if (addJSLibFiles(depType, true, null, type, "uses") == null && !hasJSCompiled(type)) {
+                     String warnTypeName = type.typeName;
+                     if (!warnedCompiledTypes.contains(warnTypeName)) {
+                        System.err.println("*** Warning: js type: " + warnTypeName + " in layer: " + type.layer + " depends on compiled class: " + depType);
+                        warnedCompiledTypes.add(warnTypeName);
+                     }
+                  }
+               }
+            }
+         }
+         else if (!isCompiledInType(depType)) // Note: if there is a bug we don't match a source method but do match the compiled method, we can see this error even when there's source available.  In this case, the source method should match (or the compiled one should not)
+            System.err.println("*** Warning: unrecognized js type: " + type.typeName + " depends on compiled thing: " + depType);
+      }
+
+      if (depType instanceof BodyTypeDeclaration) {
+         BodyTypeDeclaration depTD = (BodyTypeDeclaration) depType;
+         depTD = depTD.resolve(true);
+         ParseUtil.initComponent(depTD);
+         ParseUtil.startComponent(depTD);
+
+         // If depTD extends type, do not add it here.  Instead, we need to add type before depTD in this case
+         if (!type.isAssignableFrom(depTD, false) && !ModelUtil.isOuterType(type.getEnclosingType(), depTD))
+            addTypeLibsToFile(depTD, typesInFile, typeLibFile, type, "uses");
+      }
+
+      if (ModelUtil.getCompileLiveDynamicTypes(type) && (type.isComponentType() || type.getDeclarationType() == DeclarationType.OBJECT)) {
+         addJSLibFiles(DynUtil.class, true, typeLibFile, type, "uses components");
+      }
+      if (type.needsDataBinding()) {
+         addJSLibFiles(Bind.class, true, typeLibFile, type, "uses data binding");
+      }
+      if (type.needsSync()) {
+         addJSLibFiles(SyncManager.class, true, typeLibFile, type, "uses the sync features");
       }
    }
 
@@ -1296,7 +1314,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    public String getJSDefaultModuleFile(BodyTypeDeclaration type) {
-      String modFile = getJSModuleFile(type, true);
+      String modFile = getJSModuleFile(type, true, true);
       if (modFile == null)
          return scLib;
       return modFile;
@@ -1309,7 +1327,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return res;
    }
 
-   public String getJSModuleFile(Object type, boolean resolveSrc) {
+   public String getJSModuleFile(Object type, boolean resolveSrc, boolean create) {
       String typeName = ModelUtil.getTypeName(type);
       String res = jsBuildInfo.jsModuleNames.get(typeName);
       if (res != null) {
@@ -1327,16 +1345,18 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          String jsModuleStr = !useModules ? null : getJSSettingsStringValue(type, "jsModuleFile", false, resolveSrc);
          if (jsModuleStr != null) {
 
-            addModuleEntryPoint(type, jsModuleStr);
+            if (create) {
+               addModuleEntryPoint(type, jsModuleStr);
 
-            // Record the top-level type-name to module name mappings.  We use these to compute at runtime the JSFiles property without having to load the src
-            jsBuildInfo.jsModuleNames.put(typeName, jsModuleStr);
+               // Record the top-level type-name to module name mappings.  We use these to compute at runtime the JSFiles property without having to load the src
+               jsBuildInfo.jsModuleNames.put(typeName, jsModuleStr);
+            }
             return jsModuleStr;
          }
 
          Object enclType = ModelUtil.getEnclosingType(type);
          if (enclType != null) {
-            jsModuleStr = getJSModuleFile(enclType, resolveSrc);
+            jsModuleStr = getJSModuleFile(enclType, resolveSrc, create);
             if (jsModuleStr != null) {
                jsBuildInfo.jsModuleNames.put(typeName, jsModuleStr);
                return jsModuleStr;
@@ -1497,6 +1517,13 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    String getDependentJSLibFiles(Object type) {
       if (!(type instanceof PrimitiveType)) {
          return getJSSettingsStringValue(type, "dependentJSFiles", false, true);
+      }
+      return null;
+   }
+
+   String getDependentJSTypes(Object type) {
+      if (!(type instanceof PrimitiveType)) {
+         return getJSSettingsStringValue(type, "dependentTypes", false, false);
       }
       return null;
    }
@@ -1691,7 +1718,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
          //type = ModelUtil.resolveSrcTypeDeclaration(system, type);
 
-         String jsModule = getJSModuleFile(type, true);
+         String jsModule = getJSModuleFile(type, true, true);
          if (jsModule != null && jsModule.length() > 0) {
             jsModule = jsModule.trim();
             if (append) {
@@ -2450,28 +2477,6 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return false;
    }
 
-   private boolean inSameFile(String rootLibFile, Object type) {
-      String typeLibFilesStr = getJSLibFiles(type);
-      String[] typeLibFiles;
-      String typeLibFile;
-      String parentLibFile;
-      boolean inParentFile = true;
-      if (typeLibFilesStr == null) {
-         parentLibFile = rootLibFile;
-         typeLibFile = getJSModuleFile(type, true);
-         if (typeLibFile == null)
-            typeLibFile = parentLibFile;
-         inParentFile = typeLibFile.equals(rootLibFile);
-      }
-      else {
-         typeLibFiles = StringUtil.split(typeLibFilesStr,',');
-         parentLibFile = typeLibFiles[0];
-         typeLibFile = parentLibFile;
-         inParentFile = false;
-      }
-      return inParentFile;
-   }
-
    /** Adds the type to the jsFileBody for the lib file registered for this type (or the default lib file)  */
    void addTypeToFile(BodyTypeDeclaration type, Map<JSFileEntry,Boolean> typesInFile, String rootLibFile, Layer genLayer, Set<String> typesInSameFile) {
       BodyTypeDeclaration origType = type;
@@ -2498,7 +2503,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       boolean notInParentFile = false;
       if (typeLibFilesStr == null) {
          parentLibFile = rootLibFile;
-         typeLibFile = getJSModuleFile(type, true);
+         typeLibFile = getJSModuleFile(type, true, true);
          if (typeLibFile == null)
             typeLibFile = parentLibFile;
          notInParentFile = !typeLibFile.equals(rootLibFile);
@@ -2928,7 +2933,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          if (type == null)
             return null;
 
-         modFile = getJSModuleFile(type, true);
+         // TODO: Maybe pass the last arg - "create" as false here?
+         modFile = getJSModuleFile(type, true, true);
          if (modFile == null)
             return jsBuildInfo.jsFiles;
       }

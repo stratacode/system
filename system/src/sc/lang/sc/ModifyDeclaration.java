@@ -2432,6 +2432,10 @@ public class ModifyDeclaration extends TypeDeclaration {
       super.addDependentTypes(types);
       if (modifyTypeDecl != null)
          modifyTypeDecl.addDependentTypes(types);
+      if (extendsTypes != null) {
+         for (JavaType t:extendsTypes)
+            t.addDependentTypes(types);
+      }
    }
 
    public String getCompiledClassName() {

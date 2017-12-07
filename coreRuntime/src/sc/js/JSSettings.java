@@ -33,6 +33,12 @@ public @interface JSSettings {
    String replaceWith() default "";
    /** Comma separated list of jsLibFiles which this lib file depends on being included before it */
    String dependentJSFiles() default "";
-   /** When jsModuleFile/Pattern is used and js.options.disableModules is enabled if this is true, this module is still used.  Set this to true for core moduls which have dependencies to/from native js code.  Those that can be split out at compile time for smaller downloads. */
+
+   /**
+    * For a class with jsLibFiles set, specifies a comma separated list of type dependencies that are used by the native class.  Once we see jsLibFiles we stop looking for dependencies in that class but sometimes
+    * the Java and JS classes depend on the same class
+    */
+   String dependentTypes() default "";
+   /** When jsModuleFile/Pattern is used and js.options.disableModules is enabled if this is true, this module is still used.  Set this to true for core modules which have dependencies to/from native js code.  Those that can be split out at compile time for smaller downloads. */
    boolean requiredModule() default false;
 }
