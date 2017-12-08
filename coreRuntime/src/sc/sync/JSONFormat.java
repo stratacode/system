@@ -4,6 +4,7 @@
 
 package sc.sync;
 
+import sc.bind.BindingContext;
 import sc.dyn.DynUtil;
 import sc.obj.Sync;
 import sc.obj.SyncMode;
@@ -34,8 +35,8 @@ public class JSONFormat extends SerializerFormat {
       return new JSONSerializer(this, mgr);
    }
 
-   public void applySyncLayer(String destName, String scopeName, String layerDef, boolean isReset, boolean allowCodeEval) {
-      JSONDeserializer dser = new JSONDeserializer(destName, scopeName, layerDef, isReset, allowCodeEval);
+   public void applySyncLayer(String destName, String scopeName, String layerDef, boolean isReset, boolean allowCodeEval, BindingContext ctx) {
+      JSONDeserializer dser = new JSONDeserializer(destName, scopeName, layerDef, isReset, allowCodeEval, ctx);
       dser.apply();
    }
 
@@ -89,18 +90,7 @@ public class JSONFormat extends SerializerFormat {
       meth {
          // { "meth": "methName", "callId": "callId", "args": [ .... ] }
          public void apply(JSONDeserializer dser, boolean topLevel) {
-            CharSequence methName = dser.parseMethName();
-            dser.parser.expectNextName(MethodArgs.typeSig.name());
-            CharSequence typeSig = dser.parser.parseString(true);
-            dser.parser.expectNextName(MethodArgs.callId.name());
-            CharSequence callIdVal = dser.parser.parseString(false);
-            dser.parser.expectNextName(MethodArgs.args.name());
-            List args = dser.parser.parseArray();
-            if (methName != null && callIdVal != null) {
-               dser.invokeMethod(methName, typeSig, args, callIdVal);
-            }
-            else
-               throw new IllegalArgumentException("Invalid remote method call in JSON: " + dser.parser);
+            dser.invokeRemoteMethod();
          }
       },
       methReturn {

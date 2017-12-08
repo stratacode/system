@@ -4,6 +4,7 @@
 
 package sc.sync;
 
+import sc.bind.BindingContext;
 import sc.dyn.DynUtil;
 import sc.obj.Sync;
 import sc.obj.SyncMode;
@@ -39,7 +40,7 @@ public class SerializerFormat {
       return new SyncSerializer(this, mgr);
    }
 
-   public void applySyncLayer(String destName, String scopeName, String layerDef, boolean isReset, boolean allowCodeEval) {
-      DynUtil.applySyncLayer(language, destName, scopeName, layerDef, isReset, allowCodeEval);
+   public void applySyncLayer(String destName, String scopeName, String layerDef, boolean isReset, boolean allowCodeEval, BindingContext ctx) {
+      DynUtil.applySyncLayer(language, destName, scopeName, layerDef, isReset, allowCodeEval, ctx);
    }
 }

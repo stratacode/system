@@ -16,24 +16,29 @@ import java.util.List;
  * or not depending upon the binding manager.
  * <p>
  * Event dispatching can be immediate, or queued into a BindingContext.  With immediate dispatching, the listeners are
- * executed in the order in which they were added with no BindingContext necessary.  The listener controls the behavior through its
+ * executed in the order in which they are added with no BindingContext necessary.  The listener controls the behavior through its
  * sync property, or the code to send an event in BindingManager.
  * <p>
- * For UI toolkits that are single-threaded, you can use one BindingContext to serialize all event streams.
+ * For UI toolkits that are single-threaded, you can use one BindingContext to serialize all event streams that communicate with another one by
+ * setting up a queued BindingContext in the sender.   On the first change, you schedule a "doLater" operation to send the batch of changes
+ * to the other side.  At any point, you can flush the queue and sync with the remote side to deal with any data dependencies.
  * <p>
- * In multi-threaded servers, you typically have the binding context stored in some manager object local to the
- * session.
+ * In multi-threaded servers, you typically have the binding context stored associated with some scope and make sure all request processing is
+ * synchronized against that scope.   That way, even different threads sharing the same scope stay in sync with respect to binding and you can
+ * use data binding across processes or to share data between different scopes.  The queued bindings act like a 'transaction log' for those
+ * parts of your application which are just doing 'data exchange'.
  * <p>
- * Transactional memory (to be implemented via scopes) will help improve the applicability of data binding even
- * for shared objects.
- * <p>
- * Still longer term this could perhaps get merged or become a part of the global language context.  It is not
- * efficient to access this through thread local state... it should be a member off of some context object
- * we pass as a hidden first parameter to "enhanced" methods.
+ * TODO: performance - it would be nice to add a way to reduce use of thread-context and instead inject method calls into runtime methods
+ * or even build a VM which provides support for 'transactional memory' - i.e. a way of managing state which incorporates flexible scopes, locking
+ * and visibility of data using data-binding and data-sync between threads, processes, users, and other ways state is shared and synchronized.
  */
 @JSSettings(jsLibFiles = "js/scbind.js", prefixAlias="sc_")
 public class BindingContext  {
    BindingEvent queuedEvents;
+
+   public BindingContext(IListener.SyncType defaultSyncType) {
+      this.defaultSyncType = defaultSyncType;
+   }
 
    public static void setBindingContext(BindingContext ctx) {
       PTypeUtil.setThreadLocal("bindingContext", ctx);
@@ -56,6 +61,7 @@ public class BindingContext  {
    }
 
    private IListener.SyncType defaultSyncType;
+   // TODO: rename this as "currentSyncType" or contextSyncType?  There's already a defaultSyncType at the BindingManager level and it seems like we don't use these two consistently all of the time.
    public IListener.SyncType getDefaultSyncType() {
       return defaultSyncType;
    }
@@ -63,6 +69,7 @@ public class BindingContext  {
       defaultSyncType = t;
    }
 
+   /*
    public static IListener.SyncType getCurrentDefaultSyncType() {
       BindingContext ctx = getBindingContext();
       // TODO: This should be set to IMMEDIATE by default so we can avoid the extra queuing step
@@ -75,6 +82,7 @@ public class BindingContext  {
       else
          return ctx.getDefaultSyncType();
    }
+   */
 
    public void queueEvent(int eventFlag, Object obj, IBeanMapper prop, IListener listener, Object eventDetail) {
       BindingEvent newEvent = new BindingEvent(eventFlag, obj, prop, listener, eventDetail);
@@ -190,40 +198,49 @@ public class BindingContext  {
 
    /**
     * At this point we have the list of events with the same priority.  We need to figure out which to run first
-    * by looking for any depedencies between the listeners.
+    * by looking for any dependencies between the listeners.
     */
    private void doDispatch(BindingEvent list) {
-      BindingEvent outer, inner;
+      BindingEvent outer;
+      IListener.SyncType oldSyncType = defaultSyncType;
 
-      /* Make a pass through all pairs and compute the dependencies */
-      /*
-      for (outer = list; outer != null; outer = outer.next) {
-         for (inner = outer.next; inner != null; inner = inner.next) {
-            IListener innerListener = inner.listener;
-            IListener outerListener = outer.listener;
-            // Not sure we should be queueing the same listener more than once but if so, it should not
-            // be a dependency.
-            if (innerListener != outerListener) {
-               ISet readsOI = outerListener.getReads();
-               ISet readsIO = innerListener.getReads();
-               if (readsOI != null && readsIO != null) {
-                  boolean depOI = readsOI.containsAny(innerListener.getWrites());
-                  boolean depIO = readsIO.containsAny(outerListener.getWrites());
-                  if (depOI) {
-                     if (!depIO) {
-                        outer.addDependency(inner);
+      // Need this to be in immediate mode to send these events
+      defaultSyncType = IListener.SyncType.IMMEDIATE;
+      try {
+
+         /* Make a pass through all pairs and compute the dependencies */
+         /*
+         for (outer = list; outer != null; outer = outer.next) {
+            for (inner = outer.next; inner != null; inner = inner.next) {
+               IListener innerListener = inner.listener;
+               IListener outerListener = outer.listener;
+               // Not sure we should be queueing the same listener more than once but if so, it should not
+               // be a dependency.
+               if (innerListener != outerListener) {
+                  ISet readsOI = outerListener.getReads();
+                  ISet readsIO = innerListener.getReads();
+                  if (readsOI != null && readsIO != null) {
+                     boolean depOI = readsOI.containsAny(innerListener.getWrites());
+                     boolean depIO = readsIO.containsAny(outerListener.getWrites());
+                     if (depOI) {
+                        if (!depIO) {
+                           outer.addDependency(inner);
+                        }
                      }
+                     else if (depIO)
+                        inner.addDependency(outer);
                   }
-                  else if (depIO)
-                     inner.addDependency(outer);
                }
             }
          }
-      }
-      */
+         */
 
-      for (outer = list; outer != null; outer = outer.next) {
-         dispatchDependencies(outer);
+         for (outer = list; outer != null; outer = outer.next) {
+            dispatchDependencies(outer);
+         }
+      }
+      finally {
+         defaultSyncType = oldSyncType;
       }
    }
 

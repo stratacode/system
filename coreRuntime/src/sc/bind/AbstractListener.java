@@ -12,11 +12,10 @@ import sc.util.ISet;
 public abstract class AbstractListener implements IListener {
    boolean activated = true;  // Set to false on nested bindings when they are not in an active code path (i.e. the not-chosen option for a ternary or part of a conditional that's not reached)
 
-   // A thread-local lookup to determine whether the framework managing this object requires
-   // queuing or not.  We do this to avoid thread-local lookups in each sendEvent method under the
-   // theory that this will vanish in the overhead of the binding setup.
-   IListener.SyncType sync = Bind.bindingManager.getDefaultSyncType();
+   IListener.SyncType sync;
    public IListener.SyncType getSync() {
+      if (sync == null)
+         return SyncType.IMMEDIATE;
       return sync;
    }
 

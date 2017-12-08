@@ -4,9 +4,7 @@
 
 package sc.lang.java;
 
-import sc.bind.Bind;
-import sc.bind.Bindable;
-import sc.bind.IChangeable;
+import sc.bind.*;
 import sc.dyn.INameContext;
 import sc.lang.*;
 import sc.lang.js.JSRuntimeProcessor;
@@ -16,7 +14,6 @@ import sc.sync.SyncManager;
 import sc.type.CTypeUtil;
 import sc.type.Type;
 import sc.util.*;
-import sc.bind.IListener;
 import sc.layer.*;
 import sc.parser.*;
 
@@ -1747,11 +1744,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
    */
 
-   public void updateRuntimeModel(SyncManager.SyncContext syncCtx) {
+   public void updateRuntimeModel(SyncManager.SyncContext syncCtx, BindingContext bindCtx) {
       if (types == null)
          return;
 
-      SyncExecutionContext ctx = new SyncExecutionContext(this, syncCtx);
+      SyncExecutionContext ctx = new SyncExecutionContext(this, syncCtx, bindCtx);
 
       // Currently the grammar lets you put more than one type in a model so it's only the package that separates the model
       // definitions.  Seems like this is not a problem?

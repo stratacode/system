@@ -5,6 +5,7 @@
 package sc.sync;
 
 import sc.bind.BindingContext;
+import sc.bind.IListener;
 import sc.obj.Sync;
 import sc.obj.SyncMode;
 import sc.type.IResponseListener;
@@ -105,7 +106,7 @@ public abstract class SyncDestination {
       }
 
       // Queuing up events so they are all fired after the sync has completed
-      BindingContext ctx = new BindingContext();
+      BindingContext ctx = new BindingContext(IListener.SyncType.QUEUED);
       BindingContext oldBindCtx = BindingContext.getBindingContext();
       BindingContext.setBindingContext(ctx);
 
@@ -151,7 +152,7 @@ public abstract class SyncDestination {
             SyncManager.setSyncState(SyncManager.SyncState.ApplyingChanges);
             SerializerFormat format = SerializerFormat.getFormat(receiveLanguage);
             if (format != null) {
-               format.applySyncLayer(name, defaultScope, layerDef, resetSync, allowCodeEval);
+               format.applySyncLayer(name, defaultScope, layerDef, resetSync, allowCodeEval, ctx);
             }
             else
                throw new IllegalArgumentException("Unrecognized receive language for applySyncLayer: " + receiveLanguage);

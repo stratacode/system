@@ -20,8 +20,19 @@ public class RemoteResult {
 
    public Object returnType;
 
-   /** Set this property to an implementation class to be notified of success/errors in the method call. */
-   public IResponseListener listener;
+   public int errorCode = -1;
+   public String exceptionStr;
+
+   /**
+    * Set this property to an implementation class to be notified of success/errors in the method call immediately as the return value is processed.  Use this listener
+    * when you need notification of a remote method response which */
+   public IResponseListener responseListener;
+
+   /**
+    * Set this property to an implementation class to be notified of success/errors in the method call after the current sync or other transaction has been completed.
+    * Use this when you need a "do later" type operation such as knowing when the start the next command in a script listener.
+    */
+   public IResponseListener postListener;
 
    private Object value;
    /** A bindable property you can use to listen to the response value of the method */
@@ -34,4 +45,28 @@ public class RemoteResult {
       value = val;
       Bind.sendEvent(IListener.VALUE_CHANGED, this, "value");
    }
+
+   public void notifyResponseListener() {
+      if (responseListener != null) {
+         if (exceptionStr == null)
+            responseListener.response(getValue());
+         else
+            responseListener.error(errorCode, exceptionStr);
+      }
+   }
+
+   public void notifyPostListener() {
+      if (postListener != null) {
+         if (exceptionStr == null)
+            postListener.response(getValue());
+         else
+            postListener.error(errorCode, exceptionStr);
+      }
+   }
+
+   public void notifyAllListeners() {
+      notifyResponseListener();
+      notifyPostListener();
+   }
 }
+

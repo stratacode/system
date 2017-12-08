@@ -30,7 +30,7 @@ public class BindingManager {
          }
       }
 
-      if (ctx != null)
+      if (ctx != null && ctx.getDefaultSyncType() != IListener.SyncType.IMMEDIATE)
          ctx.queueEvent(event, obj, prop, listener, eventDetail);
       else
          Bind.dispatchEvent(event, obj, prop, listener, eventDetail);

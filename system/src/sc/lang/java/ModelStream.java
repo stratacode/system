@@ -39,6 +39,8 @@ public class ModelStream extends SemanticNode implements ICustomResolver {
    public boolean isSyncStream = true;
    public SyncManager.SyncContext syncCtx;
 
+   public BindingContext bindCtx;
+
    private LayeredSystem system;
 
    public boolean useRuntimeResolution = true;
@@ -83,7 +85,7 @@ public class ModelStream extends SemanticNode implements ICustomResolver {
             }
          }
          for (JavaModel model:modelList)
-            model.updateRuntimeModel(syncCtx);
+            model.updateRuntimeModel(syncCtx, bindCtx);
       }
       finally {
          SyncManager.setCurrentSyncLayers(null);
@@ -241,7 +243,7 @@ public class ModelStream extends SemanticNode implements ICustomResolver {
       modelList.add(model);
    }
 
-   public static ModelStream convertToModelStream(String layerDef) {
+   public static ModelStream convertToModelStream(String layerDef, BindingContext bindCtx) {
       SCLanguage lang = SCLanguage.getSCLanguage();
       boolean trace = SyncManager.trace;
       long startTime;
@@ -255,6 +257,7 @@ public class ModelStream extends SemanticNode implements ICustomResolver {
       else {
          ModelStream stream = (ModelStream) ParseUtil.nodeToSemanticValue(streamRes);
          stream.setLayeredSystem(LayeredSystem.getCurrent());
+         stream.bindCtx = bindCtx;
 
          if (trace && layerDef.length() > 2048)
             System.out.println("Parsed sync layer in: " + StringUtil.formatFloat((System.currentTimeMillis() - startTime)/1000.0) + " secs");

@@ -4,6 +4,8 @@
 
 package sc.sync;
 
+import sc.bind.BindingContext;
+import sc.bind.IListener;
 import sc.dyn.DynUtil;
 import sc.obj.Sync;
 import sc.obj.SyncMode;
@@ -28,15 +30,16 @@ public class JSONDeserializer {
    public ArrayList<Object> curObjs = new ArrayList<Object>();
    public ArrayList<String> curTypeNames = new ArrayList<String>();
    SyncManager.SyncContext syncCtx;
+   BindingContext bindCtx;
 
-   public JSONDeserializer(String destName, String scopeName, String layerDef, boolean isReset, boolean allowCodeEval) {
+   public JSONDeserializer(String destName, String scopeName, String layerDef, boolean isReset, boolean allowCodeEval, BindingContext bindCtx) {
       syncCtx = SyncManager.getSyncContext(destName, scopeName, true);
       parser = new JSONParser(layerDef, this);
       this.destName = destName;
       this.scopeName = scopeName;
       this.isReset = isReset;
       this.allowCodeEval = allowCodeEval;
-
+      this.bindCtx = bindCtx;
    }
 
    public void apply() {
@@ -273,11 +276,15 @@ public class JSONDeserializer {
       }
       else {
          SyncManager mgr = syncCtx.getSyncManager();
+         // This is the security check - to be sure we're allowed to invoke the method
          if (!mgr.allowInvoke(meth)) {
             System.err.println("Remote call to method: " + methName + " not allowed - missing sc.obj.Remote annotation or remoteRuntimes is missing: " + mgr.syncDestination.remoteRuntimeName);
             return;
          }
-         // TODO: security: need to validate that this method is authorized for remote access
+         // Sync up with the binding system - in case any property changes influence the inputs of this method invocation
+         if (bindCtx != null)
+            bindCtx.dispatchEvents(null);
+         // Start queuing up sync events - add inst etc. so we don't process them until scopes or other info required for the instances are available
          boolean flushQueue = SyncManager.beginSyncQueue();
          try {
             if (args.size() > 0) {
@@ -307,6 +314,11 @@ public class JSONDeserializer {
                SyncManager.flushSyncQueue();
                flushQueue = false;
             }
+            // Again - make sure any bindings fired during the invocation of the method are logged before we queue our
+            // result so the stream of change events is in the right order - in other words, side-effects of the method invocation are
+            // queued before the return value itself is queued.
+            if (bindCtx != null)
+               bindCtx.dispatchEvents(null);
 
             if (returnVal != null) {
                syncCtx.registerObjName(returnVal, callId, false, false);
@@ -326,5 +338,36 @@ public class JSONDeserializer {
 
    public void fetchProperty(String propName) {
       syncCtx.updateProperty(getCurObj(), propName, false, true);
+   }
+
+   public void invokeRemoteMethod() {
+      CharSequence methName = parseMethName();
+      parser.expectNextName(JSONFormat.MethodArgs.typeSig.name());
+      CharSequence typeSig = parser.parseString(true);
+      parser.expectNextName(JSONFormat.MethodArgs.callId.name());
+      CharSequence callIdVal = parser.parseString(false);
+      parser.expectNextName(JSONFormat.MethodArgs.args.name());
+      List args = parser.parseArray();
+      if (methName != null && callIdVal != null) {
+         // Make sure the state is set up before the remote method call.  While queuing is probably the most efficient way to
+         // send a batch of property changes, it breaks when used with RPC so this is a compromise but I think the right one.
+         IListener.SyncType oldSyncType = null;
+         if (bindCtx != null) {
+            bindCtx.dispatchEvents(null);
+            oldSyncType = bindCtx.getDefaultSyncType();
+            bindCtx.setDefaultSyncType(IListener.SyncType.IMMEDIATE);
+         }
+         try {
+            invokeMethod(methName, typeSig, args, callIdVal);
+         }
+         finally {
+            if (bindCtx != null) {
+               bindCtx.dispatchEvents(null);
+               bindCtx.setDefaultSyncType(oldSyncType);
+            }
+         }
+      }
+      else
+         throw new IllegalArgumentException("Invalid remote method call in JSON: " + parser);
    }
 }

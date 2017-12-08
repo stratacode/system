@@ -326,4 +326,9 @@ public class ExecutionContext {
    public boolean allowInvoke(Object method) {
       return true;
    }
+
+   // Hook point for remote method invocation - during deserialization of a remote stream, we by default queue up property-changes
+   // because they all essentially happened at the same time from the server's perspective.   This hook is here so that we can
+   // flush the data binding events before and after the remote method call to make sure it runs with an appropriate context.
+   public void postInvoke() {}
 }

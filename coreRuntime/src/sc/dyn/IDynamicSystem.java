@@ -4,6 +4,7 @@
 
 package sc.dyn;
 
+import sc.bind.BindingContext;
 import sc.obj.ScopeDefinition;
 import sc.type.IBeanMapper;
 
@@ -147,7 +148,7 @@ public interface IDynamicSystem {
 
    int getLayerPosition(Object type);
 
-   void applySyncLayer(String lang, String destName, String scopeName, String code, boolean isReset, boolean allowCodeEval);
+   void applySyncLayer(String lang, String destName, String scopeName, String code, boolean isReset, boolean allowCodeEval, BindingContext ctx);
 
    Object newInnerInstance(Object typeObj, Object outerObj, String constrSig, Object[] params);
 

@@ -186,7 +186,10 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
       }
    }
 
-   // TODO: need to validate that all items in the expression are marked with the @Sync annotation - i.e. are available to the client
+   // TODO: security - this is a highly security sensitive method because we're potentially taking code from the client and running it on the server.  We check that
+   // via the allowInvoke, allowCreate, allowSetProperty methods in the ExecutionContext.  These enforce that the appropriate meta-data is available for that operation.
+   // It would be great to add defensive mechanisms here - logging/alerts, honey-pot patterns to escalate alerts,  code-gen a custom pen-test for your application from the metadata
+   // - i.e. inputs that explicitly try to expose all info using the system, as well as 'fuzzed' inputs tailor-made for your application.
    public void updateRuntimeType(Object inst, SyncManager.SyncContext syncCtx, ExecutionContext ctx) {
       Object rtType = type.getRuntimeType();
       Class rtClass = type.getRuntimeClass();

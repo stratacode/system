@@ -20,6 +20,16 @@ public abstract class DestinationListener extends AbstractListener implements IB
       this.opts = opts;
       if ((flags & Bind.INACTIVE) != 0)
          activated = false;
+      if ((flags & Bind.QUEUED) != 0)
+         sync = SyncType.QUEUED;
+      else if ((flags & Bind.IMMEDIATE) != 0)
+         sync = SyncType.QUEUED;
+      else {
+         // Depending on the BindingManager, this might be a thread-local lookup to determine whether the framework managing this object requires
+         // queuing or not.  We do this to avoid thread-local lookups in each sendEvent method under the
+         // theory that there will be at least one sendEvent per property (but maybe that's not the case?)
+         sync = Bind.bindingManager.getDefaultSyncType();
+      }
    }
 
    public String toString(String operation, boolean displayValue) {

@@ -5,6 +5,7 @@
 package sc.sync;
 
 import sc.bind.Bind;
+import sc.bind.BindingContext;
 import sc.dyn.DynUtil;
 import sc.obj.Sync;
 import sc.obj.SyncMode;

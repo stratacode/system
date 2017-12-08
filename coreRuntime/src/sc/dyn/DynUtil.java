@@ -5,6 +5,7 @@
 package sc.dyn;
 
 import sc.bind.Bind;
+import sc.bind.BindingContext;
 import sc.bind.MethodBinding;
 import sc.obj.*;
 import sc.sync.SyncDestination;
@@ -237,7 +238,7 @@ public class DynUtil {
    public static Object invokeRemoteSync(ScopeDefinition def, ScopeContext ctx, long timeout, Object obj, Object method, Object... paramValues) {
       RemoteResult remoteRes = invokeRemote(def, ctx, obj, method, paramValues);
       RemoteCallSyncListener listener = new RemoteCallSyncListener();
-      remoteRes.listener = listener;
+      remoteRes.responseListener = listener;
 
       long startTime = System.currentTimeMillis();
 
@@ -1263,9 +1264,9 @@ public class DynUtil {
       return evalRemoteScript(null, script);
    }
 
-   public static void applySyncLayer(String lang, String destName, String scopeName, String code, boolean isReset, boolean allowCodeEval) {
+   public static void applySyncLayer(String lang, String destName, String scopeName, String code, boolean isReset, boolean allowCodeEval, BindingContext ctx) {
       if (dynamicSystem != null)
-         dynamicSystem.applySyncLayer(lang, destName, scopeName, code, isReset, allowCodeEval);
+         dynamicSystem.applySyncLayer(lang, destName, scopeName, code, isReset, allowCodeEval, ctx);
       else
          throw new UnsupportedOperationException(("Attempt to evalCode without a dynamic runtime"));
    }

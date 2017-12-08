@@ -6,6 +6,7 @@ package sc.layer;
 
 import sc.bind.Bind;
 import sc.bind.Bindable;
+import sc.bind.BindingContext;
 import sc.classfile.CFClass;
 import sc.js.URLPath;
 import sc.lang.html.Element;
@@ -3294,7 +3295,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return -1;
    }
 
-   public void applySyncLayer(String language, String destName, String scopeName, String codeString, boolean isReset, boolean allowCodeEval) {
+   public void applySyncLayer(String language, String destName, String scopeName, String codeString, boolean isReset, boolean allowCodeEval, BindingContext ctx) {
       if (language.equals("js")) {
          throw new IllegalArgumentException("javascript layers - only supported in the browser");
       }
@@ -3302,7 +3303,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (codeString == null || codeString.length() == 0)
             return;
 
-         ModelStream stream = ModelStream.convertToModelStream(codeString);
+         ModelStream stream = ModelStream.convertToModelStream(codeString, ctx);
 
          if (stream != null) {
             boolean trace = SyncManager.trace;

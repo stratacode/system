@@ -39,6 +39,7 @@ public class SyncLayer {
    private Map<SyncChange,SyncChange> latestChanges = new HashMap<SyncChange,SyncChange>();
 
    private TreeMap<String, RemoteResult> pendingMethods = new TreeMap<String, RemoteResult>();
+   private ArrayList<RemoteResult> notifyMethods = new ArrayList<RemoteResult>();
 
    /** Each sync layer stores a list of changes made in that layer - each are a subclass of this abstract class */
    public abstract static class SyncChange {
@@ -422,14 +423,23 @@ public class SyncLayer {
       if (res.returnType != null)
          retValue = SyncHandler.convertRemoteType(retValue, res.returnType);
 
+      res.exceptionStr = exceptionStr;
       res.setValue(retValue);
-      if (res.listener != null) {
-         if (exceptionStr == null)
-            res.listener.response(retValue);
-         else
-            res.listener.error(-1, exceptionStr);
-      }
+      notifyMethods.add(res);
+      res.notifyResponseListener();
+
       return true;
+   }
+
+   public void notifyMethodReturns() {
+      ArrayList<RemoteResult> toNotify = new ArrayList<RemoteResult>(notifyMethods);
+      notifyMethods.clear();
+
+      for (RemoteResult res:toNotify) {
+         if (SyncManager.trace && res.postListener != null)
+            System.out.println("Notifying post remote method return: " + res.callId + " = " + res.getValue());
+         res.notifyPostListener();
+      }
    }
 
    public void removeSyncInst(Object inst) {
@@ -454,6 +464,10 @@ public class SyncLayer {
          return;
       }
       pendingSync = false;
+
+      // Notify any listeners of remote method calls in this sync and clear that list
+      notifyMethodReturns();
+
       // If there's no error - clear the pendingValues - reset any changedValues back to the server's version.
       if (errorCode == null) {
          // Did any changes come in when the system was pending?
@@ -509,8 +523,9 @@ public class SyncLayer {
       // If there's an error we'll preserve the current state - merging pendingValues with the changedValues but where changedValues (the most recent changes) have precedence
       else {
          for (RemoteResult res:pendingMethods.values()) {
-            if (res.listener != null)
-               res.listener.error(errorCode, message);
+            res.exceptionStr = message;
+            res.errorCode = errorCode;
+            res.notifyAllListeners();
          }
 
          if (changedValues.size() > 0) {

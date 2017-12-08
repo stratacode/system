@@ -2965,6 +2965,8 @@ public class SyncManager {
       boolean handled = false;
       if (currentSyncLayers != null) {
          for (SyncLayer currentSyncLayer:currentSyncLayers) {
+            if (trace || verbose)
+               System.out.println("Processing remote method result: " + callId + " = " + retValue);
             if (currentSyncLayer.processMethodReturn(callId, retValue, exceptionStr)) {
                handled = true;
                break;
