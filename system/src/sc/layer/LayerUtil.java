@@ -110,7 +110,6 @@ public class LayerUtil implements LayerConstants {
       addFilesToCompile(srcEnts, buildDir, filesToCompile);
 
       if (filesToCompile.size() == 0) {
-         System.out.println("No files to compile");
          return 0;
       }
       else {
@@ -257,7 +256,6 @@ public class LayerUtil implements LayerConstants {
          return -1;
       }
       else {
-         System.out.println("*** No files to compile");
          return 0;
       }
    }

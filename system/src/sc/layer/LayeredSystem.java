@@ -9577,6 +9577,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          if (phase == BuildPhase.Process && !skipBuild) {
             if (!options.noCompile) {
+               int numToCompile = bd.toCompile.size();
                // Need to remove any null sentinels we might have registered
                for (SrcEntry compiledSrcEnt : bd.toCompile) {
                   String cSrcTypeName = compiledSrcEnt.getTypeName();
@@ -9590,49 +9591,55 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      messageHandler.reportMessage("Compiling Java: " + bd.toCompile.size() + " files into " + genLayer.getBuildClassesDir(), null, -1, -1, MessageType.Info);
                }
                else if (options.info) {
-                  if (options.testVerifyMode) // avoiding the # of files in the test verify output
+                  if (numToCompile == 0) {
+                     if (!options.testVerifyMode)
+                        info("No files to compile");
+                  }
+                  else if (options.testVerifyMode) // avoiding the # of files in the test verify output
                      info("Compiling Java files into " + genLayer.getBuildClassesDir());
                   else
                      info("Compiling Java: " + bd.toCompile.size() + " files into " + genLayer.getBuildClassesDir());
                }
 
-               PerfMon.start("javaCompile");
-               HashSet<String> errorFiles = new HashSet<String>();
-               if (LayerUtil.compileJavaFilesInternal(bd.toCompile, genLayer.getBuildClassesDir(), getClassPathForLayer(genLayer, true, genLayer.getBuildClassesDir(), true), options.debug, javaSrcVersion, messageHandler, errorFiles) == 0) {
-                  if (!buildInfo.buildJars())
+               if (numToCompile > 0) {
+                  PerfMon.start("javaCompile");
+                  HashSet<String> errorFiles = new HashSet<String>();
+                  if (LayerUtil.compileJavaFilesInternal(bd.toCompile, genLayer.getBuildClassesDir(), getClassPathForLayer(genLayer, true, genLayer.getBuildClassesDir(), true), options.debug, javaSrcVersion, messageHandler, errorFiles) == 0) {
+                     if (!buildInfo.buildJars())
+                        compileFailed = true;
+                  }
+                  else {
                      compileFailed = true;
-               }
-               else {
-                  compileFailed = true;
-               }
+                  }
 
-               if (compileFailed) {
-                  anyErrors = true;
-                  String fileExt;
-                  for (String javaErrorFileName:errorFiles) {
-                     if (javaErrorFileName != null && (fileExt = FileUtil.getExtension(javaErrorFileName)) != null && fileExt.equals("java") && buildLayer != null) {
-                        String buildSrcDir = buildLayer.buildSrcDir;
-                        if (javaErrorFileName.startsWith(buildSrcDir)) {
-                           String errorTypeName = FileUtil.removeExtension(javaErrorFileName.substring(buildSrcDir.length() + 1).replace(FileUtil.FILE_SEPARATOR_CHAR, '.'));
-                           if (errorTypeName != null) {
-                              TypeDeclaration td = (TypeDeclaration) getSrcTypeDeclaration(errorTypeName, null, true, false, true, buildLayer, false, true);
-                              if (td != null) {
-                                 JavaModel model = td.getJavaModel();
-                                 SrcEntry srcEnt = model.getSrcFile();
-                                 if (srcEnt != null)
-                                    bd.addErrorFile(srcEnt);
+                  if (compileFailed) {
+                     anyErrors = true;
+                     String fileExt;
+                     for (String javaErrorFileName:errorFiles) {
+                        if (javaErrorFileName != null && (fileExt = FileUtil.getExtension(javaErrorFileName)) != null && fileExt.equals("java") && buildLayer != null) {
+                           String buildSrcDir = buildLayer.buildSrcDir;
+                           if (javaErrorFileName.startsWith(buildSrcDir)) {
+                              String errorTypeName = FileUtil.removeExtension(javaErrorFileName.substring(buildSrcDir.length() + 1).replace(FileUtil.FILE_SEPARATOR_CHAR, '.'));
+                              if (errorTypeName != null) {
+                                 TypeDeclaration td = (TypeDeclaration) getSrcTypeDeclaration(errorTypeName, null, true, false, true, buildLayer, false, true);
+                                 if (td != null) {
+                                    JavaModel model = td.getJavaModel();
+                                    SrcEntry srcEnt = model.getSrcFile();
+                                    if (srcEnt != null)
+                                       bd.addErrorFile(srcEnt);
+                                 }
                               }
                            }
                         }
                      }
                   }
+                  if (options.info && numToCompile > 0)
+                     info("Compile " + (compileFailed ? "failed" : "completed"));
+                  PerfMon.end("javaCompile");
                }
-               if (options.info)
-                  info("Compile " + (compileFailed ? "failed" : "completed"));
-               PerfMon.end("javaCompile");
             }
             else {
-               info("Compiliation disabled - not compiling: " + bd.toCompile.size() + " files");
+               info("Compilation disabled - not compiling: " + bd.toCompile.size() + " files");
             }
          }
 
