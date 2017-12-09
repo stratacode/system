@@ -1082,29 +1082,37 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       return obj;
    }
 
+   public String scopeStateName = "defaultCmdContext";
+
    /**
     * Before we run any object resolveName methods or expressions from the command, we may need to select a CurrentScopeContext that's
     * been registered by the framework, to select the specific context these commands operate in.  For example, when the command
-    * line is enabled, each time we render a window, we switch the defaultCmdContext to that window's contexts so we can control
-    * the last browser window opened by default.   Some scripts will explicitly open a named scope context and call waitForIdle on that
-    * which prevents us from needing to use the default one.
+    * line is enabled, each time we render a window, we switch to the current scopeStateName's context so we can control a specific
+    * collection of state with the right locks to operate in that context.  The defaultCmdContext can be updated to point to the most
+    * logical state based on the developer's current context (e.g. the last web-page loaded).
     */
    public boolean pushCurrentScopeContext() {
-      CurrentScopeContext ctx = CurrentScopeContext.getEnvScopeContextState();
-      if (ctx == null) {
-         ctx = CurrentScopeContext.get("defaultCmdContext");
-         if (ctx != null) {
-            CurrentScopeContext.pushCurrentScopeContext(ctx);
-            return true;
-         }
+      CurrentScopeContext ctx = CurrentScopeContext.get(scopeStateName);
+      if (ctx != null) {
+         CurrentScopeContext.pushCurrentScopeContext(ctx, true);
+         return true;
       }
       return false;
    }
 
    public void popCurrentScopeContext() {
-      CurrentScopeContext.popCurrentScopeContext();
+      CurrentScopeContext.popCurrentScopeContext(true);
    }
 
+   /**
+    * Wait for the specified scopeStateName to be created, and for it's ready bit to be set, indicating it's done initializing.
+    * Then use that scopeState for resolving names in subsequent script commands.
+    */
+   public CurrentScopeContext waitForReady(String scopeStateName, long timeout) {
+      CurrentScopeContext ctx = CurrentScopeContext.waitForReady(scopeStateName, timeout);
+      this.scopeStateName = scopeStateName;
+      return ctx;
+   }
 
    private void removeFromCurrentObject(JavaModel model, BodyTypeDeclaration parentType, Statement type) {
       if (parentType == null) {

@@ -3914,8 +3914,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      RTypeUtil.verboseClasses = true;
                      options.verboseClasses = true;
                   }
-                  else if (opt.equals("vlck"))
+                  else if (opt.equals("vlck")) {
                      options.verboseLocks = true;
+                     ScopeDefinition.traceLocks = true;
+                  }
                   else if (opt.equals("vsa")) {
                      ScopeDefinition.verbose = true;
                      ScopeDefinition.trace = true;

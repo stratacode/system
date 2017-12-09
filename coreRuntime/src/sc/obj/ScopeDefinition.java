@@ -30,6 +30,8 @@ public abstract class ScopeDefinition {
    /** Detailed messages about property-level events */
    public static boolean trace;
 
+   public static boolean traceLocks;
+
    public ScopeDefinition(int scopeId) {
       this.scopeId = scopeId;
       while (scopes.size() <= scopeId)

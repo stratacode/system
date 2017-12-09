@@ -515,4 +515,10 @@ public class PTypeUtil {
       exc.printStackTrace(out);
       return sw.toString();
    }
+
+   public static void acquireLocks(List<Object> locks, String traceInfo) {
+   }
+
+   public static void releaseLocks(List<Object> locks, String traceInfo) {
+   }
 }

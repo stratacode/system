@@ -17,6 +17,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.lang.reflect.Modifier;
 import java.util.*;
+import java.util.concurrent.locks.Lock;
 
 /** This is the version of the PTypeUtil utilities that is used in the full runtime, with Java reflection etc.  */
 @JSSettings(jsLibFiles="js/scdyn.js")
@@ -1047,5 +1048,58 @@ public class PTypeUtil {
       PrintWriter out = new PrintWriter(sw);
       exc.printStackTrace(out);
       return sw.toString();
+   }
+
+   public static void acquireLocks(List<Object> locks, String traceInfo) {
+      if (locks.size() == 0)
+         return;
+      if (traceInfo != null)
+         System.out.println("Acquiring locks: " + traceInfo);
+
+      // Wait as normal to get the first lock
+      ((Lock) locks.get(0)).lock();
+      int fetchFrom = 1;
+      int fetchTo = locks.size();
+      int repeatTo = -1;
+      boolean repeat;
+      do {
+         repeat = false;
+         for (int i = fetchFrom; i < fetchTo; i++) {
+            Lock lock = (Lock) locks.get(i);
+            // If we can't immediately get the next lock
+            if (!lock.tryLock()) {
+               releaseLocks(locks, 0, i);
+               if (traceInfo != null)
+                  System.out.println("Waiting for lock: " + lock + ": " + traceInfo);
+               // Wait now to get the contended lock to avoid a busy loop but we'll just immediately release it just to make the code simpler
+               lock.lock();
+
+               // We're going to finish this iteration of the loop to acquire
+               repeat = true;
+               fetchFrom = 0;
+               repeatTo = i;
+            }
+         }
+         // We'll either exit this loop with all of the locks (repeat=false) or repeat=true, from repeatTo=>size locks.  In the latter case we need to acquire then 0-repeatTo locks and repeat the loop once.
+         if (repeat)
+            fetchTo = repeatTo;
+      } while (repeat);
+
+      if (traceInfo != null)
+         System.out.println("Page - locks acquired: " + traceInfo);
+   }
+
+   public static void releaseLocks(List<Object> locks, String traceInfo) {
+      if (locks.size() == 0)
+         return;
+      if (traceInfo != null)
+         System.out.println("Releasing locks: " + traceInfo);
+      releaseLocks(locks, 0, locks.size());
+   }
+
+   static void releaseLocks(List<Object> locks, int from, int to) {
+      for (int i = from; i < to; i++) {
+         ((Lock) locks.get(i)).unlock();
+      }
    }
 }

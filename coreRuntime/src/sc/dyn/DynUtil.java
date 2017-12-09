@@ -1613,4 +1613,9 @@ public class DynUtil {
       return DynUtil.isType(changedObj) ? changedObj.getClass() : DynUtil.getType(changedObj);
    }
 
+   /** Don't put the ugly thread ids into the logs - normalize them with an incremending integer */
+   public static String getCurrentThreadString() {
+      return DynUtil.getTraceObjId(Thread.currentThread());
+   }
+
 }

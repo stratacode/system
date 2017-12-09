@@ -1096,6 +1096,9 @@ public class SyncManager {
          // We may have already registered this object with a parent scope cause the outer instance was not set when the object was created.
          clearParentSyncInst(inst, syncProps);
 
+         if (verbose) // TODO: add some info here about locks held if we have verboseLocks set?
+            System.out.println("Add sync inst: " + DynUtil.getInstanceName(inst) + " on thread: " +  DynUtil.getCurrentThreadString());
+
          InstInfo ii = syncInsts.get(inst);
          if (ii == null) {
             ii = new InstInfo(args, initDefault, onDemand);
@@ -1205,6 +1208,9 @@ public class SyncManager {
             else // TODO: any other cases other than remote here?
                message = "Synchronizing remote instance: ";
             System.out.println(message + objName + syncType + (scopeId != 0 ? "scope: " + ScopeDefinition.getScopeDefinition(scopeId).name : "global scope"));
+
+            if (objName.contains("SelectedFile"))
+               System.out.println("***");
          }
       }
 
@@ -1795,6 +1801,9 @@ public class SyncManager {
       }
 
       void removeSyncInst(Object inst, SyncProperties syncProps) {
+         if (verbose) // TODO: add some info here about locks held if we have verboseLocks set?
+            System.out.println("Remove sync inst: " + DynUtil.getInstanceName(inst) + " on thread: " +  DynUtil.getTraceObjId(Thread.currentThread()));
+
          InstInfo toRemove = syncInsts.remove(inst);
          if (toRemove == null) {
             System.err.println("*** Unable to find sync inst to remove: " + DynUtil.getInstanceName(inst));
@@ -1804,6 +1813,9 @@ public class SyncManager {
       }
 
       void replaceSyncInst(Object fromInst, Object toInst, SyncProperties syncProps) {
+         if (verbose) // TODO: add some info here about locks held if we have verboseLocks set?
+            System.out.println("Replace sync inst: " + DynUtil.getInstanceName(toInst) + " on thread: " +  DynUtil.getTraceObjId(Thread.currentThread()));
+
          InstInfo toRemove = syncInsts.remove(fromInst);
          if (toRemove == null) {
             return;

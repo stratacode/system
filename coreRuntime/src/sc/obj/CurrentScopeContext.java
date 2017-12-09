@@ -8,6 +8,7 @@ import sc.type.PTypeUtil;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 /**
  * Used to capture, save and restore the set of scope contexts from a current context, so we can run code in another thread
@@ -18,23 +19,34 @@ import java.util.HashMap;
  * code that depends on the session being available.
  *
  * The new use case is for allowing the command-line interpreter to control a specific browser window session.  When it opens the
- * window, it adds the scopeAlias query param which signals the PageDispatcher to get the current scope context and register it
- * with an alias.  There are methods here which let the command line interpreter wait for the CurrentScopeContext to be 'ready'
+ * window, it adds the scopeContextName query param which signals the PageDispatcher to get the current scope context and register it
+ * with a 'scopeContextName'.  There are methods here which let the command line interpreter wait for the CurrentScopeContext to be 'ready'
  * which basically means the client is waiting for commands.  At that point, we continue the test-script and use that CurrentScopeContext
  * to override the default scope lookup.
  */
 @sc.js.JSSettings(jsModuleFile="js/scgen.js", prefixAlias="sc_")
 public class CurrentScopeContext {
    private static final int MAX_STATE_LIST_SIZE = 32;
-   private static final Object aliasLock = new Object();
 
-   static HashMap<String,CurrentScopeContext> scopeAliases = null;
+   private static final Object scopeContextNamesLock = new Object();
+   static HashMap<String,CurrentScopeContext> scopeContextNames = null;
 
-   ArrayList<ScopeContext> scopeContexts = new ArrayList<ScopeContext>();
+   // List of ScopeContexts active
+   List<ScopeContext> scopeContexts = new ArrayList<ScopeContext>();
+   // Optional list of locks to acquire to support these contexts
+   List<Object> locks = null;
 
-   // Is there a thread waiting for change events for this CurrentScopeContext - used as a trigger to wake up the test script (or another waiter) when
-   // a scopeAlias has been created, and the corresponding client is waiting for idle events for this window (or another scope).
+   // Used for debug logging
+   public String scopeContextName, traceInfo;
+
+   // Flag set to true when there is a thread waiting for change events for this CurrentScopeContext - it is used as a trigger to wake up the test script (or another waiter) when
+   // a scopeContextName has been created, and the corresponding client is waiting for idle events for this window (or another scope).
    boolean contextIsReady = false;
+
+   public CurrentScopeContext(List<ScopeContext> scopeContexts, List<Object> locks) {
+      this.scopeContexts = scopeContexts;
+      this.locks = locks;
+   }
 
    ScopeContext getScopeContext(int scopeId) {
       for (int i = 0; i < scopeContexts.size(); i++) {
@@ -49,10 +61,14 @@ public class CurrentScopeContext {
     * Call this to temporarily restore a CurrentScopeContext retrieved from getCurrentScopeContext.   You must call popScopeContext
     * in a finally clause after you've called this method.
     */
-   public static void pushCurrentScopeContext(CurrentScopeContext state) {
+   public static void pushCurrentScopeContext(CurrentScopeContext state, boolean acquireLocks) {
       ArrayList<CurrentScopeContext> curStateList = (ArrayList<CurrentScopeContext>) PTypeUtil.getThreadLocal("scopeStateStack");
-      if (ScopeDefinition.verbose && state != null)
-         System.out.println("Begin scope context: " + state);
+      if (state != null) {
+         if (acquireLocks)
+            state.acquireLocks();
+         if (ScopeDefinition.verbose)
+            System.out.println("Begin scope context: " + state);
+      }
       if (curStateList == null) {
          curStateList = new ArrayList<CurrentScopeContext>();
          PTypeUtil.setThreadLocal("scopeStateStack", curStateList);
@@ -62,7 +78,7 @@ public class CurrentScopeContext {
          throw new IllegalArgumentException("Too many pushCurrentScopeContext calls in a row - max is: " + MAX_STATE_LIST_SIZE);
    }
 
-   public static void popCurrentScopeContext() {
+   public static void popCurrentScopeContext(boolean releaseLocks) {
       ArrayList<CurrentScopeContext> curStateList = (ArrayList<CurrentScopeContext>) PTypeUtil.getThreadLocal("scopeStateStack");
       if (curStateList == null || curStateList.size() == 0) {
          throw new IllegalArgumentException("Empty scopeContext stack!");
@@ -71,7 +87,10 @@ public class CurrentScopeContext {
       if (ScopeDefinition.verbose) {
          System.out.println("End scope context: " + rem);
       }
+      if (releaseLocks && rem != null)
+         rem.releaseLocks();
    }
+
 
    /**
     * Call this to retrieve the current set of scope contexts that are available to your object.  For methods that may be called
@@ -81,15 +100,15 @@ public class CurrentScopeContext {
       CurrentScopeContext envCtx = getEnvScopeContextState();
       if (envCtx != null)
          return envCtx;
-      CurrentScopeContext ctx = new CurrentScopeContext();
+      ArrayList<ScopeContext> ctxList = new ArrayList<ScopeContext>();
       for (ScopeDefinition scope : ScopeDefinition.scopes) {
          if (scope == null)
             continue;
          ScopeContext scopeCtx = scope.getScopeContext(false);
          if (scopeCtx != null)
-            ctx.scopeContexts.add(scopeCtx);
+            ctxList.add(scopeCtx);
       }
-      return ctx;
+      return new CurrentScopeContext(ctxList, null);
    }
 
    /** Returns the currently pushed CurrentScopeContext (or null if there is not one present) */
@@ -102,47 +121,48 @@ public class CurrentScopeContext {
    }
 
 
-   public static void register(String alias, CurrentScopeContext ctx) {
-      synchronized (aliasLock) {
-         if (scopeAliases == null)
-            scopeAliases = new HashMap<String,CurrentScopeContext>();
-         scopeAliases.put(alias, ctx);
-         aliasLock.notify();
+   public static void register(String scopeContextName, CurrentScopeContext ctx) {
+      ctx.scopeContextName = scopeContextName;
+      synchronized (scopeContextNamesLock) {
+         if (scopeContextNames == null)
+            scopeContextNames = new HashMap<String,CurrentScopeContext>();
+         scopeContextNames.put(scopeContextName, ctx);
+         scopeContextNamesLock.notify();
       }
    }
 
-   public static CurrentScopeContext get(String alias) {
-      synchronized (aliasLock) {
-         if (scopeAliases == null)
-            scopeAliases = new HashMap<String,CurrentScopeContext>();
-         return scopeAliases.get(alias);
+   public static CurrentScopeContext get(String scopeContextName) {
+      synchronized (scopeContextNamesLock) {
+         if (scopeContextNames == null)
+            scopeContextNames = new HashMap<String,CurrentScopeContext>();
+         return scopeContextNames.get(scopeContextName);
       }
    }
 
-   public static boolean remove(String alias) {
-      synchronized (aliasLock) {
-         if (scopeAliases == null)
-            scopeAliases = new HashMap<String,CurrentScopeContext>();
-         return scopeAliases.remove(alias) != null;
+   public static boolean remove(String scopeContextName) {
+      synchronized (scopeContextNamesLock) {
+         if (scopeContextNames == null)
+            scopeContextNames = new HashMap<String,CurrentScopeContext>();
+         return scopeContextNames.remove(scopeContextName) != null;
       }
    }
 
-   public static CurrentScopeContext waitForCreate(String alias, long timeout) {
-      synchronized (aliasLock) {
-         if (scopeAliases == null)
-            scopeAliases = new HashMap<String,CurrentScopeContext>();
+   public static CurrentScopeContext waitForCreate(String scopeContextName, long timeout) {
+      synchronized (scopeContextNamesLock) {
+         if (scopeContextNames == null)
+            scopeContextNames = new HashMap<String,CurrentScopeContext>();
       }
       long now = System.currentTimeMillis();
       long startTime = now;
       do {
-         synchronized (aliasLock) {
-            CurrentScopeContext ctx = scopeAliases.get(alias);
+         synchronized (scopeContextNamesLock) {
+            CurrentScopeContext ctx = scopeContextNames.get(scopeContextName);
             if (ctx == null) {
                if (now - startTime > timeout) {
                   break;
                }
                try {
-                  aliasLock.wait(timeout);
+                  scopeContextNamesLock.wait(timeout);
                }
                catch (InterruptedException exc) {}
             }
@@ -153,13 +173,13 @@ public class CurrentScopeContext {
       } while (true);
 
       if (ScopeDefinition.verbose)
-         System.out.println("waitForCreate(" + alias + ", " + timeout + ") - timed out in " + (now - startTime) + " millis");
+         System.out.println("waitForCreate(" + scopeContextName + ", " + timeout + ") - timed out in " + (now - startTime) + " millis");
       return null;
    }
 
-   public static CurrentScopeContext waitForIdle(String alias, long timeout) {
+   public static CurrentScopeContext waitForReady(String scopeContextName, long timeout) {
       long startTime = System.currentTimeMillis();
-      CurrentScopeContext ctx = waitForCreate(alias, timeout);
+      CurrentScopeContext ctx = waitForCreate(scopeContextName, timeout);
       if (ctx == null) {
          return null;
       }
@@ -167,7 +187,7 @@ public class CurrentScopeContext {
       do {
          now = System.currentTimeMillis();
          synchronized (ctx) {
-            if (ctx.contextIsReady) { // A thread is already waiting on this scopeAlias
+            if (ctx.contextIsReady) { // A thread is already waiting on this scopeContextName
                break;
             }
             if (now - startTime > timeout) {
@@ -183,27 +203,25 @@ public class CurrentScopeContext {
 
       if (ctx != null) {
          if (ScopeDefinition.verbose)
-            System.out.println("waitForIdle(" + alias + ", " + timeout + ") returns idle scope ctx: " + ctx + " after: " + (now - startTime) + " millis");
-         // Should we do the push outside of this method?  Will we ever need to pop it?
-         pushCurrentScopeContext(ctx);
+            System.out.println("waitForReady(" + scopeContextName + ", " + timeout + ") - scope ready: " + ctx + " after: " + (now - startTime) + " millis");
       }
       else {
          if (ScopeDefinition.verbose)
-            System.out.println("waitForIdle(" + alias + ", " + timeout + ") - timed out: found scopeAlias but no contextIsReady in " + (now - startTime) + " millis");
+            System.out.println("waitForReady(" + scopeContextName + ", " + timeout + ") - timed out: scope created but not ready in " + (now - startTime) + " millis");
       }
       return ctx;
    }
 
-   public static void markReady(String scopeAlias, boolean val) {
+   public static void markReady(String scopeContextName, boolean val) {
       CurrentScopeContext ctx = null;
-      synchronized (aliasLock) {
-         ctx = scopeAliases.get(scopeAlias);
+      synchronized (scopeContextNamesLock) {
+         ctx = scopeContextNames.get(scopeContextName);
       }
       if (ctx == null)
-         System.err.println("**** CurrentScopeContext.markReady - no scope for alias: " + scopeAlias);
+         System.err.println("**** CurrentScopeContext.markReady - no scope for scopeContextName: " + scopeContextName);
       else if (!ctx.contextIsReady) {
          if (ScopeDefinition.verbose)
-            System.out.println("ScopeAlias " + scopeAlias + " is ready");
+            System.out.println("ScopeContextName " + scopeContextName + " is ready");
          ctx.markWaiting(val);
       }
    }
@@ -213,6 +231,24 @@ public class CurrentScopeContext {
       contextIsReady = val;
       if (val)
          notify();
+   }
+
+   public String getTraceInfo() {
+      return (scopeContextName != null ? scopeContextName + ": " : "") + traceInfo;
+   }
+
+   public void setTraceInfo(String info) {
+      this.traceInfo = info;
+   }
+
+   public void acquireLocks() {
+      if (locks != null)
+         PTypeUtil.acquireLocks(locks, ScopeDefinition.traceLocks ? getTraceInfo() : null);
+   }
+
+   public void releaseLocks() {
+      if (locks != null)
+         PTypeUtil.releaseLocks(locks, ScopeDefinition.traceLocks ? getTraceInfo() : null);
    }
 
    public String toString() {
