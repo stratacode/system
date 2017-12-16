@@ -5,6 +5,7 @@
 package sc.bind;
 
 import sc.js.JSSettings;
+import sc.obj.CurrentScopeContext;
 import sc.util.ISet;
 
 /**
@@ -66,4 +67,8 @@ public interface IListener {
    boolean getTrace();
 
    boolean getVerbose();
+
+   boolean isCrossScope();
+
+   CurrentScopeContext getCurrentScopeContext();
 }

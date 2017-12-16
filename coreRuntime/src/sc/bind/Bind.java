@@ -7,6 +7,9 @@ package sc.bind;
 import sc.dyn.DynUtil;
 import sc.js.JSSettings;
 import sc.obj.CompilerSettings;
+import sc.obj.CurrentScopeContext;
+import sc.obj.ScopeContext;
+import sc.obj.ScopeDefinition;
 import sc.type.IBeanMapper;
 import sc.type.PTypeUtil;
 import sc.type.TypeUtil;
@@ -1061,6 +1064,32 @@ public class Bind {
    }
 
    static void dispatchEvent(int event, Object obj, IBeanMapper prop, IListener listener, Object eventDetail) {
+      if (listener.isCrossScope()) {
+         CurrentScopeContext curScopeCtx = CurrentScopeContext.getCurrentScopeContext();
+         CurrentScopeContext listenerCtx = listener.getCurrentScopeContext();
+         if (listenerCtx != curScopeCtx) {
+            ScopeContext listenerEventScopeCtx = listenerCtx.getEventScopeContext();
+            ScopeContext curEventScopeCtx = curScopeCtx.getEventScopeContext();
+            if (listenerEventScopeCtx != null && listenerEventScopeCtx != curEventScopeCtx) {
+               BindingContext bctx = (BindingContext) listenerEventScopeCtx.eventListener;
+               if (bctx == null) {
+                  synchronized (listenerEventScopeCtx.eventListenerLock) {
+                     bctx = (BindingContext) listenerEventScopeCtx.eventListener;
+                     if (bctx == null)
+                        listenerEventScopeCtx.eventListener = bctx = new BindingContext(IListener.SyncType.IMMEDIATE);
+                  }
+               }
+               if (ScopeDefinition.trace || trace)
+                  System.out.println("Bind - cross scope event: " + DynUtil.getInstanceName(obj) + "." + prop.getPropertyName() + " - Queuing event from: " + curScopeCtx + " to: " + listenerEventScopeCtx + " in: " + listenerCtx);
+               bctx.queueEvent(event, obj, prop, listener, eventDetail);
+               listenerEventScopeCtx.scopeChanged();
+               return;
+            }
+
+            if (listenerEventScopeCtx == null)
+               System.err.println("*** No binding context for object" + obj);
+         }
+      }
       ThreadState bindState = (ThreadState) PTypeUtil.getThreadLocal("bindingState");
       if (bindState == null) {
          bindState = new ThreadState();

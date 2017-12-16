@@ -4,6 +4,8 @@
 
 package sc.bind;
 
+import sc.obj.CurrentScopeContext;
+
 /**
  * The base class for binding objects which can be the root level binding - i.e. that have
  * a reference to the dstObj, the dstProp, and are initially given the direction.
@@ -14,6 +16,7 @@ public abstract class DestinationListener extends AbstractListener implements IB
    BindingDirection direction;
    int flags;
    BindOptions opts;
+   CurrentScopeContext curScopeCtx;
 
    protected void initFlags(int flags, BindOptions opts) {
       this.flags = flags;
@@ -23,13 +26,15 @@ public abstract class DestinationListener extends AbstractListener implements IB
       if ((flags & Bind.QUEUED) != 0)
          sync = SyncType.QUEUED;
       else if ((flags & Bind.IMMEDIATE) != 0)
-         sync = SyncType.QUEUED;
+         sync = SyncType.IMMEDIATE;
       else {
          // Depending on the BindingManager, this might be a thread-local lookup to determine whether the framework managing this object requires
          // queuing or not.  We do this to avoid thread-local lookups in each sendEvent method under the
          // theory that there will be at least one sendEvent per property (but maybe that's not the case?)
          sync = Bind.bindingManager.getDefaultSyncType();
       }
+      if ((flags & Bind.CROSS_SCOPE) != 0)
+         curScopeCtx = CurrentScopeContext.getCurrentScopeContext();
    }
 
    public String toString(String operation, boolean displayValue) {
@@ -82,4 +87,8 @@ public abstract class DestinationListener extends AbstractListener implements IB
    public boolean getVerbose() {
       return (flags & Bind.VERBOSE) != 0;
    }
+
+   public boolean isCrossScope() { return (flags & Bind.CROSS_SCOPE) != 0; }
+
+   public CurrentScopeContext getCurrentScopeContext() { return curScopeCtx; }
 }

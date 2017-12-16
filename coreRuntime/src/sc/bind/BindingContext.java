@@ -4,7 +4,9 @@
 
 package sc.bind;
 
+import sc.dyn.DynUtil;
 import sc.js.JSSettings;
+import sc.obj.IScopeEventListener;
 import sc.type.IBeanMapper;
 import sc.type.PTypeUtil;
 
@@ -33,7 +35,7 @@ import java.util.List;
  * and visibility of data using data-binding and data-sync between threads, processes, users, and other ways state is shared and synchronized.
  */
 @JSSettings(jsLibFiles = "js/scbind.js", prefixAlias="sc_")
-public class BindingContext  {
+public class BindingContext implements IScopeEventListener {
    BindingEvent queuedEvents;
 
    public BindingContext(IListener.SyncType defaultSyncType) {
@@ -129,13 +131,14 @@ public class BindingContext  {
     *
     * @param sync
     */
-   public void dispatchEvents(Object sync) {
+   public boolean dispatchEvents(Object sync) {
       BindingEvent oldEvent;
       BindingEvent toExecute = null, lastToExecute = null;
       float priority = UNSET_PRIORITY;
       BindingEvent prevEvent = null, nextEvent;
       List<BindingEvent> runList = null;
       boolean queuedLastEvent = false;
+      boolean any = false;
 
       synchronized (this) {
          /**
@@ -186,14 +189,18 @@ public class BindingContext  {
       // If we have more than one priority, the list stores the lists that need to be run first
       if (runList != null) {
          int sz = runList.size();
+         any = true;
          for (int i = 0; i < sz; i++) {
             BindingEvent be = runList.get(i);
             // Dispatch all of the events with the same priority.
             doDispatch(be);
          }
       }
-      if (toExecute != null)
+      if (toExecute != null) {
          doDispatch(toExecute);
+         any = true;
+      }
+      return any;
    }
 
    /**
@@ -260,4 +267,10 @@ public class BindingContext  {
       }
    }
 
+   /**
+    * Called when this BindingContext is used in the CurrentScopeContext as an eventListener, to dispatch the events then run any doLaters.
+    */
+   public void startContext() {
+      dispatchEvents(null);
+   }
 }

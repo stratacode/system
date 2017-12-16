@@ -24,6 +24,9 @@ public abstract class ScopeDefinition {
    public String name;
    public List<String> aliases;
 
+   /** Does this scope receive queued up events for sharing in cross-scope bindings */
+   public boolean eventListenerCtx = false;
+
    /** High-level messages about object-level events */
    public static boolean verbose;
 

@@ -4,6 +4,7 @@
 
 package sc.obj;
 
+import sc.dyn.DynUtil;
 import sc.type.PTypeUtil;
 
 import java.util.ArrayList;
@@ -32,7 +33,7 @@ public class CurrentScopeContext {
    static HashMap<String,CurrentScopeContext> scopeContextNames = null;
 
    // List of ScopeContexts active
-   List<ScopeContext> scopeContexts = new ArrayList<ScopeContext>();
+   public List<ScopeContext> scopeContexts = new ArrayList<ScopeContext>();
    // Optional list of locks to acquire to support these contexts
    List<Object> locks = null;
 
@@ -42,6 +43,8 @@ public class CurrentScopeContext {
    // Flag set to true when there is a thread waiting for change events for this CurrentScopeContext - it is used as a trigger to wake up the test script (or another waiter) when
    // a scopeContextName has been created, and the corresponding client is waiting for idle events for this window (or another scope).
    boolean contextIsReady = false;
+
+   Thread lockThread = null;
 
    public CurrentScopeContext(List<ScopeContext> scopeContexts, List<Object> locks) {
       this.scopeContexts = scopeContexts;
@@ -57,6 +60,20 @@ public class CurrentScopeContext {
       return null;
    }
 
+   public void startScopeContext(boolean acquireLocks) {
+      if (acquireLocks) {
+         acquireLocks();
+         if (scopeContexts != null) {
+            for (ScopeContext ctx:scopeContexts) {
+               if (ctx.eventListener != null)
+                  ctx.eventListener.startContext();
+            }
+         }
+      }
+      if (ScopeDefinition.verbose)
+         System.out.println("Begin scope context: " + this);
+   }
+
    /**
     * Call this to temporarily restore a CurrentScopeContext retrieved from getCurrentScopeContext.   You must call popScopeContext
     * in a finally clause after you've called this method.
@@ -64,10 +81,7 @@ public class CurrentScopeContext {
    public static void pushCurrentScopeContext(CurrentScopeContext state, boolean acquireLocks) {
       ArrayList<CurrentScopeContext> curStateList = (ArrayList<CurrentScopeContext>) PTypeUtil.getThreadLocal("scopeStateStack");
       if (state != null) {
-         if (acquireLocks)
-            state.acquireLocks();
-         if (ScopeDefinition.verbose)
-            System.out.println("Begin scope context: " + state);
+         state.startScopeContext(acquireLocks);
       }
       if (curStateList == null) {
          curStateList = new ArrayList<CurrentScopeContext>();
@@ -108,6 +122,8 @@ public class CurrentScopeContext {
          if (scopeCtx != null)
             ctxList.add(scopeCtx);
       }
+      // TODO: synchronization: add default locking for scopes.  In the web framework now, we're getting away from this since we already build the CurrentScopeContext for a page
+      // but we should have a way a default lock for a ScopeContext and some flags to control which locks it includes.
       return new CurrentScopeContext(ctxList, null);
    }
 
@@ -242,11 +258,23 @@ public class CurrentScopeContext {
    }
 
    public void acquireLocks() {
+      Thread thisThread = Thread.currentThread();
+      if (lockThread == thisThread) {
+         System.err.println("*** Locks for context scope already acquired: " + this);
+         return;
+      }
       if (locks != null)
          PTypeUtil.acquireLocks(locks, ScopeDefinition.traceLocks ? getTraceInfo() : null);
+      if (lockThread != null)
+         throw new UnsupportedOperationException();
+      lockThread = Thread.currentThread();
    }
 
    public void releaseLocks() {
+      Thread cur = Thread.currentThread();
+      if (cur != lockThread)
+         throw new IllegalArgumentException("Context scope: " + this + " releaseLocks called from thread: " + cur + " when held by: " + lockThread);
+      lockThread = null;
       if (locks != null)
          PTypeUtil.releaseLocks(locks, ScopeDefinition.traceLocks ? getTraceInfo() : null);
    }
@@ -264,4 +292,18 @@ public class CurrentScopeContext {
       sb.append("]");
       return sb.toString();
    }
+
+   public ScopeContext getEventScopeContext() {
+      if (scopeContexts != null) {
+         int sz = scopeContexts.size();
+         for (int i = sz - 1; i >= 0; i--) {
+            ScopeContext ctx = scopeContexts.get(i);
+            if (ctx.getScopeDefinition().eventListenerCtx)
+               return ctx;
+         }
+      }
+      System.err.println("*** No event scope context in the current scope context: " + this);
+      return null;
+   }
+
 }

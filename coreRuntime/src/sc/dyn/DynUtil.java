@@ -40,6 +40,9 @@ public class DynUtil {
    // A table for each type name which lists the current unique integer for that type that we use to automatically generate semi-unique ids for each instance
    static Map<String,Integer> typeIdCounts = new HashMap<String,Integer>();
 
+   // Like typeIdCounts but used for building more readable traceIds for logging.  Unlike typeIdCounts, this one can be cleared without affecting the application
+   static Map<Object,Integer> traceTypeIdCounts = (Map<Object,Integer>) PTypeUtil.getWeakHashMap();
+
    // A table which stores the automatically assigned id for a given object instance.
    //static Map<Object,String> objectIds = (Map<Object,String>) PTypeUtil.getWeakHashMap();
    // This used to be WeakHashMap but we use IdentityWrapper as a key most of the time which causes this to get gc'd too quickly
@@ -245,13 +248,22 @@ public class DynUtil {
       // Need to run scopeChanged jobs here - so we notify the threads which will process the request
       DynUtil.execLaterJobs();
 
+      CurrentScopeContext curScopeCtx = null;
       synchronized (listener) {
          try {
-            if (!listener.complete)
+            if (!listener.complete) {
+               curScopeCtx = CurrentScopeContext.getEnvScopeContextState();
+               if (curScopeCtx != null)
+                  curScopeCtx.releaseLocks();
                listener.wait(timeout);
+            }
          }
          catch (InterruptedException exc) {
             System.err.println("*** invokeRemoteSync of method: " + getMethodName(method) + " interrupted: " + exc);
+         }
+         finally {
+            if (curScopeCtx != null)
+               curScopeCtx.acquireLocks();
          }
       }
       Object evalRes = listener.result;
@@ -762,18 +774,30 @@ public class DynUtil {
       Integer id;
       IdentityWrapper wrap = new IdentityWrapper(obj);
       if ((id = traceIds.get(wrap)) == null)
-         traceIds.put(wrap, id = new Integer(traceCt++));
+         traceIds.put(wrap, id = getTypeTraceCount(DynUtil.getType(obj)));
 
       return String.valueOf(id);
    }
 
-   /** Gets the trace id without the identity wrapper, for things like session ids which should use 'equals' to find the same thing */
+   /** Gets the trace id without the identity wrapper, for things like session ids which should use 'equals' rather than object identity to match the same trace id */
    public static String getTraceObjId(Object obj) {
       Integer id;
       if ((id = traceIds.get(obj)) == null)
-         traceIds.put(obj, id = new Integer(traceCt++));
+         traceIds.put(obj, id = getTypeTraceCount(DynUtil.getType(obj)));
 
       return String.valueOf(id);
+   }
+
+   private static Integer getTypeTraceCount(Object type) {
+      Integer typeId = traceTypeIdCounts.get(type);
+      if (typeId == null) {
+         traceTypeIdCounts.put(type, 1);
+         typeId = 0;
+      }
+      else {
+         traceTypeIdCounts.put(type, typeId + 1);
+      }
+      return typeId;
    }
 
    public static String cleanClassName(Class cl) {

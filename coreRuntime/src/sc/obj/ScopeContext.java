@@ -47,6 +47,12 @@ public abstract class ScopeContext {
 
    private boolean refreshPending = false;
 
+   // Used for synchronizing the set/get of eventListener
+   public final Object eventListenerLock = new Object();
+
+   // Used for receiving cross-scope binding events
+   public IScopeEventListener eventListener = null;
+
    public void scopeDestroyed() {
       if (destroyListener != null)
          destroyListener.scopeDestroyed(this);
@@ -140,4 +146,5 @@ public abstract class ScopeContext {
          return false;
       return changeListeners.remove(listener);
    }
+
 }

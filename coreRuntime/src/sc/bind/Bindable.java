@@ -26,11 +26,13 @@ public @interface Bindable {
    boolean inactive() default false; // Set this to true to initially disable the binding.  It can be enabled via an api later - Bind.activate()
    boolean trace() default false;  // Set to enable selective tracing - each time the binding is initialized, set, retrieved, destroyed
    boolean verbose() default false; // Set to enable init, set, destroy events only
+   boolean crossScope() default false; // Set to true for those bindings where the changeEvents might come from some other thread operating in another context.  Adds extra thread-local lookup for the init and apply calls plus any necessary context switching overhead
+   boolean queued() default false; // Set to true to force queued mode (default depends on BindingContext)
+   boolean immediate() default false; // Set to true to force immediate mode (default depends on BindingContext)
+   // TODO: to-implement!
    boolean history() default false;  // Set to true to enable recording of the history of values.  APIs for diagnostics.  When combined
    boolean origin() default false;  // For trace or history include the origin - the stack trace and bindings leading up to this change.  If neither are set, both are enabled by default so origin=true by itself will provide the most diagnostics on this property.
    int delay() default -1;  // Set to 0 does the same thing as doLater=true.  Set to some number of milliseconds to run this binding with a delay.
-   boolean queued() default false; // Set to true to force queued mode (default depends on BindingContext)
-   boolean immediate() default false; // Set to true to force immediate mode (default depends on BindingContext)
    boolean doLater() default false; // Set to true to run this binding in a doLater
    // disabled? - to force an error
 }

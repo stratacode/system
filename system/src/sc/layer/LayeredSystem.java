@@ -42,6 +42,7 @@ import java.net.URLClassLoader;
 import java.util.*;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -3497,6 +3498,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       /** General flag for when we are running tests  */
       @Constant public boolean testMode = false;
 
+      /** Defaults the command interpreter to use cmd.edit = false - i.e. to just set properties rather than build or edit the layer */
+      @Constant public boolean scriptMode = false;
+
       /** Argument to control what happens after the command is run, e.g. it can specify the URL of the page to open. */
       @Constant public String openPattern = null;
 
@@ -3680,6 +3684,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                case 's':
                   if (opt.equals("scn"))
                      SyncManager.defaultLanguage = "stratacode";
+                  else if (opt.equals("scr"))
+                     options.scriptMode = true;
                   else
                      usage("Unrecognized option: " + opt, args);
                   break;
@@ -3857,6 +3863,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      options.testExit = true;
                      options.testMode = true;
                   }
+                  else if (opt.equals("tv")) {
+                     options.testVerifyMode = true;
+                     options.testMode = true;
+                  }
                   else if (opt.equals("t")) {
                      options.testMode = true;
                      if (i == args.length - 1)
@@ -3938,6 +3948,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   }
                   else if (opt.equals("vp"))
                      PerfMon.enabled = true;
+                  // DEPRECATED - use -tv instead
                   else if (opt.equals("vt")) {
                      options.testVerifyMode = true;
                      options.testMode = true;
@@ -4144,6 +4155,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       try {
          Thread commandThread = null;
          if (startInterpreter) {
+            if (options.testMode || options.scriptMode) {
+               // Change the default for testing
+               sys.cmd.edit = false;
+            }
             if (options.testScriptName != null && options.testMode && !sys.peerMode) {
                String pathName = options.testScriptName;
                if (!pathName.startsWith(".") && !FileUtil.isAbsolutePath(pathName))
@@ -4158,7 +4173,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // If we are adding a temporary layer, we can put it at the specified path.  If we are editing the
             // last layer, we can't switch the directory.  In this case, it is treated as relative to the layer's
             // directory.
-            if (!editLayer) {
+            if (!editLayer && sys.cmd.edit) {
                sys.addTemporaryLayer(commandDirectory, false);
                commandDirectory = null;
 
@@ -13837,40 +13852,48 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       long startTime = 0;
       if (options.verbose || options.verboseLocks)
          startTime = System.currentTimeMillis();
+
+      Lock lock = (!readOnly ? globalDynLock.writeLock() : globalDynLock.readLock());
       if (options.verboseLocks) {
-         System.out.println("Acquiring system dyn lock for read-only: " + readOnly + " thread: " + Thread.currentThread().getName() + ": runtime: " + getRuntimeName());
+         if ((!readOnly && globalDynLock.getWriteHoldCount() == 0) || (readOnly && globalDynLock.getReadHoldCount() == 0))
+            System.out.println("Acquiring system dyn lock" + (readOnly ? " (readOnly)" : "") + " thread: " + DynUtil.getCurrentThreadString());
       }
-      if (!readOnly) {
-         globalDynLock.writeLock().lock();
+
+      lock.lock();
+
+      if (!readOnly)
          writeLocked++;
-      }
-      else {
-         globalDynLock.readLock().lock();
+      else
          readLocked++;
-      }
+
       if (options.verboseLocks || options.verbose) {
          long duration = System.currentTimeMillis() - startTime;
          if (duration > 1000) {
-            System.err.println("Warning: waited: " + duration + " millis for lock on thread: " + Thread.currentThread().getName());
+            System.err.println("Warning: waited: " + duration + " millis for lock on thread: " + DynUtil.getCurrentThreadString());
             if (duration > 2000 && Thread.currentThread().getName().contains("AWT-Event")) {
                System.err.println("*** stack of waiting thread: ");
                new Throwable().printStackTrace(System.err);
             }
          }
+         else if (duration > 100 && options.verboseLocks)
+            System.out.println("Acquired system dyn lock " + (readOnly ? "(readOnly)" : "") + " after waiting: " + duration + " millis" + " thread: " + DynUtil.getCurrentThreadString());
       }
    }
 
    public void releaseDynLock(boolean readOnly) {
-      if (options.verboseLocks)
-         System.out.println("Releasing system dyn lock for read-only: " + readOnly + " thread: " + Thread.currentThread().getName() + ": runtime: " + getRuntimeName());
-      if (!readOnly) {
+      Lock lock = (!readOnly ? globalDynLock.writeLock() : globalDynLock.readLock());
+
+      if (options.verboseLocks) {
+         if (!readOnly && globalDynLock.getWriteHoldCount() == 1 || (readOnly && globalDynLock.getReadHoldCount() == 1)) {
+            System.out.println("Releasing system dyn lock" + (readOnly ? "(readOnly)" : "") + " thread: " + DynUtil.getCurrentThreadString());
+         }
+      }
+      if (!readOnly)
          writeLocked--;
-         globalDynLock.writeLock().unlock();
-      }
-      else {
+      else
          readLocked--;
-         globalDynLock.readLock().unlock();
-      }
+
+      lock.unlock();
    }
 
    public Lock getDynReadLock() {

@@ -40,6 +40,7 @@ public class GlobalScopeDefinition extends ScopeDefinition {
       name = null;
       aliases = new ArrayList<String>(1);
       aliases.add("global");
+      eventListenerCtx = true; // By default, collect all of the binding events here if there's no more specific context registered
    }
    public GlobalScopeDefinition() {
       super(0); // global scope is always id 0

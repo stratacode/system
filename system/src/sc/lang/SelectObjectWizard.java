@@ -23,34 +23,15 @@ public class SelectObjectWizard extends CommandWizard {
 
    public static final Object NO_INSTANCES_SENTINEL = new String("No instances");
 
-   public static Object start(AbstractInterpreter cmd, Object st, boolean needsInstance) {
+   public static void start(AbstractInterpreter cmd, Object st, List<InstanceWrapper> instances) {
       SelectObjectWizard wizard = new SelectObjectWizard();
       wizard.commandInterpreter = cmd;
       wizard.currentStep = Step.Select;
       wizard.verbose = cmd.system.options.info;
       wizard.statement = st;
       wizard.type = cmd.currentTypes.get(cmd.currentTypes.size()-1);
-      int max = 10;
-      try {
-         cmd.system.acquireDynLock(false);
-         wizard.instances = cmd.getInstancesOfType(wizard.type, max, false);
-      }
-      finally {
-         cmd.system.releaseDynLock(false);
-      }
-      // Nothing to do - just skip the eval
-      if (wizard.instances.size() == 0) {
-         if (!cmd.consoleDisabled && needsInstance)
-            wizard.print("*** Warning: No instances for class: " + ModelUtil.getTypeName(wizard.type) + " skipping eval");
-         return NO_INSTANCES_SENTINEL;
-      }
-      if (wizard.instances.size() == 1) {
-         if (!cmd.consoleDisabled)
-            wizard.print("Class context - choosing singleton for type: " + ModelUtil.getTypeName(wizard.type));
-         return wizard.instances.get(0).getInstance();
-      }
+      wizard.instances = instances;
       cmd.currentWizard = wizard;
-      return null;
    }
 
    public String prompt() {

@@ -588,25 +588,21 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             try {
                execContext.pushStaticFrame(type);
 
-               // For top-level types, we'll select the current object instance so we can use it to resolve sub-objects
-               if (parentObj == null && parentType == null && !hasCurrentObject() && autoObjectSelect) {
-                  Object res = SelectObjectWizard.start(this, null, false);
-                  if (res == null) {
-                     if (pushedCtx)
-                        popCurrentScopeContext();
-                     return;
-                  }
-                  if (res != SelectObjectWizard.NO_INSTANCES_SENTINEL && res != null) {
-                     obj = res;
-                  }
-               }
+               CurrentObjectResult cor = selectCurrentObject(null, type, !pushedCtx, false, true);
+               if (cor.wizardStarted)
+                  return;
+               obj = cor.curObj;
+               pushed = cor.pushedObj;
+               pushedCtx = pushedCtx || cor.pushedCtx;
 
                // Using origTypeName here - grabbed before we do the "a.b" to a as a parent of b" conversion.   type.typeName now will just be "b".
                // Only do this if the current object is the parent object - not if it's already been resolved from the selectedInstances array
-               if (obj == null)
-                  obj = parentObj == null ? (checkCurrentObject ? system.resolveName(typeName, true, false) : null) : (hasCurrentObject ? DynUtil.getPropertyPath(parentObj, origTypeName) : null);
-               execContext.pushCurrentObject(obj);
-               pushed = true;
+               if (!pushed) {
+                  if (obj == null)
+                     obj = parentObj == null ? (checkCurrentObject ? system.resolveName(typeName, true, false) : null) : (hasCurrentObject ? DynUtil.getPropertyPath(parentObj, origTypeName) : null);
+                  execContext.pushCurrentObject(obj);
+                  pushed = true;
+               }
             }
             catch (RuntimeException exc) {
                system.anyErrors = true;
@@ -614,7 +610,6 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                exc.printStackTrace();
             }
             finally {
-               // Avoid stack problems
                if (!pushed)
                   execContext.pushCurrentObject(null);
                if (pushedCtx) {
@@ -634,9 +629,9 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          else {
             execContext.pushStaticFrame(type);
          }
+         markCurrentTypeChanged();
          if (pushedCtx)
             popCurrentScopeContext();
-         markCurrentTypeChanged();
       }
       else if (statement instanceof PropertyAssignment) {
          Object curObj = null;
@@ -645,30 +640,19 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          boolean noInstance = false;
          PropertyAssignment pa = (PropertyAssignment) statement;
 
-         if (!pa.isStatic() && autoObjectSelect) {
-            if (!hasCurrentObject() || (curObj = getCurrentObject()) == null) {
-               Object res = SelectObjectWizard.start(this, statement, true);
-               if (res == SelectObjectWizard.NO_INSTANCES_SENTINEL)
-                  noInstance = true; // TODO: see below - used to set skipEval = true here
-               else if (res == null) {
-                  if (pushedCtx)
-                     popCurrentScopeContext();
-                  return;
-               }
-               else {
-                  curObj = res;
-                  execContext.pushCurrentObject(curObj);
-                  pushed = true;
-               }
-            }
-            else {
-               execContext.pushCurrentObject(curObj);
-               pushed = true;
-            }
+         BodyTypeDeclaration current = currentTypes.get(currentTypes.size()-1);
+
+         if (!pa.isStatic()) {
+            CurrentObjectResult cor = selectCurrentObject(pa, current, !pushedCtx, true, true);
+            if (cor.wizardStarted)
+               return;
+            noInstance = cor.skipEval;
+            pushed = cor.pushedObj;
+            pushedCtx = pushedCtx || cor.pushedCtx;
+            curObj = cor.curObj;
          }
 
          try {
-            BodyTypeDeclaration current = currentTypes.get(currentTypes.size()-1);
             PropertyAssignment assign = (PropertyAssignment) statement;
             boolean performedOnce = false;
 
@@ -804,27 +788,14 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
          if (expr.errorArgs == null && !model.hasErrors) {
             pushedCtx = pushCurrentScopeContext();
-            if (!expr.isStaticTarget() && autoObjectSelect && currentType != null) {
-               if (!hasCurrentObject() || (curObj = getCurrentObject()) == null) {
-                  Object res;
-                  res = SelectObjectWizard.start(this, statement, true);
-                  if (res == SelectObjectWizard.NO_INSTANCES_SENTINEL)
-                     skipEval = true;
-                  else if (res == null) {
-                     if (pushedCtx)
-                        popCurrentScopeContext();
-                     return;
-                  }
-                  else {
-                     curObj = res;
-                     execContext.pushCurrentObject(curObj);
-                     pushed = true;
-                  }
-               }
-               else {
-                  execContext.pushCurrentObject(curObj);
-                  pushed = true;
-               }
+            if (!expr.isStaticTarget() && currentType != null) {
+               CurrentObjectResult cor = selectCurrentObject(expr, currentType, !pushedCtx, true, true);
+               if (cor.wizardStarted)
+                  return;
+               pushed = cor.pushedObj;
+               pushedCtx = pushedCtx || cor.pushedCtx;
+               skipEval = cor.skipEval;
+               curObj = cor.curObj;
             }
 
             try {
@@ -879,27 +850,14 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          boolean pushed = false;
          boolean pushedCtx = pushCurrentScopeContext();
 
-         if (!block.staticEnabled && autoObjectSelect) {
-            if (!hasCurrentObject() || (curObj = getCurrentObject()) == null) {
-               Object res;
-               res = SelectObjectWizard.start(this, statement, true);
-               if (res == SelectObjectWizard.NO_INSTANCES_SENTINEL)
-                  skipEval = true;
-               else if (res == null) {
-                  if (pushedCtx)
-                     popCurrentScopeContext();
-                  return;
-               }
-               else {
-                  curObj = res;
-                  execContext.pushCurrentObject(curObj);
-                  pushed = true;
-               }
-            }
-            else {
-               execContext.pushCurrentObject(curObj);
-               pushed = true;
-            }
+         if (!block.staticEnabled) {
+            CurrentObjectResult cor = selectCurrentObject(block, currentType, !pushedCtx, true, true);
+            if (cor.wizardStarted)
+               return;
+            pushed = cor.pushedObj;
+            pushedCtx = pushedCtx || cor.pushedCtx;
+            curObj = cor.curObj;
+            skipEval = cor.skipEval;
          }
 
          try {
@@ -956,28 +914,13 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          ParseUtil.initAndStartComponent(expr);
 
          if (expr.errorArgs == null && !model.hasErrors) {
-            if (autoObjectSelect && currentType != null) {
-               pushedCtx = pushCurrentScopeContext();
-               if (!hasCurrentObject() || (curObj = getCurrentObject()) == null) {
-                  Object res;
-                  res = SelectObjectWizard.start(this, statement, true);
-                  if (res == SelectObjectWizard.NO_INSTANCES_SENTINEL)
-                     skipEval = true;
-                  else if (res == null) {
-                     if (pushedCtx)
-                        popCurrentScopeContext();
-                     return;
-                  }
-                  else {
-                     curObj = res;
-                     execContext.pushCurrentObject(curObj);
-                     pushed = true;
-                  }
-               }
-               else {
-                  execContext.pushCurrentObject(curObj);
-                  pushed = true;
-               }
+            if (currentType != null) {
+               CurrentObjectResult cor = selectCurrentObject(expr, currentType, false, true, true);
+               if (cor.wizardStarted)
+                  return;
+               pushedCtx = cor.pushedCtx;
+               skipEval = cor.skipEval;
+               pushed = cor.pushedObj;
             }
 
             try {
@@ -990,7 +933,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                      evalPerformed = true;
                   }
 
-                  if (!evalPerformed && syncSystems != null && currentType != null && currentLayer != null) {
+                  if (syncSystems != null && currentType != null && currentLayer != null) {
                      for (LayeredSystem peerSys:syncSystems) {
                         if (performUpdatesToSystem(peerSys, evalPerformed)) {
                            Layer peerLayer = peerSys.getLayerByName(currentLayer.layerUniqueName);
@@ -1029,6 +972,60 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
       if (pauseTime != 0)
          sleep(pauseTime);
+   }
+
+   class CurrentObjectResult {
+      Object curObj;
+      boolean wizardStarted;
+      boolean pushedCtx;
+      boolean pushedObj;
+      boolean skipEval;
+   }
+
+   private CurrentObjectResult selectCurrentObject(Statement statement, BodyTypeDeclaration currentType, boolean doPushCtx, boolean needsInstance, boolean useWizard) {
+      CurrentObjectResult cor = new CurrentObjectResult();
+      if (autoObjectSelect && currentType != null) {
+         if (doPushCtx)
+            cor.pushedCtx = pushCurrentScopeContext();
+         if (!hasCurrentObject() || (cor.curObj = getCurrentObject()) == null) {
+            Object res;
+            List<InstanceWrapper> instances;
+            int max = 10;
+            try {
+               system.acquireDynLock(false);
+               instances = getInstancesOfType(currentType, max, false);
+            }
+            finally {
+               system.releaseDynLock(false);
+            }
+            int numInsts = instances.size();
+            if (numInsts == 0) {
+               if (!consoleDisabled && needsInstance)
+                  System.out.println("*** Warning: No instances for class: " + ModelUtil.getTypeName(currentType) + " skipping eval");
+               cor.skipEval = true;
+            }
+            else if (numInsts == 1) {
+               if (!consoleDisabled)
+                  System.out.println("Class context - choosing singleton for type: " + ModelUtil.getTypeName(currentType));
+               cor.curObj = instances.get(0).getInstance();
+               execContext.pushCurrentObject(cor.curObj);
+               cor.pushedObj = true;
+            }
+            else if (useWizard) {
+               SelectObjectWizard.start(this, statement, instances);
+               cor.wizardStarted = true;
+               if (cor.pushedCtx) {
+                  popCurrentScopeContext();
+                  cor.pushedCtx = false;
+               }
+            }
+         }
+         else {
+            execContext.pushCurrentObject(cor.curObj);
+            cor.pushedObj = true;
+         }
+      }
+      return cor;
    }
 
    private static boolean ignoreRemoteStatement(LayeredSystem sys, Statement st) {
@@ -1093,7 +1090,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
     */
    public boolean pushCurrentScopeContext() {
       CurrentScopeContext ctx = CurrentScopeContext.get(scopeStateName);
-      if (ctx != null) {
+      if (ctx != null && ctx != CurrentScopeContext.getEnvScopeContextState()) {
          CurrentScopeContext.pushCurrentScopeContext(ctx, true);
          return true;
       }
@@ -1235,6 +1232,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             edit();
          }
       }
+      CurrentObjectResult cor = selectCurrentObject(null, newType, false, false, false);
    }
 
    public void edit() {
@@ -1652,17 +1650,21 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       ScheduledJob job = new ScheduledJob();
       job.priority = priority;
       job.toInvoke = r;
+      // TODO: performance check if it's different?  Or maybe check on the other end?
+      job.curScopeCtx = CurrentScopeContext.getEnvScopeContextState();
       ScheduledJob.addToJobList(toRunLater, job);
    }
 
    public void execLaterJobs() {
-      boolean pushed = pushCurrentScopeContext(); // TODO: maybe we should just set this and leave it in place rather than popping in processStatement?  We do need to update it each time in case the scope we are using has been changed
+      boolean pushed = false;
+      if (CurrentScopeContext.getEnvScopeContextState() == null)
+         pushed = pushCurrentScopeContext(); // TODO: maybe we should just set this and leave it in place rather than popping in processStatement?  We do need to update it each time in case the scope we are using has been changed
       try {
          ArrayList<ScheduledJob> toRunNow = new ArrayList<ScheduledJob>(toRunLater);
          toRunLater.clear();
          for (int i = 0; i < toRunNow.size(); i++) {
             ScheduledJob toRun = toRunNow.get(i);
-            toRun.toInvoke.run();
+            toRun.run();
          }
       }
       finally {

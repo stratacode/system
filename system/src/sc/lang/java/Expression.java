@@ -497,8 +497,8 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       bindingExpr.transform(runtime);
    }
 
-   private final static String[] bindFlagAnnotNames = {"inactive", "trace", "verbose", "queued", "immediate", "history", "origin"};
-   private final static String [] bindFlagConstNames = {"sc.bind.Bind.INACTIVE", "sc.bind.Bind.TRACE", "sc.bind.Bind.VERBOSE", "sc.bind.Bind.QUEUED", "sc.bind.Bind.IMMEDIATE", "sc.bind.Bind.HISTORY", "sc.bind.Bind.ORIGIN"};
+   private final static String[] bindFlagAnnotNames = {"inactive", "trace", "verbose", "queued", "immediate", "history", "origin", "crossScope"};
+   private final static String [] bindFlagConstNames = {"sc.bind.Bind.INACTIVE", "sc.bind.Bind.TRACE", "sc.bind.Bind.VERBOSE", "sc.bind.Bind.QUEUED", "sc.bind.Bind.IMMEDIATE", "sc.bind.Bind.HISTORY", "sc.bind.Bind.ORIGIN", "sc.bind.Bind.CROSS_SCOPE"};
 
    void addBindFlagsAndOptionsExpr(SemanticNodeList<Expression> bindArgs) {
       Expression flagsExpr = null;
@@ -546,8 +546,8 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
          ArrayList<String> flagNames = new ArrayList<String>();
          Object annotObj = ModelUtil.getAnnotation(bindingStatement, "sc.bind.Bindable");
          if (annotObj != null) {
-            String[] bindFlagAnnotNames = {"activated", "trace", "verbose", "queued", "immediate", "history", "origin"};
-            int[] bindFlagConstVals = {sc.bind.Bind.INACTIVE, sc.bind.Bind.TRACE, sc.bind.Bind.VERBOSE, sc.bind.Bind.QUEUED, sc.bind.Bind.IMMEDIATE, sc.bind.Bind.HISTORY, sc.bind.Bind.ORIGIN};
+            String[] bindFlagAnnotNames = {"activated", "trace", "verbose", "queued", "immediate", "history", "origin", "crossScope"};
+            int[] bindFlagConstVals = {sc.bind.Bind.INACTIVE, sc.bind.Bind.TRACE, sc.bind.Bind.VERBOSE, sc.bind.Bind.QUEUED, sc.bind.Bind.IMMEDIATE, sc.bind.Bind.HISTORY, sc.bind.Bind.ORIGIN, sc.bind.Bind.CROSS_SCOPE};
             for (int i = 0; i < bindFlagAnnotNames.length; i++) {
                String annotName = bindFlagAnnotNames[i];
                Boolean isSet = (Boolean) ModelUtil.getAnnotationValue(annotObj, annotName);

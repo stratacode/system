@@ -18,10 +18,11 @@ public class BindingManager {
    public void sendEvent(IListener listener, int event, Object obj, IBeanMapper prop, Object eventDetail) {
       BindingContext ctx = null;
 
-      // VALUE_REQUESTED events are always immediate
       if ((event & IListener.VALUE_CHANGED_MASK) != 0) {
+         // For queued events, we don't want to go through the work of queuing if the value has not changed.
+         // without requiring synchronization from the remote scope.   If that turns out not to be the
          if (listener.getSync() != IListener.SyncType.IMMEDIATE) {
-            // Check if the value has changed - don't apply the change
+            // If the value has not changed, don't apply the change
             if (listener.valueInvalidated(obj, prop, eventDetail, false)) {
                ctx = BindingContext.getBindingContext();  // TODO... get this first and only call valueChanged if it is not null
             }

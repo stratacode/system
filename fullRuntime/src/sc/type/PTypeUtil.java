@@ -1053,8 +1053,11 @@ public class PTypeUtil {
    public static void acquireLocks(List<Object> locks, String traceInfo) {
       if (locks.size() == 0)
          return;
-      if (traceInfo != null)
-         System.out.println("Acquiring locks: " + traceInfo);
+      long startTime = -1;
+      if (traceInfo != null) {
+         startTime = System.currentTimeMillis();
+         System.out.println("Acquiring locks:" + traceInfo);
+      }
 
       // Wait as normal to get the first lock
       ((Lock) locks.get(0)).lock();
@@ -1070,7 +1073,7 @@ public class PTypeUtil {
             if (!lock.tryLock()) {
                releaseLocks(locks, 0, i);
                if (traceInfo != null)
-                  System.out.println("Waiting for lock: " + lock + ": " + traceInfo);
+                  System.out.println("Waiting for lock: " + lock + ":" + traceInfo);
                // Wait now to get the contended lock to avoid a busy loop but we'll just immediately release it just to make the code simpler
                lock.lock();
 
@@ -1085,15 +1088,18 @@ public class PTypeUtil {
             fetchTo = repeatTo;
       } while (repeat);
 
-      if (traceInfo != null)
-         System.out.println("Page - locks acquired: " + traceInfo);
+      if (traceInfo != null) {
+         long duration = System.currentTimeMillis() - startTime;
+         if (duration > 100)
+            System.out.println("Locks acquired after waiting: " + duration + " millis for:" + traceInfo);
+      }
    }
 
    public static void releaseLocks(List<Object> locks, String traceInfo) {
       if (locks.size() == 0)
          return;
       if (traceInfo != null)
-         System.out.println("Releasing locks: " + traceInfo);
+         System.out.println("Releasing locks:" + traceInfo);
       releaseLocks(locks, 0, locks.size());
    }
 

@@ -6,6 +6,7 @@ package sc.bind;
 
 import sc.dyn.DynUtil;
 import sc.js.JSSettings;
+import sc.obj.CurrentScopeContext;
 import sc.util.ISet;
 
 @JSSettings(jsLibFiles = "js/scbind.js", prefixAlias="sc_")
@@ -88,4 +89,8 @@ public abstract class AbstractListener implements IListener {
    public boolean getVerbose() {
       return false;
    }
+
+   public boolean isCrossScope() { return false; }
+
+   public CurrentScopeContext getCurrentScopeContext() { return null; }
 }
