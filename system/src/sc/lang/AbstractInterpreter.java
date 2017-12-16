@@ -1694,6 +1694,13 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    abstract void resetInput();
 
+   public String getInputFileName() {
+      if (inputFileName == null)
+         return "<stdin>";
+      else
+         return inputFileName;
+   }
+
    // ---- Begin the DynObject redirection boilerplate
    public Object getProperty(String propName) {
       return dynObj.getPropertyFromWrapper(this, propName);

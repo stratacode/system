@@ -1208,9 +1208,6 @@ public class SyncManager {
             else // TODO: any other cases other than remote here?
                message = "Synchronizing remote instance: ";
             System.out.println(message + objName + syncType + (scopeId != 0 ? "scope: " + ScopeDefinition.getScopeDefinition(scopeId).name : "global scope"));
-
-            if (objName.contains("SelectedFile"))
-               System.out.println("***");
          }
       }
 

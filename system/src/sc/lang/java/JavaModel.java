@@ -3117,6 +3117,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return unsavedModel;
    }
 
+   /** This is a way for code to determine this model has been created from the command-line */
+   public EditorContext getEditorContext() {
+      return commandInterpreter;
+   }
+
    public File getLineIndexFile(String buildSrcDir) {
       return GenFileLineIndex.getLineIndexFile(getProcessedFileName(buildSrcDir));
    }

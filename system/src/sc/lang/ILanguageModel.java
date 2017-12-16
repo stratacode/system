@@ -98,5 +98,7 @@ public interface ILanguageModel extends IFileProcessorResult {
    /** Called when this model nees to be regenerated */
    void stop();
 
-   public boolean isUnsavedModel();
+   boolean isUnsavedModel();
+
+   EditorContext getEditorContext();
 }

@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import sc.lang.AbstractInterpreter;
 import sc.lang.ISemanticNode;
 import sc.lang.JavaLanguage;
 import sc.lang.html.Element;
@@ -435,8 +436,14 @@ public abstract class JavaSemanticNode extends SemanticNode {
    public String toFileString() {
       String file;
       JavaModel model = getJavaModel();
-      if (model == null || model.getSrcFile() == null)
-         file = "<no file>";
+      if (model == null || model.getSrcFile() == null) {
+         if (model != null && model.commandInterpreter !=null) {
+            AbstractInterpreter cmd = model.commandInterpreter;
+            file = "script: " + cmd.getInputFileName();
+         }
+         else
+            file = "<no file>";
+      }
       else
          file = model.getSrcFile().toShortString();
       return "File: " + file + toLocationString(false, false);

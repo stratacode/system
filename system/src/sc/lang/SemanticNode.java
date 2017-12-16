@@ -694,7 +694,8 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       if (startIx != -1) {
          ISemanticNode rootNode = getRootNode();
          if (rootNode != null && rootNode instanceof ILanguageModel) {
-            List<SrcEntry> srcEnts = ((ILanguageModel) rootNode).getSrcFiles();
+            ILanguageModel rootModel = (ILanguageModel) rootNode;
+            List<SrcEntry> srcEnts = rootModel.getSrcFiles();
             if (srcEnts != null && srcEnts.size() > 0) {
                String fileName = srcEnts.get(0).absFileName;
                if (addFile) {
@@ -710,6 +711,17 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
                      sb.append(" ");
                      sb.append(atStr);
                   }
+               }
+            }
+            else if (rootModel.getEditorContext() != null) {
+               EditorContext ctx = rootModel.getEditorContext();
+               if (addFile) {
+                  sb.append("Script: ");
+                  sb.append(ctx.getCurrentFile());
+               }
+               if (addAt) {
+                  sb.append(" at ");
+                  sb.append(ctx.getCurrentFilePosition());
                }
             }
             else if (addAt) {

@@ -66,6 +66,8 @@ public class EditorContext extends ClientEditorContext {
    /** The path name of the current file - currently only used by the command line interpreter though maybe should be tied to current package? */
    public String path;
 
+   public int currentLine = 0;
+
    public static final String NO_CURRENT_OBJ_SENTINEL = "<NoSelectedObj>";
 
    // Since we rebuild the class view structure, we cannot store the instances selected for a given type
@@ -1632,5 +1634,13 @@ public class EditorContext extends ClientEditorContext {
    @Remote(remoteRuntimes="js")
    public void rebuildAll() {
       system.rebuildAll();
+   }
+
+   public String getCurrentFile() {
+      return path;
+   }
+
+   public String getCurrentFilePosition() {
+      return "line: " + currentLine;
    }
 }

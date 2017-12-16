@@ -1448,11 +1448,24 @@ public class IdentifierExpression extends ArgumentsExpression {
                if (methVar == null) {
                   idTypes[i] = IdentifierType.UnboundMethodName;
                   if (model != null && !model.disableTypeErrors && expr.isInferredSet() && expr.isInferredFinal()) {
-                     boundTypes[i] = findClosestMethod(currentType, nextName, arguments); // For the IDE - map to something at least
-                     String otherMessage = getOtherMethodsMessage(currentType, nextName, isStatic);
-                     String message = isStatic ? "No static method: " : "No method: ";
-                     expr.displayRangeError(i, i, message, nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentTypeDecl),otherMessage == null ? "" : otherMessage.toString(),  " for ");
-                     methVar = currentTypeDecl.definesMethod(nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs);
+                     boolean handled = false;
+                     if (enclosingType != null) {
+                        // Try again with no reference type and if we can find the method, it's a permissions problem
+                        Object inaccessible = currentTypeDecl.definesMethod(nextName, arguments, null, null, enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs);
+                        if (inaccessible != null) {
+                           String modString = ModelUtil.getAccessLevelString(inaccessible, false, null);
+                           expr.displayRangeError(i, i, "Method: ", nextName, " with access " + modString + " not accessible from type: " + enclosingType.getFullTypeName() + " in: ");
+                           boundTypes[i] = inaccessible;
+                           handled = true;
+                        }
+                     }
+                     if (!handled) {
+                        boundTypes[i] = findClosestMethod(currentType, nextName, arguments); // For the IDE - map to something at least
+                        String otherMessage = getOtherMethodsMessage(currentType, nextName, isStatic);
+                        String message = isStatic ? "No static method: " : "No method: ";
+                        expr.displayRangeError(i, i, message, nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentTypeDecl),otherMessage == null ? "" : otherMessage.toString(),  " for ");
+                        methVar = currentTypeDecl.definesMethod(nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs);
+                     }
                   }
                }
             }
@@ -1537,14 +1550,27 @@ public class IdentifierExpression extends ArgumentsExpression {
             }
             else {
                Object remoteMeth = checkRemoteMethod(expr, currentType, nextName, i, idTypes, boundTypes, arguments, isStatic, inferredType);
-               if (methObj == null && remoteMeth == null) {
+               if (remoteMeth == null) {
                   idTypes[i] = IdentifierType.UnboundMethodName;
                   if (model != null && !model.disableTypeErrors && expr.isInferredFinal() && expr.isInferredSet()) {
-                     boundTypes[i] = findClosestMethod(currentClass, nextName, arguments); // For the IDE - map to something at least
-                     String otherMethods = getOtherMethodsMessage(currentClass, nextName, isStatic);
-                     String message = isStatic ? "No static method: " : "No method: ";
-                     expr.displayRangeError(i, i, message, nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentClass), otherMethods, " for ");
-                     methObj = ModelUtil.definesMethod(currentClass, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs, sys); // TODO: remove - for debugging only
+                     boolean handled = false;
+                     if (enclosingType != null) {
+                        // Try again with no reference type and if we can find the method, it's a permissions problem
+                        Object inaccessible = ModelUtil.definesMethod(currentClass, nextName, arguments, null, null, enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs, sys);
+                        if (inaccessible != null) {
+                           String modString = ModelUtil.getAccessLevelString(inaccessible, false, null);
+                           expr.displayRangeError(i, i, "Method: ", nextName, " with access " + modString + " not accessible from type: " + enclosingType.getFullTypeName() + " in: ");
+                           boundTypes[i] = inaccessible;
+                           handled = true;
+                        }
+                     }
+                     if (!handled) {
+                        boundTypes[i] = findClosestMethod(currentClass, nextName, arguments); // For the IDE - map to something at least
+                        String otherMethods = getOtherMethodsMessage(currentClass, nextName, isStatic);
+                        String message = isStatic ? "No static method: " : "No method: ";
+                        expr.displayRangeError(i, i, message, nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentClass), otherMethods, " for ");
+                        methObj = ModelUtil.definesMethod(currentClass, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs, sys); // TODO: remove - for debugging only
+                     }
                   }
                }
             }

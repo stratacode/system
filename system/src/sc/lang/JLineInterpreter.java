@@ -27,7 +27,9 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
    @Override
    public String readLine(String nextPrompt) {
       try {
-         return input.readLine(nextPrompt);
+         String res = input.readLine(nextPrompt);
+         currentLine++;
+         return res;
       }
       catch (IOException exc) {
          System.err.println("*** error reading from console");
@@ -44,6 +46,7 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
          input.addCompleter(this);
          inputStream = inStream;
          smartTerminal = input.getTerminal().isSupported(); // Or isAnsiSupported?  Or isEchoEnabled()?  These also are different between the dumb IntelliJ terminal and the real command line
+         currentLine = 0;
       }
       catch (EOFException exc) {
          System.exit(1);
@@ -67,6 +70,7 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
             String nextLine;
             String nextPrompt = inputBytesAvailable() ? "" : prompt();
             while ((nextLine = input.readLine(nextPrompt)) != null) {
+               currentLine++;
                Object result = null;
                if (currentWizard != null || nextLine.trim().length() != 0) {
                   pendingInput.append(nextLine);
@@ -175,5 +179,9 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
       if (system.options.testVerifyMode) // allow the logs to look the same
          return super.getTermWidth();
       return input.getTerminal().getWidth();
+   }
+
+   public String getCurrentFile() {
+      return inputFileName == null ? path : inputFileName;
    }
 }
