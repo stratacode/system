@@ -2799,4 +2799,12 @@ public class ModifyDeclaration extends TypeDeclaration {
    public boolean isEmpty() {
       return body == null || body.size() == 0;
    }
+
+   public boolean needsEnclosingClass() {
+      if (modifiers != null)
+         return true;
+      if (extendsTypes != null || implementsTypes != null)
+         return true;
+      return modifyNeedsClass();
+   }
 }

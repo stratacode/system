@@ -85,13 +85,13 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
                      Object errSt = result;
                      if (errSt instanceof List && ((List) errSt).size() == 1)
                         errSt = ((List) errSt).get(0);
-                     System.err.println("Exception executing: " + errSt);
+                     System.err.println("Script error: " + exc.toString() + " for statement: " + errSt);
                      if (system.options.verbose)
                         exc.printStackTrace();
-                     else
-                        System.err.println(exc);
-                     if (exitOnError)
+                     if (exitOnError) {
+                        System.err.println("Exiting -1 on error because cmd.exitOnError configured as true");
                         System.exit(-1);
+                     }
                   }
                }
                if (pendingInput.length() > 0) {

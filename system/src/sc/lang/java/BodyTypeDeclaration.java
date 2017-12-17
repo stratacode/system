@@ -1168,11 +1168,17 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    void checkForStaleAdd() {
-      if (isTransformedType()) return; Layer l = getLayer();
+      if (isTransformedType())
+         return;
+      Layer l = getLayer();
       if (l != null && l.compiled && !isDynamicNew() && staleClassName == null && !isGeneratedType()) {
          LayeredSystem sys = l.layeredSystem;
          sys.setStaleCompiledModel(true, "Added statement to compiled type: ", typeName);
          staleClassName = getCompiledClassName();
+
+         TypeDeclaration enclType = getEnclosingType();
+         if (enclType != null) // For the enclosing type, if we've added the first statement to an inner modify type, it changes needsOwnClass for the parent type to return 'true' so we need to snag the scaleClassName there too
+            enclType.checkForStaleAdd();
       }
    }
 
@@ -7124,8 +7130,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             return getInnerStubFullTypeName();
          return getFullTypeName();
       }
-      else
+      else {
          return ModelUtil.getTypeName(getClassDeclarationForType());
+      }
    }
 
    public static boolean isExtendsDynamicType(Object extendsType) {
@@ -8063,6 +8070,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return false;
 
       Object res = outer.getClassDeclarationForType();
+
+      if (ModelUtil.hasTypeParameters(res))
+         res = ModelUtil.getParamTypeBaseType(res);
 
       if (res instanceof Class) {
          return false;

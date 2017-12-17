@@ -542,9 +542,9 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                system.releaseDynLock(false);
             }
 
-            if (currentDefChanged)
+            if (currentDefChanged && edit)
                addChangedModel(currentDef.getJavaModel());
-            if (modelChanged)
+            if (modelChanged && edit)
                addChangedModel(model);
          }
 
@@ -553,13 +553,19 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          // By default, we'd like to the live dynamic types feature for types manipulated in the command line
          type.liveDynType = true;
 
-         if (addToType) {
-            BodyTypeDeclaration origType = type;
-            type = addToCurrentType(model, parentType, type);
-            if (type == null) {
-               removeFromCurrentObject(model, parentType, origType);
-               return;
+         if (edit) {
+            if (addToType) {
+               BodyTypeDeclaration origType = type;
+               type = addToCurrentType(model, parentType, type);
+               if (type == null) {
+                  removeFromCurrentObject(model, parentType, origType);
+                  return;
+               }
             }
+         }
+         else {
+            type.markAsTemporary();
+            type.parentNode = parentType == null ? model : parentType;
          }
          // Need to do this after we've added the type to the file system.  Otherwise, we try to lookup the type
          // before it is on the file system and that leads to an error trying to find the type
