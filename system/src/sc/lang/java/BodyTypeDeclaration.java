@@ -1508,18 +1508,30 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return getFullTypeName();
    }
 
+   /**
+    * A dynamic type may become out of sync with the instances, due to the optimization where we eliminate types.
+    * So in a few situations, we need to get the 'runtimeFullTypeName' rather than the full-type-name as based
+    * on the current type definition.  For example, we add the first field to a type which has already been instantiated.
+    * We need to also consider that for an inner type, it's runtime type name depends on the runtime type name of its enclosing type.
+    */
+   public String getRuntimeFullTypeName() {
+      if (staleClassName != null)
+         return staleClassName;
+      return getFullTypeName(".", true);
+   }
+
    public String getFullTypeName() {
       if (fullTypeName != null)
          return fullTypeName;
-      fullTypeName = getFullTypeName(".");
+      fullTypeName = getFullTypeName(".", false);
       return fullTypeName;
    }
 
    public String getJavaFullTypeName() {
-      return getFullTypeName("$");
+      return getFullTypeName("$", false);
    }
 
-   private String getFullTypeName(String innerTypeSep) {
+   private String getFullTypeName(String innerTypeSep, boolean runtime) {
       ISemanticNode pnode = parentNode instanceof BodyTypeDeclaration || parentNode instanceof JavaModel ? parentNode : parentNode == null ? null : parentNode.getParentNode(); // Skip the list, not there for command completion
 
       String useTypeName = typeName;
@@ -1550,7 +1562,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          // We put all inner types found in layer def files into a single name-space.
          // TODO? should we could use the layer's package prefix?  If so, we probably need a way for one layer to set other
          // layer's properties so you are not limited what you can do in a layer def file.
-         String parentName = itd.isLayerType() ? LayerConstants.LAYER_COMPONENT_FULL_TYPE_NAME : itd.getFullTypeName();
+         String parentName = itd.isLayerType() ? LayerConstants.LAYER_COMPONENT_FULL_TYPE_NAME : (runtime && itd instanceof BodyTypeDeclaration ? ((BodyTypeDeclaration) itd).getRuntimeFullTypeName() : itd.getFullTypeName());
          res = parentName + innerTypeSep + useTypeName;
       }
       else if (pnode == null)
@@ -4894,7 +4906,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          // Find all instances pointing to this type and replace them with the new one.  Update the inst/type index.
          // Update the sub-type index so that all sub-types point to this new type
          if (sys.options.liveDynamicTypes && ModelUtil.getLiveDynamicTypes(this)) {
-            String oldTypeName = getFullTypeName();
+            String oldTypeName = getRuntimeFullTypeName();
             Iterator insts = sys.getInstancesOfType(oldTypeName);
             if (insts != null) {
                while (insts.hasNext()) {
@@ -5419,7 +5431,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       JavaModel model = getJavaModel();
       LayeredSystem sys = model.getLayeredSystem();
       if (sys.options.liveDynamicTypes && ModelUtil.getLiveDynamicTypes(this)) {
-         Iterator insts = sys.getInstancesOfType(getFullTypeName());
+         Iterator insts = sys.getInstancesOfType(getRuntimeFullTypeName());
          if (insts != null) {
             while (insts.hasNext()) {
                Object inst = insts.next();
@@ -5463,7 +5475,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (sys.options.liveDynamicTypes && ModelUtil.getLiveDynamicTypes(this)) {
          IDynChildManager mgr = getDynChildManager();
          String innerTypeName = innerType.typeName;
-         Iterator insts = sys.getInstancesOfType(getFullTypeName());
+         Iterator insts = sys.getInstancesOfType(getRuntimeFullTypeName());
          if (insts != null) {
             while (insts.hasNext()) {
                Object instObj = insts.next();
@@ -6294,7 +6306,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (sys.options.liveDynamicTypes && ModelUtil.getLiveDynamicTypes(this)) {
 
          if (getRealReplacedByType() == null) {
-            Iterator insts = sys.getInstancesOfType(getFullTypeName());
+            Iterator insts = sys.getInstancesOfType(getRuntimeFullTypeName());
             if (insts != null) {
                while (insts.hasNext()) {
                   Object inst = insts.next();
@@ -6331,7 +6343,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public void updateInstancesForProperty(JavaSemanticNode overriddenAssign, ExecutionContext ctx, InitInstanceType iit) {
       JavaModel model = getJavaModel();
       LayeredSystem sys = model.layeredSystem;
-      Iterator insts = sys.getInstancesOfTypeAndSubTypes(getFullTypeName());
+      Iterator insts = sys.getInstancesOfTypeAndSubTypes(getRuntimeFullTypeName());
 
       if (overriddenAssign.isStatic()) {
          if (sys.options.verbose) {
@@ -6640,7 +6652,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    /** Removes any instances lying around for this type */
    public void removeTypeInstances() {
       LayeredSystem sys = getLayeredSystem();
-      String typeName = getFullTypeName();
+      String typeName = getRuntimeFullTypeName();
       sys.removeGlobalObject(typeName);
       // Assumes that we'll call disposeInstances on any sub-type of this type.  Could just call getInstancesOfTypeAndSubTypes
       Iterator<Object> insts = sys.getInstancesOfType(typeName);
@@ -7111,7 +7123,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if (needsCompiledClass) {
             if (isDynInnerStub() && getEnclosingType() != null)
                return getInnerStubFullTypeName();
-            return getFullTypeName();
+            return getRuntimeFullTypeName();
          }
 
          Object extendsType = getExtendsTypeDeclaration();

@@ -2805,6 +2805,12 @@ public class ModifyDeclaration extends TypeDeclaration {
          return true;
       if (extendsTypes != null || implementsTypes != null)
          return true;
-      return modifyNeedsClass();
+      // Can we support nested a { b { c = 3 }} sequences without creating a class for 'a' and 'b'.   right now, testEditor2threeD fails with the modifyNeedsClass() call here that supports the nesting not creating a class.
+      // during the transform, a binding involved in one of the omitted types cannot resolve it's type.   We probably would need to handle these in the transformation of the 'a' class
+      // no tests currently rely on this but at one point it seemed like the right behavior for modify types created from the command line which are basically simple modifies.
+      boolean res = true; // modifyNeedsClass();
+      //if (!res)
+      //   System.out.println("***");
+      return res;
    }
 }
