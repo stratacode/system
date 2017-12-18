@@ -2417,6 +2417,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       Object[] implTypes = td.getImplementsTypeDeclarations();
       if (implTypes != null) {
          for (Object implObj:implTypes) {
+            if (implObj == null)
+               continue; // Unresolved type
             implObj = resolveBaseType(implObj);
             boolean needsCompile = false;
             if (!hasJSLibFiles(implObj) && !hasJSCompiled(implObj)) {

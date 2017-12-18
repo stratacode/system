@@ -4,10 +4,10 @@
 
 package sc.layer;
 
-public class AsyncResult {
+public class AsyncProcessHandle {
    public Process process;
 
-   AsyncResult(Process p) {
+   AsyncProcessHandle(Process p) {
       process = p;
    }
 

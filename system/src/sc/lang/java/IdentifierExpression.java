@@ -530,13 +530,11 @@ public class IdentifierExpression extends ArgumentsExpression {
                            // Even if we've matched a child type, need to check if that object is a subobject
                            // of another parent, since the parent will need transforming too.
                            else {
-                              idTypes[k] = ModelUtil.isObjectType(rootType) ?
-                                      BoundObjectName : IdentifierType.BoundTypeName;
+                              idTypes[k] = ModelUtil.isObjectType(rootType) ? BoundObjectName : IdentifierType.BoundTypeName;
                               boundTypes[k] = rootType;
                            }
                         }
-                        idTypes[k] = ModelUtil.isObjectType(resolvedType) ?
-                                BoundObjectName : IdentifierType.BoundTypeName;
+                        idTypes[k] = ModelUtil.isObjectType(resolvedType) ? BoundObjectName : IdentifierType.BoundTypeName;
 
                         // Explicitly disallow a.b.c where c is a class unless it is an object
                         if (k == sz-1 && !allowClassBinding() && idTypes[k] == IdentifierType.BoundTypeName) {
@@ -550,8 +548,15 @@ public class IdentifierExpression extends ArgumentsExpression {
                      }
                      else {
                         if (ident != null && ident.indexOf(".") == -1) {
-                           displayRangeError(0, 0, "No type: " + ident + " in ");
-                           Object x =  findType(firstIdentifier, enclType, null);
+                           Object closest = findClosestIdentifier(firstIdentifier, enclType);
+
+                           if (closest == null) {
+                              displayRangeError(0, 0, "No type or var: " + ident + " in ");
+                           }
+                           else {
+                              boundTypes[0] = closest;
+                              displayRangeError(0, 0, "Identifier: " + ident + " inaccessible ref to: " + closest + " with access: " + ModelUtil.getAccessLevelString(closest, false, null) + " for: ");
+                           }
                            break;
                         }
                         else {
@@ -614,6 +619,21 @@ public class IdentifierExpression extends ArgumentsExpression {
       } finally {
          PerfMon.end("resolveIdentifierExpression");
       }
+   }
+
+   // This mimics the logic for finding the first identifier in an identifier expression (that's not a method).  Used for both improved errors
+   // as well as our desire to match the closest entity in references for the IDE.
+   private Object findClosestIdentifier(String ident, Object enclType) {
+      Object res = findMember(ident, MemberType.VariableSet, null, null, null, false);
+      if (res != null)
+         return res;
+      res = findMember(ident, MemberType.AllSet, this, null, null, false);
+      if (res != null)
+         return res;
+      res = findType(ident, null, null);
+      if (res != null)
+         return res;
+      return null;
    }
 
    static Object parameterizeMethod(Expression rootExpr, Object foundMeth, Object currentType, Object inferredType, List<Expression> arguments, List<JavaType> methodTypeArgs) {

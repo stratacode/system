@@ -118,7 +118,7 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
                   nextPrompt = inputBytesAvailable() ? "" : prompt();
                }
             }
-            if (nextLine == null) {
+            if (pendingInputSources.size() == 0) {
                system.performExitCleanup();
                if (pendingInput.length() > 0) {
                   System.err.println("EOF with unprocessed input: " + pendingInput);
@@ -127,11 +127,13 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
                else
                   return true;
             }
+            else
+               popCurrentInput();
          }
          catch (IOException exc) {
             if (exc instanceof EOFException)
                return pendingInput.length() == 0;
-            // Skip interrupted systme calls
+            // Skip interrupted system calls
             if (!exc.getMessage().contains("Interrupted"))
                System.err.println("Error reading command input: " + exc);
             else {
@@ -148,6 +150,24 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
             }
          }
       } while (true);
+   }
+
+   void pushCurrentInput() {
+      InputSource oldInput = new InputSource();
+      oldInput.inputFileName = inputFileName;
+      oldInput.inputStream = inputStream;
+      oldInput.consoleObj = input;
+      oldInput.currentLine = currentLine;
+      pendingInputSources.add(oldInput);
+   }
+
+   void popCurrentInput() {
+      InputSource newInput = pendingInputSources.remove(pendingInputSources.size()-1);
+      inputFileName = newInput.inputFileName;
+      inputStream = newInput.inputStream;
+      input = (ConsoleReader) newInput.consoleObj;
+      currentLine = newInput.currentLine;
+      smartTerminal = input.getTerminal().isSupported(); // Or isAnsiSupported?  Or isEchoEnabled()?  These also are different between the dumb IntelliJ terminal and the real command line
    }
 
    public int complete(String command, int cursor, List candidates) {

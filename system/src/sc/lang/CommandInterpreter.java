@@ -8,6 +8,7 @@ import sc.layer.LayeredSystem;
 import sc.util.FileUtil;
 
 import java.io.*;
+import java.util.List;
 
 @sc.js.JSSettings(replaceWith="sc_EditorContext")
 public class CommandInterpreter extends AbstractInterpreter {
@@ -57,43 +58,87 @@ public class CommandInterpreter extends AbstractInterpreter {
 
    public boolean readParseLoop() {
       initReadThread();
-      boolean lastPending = false;
-      try {
-         String nextLine;
-         prompt();
-         while ((nextLine = input.readLine()) != null) {
+      do {
+         try {
+            String nextLine;
+            String nextPrompt = inputBytesAvailable() ? "" : prompt();
+            if (!noPrompt)
+               System.out.print(nextPrompt);
+            while ((nextLine = input.readLine()) != null) {
+               currentLine++;
+               Object result = null;
+               if (currentWizard != null || nextLine.trim().length() != 0) {
+                  pendingInput.append(nextLine);
 
-            processCommand(nextLine);
-
-            if (pendingInput.length() > 0) {
-               if (lastPending) {
-                  System.out.print(pendingInput);
-                  lastPending = false;
+                  result = parseCommand(pendingInput.toString(), getParselet());
+               }
+               if (result != null) {
+                  try {
+                     statementProcessor.processStatement(this, result);
+                  }
+                  catch (Throwable exc) {
+                     Object errSt = result;
+                     if (errSt instanceof List && ((List) errSt).size() == 1)
+                        errSt = ((List) errSt).get(0);
+                     System.err.println("Script error: " + exc.toString() + " for statement: " + errSt);
+                     if (system.options.verbose)
+                        exc.printStackTrace();
+                     if (exitOnError) {
+                        System.err.println("Exiting -1 on error because cmd.exitOnError configured as true");
+                        System.exit(-1);
+                     }
+                  }
+               }
+               if (pendingInput.length() > 0) {
+                  if (!consoleDisabled && !noPrompt)
+                     nextPrompt = "Incomplete statement: ";
                }
                else {
-                  lastPending = true;
-                  System.out.print("pending: ");
-               }
-            }
-            else {
-               execLaterJobs();
+                  execLaterJobs();
 
-               System.out.print(prompt());
-               lastPending = false;
+                  nextPrompt = inputBytesAvailable() ? "" : prompt();
+               }
+               if (!noPrompt)
+                  System.out.print(nextPrompt);
             }
+            // at EOF on this input file
+            if (pendingInputSources.size() == 0) {
+               system.performExitCleanup();
+               if (pendingInput.length() > 0) {
+                  System.err.println("EOF with unprocessed input: " + pendingInput);
+                  return false;
+               }
+               else
+                  return true;
+            }
+            else
+               popCurrentInput();
          }
-      }
-      catch (IOException exc) {
-         System.out.println("Error reading command input: " + exc);
-         return false;
-      }
-      if (pendingInput.length() > 0) {
-         System.err.println("EOF with unprocessed input: " + pendingInput);
-         return false;
-      }
-      return true;
+         catch (IOException exc) {
+            System.out.println("Error reading command input: " + exc);
+            return false;
+         }
+         if (pendingInput.length() > 0) {
+            System.err.println("EOF with unprocessed input: " + pendingInput);
+            return false;
+         }
+      } while (true);
    }
 
+   void pushCurrentInput() {
+      InputSource oldInput = new InputSource();
+      oldInput.inputFileName = inputFileName;
+      oldInput.inputReader = input;
+      oldInput.currentLine = currentLine;
+      pendingInputSources.add(oldInput);
+   }
+
+   void popCurrentInput() {
+      InputSource newInput = pendingInputSources.remove(pendingInputSources.size()-1);
+      inputFileName = newInput.inputFileName;
+      input = (BufferedReader) newInput.inputReader;
+      currentLine = newInput.currentLine;
+   }
 
    /** TODO: This is here as part of the thread implementation... should not be exposed to command methods.  needs @private */
    public void run() {

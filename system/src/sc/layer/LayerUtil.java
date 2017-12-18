@@ -522,7 +522,7 @@ public class LayerUtil implements LayerConstants {
       return -1;
    }
 
-   public static AsyncResult execAsync(ProcessBuilder cmd, String dir, String inputFile, String outputFile) {
+   public static AsyncProcessHandle execAsync(ProcessBuilder cmd, String dir, String inputFile, String outputFile) {
       if (dir != null)
          cmd.directory(new File(dir));
 
@@ -539,7 +539,7 @@ public class LayerUtil implements LayerConstants {
          InputStream in = p.getInputStream();
          InputStream err = p.getErrorStream();
 
-         return new AsyncResult(p);
+         return new AsyncProcessHandle(p);
       }
       catch (IOException exc) {
          if (cmd.command() != null)

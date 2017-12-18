@@ -22,7 +22,6 @@ import sc.obj.*;
 import sc.parser.*;
 import sc.repos.RepositoryStore;
 import sc.repos.RepositorySystem;
-import sc.sync.ClassSyncWrapper;
 import sc.sync.SyncManager;
 import sc.sync.SyncOptions;
 import sc.sync.SyncProperties;
@@ -40,9 +39,7 @@ import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.*;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -928,6 +925,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private List<ITypeChangeListener> typeChangeListeners = new ArrayList<ITypeChangeListener>();
    private final List<ICodeUpdateListener> codeUpdateListeners = new ArrayList<ICodeUpdateListener>();
    private List<IDynListener> dynListeners = null;
+   private final List<ISystemExitListener> systemExitListeners = new ArrayList<ISystemExitListener>();
 
    EditorContext editorContext;
 
@@ -1763,6 +1761,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // Any mainMethods which implement IStoppable get stopped before we shutdown.  This should stop the server etc. and all requests that will come back in
          // to access the layered system after it's been stopped.
          buildInfo.stopMainInstances();
+
+         for (ISystemExitListener exitListener:systemExitListeners)
+            exitListener.systemExiting();
 
          acquireDynLock(false);
          try {
@@ -15578,6 +15579,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             catch (InterruptedException exc) {}
          }
       } while (true);
+   }
+
+   public void addSystemExitListener(ISystemExitListener listener) {
+      systemExitListeners.add(listener);
    }
 }
 

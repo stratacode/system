@@ -731,8 +731,11 @@ public class ModelUtil {
          Object encType = getEnclosingType(member);
          if (ModelUtil.isInterface(encType))
             return true;
-         // TODO: this happens when the member is resolved as a top-level reference property.  maybe check the access level of the type?
+         // TODO: encType = null happens when the member is resolved as a top-level reference property.  maybe check the access level of the type?
          if (encType == null)
+            return true;
+         // All fields or methods defined in the cmd object are visible for everyone
+         if (encType instanceof AbstractInterpreter.CmdClassDeclaration)
             return true;
          return ModelUtil.samePackage(refType, encType);
       }

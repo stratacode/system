@@ -31,7 +31,18 @@ import sc.dyn.ScheduledJob;
 public abstract class AbstractInterpreter extends EditorContext implements IScheduler, Runnable, IDynObject {
    static SCLanguage vlang = SCLanguage.INSTANCE;
 
-   String inputFileName = null; // Defaults to use standard input
+   public class InputSource {
+      String inputFileName;
+      InputStream inputStream;
+      Reader inputReader;
+      int currentLine;
+      Object consoleObj;
+   }
+
+   // The current inputFileName, inputStream etc are not in the pendingInputSources list.
+   ArrayList<InputSource> pendingInputSources = new ArrayList<InputSource>();
+
+   String inputFileName = null;
 
    StringBuilder pendingInput = new StringBuilder();
 
@@ -58,7 +69,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    public ClassDeclaration cmdObject = new CmdClassDeclaration();
    {
-      cmdObject.fullTypeName = cmdObject.typeName = "cmd";
+      cmdObject.staleClassName = cmdObject.fullTypeName = cmdObject.typeName = "cmd";
       cmdObject.operator = "class"; // If we use object, this becomes a 'rooted object' in the sync system and we won't construct it during sync
       cmdObject.setProperty("extendsType", ClassType.create(getClass().getTypeName()));
       cmdObject.setDynamicType(true);
@@ -1541,11 +1552,11 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    }
 
    /**
-    * Run a system command asynchronously.  Returns an AsyncResult object which has a "process" field you can use
+    * Run a system command asynchronously.  Returns an AsyncProcessHandle object which has a "process" field you can use
     * to control the exec'd process - i.e. call waitFor or destroy.
     */
-   public AsyncResult execAsync(String argStr) {
-      return (AsyncResult) execCommand(argStr, true);
+   public AsyncProcessHandle execAsync(String argStr) {
+      return (AsyncProcessHandle) execCommand(argStr, true);
    }
 
    private Object execCommand(String argStr, boolean async) {
@@ -1689,8 +1700,23 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    public abstract boolean readParseLoop();
 
+   abstract void pushCurrentInput();
+
    public void loadScript(String inputFileName) {
       this.inputFileName = inputFileName;
+      resetInput();
+   }
+
+   public void include(String includeName) {
+      if (!FileUtil.isAbsolutePath(includeName)) {
+         String fileName = FileUtil.concat(system.buildDir, includeName);
+         if (!new File(fileName).canRead()) {
+            throw new IllegalArgumentException("No script to include: " + fileName);
+         }
+         includeName = fileName;
+      }
+      pushCurrentInput();
+      this.inputFileName = includeName;
       resetInput();
    }
 

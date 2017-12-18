@@ -160,7 +160,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    protected transient MemberCache memberCache = null;
 
    /** In the event we modify a compiled type which was an omitted object type, we need to freeze the compiled class name at the one which was actually compiled.   We could lazily cache the compiledClassName but maybe it will change during start/validate so we'd have to cache it the first time after we've compiled the system.  Instead, we cache it the first time we see that we're stale */
-   protected transient String staleClassName = null;
+   public transient String staleClassName = null;
 
    protected transient boolean memberCacheEnabled = true;
 
