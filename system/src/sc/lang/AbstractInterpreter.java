@@ -564,8 +564,8 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          // By default, we'd like to the live dynamic types feature for types manipulated in the command line
          type.liveDynType = true;
 
-         if (edit) {
-            if (addToType) {
+         if (addToType) {
+            if (edit) {
                BodyTypeDeclaration origType = type;
                type = addToCurrentType(model, parentType, type);
                if (type == null) {
@@ -573,10 +573,23 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                   return;
                }
             }
-         }
-         else {
-            type.markAsTemporary();
-            type.parentNode = parentType == null ? model : parentType;
+            else {
+               type.markAsTemporary();
+               type.parentNode = parentType == null ? model : parentType;
+
+               if (type instanceof ModifyDeclaration) {
+                  ParseUtil.initAndStartComponent(type);
+                  BodyTypeDeclaration modType = type.getModifiedType();
+                  if (modType != null) {
+                     type = modType;
+                     JavaModel modModel = type.getJavaModel();
+
+                     // TODO: security check - when we are using the command line here, we are randomly picking a type and exposing the 'cmd' name space through that type
+                     // Great for diagnostics and debugging but not great for using in a live environment.  But the command line would typically not be exposed in that environment.
+                     modModel.commandInterpreter = this;
+                  }
+               }
+            }
          }
          // Need to do this after we've added the type to the file system.  Otherwise, we try to lookup the type
          // before it is on the file system and that leads to an error trying to find the type
@@ -590,7 +603,6 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          boolean checkCurrentObject = parentType == null || hasCurrentObject;
 
          Object parentObj = getCurrentObjectWithDefault();
-
          currentTypes.add(type);
 
          DeclarationType declType = type.getDeclarationType();
@@ -629,10 +641,6 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             finally {
                if (!pushed)
                   execContext.pushCurrentObject(null);
-               if (pushedCtx) {
-                  popCurrentScopeContext();
-                  pushedCtx = false;
-               }
             }
             if (obj == null && checkCurrentObject) {
                System.err.println("*** Unable to resolve object: " + typeName);
@@ -673,10 +681,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             PropertyAssignment assign = (PropertyAssignment) statement;
             boolean performedOnce = false;
 
-            if (current == null)
-               assign.parentNode = getModel();
-            else
-               assign.parentNode = current;
+            assign.parentNode = getParentNode(current);
 
             ParseUtil.initAndStartComponent(assign);
 
@@ -1045,6 +1050,26 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       return cor;
    }
 
+   /** In what context do we create this element.  When in edit mode, we want to use the current parent type
+    * or model as the container for this entity.  But in script mode, we need to resolve properties in all of the
+    * layers so we choose the most specific type.
+    */
+   private JavaSemanticNode getParentNode(BodyTypeDeclaration current) {
+      if (edit) {
+         if (current == null)
+            return getModel();
+         else
+            return current;
+      }
+      else {
+         if (current == null) {
+            return getModel().resolve();
+         }
+         else
+           return current.resolve(true);
+      }
+   }
+
    private static boolean ignoreRemoteStatement(LayeredSystem sys, Statement st) {
       JavaModel stModel = st.getJavaModel();
       if (stModel == null)
@@ -1240,14 +1265,20 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    }
 
    public void setCurrentType(BodyTypeDeclaration newType) {
+      if (currentTypes.size() > 0 && newType == currentTypes.get(currentTypes.size() - 1))
+         return;
       super.setCurrentType(newType);
       if (pendingModel != null) {
          pendingModel.setCommandInterpreter(this);
 
-         ArrayList<IEditorSession> sessions = editSessions.get(pendingModel.getModelTypeDeclaration().getFullTypeName());
-         if (sessions != null && sessions.size() > 0) {
-            edit();
+         TypeDeclaration modelType = pendingModel.getModelTypeDeclaration();
+         if (modelType != null) {
+            ArrayList<IEditorSession> sessions = editSessions.get(modelType.getFullTypeName());
+            if (sessions != null && sessions.size() > 0) {
+               edit();
+            }
          }
+         // else - should we be adding the modify-types required for this type in the pendingModel?
       }
       CurrentObjectResult cor = selectCurrentObject(null, newType, false, false, false);
    }
@@ -1708,7 +1739,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    }
 
    public void include(String includeName) {
-      if (!FileUtil.isAbsolutePath(includeName)) {
+     if (!FileUtil.isAbsolutePath(includeName)) {
          String fileName = FileUtil.concat(system.buildDir, includeName);
          if (!new File(fileName).canRead()) {
             throw new IllegalArgumentException("No script to include: " + fileName);

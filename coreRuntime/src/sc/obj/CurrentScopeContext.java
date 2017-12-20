@@ -250,7 +250,10 @@ public class CurrentScopeContext {
    }
 
    public String getTraceInfo() {
-      return (scopeContextName != null ? scopeContextName + ": " : "") + traceInfo;
+      if (traceInfo == null)
+         traceInfo = scopeContexts == null ? " <no scope contexts>" : " " + scopeContexts.toString();
+
+      return (scopeContextName != null ? " " + scopeContextName + ":" : "") + traceInfo;
    }
 
    public void setTraceInfo(String info) {

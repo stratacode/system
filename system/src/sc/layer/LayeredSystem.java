@@ -7304,7 +7304,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // ?? huh we just listed out the file - rebuild it from scratch.
          verbose("Layer type index not found for layer: " + layerName + " rebuilding type index");
 
-         addLayerToRebuild(layerName, refreshCtx.layersToRebuild);
+         addLayerToRebuildTypeIndex(layerName, refreshCtx.layersToRebuild);
          refreshCtx.refreshedLayers.add(layerName);
       } else {
          switch (options.typeIndexMode) {
@@ -7338,8 +7338,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          System.err.println("*** Failed to remove the index file from files to process for: " + indexFileName);
    }
 
-   private void refreshTypeIndex(Set<String> refreshedLayers) {
+   /** To pick up any new source directories or layers added you can call this */
+   public void refreshTypeIndex() {
+      if (refreshTypeIndex(typeIndexProcessedLayers)) {
+         buildReverseTypeIndex(false);
+
+         saveTypeIndexFiles();
+      }
+   }
+
+   private boolean refreshTypeIndex(Set<String> refreshedLayers) {
       TypeIndexMode mode = options.typeIndexMode;
+      boolean any = false;
 
       // If we have Refresh or Rebuild modes - walk through all layers in each layer path.  If no index, build it.
       switch (mode) {
@@ -7353,14 +7363,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             for (LayerIndexInfo idx : allLayers.values()) {
                String layerName = idx.layerDirName;
                if (idx.layer != null && !idx.layer.disabled && (mode == TypeIndexMode.Rebuild || !typeIndex.excludesLayer(layerName))) {
-                  if (mode == TypeIndexMode.Rebuild || !refreshedLayers.contains(layerName))
-                     addLayerToRebuild(layerName, layersToRebuild);
+                  if (mode == TypeIndexMode.Rebuild || !refreshedLayers.contains(layerName)) {
+                     addLayerToRebuildTypeIndex(layerName, layersToRebuild);
+                     any = true;
+                  }
                }
             }
             rebuildLayersTypeIndex(layersToRebuild);
             break;
       }
+      return any;
    }
+
+   private Set<String> typeIndexProcessedLayers = new TreeSet<String>();
+
 
    /** This is called on the main layered system.  It will enable the type index on all peer systems.  */
    public void initTypeIndex() {
@@ -7370,11 +7386,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             peerSys.typeIndexEnabled = true;
       }
 
-      Set<String> refreshedLayers = new TreeSet<String>();
+      typeIndexProcessedLayers.clear();
 
-      loadTypeIndex(refreshedLayers);
+      loadTypeIndex(typeIndexProcessedLayers);
 
-      refreshTypeIndex(refreshedLayers);
+      refreshTypeIndex(typeIndexProcessedLayers);
 
       buildReverseTypeIndex(false);
 
@@ -7517,7 +7533,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public LayerTypeIndex buildLayerTypeIndex(String layerName) {
       ArrayList<Layer> toBuild = new ArrayList<Layer>(1);
-      addLayerToRebuild(layerName, toBuild);
+      addLayerToRebuildTypeIndex(layerName, toBuild);
       if (toBuild.size() == 0) {
          error("Failed to find layer type index: " + layerName);
          return null;
@@ -7632,7 +7648,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       leafLayerNames = new LinkedHashSet<String>();
    }
 
-   public void addLayerToRebuild(String layerName, ArrayList<Layer> layersToRebuild) {
+   public void addLayerToRebuildTypeIndex(String layerName, ArrayList<Layer> layersToRebuild) {
       try {
          acquireDynLock(false);
          Layer layer = getInactiveLayer(layerName, false, false, true, false);
@@ -7653,7 +7669,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          if (!peerMode && peerSystems != null) {
             for (LayeredSystem peerSys:peerSystems) {
-               peerSys.addLayerToRebuild(layerName, layersToRebuild);
+               peerSys.addLayerToRebuildTypeIndex(layerName, layersToRebuild);
             }
          }
       }
