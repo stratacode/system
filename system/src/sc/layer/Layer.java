@@ -321,6 +321,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    // A cached index of the relative file names to File objects so we can quickly resolve whether a file is
    // there or not.  Also, this helps get the canonical case for the file name.
    HashMap<String,File> srcDirCache = new HashMap<String,File>();
+   // Similar to the srcDirCache but stores non-parsed files, e.g. testScript.scr.  Used so we can quickly find the previous file of the same name in
+   // the base layer.
+   HashMap<String,String> layerFileCache = null;
 
    // TODO: right now this only stores ZipFiles in the preCompiledSrcPath.  We can't support zip entries for other than parsing models.
    // Stores a list of zip files which are in the srcDirCache for this layer.  Note that this may store src files which are not actually processed by this layer.
@@ -1205,13 +1208,20 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (model != null && (td = model.getModelTypeDeclaration()) != null) {
          //ParseUtil.startComponent(model);
 
-         // This will go and create all of the dynamic objects defined in this layer's definition file
-         Object[] children = td.getObjChildren(this, null, false, true, true);
-         if (children != null) {
-            if (this.children == null)
-               this.children = new ArrayList<Object>(Arrays.asList(children));
-            else
-               this.children.addAll(Arrays.asList(children));
+         try {
+            // This will go and create all of the dynamic objects defined in this layer's definition file
+            Object[] children = td.getObjChildren(this, null, false, true, true);
+            if (children != null) {
+               if (this.children == null)
+                  this.children = new ArrayList<Object>(Arrays.asList(children));
+               else
+                  this.children.addAll(Arrays.asList(children));
+            }
+         }
+         catch (RuntimeException exc) {
+            error("Application error initializing layer: " + getLayerName() + ": " + exc);
+            if (layeredSystem.options.verbose)
+               exc.printStackTrace();
          }
       }
 
@@ -1612,9 +1622,16 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                layerTypeIndex.fileIndex.put(FileUtil.concat(rootPath, srcPath), TypeIndexEntry.EXCLUDED_SENTINEL);
             }
          }
-         else if (!excludedFile(fn, prefix) && f.isDirectory()) {
-            if (!addSrcFilesToCache(f, FileUtil.concat(prefix, f.getName()), replacedTypes)) {
-               warn("Invalid child src directory: " + f);
+         else if (!excludedFile(fn, prefix)) {
+            if (f.isDirectory()) {
+               if (!addSrcFilesToCache(f, FileUtil.concat(prefix, f.getName()), replacedTypes)) {
+                  warn("Invalid child src directory: " + f);
+               }
+            }
+            else if (proc != null) {
+               if (layerFileCache == null)
+                  layerFileCache = new HashMap<String,String>();
+               layerFileCache.put(srcPath, f.getPath());
             }
          }
       }
@@ -4471,5 +4488,22 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          buildState.errorFiles.add(srcEnt);
    }
 
+   public SrcEntry getLayerFileFromRelName(String relName, boolean includeThisLayer) {
+      if (includeThisLayer && layerFileCache != null) {
+         String absName = layerFileCache.get(relName);
+         if (absName != null) {
+            return new SrcEntry(this, absName, relName, false);
+         }
+      }
+      if (baseLayers != null) {
+         SrcEntry res;
+         for (Layer baseLayer:baseLayers) {
+            res = baseLayer.getLayerFileFromRelName(relName, true);
+            if (res != null)
+               return res;
+         }
+      }
+      return null;
+   }
 }
 

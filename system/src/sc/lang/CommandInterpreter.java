@@ -128,6 +128,8 @@ public class CommandInterpreter extends AbstractInterpreter {
    void pushCurrentInput() {
       InputSource oldInput = new InputSource();
       oldInput.inputFileName = inputFileName;
+      oldInput.inputRelName = inputRelName;
+      oldInput.includeLayer = includeLayer;
       oldInput.inputReader = input;
       oldInput.currentLine = currentLine;
       pendingInputSources.add(oldInput);
@@ -136,6 +138,7 @@ public class CommandInterpreter extends AbstractInterpreter {
    void popCurrentInput() {
       InputSource newInput = pendingInputSources.remove(pendingInputSources.size()-1);
       inputFileName = newInput.inputFileName;
+      includeLayer = newInput.includeLayer;
       input = (BufferedReader) newInput.inputReader;
       currentLine = newInput.currentLine;
    }

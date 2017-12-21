@@ -33,16 +33,29 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    public class InputSource {
       String inputFileName;
+      String inputRelName;
       InputStream inputStream;
       Reader inputReader;
       int currentLine;
+      Layer includeLayer;
       Object consoleObj;
+
+      public String toString() {
+         return "file: " + inputFileName + "[" + currentLine + "]" + " layer:" + (includeLayer == null ? system.buildLayer : includeLayer);
+      }
    }
 
    // The current inputFileName, inputStream etc are not in the pendingInputSources list.
    ArrayList<InputSource> pendingInputSources = new ArrayList<InputSource>();
 
    String inputFileName = null;
+
+   // If inputFileName is a relative file in the layer tree, the relative path-name (used for includeSuper)
+   String inputRelName = null;
+
+   // Either null (which means effectively the buildLayer) or the layer of the current include file when we're running a script from
+   // a layer file - e.g. testInit.scr
+   Layer includeLayer = null;
 
    StringBuilder pendingInput = new StringBuilder();
 
@@ -156,6 +169,8 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       super(sys);
       cmdObject.parentNode = getModel();
       this.inputFileName = inputFileName;
+      if (inputFileName != null)
+         this.inputRelName = FileUtil.getFileName(inputFileName);
       this.consoleDisabled = consoleDisabled;
       cmdlang.initialize();
 
@@ -1733,14 +1748,23 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    abstract void pushCurrentInput();
 
-   public void loadScript(String inputFileName) {
-      this.inputFileName = inputFileName;
+   public void loadScript(String baseDirName, String pathName) {
+      if (!pathName.startsWith(".") && !FileUtil.isAbsolutePath(pathName)) {
+         this.inputRelName = pathName;
+         pathName = FileUtil.concat(baseDirName, pathName);
+      }
+      else
+         this.inputRelName = null;
+      this.inputFileName = pathName;
       resetInput();
    }
 
    public void include(String includeName) {
-     if (!FileUtil.isAbsolutePath(includeName)) {
+      String relName = null;
+      if (!FileUtil.isAbsolutePath(includeName)) {
+         relName = includeName;
          String fileName = FileUtil.concat(system.buildDir, includeName);
+
          if (!new File(fileName).canRead()) {
             throw new IllegalArgumentException("No script to include: " + fileName);
          }
@@ -1748,8 +1772,30 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       }
       pushCurrentInput();
       this.inputFileName = includeName;
+      this.inputRelName = relName;
+      this.includeLayer = null; // The normal include chooses the most specific version of the file (at least when a relative name is used
       resetInput();
    }
+
+   // for the test scripts, if we are running as script "testScript.scr" - let's find the previous testScript.scr and include it as above
+   public void includeSuper() {
+      if (inputRelName != null) {
+         Layer curLayer = includeLayer == null ? system.buildLayer : includeLayer;
+         if (curLayer == null)
+            throw new IllegalArgumentException("*** No current layer for includeSuper()");
+         SrcEntry srcEnt = curLayer.getLayerFileFromRelName(inputRelName, false);
+         if (srcEnt != null) {
+            pushCurrentInput();
+            this.inputFileName = srcEnt.absFileName;
+            this.inputRelName = srcEnt.relFileName;
+            includeLayer = srcEnt.layer;
+            resetInput();
+         }
+         else
+            throw new IllegalArgumentException("includeSuper - no super script for: " + inputFileName + " relative name: " + inputRelName + " from layer: " + curLayer);
+      }
+   }
+
 
    private List<LayeredSystem> getSyncSystems() {
       return system.getSyncSystems();

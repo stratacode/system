@@ -155,6 +155,8 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
    void pushCurrentInput() {
       InputSource oldInput = new InputSource();
       oldInput.inputFileName = inputFileName;
+      oldInput.inputRelName = inputRelName;
+      oldInput.includeLayer = includeLayer;
       oldInput.inputStream = inputStream;
       oldInput.consoleObj = input;
       oldInput.currentLine = currentLine;
@@ -164,6 +166,8 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
    void popCurrentInput() {
       InputSource newInput = pendingInputSources.remove(pendingInputSources.size()-1);
       inputFileName = newInput.inputFileName;
+      inputRelName = newInput.inputRelName;
+      includeLayer = newInput.includeLayer;
       inputStream = newInput.inputStream;
       input = (ConsoleReader) newInput.consoleObj;
       currentLine = newInput.currentLine;

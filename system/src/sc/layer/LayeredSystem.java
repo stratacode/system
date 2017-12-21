@@ -4162,10 +4162,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
             if (options.testScriptName != null && options.testMode && !sys.peerMode) {
                String pathName = options.testScriptName;
-               if (!pathName.startsWith(".") && !FileUtil.isAbsolutePath(pathName))
-                  pathName = FileUtil.concat(sys.buildDir, pathName);
-               System.out.println("Running test script: " + pathName);
-               sys.cmd.loadScript(pathName);
+               System.out.println("Running test script: " + pathName + " from: " + sys.buildDir);
+               sys.cmd.loadScript(sys.buildDir, pathName);
 
                // We need to add the temp layer so the testScriptName is not evaluated in a compiled layer - it has to be dynamic
                editLayer = false;
@@ -15601,4 +15599,5 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       systemExitListeners.add(listener);
    }
 }
+
 

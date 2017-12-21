@@ -28,6 +28,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.util.*;
 
+import static sc.lang.java.IdentifierExpression.IdentifierType.BoundInstanceName;
 import static sc.lang.java.IdentifierExpression.IdentifierType.BoundObjectName;
 import static sc.lang.java.IdentifierExpression.IdentifierType.RemoteMethodInvocation;
 
@@ -364,7 +365,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                }
 
                if (typeObj instanceof AbstractInterpreter) {
-                  idTypes[0] = IdentifierType.BoundInstanceName;
+                  idTypes[0] = BoundInstanceName;
                   boundTypes[0] = typeObj;
                }
                else if (typeObj != null && ModelUtil.isObjectType(typeObj)) {
@@ -3294,6 +3295,8 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (rootType != null && ModelUtil.isTypeVariable(rootType))
          rootType = ModelUtil.getTypeParameterDefault(rootType);
       if (idTypes[ix] != null) {
+         if (idTypes[ix] == IdentifierType.BoundInstanceName)
+            System.out.println("***");
          switch (idTypes[ix]) {
             case FieldName:
                if (model != null && !model.enableExtensions()) {
@@ -3327,6 +3330,8 @@ public class IdentifierExpression extends ArgumentsExpression {
                return resolveType(ModelUtil.getEnumTypeFromEnum(boundTypes[ix]), ix, idTypes);
             case BoundName:
                return resolveType(boundTypes[ix] != null ? boundTypes[ix].getClass() : null, ix, idTypes);
+            case BoundInstanceName:
+               return resolveType(boundTypes[ix] != null ? DynUtil.getSType(boundTypes[ix]) : null, ix, idTypes);
          }
       }
       Object type = resolveType(boundTypes[ix], ix, idTypes);
