@@ -975,12 +975,21 @@ public class IdentifierExpression extends ArgumentsExpression {
       return boundType;
    }
 
-   /** Returns true for a static field or method at the specific location in the indentifiers list */
+   /** Returns true for a static field or method at the specific location in the identifiers list */
    private boolean isStaticTarget(int ix) {
       if (idTypes == null || idTypes[ix] == null)
          return false;
 
       switch (idTypes[ix]) {
+         // For components when we convert a new X to a newX method call - here we need to consider the relationship of the type to the current context
+         case NewMethodInvocation:
+            Object newType = boundTypes[ix];
+            if (newType != null) {
+               if (ModelUtil.getEnclosingType(newType) == null || ModelUtil.hasModifier(newType, "static"))
+                  return true;
+               return false;
+            }
+            break;
          case UnboundMethodName:
          case FieldName:
          case MethodInvocation:
@@ -3295,8 +3304,6 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (rootType != null && ModelUtil.isTypeVariable(rootType))
          rootType = ModelUtil.getTypeParameterDefault(rootType);
       if (idTypes[ix] != null) {
-         if (idTypes[ix] == IdentifierType.BoundInstanceName)
-            System.out.println("***");
          switch (idTypes[ix]) {
             case FieldName:
                if (model != null && !model.enableExtensions()) {
@@ -5010,6 +5017,7 @@ public class IdentifierExpression extends ArgumentsExpression {
 
             case MethodInvocation:
             case RemoteMethodInvocation:
+            case NewMethodInvocation:
             case FieldName:
             case GetVariable:
             case IsVariable:

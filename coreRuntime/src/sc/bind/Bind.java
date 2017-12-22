@@ -1080,7 +1080,7 @@ public class Bind {
                   }
                }
                if (ScopeDefinition.trace || trace)
-                  System.out.println("Bind - cross scope event: " + DynUtil.getInstanceName(obj) + "." + prop.getPropertyName() + " - Queuing event from: " + curScopeCtx + " to: " + listenerEventScopeCtx + " in: " + listenerCtx);
+                  System.out.println("Bind - cross scope event: " + DynUtil.getInstanceName(obj) + "." + (prop == null ? "<default-event>" : prop.getPropertyName()) + " - Queuing event from: " + curScopeCtx + " to: " + listenerEventScopeCtx + " in: " + listenerCtx);
                bctx.queueEvent(event, obj, prop, listener, eventDetail);
                listenerEventScopeCtx.scopeChanged();
                return;
