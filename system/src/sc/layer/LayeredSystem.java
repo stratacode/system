@@ -15598,6 +15598,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public void addSystemExitListener(ISystemExitListener listener) {
       systemExitListeners.add(listener);
    }
+
+   public boolean isDefaultSystem() {
+      return defaultLayeredSystem == this;
+   }
 }
 
 

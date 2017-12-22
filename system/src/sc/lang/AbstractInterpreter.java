@@ -27,7 +27,9 @@ import java.io.*;
 import java.util.*;
 import sc.dyn.ScheduledJob;
 
-@sc.obj.Exec(runtimes="java")
+// We want these commands to be run for the Java_Server runtime when there's a server and the js runtime when it
+// is the only runtime.
+@sc.obj.Exec(runtimes="default")
 public abstract class AbstractInterpreter extends EditorContext implements IScheduler, Runnable, IDynObject {
    static SCLanguage vlang = SCLanguage.INSTANCE;
 

@@ -8711,9 +8711,12 @@ public class ModelUtil {
          String execRuntimes = (String) ModelUtil.getAnnotationValue(execAnnot, "runtimes");
          if (execRuntimes != null && execRuntimes.length() > 0) {
             String[] rtNames = execRuntimes.split(",");
-            for (String rtName:rtNames)
+            for (String rtName:rtNames) {
                if (rtName.equals(runtimeSys.getRuntimeName()) || rtName.equals(runtimeSys.getProcessName()))
                   return true;
+               if (rtName.equals("default") && runtimeSys.isDefaultSystem())
+                  return true;
+            }
             return false;
          }
          Boolean serverOnly = (Boolean) ModelUtil.getAnnotationValue(execAnnot, "serverOnly");
