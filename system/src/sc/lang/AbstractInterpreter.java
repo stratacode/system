@@ -436,6 +436,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
          boolean addToType = true;
          SrcEntry newSrcEnt = null;
+         Object absType = null;
          if (parentType == null) {
             // If you do pkgName with an open brace we'll just prepend this onto the path.  Since pkgNames and class names do not
             // overlap in the namespace, this gives you one syntax for navigating the type hierarchy of packages,
@@ -443,19 +444,23 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             // overlap with the package name
             if (statement instanceof ModifyDeclaration) {
                String typeName = ((ModifyDeclaration) statement).typeName;
-               String testPackageName = CTypeUtil.prefixPath(getPrefix(), typeName);
-               Set<String> pkgFiles = system.getFilesInPackage(testPackageName);
-               if (pkgFiles != null) {
-                  path = typeName;
-                  recordOutput(recordString, origIndent);
-                  return;
-               }
+               // Specify the full-type name to a type and get it unambiguously
+               absType = system.getTypeDeclaration(typeName, false, system.buildLayer, false);
+               if (absType == null) {
+                  String testPackageName = CTypeUtil.prefixPath(getPrefix(), typeName);
+                  Set<String> pkgFiles = system.getFilesInPackage(testPackageName);
+                  if (pkgFiles != null) {
+                     path = typeName;
+                     recordOutput(recordString, origIndent);
+                     return;
+                  }
 
-               Layer switchLayer;
-               if ((switchLayer = system.getLayerByPath(typeName, false)) != null || (switchLayer = system.getLayerByPath(CTypeUtil.prefixPath(currentLayer.getLayerGroupName(), typeName), false)) != null) {
-                  setCurrentLayer(switchLayer);
-                  recordOutput(recordString, origIndent);
-                  return;
+                  Layer switchLayer;
+                  if ((switchLayer = system.getLayerByPath(typeName, false)) != null || (switchLayer = system.getLayerByPath(CTypeUtil.prefixPath(currentLayer.getLayerGroupName(), typeName), false)) != null) {
+                     setCurrentLayer(switchLayer);
+                     recordOutput(recordString, origIndent);
+                     return;
+                  }
                }
             }
 
@@ -515,26 +520,41 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                      system.refreshRuntimes(true);
                      currentDef = system.getSrcTypeDeclaration(CTypeUtil.prefixPath(model.getPackagePrefix(), type.typeName), currentLayer.getNextLayer(), true);
                      if (currentDef == null) {
-                        System.err.println("No type: " + type.typeName + " in layer: " + currentLayer);
-                        return;
+                        // When we looked for this type if we did not find it at all - it's an invalid type
+                        if (absType == null) {
+                           System.err.println("No type: " + type.typeName + " in layer: " + currentLayer);
+                           return;
+                        }
+                        else if (absType instanceof TypeDeclaration) {
+                           currentDef = (TypeDeclaration) absType;
+                           if (currentDef.getLayer() != currentLayer)
+                              setCurrentLayer(currentDef.getLayer());
+                        }
+                        else {
+                           // TODO: we should be able to handle simple get/set properties even on compiled types - but right now currentTypes is a BodyTypeDeclaration
+                           System.err.println("*** Compiled type: " + type.typeName + " - unable to modify in command line");
+                           return;
+                        }
                      }
                   }
 
-                  if (currentDef.getLayer() != layer) {
-                     System.err.println("*** definition has wrong layer");
-                  }
-                  if (type instanceof ModifyDeclaration) {
-                     ModifyDeclaration modType = (ModifyDeclaration) type;
-                     type.parentNode = currentDef.parentNode;
-                     // We're going to throw this away so this tells the system not to consider it part of the type
-                     // system.
-                     modType.markAsTemporary();
-                     ParseUtil.initAndStartComponent(type);
-                     if (modType.mergeDefinitionsInto(currentDef, false))
-                        currentDefChanged = true;
-                  }
-                  else {
-                     System.err.println("*** Definition of type: " + type.typeName + " already exists in layer: " + layer);
+                  if (currentDef != null) {
+                     if (currentDef.getLayer() != layer) {
+                        System.err.println("*** definition has wrong layer");
+                     }
+                     if (type instanceof ModifyDeclaration) {
+                        ModifyDeclaration modType = (ModifyDeclaration) type;
+                        type.parentNode = currentDef.parentNode;
+                        // We're going to throw this away so this tells the system not to consider it part of the type
+                        // system.
+                        modType.markAsTemporary();
+                        ParseUtil.initAndStartComponent(type);
+                        if (modType.mergeDefinitionsInto(currentDef, false))
+                           currentDefChanged = true;
+                     }
+                     else {
+                        System.err.println("*** Definition of type: " + type.typeName + " already exists in layer: " + layer);
+                     }
                   }
 
                   // Proceed using this object as the type to push onto the stack
@@ -582,7 +602,22 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          type.liveDynType = true;
 
          if (addToType) {
-            if (edit) {
+            if (absType != null) {
+               if (absType instanceof BodyTypeDeclaration) {
+                  type = (BodyTypeDeclaration) absType;
+                  if (type.getLayer() != currentLayer) {
+                     JavaModel absModel = type.getJavaModel();
+                     if (absModel != null)
+                        absModel.commandInterpreter = this;
+                     setCurrentLayer(type.getLayer());
+                  }
+               }
+               else {
+                  System.out.println("*** Command line - unable to operate on compiled type: " + origTypeName);
+                  return;
+               }
+            }
+            else if (edit) {
                BodyTypeDeclaration origType = type;
                type = addToCurrentType(model, parentType, type);
                if (type == null) {

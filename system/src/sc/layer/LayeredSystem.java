@@ -12291,7 +12291,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return getTypeDeclaration(typeName, false, null, false);
    }
 
-   // TODO: can we just remove this whole method now that there's a srcOnly parameter to getSrcTypeDclaration - just call that?
+   // TODO: can we just remove this whole method now that there's a srcOnly parameter to getSrcTypeDeclaration - just call that?
    // First if we've loaded the src we need to return that.
    public Object getTypeDeclaration(String typeName, boolean srcOnly, Layer refLayer, boolean layerResolve) {
       boolean beingReplaced = false;
