@@ -152,7 +152,7 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
       } while (true);
    }
 
-   void pushCurrentInput() {
+   void pushCurrentInput(boolean pushLayer) {
       InputSource oldInput = new InputSource();
       oldInput.inputFileName = inputFileName;
       oldInput.inputRelName = inputRelName;
@@ -160,6 +160,7 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
       oldInput.inputStream = inputStream;
       oldInput.consoleObj = input;
       oldInput.currentLine = currentLine;
+      oldInput.pushLayer = pushLayer;
       pendingInputSources.add(oldInput);
    }
 
@@ -168,6 +169,14 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
       inputFileName = newInput.inputFileName;
       inputRelName = newInput.inputRelName;
       includeLayer = newInput.includeLayer;
+      // When we have an include layer in the push, we will have set the currentLayer so need to restore that here.
+      if (newInput.pushLayer) {
+         if (newInput.includeLayer == null)
+            currentLayer = system.lastLayer;
+         else
+            currentLayer = newInput.includeLayer;
+         updateCurrentLayer();
+      }
       inputStream = newInput.inputStream;
       input = (ConsoleReader) newInput.consoleObj;
       currentLine = newInput.currentLine;

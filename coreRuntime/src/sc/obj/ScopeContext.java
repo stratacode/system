@@ -147,4 +147,20 @@ public abstract class ScopeContext {
       return changeListeners.remove(listener);
    }
 
+   public Object getSingletonForType(Object typeObj) {
+      Map<String,Object> valueMap = getValues();
+      Object firstInst = null;
+      if (valueMap != null) {
+         for (Object inst:valueMap.entrySet()) {
+            if (DynUtil.isAssignableFrom(typeObj, DynUtil.getType(inst))) {
+               if (firstInst == null)
+                  firstInst = inst;
+               else
+                  return null; // More than one instance of the same type - not going to return any in this case since it's not a singleton
+            }
+         }
+      }
+      return null;
+   }
+
 }

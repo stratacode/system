@@ -50,6 +50,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    public final static Layer ANY_INACTIVE_LAYER = new Layer();
    public final static Layer ANY_OPEN_INACTIVE_LAYER = new Layer();
 
+   public final static String INVALID_LAYER_PATH = "invalid-layer-file";
+
    DynObject dynObj;
 
    /** The list of child components - e.g. file processors, repository packages, that are defined for this layer. */
@@ -298,7 +300,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    /** If a Java file uses no extensions, we can either compile it from the source dir or copy it to the build dir */
    public boolean copyPlainJavaFiles = true;
 
-   /** Set by the system to the full path to the directory containing LayerName.sc (layerFileName = layerPathName + layerBaseName) */
+   /** Set by the system to the full path to the directory containing LayerName.sc (layerFileName = layerPathName + layerBaseName + ".sc") (or INVALID_LAYER_FILE if we do not have a valid path) */
    public @Constant String layerPathName;
 
    /** Just the LayerName.sc part */
@@ -1532,6 +1534,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             }
          }
       }
+   }
+
+   public void info(String... args) {
+      reportMessage(MessageType.Info, args);
    }
 
    public void error(String... args) {
@@ -3205,6 +3211,14 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    public void refresh(long lastRefreshTime, ExecutionContext ctx, List<ModelUpdate> changedModels, UpdateInstanceInfo updateInfo, boolean active) {
+      if (layerPathName == INVALID_LAYER_PATH)
+         return;
+
+      File layerDir = new File(layerPathName);
+      if (!layerDir.isDirectory()) {
+         layeredSystem.removeLayer(this, ctx);
+         return;
+      }
       for (int i = 0; i < srcDirs.size(); i++) {
          String srcDir = srcDirs.get(i);
          String relDir = null;
@@ -3239,15 +3253,18 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       File f = new File(srcDir);
       long newTime = -1;
       String prefix = relDir == null ? "" : relDir;
+
+      // Is this srcDir itself still there?  If not, remove the cached info from it
+      if (!f.isDirectory()) {
+         info("Layer src directory removed: " + this + " dir: " + f);
+         removeSrcDir(srcDir, changedModels);
+         return;
+      }
+
       if (lastRefreshTime == -1 || (newTime = f.lastModified()) > lastRefreshTime) {
          // First update the src cache to pick up any new files, refresh any models we find in there when ctx is not null
          addSrcFilesToCache(f, prefix, null);
          findRemovedFiles(changedModels);
-      }
-
-      if (!f.isDirectory()) {
-         System.err.println("*** Invalid layer source directory: " + f);
-         return;
       }
 
       File[] files = f.listFiles();
@@ -4456,17 +4473,24 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    void findRemovedFiles(List<ModelUpdate> changedModels) {
+      ArrayList<IdentityWrapper<ILanguageModel>> toRem = new ArrayList<IdentityWrapper<ILanguageModel>>();
       for (IdentityWrapper<ILanguageModel> layerWrapper:layerModels) {
          ILanguageModel model = layerWrapper.wrapped;
          SrcEntry srcFile = model.getSrcFile();
          if (srcFile != null && !srcFile.canRead() && !model.isUnsavedModel()) {
-            ModelUpdate removedModel = new ModelUpdate(model, null);
-            removedModel.removed = true;
-            changedModels.add(removedModel);
+            if (changedModels != null) {
+               ModelUpdate removedModel = new ModelUpdate(model, null);
+               removedModel.removed = true;
+               changedModels.add(removedModel);
+            }
+            toRem.add(layerWrapper);
+            removeSrcFile(model.getSrcFile());
 
             verbose("Model file removed: " + srcFile);
          }
       }
+      for (IdentityWrapper<ILanguageModel> remModel:toRem)
+         layerModels.remove(remModel);
    }
 
    boolean cacheForRefLayer() {
@@ -4488,22 +4512,45 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          buildState.errorFiles.add(srcEnt);
    }
 
-   public SrcEntry getLayerFileFromRelName(String relName, boolean includeThisLayer) {
-      if (includeThisLayer && layerFileCache != null) {
+   public SrcEntry getLayerFileFromRelName(String relName) {
+      if (layerFileCache != null) {
          String absName = layerFileCache.get(relName);
          if (absName != null) {
             return new SrcEntry(this, absName, relName, false);
          }
       }
-      if (baseLayers != null) {
-         SrcEntry res;
-         for (Layer baseLayer:baseLayers) {
-            res = baseLayer.getLayerFileFromRelName(relName, true);
-            if (res != null)
-               return res;
-         }
+      return null;
+   }
+
+   public SrcEntry getBaseLayerFileFromRelName(String relName) {
+      SrcEntry res;
+      // Pick any layer before this one in the stack - used for testScripts etc. which need to be merged based on the layers stack, not the baseLayers so a mixin layer can be inserted
+      for (int i = layerPosition - 1; i >= 0; i--) {
+         Layer baseLayer = layeredSystem.layers.get(i);
+         res = baseLayer.getLayerFileFromRelName(relName);
+         if (res != null)
+            return res;
       }
       return null;
+   }
+
+   public boolean checkRemovedDirectory(String dirPath) {
+      File layerDir = new File(layerPathName);
+      // The layer itself was removed so let's start there :)
+      if (!layerDir.isDirectory()) {
+         return false;
+      }
+      if (srcDirs.contains(dirPath)) {
+         layeredSystem.scheduleRefresh();
+      }
+      return true;
+   }
+
+   public void removeSrcDir(String srcDir, List<ModelUpdate> changedModels) {
+      if (topLevelSrcDirs.contains(srcDir)) {
+         topLevelSrcDirs.remove(srcDir);
+      }
+      findRemovedFiles(changedModels);
    }
 }
 

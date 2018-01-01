@@ -309,4 +309,21 @@ public class CurrentScopeContext {
       return null;
    }
 
+   /**
+    * If there is a singleton instance for this type, return it, otherwise not.  Since we frequently use singletons this method helps
+    * diagnostics like the command interpreter where you want to select an instance by it being the only one of it's type for a specific scope context
+    * For example, use HtmlPage { } to select whatever page instance is available if there's only one.
+     */
+   public Object getSingletonForType(Object typeObj) {
+      String scopeName = DynUtil.getScopeNameForType(typeObj);
+      if (scopeName != null) {
+         for (ScopeContext ctx:scopeContexts) {
+            if (ctx.getScopeDefinition().name.equals(scopeName)) {
+               return ctx.getSingletonForType(typeObj);
+            }
+         }
+      }
+      return null;
+   }
+
 }

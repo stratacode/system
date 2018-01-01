@@ -688,6 +688,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          setProperty("imports", imps);
    }
 
+   public void changePackage(sc.lang.java.Package newPackage) {
+      setProperty("packageDef", newPackage);
+      initPackage = false;
+   }
 
    /** Returns a type declaration defined in this model */
    public TypeDeclaration getTypeDeclaration(String typeName) {

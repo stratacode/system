@@ -105,6 +105,11 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    public final static boolean nestedTagsInStatements = false;
 
+   public Element() {
+   }
+   public Element(sc.lang.java.TypeDeclaration concreteType)  {
+      super(concreteType);
+   }
 
    @Bindable(manual=true)
    public void setVisible(boolean vis) {
@@ -3414,12 +3419,6 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             return MergeMode.Merge;
       }
       return mode;
-   }
-
-   public Element() {
-   }
-   public Element(sc.lang.java.TypeDeclaration concreteType)  {
-      super(concreteType);
    }
 
    public Object findType(String name, Object refType, TypeContext context) {

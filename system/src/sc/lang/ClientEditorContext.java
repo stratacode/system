@@ -38,6 +38,9 @@ public abstract class ClientEditorContext {
 
    private boolean memorySessionChanged = false;
 
+   /** A list of packages that are used to search for a type name - by default, we'll take any exported packages from the layers in the stack as the importPackages */
+   ArrayList<String> importPackages = new ArrayList<String>();
+
    @Bindable(manual=true)
    public boolean getMemorySessionChanged() {
       return memorySessionChanged;

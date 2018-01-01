@@ -125,13 +125,14 @@ public class CommandInterpreter extends AbstractInterpreter {
       } while (true);
    }
 
-   void pushCurrentInput() {
+   void pushCurrentInput(boolean pushLayer) {
       InputSource oldInput = new InputSource();
       oldInput.inputFileName = inputFileName;
       oldInput.inputRelName = inputRelName;
       oldInput.includeLayer = includeLayer;
       oldInput.inputReader = input;
       oldInput.currentLine = currentLine;
+      oldInput.pushLayer = pushLayer;
       pendingInputSources.add(oldInput);
    }
 
@@ -141,6 +142,14 @@ public class CommandInterpreter extends AbstractInterpreter {
       includeLayer = newInput.includeLayer;
       input = (BufferedReader) newInput.inputReader;
       currentLine = newInput.currentLine;
+      // When we have an include layer in the push, we will have set the currentLayer so need to restore that here.
+      if (newInput.pushLayer) {
+         if (newInput.includeLayer == null)
+            currentLayer = system.lastLayer;
+         else
+            currentLayer = newInput.includeLayer;
+         updateCurrentLayer();
+      }
    }
 
    /** TODO: This is here as part of the thread implementation... should not be exposed to command methods.  needs @private */

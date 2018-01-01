@@ -912,6 +912,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return false;
    }
 
+
    public enum BuildCommandTypes {
       Pre, Post, Run, Test
    }
@@ -5392,6 +5393,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (toRemLayers.size() == 0)
          throw new IllegalArgumentException("empty list to removeLayers");
 
+      boolean activated = toRemLayers.get(0).activated;
+
+      List<Layer> layersList = activated ? layers : inactiveLayers;
+
       // Assumes we are processing layers from base to last.  We first gather up the complete list of models
       // we need to replace - the one to remove and the new one (which is really the base one in this case)
       for (int li = 0; li < toRemLayers.size(); li++) {
@@ -5403,9 +5408,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          pos = toRem.layerPosition;
 
-         if (toRem.layerPosition > layers.size() || layers.get(toRem.layerPosition) != toRem) {
+         if (toRem.layerPosition > layersList.size() || layersList.get(toRem.layerPosition) != toRem) {
             System.err.println("*** removeLayers called with layer which is not active: " + toRem);
             return;
+         }
+
+         if (activated != toRem.activated) {
+            throw new IllegalArgumentException("*** Mix of inactive and active layers to removeLayers");
          }
       }
 
@@ -5434,14 +5443,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
          }
 
-         layers.remove(toRem.layerPosition - deletedCount);
+         layersList.remove(toRem.layerPosition - deletedCount);
          deletedCount++;
          if (toRem == buildLayer) {
             resetBuildLayer = true;
          }
          deregisterLayer(toRem, true);
 
-         // When we remove a layer that was specified on the command line, we need to replacd it with any base layers (unless those were also removed).  This, along with code that adds new layers to the command line preserves restartability.
+         // When we remove a layer that was specified on the command line, we need to replaced it with any base layers (unless those were also removed).  This, along with code that adds new layers to the command line preserves restartability.
          if (restartArgs != null) {
             for (int i = 0; i < restartArgs.size(); i++) {
                String arg = restartArgs.get(i);
@@ -5463,7 +5472,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       // For now, we are not changing buildDir, buildSrcDir etc. and not recompiling things... maybe we just need to force a restart in this case and make sure it does not happen by not using
       // the buildDir for dynamic layers?
-      if (resetBuildLayer) {
+      if (resetBuildLayer && activated) {
 
          // Can't rely on TrackingClassLoader's to match the model because we are not removing the old guys class loader.
          // unless we unwind the class loaders as below
@@ -5494,8 +5503,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       // Renumber any layers which are after the one we removed
-      for (int i = toRemLayers.get(0).layerPosition; i < layers.size(); i++) {
-         Layer movedLayer = layers.get(i);
+      for (int i = toRemLayers.get(0).layerPosition; i < layersList.size(); i++) {
+         Layer movedLayer = layersList.get(i);
          movedLayer.layerPosition = i;
       }
 
@@ -5524,7 +5533,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
 
-      updateInfo.updateInstances(ctx);
+      if (updateInfo != null)
+         updateInfo.updateInstances(ctx);
 
       for (Layer l:toRemLayers) {
          for (IModelListener ml: modelListeners) {
@@ -10726,6 +10736,23 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
+   private boolean refreshScheduled = false;
+
+   public void scheduleRefresh() {
+      if (peerMode) {
+         getMainLayeredSystem().scheduleRefresh();
+         return;
+      }
+      if (refreshScheduled)
+         return;
+      refreshScheduled = true;
+      DynUtil.invokeLater(new Runnable() {
+         public void run() {
+            refreshRuntimes(false); // TODO: should we also refresh the active runtimes here/
+         }
+      }, 0);
+   }
+
    /**
     * This call will update the models in all of the runtimes for either active or inactive types.
     *  Even if you specify active, this will not rebuild the active layers.
@@ -11160,22 +11187,21 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       long changedModelStartTime = System.currentTimeMillis();
       ArrayList<Layer.ModelUpdate> refreshedModels = new ArrayList<Layer.ModelUpdate>();
       if (active) {
-         int numLayers = layers.size();
-         for (int i = 0; i < numLayers; i++) {
+         for (int i = 0; i < layers.size(); i++) {
             Layer l = layers.get(i);
+            // NOTE: l.refresh here can remove the layer from layers
             l.refresh(lastRefreshTime, ctx, refreshedModels, updateInfo, true);
          }
       }
       else {
-         int numLayers = inactiveLayers.size();
-         for (int i = 0; i < numLayers; i++) {
+         for (int i = 0; i < inactiveLayers.size(); i++) {
             Layer l = inactiveLayers.get(i);
             l.refresh(lastRefreshTime, ctx, refreshedModels, updateInfo, false);
          }
       }
       if (refreshedModels.size() > 0)
          lastChangedModelTime = changedModelStartTime;
-      // We also have to coordinate manaagement of all of the errorModels for both layered systems in EditorContext.
+      // We also have to coordinate management of all of the errorModels for both layered systems in EditorContext.
       return refreshedModels;
    }
 
@@ -11400,6 +11426,38 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       else {
          error("Invalid new directory: " + dirPath);
+      }
+   }
+
+   /** Checks if the directory has been removed and if so, updates the indexes */
+   public void checkRemovedDirectory(String dirPath) {
+      File dir = new File(dirPath);
+      if (!dir.isDirectory()) {
+         boolean needsRefresh = false;
+         for (File layerPathDir:layerPathDirs) {
+            String layerPathFile = layerPathDir.getPath();
+            if (dirPath.startsWith(layerPathFile)) {
+               needsRefresh = true;
+               break;
+            }
+         }
+         if (needsRefresh) {
+            checkRemovedDirectoryList(layers, dirPath);
+            checkRemovedDirectoryList(inactiveLayers, dirPath);
+         }
+      }
+      else
+         System.out.println("*** checkRemovedDirectory called with directory that exists: " + dirPath);
+   }
+
+   private void checkRemovedDirectoryList(List<Layer> layersList, String dirPath) {
+      ArrayList<Layer> toRemove = new ArrayList<Layer>();
+      for (Layer layer:layersList) {
+         if (!layer.checkRemovedDirectory(dirPath))
+            toRemove.add(layer);
+      }
+      if (toRemove.size() > 0) {
+         removeLayers(toRemove, null);
       }
    }
 
@@ -13547,7 +13605,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                stubLayer = new Layer();
             stubLayer.activated = false;
             stubLayer.layeredSystem = this;
-            stubLayer.layerPathName = expectedName;
+            stubLayer.layerPathName = defFile.absFileName;
             //stubLayer.layerBaseName = ...
             stubLayer.layerDirName = layerDirName;
             return stubLayer;
@@ -13742,7 +13800,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                stubLayer = new Layer();
             stubLayer.activated = false;
             stubLayer.layeredSystem = this;
-            stubLayer.layerPathName = expectedName;
+            if (stubLayer.layerPathName == null)
+               stubLayer.layerPathName = Layer.INVALID_LAYER_PATH;
             //stubLayer.layerBaseName = ...
             stubLayer.layerDirName = layerDirName;
             System.err.println("*** failed to initialize inactive layer: ");
@@ -14557,7 +14616,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       // As long as there is a dynamic type which we're loading, to be sure we really need to refresh
-      // everything.  Evenetually a file system watcher will make this more incremental.
+      // everything.  Eventually a file system watcher will make this more incremental.
       refreshRuntimes(true);
 
       //JavaModel model = toRefresh.getJavaModel();

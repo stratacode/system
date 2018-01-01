@@ -4,6 +4,7 @@
 
 package sc.lang.html;
 
+import sc.obj.CompilerSettings;
 import sc.obj.Sync;
 import sc.obj.SyncMode;
 
@@ -14,6 +15,7 @@ import sc.obj.SyncMode;
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js", dependentTypes="sc.obj.IChildInit")
 /** Used as the tag class for the html tag it is the top level tag in the page. */
 @Sync(syncMode= SyncMode.Automatic) // Turn back on sync mode for user defined page types so that any fields they defined will be synchronized by default.
+@CompilerSettings(liveDynamicTypes=true) // An important component - nice to track instances for the command line editor
 public class HtmlPage extends Html {
    protected boolean isPageElement() {
       return true;

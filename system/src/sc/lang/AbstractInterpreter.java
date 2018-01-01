@@ -41,6 +41,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       int currentLine;
       Layer includeLayer;
       Object consoleObj;
+      boolean pushLayer;
 
       public String toString() {
          return "file: " + inputFileName + "[" + currentLine + "]" + " layer:" + (includeLayer == null ? system.buildLayer : includeLayer);
@@ -226,7 +227,6 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          if (currentWizard != null)
             return currentWizard.prompt();
 
-         JavaModel model = pendingModel;
          String hdr = edit ? "edit" : "scr" + (system.staleCompiledModel ? "*" : "");
          hdr += ":";
          boolean displayLayer = edit;
@@ -462,138 +462,123 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                      return;
                   }
                }
+
+               // If it's not an absolute name of a type, package or layer, see if it's a name that's been imported.
+               if (absType == null) {
+                  absType = system.getImportDecl(null, currentLayer, typeName);
+                  if (absType == null) {
+                     for (String importPackage:importPackages) {
+                        absType = system.getTypeDeclaration(CTypeUtil.prefixPath(importPackage, typeName), false, system.buildLayer, false);
+                        if (absType != null)
+                           break;
+                     }
+                  }
+                  if (absType != null) {
+                     Layer typeLayer = ModelUtil.getLayerForType(system, absType);
+                     JavaModel absModel = type.getJavaModel();
+                     if (absModel != null)
+                        absModel.commandInterpreter = this;
+                     // Unless we are creating a new 'modify' for this type, we want to change the current layer to match the type, or else this type will disappear.
+                     if (typeLayer != null && typeLayer != currentLayer && (!edit || currentLayer == null || (!StringUtil.equalStrings(typeLayer.packagePrefix, currentLayer.packagePrefix) && !StringUtil.isEmpty(currentLayer.packagePrefix)))) {
+                        setCurrentLayer(typeLayer);
+                        layer = typeLayer;
+                        model = getModel();
+                     }
+                  }
+               }
             }
 
-            String filePrefix = path;
+            if (edit) {
+               newSrcEnt = findModelSrcFileForLayer(type, path, layer);
 
-            String baseFileName = type.typeName;
-            int ix;
-            if ((ix = baseFileName.indexOf(".")) != -1)
-               baseFileName = baseFileName.substring(0, ix);
+               boolean modelChanged = false;
+               boolean currentDefChanged = false;
+               TypeDeclaration currentDef = null;
+               File modelFile = new File(newSrcEnt.absFileName);
 
-            // TODO: maybe change this into a utility method and have it using the file processors?  I like that it's going right to the file
-            // system in case the layered system is not up-to-date but otherwise, it seems redundant to what's in LayeredSystem already
-            String[] suffixes = {
-               TemplateLanguage.SCT_SUFFIX,
-               JavaLanguage.SCJ_SUFFIX,
-               HTMLLanguage.SC_HTML_SUFFIX,
-               SCLanguage.STRATACODE_SUFFIX  // This should be last - we need to check for the existence of all suffixes, but only create ".sc" files from the command-line
-            };
+               try {
+                  system.acquireDynLock(false);
+                  // If either there's a file in this layer or we may have unsaved changed to a file in this layer
+                  if (modelFile.canRead() || isChangedModel(layer, newSrcEnt.relFileName)) {
+                     boolean restart = model.isStarted();
+                     model.removeSrcFiles();
+                     model.addSrcFile(newSrcEnt);
+                     if (restart)
+                        ParseUtil.restartComponent(model);
 
-            int suffixIx = 0;
-            File mFile;
-            String relFile;
-            String absFileName;
-            do {
-               // TODO: if we are in persistent layer, a modify def should load the previous modify def.  A replace
-               // def should warn the user and then (re)move the previous model object in the layer.
-               String baseFile = FileUtil.addExtension(baseFileName.replace(".", FileUtil.FILE_SEPARATOR), suffixes[suffixIx]);
-               if (filePrefix != null)
-                  relFile = FileUtil.concat(filePrefix.replace(".", FileUtil.FILE_SEPARATOR), baseFile);
-               else
-                  relFile = baseFile;
+                     if (!model.isStarted()) // make sure the model
+                        ParseUtil.initAndStartComponent(model);
 
-               absFileName = FileUtil.concat(layer.getLayerPathName(), relFile);
-               mFile = new File(absFileName);
-               suffixIx++;
-            } while (suffixIx < suffixes.length && !mFile.canRead());
-
-            boolean modelChanged = false;
-            boolean currentDefChanged = false;
-            TypeDeclaration currentDef = null;
-
-            try {
-               system.acquireDynLock(false);
-               // If either there's a file in this layer or we may have unsaved changed to a file in this layer
-               if (mFile.canRead() || isChangedModel(layer, relFile)) {
-                  boolean restart = model.isStarted();
-                  model.removeSrcFiles();
-                  model.addSrcFile(new SrcEntry(layer, absFileName, relFile));
-                  if (restart)
-                     ParseUtil.restartComponent(model);
-
-                  if (!model.isStarted()) // make sure the model
-                     ParseUtil.initAndStartComponent(model);
-
-                  currentDef = system.getSrcTypeDeclaration(CTypeUtil.prefixPath(model.getPackagePrefix(), type.typeName), currentLayer.getNextLayer(), true);
-                  if (currentDef == null || currentDef.getLayer() != layer) {
-                     system.refreshRuntimes(true);
                      currentDef = system.getSrcTypeDeclaration(CTypeUtil.prefixPath(model.getPackagePrefix(), type.typeName), currentLayer.getNextLayer(), true);
-                     if (currentDef == null) {
-                        // When we looked for this type if we did not find it at all - it's an invalid type
-                        if (absType == null) {
+                     if (currentDef == null || currentDef.getLayer() != layer) {
+                        system.refreshRuntimes(true);
+                        currentDef = system.getSrcTypeDeclaration(CTypeUtil.prefixPath(model.getPackagePrefix(), type.typeName), currentLayer.getNextLayer(), true);
+                        if (currentDef == null) {
                            System.err.println("No type: " + type.typeName + " in layer: " + currentLayer);
                            return;
                         }
-                        else if (absType instanceof TypeDeclaration) {
-                           currentDef = (TypeDeclaration) absType;
-                           if (currentDef.getLayer() != currentLayer)
-                              setCurrentLayer(currentDef.getLayer());
+                     }
+
+                     if (currentDef != null) {
+                        if (currentDef.getLayer() != layer) {
+                           System.err.println("*** definition has wrong layer");
+                        }
+                        if (type instanceof ModifyDeclaration) {
+                           ModifyDeclaration modType = (ModifyDeclaration) type;
+                           type.parentNode = currentDef.parentNode;
+                           // We're going to throw this away so this tells the system not to consider it part of the type
+                           // system.
+                           modType.markAsTemporary();
+                           ParseUtil.initAndStartComponent(type);
+                           if (modType.mergeDefinitionsInto(currentDef, false))
+                              currentDefChanged = true;
                         }
                         else {
-                           // TODO: we should be able to handle simple get/set properties even on compiled types - but right now currentTypes is a BodyTypeDeclaration
-                           System.err.println("*** Compiled type: " + type.typeName + " - unable to modify in command line");
-                           return;
+                           System.err.println("*** Definition of type: " + type.typeName + " already exists in layer: " + layer);
                         }
                      }
-                  }
 
-                  if (currentDef != null) {
-                     if (currentDef.getLayer() != layer) {
-                        System.err.println("*** definition has wrong layer");
-                     }
-                     if (type instanceof ModifyDeclaration) {
-                        ModifyDeclaration modType = (ModifyDeclaration) type;
-                        type.parentNode = currentDef.parentNode;
-                        // We're going to throw this away so this tells the system not to consider it part of the type
-                        // system.
-                        modType.markAsTemporary();
-                        ParseUtil.initAndStartComponent(type);
-                        if (modType.mergeDefinitionsInto(currentDef, false))
+                     // Proceed using this object as the type to push onto the stack
+                     type = currentDef;
+                     addToType = false;
+                     List oldImports = pendingModel.imports;
+                     sc.lang.java.Package oldPkg = pendingModel.packageDef;
+
+                     pendingModel = type.getJavaModel();
+                     pendingModel.setCommandInterpreter(this);
+
+                     // Copy over any definitions added before we switched into this type
+                     if (oldImports != null) {
+                        for (Object imp:oldImports) {
+                           pendingModel.addImport(((ImportDeclaration) imp));
                            currentDefChanged = true;
+                        }
                      }
-                     else {
-                        System.err.println("*** Definition of type: " + type.typeName + " already exists in layer: " + layer);
-                     }
-                  }
-
-                  // Proceed using this object as the type to push onto the stack
-                  type = currentDef;
-                  addToType = false;
-                  List oldImports = pendingModel.imports;
-                  sc.lang.java.Package oldPkg = pendingModel.packageDef;
-
-                  pendingModel = type.getJavaModel();
-                  pendingModel.setCommandInterpreter(this);
-
-                  // Copy over any definitions added before we switched into this type
-                  if (oldImports != null) {
-                     for (Object imp:oldImports) {
-                        pendingModel.addImport(((ImportDeclaration) imp));
+                     if (oldPkg != null) {
+                        pendingModel.changePackage(oldPkg);
                         currentDefChanged = true;
                      }
                   }
-                  if (oldPkg != null) {
-                     pendingModel.setProperty("packageDef", oldPkg);
-                     currentDefChanged = true;
+                  else {
+                     model.removeSrcFiles();
+                     model.addSrcFile(newSrcEnt);
+                     ParseUtil.restartComponent(model);
+                     modelChanged = true;
                   }
                }
-               else {
-                  model.removeSrcFiles();
-                  newSrcEnt = new SrcEntry(layer, absFileName, relFile);
-                  model.addSrcFile(newSrcEnt);
-                  ParseUtil.restartComponent(model);
-                  modelChanged = true;
+               finally {
+                  system.releaseDynLock(false);
                }
-            }
-            finally {
-               system.releaseDynLock(false);
-            }
 
-            if (currentDefChanged && edit)
-               addChangedModel(currentDef.getJavaModel());
-            if (modelChanged && edit)
-               addChangedModel(model);
+               if (currentDefChanged)
+                  addChangedModel(currentDef.getJavaModel());
+               if (modelChanged)
+                  addChangedModel(model);
+            }
+            else {
+               if (!model.isInitialized())
+                  model.init();
+            }
          }
 
          String origTypeName = type.typeName;
@@ -602,22 +587,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          type.liveDynType = true;
 
          if (addToType) {
-            if (absType != null) {
-               if (absType instanceof BodyTypeDeclaration) {
-                  type = (BodyTypeDeclaration) absType;
-                  if (type.getLayer() != currentLayer) {
-                     JavaModel absModel = type.getJavaModel();
-                     if (absModel != null)
-                        absModel.commandInterpreter = this;
-                     setCurrentLayer(type.getLayer());
-                  }
-               }
-               else {
-                  System.out.println("*** Command line - unable to operate on compiled type: " + origTypeName);
-                  return;
-               }
-            }
-            else if (edit) {
+            if (edit) {
                BodyTypeDeclaration origType = type;
                type = addToCurrentType(model, parentType, type);
                if (type == null) {
@@ -1048,6 +1018,42 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          sleep(pauseTime);
    }
 
+   SrcEntry findModelSrcFileForLayer(BodyTypeDeclaration type, String filePrefix, Layer layer) {
+      String baseFileName = type.typeName;
+      int ix;
+      if ((ix = baseFileName.indexOf(".")) != -1)
+         baseFileName = baseFileName.substring(0, ix);
+
+      // TODO: maybe change this into a utility method and have it using the file processors?  I like that it's going right to the file
+      // system in case the layered system is not up-to-date but otherwise, it seems redundant to what's in LayeredSystem already
+      String[] suffixes = {
+          TemplateLanguage.SCT_SUFFIX,
+          JavaLanguage.SCJ_SUFFIX,
+          HTMLLanguage.SC_HTML_SUFFIX,
+          SCLanguage.STRATACODE_SUFFIX  // This should be last - we need to check for the existence of all suffixes, but only create ".sc" files from the command-line
+      };
+
+      int suffixIx = 0;
+      File mFile;
+      String relFile;
+      String absFileName;
+      do {
+         // TODO: if we are in persistent layer, a modify def should load the previous modify def.  A replace
+         // def should warn the user and then (re)move the previous model object in the layer.
+         String baseFile = FileUtil.addExtension(baseFileName.replace(".", FileUtil.FILE_SEPARATOR), suffixes[suffixIx]);
+         if (filePrefix != null)
+            relFile = FileUtil.concat(filePrefix.replace(".", FileUtil.FILE_SEPARATOR), baseFile);
+         else
+            relFile = baseFile;
+
+         absFileName = FileUtil.concat(layer.getLayerPathName(), relFile);
+         mFile = new File(absFileName);
+         suffixIx++;
+      } while (suffixIx < suffixes.length && !mFile.canRead());
+
+      return new SrcEntry(layer, absFileName, relFile);
+   }
+
    class CurrentObjectResult {
       Object curObj;
       boolean wizardStarted;
@@ -1062,6 +1068,19 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          if (doPushCtx)
             cor.pushedCtx = pushCurrentScopeContext();
          if (!hasCurrentObject() || (cor.curObj = getCurrentObject()) == null) {
+            // When we need to choose a current object, our first choice is to use the ScopeContext to choose a "singleton" - i.e. one instance of the given type in that CurrentScopeContext.
+            CurrentScopeContext ctx = CurrentScopeContext.getEnvScopeContextState();
+            if (ctx != null) {
+               Object scopeInst = ctx.getSingletonForType(currentType);
+               if (scopeInst != null) {
+                  cor.curObj = scopeInst;
+                  execContext.pushCurrentObject(cor.curObj);
+                  cor.pushedObj = true;
+                  return cor;
+               }
+            }
+
+            // No singleton instance so now look in the dynamic type system for the set of instances available using liveDynamicTypes.
             Object res;
             List<InstanceWrapper> instances;
             int max = 10;
@@ -1310,6 +1329,17 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    public void updateLayerState() {
       super.updateLayerState();
+      updateCurrentLayer();
+      for (Layer layer:system.layers) {
+         String pref = layer.packagePrefix;
+         if (layer.exportPackage && pref != null) {
+            if (!importPackages.contains(pref))
+               importPackages.add(pref);
+         }
+      }
+   }
+
+   public void updateCurrentLayer() {
       if (pendingModel != null && pendingModel.layer != currentLayer) {
          clearPendingModel();
          initPendingModel();
@@ -1783,7 +1813,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    public abstract boolean readParseLoop();
 
-   abstract void pushCurrentInput();
+   abstract void pushCurrentInput(boolean pushLayer);
 
    public void loadScript(String baseDirName, String pathName) {
       if (!pathName.startsWith(".") && !FileUtil.isAbsolutePath(pathName)) {
@@ -1807,7 +1837,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          }
          includeName = fileName;
       }
-      pushCurrentInput();
+      pushCurrentInput(false);
       this.inputFileName = includeName;
       this.inputRelName = relName;
       this.includeLayer = null; // The normal include chooses the most specific version of the file (at least when a relative name is used
@@ -1820,12 +1850,15 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          Layer curLayer = includeLayer == null ? system.buildLayer : includeLayer;
          if (curLayer == null)
             throw new IllegalArgumentException("*** No current layer for includeSuper()");
-         SrcEntry srcEnt = curLayer.getLayerFileFromRelName(inputRelName, false);
+         SrcEntry srcEnt = curLayer.getBaseLayerFileFromRelName(inputRelName);
          if (srcEnt != null) {
-            pushCurrentInput();
+            // Setting the currentLayer here because the includedScript has to expect the context of the layer in which it's defined, since it can be used from multiple places.
+            // The normal include always picks a file that's defined in the context of the buildLayer.
+            pushCurrentInput(true);
             this.inputFileName = srcEnt.absFileName;
             this.inputRelName = srcEnt.relFileName;
             includeLayer = srcEnt.layer;
+            currentLayer = srcEnt.layer;
             resetInput();
          }
          else

@@ -554,7 +554,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
    public Object getInitialValue(ExecutionContext ctx) {
       Class c = getRuntimeClass();
       if (initializer == null) {
-         if (c.isPrimitive())
+         if (c != null && c.isPrimitive())
             return Type.get(c).getDefaultObjectValue();
          return null;
       }
