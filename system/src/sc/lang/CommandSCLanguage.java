@@ -51,9 +51,10 @@ public class CommandSCLanguage extends SCLanguage {
                              startModifyDeclaration, reqClassBodyDeclaration, statement, endTypeDeclaration),
            new Symbol(EOF));
 
+   // NOTE: we allow statements in the class body for the command line (and at the top-level)
    public Sequence typeCommands = new Sequence("(,.,)", spacing,
-           new OrderedChoice("([],[],[],[],[])", REPEAT | OPTIONAL, startClassDeclaration, startModifyDeclaration,
-                             reqClassBodyDeclaration, expressionStatement, endTypeDeclaration),
+           new OrderedChoice("([],[],[],[],[],[])", REPEAT | OPTIONAL, startClassDeclaration, startModifyDeclaration,
+                             reqClassBodyDeclaration, expressionStatement, statement, endTypeDeclaration),
            new Symbol(EOF));
 
    Sequence completeExtends =

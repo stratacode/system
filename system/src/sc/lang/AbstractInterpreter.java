@@ -1830,6 +1830,18 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       resetInput();
    }
 
+   public boolean exists(String includeName) {
+      String pathName = resolvePathName(includeName);
+      return new File(pathName).canRead();
+   }
+
+   private String resolvePathName(String includeName) {
+      if (!FileUtil.isAbsolutePath(includeName)) {
+         return FileUtil.concat(system.buildDir, includeName);
+      }
+      return includeName;
+   }
+
    public void include(String includeName) {
       String relName = null;
       if (!FileUtil.isAbsolutePath(includeName)) {

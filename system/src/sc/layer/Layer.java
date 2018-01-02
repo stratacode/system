@@ -3290,7 +3290,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                        layeredSystem.lastRefreshTime == -1 ? layeredSystem.buildStartTime : layeredSystem.lastRefreshTime :
                        oldFile.getLastModifiedTime();
                if (lastTime == -1 || newLastModTime > lastTime) {
-                  if (model.isUnsavedModel())
+                  if (model != null && model.isUnsavedModel())
                      System.out.println("*** Should we be refreshing an unsaved model?");
                   layeredSystem.refreshFile(srcEnt, this, active); // For non parseableable files - do the file copy since the source file changed
                }

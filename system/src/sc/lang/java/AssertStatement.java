@@ -6,11 +6,11 @@ package sc.lang.java;
 
 import sc.lang.ILanguageModel;
 import sc.lang.SemanticNodeList;
+import sc.layer.LayeredSystem;
 
 import java.util.Set;
 
-public class AssertStatement extends Statement
-{
+public class AssertStatement extends Statement {
    public Expression expression;
    public Expression otherExpression;
 
@@ -68,5 +68,11 @@ public class AssertStatement extends Statement
       Statement repl = IdentifierExpression.createMethodCall(args, "jv_assert");
       parentNode.replaceChild(this, repl);
       return repl;
+   }
+
+   public boolean execForRuntime(LayeredSystem sys) {
+      if (expression != null)
+         return expression.execForRuntime(sys);
+      return false;
    }
 }
