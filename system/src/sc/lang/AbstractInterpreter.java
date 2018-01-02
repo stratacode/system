@@ -468,20 +468,24 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                   absType = system.getImportDecl(null, currentLayer, typeName);
                   if (absType == null) {
                      for (String importPackage:importPackages) {
-                        absType = system.getTypeDeclaration(CTypeUtil.prefixPath(importPackage, typeName), false, system.buildLayer, false);
+                        absType = system.getTypeDeclaration(CTypeUtil.prefixPath(importPackage, CTypeUtil.prefixPath(path, typeName)), false, system.buildLayer, false);
                         if (absType != null)
                            break;
                      }
                   }
                   if (absType != null) {
                      Layer typeLayer = ModelUtil.getLayerForType(system, absType);
-                     JavaModel absModel = type.getJavaModel();
+                     JavaModel absModel = null;
+                     if (absType instanceof BodyTypeDeclaration)
+                        absModel = ((BodyTypeDeclaration) absType).getJavaModel();
                      if (absModel != null)
                         absModel.commandInterpreter = this;
                      // Unless we are creating a new 'modify' for this type, we want to change the current layer to match the type, or else this type will disappear.
                      if (typeLayer != null && typeLayer != currentLayer && (!edit || currentLayer == null || (!StringUtil.equalStrings(typeLayer.packagePrefix, currentLayer.packagePrefix) && !StringUtil.isEmpty(currentLayer.packagePrefix)))) {
                         setCurrentLayer(typeLayer);
                         layer = typeLayer;
+                        if (!edit)
+                           pendingModel = absModel;
                         model = getModel();
                      }
                   }
@@ -1330,7 +1334,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    public void updateLayerState() {
       super.updateLayerState();
       updateCurrentLayer();
-      for (Layer layer:system.layers) {
+      for (Layer layer:system.specifiedLayers) {
          String pref = layer.packagePrefix;
          if (layer.exportPackage && pref != null) {
             if (!importPackages.contains(pref))
