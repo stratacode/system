@@ -465,7 +465,10 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
                // If it's not an absolute name of a type, package or layer, see if it's a name that's been imported.
                if (absType == null) {
-                  absType = system.getImportDecl(null, currentLayer, typeName);
+                  ImportDeclaration importDecl = system.getImportDecl(null, currentLayer, typeName);
+                  if (importDecl != null && !importDecl.staticImport) {
+                     absType = system.getTypeDeclaration(importDecl.identifier, false, system.buildLayer, false);
+                  }
                   if (absType == null) {
                      for (String importPackage:importPackages) {
                         absType = system.getTypeDeclaration(CTypeUtil.prefixPath(importPackage, CTypeUtil.prefixPath(path, typeName)), false, system.buildLayer, false);
