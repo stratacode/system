@@ -969,6 +969,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                pushedCtx = cor.pushedCtx;
                skipEval = cor.skipEval;
                pushed = cor.pushedObj;
+               curObj = cor.curObj;
             }
 
             try {
