@@ -583,6 +583,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                   addChangedModel(model);
             }
             else {
+               model.setRelDirPath(path);
                if (!model.isInitialized())
                   model.init();
             }

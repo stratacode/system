@@ -168,6 +168,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    /** Set to true during the stop operation so we can tell if someone tries to init or start us while being stopped */
    private transient boolean beingStopped = false;
 
+   /** For models without a srcFile, the "a.b" name to append onto the layer package to get the package for the model */
+   private transient String relDirPath;
+
    public void setLayeredSystem(LayeredSystem system) {
       layeredSystem = system;
    }
@@ -1086,12 +1089,18 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return srcFiles.get(0);
    }
 
+   public void setRelDirPath(String relDirPath) {
+      this.relDirPath = relDirPath;
+      initPackage = false;
+      initPackageAndImports();
+   }
+
    /**
     * Returns the directory containing this file in a path format (i.e. "a.b").
     */
    public String getRelDirPath() {
       if (srcFiles == null)
-         return null;
+         return relDirPath;
       String s = srcFiles.get(0).getRelDir();
       if (s != null) return s.replace(FileUtil.FILE_SEPARATOR, ".");
       return null;
