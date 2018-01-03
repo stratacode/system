@@ -17,7 +17,8 @@ public class AssertStatement extends Statement {
    public ExecResult exec(ExecutionContext ctx) {
       Boolean val = (Boolean) expression.eval(Boolean.class, ctx);
       if (!val) {
-         String message = otherExpression == null ? "Assertion failed: " + expression.toLanguageString() : (String) otherExpression.eval(String.class, ctx);
+         String exprStr = expression.toLanguageString();
+         String message = otherExpression == null ? "Assertion failed: " + exprStr : exprStr + " : " + (String) otherExpression.eval(String.class, ctx);
          throw new AssertionError(message);
       }
       return ExecResult.Next;
@@ -74,5 +75,9 @@ public class AssertStatement extends Statement {
       if (expression != null)
          return expression.execForRuntime(sys);
       return false;
+   }
+
+   public String toString() {
+      return "assert " + (expression == null ? "<null>" : expression.toString() + (otherExpression == null ? "" : " : " + otherExpression));
    }
 }
