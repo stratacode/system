@@ -42,6 +42,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       Layer includeLayer;
       Object consoleObj;
       boolean pushLayer;
+      boolean returnOnInputChange;
 
       public String toString() {
          return "file: " + inputFileName + "[" + currentLine + "]" + " layer:" + (includeLayer == null ? system.buildLayer : includeLayer);
@@ -61,6 +62,8 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    Layer includeLayer = null;
 
    StringBuilder pendingInput = new StringBuilder();
+
+   boolean returnOnInputChange = false;
 
    // The script starts out in the context of a global 'cmd' object which is a dynamic type so you can add fields, etc.
    // in a dynamic context even if you are running a fully compiled application.  Inner types however are not added to this
@@ -1824,6 +1827,8 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    abstract void pushCurrentInput(boolean pushLayer);
 
+   abstract void popCurrentInput();
+
    public void loadScript(String baseDirName, String pathName) {
       if (!pathName.startsWith(".") && !FileUtil.isAbsolutePath(pathName)) {
          this.inputRelName = pathName;
@@ -1847,7 +1852,8 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       return includeName;
    }
 
-   public void include(String includeName) {
+   // TODO: Do we need this at all?
+   public void includeAsync(String includeName) {
       String relName = null;
       if (!FileUtil.isAbsolutePath(includeName)) {
          relName = includeName;
@@ -1863,6 +1869,32 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       this.inputRelName = relName;
       this.includeLayer = null; // The normal include chooses the most specific version of the file (at least when a relative name is used
       resetInput();
+   }
+
+   public void include(String includeName) {
+      String relName = null;
+      if (!FileUtil.isAbsolutePath(includeName)) {
+         relName = includeName;
+         String fileName = FileUtil.concat(system.buildDir, includeName);
+
+         if (!new File(fileName).canRead()) {
+            throw new IllegalArgumentException("No script to include: " + fileName);
+         }
+         includeName = fileName;
+      }
+      pushCurrentInput(false);
+      try {
+         this.inputFileName = includeName;
+         this.inputRelName = relName;
+         this.includeLayer = null; // The normal include chooses the most specific version of the file (at least when a relative name is used
+         resetInput();
+         this.returnOnInputChange = true;
+         if (!readParseLoop())
+            pendingInput = new StringBuilder();
+      }
+      finally {
+         popCurrentInput();
+      }
    }
 
    // for the test scripts, if we are running as script "testScript.scr" - let's find the previous testScript.scr and include it as above

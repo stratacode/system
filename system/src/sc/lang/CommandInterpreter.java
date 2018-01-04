@@ -5,7 +5,6 @@
 package sc.lang;
 
 import sc.layer.LayeredSystem;
-import sc.util.FileUtil;
 
 import java.io.*;
 import java.util.List;
@@ -133,6 +132,7 @@ public class CommandInterpreter extends AbstractInterpreter {
       oldInput.inputReader = input;
       oldInput.currentLine = currentLine;
       oldInput.pushLayer = pushLayer;
+      oldInput.returnOnInputChange = returnOnInputChange;
       pendingInputSources.add(oldInput);
    }
 
@@ -142,6 +142,7 @@ public class CommandInterpreter extends AbstractInterpreter {
       includeLayer = newInput.includeLayer;
       input = (BufferedReader) newInput.inputReader;
       currentLine = newInput.currentLine;
+      returnOnInputChange = newInput.returnOnInputChange;
       // When we have an include layer in the push, we will have set the currentLayer so need to restore that here.
       if (newInput.pushLayer) {
          if (newInput.includeLayer == null)

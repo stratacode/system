@@ -7,7 +7,6 @@ package sc.lang;
 import sc.layer.LayeredSystem;
 import jline.console.completer.Completer;
 import jline.console.ConsoleReader;
-import jline.Terminal;
 
 import java.io.*;
 import java.util.List;
@@ -127,8 +126,17 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
                else
                   return true;
             }
-            else
+            else if (returnOnInputChange) {
+               if (pendingInput.length() > 0) {
+                  System.err.println("Include: " + inputFileName + " with unprocessed input: " + pendingInput);
+                  return false;
+               }
+               else
+                  return true;
+            }
+            else {
                popCurrentInput();
+            }
          }
          catch (IOException exc) {
             if (exc instanceof EOFException)
@@ -161,6 +169,7 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
       oldInput.consoleObj = input;
       oldInput.currentLine = currentLine;
       oldInput.pushLayer = pushLayer;
+      oldInput.returnOnInputChange = returnOnInputChange;
       pendingInputSources.add(oldInput);
    }
 
@@ -177,6 +186,7 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
             currentLayer = newInput.includeLayer;
          updateCurrentLayer();
       }
+      returnOnInputChange = newInput.returnOnInputChange;
       inputStream = newInput.inputStream;
       input = (ConsoleReader) newInput.consoleObj;
       currentLine = newInput.currentLine;
