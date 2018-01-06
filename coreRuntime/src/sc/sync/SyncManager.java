@@ -411,7 +411,7 @@ public class SyncManager {
          // When we are processing the initial sync, we are not recording changes.
          // TODO: do we need to record separate versions when dealing with sync contexts shared by more than one client?
          // to track versions, so we can respond to sync requests from more than one client
-         if (!initialSync) {
+         if (!initialSync && scope.supportsChangeEvents) {
             // For simple value properties, that cannot refer recursively, we add them to the dep changes which are put before the object which is referencing the
             // object we are serializing.  If it's possibly a reference to an object either that's not yet serialized or is being serialized we do it after.  It might
             // be nice to check if it's not being serialized cause we could then serialize it all before... rather than splitting up the object definition unnecessarily
@@ -433,6 +433,7 @@ public class SyncManager {
             else
                changedLayer.addChangedValue(obj, propName, val);
          }
+         // else if !initialSync - not recording this change here!
          SyncState syncState = getSyncState();
          if (recordInitial || syncState != SyncState.Initializing) {
             // For the 'remote' parameter, we want it to be true only for those changes which definitively originated on the client.  The binding count test will
@@ -779,22 +780,31 @@ public class SyncManager {
       }
 
       private InstInfo getParentInheritedInstInfo(Object changedObj, SyncContextHolder resCtxHolder) {
+         InstInfo parentII = null;
          if (parentContexts != null) {
             for (SyncContext parentContext:parentContexts) {
                // Is this an immediate instance of this context - if so, initialize it (and return the specific context it's in
-               InstInfo parentII = parentContext.getInstInfo(changedObj);
+               parentII = parentContext.getInstInfo(changedObj);
                if (parentII != null) {
                   if (!parentII.initialized)
                      parentContext.initOnDemandInst(null, changedObj, parentII, false, false, null);
                   if (resCtxHolder != null)
                      resCtxHolder.ctx = parentContext;
-                  return parentII;
+                  break;
                }
                // Still need to check the parents of the parent but by then resCtxHolder is already filled in
                parentII = parentContext.getParentInheritedInstInfo(changedObj, resCtxHolder);
-               if (parentII != null)
-                  return parentII;
+               if (parentII != null) {
+                  break;
+               }
             }
+         }
+         // NOTE: Currently we need the entire chain of SyncContexts to contain the InstInfo because in valueInvalidated we
+         // only check if immediate children have the object instance.   Not sure this is the right thing... maybe there's
+         // a more efficient way to mark the instance being in a child of a SyncContext.
+         if (parentII != null) {
+            InstInfo intermedII = createAndRegisterInheritedInstInfo(changedObj, parentII);
+            return intermedII;
          }
          return null;
       }

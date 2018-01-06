@@ -50,6 +50,9 @@ public abstract class ScopeContext {
    // Used for synchronizing the set/get of eventListener
    public final Object eventListenerLock = new Object();
 
+   // Set to true for scopes for which a client is listening for change events (e.g. the "window scope" for a browser window based application)
+   public boolean supportsChangeEvents = false;
+
    // Used for receiving cross-scope binding events
    public IScopeEventListener eventListener = null;
 

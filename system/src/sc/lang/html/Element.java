@@ -214,9 +214,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return res;
    }
 
-   // The repeat element's identity is synchronized from the client to the server so mark those instances as
-   // "not new" so the modify tag is sent.  In general, it seems best to create the children when we create the parent
-   // instead of the first time on the refresh anyway.
+   // This method is used to register an instance and it's children with the sync system so the changes are not
+   // synchronized to the remote side. It's used for example for the repeat element's identity, which is automatically
+   // kept in sync.   We mark these instances here as "not new" so changes are not sent.
    private void registerSyncInstAndChildren(Object res) {
       SyncManager.registerSyncInst(res);
       // Need to register this entire tree with the sync system, at least as far as it is sync'd.
@@ -3050,6 +3050,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             }
          }
          else {
+            int renumberIx = -1;
             for (int i = 0; i < sz; i++) {
                Object arrayVal = DynUtil.getArrayElement(repeatVal, i);
                if (arrayVal == null) {
@@ -3110,12 +3111,15 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                            if (curNewIx == -1) {
                               Element toRem = tags.remove(delIx);
                               removeElement(toRem, delIx);
+                              if (renumberIx == -1)
+                                 renumberIx = delIx;
                            }
                            else
                               needsMove = true;
                         }
                         // If we deleted up to the current, we are done.  Otherwise, we need to re-order
                         if (needsMove) {
+                           renumberIx = i;
                            elemToMove.setRepeatIndex(i);
                            tags.add(i, elemToMove);
                            moveElement(elemToMove, curIx, i);
@@ -3145,6 +3149,17 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                Element toRem = tags.remove(ix);
                removeElement(toRem, ix);
                anyChanges = true;
+            }
+            // We removed one or more elements so make sure the repeatIndex is correct now
+            if (renumberIx != -1) {
+               int tagSz = tags.size();
+               for (int r = renumberIx; renumberIx < tagSz; r++) {
+                  Element tagElem = tags.get(r);
+                  if (tagElem.getRepeatIndex() != r)
+                     tagElem.setRepeatIndex(r);
+               }
+               if (this instanceof IRepeatWrapper)
+                  ((IRepeatWrapper) this).updateElementIndexes(renumberIx);
             }
          }
       }
@@ -3861,5 +3876,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    public TypeDeclaration getRepeatWrapperType() {
       return repeatWrapper;
+   }
+
+   // Part of IRepeatWrapper - to manage changes in the ordering of the tags
+   public void updateElementIndexes(int fromIx) {
    }
 }
