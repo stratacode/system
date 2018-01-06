@@ -7894,8 +7894,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (messageHandler != null)
          messageHandler.reportMessage(sb, null, -1, -1, type);
       else {
-         if (type == MessageType.Error)
-            System.err.println(sb);
+         if (type == MessageType.Error) {
+            String err = sb.toString();
+            // So this shows up in the summary of errors
+            viewedErrors.add(err);
+            System.err.println(err);
+         }
          else {
             switch (type) {
                case Warning:
@@ -10464,8 +10468,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             Object result = processor.process(srcEnt, enablePartialValues);
             if (result instanceof ParseError) {
                if (reportErrors) {
-                  System.err.println("File: " + srcEnt.absFileName + ": " +
-                          ((ParseError) result).errorStringWithLineNumbers(new File(srcEnt.absFileName)));
+                  error("File: " + srcEnt.absFileName + ": " + ((ParseError) result).errorStringWithLineNumbers(new File(srcEnt.absFileName)));
 
                   if (currentBuildLayer != null && currentBuildLayer.buildState != null) {
                      BuildState bd = currentBuildLayer.buildState;
