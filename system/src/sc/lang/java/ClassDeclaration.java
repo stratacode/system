@@ -204,7 +204,7 @@ public class ClassDeclaration extends TypeDeclaration {
             return Object.class;
          Object res = extendsType.getTypeDeclaration();
          // Once a type has been transformed, we need to return the transformed type for the last ClassDeclaration in the modify.
-         // Need this at least for the definesMemmber/definesMethod calls.
+         // Need this at least for the definesMember/definesMethod calls.
          if (res instanceof BodyTypeDeclaration && isTransformedType()) {
             BodyTypeDeclaration tdRes = ((BodyTypeDeclaration) res).getTransformedResult();
             if (tdRes != null)
@@ -942,7 +942,7 @@ public class ClassDeclaration extends TypeDeclaration {
       else {
          for (int i = 0; i < meths.length; i++) {
             Object meth = meths[i];
-            Object declMethObj = declaresMethod(onInitMethodName, Arrays.asList(ModelUtil.getParameterTypes(meth)), null, null, false, null, null, false);
+            Object declMethObj = declaresMethod(onInitMethodName, Arrays.asList(ModelUtil.getParameterTypes(meth)), null, null, false, false, null, null, false);
             MethodDefinition declMeth;
             if (declMethObj == null) {
                declMeth = (MethodDefinition) TransformUtil.defineRedirectMethod(this, onInitMethodName, meth, false, !ModelUtil.isAbstractMethod(meth));
@@ -1127,13 +1127,7 @@ public class ClassDeclaration extends TypeDeclaration {
    }
 
    private MethodDefinition defineInitMethod(String name, String accessModifier) {
-      MethodDefinition initMethod = new MethodDefinition();
-      initMethod.addModifier(accessModifier);
-      initMethod.name = name;
-      PrimitiveType pt = new PrimitiveType();
-      pt.typeName = "void";
-      initMethod.setProperty("type", pt);
-
+      MethodDefinition initMethod = addOrGetInitMethod(name, accessModifier);
       TransformUtil.appendIndentIfNecessary((SemanticNodeList) body);
       addBodyStatement(initMethod);
       return initMethod;

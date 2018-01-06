@@ -756,7 +756,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          visited.add(subType);
 
          // In this case, we need to consider all overriding methods - including those in modified types
-         Object result = subType.declaresMethod(name, ptypes, null, enclType, false, null, null, false);
+         Object result = subType.declaresMethod(name, ptypes, null, enclType, false, false, null, null, false);
          if (result instanceof MethodDefinition && !resultListContainsMethod(res, result)) {
             res.add(result);
          }
@@ -765,7 +765,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             // If we hit this same type in the list of modified types need to stop since anything below this type is not an overriding method
             if (modType == null || ModelUtil.sameTypes(modType, enclType) && modType.layer.getLayerName().equals(subType.layer.getLayerName()))
                break;
-            result = modType.declaresMethod(name, ptypes, null, enclType, false, null, null, false);
+            result = modType.declaresMethod(name, ptypes, null, enclType, false, false, null, null, false);
             if (result instanceof MethodDefinition && !resultListContainsMethod(res, result))
                res.add(result);
             modType = modType.getModifiedType();

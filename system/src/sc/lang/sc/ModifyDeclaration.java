@@ -803,13 +803,13 @@ public class ModifyDeclaration extends TypeDeclaration {
       return null;
    }
 
-   public Object declaresMethod(String name, List<? extends Object> types, ITypeParamContext ctx, Object refType, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs, boolean includeModified) {
-      Object res = super.declaresMethod(name, types, ctx, refType, staticOnly, inferredType, methodTypeArgs, includeModified);
+   public Object declaresMethod(String name, List<? extends Object> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs, boolean includeModified) {
+      Object res = super.declaresMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, includeModified);
       if (res != null)
          return res;
       // if we have a modifyClass is there ever a case where we need to include those methods?  We typically use definesMethod for resolution - this is just for the IDE - overriding methods.
       if (includeModified && modifyTypeDecl != null) {
-         return modifyTypeDecl.declaresMethod(name, types, ctx, refType, staticOnly, inferredType, methodTypeArgs, includeModified);
+         return modifyTypeDecl.declaresMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, includeModified);
       }
       return null;
    }

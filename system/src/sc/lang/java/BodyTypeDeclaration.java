@@ -32,6 +32,11 @@ import java.util.*;
 public abstract class BodyTypeDeclaration extends Statement implements ITypeDeclaration, INamedNode, IClassBodyStatement {
    public final static String INNER_STUB_SEPARATOR = "__";
 
+   private final static TreeSet<String> componentMethodNames = new TreeSet<String>();
+   static {
+      componentMethodNames.addAll(Arrays.asList("preInit", "init", "start", "stop"));
+   }
+
    @Constant
    public String typeName;
    public SemanticNodeList<Statement> body;
@@ -199,7 +204,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    transient public boolean temporaryType;
 
    /** Set to true for types manipulated in the command line, so we know to make them live-dynamic types by default */
+
    transient public boolean liveDynType = false;
+
+   transient ArrayList<MethodDefinition> componentMethods = null;
 
    public Layer getLayer() {
       return layer;
@@ -732,7 +740,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             return v;
       }
 
-      v = declaresMethod(name, types, ctx, refType, staticOnly, inferredType, methodTypeArgs, false); // false for 'includeModified' because we already traverse modified types in definesMethod
+      v = declaresMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, false); // false for 'includeModified' because we already traverse modified types in definesMethod
       if (v != null)
          return v;
 
@@ -788,7 +796,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    /** Just returns methods declared in this specific type */
-   public Object declaresMethod(String name, List<? extends Object> types, ITypeParamContext ctx, Object refType, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs, boolean includeModified) {
+   public Object declaresMethod(String name, List<? extends Object> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs, boolean includeModified) {
       if (methodsByName == null) {
          initMethodsByName();
       }
@@ -802,20 +810,26 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (v != null)
          return v;
 
-      if (isTransformedType() && isAutoComponent() && !isTransformed()) {
+      if ((isTransformed || isTransformedType()) && isAutoComponent() && !isTransformed() && componentMethodNames.contains(name)) {
+         return addOrGetInitMethod(name, "public");
          // Note: this returns a compiled method even from the source type.  Use declaresMethodDef if you want to exclude
          // those compiled definitions.
+         /*
          obj = ModelUtil.definesMethod(ComponentImpl.class, name, types, ctx, refType, true, staticOnly, inferredType, methodTypeArgs, getLayeredSystem());
          if (obj != null)
             return obj;
+         */
       }
 
       return null;
    }
 
-   // Returns the MethodDefinition, omitting the compiled types we might inherit from ComponentImpl
+   // Returns the MethodDefinition, omitting the component methods
    AbstractMethodDefinition declaresMethodDef(String name, List<? extends Object> types) {
-      Object res = declaresMethod(name, types, null, null, false, null, null, false);
+      Object res = declaresMethod(name, types, null, null, false, false, null, null, false);
+      // Skip the component methods here since this is used to find the native method
+      if (res != null && componentMethods != null && componentMethods.contains(res))
+         return null;
       if (res instanceof ParamTypedMethod)
          res = ((ParamTypedMethod) res).method;
       if (res instanceof AbstractMethodDefinition)
@@ -5160,7 +5174,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
             // Look for a method in this type specifically.  Anything in a modified type or extended type should not
             // get replaced since we are overriding that method in that case.
-            AbstractMethodDefinition overridden = (AbstractMethodDefinition) declaresMethod(newDef.name, newDef.getParameterList(), null, null, false, null, null, false);
+            AbstractMethodDefinition overridden = (AbstractMethodDefinition) declaresMethod(newDef.name, newDef.getParameterList(), null, null, false, false, null, null, false);
             if (overridden != null) {
                overridden.parentNode.replaceChild(overridden, newDef);
                if (overridden.overriddenMethod != null) {
@@ -5282,7 +5296,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
          // Look for a method in this type specifically.  Anything in a modified type or extended type should not
          // get replaced since we are overriding that method in that case.
-         AbstractMethodDefinition overridden = (AbstractMethodDefinition) declaresMethod(toRem.name, toRem.getParameterList(), null, null, false, null, null, false);
+         AbstractMethodDefinition overridden = (AbstractMethodDefinition) declaresMethod(toRem.name, toRem.getParameterList(), null, null, false, false, null, null, false);
          if (overridden != null) {
             overridden.parentNode.removeChild(overridden);
             removeStatement(overridden);
@@ -5806,7 +5820,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             }
             else if (newBodyDef instanceof AbstractMethodDefinition) {
                AbstractMethodDefinition newMeth = (AbstractMethodDefinition) newBodyDef;
-               Object oldMethObj = declaresMethod(newMeth.name, newMeth.getParameterList(), null, null, false, null, null, false);
+               Object oldMethObj = declaresMethod(newMeth.name, newMeth.getParameterList(), null, null, false, false, null, null, false);
                if (oldMethObj instanceof ParamTypedMethod)
                   oldMethObj = ((ParamTypedMethod) oldMethObj).method;
                AbstractMethodDefinition oldMeth = (AbstractMethodDefinition) oldMethObj;
@@ -9120,6 +9134,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       if ((options & CopyTransformed) != 0) {
          transformedType = res;
+         // In case we created the preInit, init, or start methods against the non-transformed model, copy them over so those same methods will get put into the transformed model.
+         // I think this happens because we do not transform the extended type before transforming the base-type.  So we might need to resolve a preInit method before it's type has
+         // been transformed or even cloned.
+         if (componentMethods != null)
+            res.componentMethods = componentMethods;
       }
 
       return res;
@@ -9450,6 +9469,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       prevCompiledExtends = null;
       staleClassName = null;
       syncProperties = null;
+      componentMethods = null;
 
       super.stop();
       if (hiddenBody != null) {
@@ -9529,4 +9549,27 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if (child instanceof BodyTypeDeclaration)
             ((BodyTypeDeclaration) child).markAsTemporary();
    }
+
+   MethodDefinition addOrGetInitMethod(String name, String accessModifier) {
+      if (componentMethods == null)
+         componentMethods = new ArrayList<MethodDefinition>();
+      else {
+         for (MethodDefinition initMeth: componentMethods)
+            if (initMeth.name.equals(name))
+               return initMeth;
+      }
+
+      MethodDefinition initMethod = new MethodDefinition();
+      initMethod.addModifier(accessModifier);
+      initMethod.name = name;
+      PrimitiveType pt = new PrimitiveType();
+      pt.typeName = "void";
+      initMethod.setProperty("type", pt);
+      // This will get reset when we actually add the method to the body, but for it to be a valid method for type resolution, it needs an enclosing type
+      initMethod.parentNode = this;
+
+      componentMethods.add(initMethod);
+      return initMethod;
+   }
+
 }
