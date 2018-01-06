@@ -651,7 +651,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
                      if (exprType instanceof BaseLambdaExpression.LambdaInvalidType)
                         break;
 
-                     if (exprType != null && !ModelUtil.isAssignableFrom(paramType, exprType, false, ctx, system)) {
+                     if (exprType != null && paramType != null && !ModelUtil.isAssignableFrom(paramType, exprType, false, ctx, system)) {
                         // Repeating parameters... if the last parameter is an array match if the component type matches
                         if (j >= last && ModelUtil.isArray(paramType) && ModelUtil.isVarArgs(toCheck)) {
                            if (!ModelUtil.isAssignableFrom(ModelUtil.getArrayComponentType(paramType), exprType, false, ctx)) {
