@@ -1908,11 +1908,19 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             // Setting the currentLayer here because the includedScript has to expect the context of the layer in which it's defined, since it can be used from multiple places.
             // The normal include always picks a file that's defined in the context of the buildLayer.
             pushCurrentInput(true);
-            this.inputFileName = srcEnt.absFileName;
-            this.inputRelName = srcEnt.relFileName;
-            includeLayer = srcEnt.layer;
-            currentLayer = srcEnt.layer;
-            resetInput();
+            try {
+               this.inputFileName = srcEnt.absFileName;
+               this.inputRelName = srcEnt.relFileName;
+               includeLayer = srcEnt.layer;
+               currentLayer = srcEnt.layer;
+               resetInput();
+               this.returnOnInputChange = true;
+               if (!readParseLoop())
+                  pendingInput = new StringBuilder();
+            }
+            finally {
+               popCurrentInput();
+            }
          }
          else
             throw new IllegalArgumentException("includeSuper - no super script for: " + inputFileName + " relative name: " + inputRelName + " from layer: " + curLayer);
