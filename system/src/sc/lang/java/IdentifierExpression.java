@@ -2611,8 +2611,9 @@ public class IdentifierExpression extends ArgumentsExpression {
                            }
                            // TODO: But here, we need to create the SelectorExpression that does the resolve and then create the identifier expression for the rest and transform that, like we do
                            // in converting to a getX method in some cases. This is not hard but just need a test-case
-                           if (i != sz - 1) {
-                              throw new UnsupportedOperationException("*** Unhandled case for transforming dynamic types");
+                           if (i != sz - 1) { // Right now, we only get here when dealing with a getSourcePosition request for some reason so just returning
+                              System.err.println("*** Unhandled case for transforming dynamic types");
+                              return true;
                            }
                         }
                         SemanticNodeList<Expression> args = new SemanticNodeList<Expression>();
@@ -3122,6 +3123,11 @@ public class IdentifierExpression extends ArgumentsExpression {
                if (idTypes[j] == IdentifierType.MethodInvocation && ModelUtil.isDynamicType(boundTypes[j])) {
                   // a.getB().dynC(x) -> a.getB().invoke("dynC", x")
                   arguments.add(0, StringLiteral.create(subIdent));
+                  String sig = ModelUtil.getTypeSignature(boundTypes[j]);
+                  if (sig == null)
+                     arguments.add(1, NullLiteral.create());
+                  else
+                     arguments.add(1, StringLiteral.create(sig));
                   subIdent = "invoke";
                }
                v.setProperty("arguments", arguments);

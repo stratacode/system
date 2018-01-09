@@ -3662,6 +3662,9 @@ public class ModelUtil {
          return ((Parameter) srcMember).getEnclosingType();
       else if (srcMember instanceof java.lang.Enum)
          return ((java.lang.Enum) srcMember).getDeclaringClass();
+      else if (srcMember instanceof ArrayTypeDeclaration) {
+         return getEnclosingType(((ArrayTypeDeclaration) srcMember).getComponentType());
+      }
       throw new UnsupportedOperationException();
    }
 
@@ -7154,7 +7157,7 @@ public class ModelUtil {
          for (int i = 0; i < fieldTypeParamNames.length; i++) {
             fieldTypeParams[i] = getJavaTypeFromTypeOrParamName(srcType, fieldTypeParamNames[i]);
          }
-         return JavaType.createFromTypeParams(ModelUtil.getTypeName(fieldType), fieldTypeParams);
+         return JavaType.createFromTypeParams(ModelUtil.getTypeName(fieldType), fieldTypeParams, fieldType);
       }
       return JavaType.createJavaType(srcType.getLayeredSystem(), fieldType);
    }

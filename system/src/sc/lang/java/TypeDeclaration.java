@@ -1385,25 +1385,36 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
    /** Returns the JavaTypes so we preserve the type parameters */
    public Object[] getCompiledImplJavaTypes() {
-      if (implementsTypes == null)
+      JavaType[] scopeIfaces = null; // getScopeInterfaceJavaTypes(); TODO - do we include the scopeInteraces here?  If so, we also need to add the obj/mixin templates which defines these methods - e.g. ListItemScope
+      if (implementsTypes == null && scopeIfaces == null)
          return null;
 
       List<Object> compiledImpl = null;
-      for (int i = 0; i < implementsTypes.size(); i++) {
-         Object impl = implementsBoundTypes[i];
-         // Get all compiled implemented types
-         if (!ModelUtil.isDynamicType(impl)) {
-            if (compiledImpl == null)
-               compiledImpl = new ArrayList<Object>();
-            compiledImpl.add(implementsTypes.get(i));
-         }
-         else {
-            Object[] nestedTypes = ModelUtil.getCompiledImplJavaTypes(impl);
-            if (nestedTypes != null) {
+      if (implementsTypes != null) {
+         for (int i = 0; i < implementsTypes.size(); i++) {
+            Object impl = implementsBoundTypes[i];
+            // Get all compiled implemented types
+            if (!ModelUtil.isDynamicType(impl)) {
                if (compiledImpl == null)
                   compiledImpl = new ArrayList<Object>();
-               compiledImpl.addAll(Arrays.asList(nestedTypes));
+               compiledImpl.add(implementsTypes.get(i));
             }
+            else {
+               Object[] nestedTypes = ModelUtil.getCompiledImplJavaTypes(impl);
+               if (nestedTypes != null) {
+                  if (compiledImpl == null)
+                     compiledImpl = new ArrayList<Object>();
+                  compiledImpl.addAll(Arrays.asList(nestedTypes));
+               }
+            }
+         }
+      }
+      if (scopeIfaces != null) {
+         if (compiledImpl == null)
+            compiledImpl = new ArrayList<Object>();
+         for (JavaType scopeIface:scopeIfaces) {
+            if (!compiledImpl.contains(scopeIface))
+               compiledImpl.add(scopeIface);
          }
       }
       if (compiledImpl == null)

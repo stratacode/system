@@ -129,16 +129,17 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
    }
 
    public static JavaType createTypeFromTypeParams(Object type, JavaType[] typeParams) {
-      return createFromTypeParams(ModelUtil.getTypeName(type), typeParams);
+      return createFromTypeParams(ModelUtil.getTypeName(type), typeParams, type);
    }
 
-   public static JavaType createFromTypeParams(String typeName, JavaType[] typeParams) {
+   public static JavaType createFromTypeParams(String typeName, JavaType[] typeParams, Object typeDecl) {
       JavaType t = createJavaTypeFromName(typeName);
       if (t instanceof ClassType) {
          ClassType ct = (ClassType) t;
          
          if (typeParams != null)
             ct.setResolvedTypeArguments(SemanticNodeList.create((Object[]) typeParams));
+         ct.type = typeDecl;
       }
       return t;
    }

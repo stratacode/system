@@ -810,7 +810,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (v != null)
          return v;
 
-      if ((isTransformed || isTransformedType()) && isAutoComponent() && !isTransformed() && componentMethodNames.contains(name)) {
+      if ((isTransformed || isTransformedType()) && isAutoComponent() && !isDynamicType() && !isTransformed() && componentMethodNames.contains(name)) {
          return addOrGetInitMethod(name, "public");
          // Note: this returns a compiled method even from the source type.  Use declaresMethodDef if you want to exclude
          // those compiled definitions.
@@ -1109,6 +1109,30 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             scopeInterfaces = new Object[0];
       }
       return scopeInterfaces;
+   }
+
+   public JavaType[] getScopeInterfaceJavaTypes() {
+      // For performance, since we cache these and they will map 1-1 with the JavaTypes
+      Object[] scopeIface = getScopeInterfaces();
+      if (scopeIface.length == 0)
+         return null;
+
+      ArrayList<JavaType> scopeTypes = null;
+      IDefinitionProcessor[] defProcs = getDefinitionProcessors();
+      if (defProcs != null) {
+         for (IDefinitionProcessor proc:defProcs) {
+            String[] scopeInterfaces = proc.getAppendInterfaces();
+            if (scopeInterfaces != null) {
+               for (int si = 0; si < scopeInterfaces.length; si++) {
+                  JavaType scopeType = ModelUtil.getJavaTypeFromTypeOrParamName(this, scopeInterfaces[si]);
+                  if (scopeTypes == null)
+                     scopeTypes = new ArrayList<JavaType>();
+                  scopeTypes.add(scopeType);
+               }
+            }
+         }
+      }
+      return scopeTypes == null ? null : scopeTypes.toArray(new JavaType[scopeTypes.size()]);
    }
 
    public void addModifier(Object modifier) {

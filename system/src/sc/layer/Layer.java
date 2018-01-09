@@ -2954,7 +2954,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    public Object getClass(String classFileName, String className, boolean external) {
       if (layeredSystem == null) {
-         System.err.println("*** No layered system for layer!");
+         System.err.println("*** No layered system for layer!"); // Could have been removed here - but why is a removed layer being used for a lookup?
          return null;
       }
       if (!external && !layeredSystem.options.crossCompile) {
