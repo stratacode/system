@@ -139,7 +139,8 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
          
          if (typeParams != null)
             ct.setResolvedTypeArguments(SemanticNodeList.create((Object[]) typeParams));
-         ct.type = typeDecl;
+         // This breaks the test/lambda with the -cc option for some reason - probably we need to use the parameterized type here if there are type params?
+         //ct.type = typeDecl;
       }
       return t;
    }
