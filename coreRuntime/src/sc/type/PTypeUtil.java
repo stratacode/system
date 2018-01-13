@@ -24,6 +24,9 @@ public class PTypeUtil {
 
    public final static int MIN_PROPERTY = 1;
 
+   // Flags which will mirror the system values on both client and server
+   public static boolean verbose, testMode;
+
    public static int numClassesCached = 0;
    public static int numFieldsCached = 0;
    public static int numMethodsCached = 0;

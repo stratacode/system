@@ -4002,11 +4002,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       // When testing we don't want the normal run - open page to open - it's up to the test script to decide what to open to test
       if (options.testMode) {
+         PTypeUtil.testMode = true;
          options.openPageAtStartup = false;
          // By default test modes should not display unless you use -yh
          if (!headlessSet)
             options.headless = true;
       }
+      if (options.verbose)
+         PTypeUtil.verbose = true;
 
       PerfMon.start("main", true, true);
 

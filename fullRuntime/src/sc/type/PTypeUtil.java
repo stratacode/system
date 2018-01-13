@@ -26,8 +26,8 @@ public class PTypeUtil {
    // Slot 0 is reserved for object/class value listeners.
    public final static int MIN_PROPERTY = 1;
 
-   // Set to true to debug errors encountered trying to resolve properties from types, e.g. properties discarded because of conflicting return types.
-   public static boolean trace = false;
+   // Flags which will mirror the system values on both client and server
+   public static boolean verbose, testMode;
 
    public static int numClassesCached = 0;
    public static int numFieldsCached = 0;
@@ -35,6 +35,8 @@ public class PTypeUtil {
    public static int numInterfacePropsCached = 0;
    public static int numPropsInherited = 0;
 
+   // Old setting - set to true to debug errors encountered trying to resolve properties from types, e.g. properties discarded because of conflicting return types.
+   public static boolean trace = false;
 
    public static IBeanMapper getListConverter(BeanMapper mapper, Class propertyClass, Class valueClass) {
       // Converts List<?> to List<String>

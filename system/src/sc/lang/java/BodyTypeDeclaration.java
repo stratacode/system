@@ -616,6 +616,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             if (subTypes != null) {
                while (subTypes.hasNext()) {
                   TypeDeclaration subType = subTypes.next();
+                  if (subType == this) {
+                     System.err.println("*** Recursive sub-type definition!");
+                     continue;
+                  }
                   subType.incrVersion();
                   subType.incrSubTypeVersions();
                }
