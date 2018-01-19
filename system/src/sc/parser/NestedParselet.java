@@ -1424,7 +1424,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       int sequenceSize = parselets.size();
 
       if (!skipSemanticValue && !parser.matchOnly) {
-         if (resultClass != null && !getSkip()) {
+         if ((resultClass != null || resultDynType != null) && !getSkip()) {
             if (parent.value == null) {
                // If we are propagating a value and have a result class specified, we wait to create this until
                // we see if the propagated value is null or not.  It only gets created if it is null.

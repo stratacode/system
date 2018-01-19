@@ -1571,8 +1571,12 @@ public class ModifyDeclaration extends TypeDeclaration {
          JavaModel m = getJavaModel();
          inst = m.resolveName(CTypeUtil.prefixPath(m.getPackagePrefix(), typeName), false, true);
          if (inst == null) {
-            if (m.isLayerModel)
-               throw new IllegalArgumentException("Layer definition file refers to: " + typeName + " which does not match it's path: " + getJavaModel().getSrcFile());
+            if (m.isLayerModel) {
+               String err = "Layer definition file refers to: " + typeName + " which does not match it's path: " + getJavaModel().getSrcFile();
+               // want this to show up as an error in the UI but also can't return null here
+               m.displayError(err + " for: ");
+               throw new IllegalArgumentException(err);
+            }
             else
                throw new IllegalArgumentException("Can't create instance of non-existent type: " + typeName + " used in modify statement: " + toDefinitionString());
          }

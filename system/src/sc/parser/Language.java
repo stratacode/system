@@ -4,6 +4,7 @@
 
 package sc.parser;
 
+import sc.dyn.RDynUtil;
 import sc.lang.ILanguageModel;
 import sc.layer.*;
 import sc.type.DynType;
@@ -569,15 +570,15 @@ public abstract class Language extends LayerFileComponent {
          if (c != null)
             return c;
       }
-      if (semanticValueClassPath == null)
-         throw new IllegalArgumentException("Unable to lookup model class: " + className + " because the Language.semanticValueClassPath has not been set");
-      for (int i = 0; i < semanticValueClassPath.length; i++) {
-         Class c = RTypeUtil.loadClass(classLoader, semanticValueClassPath[i] + "." + className, true);
-         if (c != null)
-             return c;
+      if (semanticValueClassPath != null) {
+         for (int i = 0; i < semanticValueClassPath.length; i++) {
+            Class c = RTypeUtil.loadClass(classLoader, semanticValueClassPath[i] + "." + className, true);
+            if (c != null)
+                return c;
+         }
       }
-      // Also need to check the system class loader for top level classes (since this is now used for user defined classes via the Pattern language)
-      Class c = RTypeUtil.loadClass(classLoader, className, true);
+      // this also checks for inner classes but is basically like the first call.
+      Class c = RDynUtil.loadClass(className);
       if (c != null)
          return c;
       return null;
@@ -815,9 +816,10 @@ public abstract class Language extends LayerFileComponent {
       if (rootOnly)
          p.fieldNamed = true;
       else {
-         Parselet replaced = parseletsByName.put(convertNameToKey(p.getName()), p);
+         String key = convertNameToKey(p.getName());
+         Parselet replaced = parseletsByName.put(key, p);
          if (replaced != null && replaced != p)
-            System.err.println("*** Warning: two parselets with the same name: " + p.getName());
+            System.err.println("*** Warning: two parselets with the same name: " + p.getName() + " key: " + key);
       }
 
       if (!rootOnly) {
@@ -837,10 +839,15 @@ public abstract class Language extends LayerFileComponent {
    public Map<String,Parselet> parseletsByName = new HashMap<String,Parselet>();
 
    public static String convertNameToKey(String name) {
-      // Remove the parameters so it makes it easier to match parselets from different languages
-      int six = name.indexOf("(");
+      int six = name.indexOf(">");
+      // If name is of the form <a
+      if (six != -1 && six < name.length() - 1)
+         six = six + 1;
+      else {
+         six = name.indexOf("(");
+      }
       if (six != -1)
-         name = name.substring(0,six);
+         name = name.substring(0, six);
       return name;
    }
 

@@ -1266,9 +1266,11 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       boolean reInit = model != null && model != newModel;
       model = newModel;
       TypeDeclaration modelType = model.getModelTypeDeclaration();
-      modelType.isLayerType = true;
+      if (modelType != null) {
+         modelType.isLayerType = true;
+      }
       if (reInit && initialized && modelType instanceof ModifyDeclaration) {
-         ModifyDeclaration layerModel = (ModifyDeclaration) modelType;
+        ModifyDeclaration layerModel = (ModifyDeclaration) modelType;
          baseLayerNames = layerModel.getExtendsTypeNames();
          baseLayers = layeredSystem.mapLayerNamesToLayers(model.getRelDirPath(), baseLayerNames, activated, !closed);
          LayerParamInfo lpi = new LayerParamInfo();
@@ -3292,7 +3294,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                if (lastTime == -1 || newLastModTime > lastTime) {
                   if (model != null && model.isUnsavedModel())
                      System.out.println("*** Should we be refreshing an unsaved model?");
-                  layeredSystem.refreshFile(srcEnt, this, active); // For non parseableable files - do the file copy since the source file changed
+                  layeredSystem.refreshFile(srcEnt, this, active); // For non parseable files - do the file copy since the source file changed
                }
             }
 

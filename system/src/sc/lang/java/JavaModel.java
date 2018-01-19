@@ -228,7 +228,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          // go in the layer file as a prefix to the layer name.
          if (!isLayerModel) {
             if (layerPackagePrefix.length() != 0) {
-               if (packageDef == null) {
+               if (packageDef == null || packageDef.name == null) {
                   computedPackagePrefix = prependLayerPackage ? CTypeUtil.prefixPath(layerPackagePrefix, relDirPath) : relDirPath;
                }
                else {

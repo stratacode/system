@@ -3563,12 +3563,15 @@ public class ModelUtil {
       else if (def instanceof IBeanMapper)
          def = ((IBeanMapper) def).getPropertyMember();
       else {
+         Object origDef = def;
          while (ModelUtil.hasTypeParameters(def))
             def = ModelUtil.getParamTypeBaseType(def);
       }
 
       if (def instanceof VariableDefinition)
          return hasModifier(((VariableDefinition) def).getDefinition(), s);
+      if (def == null)
+         return false;
 
       return PTypeUtil.hasModifier(def, s);
    }

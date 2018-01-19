@@ -431,7 +431,7 @@ public class ClassType extends JavaType {
             // references work like normal types.
             if (it instanceof TypeDeclaration) {
                JavaModel curModel = ((TypeDeclaration) it).getJavaModel();
-               if (curModel != null) {
+               if (curModel != null && curModel.getLayer() != null) {
                   String layerRelPath = CTypeUtil.getPackageName(curModel.getLayer().getLayerName());
                   if (curModel.getUserData() != null) {
                      JavaModel layerModel = sys.getAnnotatedLayerModel(fullTypeName, layerRelPath);

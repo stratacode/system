@@ -309,6 +309,18 @@ public class CurrentScopeContext {
       return null;
    }
 
+   /** Return the scope attribute for this current scope context */
+   /*
+   public Object getScopeAttribute(String attributeName) {
+      for (ScopeContext ctx:scopeContexts) {
+         Object ctxVal = ctx.getValue(attributeName);
+         if (ctxVal != null)
+            return ctxVal;
+      }
+      return null;
+   }
+   */
+
    /**
     * If there is a singleton instance for this type, return it, otherwise not.  Since we frequently use singletons this method helps
     * diagnostics like the command interpreter where you want to select an instance by it being the only one of it's type for a specific scope context

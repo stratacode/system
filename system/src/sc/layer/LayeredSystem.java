@@ -2706,7 +2706,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
 
             URL[] layerURLs = getLayerClassURLs(sysLayer, lastPos, mode);
-            if (layerURLs.length > 0) {
+            if (layerURLs != null && layerURLs.length > 0) {
                if (options.verbose) {
                   String fromLayer = lastPos == -1 || lastPos == sysLayer.layerPosition - 1 ? null : sysLayer.getLayersList().get(lastPos).getLayerName();
                   if (fromLayer != null)
@@ -4216,7 +4216,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                sys.resetClassLoader();
             // First run the unit tests which match (i.e. those installed with the @Test annotation)
             Thread.currentThread().setContextClassLoader(sys.getSysClassLoader());
-            sys.buildInfo.runMatchingTests(options.testPattern);
+            if (sys.buildInfo == null)
+               sys.error("No build - unable to run tests with pattern: " + options.testPattern);
+            else
+               sys.buildInfo.runMatchingTests(options.testPattern);
          }
 
          if (options.verbose && !options.testVerifyMode) {
@@ -11600,6 +11603,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                }
             }
          }
+         // In replaceModel, we'll have updated the index but not the layerModel so need to take care of that here.
+         else if (model instanceof JavaModel) {
+            JavaModel javaModel = (JavaModel) model;
+            if (javaModel.isLayerModel)
+               layer.updateModel(javaModel);
+         }
          if (layer != null)
             layer.layerModels.add(new IdentityWrapper(model));
       }
@@ -11613,7 +11622,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (beingLoaded.get(srcEnt.absFileName) != oldModel)
             return;
       }
-      if (oldModel != null && options.verbose && oldModel.getLayer().activated) {
+      if (oldModel != null && options.verbose && oldModel.getLayer() != null && oldModel.getLayer().activated) {
          System.err.println("Replacing model " + absName + " in layer: " + oldModel.getLayer() + " with: " + model.getLayer());
       }
 
@@ -11652,6 +11661,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public void replaceModel(ILanguageModel oldModel, ILanguageModel newModel) {
       SrcEntry srcEnt = oldModel.getSrcFile();
+      updateModelIndex(srcEnt.layer, newModel, srcEnt.absFileName);
+   }
+
+   /** When making changes to a model which don't actually create a new model, we may need to update the layer - e.g. update the imports in the layer which is done here */
+   public void modelUpdated(ILanguageModel newModel) {
+      SrcEntry srcEnt = newModel.getSrcFile();
       updateModelIndex(srcEnt.layer, newModel, srcEnt.absFileName);
    }
 
@@ -13341,7 +13356,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return val;
 
       if (layerResolve) {
-         Map<String,Layer> pendingLayers = refLayer.activated ? pendingActiveLayers : pendingInactiveLayers;
+         Map<String,Layer> pendingLayers = refLayer != null && refLayer.activated ? pendingActiveLayers : pendingInactiveLayers;
          Layer pendingLayer = pendingLayers.get(name);
          if (pendingLayer != null)
             return pendingLayer;
@@ -13810,8 +13825,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                stubLayer.layerPathName = Layer.INVALID_LAYER_PATH;
             //stubLayer.layerBaseName = ...
             stubLayer.layerDirName = layerDirName;
-            System.err.println("*** failed to initialize inactive layer: ");
-            exc.printStackTrace();
+            System.err.println("*** Failed to initialize inactive layer due to error initializing the layer: " + exc);
+            if (options.verbose) exc.printStackTrace();
             return stubLayer;
          }
          System.err.println("*** Failed to initialize layer: " + expectedName + " due to runtime error: " + exc);
@@ -14287,8 +14302,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          for (String subTypeName:subTypesMap.keySet()) {
             if (type.isLayerType()) {
                Layer layer = getActiveOrInactiveLayerByPath(subTypeName.replace('.', '/'), null, openLayers, true, true);
-               if (layer != null) {
-                  result.add(layer.model.getModelTypeDeclaration());
+               if (layer != null && layer.model != null) {
+                  TypeDeclaration layerType = layer.model.getModelTypeDeclaration();
+                  if (layerType != null)
+                     result.add(layerType);
                }
             }
             else {

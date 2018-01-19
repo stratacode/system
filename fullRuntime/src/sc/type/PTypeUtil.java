@@ -158,6 +158,26 @@ public class PTypeUtil {
             }
          };
       }
+      else if (propertyClass == Integer.class || propertyClass == Integer.TYPE) {
+         return new BeanMapper(mapper) {
+            public void setPropertyValue(Object parent, Object value) {
+               Integer intVal = null;
+               if (value != null) {
+                  String val = value.toString();
+                  try {
+                     intVal = Integer.parseInt(val);
+                  }
+                  catch (NumberFormatException exc) {
+                     throw new IllegalArgumentException("Invalid integer for set property of: " + parent + "." + getPropertyName() + " value: '" + val + "' is not an integer" + exc);
+                  }
+               }
+               TypeUtil.setProperty(parent, setSelector, intVal);
+            }
+            public String toString() {
+               return "boolean converter for " + getPropertyName();
+            }
+         };
+      }
       if (IValueConverter.class.isAssignableFrom(valueClass)) {
          return new BeanMapper() {
             BeanMapper superMapper = mapper;

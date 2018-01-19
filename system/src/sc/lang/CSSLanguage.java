@@ -285,7 +285,7 @@ public class CSSLanguage extends TemplateLanguage {
                new Sequence("(,,[])", OPTIONAL | REPEAT, semicolonEOL, spacing, declaration), closeBraceEOL);
 
     // STATUS: DONE
-    Sequence pseudo = new Sequence("Pseudo(,pseudo)", colon, new OrderedChoice("<pseudo>", ident,
+    Sequence pseudo = new Sequence("Pseudo(,pseudo)", colon, new OrderedChoice("<pseudo.1>", ident,
             new Sequence("PseudoFunction(function,,ident,,)", functionStart, spacing, ident, spacing, closeParen)));
 
     // STATUS: DONE (I think)
@@ -308,7 +308,7 @@ public class CSSLanguage extends TemplateLanguage {
             new OrderedChoice("([],[],[],[])", OPTIONAL | REPEAT, hashName, clazz, attrib, pseudo), spacing);
 
     // STATUS: DONE?
-    Sequence selector = new Sequence ("CSSSelector(simpleSelector, additionalSelectorTerms)", simpleSelector,
+    Sequence cssSelector = new Sequence ("CSSSelector(simpleSelector, additionalSelectorTerms)", simpleSelector,
             new Sequence("([],[])", OPTIONAL | REPEAT,
                     new OrderedChoice(OPTIONAL,
                             new Sequence("(.,)", new Symbol("+"), spacing),
@@ -316,11 +316,11 @@ public class CSSLanguage extends TemplateLanguage {
                     simpleSelector));
 
     // STATUS: DONE?
-    Sequence selectors = new Sequence("<otherSelectors>(,,[])", OPTIONAL | REPEAT, comma, spacing, selector);
+    Sequence selectors = new Sequence("<otherSelectors>(,,[])", OPTIONAL | REPEAT, comma, spacing, cssSelector);
 
     // STATUS: READY
-    Sequence ruleset = new Sequence("RuleSet(selector, otherSelectors, declarations)",
-             selector, selectors, declarations);
+    Sequence ruleset = new Sequence("RuleSet(cssSelector, otherSelectors, declarations)",
+            cssSelector, selectors, declarations);
 
     // STATUS: DONE
     Sequence ruleSets = new Sequence("<rulesets>([])", OPTIONAL | REPEAT, ruleset);

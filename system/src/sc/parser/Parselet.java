@@ -10,6 +10,7 @@ import sc.lang.SemanticNodeList;
 import sc.lang.java.BodyTypeDeclaration;
 import sc.lifecycle.ILifecycle;
 import sc.type.RTypeUtil;
+import sc.util.StringUtil;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -172,14 +173,19 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
                if (resultClassName == null)
                   resultClassName = className;
                if (resultDynType == null) {
-                  setResultClass(getLanguage().lookupModelClass(resultClassName));
+                  Language lang = getLanguage();
+                  setResultClass(lang.lookupModelClass(resultClassName));
                   if (resultClass == null) {
                      Object resultType;
                      // This might be a model type used by the Pattern servlet...
-                     if ((resultType = DynUtil.findType(resultClassName)) == null)
-                        System.err.println("*** Error: " + className + " could not be loaded as a model class");
+                     if ((resultType = DynUtil.findType(resultClassName)) == null) {
+                        String[] svcp = lang.semanticValueClassPath;
+                        System.err.println("*** Error: " + className + " could not be loaded as a model class - semanticValueClassPath: " + (svcp == null ? "null" : StringUtil.arrayToString(svcp)));
+                     }
                      else if (resultType instanceof BodyTypeDeclaration)
                         resultDynType = (BodyTypeDeclaration) resultType;
+                     else if (resultType instanceof Class)
+                        resultClass = (Class) resultType;
                   }
                }
             }
@@ -192,6 +198,8 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
    }
 
    public void setResultClass(Class c) {
+      if (c == resultClass)
+         return;
       if (resultClass != null && c != null)
          System.out.println("*** conflicting class definition for: " + this + " " + resultClass + " and " + c);
       resultClass = c;
@@ -861,6 +869,9 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       // If the value is a boolean, it matches null or non-null so we have to allow it.
       if (otherClass == Boolean.class)
          return true;
+
+      if (otherClass == Integer.class)
+         return other instanceof Integer;
 
       return false;
    }

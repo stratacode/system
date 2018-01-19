@@ -604,7 +604,7 @@ public class BuildInfo {
                            System.err.println("FAILED: " + tinst.typeName);
                         success = false;
                      }
-                     else if (system.options.verbose)
+                     else if (system.options.verbose || system.options.testMode)
                         System.out.println("Test: " + tinst.typeName + " success");
                   }
                   else {

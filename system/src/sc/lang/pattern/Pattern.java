@@ -14,7 +14,7 @@ import sc.parser.*;
 import java.util.ArrayList;
 
 public class Pattern extends SemanticNode {
-   // String or VariableDef object
+   // String, VariableDef, or OptionalPattern objects
    SemanticNodeList<Object> elements;
 
    private transient Parselet parselet = null;
@@ -43,6 +43,14 @@ public class Pattern extends SemanticNode {
       return ((Pattern) res).getParselet(language, pageType);
    }
 
+   public static Parselet getPattern(Language language, Object pageType, String pattern) {
+      Object res = initPattern(language, pageType, pattern);
+      if (res instanceof ParseError) {
+         throw new IllegalArgumentException("Error parsing pattern string: " + res.toString());
+      }
+      return (Parselet) res;
+   }
+
    public Parselet getParselet(Language language, Object pageType) {
       if (!initialized);
          init();
@@ -62,13 +70,38 @@ public class Pattern extends SemanticNode {
                descriptor.append(",");
             first = false;
             if (PString.isString(elem)) {
-               parselets.add(new Symbol(elem.toString()));
+               String elemStr = elem.toString();
+               int elemStrLen = elemStr.length();
+               for (int i = 0; i < elemStrLen; i++) {
+                  // Replace \{, etc. with { in the symbol string
+                  if (elemStr.charAt(i) == '\\') {
+                     if (i < elemStrLen - 1 && elemStr.charAt(i+1) != '\\') {
+                        elemStr = elemStr.substring(0, i) + elemStr.substring(i+1);
+                        elemStrLen = elemStr.length();
+                     }
+                  }
+               }
+               parselets.add(new Symbol(elemStr));
             }
-            else {
+            else if (elem instanceof VariableDef) {
                VariableDef varDef = (VariableDef) elem;
                if (varDef.propertyName != null)
                   descriptor.append(varDef.propertyName);
-               parselets.add((Parselet) language.getParselet(varDef.parseletName).clone());
+               Parselet patternParselet = language.getParselet("<" + varDef.parseletName + ">");
+               if (patternParselet == null)
+                  throw new IllegalArgumentException("Pattern: " + this + " referenced parselet: " + varDef.parseletName + " which does not exist in language: " + language);
+               else
+                  parselets.add((Parselet) patternParselet.clone());
+            }
+            else if (elem instanceof OptionalPattern) {
+               Parselet optSubPattern = ((OptionalPattern) elem).getParselet(language, pageType);
+               optSubPattern.optional = true;
+               parselets.add(optSubPattern);
+               // If there are any variables in the optSubPattern, this will cause them to be applied on the same instance.
+               descriptor.append("*");
+            }
+            else {
+               System.err.println("*** Unexpected element type in Pattern elements: " + elem);
             }
          }
          descriptor.append(")");

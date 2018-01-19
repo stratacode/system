@@ -71,7 +71,7 @@ public class Parser implements IString {
    // input, such as for command line completion.
    public boolean enablePartialValues = false;
 
-   /** For some small grammers, we may want to populate the parent instance rather than create a new instance from the grammar */
+   /** For some small grammars, we may want to populate the parent instance rather than create a new instance from the grammar */
    public Object populateInst = null;
 
    int traceCt = 0; // # of nodes we are currently tracing for debug information

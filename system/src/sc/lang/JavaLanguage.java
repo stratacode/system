@@ -528,7 +528,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    // Forward declarations
    public OrderedChoice variableInitializer = new OrderedChoice("<variableInitializer>");
    public Sequence localVariableDeclaration = new Sequence("VariableStatement(variableModifiers, type, definitions):(.,.,.)");
-   public Sequence localVariableDeclarationStatement = new Sequence("<localVariableDeclaration>(.,)", localVariableDeclaration, endStatement);
+   public Sequence localVariableDeclarationStatement = new Sequence("<localVariableDeclarationStatement>(.,)", localVariableDeclaration, endStatement);
    {
       arrayInitializer.set(
            openBrace,
