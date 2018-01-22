@@ -25,6 +25,9 @@ public class ClassDeclaration extends TypeDeclaration {
 
    private transient DeclarationType declarationType;
 
+   /** If we've resolved our extendsType at least once, this stores that type - used so we can unregister our type from the sub-types map as we are being stopped */
+   private transient Object extendsBoundType;
+
    public static ClassDeclaration create(String operator, String typeName, JavaType extendsType) {
       ClassDeclaration cd = new ClassDeclaration();
       cd.typeName = typeName;
@@ -190,7 +193,7 @@ public class ClassDeclaration extends TypeDeclaration {
 
    public void unregister() {
       super.unregister();
-      Object ext = getExtendsTypeDeclaration();
+      Object ext = extendsBoundType;
       if (ext != null && ext instanceof TypeDeclaration) {
          JavaModel model = getJavaModel();
          if (model != null && model.layeredSystem != null)
@@ -559,7 +562,7 @@ public class ClassDeclaration extends TypeDeclaration {
                // The template declaration may contain a class but we've already made a copy of this type elsewhere and this does not affect the saved file so just ignore it.
                if (outer instanceof TemplateDeclaration)
                   return false;
-               // If we are merging, all objects should get tranformed
+               // If we are merging, all objects should get transformed
                if (model.mergeDeclaration) {
                   displayError("object tag cannot be a member of: " + outer.getDeclarationType() + " for type: ");
                   return false;
@@ -1420,5 +1423,12 @@ public class ClassDeclaration extends TypeDeclaration {
 
    public String getOperatorString() {
       return operator;
+   }
+
+   public Object getExtendsTypeDeclaration() {
+      Object res = super.getExtendsTypeDeclaration();
+      if (res != null)
+         extendsBoundType = res;
+      return res;
    }
 }

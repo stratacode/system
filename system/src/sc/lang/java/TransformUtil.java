@@ -9,6 +9,7 @@ import sc.dyn.IObjChildren;
 import sc.lang.sc.PropertyAssignment;
 import sc.lang.template.Template;
 import sc.layer.LayeredSystem;
+import sc.layer.SrcEntry;
 import sc.util.FileUtil;
 import sc.lang.*;
 import sc.parser.*;
@@ -372,12 +373,12 @@ public class TransformUtil {
    }
    */
 
-   public static int parseClassBodySnippet(TypeDeclaration accessClass, String codeToInsert, boolean applyToHiddenBody, int insertPos, SemanticNodeList<Statement> fromStatements, Statement globalFromStatement) {
+   public static int parseClassBodySnippet(TypeDeclaration accessClass, String codeToInsert, boolean applyToHiddenBody, int insertPos, SemanticNodeList<Statement> fromStatements, Statement globalFromStatement, String templateFromStr) {
       if (codeToInsert == null || codeToInsert.trim().length() == 0)
           return 0;
       Object result = SCLanguage.INSTANCE.parseString(codeToInsert, SCLanguage.INSTANCE.classBodySnippet);
       if (result instanceof ParseError) {
-         System.err.println("*** error parsing object template: " + ((ParseError) result).errorStringWithLineNumbers(codeToInsert));
+         System.err.println("Error parsing template: " + templateFromStr + " for type: " + accessClass.typeName +  ": " + ((ParseError) result).errorStringWithLineNumbers(codeToInsert));
          return -1;
       }
       else {
@@ -429,25 +430,39 @@ public class TransformUtil {
                                           boolean isObject, boolean isComponent, boolean applyToHiddenBody) {
       PerfMon.start("addObjectDefinition");
       Template template = customTemplate;
+      String templateFromStr = null;
       if (assignments != null || parameters.overrideGet || ModelUtil.getCompileLiveDynamicTypes(objType) || parameters.getNeedsCustomResolver() || objType.needsSync()) {
          if (assignments != null)
             parameters.propertyAssignments = ParseUtil.toLanguageString(SCLanguage.INSTANCE.blockStatements, assignments);
-         if (template == null && isObject)
+         if (template == null && isObject) {
             template = getComplexObjectDefinitionTemplate();
+            templateFromStr = "<default complex object template>";
+         }
       }
       // Simpler template for smaller code when there is nothing else to do in there
-      else if (template == null && isObject)
+      else if (template == null && isObject) {
          template = getObjectDefinitionTemplate();
+         templateFromStr = "<default object template>";
+      }
 
       if (customTemplate == null) {
          if (isComponent) {
             if (isObject) {
                template = getComponentObjectDefinitionTemplate();
+               templateFromStr = "<default component object template>";
             }
             else {
                template = getComponentClassDefinitionTemplate();
+               templateFromStr = "<default component class template>";
             }
          }
+      }
+      else {
+         SrcEntry srcFile = customTemplate.getSrcFile();
+         if (srcFile == null)
+            templateFromStr = "huh?";
+         else
+            templateFromStr = customTemplate.getSrcFile().toString();
       }
 
       // Nothing to do for simple classes but which have inner objects.
@@ -461,13 +476,13 @@ public class TransformUtil {
             PerfMon.end("evalObjectTemplate");
          }
          catch (IllegalArgumentException exc) {
-            objType.displayError("Template: ", template.getModelTypeName(), ":  reports: ", exc.toString(), " ");
+            objType.displayError("Template: ", templateFromStr, " for: ", template.getModelTypeName(), ":  reports: ", exc.toString(), " ");
             return;
          }
 
          objType.bodyChanged();
          PerfMon.start("parseClassSnippet");
-         parseClassBodySnippet(accessClass, codeToInsert, applyToHiddenBody, -1, assignments, objType);
+         parseClassBodySnippet(accessClass, codeToInsert, applyToHiddenBody, -1, assignments, objType, templateFromStr);
          PerfMon.end("parseClassSnippet");
       }
       // This is the case where it's not a component or an object so we do not use a template to redefine the creation semantics of the type.
@@ -524,7 +539,7 @@ public class TransformUtil {
          if (objType.declaresMethod("getObjChildren", objChildrenParameters, null, null, false, false, null, null, false) == null) {
             String getObjCodeToInsert = evalTemplate(parameters, getObjChildrenDefinitionTemplate());
 
-            parseClassBodySnippet(objType, getObjCodeToInsert, applyToHiddenBody, -1, null, objType);
+            parseClassBodySnippet(objType, getObjCodeToInsert, applyToHiddenBody, -1, null, objType, "<default obj children template>");
          }
       }
 
@@ -627,7 +642,8 @@ public class TransformUtil {
       Template t = templateResourceCache.get(templateResourceTypeName);
       if (t != null)
          return t;
-      InputStream is = loader.getResourceAsStream(FileUtil.addExtension(templateResourceTypeName.replace('.','/'), "sctp"));
+      String resourcePath = FileUtil.addExtension(templateResourceTypeName.replace('.','/'), "sctp");
+      InputStream is = loader.getResourceAsStream(resourcePath);
       if (is == null) {
          return null;
       }
@@ -639,6 +655,7 @@ public class TransformUtil {
 
 
       Template res = TransformUtil.parseTemplate(templateBuf.toString(), params, false);
+      res.setSrcFile(new SrcEntry(null, resourcePath, resourcePath, resourcePath));
       templateResourceCache.put(templateResourceTypeName, res);
       return res;
    }
@@ -648,9 +665,9 @@ public class TransformUtil {
       return TransformUtil.evalTemplate(paramObj, template);
    }
 
-   public static int parseClassBodySnippetTemplate(TypeDeclaration typeDeclaration, String templateResourcePath, Object params, boolean hiddenBody, int insertPos) {
+   public static int parseClassBodySnippetTemplate(TypeDeclaration typeDeclaration, String templateResourcePath, Object params, boolean hiddenBody, int insertPos, String templateFromStr) {
       String res = evalTemplateResource(templateResourcePath, params, typeDeclaration.getLayeredSystem().getSysClassLoader());
-      return TransformUtil.parseClassBodySnippet(typeDeclaration, res, hiddenBody, insertPos, null, null);
+      return TransformUtil.parseClassBodySnippet(typeDeclaration, res, hiddenBody, insertPos, null, null, templateFromStr);
    }
 
    private final static String PROPERTY_DEFINITION =

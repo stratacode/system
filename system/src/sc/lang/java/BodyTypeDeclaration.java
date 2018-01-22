@@ -606,25 +606,39 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          replacedByType.incrVersion();
    }
 
+   private int dbgSubTypeVersionCt = 0;
+
    protected void incrSubTypeVersions() {
       LayeredSystem sys = getLayeredSystem();
-      if (sys != null) {
-         Layer layer = getLayer();
-         if (layer != null && this instanceof TypeDeclaration) {
-            // If there are any cached sub-types (passing cachedOnly = true), we want to invalidate their entries.
-            Iterator<TypeDeclaration> subTypes = sys.getSubTypesOfType((TypeDeclaration) this, layer.activated, false, false, true, true);
-            if (subTypes != null) {
-               while (subTypes.hasNext()) {
-                  TypeDeclaration subType = subTypes.next();
-                  if (subType == this) {
-                     System.err.println("*** Recursive sub-type definition!");
-                     continue;
+
+      dbgSubTypeVersionCt++;
+      try {
+         if (dbgSubTypeVersionCt > 50) {
+            System.err.println("*** Recursive sub-type chain in incrSubTypeVersions after 50 levels - abort");
+            return;
+         }
+
+         if (sys != null) {
+            Layer layer = getLayer();
+            if (layer != null && this instanceof TypeDeclaration) {
+               // If there are any cached sub-types (passing cachedOnly = true), we want to invalidate their entries.
+               Iterator<TypeDeclaration> subTypes = sys.getSubTypesOfType((TypeDeclaration) this, layer.activated, false, false, true, true);
+               if (subTypes != null) {
+                  while (subTypes.hasNext()) {
+                     TypeDeclaration subType = subTypes.next();
+                     if (subType == this) {
+                        System.err.println("*** Recursive sub-type definition!");
+                        continue;
+                     }
+                     subType.incrVersion();
+                     subType.incrSubTypeVersions();
                   }
-                  subType.incrVersion();
-                  subType.incrSubTypeVersions();
                }
             }
          }
+      }
+      finally {
+         dbgSubTypeVersionCt--;
       }
    }
 

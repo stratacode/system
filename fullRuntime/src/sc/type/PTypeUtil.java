@@ -57,7 +57,7 @@ public class PTypeUtil {
       return null;
    }
 
-   public static IBeanMapper getBeanMapper(final BeanMapper mapper, Class propertyClass, Class valueClass) {
+   public static IBeanMapper getBeanConverterMapper(final BeanMapper mapper, Class propertyClass, Class valueClass) {
       if (propertyClass == String.class) {
          return new BeanMapper(mapper) {
             public void setPropertyValue(Object parent, Object value) {
@@ -344,18 +344,18 @@ public class PTypeUtil {
       return null;
    }
 
-   public static IBeanMapper getPropertyMappingConverter(Class beanClass, String propName, IBeanMapper mapper, Class valueClass, Class componentClass) {
+   public static IBeanMapper getPropertyMappingConverter(IBeanMapper mapper, Class valueClass, Class componentClass) {
       Class propType = (Class) mapper.getPropertyType();
 
       // If the types are not exact, need to check for a converter
       if (valueClass != null && !propType.isAssignableFrom(valueClass)) {
-         IBeanMapper cvtMapper = PTypeUtil.getBeanMapper((BeanMapper) mapper, propType, valueClass);
+         IBeanMapper cvtMapper = PTypeUtil.getBeanConverterMapper((BeanMapper) mapper, propType, valueClass);
          if (cvtMapper != null)
             return cvtMapper;
 
          // If reflection will do the conversion for us, go ahead and use it.
          if (!TypeUtil.isAssignableFromParameter(propType, valueClass))
-            throw new IllegalArgumentException(beanClass + "." + propName + " has type: " + propType + " which cannot be set with: " + valueClass);
+            throw new IllegalArgumentException(mapper.getOwnerType() + "." + mapper.getPropertyName() + " has type: " + propType + " which cannot be set with: " + valueClass);
       }
       else if (List.class.isAssignableFrom(propType) && componentClass != null) {
          java.lang.reflect.Type genType = (java.lang.reflect.Type) mapper.getGenericType();
@@ -367,7 +367,7 @@ public class PTypeUtil {
                if (!listType.isAssignableFrom(componentClass)) {
                   IBeanMapper setter = PTypeUtil.getListConverter((BeanMapper) mapper, listType, componentClass);
                   if (setter == null)
-                     throw new IllegalArgumentException(beanClass + "." + propName + " has list component type: " + listType + " which cannot be set with: " + componentClass);
+                     throw new IllegalArgumentException(mapper.getOwnerType() + "." + mapper.getPropertyName() + " has list component type: " + listType + " which cannot be set with: " + componentClass);
                   return setter;
                }
             }
@@ -399,7 +399,7 @@ public class PTypeUtil {
             throw new IllegalArgumentException("Non runtime exc caught when invoking a method: " + target.toString());
       }
       catch (IllegalArgumentException exc) {
-         System.err.println("*** Invoke method failed: argument exception - method: " + method + " params: " + (argValues == null ? null : Arrays.asList(argValues)));
+         System.err.println("*** Invoke method failed: argument exception - method: " + method + " params: " + (argValues == null ? null : Arrays.asList(argValues)) + " exc: " + exc.toString());
          throw exc;
       }
       catch (RuntimeException exc) {
@@ -433,6 +433,8 @@ public class PTypeUtil {
    public static String getPropertyName(Object mapper) {
       if (mapper instanceof Member)
          return ((Member) mapper).getName();
+      else if (mapper instanceof IBeanMapper)
+         return ((IBeanMapper) mapper).getPropertyName();
       else
          throw new UnsupportedOperationException();
    }

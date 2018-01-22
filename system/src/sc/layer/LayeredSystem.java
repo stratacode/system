@@ -3206,6 +3206,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return ModelUtil.getMethodName(method);
    }
 
+   public String getPropertyName(Object prop) {
+      return ModelUtil.getPropertyName(prop);
+   }
+
+   public Object getPropertyType(Object prop) {
+      return ModelUtil.getPropertyType(prop, this);
+   }
+
    public String getMethodTypeSignature(Object method) {
       return ModelUtil.getTypeSignature(method);
    }
@@ -12610,7 +12618,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                rootType = getSrcTypeDeclaration(rootTypeName, rootFrom, true, notHidden, true, refLayer == null ? fromLayer : refLayer, layerResolve, true);
 
             if (rootType == null && layerResolve && rootTypeName.equals(LayerConstants.LAYER_COMPONENT_FULL_TYPE_NAME)) {
-               List<Layer> layersList = refLayer == null ? layers : refLayer.getLayersList();
+               List<Layer> layersList = refLayer == null || refLayer == Layer.ANY_LAYER ? layers : (refLayer == Layer.ANY_INACTIVE_LAYER ? inactiveLayers : refLayer.getLayersList());
                // If we are initializing the fromLayer's layer def objects it is not in the list yet
                int pos = fromLayer == null || !fromLayer.isInitialized() ? layersList.size()-1 : fromLayer.layerPosition - 1;
 

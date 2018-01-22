@@ -229,7 +229,7 @@ public class TypeUtil  {
       if (mapper == null)
          return null;
 
-      mapper = PTypeUtil.getPropertyMappingConverter(beanClass, propName, mapper, valueClass, componentClass);
+      mapper = PTypeUtil.getPropertyMappingConverter(mapper, valueClass, componentClass);
       return mapper;
    }
 

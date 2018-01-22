@@ -232,6 +232,10 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       return ModelUtil.getAnnotation(objType, annotName);
    }
 
+   public List<Object> getPropertiesWithAnnotation(String annotName) {
+      return ModelUtil.getPropertiesWithAnnotation(objType, annotName);
+   }
+
    public Object getAnnotationValue(String annotName, String valueName) {
       return ModelUtil.getAnnotationValue(objType, annotName, valueName);
    }

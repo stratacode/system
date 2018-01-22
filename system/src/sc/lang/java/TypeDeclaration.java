@@ -372,7 +372,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       if (t != null) {
          Object o = resolveExtendsType(t);
          if (o instanceof BodyTypeDeclaration)
-            return ((BodyTypeDeclaration) o).resolve(true);
+            o = ((BodyTypeDeclaration) o).resolve(true);
          /*
          Object o = t.getTypeDeclaration();
          */
@@ -1554,9 +1554,9 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
          // Insert getPropertyMapping calls after this stuff.  On GWT, we need the static section to run to define the type
          // before we start accessing types with getPropertyMapping calls.  It's not enough to just put these at the top of the static
          // section but getting all types defined before you start referencing types is necessary when you have recursive dependencies.
-         rootType.propDefInsertIndex += TransformUtil.parseClassBodySnippetTemplate(rootType, STATIC_DYN_TEMPLATE_FILE, params, false, 0);
+         rootType.propDefInsertIndex += TransformUtil.parseClassBodySnippetTemplate(rootType, STATIC_DYN_TEMPLATE_FILE, params, false, 0, "<static dyn template file>");
 
-         TransformUtil.parseClassBodySnippetTemplate(this, DYN_TEMPLATE_FILE, params, false, -1);
+         TransformUtil.parseClassBodySnippetTemplate(this, DYN_TEMPLATE_FILE, params, false, -1, "<dyn template file>");
       }
    }
 

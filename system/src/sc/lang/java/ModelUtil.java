@@ -2616,6 +2616,21 @@ public class ModelUtil {
       return combined;
    }
 
+   public static List<Object> getPropertiesWithAnnotation(Object type, String annotationName) {
+      Object[] props = getProperties(type, null);
+      List<Object> res = null;
+      if (props != null) {
+         for (Object prop:props) {
+            if (getPropertyAnnotation(prop, annotationName) != null) {
+               if (res == null)
+                  res = new ArrayList<Object>();
+               res.add(prop);
+            }
+         }
+      }
+      return res;
+   }
+
    /** This method is available in the Javascript runtime so we have it here so the APIs stay in sync */
    public static boolean hasAnnotation(Object definition, String annotationName) {
       return getAnnotation(definition, annotationName) != null;

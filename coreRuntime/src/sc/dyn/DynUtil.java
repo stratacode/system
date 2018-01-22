@@ -322,7 +322,6 @@ public class DynUtil {
       else
          return PTypeUtil.getMethodName(method);
    }
-
    public static Object getMethodType(Object method) {
       if (method instanceof DynRemoteMethod)
          return ((DynRemoteMethod) method).type;
@@ -330,6 +329,22 @@ public class DynUtil {
          return dynamicSystem.getDeclaringClass(method);
       else
          return PTypeUtil.getMethodType(method);
+   }
+
+   public static String getPropertyName(Object prop) {
+      if (dynamicSystem != null)
+         return dynamicSystem.getPropertyName(prop);
+      else
+         return PTypeUtil.getPropertyName(prop);
+   }
+
+   public static Object getPropertyType(Object prop) {
+      if (prop instanceof IBeanMapper)
+         return ((IBeanMapper) prop).getPropertyType();
+      if (dynamicSystem != null)
+         return dynamicSystem.getPropertyType(prop);
+      else
+         return PTypeUtil.getPropertyName(prop);
    }
 
    public static String getTypeSignature(Object method) {

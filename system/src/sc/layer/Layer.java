@@ -1269,7 +1269,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (modelType != null) {
          modelType.isLayerType = true;
       }
-      if (reInit && initialized && modelType instanceof ModifyDeclaration) {
+      // For reparsed models, the model instance will not be different but it's internals will have changed so removing the 'reInit' flag here
+      if (/*reInit &&*/ initialized && modelType instanceof ModifyDeclaration) {
         ModifyDeclaration layerModel = (ModifyDeclaration) modelType;
          baseLayerNames = layerModel.getExtendsTypeNames();
          baseLayers = layeredSystem.mapLayerNamesToLayers(model.getRelDirPath(), baseLayerNames, activated, !closed);
@@ -1366,7 +1367,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          }
       }
       else
-        importsByName = null;
+         importsByName = null;
    }
 
    public void ensureInitialized(boolean checkBaseLayers) {
@@ -2842,8 +2843,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    public List<Layer> getLayersList() {
-      if (layeredSystem == null)
+      if (layeredSystem == null) {
          System.out.println("*** Invalid layer: " + this);
+      }
       if (disabled)
          return layeredSystem.disabledLayers;
       return activated ? layeredSystem.layers : layeredSystem.inactiveLayers;

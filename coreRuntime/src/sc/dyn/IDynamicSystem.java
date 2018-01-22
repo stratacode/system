@@ -36,6 +36,10 @@ public interface IDynamicSystem {
 
    String getMethodName(Object method);
 
+   String getPropertyName(Object propObj);
+
+   Object getPropertyType(Object propObj);
+
    String getMethodTypeSignature(Object method);
 
    Object evalCast(Object type, Object value);

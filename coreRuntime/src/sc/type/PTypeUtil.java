@@ -221,7 +221,7 @@ public class PTypeUtil {
       throw new UnsupportedOperationException();
    }
 
-   public static IBeanMapper getPropertyMappingConverter(Class beanClass, String propName, IBeanMapper mapper, Class valueClass, Class componentClass) {
+   public static IBeanMapper getPropertyMappingConverter(IBeanMapper mapper, Class valueClass, Class componentClass) {
       // TODO - is this used by runtime components?  Think it is just used for the parselet engine
       return mapper;
    }
