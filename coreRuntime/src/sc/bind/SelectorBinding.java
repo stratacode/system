@@ -506,6 +506,10 @@ public class SelectorBinding extends DestinationListener {
       return sb.toString();
    }
 
+   protected Object getBoundProperty(Object bindingParent, int i) {
+      return !isValidObject(bindingParent) ? (bindingParent == PENDING_VALUE_SENTINEL ? PENDING_VALUE_SENTINEL : UNSET_VALUE_SENTINEL) : PBindUtil.getPropertyValue(bindingParent, boundProps[i]);
+   }
+
    public void activate(boolean state, Object obj, boolean chained) {
       if (state == activated)
          return;
@@ -514,9 +518,10 @@ public class SelectorBinding extends DestinationListener {
       int i = 0;
       for (Object param:boundProps) {
          Bind.activate(param, state, bindingParent, true);
-         //if (i != boundProps.length - 1)
-         //   if (state && bindingParent != null)
-         //      bindingParent = param.getPropertyValue(bindingParent);
+         if (state && i != boundProps.length - 1 && bindingParent != null && bindingParent != UNSET_VALUE_SENTINEL)
+            bindingParent = getBoundProperty(bindingParent, i);
+         else
+            bindingParent = null; // This is only used for state = true - so we can revalidate the tree
          i++;
       }
 
