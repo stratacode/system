@@ -143,6 +143,8 @@ public abstract class AbstractMethodBinding extends DestinationListener {
             boundValue = newValue;
          }
       }
+      if (isDefinedObject(boundValue))
+         valid = true;
    }
 
    boolean useReverseListener() {
@@ -241,26 +243,31 @@ public abstract class AbstractMethodBinding extends DestinationListener {
    public boolean applyBinding(Object obj, Object value, IBinding src, boolean refresh) {
       Object newBoundValue = null;
 
-      try {
-         // When we don't have a method object and there is no current value, we can't apply the method
-         // or it will get an RTE.
-         if (obj == null && (needsMethodObj() && methObj == null))
-            newBoundValue = null;
-         else
-            newBoundValue = activated ? invokeMethod(obj == null ? methObj : obj) : null;
-      }
-      catch (Throwable exc) {
-         System.err.println("*** Error applying binding: " + this + " with value: " + value + " :" + exc.toString());
-         exc.printStackTrace();
+      if (activated) {
+         try {
+            // When we don't have a method object and there is no current value, we can't apply the method
+            // or it will get an RTE.
+            if (obj == null && (needsMethodObj() && methObj == null))
+               newBoundValue = null;
+            else
+               newBoundValue = invokeMethod(obj == null ? methObj : obj);
+         }
+         catch (Throwable exc) {
+            System.err.println("*** Error applying binding: " + this + " with value: " + value + " :" + exc.toString());
+            exc.printStackTrace();
+         }
       }
 
-      boolean valueChanged = !equalObjects(newBoundValue, boundValue);
+      // If we are not activated, we need to call applyBinding on the parent.  When it activates us, we'll be re-validated.
+      boolean valueChanged = !activated || !equalObjects(newBoundValue, boundValue);
       if (refresh || !valid || valueChanged) {
          if (refresh && !valueChanged)
             return false;
-         boundValue = newBoundValue;
-         if (activated && isDefinedObject(boundValue))
-            valid = true;
+         if (activated) {
+            boundValue = newBoundValue;
+            if (isDefinedObject(boundValue))
+               valid = true;
+         }
 
          if (dstObj != dstProp) {
             if (newBoundValue == UNSET_VALUE_SENTINEL)
@@ -404,7 +411,7 @@ public abstract class AbstractMethodBinding extends DestinationListener {
 
       if (!state)
          valid = false;
-      else if (!valid && !chained)
+      else if (!valid)
          reactivate(obj);
    }
 
