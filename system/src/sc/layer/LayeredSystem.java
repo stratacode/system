@@ -14362,6 +14362,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   TypeDeclaration res = (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
                   // Check the resulting class name.  getSrcTypeDeclaration may find the base-type of an inner type as it looks for inherited inner types under the parent type's name
                   if (res != null) {
+                     // Make sure we don't add any sub-types which are from the same layer as this one.
+                     if (res == type || ModelUtil.sameTypesAndLayers(this, type, res))
+                        continue;
                      if (res.getFullTypeName().equals(subTypeName)) {
                         addUniqueLayerType(result, res);
 
@@ -14371,6 +14374,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         if (includeModifiedTypes && res.getModifiedExtendsTypeDeclaration() == null) {
                            BodyTypeDeclaration modType = res;
                            while ((modType = modType.getModifiedType()) != null && modType instanceof TypeDeclaration) {
+                              // Stop once we run into this type - so we don't return a recursive result and don't keep going returning base-types of the current type
+                              if (modType == type || ModelUtil.sameTypesAndLayers(this, type, modType))
+                                 break;
                               addUniqueLayerType(result, (TypeDeclaration) modType);
                            }
                         }
@@ -14384,7 +14390,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                               // We may not find this sub-type in this system because we share the same type index across all processes in the runtime.  It might be
                               // a different runtime.
                               res = (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
-                              if (res != null && res.getFullTypeName().equals(subTypeName))
+                              if (res != null && res.getFullTypeName().equals(subTypeName) && !ModelUtil.sameTypesAndLayers(this, type, res))
                                  result.add(0, res);
                            }
                         } else {
