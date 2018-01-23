@@ -3604,7 +3604,19 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             Object declRoot = DynUtil.getRootType(decl);
             if (declRoot == null)
                declRoot = decl;
-            return jsRT.getJSFiles(declRoot);
+            List<String> fileList = jsRT.getJSFiles(declRoot);
+            if (fileList != null) {
+               ArrayList<String> res = new ArrayList<String>(fileList);
+               for (int i = 0; i < res.size(); i++) {
+                  String jsFilePath = res.get(i);
+                  if (!jsFilePath.startsWith("/")) {
+                     jsFilePath = "/" + jsFilePath;
+                     res.set(i, jsFilePath);
+                  }
+               }
+               return res;
+            }
+            return null;
          }
 
       }
