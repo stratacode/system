@@ -4,7 +4,6 @@
 
 package sc.lang.js;
 
-import com.sun.org.apache.bcel.internal.generic.JSR;
 import sc.bind.Bind;
 import sc.dyn.DynUtil;
 import sc.lang.*;
@@ -819,6 +818,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       if (td.replacedByType != null)
          return;
 
+      // TemplateDeclarations that are part of another type get added to that type so we don't process them here
+      if (!td.isRealType())
+         return;
+
       //if (verboseJS && td.getEnclosingType() == null)
       //   system.verbose("Starting for JS: " + td.getFullTypeName());
 
@@ -1034,6 +1037,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                }
             }
          }
+         addFrameworkDependencies(type, typeLibFile, typesInFile);
 
          // Since MainInit is in src form here, need to skip checking on compiled types or the runtime method barfs
          boolean entryPointAdded = false;
@@ -1203,15 +1207,22 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          if (!type.isAssignableFrom(depTD, false) && !ModelUtil.isOuterType(type.getEnclosingType(), depTD))
             addTypeLibsToFile(depTD, typesInFile, typeLibFile, type, "uses");
       }
+   }
 
+   /**
+    * We detect dependencies during 'start' which does not include those added during 'transform'.   TODO: should this be changed.  It makes it harder to add new platform components?
+    * For now we have a way to determine the key platform dependencies and add those to the JS at runtime so that's done here.
+    */
+   private void addFrameworkDependencies(BodyTypeDeclaration type, String typeLibFile, Map<JSFileEntry,Boolean> typesInFile) {
       if (ModelUtil.getCompileLiveDynamicTypes(type) && (type.isComponentType() || type.getDeclarationType() == DeclarationType.OBJECT)) {
          addJSLibFiles(DynUtil.class, true, typeLibFile, type, "uses components");
       }
+
       if (type.needsDataBinding()) {
-         addJSLibFiles(Bind.class, true, typeLibFile, type, "uses data binding");
+         addDependentType(type, Bind.class, typeLibFile, typesInFile);
       }
       if (type.needsSync()) {
-         addJSLibFiles(SyncManager.class, true, typeLibFile, type, "uses the sync features");
+         addDependentType(type, SyncManager.class, typeLibFile, typesInFile);
       }
    }
 
@@ -2652,8 +2663,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                         depTD = depTD.resolve(true);
 
                         // If depTD extends type, do not add it here.  Instead, we need to add type before depTD in this case
-                        if (!type.isAssignableFrom(depTD, false))
-                           addTypeToFile(depTD, typesInFile, parentLibFile, genLayer, typesInSameFile);
+                        addTypeToFile(depTD, typesInFile, parentLibFile, genLayer, typesInSameFile);
                      }
                   }
                }
