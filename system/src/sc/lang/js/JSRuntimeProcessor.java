@@ -1352,7 +1352,6 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          // We'll look at the module annotations only if modules are enabled, or this is an entry point type.
          boolean useModules = !disableModules || isEntryPointType(type);
 
-         // Do not resolve the src here since we use this on the .class file to determine if we need to load the source
          String jsModuleStr = !useModules ? null : getJSSettingsStringValue(type, "jsModuleFile", false, resolveSrc);
          if (jsModuleStr != null) {
 
@@ -1419,6 +1418,17 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             else if (res.equals(NULL_JS_MODULE_NAMES_SENTINEL))
                res = null;
             return res;
+         }
+         // Since we do not call addJSTypeLibs for the modified type, we need to search down and figure out if this is
+         // a module because one of our module types set the module annotation on it.
+         else if (type instanceof ModifyDeclaration) {
+            ModifyDeclaration mtype = (ModifyDeclaration) type;
+            BodyTypeDeclaration modType = mtype.getPureModifiedType();
+            if (modType != null) {
+               String modRes = getJSModuleFile(modType, resolveSrc, create);
+               if (modRes != null)
+                  return modRes;
+            }
          }
       }
       finally {
