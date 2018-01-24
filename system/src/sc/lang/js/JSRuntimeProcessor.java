@@ -1011,6 +1011,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             for (Object depType:depTypes) {
                addDependentType(type, depType, typeLibFile, typesInFile);
             }
+            addFrameworkDependencies(type, typeLibFile, typesInFile);
          }
          else {
             // TODO: should we recursively process this types dependencies and add any jsLibFiles we find along the way?  That seems safe, just computationally expensive.  Given the small number of lib files, manually adding them for now.
@@ -1037,7 +1038,6 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                }
             }
          }
-         addFrameworkDependencies(type, typeLibFile, typesInFile);
 
          // Since MainInit is in src form here, need to skip checking on compiled types or the runtime method barfs
          boolean entryPointAdded = false;

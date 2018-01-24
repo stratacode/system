@@ -103,7 +103,7 @@ public class ClassDeclaration extends TypeDeclaration {
             Object extendsTypeDecl = getDerivedTypeDeclaration();
             extendsTypeDecl = ParamTypeDeclaration.toBaseType(extendsTypeDecl);
 
-            if (extendsTypeDecl instanceof TypeDeclaration) {
+            if (extendsTypeDecl instanceof TypeDeclaration && !m.temporary) {
                TypeDeclaration extTypeDecl = (TypeDeclaration) extendsTypeDecl;
                if (extTypeDecl.getLayer() != null && getLayer() != null && extTypeDecl.getLayer().activated != getLayer().activated) {
                   System.out.println("*** Mismatching activated/inactived for base and extends type");
