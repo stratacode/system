@@ -802,21 +802,14 @@ public class SyncManager {
                      parentContext.initOnDemandInst(null, changedObj, parentII, false, false, null);
                   if (resCtxHolder != null)
                      resCtxHolder.ctx = parentContext;
-                  break;
+                  return parentII;
                }
                // Still need to check the parents of the parent but by then resCtxHolder is already filled in
                parentII = parentContext.getParentInheritedInstInfo(changedObj, resCtxHolder);
                if (parentII != null) {
-                  break;
+                  return parentII;
                }
             }
-         }
-         // NOTE: Currently we need the entire chain of SyncContexts to contain the InstInfo because in valueInvalidated we
-         // only check if immediate children have the object instance.   Not sure this is the right thing... maybe there's
-         // a more efficient way to mark the instance being in a child of a SyncContext.
-         if (parentII != null) {
-            InstInfo intermedII = createAndRegisterInheritedInstInfo(changedObj, parentII);
-            return intermedII;
          }
          return null;
       }
@@ -1663,6 +1656,10 @@ public class SyncManager {
          //newInstInfo.nameQueued = true;
          newInstInfo.props = ii.props;
          SyncContext parCtx = ii.syncContext;
+         if (parCtx == this) {
+            System.err.println("*** Inherited inst info from itself?");
+            return ii;
+         }
          if (parCtx.childSyncInsts == null) {
             parCtx.childSyncInsts = new IdentityHashMap<Object, Set<InstInfo>>();
          }
@@ -1997,7 +1994,11 @@ public class SyncManager {
             Set<InstInfo> childInstInfos = childSyncInsts.get(obj);
             if (childInstInfos != null) {
                for (InstInfo childInstInfo:childInstInfos) {
-                   childInstInfo.syncContext.valueInvalidated(obj, propName, curValue, syncGroup, false);
+                  if (childInstInfo.syncContext == this)
+                     System.err.println("*** Invalid childInstInfo!");
+                  else {
+                     childInstInfo.syncContext.valueInvalidated(obj, propName, curValue, syncGroup, false);
+                  }
                }
             }
          }
