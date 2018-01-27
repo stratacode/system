@@ -163,8 +163,6 @@ public class Annotation extends ErrorSemanticNode implements IAnnotation {
    }
 
    public Object getAnnotationValue(String identifier) {
-      if (!started)
-         ParseUtil.initAndStartComponent(this);
       AnnotationValue av = getAnnotationValueWrapper(identifier);
       if (av != null) {
          // Just handling literals for now... not sure if anything else is valid in annotation defs
