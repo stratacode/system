@@ -7811,14 +7811,16 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          excluded = true;
          return;
       }
-      else if (!isLayerType && layer != null && !ModelUtil.execForRuntime(sys, layer, this, sys)) {
+
+      super.start();
+
+      // Need to do this after we start the @Exec annotation
+      if (!isLayerType && layer != null && !ModelUtil.execForRuntime(sys, layer, this, sys)) {
          if (sys.options.verbose)
             sys.verbose("Excluding type: " + typeName + " for: " + sys.getProcessIdent());
          excluded = true;
          return;
       }
-
-      super.start();
 
       if (hiddenBody != null)
          hiddenBody.start();

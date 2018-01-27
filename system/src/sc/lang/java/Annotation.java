@@ -8,6 +8,7 @@ import sc.classfile.CFAnnotation;
 import sc.lang.JavaLanguage;
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
+import sc.parser.ParseUtil;
 
 import java.lang.reflect.Array;
 import java.util.IdentityHashMap;
@@ -60,7 +61,8 @@ public class Annotation extends ErrorSemanticNode implements IAnnotation {
          boundType = model.findTypeDeclaration(typeName, true);
       if (boundType == null) {
          displayTypeError("No annotation: ", typeName, " ");
-         boundType = model.findTypeDeclaration(typeName, true);
+         if (model != null)
+            boundType = model.findTypeDeclaration(typeName, true);
       }
 
       /* Debug code to test that we can retrieve annotation values from any annotation
@@ -161,6 +163,8 @@ public class Annotation extends ErrorSemanticNode implements IAnnotation {
    }
 
    public Object getAnnotationValue(String identifier) {
+      if (!started)
+         ParseUtil.initAndStartComponent(this);
       AnnotationValue av = getAnnotationValueWrapper(identifier);
       if (av != null) {
          // Just handling literals for now... not sure if anything else is valid in annotation defs
@@ -168,7 +172,9 @@ public class Annotation extends ErrorSemanticNode implements IAnnotation {
             return ((IValueNode) av.elementValue).eval(null, null);
          else if (av.elementValue instanceof List) {
             Object annotType = getAnnotationValueType(identifier);
-            Class rtClass = ModelUtil.getCompiledClass(annotType);
+            Class rtClass = annotType == null ? null : ModelUtil.getCompiledClass(annotType);
+            if (rtClass == null)
+               rtClass = Object.class;
             return initAnnotationArray(rtClass, (List<Expression>) av.elementValue, new ExecutionContext());
          }
          // When copied over from the compile time versions
@@ -181,7 +187,9 @@ public class Annotation extends ErrorSemanticNode implements IAnnotation {
    Object initAnnotationArray(Class rtClass, List<?> initializers, ExecutionContext ctx) {
       int size = initializers.size();
       Class componentType = rtClass.getComponentType();
-      if (componentType.isAnnotation())
+      if (componentType == null)
+         componentType = Object.class;
+      else if (componentType.isAnnotation())
          componentType = Annotation.class;
       else {
          // TODO: check if there are any annotations in this list - if so, it should be an error
