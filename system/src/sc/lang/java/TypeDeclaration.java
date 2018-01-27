@@ -1485,10 +1485,13 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
       boolean any = false;
 
-      /** Any properties not declared as fields on this type but which have bindability injected as a wrapper */
+      /* Any properties not declared as fields on this type but which have bindability injected as a wrapper. */
       if (propertiesToMakeBindable != null) {
-         any = true;
-         transformBindableProperties(runtime);
+         // For interfaces, we should have inherited the 'bindable' flag in the implementing classes, or logged an error - nothing to do here
+         if (getDeclarationType() != DeclarationType.INTERFACE) {
+            any = true;
+            transformBindableProperties(runtime);
+         }
       }
 
       if (!useRuntimeReflection)
@@ -1857,4 +1860,11 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return null;
    }
 
+   protected boolean transformExcluded() {
+      LayeredSystem sys = getLayeredSystem();
+      if (sys.options.verbose)
+        sys.verbose("Excluded type: " + typeName);
+      parentNode.removeChild(this);
+      return true;
+   }
 }

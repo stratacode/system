@@ -1967,7 +1967,11 @@ public class IdentifierExpression extends ArgumentsExpression {
                // return the customObj.
                Object customObj = resolveCustomObj(jmodel, sz-1);
                if (customObj == null) {
-                  value = ctx.resolveUnboundName(idents.get(0).toString());
+                  if (ctx != null) {
+                     IString val = idents.get(0);
+                     if (val != null)
+                        value = ctx.resolveUnboundName(val.toString());
+                  }
                }
                else
                   return customObj;

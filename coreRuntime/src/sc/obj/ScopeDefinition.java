@@ -27,6 +27,12 @@ public abstract class ScopeDefinition {
    /** Does this scope receive queued up events for sharing in cross-scope bindings */
    public boolean eventListenerCtx = false;
 
+   /**
+    * Must set this to true for scopes that clients will use to send/receive events (e.g. window for the server and global for the client0.
+    * It's false for the intermediate 'store-only' contexts
+     */
+   public boolean supportsChangeEvents = false;
+
    /** High-level messages about object-level events */
    public static boolean verbose;
 

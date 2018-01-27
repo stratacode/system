@@ -272,8 +272,14 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    public static class JSTypeInfo extends JSLayerable {
       public boolean needsClassInit = true;
       public boolean hasLibFile = false;
+      public boolean execJS = false;
       public String jsModuleFile = null;
 
+      /**
+       * This stores the ordered set of types in the file of a given entry point - specifically,
+       * the ones we dragged in during the full compile.  During an incremental compile, if this type has
+       * not changed, we'll include the same types as dependencies for this entry point.
+        */
       public LinkedHashSet<String> typesInSameFile = null;
 
       // For non-final types, we might start a modified type, in a subsequent build layer, but not restart the types
@@ -923,6 +929,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       if (!javaModel.needsCompile())
          return;
 
+      LayeredSystem sys = javaModel.getLayeredSystem();
+      boolean execForJS = ModelUtil.execForRuntime(sys, javaModel.getLayer(), type, sys);
+
       JSFileEntry jsEnt = new JSFileEntry();
       jsEnt.fullTypeName = type.getFullTypeName();
       Boolean state = typesInFile.get(jsEnt);
@@ -957,13 +966,18 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             jti.fromLayerName = jti.toLayerName = type.layer.getLayerUniqueName();
             jti.hasLibFile = hasLibFile;
             jti.jsModuleFile = jsModuleFile;
+            jti.execJS = execForJS;
             jsBuildInfo.jsTypeInfo.put(fullTypeName, jti);
             // Also register this type info using the JS type name, so we can detect different Java classes that map
             // to the same JS type (e.g. sc.js.bind and sc.bind
             jsBuildInfo.jsTypeInfoByJS.put(getJSTypeName(fullTypeName), jti);
 
+            if (!execForJS) {
+               if (verboseJS)
+                  System.out.println("Not exec'ing: " + fullTypeName + " for JS");
+            }
          }
-         else if (!DynUtil.equalObjects(jsModuleFile, jti.jsModuleFile)) {
+         else if (!DynUtil.equalObjects(jsModuleFile, jti.jsModuleFile) && execForJS) {
             jti.expandToLayer(type.layer);
             ArrayList<BodyTypeDeclaration> prevDeps = jti.prevDepTypes;
             if (prevDeps != null && typeLibFile != null) {
@@ -987,6 +1001,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          }
 
          typesInFile.put(jsEnt, Boolean.FALSE);
+
+         if (!execForJS)
+            return;
 
          if (!hasLibFile) {
 
@@ -1561,6 +1578,12 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       }
       if (!(type instanceof PrimitiveType)) {
          res = getJSSettingsStringValue(type, "jsLibFiles", false, true);
+         if (res == null) {
+            Object enclType = ModelUtil.getEnclosingType(type);
+            if (enclType != null) {
+               res = getJSLibFiles(enclType);
+            }
+         }
          if (res != null) {
             jsBuildInfo.jsLibFilesForType.put(typeName, res);
          }
@@ -1997,6 +2020,11 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return templatePrefix != null ? templatePrefix : system.getSrcPathBuildPrefix(srcPathType);
    }
 
+   /**
+    * At this point, we've already assembled the generated JS files, and the entry points.  So now we have to go through each file, find the entry
+    * points that go into that file, and stitch together the JS files in proper dependency order.  We need to define base classes before sub-classes in particular for how the
+    * current sccore.js newClass works.
+    */
    public void postProcess(LayeredSystem sys, Layer genLayer) {
       List<BuildInfo.MainMethod> mainMethods = genLayer.buildInfo.mainMethods;
       if (jsBuildInfo.jsGenFiles.size() == 0 && (mainMethods == null || mainMethods.size() == 0)) {
@@ -2037,7 +2065,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          String jsFile = ent.getKey();
 
          JSGenFile jsg = ent.getValue();
-         LinkedHashMap<JSFileEntry,Boolean> typesInFile = new LinkedHashMap<JSFileEntry,Boolean>();
+         LinkedHashMap<JSFileEntry,Boolean> typesInFile = new LinkedHashMap<JSFileEntry,Boolean>(); // the current file we are processing
          String absFilePath = FileUtil.concat(genLayer.buildDir, getJSPathPrefix(genLayer), FileUtil.unnormalize(jsFile));
 
          // This gen file has not been added yet in the layer stack so no processing for it.
@@ -2114,7 +2142,15 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                      e.initType(sys);
                   }
                   */
-                  addTypeToFile(e.getResolvedType(sys), typesInFile, jsFile, genLayer, null);
+                  List<BodyTypeDeclaration> addLaterTypes = new ArrayList<BodyTypeDeclaration>();
+                  addTypeToFile(e.getResolvedType(sys), typesInFile, jsFile, genLayer, null, addLaterTypes);
+                  while (addLaterTypes.size() > 0) {
+                     List<BodyTypeDeclaration> addNowTypes = addLaterTypes;
+                     addLaterTypes = new ArrayList<BodyTypeDeclaration>();
+                     for (BodyTypeDeclaration addNowType:addNowTypes) {
+                        addTypeToFile(addNowType, typesInFile, jsFile, genLayer, null, addLaterTypes);
+                     }
+                  }
                }
             }
          }
@@ -2461,21 +2497,21 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          addJSLibFiles(IComponent.class, true, rootLibFile, td, "implements");
    }
 
-   void addExtendsJSTypeToFile(BodyTypeDeclaration td, Map<JSFileEntry,Boolean> typesInFile, String rootLibFile, Layer genLayer, Set<String> typesInSameFile) {
+   void addExtendsJSTypeToFile(BodyTypeDeclaration td, Map<JSFileEntry,Boolean> typesInFile, String rootLibFile, Layer genLayer, Set<String> typesInSameFile, List<BodyTypeDeclaration> addLaterTypes) {
       Object derivedType = td.getDerivedTypeDeclaration();
       Object extType = td.getExtendsTypeDeclaration();
       if (false && derivedType != extType) {
          derivedType = resolveBaseType(derivedType);
          if (derivedType instanceof BodyTypeDeclaration) {
             BodyTypeDeclaration extTD = (BodyTypeDeclaration) derivedType;
-            addTypeToFile(extTD, typesInFile, rootLibFile, genLayer, null);
+            addTypeToFile(extTD, typesInFile, rootLibFile, genLayer, null, addLaterTypes);
          }
       }
       if (extType != null ) {
          extType = resolveBaseType(extType);
          if (extType instanceof BodyTypeDeclaration) {
             BodyTypeDeclaration extTD = (BodyTypeDeclaration) extType;
-            addTypeToFile(extTD, typesInFile, rootLibFile, genLayer, null);
+            addTypeToFile(extTD, typesInFile, rootLibFile, genLayer, null, addLaterTypes);
          }
          else if (!hasJSLibFiles(extType) && !hasJSCompiled(extType))
             System.err.println("*** Can't convert compiled type: " + ModelUtil.getTypeName(extType) + " to JS");
@@ -2485,7 +2521,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          for (Object implObj:implTypes) {
             implObj = resolveBaseType(implObj);
             if (implObj instanceof BodyTypeDeclaration)
-               addTypeToFile((BodyTypeDeclaration) implObj, typesInFile, rootLibFile, genLayer, null);
+               addTypeToFile((BodyTypeDeclaration) implObj, typesInFile, rootLibFile, genLayer, null, addLaterTypes);
          }
       }
    }
@@ -2501,10 +2537,15 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    /** Adds the type to the jsFileBody for the lib file registered for this type (or the default lib file)  */
-   void addTypeToFile(BodyTypeDeclaration type, Map<JSFileEntry,Boolean> typesInFile, String rootLibFile, Layer genLayer, Set<String> typesInSameFile) {
+   void addTypeToFile(BodyTypeDeclaration type, Map<JSFileEntry,Boolean> typesInFile, String rootLibFile, Layer genLayer, Set<String> typesInSameFile, List<BodyTypeDeclaration> addLaterTypes) {
       BodyTypeDeclaration origType = type;
       ModelUtil.ensureStarted(type, true); // Coming from dependent types, we may not be started.
       boolean transformed;
+
+      String fullTypeName = type.getFullTypeName();
+      JSTypeInfo typeInfo = jsBuildInfo.jsTypeInfo.get(fullTypeName);
+      if (typeInfo != null && !typeInfo.execJS)
+         return;
 
       BodyTypeDeclaration txtype = type.getTransformedResult();
       if (txtype != null && txtype != type) {
@@ -2547,7 +2588,6 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       StringBuilder jsFileBody = jsFileBodyCache == null ? null : jsFileBodyCache.jsFileBody;
       GenFileLineIndex lineIndex = jsFileBodyCache == null ? null : jsFileBodyCache.lineIndex;
 
-      String fullTypeName = type.getFullTypeName();
       JSFileEntry jsEnt = new JSFileEntry();
       jsEnt.fullTypeName = fullTypeName;
       Boolean state = typesInFile.get(jsEnt);
@@ -2563,7 +2603,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          typesInFile.put(jsEnt, Boolean.FALSE);
 
          if (!notInParentFile) {
-            addExtendsJSTypeToFile(type, typesInFile, rootLibFile, genLayer, typesInSameFile);
+            addExtendsJSTypeToFile(type, typesInFile, rootLibFile, genLayer, typesInSameFile, addLaterTypes);
 
             boolean needsSave = false;
             //if (type.toString().equals("TypeTreeModel (layer:test.editor2.js.core) (runtime: js)"))
@@ -2603,10 +2643,11 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             }
 
             BodyTypeDeclaration enclType = type.getEnclosingType();
-            JSTypeInfo typeInfo = jsBuildInfo.jsTypeInfo.get(fullTypeName);
+            if (typeInfo == null)
+               typeInfo = jsBuildInfo.jsTypeInfo.get(fullTypeName);
 
             // When we have not transformed the type and we've cached the type to file membership, we can take a faster path and just gather up the files.
-            // We can't use the untransformed model to reliably get the list of inner types cause it mises the __Anon classes and anything which is generated.
+            // We can't use the untransformed model to reliably get the list of inner types cause it misses the __Anon classes and anything which is generated.
             // The order is also messed up.
             if (needsSave || (enclType == null && typeInfo != null && typeInfo.typesInSameFile == null) || processedTypes.contains(fullTypeName)) {
                if (enclType == null) {
@@ -2618,7 +2659,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                      typeInfo.typesInSameFile = (LinkedHashSet<String>) typesInSameFile;
                }
                // Because the inner types can extend the outer type (but not the other way around) we need to define them after the parent type.
-               addInnerTypesToFile(type, typesInFile, parentLibFile, genLayer, typesInSameFile);
+               addInnerTypesToFile(type, typesInFile, parentLibFile, genLayer, typesInSameFile, addLaterTypes);
 
                if (enclType == null) {
                   // Since the dependent types for the parent type include the inner type we are only processing them for the outer type
@@ -2648,7 +2689,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                                     continue;
                                  // If it's an unassigned class it's in the same file, or if the files match.
                                  if (depJTI.jsModuleFile == null || (typeLibFile != null && depJTI.jsModuleFile.equals(typeLibFile))) {
-                                    addCompiledTypesToFile(depTypeName, typesInFile, parentLibFile, genLayer, jsFileBody, lineIndex, typesInSameFile);
+                                    addCompiledTypesToFile(depTypeName, typesInFile, parentLibFile, genLayer, jsFileBody, lineIndex, typesInSameFile, addLaterTypes);
                                  }
                                  continue;
                               }
@@ -2672,8 +2713,13 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                         ModelUtil.ensureStarted(depType, true);
                         depTD = depTD.resolve(true);
 
-                        // If depTD extends type, do not add it here.  Instead, we need to add type before depTD in this case
-                        addTypeToFile(depTD, typesInFile, parentLibFile, genLayer, typesInSameFile);
+                        if (!ModelUtil.sameTypes(depTD, type)) {
+                           if (!type.isAssignableFrom(depTD, false))
+                              addTypeToFile(depTD, typesInFile, parentLibFile, genLayer, typesInSameFile, addLaterTypes);
+                           else { // Because this may be the only reference to a type which depends on this type, we need to just make sure this gets added to the file after this type and it's dependencies have been added.
+                              addLaterTypes.add(depTD);
+                           }
+                        }
                      }
                   }
                }
@@ -2681,7 +2727,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             else if (enclType == null) {
                if (typeInfo != null && typeInfo.typesInSameFile != null) {
                   for (String subTypeName:typeInfo.typesInSameFile) {
-                     addCompiledTypesToFile(subTypeName, typesInFile, rootLibFile, genLayer, jsFileBody, lineIndex, typeInfo.typesInSameFile);
+                     addCompiledTypesToFile(subTypeName, typesInFile, rootLibFile, genLayer, jsFileBody, lineIndex, typeInfo.typesInSameFile, addLaterTypes);
                   }
                }
             }
@@ -2716,14 +2762,14 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return res;
    }
 
-   private void addCompiledTypesToFile(String typeName, Map<JSFileEntry,Boolean> typesInFile, String rootLibFile, Layer genLayer, StringBuilder jsFileBody, GenFileLineIndex lineIndex, Set<String> typesInSameFile) {
+   private void addCompiledTypesToFile(String typeName, Map<JSFileEntry,Boolean> typesInFile, String rootLibFile, Layer genLayer, StringBuilder jsFileBody, GenFileLineIndex lineIndex, Set<String> typesInSameFile, List<BodyTypeDeclaration> addLaterTypes) {
       JSTypeInfo subTypeInfo = jsBuildInfo.jsTypeInfo.get(typeName);
       if (subTypeInfo != null && !subTypeInfo.presentInLayer(genLayer))
          return;
 
       Object type = ModelUtil.findTypeDeclaration(system, typeName, genLayer, false);
       if (type instanceof BodyTypeDeclaration) {
-         addTypeToFile((BodyTypeDeclaration) type, typesInFile, rootLibFile, genLayer, typesInSameFile);
+         addTypeToFile((BodyTypeDeclaration) type, typesInFile, rootLibFile, genLayer, typesInSameFile, addLaterTypes);
       }
       else {
          SrcEntry subSrcEnt = findJSSrcEntryFromTypeName(genLayer, typeName);
@@ -2747,7 +2793,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                      System.err.println("*** Invalid sub-type name - same as main type: " + subTypeName);
                      continue;
                   }
-                  addCompiledTypesToFile(subTypeName, typesInFile, rootLibFile, genLayer, jsFileBody, lineIndex, subTypeInfo.typesInSameFile);
+                  addCompiledTypesToFile(subTypeName, typesInFile, rootLibFile, genLayer, jsFileBody, lineIndex, subTypeInfo.typesInSameFile, addLaterTypes);
                }
             }
 
@@ -2843,7 +2889,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return false;
    }
 
-   void addInnerTypesToFile(BodyTypeDeclaration td, Map<JSFileEntry,Boolean> typesInFile, String rootLibFile, Layer genLayer, Set<String> typesInSameFile) {
+   void addInnerTypesToFile(BodyTypeDeclaration td, Map<JSFileEntry,Boolean> typesInFile, String rootLibFile, Layer genLayer, Set<String> typesInSameFile, List<BodyTypeDeclaration> addLaterTypes) {
       BodyTypeDeclaration origtd = td;
       td = ensureTransformedResult(td);
       if (td instanceof EnumDeclaration) {
@@ -2863,7 +2909,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                   continue;
                BodyTypeDeclaration innerType = (BodyTypeDeclaration) innerTypeObj;
 
-               addTypeToFile(innerType, typesInFile, rootLibFile, genLayer, typesInSameFile);
+               addTypeToFile(innerType, typesInFile, rootLibFile, genLayer, typesInSameFile, addLaterTypes);
             }
             else
                System.err.println("*** Warning: can't convert class: " + innerTypeObj + " into Javascript - .class but no source code found");

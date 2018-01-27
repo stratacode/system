@@ -109,8 +109,13 @@ public class SyncManager {
    /** Specify to sync calls for the sync group name which synchronizes all sync groups. */
    public final static String SYNC_ALL = "syncAll";
 
-   /** This is the primary sync data structure we use for storing data for each synchronized object instance */
+   /** This is the primary sync data structure we use for storing data for each synchronized object instance, for each client.
+    * An InstInfo will be created both for the original SyncContext the object is created in as well as an 'inherited' InstInfo
+    * for each context in which that instance is used.  This stores the buffer of changes - the change state - for propagating
+    * the object's changes to listeners of the child context.
+    */
    public static class InstInfo {
+      SyncContext syncContext; // Each InstInfo is stored in the syncInsts of only one SyncContext
       // NOTE: these are public for the debugging package only - not intended to be manipulated in user code
       public Object[] args;       // Any argument values used in the constructor to construct this instance?
       public boolean initDefault;
@@ -133,7 +138,11 @@ public class SyncManager {
 
       SyncHandler syncHandler; // Caching the sync handler for this instance so we don't create them over and over again
 
-      InstInfo(Object[] args, boolean initDef, boolean onDemand) {
+      SyncContext parContext;
+      int childCt;
+
+      InstInfo(SyncContext syncCtx, Object[] args, boolean initDef, boolean onDemand) {
+         this.syncContext = syncCtx;
          this.args = args;
          this.initDefault = initDef;
          this.onDemand = onDemand;
@@ -202,8 +211,11 @@ public class SyncManager {
       // The server stores around the initial sync layer so clients can refresh, the client does not have to do that.
       protected boolean needsInitialSync = true;
 
-      // Stores the array of arguments used to construct each instance, and the marker this is a synchronized instance, to track sync instances and to avoid adding them twice.
+      // Stores the sync state for an instance: InstInfo for each instance that's managed by this SyncContext
       private IdentityHashMap<Object, InstInfo> syncInsts = new IdentityHashMap<Object, InstInfo>();
+
+      // Stores the reference to the InstInfo for any instances which are managed by this context and references in some child SyncContext.
+      private IdentityHashMap<Object, Set<InstInfo>> childSyncInsts = null;
 
       // Stores the SyncListener objects which we use to add as listeners on each sync instance.
       Map<String,SyncChangeListener> syncListenersByGroup = new HashMap<String,SyncChangeListener>();
@@ -411,7 +423,7 @@ public class SyncManager {
          // When we are processing the initial sync, we are not recording changes.
          // TODO: do we need to record separate versions when dealing with sync contexts shared by more than one client?
          // to track versions, so we can respond to sync requests from more than one client
-         if (!initialSync && scope.supportsChangeEvents) {
+         if (!initialSync && scope.getScopeDefinition().supportsChangeEvents) {
             // For simple value properties, that cannot refer recursively, we add them to the dep changes which are put before the object which is referencing the
             // object we are serializing.  If it's possibly a reference to an object either that's not yet serialized or is being serialized we do it after.  It might
             // be nice to check if it's not being serialized cause we could then serialize it all before... rather than splitting up the object definition unnecessarily
@@ -545,7 +557,7 @@ public class SyncManager {
                ii = createAndRegisterInheritedInstInfo(inst, ii);
             }
             else {
-               ii = new InstInfo(null, false, false);
+               ii = new InstInfo(this, null, false, false);
                syncInsts.put(inst, ii);
             }
 
@@ -602,7 +614,7 @@ public class SyncManager {
       public boolean registerSyncInst(Object inst) {
          InstInfo ii = syncInsts.get(inst);
          if (ii == null) {
-            ii = new InstInfo(null, false, false);
+            ii = new InstInfo(this, null, false, false);
             ii.registered = true;
             ii.nameQueued = true;
             ii.fixedObject = true;
@@ -813,10 +825,10 @@ public class SyncManager {
          if (ii == null) {
             InstInfo parentII = getParentInheritedInstInfo(changedObj, null);
             if (parentII != null) {
-               ii = createInheritedInstInfo(parentII);
+               ii = createInheritedInstInfo(changedObj, parentII);
             }
             else {
-               ii = new InstInfo(null, false, false);
+               ii = new InstInfo(this, null, false, false);
             }
             ii.setName(parentName);
             syncInsts.put(changedObj, ii);
@@ -1111,7 +1123,7 @@ public class SyncManager {
 
          InstInfo ii = syncInsts.get(inst);
          if (ii == null) {
-            ii = new InstInfo(args, initDefault, onDemand);
+            ii = new InstInfo(this, args, initDefault, onDemand);
             syncInsts.put(inst, ii);
          }
          else {
@@ -1222,7 +1234,7 @@ public class SyncManager {
       }
 
       public InstInfo createAndRegisterInheritedInstInfo(Object inst, InstInfo ii) {
-         InstInfo childInstInfo = createInheritedInstInfo(ii);
+         InstInfo childInstInfo = createInheritedInstInfo(inst, ii);
          syncInsts.put(inst, childInstInfo);
          if (ii.name != null) {
             objectIndex.put(ii.name, inst);
@@ -1636,8 +1648,8 @@ public class SyncManager {
          return ii;
       }
 
-      private InstInfo createInheritedInstInfo(InstInfo ii) {
-         InstInfo newInstInfo = new InstInfo(ii.args, ii.initDefault, ii.onDemand);
+      private InstInfo createInheritedInstInfo(Object inst, InstInfo ii) {
+         InstInfo newInstInfo = new InstInfo(this, ii.args, ii.initDefault, ii.onDemand);
          newInstInfo.setName(ii.name);
          newInstInfo.fixedObject = ii.fixedObject;
          // TODO: Do we reuse the change maps or should we clone them so we can track the changes for each session, etc.
@@ -1645,12 +1657,50 @@ public class SyncManager {
          newInstInfo.previousValues = ii.previousValues != null ? (HashMap<String,Object>) ii.previousValues.clone() : null;
 
          newInstInfo.inherited = true;
+         newInstInfo.parContext = ii.syncContext;
          if (ii.onDemandProps != null)
             newInstInfo.onDemandProps = (TreeMap<String,Boolean>) ii.onDemandProps.clone();
          //newInstInfo.nameQueued = true;
          newInstInfo.props = ii.props;
+         SyncContext parCtx = ii.syncContext;
+         if (parCtx.childSyncInsts == null) {
+            parCtx.childSyncInsts = new IdentityHashMap<Object, Set<InstInfo>>();
+         }
+         Set<InstInfo> parChildSet = parCtx.childSyncInsts.get(inst);
+         if (parChildSet == null) {
+            parChildSet = new HashSet<InstInfo>();
+            parCtx.childSyncInsts.put(inst, parChildSet);
+         }
+         parChildSet.add(newInstInfo);
          return newInstInfo;
       }
+
+      /*
+      List<SyncContext> getPathToParentContext(SyncContext toFindPar) {
+         if (parentContexts == null) {
+            System.err.println("*** path to parent not found!");
+            return null;
+         }
+         if (parentContexts.contains(toFindPar))
+            return null; // Immediate child
+
+         for (SyncContext curPar:parentContexts) {
+            if (curPar.parentContexts != null && curPar.parentContexts.contains(toFindPar)) {
+               return Collections.singletonList(curPar);
+            }
+            else {
+               List<SyncContext> parPath = curPar.getPathToParentContext(toFindPar);
+               if (parPath != null) {
+                  List<SyncContext> path = new ArrayList<SyncContext>(parPath.size() + 1);
+                  path.add(curPar);
+                  path.addAll(parPath);
+                  return path;
+               }
+            }
+         }
+         return null;
+      }
+      */
 
       public String createOnDemandInst(Object changedObj, List<SyncLayer.SyncChange> depChanges, String varName, SyncLayer syncLayer) {
          SyncManager.InstInfo ii = getInstInfo(changedObj);
@@ -1770,7 +1820,7 @@ public class SyncManager {
 
       void removeSyncInstInternal(InstInfo toRemove, Object inst, SyncProperties syncProps, boolean listenersOnly) {
          if (trace)
-            System.out.println("Removing sync inst: " + DynUtil.getInstanceName(inst) + " from scope: " + name);
+            System.out.println("Removing sync inst: " + DynUtil.getInstanceName(inst) + " from scope: " + name + (toRemove.inherited ? " inherited from: " + toRemove.parContext.name : ""));
 
          // We only add the listeners on the original instance subscription.  So when removing an inherited instance don't remove the listeners
          if (!toRemove.inherited && toRemove.initialized) {
@@ -1793,7 +1843,24 @@ public class SyncManager {
                }
             }
             removePropertyValueListeners(inst);
+
+            if (childSyncInsts != null) {
+               Set<InstInfo> children = childSyncInsts.get(inst);
+               if (children != null) {
+                  for (InstInfo child:children) {
+                     child.syncContext.removeSyncInstInternal(child, inst, syncProps, listenersOnly);
+                  }
+               }
+            }
          }
+         else if (toRemove.inherited) {
+            if (listenersOnly)
+               System.err.println("*** replacing sync instance but on child context?");
+            Set<InstInfo> children = toRemove.parContext.childSyncInsts.get(inst);
+            if (children == null || !children.remove(toRemove))
+               System.err.println("*** Did not find inherited instance to remove for: " + toRemove);
+         }
+
          if (!listenersOnly) {
             if (objectIds != null)
                objectIds.remove(inst);
@@ -1916,6 +1983,7 @@ public class SyncManager {
          }
 
          // Send this event to any child contexts which are registered for this instance.
+         /*
          if (childContexts != null) {
             synchronized (this) {
                for (SyncContext childCtx:childContexts) {
@@ -1924,7 +1992,15 @@ public class SyncManager {
                }
             }
          }
-
+         */
+         if (childSyncInsts != null) {
+            Set<InstInfo> childInstInfos = childSyncInsts.get(obj);
+            if (childInstInfos != null) {
+               for (InstInfo childInstInfo:childInstInfos) {
+                   childInstInfo.syncContext.valueInvalidated(obj, propName, curValue, syncGroup, false);
+               }
+            }
+         }
          return true;
       }
 

@@ -292,7 +292,10 @@ public class JSONSerializer extends SyncSerializer {
       appendCommandStart(Commands.meth, smc.methName, ix);
 
       appendName(MethodArgs.typeSig.toString());
-      appendString(smc.paramSig);
+      if (smc.paramSig == null)
+         appendNullValue();
+      else
+         appendString(smc.paramSig);
 
       appendName(MethodArgs.callId.toString());
       appendString(smc.callId);

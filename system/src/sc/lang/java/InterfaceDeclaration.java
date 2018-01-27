@@ -291,6 +291,9 @@ public class InterfaceDeclaration extends TypeDeclaration {
    public boolean transform(ILanguageModel.RuntimeType runtime) {
       boolean any = false;
 
+      if (excluded)
+         return transformExcluded();
+
       // Before we transform the fields, we first make a copy of the entire field into the hidden body.  When we are transforming
       // the classes, we'll need to get at the complete field definition for copying it into them.
       if (body != null && getJavaModel().enableExtensions()) {

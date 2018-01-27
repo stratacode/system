@@ -172,6 +172,7 @@ import java.util.zip.ZipFile;
  *  Unfortunately it's probably never going to be small... there's a lot of code to customize and manage at the system level.   Once you understand the keywords
  *  to search for, you can find the chunks of code dealing with that feature as it's somewhat modularized by location in the file.
  */
+@sc.js.JSSettings(jsModuleFile="js/sclayer.js", prefixAlias="sc_")
 public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSystem, IClassResolver {
    {
       setCurrent(this);
@@ -1196,6 +1197,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       objDefTemplateLang.compiledTemplate = false;
       objDefTemplateLang.runtimeTemplate = true;
       objDefTemplateLang.defaultExtendsType = "sc.lang.java.ObjectDefinitionParameters";
+      objDefTemplateLang.needsJavascript = false; // Because these templates affect code-generation, don't need to transform them to JS code
       // This one is for object definition templates we process from Java code, i.e. as part of framework definitions from CompilerSettings, newTemplate, and objTemplate
       Language.registerLanguage(objDefTemplateLang, "sctd");
       Language.registerLanguage(TemplateLanguage.INSTANCE, TemplateLanguage.SCT_SUFFIX);

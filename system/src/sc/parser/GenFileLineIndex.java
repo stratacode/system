@@ -59,7 +59,7 @@ public class GenFileLineIndex implements Serializable, Cloneable {
    public transient String currentStatement;
 
    /**
-    * Use this constructor when you are have the generated line number directly - i.e. you are generating the code line-by-line
+    * Use this constructor when you generated the line number directly in Java code - i.e. you are generating the code line-by-line like for Js
     * like we do in the JSTypeTemplate conversion.
     */
    public GenFileLineIndex(String genFileName) {
@@ -314,6 +314,9 @@ public class GenFileLineIndex implements Serializable, Cloneable {
          System.out.println("Gen file: " + genFileName);
          System.out.println("   srcFiles: " + srcFiles.toString().replace(",", "\n      "));
       }
+
+      if (genLineMapping == null)
+         return "";
 
       for (int i = 0; i < genLineMapping.size(); i += GENSZ) {
          int srcIdx = genLineMapping.get(i);

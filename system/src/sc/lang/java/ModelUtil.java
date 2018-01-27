@@ -3814,7 +3814,8 @@ public class ModelUtil {
       if (repeatArgs && argValues.length > 0) {
          argValues = convertArgsForRepeating(methToInvoke, pmeth, arguments, argValues);
       }
-      return DynUtil.invokeRemoteSync(null, null, SyncDestination.defaultDestination.defaultTimeout, methThis, methToInvoke, argValues);
+      SyncDestination dest = SyncDestination.defaultDestination;
+      return DynUtil.invokeRemoteSync(null, null, dest.name, dest.defaultTimeout, methThis, methToInvoke, argValues);
    }
 
    private static Object[] convertArgsForRepeating(Object meth, ParamTypedMethod pmeth, List<Expression> arguments, Object[] argValues) {

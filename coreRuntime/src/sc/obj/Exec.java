@@ -23,4 +23,7 @@ public @interface Exec {
    boolean clientOnly() default false;
    /** Set to true for this method to always run on the server in a client/server configuration */
    boolean serverOnly() default false;
+
+   /** Set this to the name of a registered destination - e.g. jsHttp, servletHttp.  If not set, use the 'default' destination, configured for the runtime */
+   String destination() default "";
 }

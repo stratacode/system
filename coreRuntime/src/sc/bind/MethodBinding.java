@@ -161,7 +161,8 @@ public class MethodBinding extends AbstractMethodBinding implements IResponseLis
          if (DynUtil.isRemoteMethod(method)) {
             if (boundValue == PENDING_VALUE_SENTINEL)
                return PENDING_VALUE_SENTINEL;
-            RemoteResult remRes = DynUtil.invokeRemote(null, null, obj, method, paramValues);
+            // TODO: find the "remote destination" of the method and fill that in here
+            RemoteResult remRes = DynUtil.invokeRemote(null, null, null, obj, method, paramValues);
             // When this listener fires, we call applyChangedValue(remRes.value)
             remRes.responseListener = this;
             return PENDING_VALUE_SENTINEL;

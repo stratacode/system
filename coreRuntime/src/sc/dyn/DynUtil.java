@@ -233,13 +233,17 @@ public class DynUtil {
         return TypeUtil.invokeMethod(obj, method, paramValues);
    }
 
-   // TODO: Should this be pluggable so we can use other RPC frameworks with data binding?
-   public static RemoteResult invokeRemote(ScopeDefinition def, ScopeContext ctx, Object obj, Object method, Object... paramValues) {
-      return SyncManager.invokeRemote(def, ctx, obj, DynUtil.getMethodType(method), DynUtil.getMethodName(method), DynUtil.getReturnType(method), DynUtil.getTypeSignature(method), paramValues);
+   // TODO: Should this api itself be pluggable so we can use other RPC frameworks with data binding?  Or perhaps just make the sync framework itself pluggable for other RPC frameworks?
+   /**
+    * Here we are are invoking a generic remote method call.  The ScopeDefinition and ScopeContext can be null for defaults, but if specified select
+    * a specific remote context in a specific remote process.  For example, a server running a method on a specific session or window that's connected.
+    */
+   public static RemoteResult invokeRemote(ScopeDefinition def, ScopeContext ctx, String destName, Object obj, Object method, Object... paramValues) {
+      return SyncManager.invokeRemoteDest(def, ctx, destName, null, obj, DynUtil.getMethodType(method), DynUtil.getMethodName(method), DynUtil.getReturnType(method), DynUtil.getTypeSignature(method), paramValues);
    }
 
-   public static Object invokeRemoteSync(ScopeDefinition def, ScopeContext ctx, long timeout, Object obj, Object method, Object... paramValues) {
-      RemoteResult remoteRes = invokeRemote(def, ctx, obj, method, paramValues);
+   public static Object invokeRemoteSync(ScopeDefinition def, ScopeContext ctx, String destName, long timeout, Object obj, Object method, Object... paramValues) {
+      RemoteResult remoteRes = invokeRemote(def, ctx, destName, obj, method, paramValues);
       RemoteCallSyncListener listener = new RemoteCallSyncListener();
       remoteRes.responseListener = listener;
 
@@ -1296,7 +1300,8 @@ public class DynUtil {
 
    /** Executes the supplied java script by making an RPC call targeted towards all clients with the lifecycle identified by ScopeContext */
    public static Object evalRemoteScript(ScopeContext ctx, String script) {
-      return invokeRemoteSync(null, ctx, SyncDestination.defaultDestination.defaultTimeout, null, DynUtil.resolveRemoteStaticMethod(DynUtil.class, "evalScript", null, "Ljava/lang/String;"), script);
+      SyncDestination dest = SyncDestination.defaultDestination;
+      return invokeRemoteSync(null, ctx, dest.name, dest.defaultTimeout, null, DynUtil.resolveRemoteStaticMethod(DynUtil.class, "evalScript", null, "Ljava/lang/String;"), script);
    }
 
    public static Object evalScript(String script) {

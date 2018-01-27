@@ -62,6 +62,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public transient boolean removed = false;  // Set to true when another type in the same layer has replaced this type
 
+   /** Has this type been determined not to be included in this runtime - e.g. it's a java only class and this is the js runtime */
+   transient protected boolean excluded = false;
+
    /** Set to true for types which are modified dynamically.  Either because they have the dynamic keyword or because they're in or modified by a dynamic layer */
    public transient boolean dynamicType = false;
 
@@ -7802,15 +7805,23 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return;
 
       // Don't start the model types for excluded layers - they'll be started in other runtimes
-      if (isLayerType && layer != null && layer.excluded)
+      LayeredSystem sys = getLayeredSystem();
+
+      if (isLayerType && layer != null && layer.excluded) {
+         excluded = true;
          return;
+      }
+      else if (!isLayerType && layer != null && !ModelUtil.execForRuntime(sys, layer, this, sys)) {
+         if (sys.options.verbose)
+            sys.verbose("Excluding type: " + typeName + " for: " + sys.getProcessIdent());
+         excluded = true;
+         return;
+      }
 
       super.start();
 
       if (hiddenBody != null)
          hiddenBody.start();
-
-      LayeredSystem sys = getLayeredSystem();
 
       if (sys != null) {
          Layer layer = getLayer();
