@@ -3609,10 +3609,11 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                ArrayList<String> res = new ArrayList<String>(fileList);
                for (int i = 0; i < res.size(); i++) {
                   String jsFilePath = res.get(i);
-                  if (!jsFilePath.startsWith("/")) {
+                  // We need to use relative paths for client-only or prepend the absolute path of the document root here
+                  if (sys.serverEnabled && !jsFilePath.startsWith("/")) {
                      jsFilePath = "/" + jsFilePath;
-                     res.set(i, jsFilePath);
                   }
+                  res.set(i, jsFilePath);
                }
                return res;
             }
