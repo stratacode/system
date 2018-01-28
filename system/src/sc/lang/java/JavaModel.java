@@ -1509,7 +1509,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       List<SrcEntry> innerObjStubs = null;
       TypeDeclaration modelType = getModelTypeDeclaration();
 
-      if (modelType.excluded) {
+      if (modelType != null && modelType.excluded) {
          LayeredSystem sys = getLayeredSystem();
          if (sys.options.verbose)
             sys.verbose("Excluded: " + modelType.typeName + " from: " + sys.getProcessIdent());
