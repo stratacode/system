@@ -677,13 +677,18 @@ public class SyncLayer {
          SyncManager.InstInfo instInfo = parentContext.getInstInfo(changedObj);
          if (instInfo == null) {
             SyncManager.InstInfo parentInstInfo = parentContext.getInheritedInstInfo(changedObj);
+            // If there's no inst info and it's not a new sync instance, it's a change for some instance that's not synchronized.  This happens for the RemoteObject
+            // sample which only needs the name of the remote object, since the object itself is not sync'd.
             if (parentInstInfo == null) {
-               System.err.println("*** Invalid sync change - no inst info");
-               return;
+               if (isNew) {
+                  System.err.println("*** Invalid sync change - no inst info for new object");
+                  return;
+               }
             }
-            instInfo = parentContext.createAndRegisterInheritedInstInfo(changedObj, parentInstInfo);
+            else
+               instInfo = parentContext.createAndRegisterInheritedInstInfo(changedObj, parentInstInfo);
          }
-         if (!instInfo.nameQueued)
+         if (instInfo != null && !instInfo.nameQueued)
             instInfo.nameQueued = true;
 
          // When we are creating a new type, the current object is the parent of the object itself
