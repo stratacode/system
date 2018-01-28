@@ -674,19 +674,20 @@ public class SyncLayer {
          Object newObj = changedObj;
          Object newObjType = DynUtil.getType(newObj);
 
+         SyncManager.InstInfo instInfo = parentContext.getInstInfo(changedObj);
+         if (instInfo == null) {
+            SyncManager.InstInfo parentInstInfo = parentContext.getInheritedInstInfo(changedObj);
+            if (parentInstInfo == null) {
+               System.err.println("*** Invalid sync change - no inst info");
+               return;
+            }
+            instInfo = parentContext.createAndRegisterInheritedInstInfo(changedObj, parentInstInfo);
+         }
+         if (!instInfo.nameQueued)
+            instInfo.nameQueued = true;
+
          // When we are creating a new type, the current object is the parent of the object itself
          if (isNew) {
-            SyncManager.InstInfo instInfo = parentContext.getInstInfo(changedObj);
-            if (instInfo == null) {
-               SyncManager.InstInfo parentInstInfo = parentContext.getInheritedInstInfo(changedObj);
-               if (parentInstInfo == null) {
-                  System.err.println("*** Invalid sync change - no inst info");
-                  return;
-               }
-               instInfo = parentContext.createAndRegisterInheritedInstInfo(changedObj, parentInstInfo);
-            }
-            if (!instInfo.nameQueued)
-               instInfo.nameQueued = true;
             if (newArgs != null && newArgs.length > 0) {
                // For objects that will turn into a field, need to go out one level for the modify operator
                Object outer = DynUtil.getOuterObject(changedObj);
