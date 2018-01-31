@@ -1229,7 +1229,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          System.setProperty("jline.terminal", "jline.UnsupportedTerminal");
 
       if (startInterpreter) {
-         initConsole();
+         initConsole(!options.includeTestScript && options.testMode && options.testScriptName != null);
       }
 
       if (newLayerDir == null) {
@@ -1335,17 +1335,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   private void initConsole() {
-      boolean consoleDisabled = false;
+   private void initConsole(boolean consoleDisabled) {
       String testInputName = null;
       // TODO: it would be nice to customize this in the layer def file but right now we create the interpreter before
       // we init the layers because we might run the "installSystem" wizard runs before we init the layers but that would be easy to fix
       // We could check systemInstalled here and create an interpreter, then destroy it and recreate it later if test-script-name is set
-      if (options.testMode && options.testScriptName != null) {
-         //testInputName = options.testScriptName;
-         consoleDisabled = true;
-      }
-      else if (System.console() == null) {
+      if (System.console() == null) {
          jline.TerminalFactory.configure("off");
          try {
             // In.available an attempt to test for when redirected from stdin so turn off the prompt here.
@@ -3465,6 +3460,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       @Constant public boolean verboseLocks = false;
       /** Set to true when collecting the logs as a 'verification file' - a signal to not output dates, or other info that will vary from run to run */
       @Constant public boolean testVerifyMode = false;
+      /** Set to true when debugging the program - used to disable timeouts  */
+      @Constant public boolean testDebugMode = false;
       @Constant public boolean info = true;
       /** Controls whether java files compiled by this system debuggable */
       @Constant public boolean debug = true;
@@ -3578,6 +3575,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       /** Test script to run as input to command line interpreter after execution.  */
       @Constant public String testScriptName = null;
+
+      /** When true, run the command interpreter after running the test script (-ti <scriptName)  */
+      @Constant public boolean includeTestScript = false;
 
       /** Directory to store test results */
       @Constant public String testResultsDir = null;
@@ -3879,6 +3879,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      options.testVerifyMode = true;
                      options.testMode = true;
                   }
+                  else if (opt.equals("tdbg")) {
+                     options.testDebugMode = true;
+                  }
                   else if (opt.equals("t")) {
                      options.testMode = true;
                      if (i == args.length - 1)
@@ -3887,10 +3890,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         options.testPattern = args[++i];
                      }
                   }
-                  else if (opt.equals("ts")) {
+                  else if (opt.equals("ts") || opt.equals("ti")) {
                      options.testMode = true;
+                     options.includeTestScript = opt.equals("ti");
                      if (i == args.length - 1)
-                        System.err.println("*** missing arg to run -t option");
+                        System.err.println("*** missing arg to run -ts/-ti option");
                      else {
                         options.testScriptName = args[++i];
                      }
@@ -3962,6 +3966,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      PerfMon.enabled = true;
                   // DEPRECATED - use -tv instead
                   else if (opt.equals("vt")) {
+                     System.err.println("*** Deprecated use of -vt option");
                      options.testVerifyMode = true;
                      options.testMode = true;
                   }
@@ -4177,7 +4182,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (options.testScriptName != null && options.testMode && !sys.peerMode) {
                String pathName = options.testScriptName;
                System.out.println("Running test script: " + pathName + " from: " + sys.buildDir);
-               sys.cmd.loadScript(sys.buildDir, pathName);
+               if (options.includeTestScript)
+                  sys.cmd.pushIncludeScript(sys.buildDir, pathName);
+               else
+                  sys.cmd.loadScript(sys.buildDir, pathName);
 
                // We need to add the temp layer so the testScriptName is not evaluated in a compiled layer - it has to be dynamic
                editLayer = false;
@@ -4310,7 +4318,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          System.out.println(Parser.getStatInfo(TemplateLanguage.INSTANCE.getStartParselet()));
       }
       if (options.testExit) {
-         // When there's a script, the EOF of the script will trigger the exit I think?
+         // When there's a script, the EOF of the script will trigger the exit
          if (options.testMode && options.testScriptName == null)
             System.exit(sys.anyErrors ? -1 : 0);
       }
@@ -5794,20 +5802,22 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                          "   [ -d/-ds/-db buildOrSrcDir]\n\nOption details:");
       System.err.println("   [ -a ]: build all files\n   [ -i ]: create temporary layer for interpreter\n   [ -nc ]: generate but don't compile java files");
       System.err.println("   <buildLayer>:  The build layer is the last layer in your stack.\n" +
-                         "   [ -dyn ]: Layers specified after -dyn (and those they extend) are made dynamic unless they are marked: 'compiledOnly'\n" +
-                         "   [ -c ]: Generate and compile only - do not run any main methods\n" +
-                         "   [ -v ]: Verbose info about the layered system.  [-vb ] [-vba] Trace data binding (or trace all) [-vs] [-vsa] [-vsv] [-vsp] Trace options for the sync system: trace, traceAll, verbose-inst, verbose-inst+props \n" +
-                         "   [ -vh ]: verbose html [ -vha ]: trace html [ -vl ]: display initial layers [ -vp ] turn on performance monitoring [ -vc ]: info on loading of class files\n" +
-                         "   [ -vt ]: trace verify mode enabled - a flag to omit inconsistent data in the logged info - so the output becomes a trace verify file we can compare from run to run\n" +
+                         "   [ -dyn ]: Layers specified after -dyn (and those they pull in using the 'extends' keyword in the layer definition file) are made dynamic unless they are marked: 'compiledOnly'\n" +
+                         "   [ -c ]: Generate and compile code only - do not run any main methods\n" +
+                         "   [ -v* ]: Enable verbose flags to debug features\n" +
+                         "       [ -v ]: verbose info of main system events.  [-vb ] [-vba] Trace data binding (or trace all) [-vs] [-vsa] [-vsv] [-vsp] Trace options for the sync system: trace, traceAll, verbose-inst, verbose-inst+props \n" +
+                         "       [ -vh ]: verbose html [ -vha ]: trace html [ -vl ]: display initial layers [ -vp ] turn on performance monitoring [ -vc ]: info on loading of class files\n" +
                          "   [ -f <file-list>]: Process/compile only these files\n" +
                          "   [ -cp <classPath>]: Use this classpath for resolving compiled references.\n" +
                          "   [ -lp <layerPath>]: Set of directories to search in order for layer directories.\n" +
                          "   [ -db,-ds,-d <buildOrSrcDir> ]: override the buildDir, buildSrcDir, or both of the buildLayer's buildDir and buildSrcDir properties \n" +
                          "   [ -r/-rs <main-class-pattern> ...all remaining args...]: After compilation, run all main classes matching the java regex with the rest of the arguments.  -r: run in the same process.  -rs: exec the generated script in a separate process.\n" +
                          "   [ -ra ... remaining args passed to main methods... ]: Run all main methods\n" +
-                         "   [ -t <test-class-pattern>]: After compilation, run matching tests.\n" +
+                         "   [ -tv ]: Enable 'test verify' mode.  Run all tests, or those specified with -t, -ts, -ti or -ta.  Omit timestamps or other info in log files that changes from run to run for easier comparison\n" +
+                         "   [ -t <test-class-pattern>]: Run only the matching tests.\n" +
+                         "   [ -ts/-ti <scriptName.scr>]: After compilation, run (-ts) or include (-ti) the specified test-script.  Use -ts to exit when the script is done.  -ti to enter the interpreter when the test is completed\n" +
                          "   [ -o <pattern> ]: Sets the openPattern, used by frameworks to choose which page to open after startup.\n" +
-                         "   [ -ta ]: Run all tests.\n" +
+                         "   [ -ta ]: Like -tv but runs all tests without 'test verify mode'.\n" +
                          "   [ -nw ]: For web frameworks, do not open the default browser window.\n" +
                          "   [ -n ]: Start 'create layer' wizard on startup.\n" +
                          "   [ -ni ]: Disable command interpreter\n" +
@@ -5815,7 +5825,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                          "   [ -dt ]: Enable the liveDynamicTypes option - so that you can modify types at runtime.  This is turned when the editor is enabled by default but you can turn it on with this option.\n" +
                          "   [ -nd ]: Disable the liveDynamicTypes option - so that you cannot modify types at runtime.  This is turned when the editor is enabled by default but you can turn it on with this option.\n" +
                          "   [ -ee ]: Edit the editor itself - when including the program editor, do not exclude it's source from editing.\n" +
-                         "   [ -cd <default-interpreter-type>]: For -i, sets the root-type the interpreter can access\n\n" +
+                         "   [ -cd <ApplicationTypeName>]: Start the command-interpreter in the context of the given ApplicationTypeName.\n\n" +
                          StringUtil.insertLinebreaks(AbstractInterpreter.USAGE, 80));
       System.exit(-1);
    }
@@ -7791,7 +7801,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       PackageEntry curEnt = packageEntry.get(fileName);
       if (curEnt == null) {
-         System.err.println("*** Cannot find package entry to remove");
+         System.err.println("*** Cannot find package entry to remove: " + fileName);
          return;
       }
       if (curEnt.prev == null)
@@ -10758,6 +10768,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private boolean refreshScheduled = false;
 
    public void scheduleRefresh() {
+      if (DynUtil.frameworkScheduler == null) {
+         System.out.println("No framework scheduler - not performing scheduleRefresh()");
+         return;
+      }
       if (peerMode) {
          getMainLayeredSystem().scheduleRefresh();
          return;
@@ -11449,7 +11463,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    /** Checks if the directory has been removed and if so, updates the indexes */
-   public void checkRemovedDirectory(String dirPath) {
+   public boolean checkRemovedDirectory(String dirPath) {
       File dir = new File(dirPath);
       if (!dir.isDirectory()) {
          boolean needsRefresh = false;
@@ -11461,15 +11475,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
          }
          if (needsRefresh) {
-            checkRemovedDirectoryList(layers, dirPath);
-            checkRemovedDirectoryList(inactiveLayers, dirPath);
+            boolean dirRemoved;
+            dirRemoved = checkRemovedDirectoryList(layers, dirPath);
+            dirRemoved |= checkRemovedDirectoryList(inactiveLayers, dirPath);
+            return dirRemoved;
          }
       }
       else
          System.out.println("*** checkRemovedDirectory called with directory that exists: " + dirPath);
+      return false;
    }
 
-   private void checkRemovedDirectoryList(List<Layer> layersList, String dirPath) {
+   private boolean checkRemovedDirectoryList(List<Layer> layersList, String dirPath) {
       ArrayList<Layer> toRemove = new ArrayList<Layer>();
       for (Layer layer:layersList) {
          if (!layer.checkRemovedDirectory(dirPath))
@@ -11477,7 +11494,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       if (toRemove.size() > 0) {
          removeLayers(toRemove, null);
+         return true;
       }
+      return false;
    }
 
    public void notifyModelListeners(JavaModel model) {

@@ -80,9 +80,6 @@ public class CurrentScopeContext {
     */
    public static void pushCurrentScopeContext(CurrentScopeContext state, boolean acquireLocks) {
       ArrayList<CurrentScopeContext> curStateList = (ArrayList<CurrentScopeContext>) PTypeUtil.getThreadLocal("scopeStateStack");
-      if (state != null) {
-         state.startScopeContext(acquireLocks);
-      }
       if (curStateList == null) {
          curStateList = new ArrayList<CurrentScopeContext>();
          PTypeUtil.setThreadLocal("scopeStateStack", curStateList);
@@ -90,6 +87,11 @@ public class CurrentScopeContext {
       curStateList.add(state);
       if (curStateList.size() > MAX_STATE_LIST_SIZE)
          throw new IllegalArgumentException("Too many pushCurrentScopeContext calls in a row - max is: " + MAX_STATE_LIST_SIZE);
+
+      // Need to dispatch any event listeners after the current context is set - otherwise, those events could just get queued up again
+      if (state != null) {
+         state.startScopeContext(acquireLocks);
+      }
    }
 
    public static void popCurrentScopeContext(boolean releaseLocks) {

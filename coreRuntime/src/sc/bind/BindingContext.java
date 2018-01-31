@@ -96,8 +96,9 @@ public class BindingContext implements IScopeEventListener {
 
       synchronized (this) {
          for (oldEvent = queuedEvents; oldEvent != null; oldEvent = oldEvent.next) {
-            // Higher priority numbers are at the top of the list - no need to check for dependencies in this case
-            if (newEvent.listener.getPriority() >= oldEvent.listener.getPriority()) {
+            // Higher priority numbers are at the top of the list - no need to check for dependencies in this case.   For the same priority, keep the order the same as when the events occurred.
+            // It's particularly important that we deliver the invalidate event before the validate event.
+            if (newEvent.listener.getPriority() > oldEvent.listener.getPriority()) {
                if (prevEvent == null) {
                   newEvent.next = queuedEvents;
                   queuedEvents = newEvent;

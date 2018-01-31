@@ -124,7 +124,7 @@ public class EditorContext extends ClientEditorContext {
 
    public void setDefaultCurrentObj(Object type, Object inst) {
       // Keep the execContext in sync with what's done in the UI.  So we are editing the same instance
-      if (currentTypes.size() > startTypeIndex && type != null && ModelUtil.sameTypes(type, currentTypes.get(currentTypes.size()-1)) && inst != execContext.getCurrentObject()) {
+      if (currentTypes.size() > startTypeIndex && type != null && ModelUtil.isAssignableFrom(type, currentTypes.get(currentTypes.size()-1)) && inst != execContext.getCurrentObject()) {
          execContext.popCurrentObject();
          execContext.pushCurrentObject(inst);
       }
@@ -944,7 +944,12 @@ public class EditorContext extends ClientEditorContext {
                   // exec context?
                   for (int i = startTypeIndex; i < currentTypes.size(); i++) {
                      currentType = currentTypes.get(i);
-                     currentTypes.set(i, system.getSrcTypeDeclaration(ModelUtil.getTypeName(currentType), null, false));
+                     BodyTypeDeclaration newType = system.getSrcTypeDeclaration(ModelUtil.getTypeName(currentType), null, false);
+                     BodyTypeDeclaration oldType = currentTypes.get(i);
+                     // For the case where refreshModel occurs because we've changed the type and layer, if we go down and come back up a type chain, it's best to keep the old context.
+                     // There's probably another refreshModel case where the parent type has changed though so we need this?
+                     if (!ModelUtil.isAssignableFrom(newType, oldType))
+                        currentTypes.set(i, newType);
                   }
                   if (pendingModel == origModel)
                      pendingModel = newModel;

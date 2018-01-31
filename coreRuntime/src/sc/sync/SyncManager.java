@@ -283,7 +283,7 @@ public class SyncManager {
          Object old = prevMap.put(prop,curVal);
          if (verboseValues && (curVal != null || old != null)) {
             if (old == null) {
-               // Filter out boolean=false to minimize message trafic.
+               // Filter out initial value of boolean=false to reduce logging
                if (!(curVal instanceof Boolean) || ((Boolean) curVal))
                   System.out.println("Initial value: " + DynUtil.getInstanceName(inst) + "." + prop + " = " + DynUtil.getInstanceName(curVal));
             }
@@ -330,8 +330,11 @@ public class SyncManager {
          //return val;
       }
 
-      public void addPreviousValue(Object obj, String propName, Object val) {
-         addPreviousValue(obj, getInheritedInstInfo(obj), propName, val);
+      public void addPreviousValue(Object obj, String propName, Object val, boolean inherited) {
+         InstInfo ii = inherited ? getInheritedInstInfo(obj) : getInstInfo(obj);
+         if (ii.syncContext != this)
+            System.out.println("*** Using inherited context for previous value: " + ii.syncContext + " for " + this);
+         addPreviousValue(obj, ii, propName, val);
       }
 
       public void addPreviousValue(Object obj, InstInfo ii, String propName, Object val) {
@@ -423,28 +426,34 @@ public class SyncManager {
          // When we are processing the initial sync, we are not recording changes.
          // TODO: do we need to record separate versions when dealing with sync contexts shared by more than one client?
          // to track versions, so we can respond to sync requests from more than one client
-         if (!initialSync && scope.getScopeDefinition().supportsChangeEvents) {
-            // For simple value properties, that cannot refer recursively, we add them to the dep changes which are put before the object which is referencing the
-            // object we are serializing.  If it's possibly a reference to an object either that's not yet serialized or is being serialized we do it after.  It might
-            // be nice to check if it's not being serialized cause we could then serialize it all before... rather than splitting up the object definition unnecessarily
-            // serialization buffer by adding a new change.  TODO: other value properties might be handled during the reference stage here
-            boolean safeDepChange = false;
-            if (depChanges != null) {
-               if (val == null)
-                  safeDepChange = true;
-               else {
-                  Class valcl = val.getClass();
-                  // TODO: we could find a faster way to do this logic, or switch it and only look for references which are being added to the stream since it's only 'forward references' we are trying to avoid here.
-                  // we also could just support deserializing forward references
-                  if (PTypeUtil.isStringOrChar(valcl) || PTypeUtil.isPrimitive(valcl) || PTypeUtil.isANumber(valcl) || valcl == Boolean.class || valcl == Boolean.TYPE || DynUtil.isEnumConstant(val))
+         if (!initialSync) {
+            if (scope.getScopeDefinition().supportsChangeEvents) {
+               // For simple value properties, that cannot refer recursively, we add them to the dep changes which are put before the object which is referencing the
+               // object we are serializing.  If it's possibly a reference to an object either that's not yet serialized or is being serialized we do it after.  It might
+               // be nice to check if it's not being serialized cause we could then serialize it all before... rather than splitting up the object definition unnecessarily
+               // serialization buffer by adding a new change.  TODO: other value properties might be handled during the reference stage here
+               boolean safeDepChange = false;
+               if (depChanges != null) {
+                  if (val == null)
                      safeDepChange = true;
+                  else {
+                     Class valClass = val.getClass();
+                     // TODO: we could find a faster way to do this logic, or switch it and only look for references which are being added to the stream since it's only 'forward references' we are trying to avoid here.
+                     // we also could just support deserializing forward references
+                     if (PTypeUtil.isStringOrChar(valClass) || PTypeUtil.isPrimitive(valClass) || PTypeUtil.isANumber(valClass) || valClass == Boolean.class || valClass == Boolean.TYPE || DynUtil.isEnumConstant(val))
+                        safeDepChange = true;
+                  }
                }
+               if (safeDepChange)
+                  changedLayer.addDepChangedValue(depChanges, obj, propName, val, false);
+               else
+                  changedLayer.addChangedValue(obj, propName, val);
             }
-            if (safeDepChange)
-               changedLayer.addDepChangedValue(depChanges, obj, propName, val, false);
-            else
-               changedLayer.addChangedValue(obj, propName, val);
+            else {
+               addPreviousValue(obj, propName, val, false); // If this scope does not support change events, we just apply the previous value now, so we'll continue to propagate any subsequent changes to children
+            }
          }
+
          // else if !initialSync - not recording this change here!
          SyncState syncState = getSyncState();
          if (recordInitial || syncState != SyncState.Initializing) {
@@ -974,6 +983,8 @@ public class SyncManager {
        */
       public void applyRemoteChanges(Object inst, Map<String,Object> pendingMap) {
          InstInfo ii = findSyncInstInfo(inst);
+         if (ii.syncContext != this)
+            System.out.println("*** applying remote changes on a parent context - does this happen?");
 
          HashMap<String,Object> prevMap = ii.previousValues;
          HashMap<String,Object> initMap = ii.initialValues;
@@ -1499,7 +1510,7 @@ public class SyncManager {
          SyncAction action = getSyncAction(syncProp);
          switch (action) {
             case Previous:
-               addPreviousValue(syncObj, syncProp, value);
+               addPreviousValue(syncObj, syncProp, value, true);
                break;
             case Value:
                addChangedValue(null, syncObj, syncProp, value, syncGroup, null);
@@ -1965,7 +1976,7 @@ public class SyncManager {
          // Any changes triggered when we are processing a sync just update the previous value - they do not trigger a change, unless there are pending bindingings.  That means we are setting a drived value.
          SyncAction action = getSyncAction(propName);
          if (action == SyncAction.Previous) {
-            addPreviousValue(obj, propName, curValue);
+            addPreviousValue(obj, propName, curValue, true);
          }
          else if (action == SyncAction.Value) {
             if (refreshProperty(obj, propName, curValue, syncGroup, "Property change")) {

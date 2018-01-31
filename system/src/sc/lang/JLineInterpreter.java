@@ -176,6 +176,7 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
    void popCurrentInput() {
       InputSource newInput = pendingInputSources.remove(pendingInputSources.size()-1);
       inputFileName = newInput.inputFileName;
+      consoleDisabled = noPrompt || inputFileName != null; // System.console() == null when either input or output is redirected - either case, it's not interactive right?
       inputRelName = newInput.inputRelName;
       includeLayer = newInput.includeLayer;
       // When we have an include layer in the push, we will have set the currentLayer so need to restore that here.

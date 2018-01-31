@@ -1070,7 +1070,7 @@ public class Bind {
          if (listenerCtx != curScopeCtx) {
             ScopeContext listenerEventScopeCtx = listenerCtx.getEventScopeContext();
             ScopeContext curEventScopeCtx = curScopeCtx.getEventScopeContext();
-            if (listenerEventScopeCtx != null && listenerEventScopeCtx != curEventScopeCtx) {
+            if (listenerEventScopeCtx != null && listenerEventScopeCtx != curEventScopeCtx) { // TODO - should this be equals?  how will we wake up two different CurrentScopeContext objects if they represent the same list of ScopeContexts
                BindingContext bctx = (BindingContext) listenerEventScopeCtx.eventListener;
                if (bctx == null) {
                   synchronized (listenerEventScopeCtx.eventListenerLock) {

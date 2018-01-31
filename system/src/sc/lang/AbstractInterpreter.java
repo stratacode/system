@@ -1852,30 +1852,12 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       return includeName;
    }
 
-   // TODO: Do we need this at all?
-   public void includeAsync(String includeName) {
+   /** Pushes an include script onto the top of the stack of files to be processed and returns immediately - before the script has run. */
+   public void pushIncludeScript(String baseDirName, String includeName) {
       String relName = null;
       if (!FileUtil.isAbsolutePath(includeName)) {
          relName = includeName;
-         String fileName = FileUtil.concat(system.buildDir, includeName);
-
-         if (!new File(fileName).canRead()) {
-            throw new IllegalArgumentException("No script to include: " + fileName);
-         }
-         includeName = fileName;
-      }
-      pushCurrentInput(false);
-      this.inputFileName = includeName;
-      this.inputRelName = relName;
-      this.includeLayer = null; // The normal include chooses the most specific version of the file (at least when a relative name is used
-      resetInput();
-   }
-
-   public void include(String includeName) {
-      String relName = null;
-      if (!FileUtil.isAbsolutePath(includeName)) {
-         relName = includeName;
-         String fileName = FileUtil.concat(system.buildDir, includeName);
+         String fileName = FileUtil.concat(baseDirName, includeName);
 
          if (!new File(fileName).canRead()) {
             throw new IllegalArgumentException("No script to include: " + fileName);
@@ -1888,6 +1870,17 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          this.inputRelName = relName;
          this.includeLayer = null; // The normal include chooses the most specific version of the file (at least when a relative name is used
          resetInput();
+      }
+      catch (RuntimeException exc) {
+         popCurrentInput();
+         throw exc;
+      }
+   }
+
+   /** Includes the script and waits for the script to complete.  Use this from a script to synchronously include another */
+   public void include(String includeName) {
+      try {
+         pushIncludeScript(system.buildDir, includeName);
          this.returnOnInputChange = true;
          if (!readParseLoop())
             pendingInput = new StringBuilder();
