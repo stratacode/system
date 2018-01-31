@@ -1229,7 +1229,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          System.setProperty("jline.terminal", "jline.UnsupportedTerminal");
 
       if (startInterpreter) {
-         initConsole(!options.includeTestScript && options.testMode && options.testScriptName != null);
+         initConsole();
       }
 
       if (newLayerDir == null) {
@@ -1335,7 +1335,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   private void initConsole(boolean consoleDisabled) {
+   private void initConsole() {
+      boolean consoleDisabled = false;
       String testInputName = null;
       // TODO: it would be nice to customize this in the layer def file but right now we create the interpreter before
       // we init the layers because we might run the "installSystem" wizard runs before we init the layers but that would be easy to fix
@@ -1346,8 +1347,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // In.available an attempt to test for when redirected from stdin so turn off the prompt here.
             // Also turn off when testVerifyMode is on because the prompts just make output harder to read
             // and potentially interleave with other output and so mess up the 'diff'
-            if (options.testVerifyMode || System.in.available() > 0)
+            if (options.testVerifyMode || System.in.available() > 0) {
                consoleDisabled = true;
+            }
          }
          catch (IOException exc) {
          }
