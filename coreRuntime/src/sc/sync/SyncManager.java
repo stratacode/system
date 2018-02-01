@@ -332,7 +332,7 @@ public class SyncManager {
 
       public void addPreviousValue(Object obj, String propName, Object val, boolean inherited) {
          InstInfo ii = inherited ? getInheritedInstInfo(obj) : getInstInfo(obj);
-         if (ii.syncContext != this)
+         if (ii != null && ii.syncContext != this)
             System.out.println("*** Using inherited context for previous value: " + ii.syncContext + " for " + this);
          addPreviousValue(obj, ii, propName, val);
       }
