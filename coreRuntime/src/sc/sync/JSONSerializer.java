@@ -298,7 +298,7 @@ public class JSONSerializer extends SyncSerializer {
          appendString(smc.paramSig);
 
       appendName(MethodArgs.callId.toString());
-      appendString(smc.callId);
+      appendString(smc.getCallId());
 
       appendName(MethodArgs.args.toString());
       formatArrayExpression(sb, syncContext, smc.args, newObjNames, newLastPackageName, null, null, false, null, depChanges, syncLayer);
