@@ -1,6 +1,7 @@
 package sc.lang.html;
 
 import sc.dyn.DynUtil;
+import sc.js.JSSettings;
 import sc.lang.java.ModelUtil;
 import sc.type.IBeanMapper;
 import sc.type.PTypeUtil;
@@ -10,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /** This is the runtime representation of the QueryParam annotation in the html/core layer. */
+@JSSettings(prefixAlias="js_",jsLibFiles="js/tags.js")
 public class QueryParamProperty {
    public String propName;
    public String paramName;
