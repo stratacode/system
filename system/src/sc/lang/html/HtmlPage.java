@@ -14,7 +14,7 @@ import sc.obj.SyncMode;
  */
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js", dependentTypes="sc.obj.IChildInit")
 /** Used as the tag class for the html tag it is the top level tag in the page. */
-@Sync(syncMode= SyncMode.Automatic) // Turn back on sync mode for user defined page types so that any fields they defined will be synchronized by default. - TODO shouldn't we just have a SyncMode.Unset?   So the page inherits the layers setting again?
+@Sync(syncMode= SyncMode.Default) // Turn back on sync mode for user defined page types so that any fields they defined will be synchronized by default. - TODO call this SyncMode.Unset?
 @CompilerSettings(liveDynamicTypes=true) // An important component - nice to track instances for the command line editor
 public class HtmlPage extends Html {
    protected boolean isPageElement() {

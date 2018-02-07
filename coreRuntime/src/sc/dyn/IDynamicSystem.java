@@ -167,4 +167,6 @@ public interface IDynamicSystem {
    void addDynListener(IDynListener listener);
 
    ScopeDefinition getScopeByName(String scopeName);
+
+   boolean needsSync(Object type);
 }

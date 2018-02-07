@@ -1662,4 +1662,15 @@ public class DynUtil {
       return DynUtil.getTraceObjId(Thread.currentThread());
    }
 
+   public static boolean needsSync(Object type) {
+      if (dynamicSystem != null)
+         return dynamicSystem.needsSync(type);
+      else {
+         // TODO: this should be possible using the SyncManager since all sync types will be
+         // registered.  Will have to include nested types/instances like needsSync() does.
+         System.err.println("*** Need to implement needsSync without a dynamic system");
+         return true;
+      }
+   }
+
 }

@@ -8632,9 +8632,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       if (syncAnnot != null) {
          Object av = ModelUtil.getAnnotationValue(syncAnnot, "syncMode");
-         syncMode = (SyncMode) av;
-         if (syncMode == null) // The @Sync tag without any mode just turns it on.
+         SyncMode typeSyncMode = (SyncMode) av;
+         if (typeSyncMode == null) // The @Sync tag without any mode just turns it on.
             syncMode = SyncMode.Enabled;
+         else if (typeSyncMode != SyncMode.Default) {  // When setting default, go back to using the default sync mode - i.e. on the layer or whatever
+            syncMode = typeSyncMode;
+         }
          String[] destArray = (String[]) ModelUtil.getAnnotationValue(syncAnnot, "destinations");
          syncGroup = (String) ModelUtil.getAnnotationValue(syncAnnot, "groupName");
          Boolean includeSuperObj = false;

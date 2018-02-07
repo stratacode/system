@@ -15400,6 +15400,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return ScopeDefinition.getScopeByName(scopeName);
    }
 
+   public boolean needsSync(Object type) {
+      if (type instanceof BodyTypeDeclaration)
+         return ((BodyTypeDeclaration) type).needsSync();
+      else  // TODO: this needs to look at sub-objects and types
+         return SyncManager.getSyncProperties(type, null) != null;
+   }
+
    public String getScopeAlias(Layer refLayer, String scopeName) {
       int startIx;
       if (searchActiveTypesForLayer(refLayer)) {
