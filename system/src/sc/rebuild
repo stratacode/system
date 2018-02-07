@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 USE_IDEA_DIR="${IDEA_PLUGIN_DIR:=${HOME}/Library/Application Support/IntelliJIdea2016.2}"
 USE_SC_DIR="${SC_DIR:=/jjv/vbuild}"
 
