@@ -15,15 +15,19 @@ import sc.parser.*;
  * parse a given string, and if successful set the properties on the instance.
  * <p>
  * This approach is an alternative to regular expressions for matching strings and extracting values from string formats, such as parameterized URLs.
- * Given a String in the form: "string{propName=parseletName}string{parseletName}[optionalString/{propName=parseletName}]"  where the 'string' can be any character except { and }, [ and ]
+ * Given a String in the form: "somestring{propName=parseletName}somestring{parseletName}[optionalString/{propName=parseletName}]"  where the 'somestring' can be any character except { and }, [ and ]
  * To include those characters in the string, use the normal backslash escape character before them.
  * This language generates a Pattern object which you can use to generate a Sequence that can parse strings that match the
  * pattern.  From this Sequence, you can:
  *    1) Match a string to the pattern.
  *    2) Parse the string and set properties on some object based on a prop=token syntax in the pattern
- *    3) Generate a string by replacing the prop=token with those found in the properties of the object.
- * The 'tokens' are defined by parselets.  This moves the pattern logic into Java code, instead of being part of each pattern that helps to keep
- * the pattern readable and robust.
+ *    3) Go in the opposite direction and generate a string from an object instance (i.e. by replacing the prop=token with those found in the properties of the instance).
+ * The types of tokens you can use are defined by parselets, named by parseletName.
+ * <p>
+ * This moves the pattern logic into Java code, instead of being part of each pattern that helps to keep
+ * the pattern readable and secure.  Unlike regular expressions, we can go in both directions and convert this into a data binding expression
+ * so the client can be responsive to changes in those properties and re-generate the string when they change (e.g. generate a parameterized
+ * URL when a property changes for history management)
  * <p>
  * The parseletName in the pattern specifies a parselet in some base language you specify to convert the Pattern into a Sequence parselet.
  * For example, if you use the Java base language, you can use any parselet like integerLiteral, floatingPointLiteral, etc.

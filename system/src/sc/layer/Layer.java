@@ -1270,7 +1270,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          modelType.isLayerType = true;
       }
       // For reparsed models, the model instance will not be different but it's internals will have changed so removing the 'reInit' flag here
-      if (/*reInit &&*/ initialized && modelType instanceof ModifyDeclaration) {
+      if (/*reInit &&*/ initialized && modelType instanceof ModifyDeclaration && !excluded) {
         ModifyDeclaration layerModel = (ModifyDeclaration) modelType;
          baseLayerNames = layerModel.getExtendsTypeNames();
          baseLayers = layeredSystem.mapLayerNamesToLayers(model.getRelDirPath(), baseLayerNames, activated, !closed);

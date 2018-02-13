@@ -23,21 +23,31 @@ public class QueryParamProperty {
    public QueryParamProperty() {
    }
 
-   public QueryParamProperty(Object enclType, String propName, String paramName, boolean req) {
+   public QueryParamProperty(Object enclType, String propName, String paramName, Object propType, boolean req) {
       this.enclType = enclType;
       this.propName = propName;
       this.paramName = paramName;
+      this.propType = propType;
       this.required = req;
    }
 
    public IBeanMapper getMapper() {
-      if (mapper != null)
-         return mapper;
-      else
-         mapper = DynUtil.getPropertyMapping(enclType, propName);
+      if (mapper == null)
+         initMapperAndType();
+      return mapper;
+   }
+
+   private void initPropertyType() {
+      propType = ModelUtil.getPropertyTypeFromType(enclType, propName);
+      if (propType == null)
+         throw new IllegalArgumentException("No property: " + propName + " for type: " + enclType + " for query param");
+   }
+
+   private void initMapperAndType() {
+      mapper = ModelUtil.getPropertyMapping(enclType, propName);
       if (mapper == null)
          throw new IllegalArgumentException("No query param property: " + this);
-      Object propType = DynUtil.getPropertyType(mapper);
+      propType = DynUtil.getPropertyType(mapper);
       if (!ModelUtil.isAssignableFrom(String.class, propType)) {
          IBeanMapper converterMapper = PTypeUtil.getPropertyMappingConverter(mapper, String.class, null);
          if (converterMapper != null)
@@ -45,7 +55,6 @@ public class QueryParamProperty {
          else
             throw new IllegalArgumentException("No converter for type: " + propType + " to convert query parameter for this: " + this);
       }
-      return mapper;
    }
 
    public static List<QueryParamProperty> getQueryParamProperties(Object type) {
@@ -66,6 +75,7 @@ public class QueryParamProperty {
                newP.required = true;
             }
             newP.enclType = type;
+            newP.initPropertyType(); // This happens during transform time where the mapper is not available
             res.add(newP);
          }
          return res;
@@ -87,7 +97,7 @@ public class QueryParamProperty {
             if (!first)
                sb.append(", ");
             first = false;
-            sb.append("new sc.lang.html.QueryParamProperty(sc.dyn.DynUtil.findType(\"" + DynUtil.getTypeName(type, false) + "\"), \"" + prop.propName + "\", \"" + prop.paramName + "\", " + prop.required + ")");
+            sb.append("new sc.lang.html.QueryParamProperty(sc.dyn.DynUtil.findType(\"" + DynUtil.getTypeName(type, false) + "\"), \"" + prop.propName + "\", \"" + prop.paramName + "\", " + DynUtil.getTypeName(prop.propType, false) + ".class, " + prop.required + ")");
          }
          sb.append("})");
          return sb.toString();

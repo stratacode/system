@@ -53,6 +53,10 @@ import java.util.*;
 public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObjChildren, ITypeUpdateHandler, ISrcStatement, IStoppable {
    public static boolean trace = false, verbose = false;
 
+   /** When a tag is invisible, instead of rendering the tag, we render the 'alt' child if there is one */
+   private final static String ALT_ID = "alt";
+   private final static Element[] EMPTY_ELEMENT_ARRAY = new Element[]{};
+
    public String tagName;
    public SemanticNodeList<Attr> attributeList;
    public SemanticNodeList<Object> children;
@@ -94,6 +98,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    private Object repeat;
 
    private boolean visible = true;
+
+   private Element[] invisTags = null;
 
    // Applies to the client only - server content is not renderered on the client.  Diffs from the exec flags in that if you use exec="client" the code is not compiled into the client version at all.  When the client version
    // is used to generate a server-side html file, that's awkward cause you can't for example render the script tags and things that should only go on the server.
@@ -747,12 +753,26 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       else if (idAttr != null || nameAttr != null) {
          Attr useAttr = idAttr != null ? idAttr : nameAttr;
          Object val = useAttr.value;
-         if (PString.isString(val))
-            return CTypeUtil.escapeIdentifierString(val.toString());
+         if (PString.isString(val)) {
+            String idStr = val.toString();
+            if (idStr.equals(ALT_ID)) { // For the 'alt' element which is a child of another tag, use _alt as the suffix
+               return getAltId();
+            }
+            return CTypeUtil.escapeIdentifierString(idStr);
+         }
          else
             useAttr.displayError("Expression for name/id attributes not supported: " + val);
       }
       return null;
+   }
+
+   private String getAltId() {
+      Element par = getEnclosingTag();
+      if (par != null) {
+         String parId = par.getElementId();
+         return parId + "_" + ALT_ID;
+      }
+      return getFixedAttribute("id");
    }
 
    public String lowerTagName() {
@@ -1000,7 +1020,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    /** This method gets called from two different contexts and for tags which are both dynamic and static so it's
     * a little confusing.
     *
-    * For "OutputAll" and this tag needs an object, it is added to the parent's outputTag method
+    * For "OutputAll" when this tag needs an object, it is added to the parent's outputTag method
     *      objectName.outputTag(sb);
     *
     * For static tags (deprecated), we add the expressions needed to render this tag as content in the parent method.
@@ -1017,7 +1037,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       boolean needsObject = needsObject();
       // Here we process a reference to the object
       if (doFlags == doOutputAll && needsObject) {
-         if (!isAbstract()) {
+         if (!isAbstract() && !StringUtil.equalStrings(getFixedAttribute("id"), ALT_ID)) {
             String objName = isRepeatElement() ? getRepeatObjectName() : getObjectName();
             Statement st = IdentifierExpression.createMethodCall(getOutputArgs(template), this == template.rootType ? null : objName, "outputTag");
             // The original source statement for the outputTag call in the parent should be the element itself for breakpoints in the debugger.
@@ -2427,8 +2447,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
 
       String fixedIdAtt = getFixedAttribute("id");
-      if (fixedIdAtt != null)
+      if (fixedIdAtt != null) {
+         if (fixedIdAtt.equals(ALT_ID)) {
+            fixedIdAtt = getAltId();
+         }
          fixedIdAtt = CTypeUtil.escapeIdentifierString(fixedIdAtt);
+      }
       if (needsAutoId(fixedIdAtt)) {
          SemanticNodeList<Expression> args = new SemanticNodeList<Expression>();
          args.add(StringLiteral.create(tagType.typeName));
@@ -2471,6 +2495,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                       // We might be inheriting this same id in which case do not set it - otherwise, we get duplicates of the same unique id.
                       // But if we are extending a tag with a different id, we do need to set it even if we are inheriting it.
                       if (!PString.isString(att.value) || !inheritsId(att.value.toString())) {
+                         String attStr = att.value.toString();
+                         if (attStr.equals(ALT_ID))
+                            attExpr = StringLiteral.create(getAltId());
                          SemanticNodeList<Expression> args = new SemanticNodeList<Expression>();
                          args.add(attExpr);
                          if (getNeedsClientServerSpecificId())
@@ -2881,6 +2908,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       behaviorAttributes.add("orderValue");
       behaviorAttributes.add("noCache");
       behaviorAttributes.add("scope");
+      behaviorAttributes.add(ALT_ID);
 
       // For select only
       behaviorAttributes.add("optionDataSource");
@@ -3203,8 +3231,16 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    public void outputTag(StringBuilder sb) {
-      if (!visible)
+      if (!visible) {
+         if (invisTags == null) {
+            invisTags = getChildrenById(getElementId() + "_" + ALT_ID);
+            if (invisTags == null)
+               invisTags = EMPTY_ELEMENT_ARRAY;
+         }
+         for (Element et:invisTags)
+            et.outputTag(sb);
          return;
+      }
 
       // Even events which fired during the tag initialization or since we last were rendered must be flushed so our content is accurate.
       DynUtil.execLaterJobs();
@@ -3315,7 +3351,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    public Element[] getChildrenById(String id) {
-      if (childrenById == null && children != null || hiddenChildren != null) {
+      if (childrenById == null) { // NOTE: used to only do this if children or hiddenChildren were set by that doesn't work for runtime elements since we never parsed those, but the instance does implement getObjChildren
          childrenById = new TreeMap<String,Element[]>();
          addChildListToByIdMap(this.getObjChildren(true), id);
       }
@@ -3894,4 +3930,5 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    // Part of IRepeatWrapper - to manage changes in the ordering of the tags
    public void updateElementIndexes(int fromIx) {
    }
+
 }

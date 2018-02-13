@@ -15,4 +15,5 @@ public class Html extends HTMLElement {
    public Html(sc.lang.java.TypeDeclaration concreteType)  {
       super(concreteType);
    }
+
 }

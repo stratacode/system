@@ -973,11 +973,22 @@ public class ModifyDeclaration extends TypeDeclaration {
          res.add(annot);
       }
 
+      LayeredSystem sys = getJavaModel().getLayeredSystem();
+
       // Then any modified extends
       ArrayList<Object> superRes;
       if (extendsBoundTypes != null) {
          for (Object extBoundType:extendsBoundTypes) {
-            superRes = ModelUtil.getAllInheritedAnnotations(getJavaModel().getLayeredSystem(), extBoundType, annotationName, skipCompiled, refLayer, layerResolve);
+            LayeredSystem useSys = sys;
+            Layer useRefLayer = refLayer;
+            // Weird case - for layer definition files extendsBoundTypes can be in different runtimes.  So we need to pass in
+            // a different refLayer for these lookups or they trigger our error detection of mismatching runtimes for the refLayer.
+            if (isLayerType && extBoundType instanceof ModifyDeclaration) {
+               ModifyDeclaration extLayerType = (ModifyDeclaration) extBoundType;
+               useRefLayer = extLayerType.getLayer();
+               useSys = useRefLayer.getLayeredSystem();
+            }
+            superRes = ModelUtil.getAllInheritedAnnotations(useSys, extBoundType, annotationName, skipCompiled, useRefLayer, layerResolve);
             if (superRes != null) {
                res = ModelUtil.appendLists(res, superRes);
             }

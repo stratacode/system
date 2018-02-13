@@ -8767,4 +8767,14 @@ public class ModelUtil {
 
    }
 
+   public static Object getPropertyTypeFromType(Object type, String propName) {
+      Object prop = ModelUtil.definesMember(type, propName, JavaSemanticNode.MemberType.PropertyAnySet, null, null, false, true, null);
+      if (prop == null) {
+         return null;
+      }
+      else {
+         return ModelUtil.getPropertyType(prop);
+      }
+   }
+
 }
