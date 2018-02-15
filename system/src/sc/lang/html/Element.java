@@ -3366,6 +3366,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             if (child instanceof Element) {
                Element elem = (Element) child;
                String childId = elem.getElementId();
+               if (childId == null)
+                  continue;
                Element[] oldList = childrenById.get(childId);
                Element[] newList;
                if (oldList == null) {
