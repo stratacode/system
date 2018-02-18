@@ -1884,7 +1884,7 @@ public class SyncManager {
 
       void removeSyncInst(Object inst, SyncProperties syncProps) {
          if (verbose) // TODO: add some info here about locks held if we have verboseLocks set?
-            System.out.println("Remove sync inst: " + DynUtil.getInstanceName(inst) + " on thread: " +  DynUtil.getTraceObjId(Thread.currentThread()));
+            System.out.println("Remove sync inst: " + DynUtil.getInstanceName(inst) + " on thread: " + DynUtil.getCurrentThreadString());
 
          InstInfo toRemove = syncInsts.remove(inst);
          if (toRemove == null) {
@@ -1896,7 +1896,7 @@ public class SyncManager {
 
       void replaceSyncInst(Object fromInst, Object toInst, SyncProperties syncProps) {
          if (verbose) // TODO: add some info here about locks held if we have verboseLocks set?
-            System.out.println("Replace sync inst: " + DynUtil.getInstanceName(toInst) + " on thread: " +  DynUtil.getTraceObjId(Thread.currentThread()));
+            System.out.println("Replace sync inst: " + DynUtil.getInstanceName(toInst) + " on thread: " + DynUtil.getCurrentThreadString());
 
          InstInfo toRemove = syncInsts.remove(fromInst);
          if (toRemove == null) {
