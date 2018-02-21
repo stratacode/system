@@ -1457,10 +1457,29 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                if (dtd.element != null)
                   return dtd.element;
             }
-            derivedType = derivedTD.getExtendsTypeDeclaration();
+
+            // In the search for an element we inherit through an extends operator, once we've crossed onto a new type
+            // we need to check the derived type first, before we move to the next 'extends'.  It's left up to that
+            // type to take into account is 'extends' if there is one.
+            Object extendsType = derivedTD.getExtendsTypeDeclaration();
+            derivedType = derivedTD.getDerivedTypeDeclaration();
             if (derivedType instanceof BodyTypeDeclaration)
                derivedTD = (BodyTypeDeclaration) derivedType;
-            else
+            else {
+               derivedType = ModelUtil.resolveSrcTypeDeclaration(getLayeredSystem(), derivedType);
+               if (derivedType instanceof BodyTypeDeclaration) {
+                  derivedTD = (BodyTypeDeclaration) derivedType;
+               }
+               else
+                  derivedTD = null;
+            }
+            if (extendsType != derivedType && extendsType != null) {
+               extendsType = ModelUtil.resolveSrcTypeDeclaration(getLayeredSystem(), extendsType);
+               if (extendsType instanceof BodyTypeDeclaration) {
+                  derivedTD = (BodyTypeDeclaration) extendsType;
+               }
+            }
+            if (derivedTD == null)
                return null;
          } while (true);
       }
