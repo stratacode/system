@@ -57,11 +57,13 @@ fi
 
 TEST_DIR="$RUN_DIR/$TEST_NAME"
 
-OUT_FILE="$TEST_DIR/out"
+OUT_FILE="$TEST_DIR/outf"
+OUTP_FILE="$TEST_DIR/out"
 STATUS_FILE="$TEST_DIR/status"
 CMD_FILE="$TEST_DIR/cmd"
 DIFF_FILE="$TEST_DIR/diff"
-PAGES="$TEST_DIR/pages"
+PAGESP="$TEST_DIR/pages"
+PAGES="$TEST_DIR/pagesf"
 
 VALID_DIR="$VALID_RESULTS/$TEST_NAME"
 VALID_FILE="$VALID_DIR/out"
@@ -81,21 +83,37 @@ if [ ! -d "$VALID_DIR" ] ; then
    mkdir -p "$VALID_DIR"
 fi
 
-echo "--- Running test $TEST_NAME: ${CMD}${INPUT_FILE_REDIR} > $OUT_FILE"
+echo "--- Running test $TEST_NAME: ${CMD}${INPUT_FILE_REDIR} > $OUTP_FILE"
 echo "$TEST_NAME" >> "${RUN_DIR}/testsRun"
 touch "${RUN_DIR}/passed"
 if [ "$ECHO_OUTPUT" = "1" ] ; then
    if [ ! -z "$INPUT_FILE" ] ; then
-      $CMD 2>&1 < "$INPUT_FILE" | tee "$OUT_FILE" 
+      $CMD 2>&1 < "$INPUT_FILE" | tee "$OUTP_FILE" 
    else
-      $CMD 2>&1 | tee "$OUT_FILE" 
+      $CMD 2>&1 | tee "$OUTP_FILE" 
    fi
 else
    if [ ! -z "$INPUT_FILE" ] ; then
-      $CMD 2>&1 < "$INPUT_FILE" &> "$OUT_FILE" 
+      $CMD 2>&1 < "$INPUT_FILE" &> "$OUTP_FILE" 
    else
-      $CMD 2>&1 &> "$OUT_FILE" 
+      $CMD 2>&1 &> "$OUTP_FILE" 
    fi
+fi
+
+if [ -f "$OUTP_FILE" ] ; then
+   scc -q -ni sctest.logFilter < "$OUTP_FILE" > "$OUT_FILE"
+   echo "Filtered: `diff "$OUTP_FILE" "$OUT_FILE" | wc -l` output lines"
+fi
+
+if [ -d "$PAGESP" ] ; then
+   mkdir "$PAGES"
+   for PAGE_FILEP in "$PAGESP"/*
+   do
+      BASE_PAGE=`basename $PAGE_FILEP`
+      PAGE_FILE="$PAGES"/"$BASE_PAGE"
+      scc -q -ni sctest.logFilter < "$PAGE_FILEP" > "$PAGE_FILE"
+      echo "Filtered: `diff "$PAGE_FILEP" "$PAGE_FILE" | wc -l` page: $BASE_PAGE lines"
+   done
 fi
 
 STATUS="$?"
