@@ -71,13 +71,18 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
             while ((nextLine = input.readLine(nextPrompt)) != null) {
                currentLine++;
                Object result = null;
+               String lastCommand = null;
                if (currentWizard != null || nextLine.trim().length() != 0) {
                   pendingInput.append(nextLine);
 
-                  result = parseCommand(pendingInput.toString(), getParselet());
+                  lastCommand = pendingInput.toString();
+                  result = parseCommand(lastCommand, getParselet());
                }
                if (result != null) {
                   try {
+                     // Nice for testing to see the command we are about to process
+                     if (echoInput && consoleDisabled && lastCommand != null && lastCommand.trim().length() > 0)
+                        System.out.println("Script cmd: " + lastCommand);
                      statementProcessor.processStatement(this, result);
                   }
                   catch (Throwable exc) {

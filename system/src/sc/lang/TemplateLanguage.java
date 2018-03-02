@@ -475,7 +475,7 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
                   // the initOnStartup code?  But then web.xml would not be generated soon enough?
                }
 
-               String pathInfo = src.relFileName; // TODO - should this use the pathName in the URL annotation above?  What if it has parameters?
+               String pathInfo = src.relFileName; // TODO - should this use the pattern in the URL annotation above?  What if it has parameters?
                if (resultSuffix != null)
                   pathInfo = FileUtil.replaceExtension(pathInfo, resultSuffix);
 

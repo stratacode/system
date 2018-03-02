@@ -622,10 +622,11 @@ public class ModifyDeclaration extends TypeDeclaration {
                else if (layer != null) {
                   String layerTypeName = extendsType.getFullTypeName();
 
-                  // Do errors for the layer def file when it gets started - skip this for peerMode.  The checkPeers flag here does not work because we only set them
-                  // after we've initialized the layers so this is too late.
-                  if (!sys.peerMode && (layer.activated ? sys.getLayerByPath(layerTypeName, true) : sys.getInactiveLayer(layerTypeName, false, true, true, false)) == null) {
-                     extendsType.displayTypeError("No layer: ");
+                  if ((layer.activated ? sys.getLayerByPath(layerTypeName, true) : sys.getInactiveLayer(layerTypeName, false, true, true, false)) == null) {
+                     // When we're activated and in a peer-system, we can't reliably look up the layers that are in other systems.   The 'check peers' flag does not work and we can't just look for these
+                     // on the main system because this is happening too early - before he main system has loaded these other layers.  But for activated mode, we should validate all of the layers existence on the main system.
+                     if (!sys.peerMode || !layer.activated)
+                        extendsType.displayTypeError("No layer: ");
                   }
                }
             }

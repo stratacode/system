@@ -25,10 +25,6 @@ public class Pattern extends SemanticNode {
     * you can use to parse that string.
     */
    public static Object initPattern(Language language, Object pageType, String pattern) {
-      if (pageType == null) {
-         System.err.println("Null page type to initPattern");
-         return null;
-      }
       Object res = PatternLanguage.getPatternLanguage().parseString(pattern);
       if (res instanceof ParseError)
          return res;
@@ -38,7 +34,7 @@ public class Pattern extends SemanticNode {
       // Need to set the system class loader so we can find the user defined model class in the pattern in case there are properties to set
       if (pageType instanceof BodyTypeDeclaration)
          language.classLoader = ((BodyTypeDeclaration) pageType).getLayeredSystem().getSysClassLoader();
-      else
+      else if (pageType != null)
          language.classLoader = ((Class) pageType).getClassLoader();
       return ((Pattern) res).getParselet(language, pageType);
    }

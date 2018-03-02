@@ -461,7 +461,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                   if (ci.execCommandTemplateName != null)
                      templ = getEnclosingType().findTemplatePath(ci.execCommandTemplateName, "exec command template", ExecCommandParameters.class);
                   String restartCommands = !doRestart ? "" :
-                                  "while expr $? = 33; do" +
+                                  "while [ \"$?\" = \"33\" ] ; do" +
                                   FileUtil.LINE_SEPARATOR +
                                   "   " + ci.restartCommand +
                                   FileUtil.LINE_SEPARATOR +

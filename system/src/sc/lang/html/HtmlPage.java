@@ -44,16 +44,22 @@ public class HtmlPage extends Html {
       this.pageURL = pageURL;
    }
    public String getPageURL() {
+      if (pageURL == null) {
+         Window w = Window.getWindow();
+         if (w != null)
+         pageURL = w.location.href;
+      }
       return pageURL;
    }
 
    public String getPageBaseURL() {
-      if (pageURL == null)
+      String pgurl = getPageURL();
+      if (pgurl == null)
          return null;
-      int ix = pageURL.indexOf("?");
+      int ix = pgurl.indexOf("?");
       if (ix == -1)
-         return pageURL;
-      return pageURL.substring(0, ix);
+         return pgurl;
+      return pgurl.substring(0, ix);
    }
 
    // TODO: this only works for the most rudimentary cases and should do escaping etc.

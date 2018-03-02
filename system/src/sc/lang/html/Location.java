@@ -12,7 +12,7 @@ import sc.obj.Constant;
  * code will pass through to the page.
  * TODO: need to make these properties bindable and settable on the client and server.  When set on the server, they
  * should be sync'd back and update the URL on the client.  This is for bookmarkable, navigation in rich apps.
- * A separae feature is a client/server api to do a redirect to another page.
+ * A separate feature is a client/server api to do a redirect to another page.
  */
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js")
 public class Location {

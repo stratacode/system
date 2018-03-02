@@ -189,6 +189,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    /** The list of other layered systems for other runtimes. */
    public ArrayList<LayeredSystem> peerSystems = null;
+   public LayeredSystem mainSystem = null;
 
    /** Set to true when this system is in a peer */
    public boolean peerMode = false;
@@ -295,6 +296,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    /** When processing more than one runtime, should the remote runtime be able to resolve methods against this system?  Typically true for servers, false for browsers. */
    public boolean enableRemoteMethods = true;
+
+   /** Is synchronization enabled for this runtime? */
+   public boolean syncEnabled = false;
 
    // Hook point for registering new file extensions into the build process.  Implement the process method
    // return IModelObj objects to register new types.
@@ -1144,6 +1148,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       this.systemPtr = new LayerUtil.LayeredSystemPtr(this);
       this.options = options;
       this.peerMode = parentSystem != null;
+      this.mainSystem = parentSystem;
       this.externalModelIndex = extModelIndex;
       this.systemInstalled = !options.installLayers;
       this.strataCodeInstallDir = scInstallDir;
@@ -2178,6 +2183,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public LayeredSystem getMainLayeredSystem() {
       if (!peerMode)
          return this;
+      if (mainSystem != null)
+         return mainSystem;
       if (peerSystems != null) {
          for (LayeredSystem sys:peerSystems)
             if (!sys.peerMode)
@@ -3866,7 +3873,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      }
                   }
                   else
-                     usage("Unrecognized options: " + opt, args);
+                     usage("Unrecognized option: " + opt, args);
                   break;
                case 't':
                   if (opt.equals("ta")) {
@@ -3902,7 +3909,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      }
                   }
                   else
-                     usage("Unrecognized options: " + opt, args);
+                     usage("Unrecognized option: " + opt, args);
+                  break;
+               case 'q':
+                  if (opt.equals("q")) {
+                     options.info = false;
+                  }
+                  else
+                     usage("Unrecognized option: " + opt, args);
                   break;
                case 'y':
                   if (opt.equals("yh"))
@@ -3912,7 +3926,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   if (opt.equals("u"))
                      options.updateSystem = true;
                   else
-                     usage("Unrecognized options: " + opt, args);
+                     usage("Unrecognized option: " + opt, args);
                   break;
                case 'v':
                   if (opt.equals("vb"))
@@ -3975,7 +3989,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   else if (opt.equals("v"))
                      traceNeedsGenerate = options.verbose = true;
                   else
-                     usage("Unrecognized options: " + opt, args);
+                     usage("Unrecognized option: " + opt, args);
                   break;
                default:
                   usage("Unrecognized option: " + opt, args);
@@ -5748,6 +5762,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
             // TODO: should we expose a way to make these layers dynamic?
             layer.baseLayers = baseLayers = initLayers(layer.baseLayerNames, newLayerDir, CTypeUtil.getPackageName(layer.layerDirName), false, paramInfo, false);
+
 
             // If we added any layers which presumably are non-empty, we will need to do a build to be sure they are up to date
             if (isActive && beforeSize != layers.size())
@@ -15184,7 +15199,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                // TODO: when the pattern is in the pattern language, we can init the pattern, find the variables and build
                // a form for testing the URL?
                String annotURL = (String) memb.getAnnotationValue("sc.html.URL", "pattern");
-               if (annotURL != null)
+               // When the server is not enabled, the URLPath's have to refer to the file system right now.
+               // TODO: add a hook so for static sites, we generate the path-mapping file for apache, nginx, etc?
+               if (annotURL != null && serverEnabled)
                   path.url = annotURL;
                if (!res.contains(path))
                   res.add(path);

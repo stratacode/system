@@ -163,6 +163,8 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    /** For commands like createLayer, we add a wizard which processes input temporarily */
    CommandWizard currentWizard = null;
 
+   public boolean echoInput = true;
+
    /** Time to pause in between commands - useful for playing back scripts */
    public int pauseTime = 0;
 
