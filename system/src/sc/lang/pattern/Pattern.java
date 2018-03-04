@@ -4,6 +4,7 @@
 
 package sc.lang.pattern;
 
+import sc.dyn.DynUtil;
 import sc.lang.PatternLanguage;
 import sc.lang.SemanticNode;
 import sc.lang.SemanticNodeList;
@@ -20,9 +21,10 @@ public class Pattern extends SemanticNode {
    private transient Parselet parselet = null;
    private transient Language language = null;
 
-   /** Initializes a pattern string written in the PatternLanguage.
-    * The pattern is applied to a second language and returns a Parselet
-    * you can use to parse that string.
+   /**
+    * Initializes a pattern string written in the PatternLanguage.  Returns either a Pattern object or a ParseError if the pattern does not match.
+    * The supplied pattern can use parselets from a second language to parse a chunk in the pattern (e.g. {integerLiteral}, or {identifier} if you supply the JavaLanguage)
+    * or the pattern can be matched to properties of the pageType (e.g. {blogId=integerLiteral}).
     */
    public static Object initPattern(Language language, Object pageType, String pattern) {
       Object res = PatternLanguage.getPatternLanguage().parseString(pattern);
@@ -36,11 +38,20 @@ public class Pattern extends SemanticNode {
          language.classLoader = ((BodyTypeDeclaration) pageType).getLayeredSystem().getSysClassLoader();
       else if (pageType != null)
          language.classLoader = ((Class) pageType).getClassLoader();
-      return ((Pattern) res).getParselet(language, pageType);
+      return res;
+   }
+
+   public static Object initPatternParselet(Language language, Object pageType, String pattern) {
+      Object pt = initPattern(language, pageType, pattern);
+      if (pt instanceof ParseError) {
+         System.err.println("*** Failed to init pattern: " + pattern + " parse error: " + pt);
+         return pt;
+      }
+      return ((Pattern) pt).getParselet(language, pageType);
    }
 
    public static Parselet getPattern(Language language, Object pageType, String pattern) {
-      Object res = initPattern(language, pageType, pattern);
+      Object res = initPatternParselet(language, pageType, pattern);
       if (res instanceof ParseError) {
          throw new IllegalArgumentException("Error parsing pattern string: " + res.toString());
       }
