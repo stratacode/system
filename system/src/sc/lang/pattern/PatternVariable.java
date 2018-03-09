@@ -6,8 +6,7 @@ package sc.lang.pattern;
 
 import sc.lang.SemanticNode;
 
-// TODO: change the name of this to "PatternVariable"
-public class VariableDef extends SemanticNode {
+public class PatternVariable extends SemanticNode {
    // The first name in the expression
    public String name;
    // The name after the equals sign - these values are copied into propertyName and parseletName in the init

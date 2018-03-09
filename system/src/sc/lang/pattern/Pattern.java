@@ -8,15 +8,17 @@ import sc.dyn.DynUtil;
 import sc.lang.PatternLanguage;
 import sc.lang.SemanticNode;
 import sc.lang.SemanticNodeList;
+import sc.lang.html.Option;
 import sc.lang.java.BodyTypeDeclaration;
 import sc.lang.java.ModelUtil;
 import sc.parser.*;
+import sc.util.URLUtil;
 
 import java.util.ArrayList;
 
 public class Pattern extends SemanticNode {
-   // String, VariableDef, or OptionalPattern objects
-   SemanticNodeList<Object> elements;
+   // String, PatternVariable, or OptionalPattern
+   public SemanticNodeList<Object> elements;
 
    private transient Parselet parselet = null;
    private transient Language language = null;
@@ -80,7 +82,7 @@ public class Pattern extends SemanticNode {
                String elemStr = elem.toString();
                int elemStrLen = elemStr.length();
                for (int i = 0; i < elemStrLen; i++) {
-                  // Replace \{, etc. with { in the symbol string
+                  // Replace \, brace, etc. with open-brace in the symbol string
                   if (elemStr.charAt(i) == '\\') {
                      if (i < elemStrLen - 1 && elemStr.charAt(i+1) != '\\') {
                         elemStr = elemStr.substring(0, i) + elemStr.substring(i+1);
@@ -90,8 +92,8 @@ public class Pattern extends SemanticNode {
                }
                parselets.add(new Symbol(elemStr));
             }
-            else if (elem instanceof VariableDef) {
-               VariableDef varDef = (VariableDef) elem;
+            else if (elem instanceof PatternVariable) {
+               PatternVariable varDef = (PatternVariable) elem;
                if (varDef.propertyName != null)
                   descriptor.append(varDef.propertyName);
                Parselet patternParselet = language.getParselet("<" + varDef.parseletName + ">");
@@ -120,5 +122,159 @@ public class Pattern extends SemanticNode {
          parselet.setLanguage(language);
       }
       return parselet;
+   }
+
+   /**
+    * The internal routine that implements the match for a given pattern.
+    * Returns null for no match - empty string for an optional match that did not match.  We could implement this using the getParselet for the
+    * server but want to have one set of logic we share between client and server and don't want to require Parselets just for URL pattern matching.
+    */
+   String match(String fromStr, Object inst) {
+      int len = 0;
+      String matchStr = fromStr;
+      for (Object elem:elements) {
+         if (elem instanceof String) {
+            String elemStr = (String) elem;
+            if (matchStr.startsWith(elemStr)) {
+               int strLen = elemStr.length();
+               matchStr = matchStr.substring(strLen);
+               len += strLen;
+            }
+            else {
+               return null;
+            }
+         }
+         else if (elem instanceof Pattern) {
+            Pattern pattern = (Pattern) elem;
+            String subMatch = pattern.match(matchStr, inst);
+            if (subMatch == null)
+               return null;
+            else {
+               int subLen = subMatch.length();
+               if (subLen != 0) {
+                  matchStr = matchStr.substring(subLen);
+                  len += subLen;
+               }
+            }
+         }
+         else if (elem instanceof PatternVariable) {
+            PatternVariable patVar = (PatternVariable) elem;
+            String typeName = patVar.parseletName;
+            String propName = patVar.propertyName;
+            Object propVal = null;
+            int matchLen = matchStr.length();
+            try {
+               if (typeName.equals("integer") || typeName.equals("integerLiteral")) {
+                  int intLen;
+                  for (intLen = 0; intLen < matchLen && Character.isDigit(matchStr.charAt(intLen)); intLen++) {
+                  }
+                  if (intLen == 0)
+                     return null;
+                  String intStr = matchStr.substring(0, intLen);
+                  try {
+                     int intVal = Integer.parseInt(intStr);
+                     propVal = intVal;
+                     if (inst != null) {
+                        if (propName != null) {
+                           DynUtil.setProperty(inst, propName, intVal);
+                        }
+                     }
+                  }
+                  catch (NumberFormatException exc) {
+                     return null;
+                  }
+               }
+               else if (typeName.equals("urlString") || typeName.equals("identifier")) {
+                  int strLen = 0;
+                  while (strLen < matchLen) {
+                     char c = matchStr.charAt(strLen);
+                     boolean isFirst = strLen == 0;
+
+                     if (typeName.equals("urlString")) {
+                        if (!URLUtil.isURLCharacter(c))
+                           break;
+                     }
+                     else if (typeName.equals("identifier")) {
+                        if (isFirst) {
+                           if (!Character.isJavaIdentifierStart(c))
+                              break;
+                        }
+                        else if (!Character.isJavaIdentifierPart(c))
+                           break;
+                     }
+                     strLen++;
+                  }
+                  if (strLen == 0)
+                     return null;
+                  String strVal = matchStr.substring(0, strLen);
+                  propVal = strVal;
+                  if (inst != null) {
+                     DynUtil.setProperty(inst, propName, strVal);
+                  }
+                  matchStr = matchStr.substring(strLen);
+               }
+               else {
+                  System.err.println("*** Unrecognized pattern name: " + typeName);
+               }
+            }
+            catch (IllegalArgumentException exc) {
+               System.err.println("*** Failed to set pattern property: " + inst + "." + propName + " = " + propVal);
+               return null;
+            }
+         }
+      }
+      if (len == fromStr.length())
+         return fromStr;
+      else
+         return fromStr.substring(0, len);
+   }
+
+   public boolean matchString(String fromStr) {
+      String matchStr = match(fromStr, null);
+      // Should be a match with nothing left over
+      return matchStr != null && matchStr.length() == fromStr.length();
+   }
+
+   public boolean updateInstance(String fromStr, Object inst) {
+      if (matchString(fromStr)) {
+         Object res = match(fromStr, inst);
+         return res != null;
+      }
+      return false;
+   }
+
+   public String getPatternFromInst(Object inst) {
+      StringBuilder sb = new StringBuilder();
+      for (Object elem:elements) {
+         if (elem instanceof String)
+            sb.append((String) elem);
+         else if (elem instanceof OptionalPattern) {
+            OptionalPattern pat = (OptionalPattern) elem;
+            String optStr = pat.getPatternFromInst(inst);
+            if (optStr != null)
+               sb.append(optStr);
+         }
+         else if (elem instanceof PatternVariable) {
+            PatternVariable patVar = (PatternVariable) elem;
+            String propName = patVar.propertyName;
+            try {
+               // The pattern is not defined because some property is not defined
+               Object propVal = DynUtil.getProperty(inst, propName);
+               if (propVal == null)
+                  return null;
+               // TODO: are there any cases where we need to do something other than toString here?
+               sb.append(propVal.toString());
+            }
+            catch (IllegalArgumentException exc) {
+               System.err.println("*** Failed to get property: " + inst + "." + propName + " for pattern: " + this);
+               return null;
+            }
+         }
+      }
+      return sb.toString();
+   }
+
+   public boolean isSimplePattern() {
+      return elements.size() == 1 && elements.get(0) instanceof String;
    }
 }

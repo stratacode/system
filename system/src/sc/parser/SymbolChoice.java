@@ -47,6 +47,11 @@ public class SymbolChoice extends Parselet {
          addExpectedValue(p);
    }
 
+   public SymbolChoice(Character... expectedValues) {
+      for (Character p: expectedValues)
+         addExpectedValue(String.valueOf(p));
+   }
+
    public void addExpectedValue(String v) {
       if (initialized) {
          System.out.println("warning: adding values to an initialized SymbolChoice");

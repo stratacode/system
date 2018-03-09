@@ -1791,7 +1791,7 @@ public class IdentifierExpression extends ArgumentsExpression {
    }
 
    private boolean isDynGetMethod(int i) {
-      if (idTypes[i] == IdentifierType.GetVariable && boundTypes[i] instanceof MethodDefinition && !disableGetVariable(i))
+      if ((idTypes[i] == IdentifierType.GetVariable || idTypes[i] == IdentifierType.IsVariable) && boundTypes[i] instanceof MethodDefinition && !disableGetVariable(i))
          return true;
 
       return false;
@@ -4738,6 +4738,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   //   break;
                case FieldName:
                case GetVariable:
+               case IsVariable:
                case BoundObjectName:
                   styleName = isStaticTarget(i) ? "staticMember" : "member";
                   break;

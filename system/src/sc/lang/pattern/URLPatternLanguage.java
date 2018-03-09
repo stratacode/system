@@ -4,15 +4,16 @@
 
 package sc.lang.pattern;
 
-import sc.lang.BaseLanguage;
+import sc.lang.SCLanguage;
 import sc.layer.Layer;
 import sc.parser.OrderedChoice;
 import sc.parser.ParseUtil;
 import sc.parser.Parselet;
 import sc.parser.SymbolChoice;
+import sc.util.URLUtil;
 
 /** A language designed for parsing values from URLs using the pattern property of the @URL annotation */
-public class URLPatternLanguage extends BaseLanguage {
+public class URLPatternLanguage extends SCLanguage {
    public URLPatternLanguage() {
       this(null);
    }
@@ -43,9 +44,9 @@ public class URLPatternLanguage extends BaseLanguage {
       return INSTANCE;
    }
 
-   public SymbolChoice urlSpecialChar = new SymbolChoice("$", "-", "_", ".", "+", "!", "*", "'", "(", ")", ",");
+   public SymbolChoice urlSpecialChar = new SymbolChoice(URLUtil.URL_SPECIAL_CHARS);
 
-   public Parselet urlString = new OrderedChoice("('','','')", OPTIONAL | REPEAT, alphaNumChar, digits, urlSpecialChar);
+   public Parselet urlString = new OrderedChoice("('','','')", REPEAT, alphaNumChar, digits, urlSpecialChar);
    public Parselet integer = new OrderedChoice(digits);
    {
       // We want the input/output value to be the integer itself, not an IntegerLiteral like in other languages.  This is the first time we've needed to

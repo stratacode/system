@@ -13,8 +13,14 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
+import java.util.Arrays;
 
 public class URLUtil {
+   public static Character[] URL_SPECIAL_CHARS = new Character[] {'$','-', '_', '.', '+', '!', '*', '\'', '(', ')', ',' };
+
+   public static boolean isURLCharacter(char c) {
+      return Character.isAlphabetic(c) || Character.isDigit(c) || Arrays.asList(URL_SPECIAL_CHARS).contains(c);
+   }
 
    /** Given a/b/c.x returns a/b */
    public static String getParentPath(String relFileName) {

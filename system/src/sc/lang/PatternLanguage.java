@@ -38,7 +38,7 @@ public class PatternLanguage extends BaseLanguage {
    Parselet escapedString = new OrderedChoice("('','')", REPEAT, new SymbolChoice("\\{", "\\}", "\\[", "\\]"), new SymbolChoice(NOT, "\\", "{", "}", "[", "]", EOF));
 
    // A variable is a variableDef surrounded by braces
-   Sequence variable = new Sequence("(,.,)", new Symbol("{"), new Sequence("VariableDef(name,*)", identifier, new Sequence("(,equalsName)", OPTIONAL, new Symbol("="), identifier)), new Symbol("}"));
+   Sequence variable = new Sequence("(,.,)", new Symbol("{"), new Sequence("PatternVariable(name,*)", identifier, new Sequence("(,equalsName)", OPTIONAL, new Symbol("="), identifier)), new Symbol("}"));
 
    Sequence optionalPattern = new Sequence("OptionalPattern(,elements,)", new Symbol("["), new OrderedChoice("([], [])", OPTIONAL | REPEAT, escapedString, variable), new Symbol("]"));
 
