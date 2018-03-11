@@ -15,6 +15,7 @@ import sc.parser.*;
 import sc.util.URLUtil;
 
 import java.util.ArrayList;
+import java.util.Map;
 
 public class Pattern extends SemanticNode {
    // String, PatternVariable, or OptionalPattern
@@ -243,14 +244,18 @@ public class Pattern extends SemanticNode {
       return false;
    }
 
-   public String getPatternFromInst(Object inst) {
+   public boolean isPatternValidWithInst(Object inst, Map<String,Object> otherProps) {
+      return evalPatternWithInst(inst, otherProps) != null;
+   }
+
+   public String evalPatternWithInst(Object inst, Map<String,Object> otherProps) {
       StringBuilder sb = new StringBuilder();
       for (Object elem:elements) {
          if (elem instanceof String)
             sb.append((String) elem);
          else if (elem instanceof OptionalPattern) {
             OptionalPattern pat = (OptionalPattern) elem;
-            String optStr = pat.getPatternFromInst(inst);
+            String optStr = pat.evalPatternWithInst(inst, otherProps);
             if (optStr != null)
                sb.append(optStr);
          }
@@ -259,7 +264,8 @@ public class Pattern extends SemanticNode {
             String propName = patVar.propertyName;
             try {
                // The pattern is not defined because some property is not defined
-               Object propVal = DynUtil.getProperty(inst, propName);
+               Object propVal = otherProps == null ? null : otherProps.get(propName);
+               propVal = propVal == null ? DynUtil.getProperty(inst, propName) : propVal;
                if (propVal == null)
                   return null;
                // TODO: are there any cases where we need to do something other than toString here?
