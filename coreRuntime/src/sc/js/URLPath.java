@@ -5,6 +5,7 @@
 package sc.js;
 
 import sc.obj.Constant;
+import sc.type.CTypeUtil;
 
 /**
  * A simple model object used to represent the information required to render a link for a URL
@@ -16,9 +17,13 @@ public class URLPath {
    public String url;
    @Constant
    public String name;
+   @Constant
+   public String keyName;
+
    public URLPath(String typeName) {
-      url = typeName + ".html";
-      name = typeName;
+      keyName = typeName;
+      name = CTypeUtil.getClassName(typeName);
+      url = name + ".html";
    }
 
    public int hashCode() {

@@ -15177,7 +15177,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                // Skip mainInit types which also have URL since we'll process them below
                if (memb.hasAnnotation("sc.html.URL"))
                   continue;
-               URLPath path = new URLPath(CTypeUtil.getClassName(memb.typeName));
+               URLPath path = new URLPath(memb.typeName);
                if (!res.contains(path))
                   res.add(path);
             }
@@ -15195,12 +15195,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                // Skip types which may not be loaded yet
                if (memb.getType() == null)
                   continue;
-               URLPath path = new URLPath(CTypeUtil.getClassName(memb.typeName));
+               URLPath path = new URLPath(memb.typeName);
                // TODO: when the pattern is in the pattern language, we can init the pattern, find the variables and build
                // a form for testing the URL?
                String annotURL = (String) memb.getAnnotationValue("sc.html.URL", "pattern");
                // When the server is not enabled, the URLPath's have to refer to the file system right now.
-               // TODO: add a hook so for static sites, we generate the path-mapping file for apache, nginx, etc?
+               // TODO: add a hook so for static sites (!serverEnabled), we could generate the path-mapping file for some other web server apache, nginx, etc?
+               if (annotURL != null) {
+
+               }
                if (annotURL != null && serverEnabled)
                   path.url = annotURL;
                if (!res.contains(path))
