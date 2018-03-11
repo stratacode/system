@@ -509,6 +509,10 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       return fullTypeName;
    }
 
+   public String getJavaFullTypeName() {
+      return classFile.getCFClassName();
+   }
+
    private String stripInnerSeparators(String input) {
       Object type = this, nextType;
       while ((nextType = ModelUtil.getEnclosingType(type)) != null) {

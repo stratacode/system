@@ -2031,6 +2031,20 @@ public class ModelUtil {
       throw new UnsupportedOperationException();
    }
 
+   public static String getJavaFullTypeName(Object type) {
+      if (type instanceof ITypeDeclaration)
+         return ((ITypeDeclaration) type).getJavaFullTypeName();
+      else if (type instanceof Class)
+         return ((Class) type).getName();
+      else if (ModelUtil.hasTypeParameters(type)) {
+         return getJavaFullTypeName(ModelUtil.getParamTypeBaseType(type));
+      }
+      else if (ModelUtil.isTypeVariable(type))
+         return ModelUtil.getTypeParameterName(type);
+      else
+         throw new UnsupportedOperationException();
+   }
+
    // TODO: Performance Fix - me - should be looking up a precedence value in each type and just comparing them
    public static Object coerceNumberTypes(Object lhsType, Object rhsType) {
       // If we are coercing Integer, Float, etc. and Number the base is a Number
@@ -7261,7 +7275,7 @@ public class ModelUtil {
       if (type instanceof JavaType)
          return ((JavaType) type).getSignature(false);
       else if (type instanceof ITypeDeclaration)
-         return "L" + ModelUtil.getTypeName(type).replace('.', '/') + ";";
+         return "L" + ((ITypeDeclaration)type).getJavaFullTypeName().replace('.', '/') + ";";
       else if (type instanceof Class) {
          return RTypeUtil.getSignature((Class) type);
       }

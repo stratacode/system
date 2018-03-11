@@ -62,6 +62,14 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
          return getFullBaseTypeName();
    }
 
+   public String getJavaFullTypeName() {
+      Object type = getTypeDeclaration(null, null, true, false, true);
+      if (type != null)
+         return ModelUtil.getJavaFullTypeName(type);
+      else
+         return getFullBaseTypeName();
+   }
+
    /** Includes type arguments in the type name */
    public String getAbsoluteGenericTypeName(Object resultType, boolean includeDims) {
       if (includeDims)

@@ -24,6 +24,8 @@ public interface ITypeDeclaration {
 
    String getFullTypeName();
 
+   String getJavaFullTypeName();
+
    String getFullBaseTypeName();
 
    String getInnerTypeName();

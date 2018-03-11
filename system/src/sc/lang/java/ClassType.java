@@ -645,7 +645,7 @@ public class ClassType extends JavaType {
    }
 
    public String getBaseSignature() {
-      return (signatureCode == null ? "L" : signatureCode) + getAbsoluteBaseTypeName().replace(".", "/")  + (signatureCode == null || signatureCode.equals("L") ? ";" : "");
+      return (signatureCode == null ? "L" : signatureCode) + getJavaFullTypeName().replace(".", "/")  + (signatureCode == null || signatureCode.equals("L") ? ";" : "");
    }
 
    public boolean transform(ILanguageModel.RuntimeType rt) {

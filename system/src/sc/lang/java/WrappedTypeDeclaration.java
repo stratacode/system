@@ -63,6 +63,11 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
       return getFullTypeName(true, false);
    }
 
+   @Override
+   public String getJavaFullTypeName() {
+      return ModelUtil.getJavaFullTypeName(baseType);
+   }
+
    public String getFullTypeName(boolean includeDims, boolean includeTypeParams) {
       return ModelUtil.getTypeName(baseType);
    }

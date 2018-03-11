@@ -864,8 +864,10 @@ public class RTypeUtil {
          if (methodAlias != null) {
             meth = resolveMethod(resultClass, methodAlias, paramSig);
          }
-         if (meth == null)
+         if (meth == null) {
             System.err.println("Unable to resolve method: " + resultClass.getName() + "." + methodName + " with param signature: " + paramSig);
+            meth = getMethodFromTypeSignature(resultClass, methodName, paramSig);
+         }
       }
       return meth;
    }

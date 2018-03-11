@@ -148,6 +148,11 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return getFullTypeName(true, false);
    }
 
+   @Override
+   public String getJavaFullTypeName() {
+      return ModelUtil.getJavaFullTypeName(baseType);
+   }
+
    public String getFullTypeName(boolean includeDims, boolean includeTypeParams) {
       String baseName = ModelUtil.getTypeName(baseType);
       if (includeTypeParams && types != null) {

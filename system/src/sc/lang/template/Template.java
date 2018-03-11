@@ -116,6 +116,10 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
       return ModelUtil.getTypeName(rootType);
    }
 
+   public String getJavaFullTypeName() {
+      return ModelUtil.getJavaFullTypeName(rootType);
+   }
+
    public String getFullTypeName(boolean includeDims, boolean includeTypeParams) {
       return ModelUtil.getTypeName(rootType, includeDims, includeTypeParams);
    }

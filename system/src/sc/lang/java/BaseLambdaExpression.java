@@ -673,6 +673,10 @@ public abstract class BaseLambdaExpression extends Expression {
          return "java.lang.Object";
       }
 
+      public String getJavaFullTypeName() {
+         return getFullTypeName();
+      }
+
       @Override
       public String getFullTypeName() {
          return "java.lang.Object";
@@ -995,6 +999,10 @@ public abstract class BaseLambdaExpression extends Expression {
 
       @Override
       public String getFullBaseTypeName() {
+         return "java.lang.Object";
+      }
+
+      public String getJavaFullTypeName() {
          return "java.lang.Object";
       }
 

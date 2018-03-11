@@ -4,11 +4,8 @@
 
 package sc.layer;
 
-import sc.dyn.DynUtil;
 import sc.lang.AbstractInterpreter;
 import sc.lang.java.*;
-import sc.lang.pattern.VariableDef;
-import sc.sync.ClassSyncWrapper;
 import sc.sync.SyncHandler;
 import sc.sync.SyncManager;
 import sc.type.IBeanMapper;

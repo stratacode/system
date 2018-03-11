@@ -126,6 +126,10 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
       return ModelUtil.getTypeName(componentType) + arrayDimensions;
    }
 
+   public String getJavaFullTypeName() {
+      return ModelUtil.getJavaFullTypeName(componentType);
+   }
+
    public String getFullBaseTypeName() {
       return ModelUtil.getTypeName(componentType);
    }
