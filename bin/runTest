@@ -100,6 +100,16 @@ else
    fi
 fi
 
+STATUS="$?"
+if [ "$STATUS" = 130 ] ; then
+   echo "Test $TEST_NAME interrupted"
+   exit 130
+fi
+if [ $STATUS != 0 ] ; then
+    echo "Warning: test exited with status: $STATUS"
+fi
+echo "$STATUS" > "$STATUS_FILE"
+
 if [ -f "$OUTP_FILE" ] ; then
    scc -q -ni sctest.logFilter < "$OUTP_FILE" > "$OUT_FILE"
    echo "Filtered: `diff "$OUTP_FILE" "$OUT_FILE" | wc -l` output lines"
@@ -115,17 +125,6 @@ if [ -d "$PAGESP" ] ; then
       echo "Filtered: `diff "$PAGE_FILEP" "$PAGE_FILE" | wc -l` page: $BASE_PAGE lines"
    done
 fi
-
-STATUS="$?"
-if [ "$STATUS" = 130 ] ; then
-   echo "Test $TEST_NAME interrupted"
-   exit 130
-fi
-
-if [ $STATUS != 0 ] ; then
-    echo "Warning: test exited with status: $STATUS"
-fi
-echo "$STATUS" > "$STATUS_FILE"
 
 if [ -z "$INPUT_FILE" ] ; then
    echo "$CMD" > "$CMD_FILE"
