@@ -31,9 +31,6 @@ public interface IExternalModelIndex {
    /** Has this file been excluded from the IDE's project.  If so, this tells StrataCode to skip processing of this file even if it's a parseable extension. */
    public boolean isExcludedFile(String fileName);
 
-   /** TODO: Is this needed anymore?  It was originally designed to be called to provide the timestamp of the file loaded by the external index, to help SC do a refresh but is no longer used */
-   public long getModelTimestamp(ILanguageModel model);
-
    /** Called to notify the index that a language model file was changed.  */
    public void modelChanged(ILanguageModel model, boolean modelChanged, Layer layer);
 }

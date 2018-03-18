@@ -220,8 +220,9 @@ public class SysTypeIndex {
    }
 
    public void removeExcludedLayer(String layerName) {
-      if (inactiveTypeIndex != null)
+      if (inactiveTypeIndex != null) {
          inactiveTypeIndex.orderIndex.removeExcludedLayer(layerName);
+      }
    }
 
    public void refreshLayerOrder(LayeredSystem sys) {

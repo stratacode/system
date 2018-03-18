@@ -101,7 +101,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    private Element[] invisTags = null;
 
-   // Applies to the client only - server content is not renderered on the client.  Diffs from the exec flags in that if you use exec="client" the code is not compiled into the client version at all.  When the client version
+   // Applies to the client only - server content is not rendered on the client.  Diffs from the exec flags in that if you use exec="client" the code is not compiled into the client version at all.  When the client version
    // is used to generate a server-side html file, that's awkward cause you can't for example render the script tags and things that should only go on the server.
    public boolean serverContent = false;
 
@@ -201,7 +201,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       else if (dynObj != null) {
          res = (Element) dynObj.invokeFromWrapper(this, "createElement","Ljava/lang/Object;ILsc/lang/html/Element;", val, ix, oldTag);
       }
-      // If it was created by parsing an HTML file, do it by hand.  We will not have an enclosing instance in this case so the deepCopy will work even in that case.
+      // If this Element instance was created by parsing an schtml file, we can implement the repeat using the parsed semantic node tree.
       else {
          Element repeatElem = (Element) this.deepCopy(ISemanticNode.CopyNormal, null);
          repeatElem.removeAttribute("repeat");
@@ -3664,11 +3664,13 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             List<String> fileList = jsRT.getJSFiles(declRoot);
             if (fileList != null) {
                ArrayList<String> res = new ArrayList<String>(fileList);
+               Template templ = getEnclosingTemplate();
                for (int i = 0; i < res.size(); i++) {
                   String jsFilePath = res.get(i);
                   // We need to use relative paths for client-only or prepend the absolute path of the document root here
                   if (sys.serverEnabled && !jsFilePath.startsWith("/")) {
-                     jsFilePath = "/" + jsFilePath;
+                     if (!sys.postBuildProcessing)  // We don't technically need this extra test... it was for the static file based websites like the doc which are built with a server, the JS links would not work from the file system, but would when you put them onto a web server.
+                        jsFilePath = "/" + jsFilePath;
                   }
                   res.set(i, jsFilePath);
                }

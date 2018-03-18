@@ -1,0 +1,20 @@
+#!/bin/sh
+
+SC=/jjv/StrataCode
+
+cd $SC
+
+# Bunch of examples whose build output is referenced from the source
+scc -c -a example/simpleComponent
+scc -c -a example/simple js/schtml
+scc -c -a example/unitConverter/model
+scc -c -a example/todo/clientOnly
+
+# Argh - two build files we want included as source for the static doc web site
+# so we can run the TodoSample.  Would be nice to have a way to generate 
+# a layer as output from any set of layers, to be used as "compiled input"
+# to other layers.
+cp build/example_todo_clientOnly/web/TodoList.html bundles/doc/doc/core/
+cp build/example_todo_clientOnly/web/js/sc_example_todo_TodoList.js bundles/doc/doc/core/js/
+
+scc -c -a doc/core

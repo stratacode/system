@@ -403,6 +403,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** Internal flag set when initializing the type index to prevent loading src files during this time. */
    boolean startingTypeIndexLayers = false;
 
+   /** Flag set when doing the postBuild process - for those cases where you might need different behavior when generating a static file versus one when the server loads */
+   public boolean postBuildProcessing = false;
+
    /** Internal flag set when intializing the type index */
    boolean initializingTypeIndexes = false;
 
@@ -3503,6 +3506,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       /** Enabled with the -c option - only compile, do not run either main methods or runCommands. */
       @Constant public boolean compileOnly = false;
 
+      /** An IDE or other tool that never runs code should set this to false.  In these cases, we do not want to include the buildDir in the classPath - we'll never run the application code or try to evaluate a template or anything in a build layer */
+      @Constant public boolean includeBuildDirInClassPath = true;
+
       /** Do a rebuild automatically when a page is refreshed.  Good for development since each page refresh will recompile and update the server and javascript code.  If a restart is required you are notified.  Bad for production because it's very expensive. */
       @Constant public boolean autoRefresh = true;
 
@@ -4178,7 +4184,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       setCurrent(sys);
 
       // This will do any post-build processing such as generating static HTML files.  Only do it for the main runtime... otherwise, we'll do the .html files twice.
-      // This has to be done after the peerSystems are built so we have enough information to peak into that runtime to get the list of JS files our app depends on.
+      // This has to be done after the peerSystems are built so we have enough information to check the other runtime for the list of JS files the app depends on.
       sys.initPostBuildModels();
 
       // Until this point, we have not started any threads or run anything else on the layered system but now we are about to
@@ -4891,8 +4897,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       // Turn off sync for the page objects when they are being rendered statically - just removes some errors because we may create synchronized instances here
       SyncManager.SyncState oldState = SyncManager.setSyncState(SyncManager.SyncState.Disabled);
+      postBuildProcessing = true;
       try {
-
          PerfMon.start("postBuildFiles");
          for (Map.Entry<String,ModelToPostBuild> ent:modelsToPostBuild.entrySet()) {
             ModelToPostBuild m = ent.getValue();
@@ -4906,6 +4912,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       finally {
          SyncManager.restoreOldSyncState(oldState);
+         postBuildProcessing = false;
       }
    }
 
@@ -6292,6 +6299,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       checkLayerPosition();
    }
 
+   public void initInactiveLayer(Layer layer) {
+      completeNewInactiveLayer(layer, true);
+   }
+
    private void checkLayerPosition() {
       int i = 0;
       for (Layer l:inactiveLayers) {
@@ -6613,7 +6624,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (!peerMode)
             verbose("Using explicit layer path: " + layerPath);
       }
-      else {
+      else if (strataCodeMainDir == null) {
          String currentDir = System.getProperty("user.dir");
          if (initStrataCodeDir(currentDir))
             return;
@@ -7298,6 +7309,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         System.err.println("*** Modifying type index without write lock");
                         new Throwable().printStackTrace();
                      }
+                     if (layer.layerTypeIndex == null)
+                        layer.initTypeIndex();
                      idx.typeIndex.put(layerName, layer.layerTypeIndex);
                      refreshedLayers.add(layerName);
                   }
@@ -7616,6 +7629,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          for (Layer layer : rebuildLayers) {
             layer.ensureValidated(true);
+         }
+         for (Layer layer : rebuildLayers) {
+            if (layer.layerTypeIndex == null)
+               layer.initTypeIndex();
          }
          startingTypeIndexLayers = false;
          // Collecting each layer in this list - it may contain layers from different layered system so we build up a list
@@ -12206,6 +12223,17 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public static int nestLevel = 0;
 
+   /**
+    * This is a simple version of this method to use for getting the inactive or active TypeDeclaration for the given refLayer.
+    * You'll get the most specific one if there's more than one layer.
+    */
+   public TypeDeclaration getSrcTypeDeclaration(String typeName, Layer refLayer) {
+      Object res = getSrcTypeDeclaration(typeName, null, true, false, true, refLayer, false);
+      if (res instanceof TypeDeclaration)
+         return (TypeDeclaration) res;
+      return null;
+   }
+
    public TypeDeclaration getSrcTypeDeclaration(String typeName, Layer fromLayer, boolean prependPackage) {
       return getSrcTypeDeclaration(typeName, fromLayer, prependPackage, false);
    }
@@ -12889,6 +12917,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (model.getLayer() != null && model.getLayer().activated)
                System.out.println("*** Error - adding activated model to inactive index");
             addNewModel(model, null, null, null, (model instanceof JavaModel && ((JavaModel) model).isLayerModel), false);
+         }
+         else {
+            error("Parsing inactive type: " + srcEnt + ": " + ((ParseError) result).errorStringWithLineNumbers(srcEnt.absFileName));
          }
       }
       if (model instanceof JavaModel)
@@ -13973,7 +14004,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      if (layer == buildLayer || !options.buildAllLayers) {
                         // Don't include the buildDir for the IDE and other environments when we are compiling only and not running unless it's a final layer like js.prebuild where
                         // we want the compilation process to load the compiled classes for speed.
-                        if (!options.compileOnly || layer.finalLayer)
+                        if (options.includeBuildDirInClassPath || layer.finalLayer)
                            layer.appendBuildURLs(urls);
                      }
                   }
@@ -14825,12 +14856,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
          Layer layer = initLayer(layerPath, null, null, false, lpi);
          if (layer != null) {
-            return completeNewInactiveLayer(layer, openLayer, checkPeers);
+            return completeNewInactiveLayer(layer, openLayer);
          }
          else if (getNewLayerDir() != null) {
             Layer res = initLayer(layerPath, getNewLayerDir(), null, false, lpi);
             if (res != null) {
-               return completeNewInactiveLayer(res, openLayer, checkPeers);
+               return completeNewInactiveLayer(res, openLayer);
             }
          }
       }
@@ -14841,7 +14872,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
-   private Layer completeNewInactiveLayer(Layer layer, boolean openLayer, boolean doBuild) {
+   private Layer completeNewInactiveLayer(Layer layer, boolean openLayer) {
       layer.ensureInitialized(true);
 
       // First mark any excluded layers with the excluded flag so we know they do not belong in this runtime.
@@ -15014,8 +15045,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    void initAllLayerIndex() {
       allLayerIndex = new LinkedHashMap<String, LayerIndexInfo>();
       // defaults to using paths relative to the current directory
-      if (layerPathDirs == null)
+      if (layerPathDirs == null) {
          addLayerPathToAllIndex(System.getProperty("user.dir"));
+         if (inactiveLayers.size() > 0) {
+            for (Layer inactiveLayer:inactiveLayers) {
+               LayerIndexInfo lii = new LayerIndexInfo();
+               lii.layerPathRoot = inactiveLayer.layerPathName;
+               lii.layerDirName = inactiveLayer.layerDirName;
+               lii.packageName = inactiveLayer.packagePrefix;
+               lii.system = this;
+               lii.layer = inactiveLayer;
+               allLayerIndex.put(inactiveLayer.layerDirName, lii);
+            }
+         }
+      }
       else {
          for (File pathDir:layerPathDirs) {
             addLayerPathToAllIndex(pathDir.getPath());

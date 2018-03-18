@@ -733,7 +733,7 @@ public class ParseUtil  {
          }
          if (fileName != null) {
             model.setLayer(layer);
-            model.addSrcFile(new SrcEntry(layer, FileUtil.concat(layer.getLayerPathName(), fileName), fileName));
+            model.addSrcFile(new SrcEntry(layer, FileUtil.concat(layer == null ? "" : layer.getLayerPathName(), fileName), fileName));
          }
          // This is needed even though we may never use this model again.  Otherwise, we load the file twice if something
          // initializing the model refers back to itself again.  Now that we have the inactiveModelIndex, this will go there
@@ -1067,6 +1067,11 @@ public class ParseUtil  {
       return oldNode;
    }
 
+   /** @Deprecated This version can potentially inherit a StrataCode index directory because it does not specify the mainDir yet may use the type index */
+   public static LayeredSystem createSimpleParser(String classPath, String externalClassPath, String srcPath, IExternalModelIndex modelIndex) {
+      return createSimpleParser(null, classPath, externalClassPath, srcPath, modelIndex);
+   }
+
    /**
     * Creates a LayeredSystem from a single classPath, externalClassPath, and srcPath.   You use this method
     * when you do not have any layers but still want to leverage the low-level language processing capabilities of
@@ -1075,11 +1080,11 @@ public class ParseUtil  {
     * are cached and managed on the file system.  This is useful to help synchronize the LayeredSystem's copy of a
     * particular model with the version of the model managed by an external tool like an IDE.
     */
-   public static LayeredSystem createSimpleParser(String classPath, String externalClassPath, String srcPath, IExternalModelIndex modelIndex) {
+   public static LayeredSystem createSimpleParser(String indexDir, String classPath, String externalClassPath, String srcPath, IExternalModelIndex modelIndex) {
       LayeredSystem.Options options = new LayeredSystem.Options();
       options.installLayers = false;
 
-      LayeredSystem sys = new LayeredSystem(null, null, null, null, classPath, options, null, null, false, modelIndex, null, null);
+      LayeredSystem sys = new LayeredSystem(null, null, null, null, classPath, options, null, null, false, modelIndex, indexDir, indexDir);
 
       /** Create a single layer to manage externalClasses and source files given to us to parse */
       Layer sysLayer = sys.createLayer("sysLayer", null, null, false, false, false, false, false);
@@ -1089,6 +1094,11 @@ public class ParseUtil  {
       // Set the path for finding src files.   By default this is relative to the layer's dir so need to make it absolute
       sysLayer.srcPath = FileUtil.makePathAbsolute(srcPath);
 
+      // Adds it to the index
+      sys.registerInactiveLayer(sysLayer);
+      // Go through the init phase of all layers
+      sys.initInactiveLayer(sysLayer);
+      // Go through the start phase of all layers
       sys.startLayers(sysLayer);
 
       return sys;

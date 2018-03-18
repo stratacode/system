@@ -2154,8 +2154,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public String toDeclarationString() {
       StringBuilder sb = new StringBuilder();
       if (modifiers != null) {
-         sb.append(modifiers.toLanguageString(JavaLanguage.getJavaLanguage().modifiers));
-         sb.append(" ");
+         String mods = modifiers.toLanguageString(JavaLanguage.getJavaLanguage().modifiers);
+         sb.append(mods);
+         if (mods.length() > 0 && !mods.endsWith(" "))
+            sb.append(" ");
       }
       if (isInitialized())
          sb.append(getDeclarationType().keyword);

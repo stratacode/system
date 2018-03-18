@@ -2293,6 +2293,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          layerTypeIndex = new LayerTypeIndex();
          layerTypeIndex.langExtensions = langExtensions;
       }
+      layerTypeIndex.layerPathName = getLayerPathName();
+      if (layerTypeIndex.layerPathName == null)
+         System.err.println("*** Missing layer path name for type index");
       // Always add the layer's type and layer components here since we've already started the layer's model and type.
       // For most types they are updated when they are started but the layer component starts before the type index has
       // been initialized.
@@ -4156,6 +4159,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          }
       }
       checkIfStarted();
+      if (layerTypeIndex == null)
+         initTypeIndex();
       // Just walk through and start each of the types in this layer  TODO - include inner types in the type index?
       startAllTypes();
       saveTypeIndex();

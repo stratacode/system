@@ -140,7 +140,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
                }
             }
             else {
-               if ((pomFile.packaging.equals("jar") || pomFile.packaging.equals("bundle")) || pomFile.packaging.equals("war") || pomFile.packaging.equals("orbit")) {
+               if (pomFile.packaging != null && ((pomFile.packaging.equals("jar") || pomFile.packaging.equals("bundle")) || pomFile.packaging.equals("war") || pomFile.packaging.equals("orbit"))) {
                   pkg.definesSrc = true;
                   pkg.definesClasses = false;
                }
