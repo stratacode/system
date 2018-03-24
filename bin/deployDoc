@@ -1,4 +1,5 @@
 #!/bin/sh
 
+scp -r /jjv/StrataCode/build/doc_core/web/ root@strataCode.com:/tmp/newWeb.$$
 ssh root@stratacode.com mv /usr/local/scc/build/doc_core/web /tmp/web.$$
-scp -r /jjv/StrataCode/build/doc_core/web/ root@strataCode.com:/usr/local/scc/build/doc_core/web
+ssh root@stratacode.com mv /tmp/newWeb.$$ /usr/local/scc/build/doc_core/web

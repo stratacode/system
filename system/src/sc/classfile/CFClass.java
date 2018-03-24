@@ -251,14 +251,18 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
                      // interface methods that have different signatures from the class versions after the main
                      // methods in this list.  As long as we ignore those other methods, we get by ok.
                      if (j < methodList.length && superMethodList[j] == methodList[j]) {
-                        // We start out sharing the array from our super class = make a copy on the
-                        // first change only
-                        method = ModelUtil.pickMoreSpecificMethod(superMethodList[j], method, null, null, null);
+                        // Used to use "pickMoreSpecificMethod" here but the isAssignableTo led to a recursive 'start' call which found an uninitialized method cache
+                        // It looks like we really only need to choose between abstract/interface methods and real ones - since the default is that the sub-class overrides
+                        // the base class for any implementation method.
+                        Object implMethod = ModelUtil.chooseImplMethod(superMethodList[j], method);
+                        if (implMethod != null) {
+                           method = implMethod;
+                        }
                         // We start out with a CFMethod[] but may need to replace it with a Class if we override something
                         methodList = checkMethodList(cache, methodList, methodName, method);
                         methodList[j] = method;
                      }
-                     // We'd like to break but unfortunately Java returns methods with the same signature from
+                     // We'd like to break here and skip the rest of the loop but unfortunately Java returns methods with the same signature from
                      // getDeclared methods (e.g. AbstractStringBuilder.append(char)).   it also will not let you
                      // use those methods on an instance in this case.  So we need to replace all methods in the
                      // methodList that are overridden by this method.

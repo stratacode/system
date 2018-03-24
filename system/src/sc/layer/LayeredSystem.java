@@ -13326,6 +13326,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    /** Note: cfName here is normalized since it comes from the class file */
    public Object getClassFromCFName(String cfName, String className) {
+      if (className == null) {
+         className = cfName.replace('/', '.');
+         className = className.replace('$', '.');
+      }
       Object res = otherClassCache.get(className);
       if (res == NullClassSentinel.class)
          return null;

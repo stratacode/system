@@ -1141,6 +1141,25 @@ public class ModelUtil {
       return true;
    }
 
+   public static Object chooseImplMethod(Object c1, Object c2) {
+      // Preference to methods in the type rather than in the interface
+      boolean c1iface = ModelUtil.isInterface(ModelUtil.getEnclosingType(c1));
+      boolean c2iface = ModelUtil.isInterface(ModelUtil.getEnclosingType(c2));
+      if (c1iface && !c2iface)
+         return c2;
+      if (c2iface && !c1iface)
+         return c1;
+
+      // Most likely only one method in this list is abstract but just to be paranoid, we check both flags
+      boolean c1abs = ModelUtil.hasModifier(c1, "abstract");
+      boolean c2abs = ModelUtil.hasModifier(c2, "abstract");
+      if (c1abs && !c2abs)
+         return c2;
+      if (c2abs && !c1abs)
+         return c1;
+      return null;
+   }
+
    /** Chooses the method with the more specific return type - as per the searchMethods method in java.lang.Class */
    public static Object pickMoreSpecificMethod(Object c1, Object c2, Object[] c1ArgTypes, Object[] c2ArgTypes, List<? extends Object> exprs) {
       if (c1 == null)
@@ -1327,21 +1346,9 @@ public class ModelUtil {
          }
       }
 
-      // Preference to methods in the type rather than in the interface
-      boolean c1iface = ModelUtil.isInterface(ModelUtil.getEnclosingType(c1));
-      boolean c2iface = ModelUtil.isInterface(ModelUtil.getEnclosingType(c2));
-      if (c1iface && !c2iface)
-         return c2;
-      if (c2iface && !c1iface)
-         return c1;
-
-      // Most likely only one method in this list is abstract but just to be paranoid, we check both flags
-      boolean c1abs = ModelUtil.hasModifier(c1, "abstract");
-      boolean c2abs = ModelUtil.hasModifier(c2, "abstract");
-      if (c1abs && !c2abs)
-         return c2;
-      if (c2abs && !c1abs)
-         return c1;
+      Object implMethod = ModelUtil.chooseImplMethod(c1, c2);
+      if (implMethod != null)
+         return implMethod;
 
       Object c1Ret = ModelUtil.getReturnType(c1, true);
       Object c2Ret = ModelUtil.getReturnType(c2, true);

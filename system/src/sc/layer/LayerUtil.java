@@ -363,6 +363,9 @@ public class LayerUtil implements LayerConstants {
          if (mergePath != null && mergePath.trim().length() > 0) {
             String[] mergeDirs = mergePath.split(FileUtil.PATH_SEPARATOR);
             zipTemp = createTempDirectory("scJarPkg");
+            if (verbose) {
+               System.out.println("Merging jar dependencies for: " + mergePath + " into: " + zipTemp);
+            }
             for (String mergeDir:mergeDirs) {
                if (mergeDir.trim().length() == 0)
                   continue;
@@ -372,11 +375,17 @@ public class LayerUtil implements LayerConstants {
                   unjarArgs.add("jar");
                   unjarArgs.add("xf");
                   unjarArgs.add(mergeDir);
-                  if (FileUtil.execCommand(zipTemp.getPath(), unjarArgs, "", 0, false) == null)
+                  if (verbose) {
+                     System.out.println("Running: " + StringUtil.arrayToCommand(unjarArgs.toArray()));
+                  }
+                  if (FileUtil.execCommand(zipTemp.getPath(), unjarArgs, "", 0, verbose) == null)
                      System.err.println("*** Failed to unjar with " + unjarArgs);
                   mergeFile = zipTemp;
                }
                else if (mergeFile.isDirectory()) {
+                  if (verbose) {
+                     System.out.println("Copying class files from: " + mergeFile.getPath() + " to: " + zipTemp.getPath());
+                  }
                   FileUtil.copyAllFiles(mergeFile.getPath(), zipTemp.getPath(), true, jarFilter);
                }
             }

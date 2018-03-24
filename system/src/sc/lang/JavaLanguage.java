@@ -756,7 +756,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       extendsTypes.skipOnErrorSlot = 1;
       implementsTypes.skipOnErrorSlot = 1;
    }
-   Sequence normalClassDeclaration =
+   public Sequence normalClassDeclaration =
        new Sequence("ClassDeclaration(operator,,typeName,typeParameters,extendsType,implementsTypes,body)",
                     classOperators, spacing, identifierSp, optTypeParameters, extendsType, implementsTypes, classBody);
    {
