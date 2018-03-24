@@ -69,4 +69,8 @@ public class URLPath {
          url = url + "?" + param + "=" + value;
       return url;
    }
+
+   public String toString() {
+      return name + ":" + url + " (key=" + keyName + ")";
+   }
 }
