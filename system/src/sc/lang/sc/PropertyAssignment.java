@@ -41,6 +41,8 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
 
    private transient boolean starting = false;
 
+   private transient Expression buildInitExpr = null;
+
    public void init() {
       if (initialized) return;
       super.init();
@@ -117,10 +119,17 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
          // setInferredType may loop around and try to start us again
          starting = true;
 
+         buildInitExpr = getBuildInitExpression(getPropertyTypeDeclaration());
+
+         if (buildInitExpr != null && initializer != null) {
+            displayError("@BuildInit valid only for property definitions which do not have an initializer");
+            buildInitExpr = null;
+         }
+
          // Check to be sure the initializer is compatible with the property
          // Skip this test for reverse-only bindings
          if (initializer != null && !isReverseOnlyExpression()) {
-            Object propType = isSetMethod ? ModelUtil.getSetMethodPropertyType(assignedProperty) : ModelUtil.getVariableTypeDeclaration(assignedProperty);
+            Object propType = getPropertyTypeDeclaration();
             initializer.setInferredType(propType, true);
             Object initType = initializer.getGenericType();
             if (initType != null && propType != null &&
@@ -136,6 +145,12 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
          }
       }
       super.start();
+   }
+
+   public Object getPropertyTypeDeclaration() {
+      if (assignedProperty == null)
+         return null;
+      return ModelUtil.isSetMethod(assignedProperty) ? ModelUtil.getSetMethodPropertyType(assignedProperty) : ModelUtil.getVariableTypeDeclaration(assignedProperty);
    }
 
    public void validate() {
@@ -241,6 +256,10 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
          // TODO: we should pass this down from the parent node to avoid the N*N
          int ix = decl.body.indexOf(this);
 
+         if (assignedProperty != null && buildInitExpr != null) {
+            setProperty("initializer", buildInitExpr);
+         }
+
          // Property assignments without an initializer are used to just merge modifiers and stuff into
          // the definition.  Just remove the property assignment and move on.
          if (initializer == null) {
@@ -282,6 +301,10 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
                   st.setProperty("staticEnabled", true);
                stCreated = true;
             }
+
+            // For OverrideAssignment, when we attach a BuildInit we may not have an operator but will have an initializer
+            if (operator == null)
+               operator = "=";
 
             Statement ae = convertToAssignmentExpression(null, false, operator, true);
 
@@ -859,6 +882,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
          res.bindingDirection = bindingDirection;
          res.fromAttribute = fromAttribute;
          res.wasBound = wasBound;
+         res.buildInitExpr = buildInitExpr;
       }
       return res;
    }

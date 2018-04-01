@@ -154,7 +154,47 @@ public enum Type {
          throw new IllegalArgumentException("Illegal arithmetic operation for a char expression");
       }
       public boolean evalConditional(String operator, Object lhs, Object rhs) {
-         throw new IllegalArgumentException("Illegal conditional operation for a short expression");
+         char lhsChar, rhsChar;
+         boolean result;
+
+         // Could be comparing a Character to a general Object.   The lhs should be a character because we select
+         // this method based on its type.
+         if (!(rhs instanceof Character))
+            return false;
+
+         lhsChar = (Character) lhs;
+         rhsChar = (Character) rhs;
+
+         char c = operator.charAt(0);
+
+         switch (c) {
+            case '=':
+               result = lhsChar == rhsChar;
+               break;
+            case '!':
+               result = lhsChar != rhsChar;
+               break;
+            case '<':
+               if (operator.length() == 2)
+                  result = lhsChar <= rhsChar;
+               else
+                  result = lhsChar < rhsChar;
+               break;
+            case '>':
+               if (operator.length() == 2)
+                  result = lhsChar >= rhsChar;
+               else
+                  result = lhsChar > rhsChar;
+               break;
+            case 'i':
+               result = DynUtil.instanceOf(lhsChar, rhsChar);
+               break;
+            case '&':
+            case '|':
+            default:
+               throw new IllegalArgumentException("Operator: " + operator + " cannot be applied to char type operands");
+         }
+         return result;
       }
       public Object evalUnary(String operator, Object value) {
          throw new IllegalArgumentException("Character type does not support unary operator: " + operator);

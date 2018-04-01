@@ -4,17 +4,16 @@
 
 package sc.lang.java;
 
+import sc.dyn.DynUtil;
 import sc.lang.*;
 import sc.lang.js.JSFormatMode;
 import sc.lang.js.JSLanguage;
 import sc.lang.js.JSTypeParameters;
+import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.layer.SrcEntry;
 import sc.parser.*;
-import sc.type.CTypeUtil;
-import sc.type.DynType;
-import sc.type.IBeanMapper;
-import sc.type.TypeUtil;
+import sc.type.*;
 
 import java.util.*;
 
@@ -573,4 +572,55 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
    public boolean execForRuntime(LayeredSystem sys) {
       return true;
    }
+
+
+   public Expression getBuildInitExpression(Object expectedType) {
+      JavaModel model = getJavaModel();
+      String buildInitExprStr = (String) ModelUtil.getAnnotationValue(this, "sc.obj.BuildInit", "value");
+      Expression buildInitExpr = null;
+      if (buildInitExprStr != null && model != null) {
+         if (buildInitExprStr.length() > 0) {
+            SCLanguage lang = SCLanguage.getSCLanguage();
+            Object evalRes = lang.parseString(buildInitExprStr, lang.expression);
+            if (evalRes instanceof ParseError) {
+               displayError("@BuildInit(\"" + buildInitExprStr + "\") invalid expression: " + evalRes + " for: ");
+            }
+            else {
+               LayeredSystem sys = model.getLayeredSystem();
+               Layer layer = sys.buildLayer;
+               Expression expr =  (Expression) ((IParseNode) evalRes).getSemanticValue();
+               JavaModel layerModel = (JavaModel) layer.model;
+               // Resolve this expression in the context of the parent layer's model - so it can see all types and values as defined
+               expr.parentNode = layerModel.getModelTypeDeclaration();
+               ParseUtil.initAndStartComponent(expr);
+               Object newExpectedType = ModelUtil.getRuntimeType(expectedType);
+               if (newExpectedType != null)
+                  expectedType = newExpectedType;
+               Class expectedClass = expectedType instanceof Class ? (Class) expectedType : null;
+               try {
+                  ExecutionContext ctx = new ExecutionContext(layerModel);
+                  ctx.pushCurrentObject(layer);
+                  Object initVal = expr.eval(expectedClass, ctx);
+                  if (initVal != null) {
+                     if (!ModelUtil.isInstance(expectedType, initVal)) {
+                        displayError("@BuildInit - type mismatch between property type: " + ModelUtil.getTypeName(expectedType) + " and value type: " + ModelUtil.getTypeName(DynUtil.getType(initVal)) + " with init value: " + initVal + " for: ");
+                        initVal = null;
+                     }
+                  }
+                  if (initVal != null) {
+                     // Turn the value back into the expression
+                     buildInitExpr = Expression.createFromValue(initVal, true);
+                  }
+               }
+               catch (RuntimeException exc) {
+                  displayError("Runtime exception evaluating BuildInit expr: " + buildInitExprStr + " with exception: " + exc + " for: ");
+                  sys.error(PTypeUtil.getStackTrace(exc));
+               }
+            }
+         }
+         return buildInitExpr;
+      }
+      return null;
+   }
+
 }

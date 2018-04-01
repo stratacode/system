@@ -24,6 +24,7 @@ import java.util.*;
  */
 @sc.js.JSSettings(jsLibFiles="js/scdyn.js", prefixAlias="sc_", dependentJSFiles = "js/jvsys.js")
 public class DynUtil {
+
    private DynUtil() {
    }
 
@@ -1258,10 +1259,10 @@ public class DynUtil {
       if (dynamicSystem != null)
          return dynamicSystem.resolveRuntimeName(name, create, returnTypes);
       else {
-         // TODO: this is not right!
          Object type = findType(name);
          if (type != null) {
             String propName = CTypeUtil.getClassName(name);
+            propName = CTypeUtil.decapitalizePropertyName(name);
             return getStaticProperty(type, propName);
          }
          return null;
@@ -1576,6 +1577,10 @@ public class DynUtil {
       if (className == null)
          return null;
       Object mgrType = findType(className);
+      if (mgrType == null) {
+         System.err.println("*** Missing dynChildManager class: " + className + " as set by CompilerSettings on: " + type);
+         return null;
+      }
       return (IDynChildManager) createInstance(mgrType, null);
    }
 

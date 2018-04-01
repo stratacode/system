@@ -356,6 +356,7 @@ public class LayerUtil implements LayerConstants {
       String jarDir = FileUtil.getParentPath(FileUtil.concat(classDir,jarName));
       File jarDirFile = new File(jarDir);
       jarDirFile.mkdirs();
+      StringBuilder jarArgsDesc = new StringBuilder();
 
       try {
          List<String> allClassFiles = null;
@@ -363,12 +364,11 @@ public class LayerUtil implements LayerConstants {
          if (mergePath != null && mergePath.trim().length() > 0) {
             String[] mergeDirs = mergePath.split(FileUtil.PATH_SEPARATOR);
             zipTemp = createTempDirectory("scJarPkg");
-            if (verbose) {
-               System.out.println("Merging jar dependencies for: " + mergePath + " into: " + zipTemp);
-            }
             for (String mergeDir:mergeDirs) {
                if (mergeDir.trim().length() == 0)
                   continue;
+               if (jarArgsDesc.length() > 0)
+                  jarArgsDesc.append(", ");
                File mergeFile = new File(mergeDir);
                if (!mergeFile.isDirectory() && mergeFile.canRead()) {
                   ArrayList<String> unjarArgs = new ArrayList<String>();
@@ -381,12 +381,17 @@ public class LayerUtil implements LayerConstants {
                   if (FileUtil.execCommand(zipTemp.getPath(), unjarArgs, "", 0, verbose) == null)
                      System.err.println("*** Failed to unjar with " + unjarArgs);
                   mergeFile = zipTemp;
+
+                  jarArgsDesc.append("jar: ");
+                  jarArgsDesc.append(mergeDir);
                }
                else if (mergeFile.isDirectory()) {
                   if (verbose) {
                      System.out.println("Copying class files from: " + mergeFile.getPath() + " to: " + zipTemp.getPath());
                   }
                   FileUtil.copyAllFiles(mergeFile.getPath(), zipTemp.getPath(), true, jarFilter);
+                  jarArgsDesc.append("classes: ");
+                  jarArgsDesc.append(mergeDir);
                }
             }
          }
@@ -395,10 +400,19 @@ public class LayerUtil implements LayerConstants {
             // Make this absolute since we are now running this from a different directory
             jarName = FileUtil.concat(classDir, jarName);
             String zipPath = zipTemp.getPath();
-            FileUtil.copyAllFiles(classDir, zipPath, true, jarFilter);
+            try {
+               FileUtil.copyAllFiles(classDir, zipPath, true, jarFilter);
+            }
+            catch (RuntimeException exc) {
+               System.err.println("*** Failed to copy classes while merging jars from: " + classDir + " with: " + zipPath + " due to : " + exc);
+               exc.printStackTrace();
+               return -1;
+            }
             classDir = zipPath;
          }
          // If the user specified a specific list of packages only process those packages
+         if (jarArgsDesc.length() > 0)
+            jarArgsDesc.append(", ");
          if (pkgs != null) {
             if (allClassFiles == null)
                allClassFiles = new ArrayList<String>();
@@ -406,9 +420,11 @@ public class LayerUtil implements LayerConstants {
                List<String> newFiles = FileUtil.getRecursiveFiles(classDir, FileUtil.concat(pkg.replace(".", FileUtil.FILE_SEPARATOR)), jarFilter);
                allClassFiles.addAll(newFiles);
             }
+            jarArgsDesc.append("packages: " + Arrays.asList(pkgs));
          }
          else {
             allClassFiles = FileUtil.getRecursiveFiles(classDir, null, jarFilter);
+            jarArgsDesc.append(allClassFiles.size() + " class files");
          }
          String opts;
 
@@ -450,9 +466,7 @@ public class LayerUtil implements LayerConstants {
          pb.redirectErrorStream(true);
 
          if (verbose)
-            System.out.println("Packaging: " + jarName + " with files: " + StringUtil.argsToString(args));
-         else
-            System.out.println("Packaging: " + args.size() + " files into: " + jarName);
+            System.out.println("Packaging: " + jarName + " with " + jarArgsDesc);
 
          Process p = pb.start();
 
@@ -834,8 +848,59 @@ public class LayerUtil implements LayerConstants {
    public static String getDefaultHomeDir() {
       String homeDir = System.getProperty("user.home");
       if (homeDir != null)
-         return FileUtil.concat(homeDir, SC_DIR);
+         return FileUtil.concat(homeDir, LayerConstants.SC_DIR);
       return null;
+   }
+
+   public static String incrBuildNumber(String appName) {
+      File buildNumberPropsFile = new File(FileUtil.concat(getDefaultHomeDir(), "buildNum.properties"));
+      Properties bnProps = new Properties();
+      if (buildNumberPropsFile.canRead()) {
+         FileReader reader = null;
+         try {
+            bnProps.load(reader = new FileReader(buildNumberPropsFile));
+         }
+         catch (IOException exc) {
+            System.err.println("*** Failed to read existing buildNum.properties: " + exc);
+         }
+         finally {
+            if (reader != null) {
+               try { reader.close(); } catch (IOException exc) {}
+            }
+         }
+      }
+      String oldBn = bnProps.getProperty(appName);
+      int buildNumber;
+      if (oldBn == null) {
+         bnProps.setProperty(appName, "1");
+         buildNumber = 1;
+      }
+      else {
+         try {
+            buildNumber = Integer.parseInt(oldBn);
+            buildNumber++;
+         }
+         catch (NumberFormatException exc) {
+            System.err.println("*** Failed to parse buildNumber: " + oldBn + " as integer in file: " + buildNumberPropsFile + ": " + exc + " resetting buildNumber to 1");
+            buildNumber = 1;
+         }
+      }
+      bnProps.setProperty(appName, String.valueOf(buildNumber));
+
+      FileWriter writer = null;
+      try {
+         writer = new FileWriter(buildNumberPropsFile);
+         bnProps.store(writer, "");
+      }
+      catch (IOException exc) {
+         System.err.println("*** Failed to save buildNumber: " + oldBn + " as integer in file: " + buildNumberPropsFile + ": " + exc + " resetting buildNumber to 1");
+      }
+      finally {
+         if (writer != null) {
+            try { writer.close(); } catch (IOException exc) {}
+         }
+      }
+      return String.valueOf(buildNumber);
    }
 
    public static class DirectoryFilter implements FilenameFilter {

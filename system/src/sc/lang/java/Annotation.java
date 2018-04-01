@@ -130,6 +130,9 @@ public class Annotation extends ErrorSemanticNode implements IAnnotation {
                return av;
          }
       }
+      else if (identifier.equals("value")) {
+         return AnnotationValue.createFromAnnotValue("value", elementValue);
+      }
       return null;
    }
 

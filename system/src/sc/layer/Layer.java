@@ -2536,16 +2536,22 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                MethodDefinition meth = (MethodDefinition) startMethObj;
                meth.invoke(ctx, null);
             }
-            catch (Exception exc) {
+            catch (RuntimeException exc) {
                error("Exception in layer's start method: ", exc.toString());
                if (layeredSystem.options.verbose)
                   exc.printStackTrace();
-               errorsStarting = true;
+               errorsStarting();
             }
          }
       }
       else
-         errorsStarting = true;
+         errorsStarting();
+   }
+
+   private void errorsStarting() {
+      errorsStarting = true;
+      if (activated)
+         layeredSystem.anyErrors = true; // Need to stop the build right away if the errors don't start cleanly
    }
 
    /** Note, this stores the type containing the statically imported name, not the field or method. */
@@ -4521,13 +4527,64 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          buildState.errorFiles.add(srcEnt);
    }
 
-   public SrcEntry getLayerFileFromRelName(String relName) {
+   HashMap<String,Properties> propertiesCache;
+
+   /**
+    * Returns the layer property of any layer under this one in the stack.  Note that this searches all layers, not just base layers because
+    * we only use it now for 'build properties' that need to do a merge of everything.   In some cases, we only use baseLayers because of the
+    * desire for 'static typing' and support of resolution in the IDE where there is no build layer.
+    */
+   public String getLayerProperty(String propertiesFile, String propName) {
+      List<Layer> layersList = getLayersList();
+      for (int i = layerPosition; i >= 0; i--) {
+         Layer layer = layersList.get(i);
+         String res = layer.getProperty(propertiesFile, propName);
+         if (res != null)
+            return res;
+      }
+      return null;
+   }
+
+   public String getProperty(String propertiesFile, String propName) {
+      SrcEntry propSrcEnt = getLayerFileFromRelName(propertiesFile, false);
+      if (propSrcEnt != null) {
+         if (propertiesCache == null)
+            propertiesCache = new HashMap<String,Properties>();
+         String fileName = propSrcEnt.absFileName;
+         Properties props = propertiesCache.get(fileName);
+         if (props == null) {
+            props = new Properties();
+            try {
+               props.load(new InputStreamReader(new FileInputStream(fileName)));
+            }
+            catch (IOException exc) {
+               System.err.println("*** Unable to read properties file: " + propSrcEnt.absFileName + " exc: " + exc);
+            }
+            propertiesCache.put(fileName, props);
+         }
+         String res = props.getProperty(propName);
+         if (res != null)
+            return res;
+      }
+      return null;
+   }
+
+   public String findSrcFileNameFromRelName(String relName) {
+      SrcEntry ent = getLayerFileFromRelName(relName, true);
+      if (ent == null)
+         return null;
+      return ent.absFileName;
+   }
+
+   public SrcEntry getLayerFileFromRelName(String relName, boolean checkBaseLayers) {
       if (layerFileCache != null) {
          String absName = layerFileCache.get(relName);
          if (absName != null) {
             return new SrcEntry(this, absName, relName, false);
          }
       }
+      if (checkBaseLayers)
+         return getBaseLayerFileFromRelName(relName);
       return null;
    }
 
@@ -4536,7 +4593,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       // Pick any layer before this one in the stack - used for testScripts etc. which need to be merged based on the layers stack, not the baseLayers so a mixin layer can be inserted
       for (int i = layerPosition - 1; i >= 0; i--) {
          Layer baseLayer = layeredSystem.layers.get(i);
-         res = baseLayer.getLayerFileFromRelName(relName);
+         res = baseLayer.getLayerFileFromRelName(relName, false);
          if (res != null)
             return res;
       }
@@ -4561,5 +4618,6 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
       findRemovedFiles(changedModels);
    }
+
 }
 

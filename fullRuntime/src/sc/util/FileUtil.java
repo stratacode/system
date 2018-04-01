@@ -282,6 +282,14 @@ public class FileUtil {
       }
    }
 
+   public static String execCmd(String command) {
+      String[] args = command.split("\\s+");
+      return exec(args);
+   }
+
+   public static String exec(String... args) {
+      return exec(null, false, args);
+   }
 
    public static String exec(String input, boolean echoOutput, String... args) {
       return execCommand(null, Arrays.asList(args), input, 0, echoOutput);

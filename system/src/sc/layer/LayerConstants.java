@@ -7,23 +7,22 @@ package sc.layer;
 import sc.type.CTypeUtil;
 import sc.util.URLUtil;
 
-public interface LayerConstants
-{
-   public static final String LAYER_CLASS_NAME = "Layer";
-   public static final String BUILD_DIRECTORY = "build";
-   public static final String DYN_BUILD_DIRECTORY = "dynbuild";
-   public static final String BUILD_INFO_FILE = "BuildInfo.sc";
-   public static final String DYN_TYPE_INDEX_FILE = "dynTypeIndex.ser";
-   public static final String DEFAULT_VM_PARAMETERS = "-Xmx1024m";
+public interface LayerConstants {
+   String LAYER_CLASS_NAME = "Layer";
+   String BUILD_DIRECTORY = "build";
+   String DYN_BUILD_DIRECTORY = "dynbuild";
+   String BUILD_INFO_FILE = "BuildInfo.sc";
+   String DYN_TYPE_INDEX_FILE = "dynTypeIndex.ser";
+   String DEFAULT_VM_PARAMETERS = "-Xmx1024m";
 
-   public static final String DEFAULT_LAYERS_URL = "https://github.com/stratacode/";
-   public static final String DEFAULT_LAYERS_PATH = "layers";
+   String DEFAULT_LAYERS_URL = "https://github.com/stratacode/";
+   String DEFAULT_LAYERS_PATH = "layers";
 
-   public static final String[] ALL_CONFIGURED_RUNTIMES = {"java", "js", "android", "gwt"};
-   public static final String SC_DIR = ".stratacode";
-   public static final String LAYER_PATH_FILE = "layerPath";
-   public static final String SC_SOURCE_PATH = "scSourcePath";
-   public static final String LAYER_COMPONENT_PACKAGE = "sys.layerCore";;
-   public static final String LAYER_COMPONENT_TYPE_NAME = "Layer";;
-   public static final String LAYER_COMPONENT_FULL_TYPE_NAME = CTypeUtil.prefixPath(LAYER_COMPONENT_PACKAGE, LAYER_COMPONENT_TYPE_NAME);
+   String[] ALL_CONFIGURED_RUNTIMES = {"java", "js", "android", "gwt"};
+   String SC_DIR = ".stratacode";
+   String LAYER_PATH_FILE = "layerPath";
+   String SC_SOURCE_PATH = "scSourcePath";
+   String LAYER_COMPONENT_PACKAGE = "sys.layerCore";;
+   String LAYER_COMPONENT_TYPE_NAME = "Layer";;
+   String LAYER_COMPONENT_FULL_TYPE_NAME = CTypeUtil.prefixPath(LAYER_COMPONENT_PACKAGE, LAYER_COMPONENT_TYPE_NAME);
 }

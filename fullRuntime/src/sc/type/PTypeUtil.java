@@ -377,6 +377,15 @@ public class PTypeUtil {
    }
 
    public static Object invokeMethod(Object thisObject, Object method, Object... argValues) {
+      // For this case in the IDE - we are compiling the LayerComponent into sys.core.build but it's not in the buildClassLoader so we end up creating a DynObject not a LayerFileComponent so this fails.  Not sure why for
+      // the IDE case, not sure where sys.core.build (getCoreBuildLayer()) is not getting into the buildClassLoader chain in initSysClassLoader.
+      /*
+      if (thisObject != null && thisObject.toString() != null && thisObject.toString().equals("testFileProcWithField__0")) {
+         if (method != null && method.toString().equals("public void sc.layer.LayerComponent.preInit()"))
+            System.out.println("***");
+      }
+      */
+
       try {
          if (method instanceof Method) {
             return ((Method) method).invoke(thisObject, argValues);
@@ -920,7 +929,6 @@ public class PTypeUtil {
          return Class.forName(typeName);
       }
       catch (ClassNotFoundException exc) {
-         System.err.println("*** findType: " + exc);
          return null;
       }
    }

@@ -287,13 +287,6 @@ public class BuildInfo {
       public String[] args;
       public String stopMethod;
 
-      // TODO: remove me!  Needed for old build info files only
-      public MainMethod(String typeName, String e, String[] a) {
-         this.typeName = typeName;
-         execName = e;
-         args = a;
-      }
-
       public MainMethod(String typeName, String e, String[] a, String stopMethod) {
          this.typeName = typeName;
          execName = e;

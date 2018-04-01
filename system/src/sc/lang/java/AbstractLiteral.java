@@ -12,6 +12,7 @@ import sc.type.*;
 import sc.util.StringUtil;
 
 import java.lang.reflect.Constructor;
+import java.util.Date;
 import java.util.List;
 import java.util.Set;
 
@@ -128,8 +129,12 @@ public abstract class AbstractLiteral extends Expression implements IValueConver
             else if (literalValue instanceof Object[]) {
                return Expression.createFromValue(literalValue, isInitializer);
             }
+            /* TODO: create a 'new Date' or SimpleDateFormat.parse("xxx")
+            else if (literalValue instanceof Date) {
+            }
+            */
             else {
-               // TODO: use an annotation to override this
+               // TODO: need a way a class can override this using annotations.  Right now we support only 'transient' to remove it from the list
                IBeanMapper[] props = RTypeUtil.getPersistProperties(literalClass);
                Class[] propTypes = new Class[props.length];
                for (int i = 0; i < props.length; i++) {
@@ -144,7 +149,7 @@ public abstract class AbstractLiteral extends Expression implements IValueConver
                   return NewExpression.create(TypeUtil.getTypeName(literalClass, false), args);
                }
                else {
-                  throw new IllegalArgumentException("Type: " + literalClass + " does not have a constructor which matches its public properties: " + StringUtil.arrayToString(props));
+                  throw new IllegalArgumentException("Type: " + literalClass + " is not a known expression type does not have a constructor which matches its public properties: " + StringUtil.arrayToString(props));
                }
             }
          default:

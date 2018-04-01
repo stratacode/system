@@ -414,7 +414,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** When restoring serialized layered components, we need to lookup a thread-local layered system and be able to know we are doing layerResolves - to swap the name space to that of the layer. */
    public boolean layerResolveContext = false;
 
-
    public void buildReverseTypeIndex(boolean clear) {
       try {
          acquireDynLock(false);
@@ -4098,6 +4097,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             System.exit(-1);
          }
          */
+         if (options.verbose) {
+            BuildTag buildTag = (BuildTag) DynUtil.resolveName("sc.buildTag.SccBuildTag", true);
+            if (buildTag != null) {
+               System.out.println("  scc build: " + buildTag.getBuildTag());
+            }
+            else {
+               System.out.println("  scc java-only build");
+            }
+         }
+
          if (explicitDynLayers != null && explicitDynLayers.size() == 0) {
             String optName = options.recursiveDynLayers ? "dyn" : "dynone";
             usage("The -" + optName + " option was provided without a list of layers.  The -" + optName + " option should be in front of the list of layer names you want to make dynamic.", args);
@@ -4778,6 +4787,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          else {
             if (!buildLayersIfNecessary(layers.size(), includeFiles, newLayersOnly, separateLayersOnly))
+               return false;
+
+            if (anyErrors)
                return false;
 
             if (getCurrent() != this)
@@ -6538,7 +6550,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    /** TODO: can we remove this and instead rely on the stricter StrataCode directory organization (in initStratCodeDir0 for identifying a layer directory? */
    public boolean isValidLayersDir(String dirName) {
-      String layerPathFileName = FileUtil.concat(dirName, SC_DIR, LAYER_PATH_FILE);
+      String layerPathFileName = FileUtil.concat(dirName, LayerConstants.SC_DIR, LAYER_PATH_FILE);
       File layerPathFile = new File(layerPathFileName);
       return layerPathFile.canRead();
    }
@@ -6568,7 +6580,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          throw new IllegalArgumentException("*** Invalid layer path - Each path entry should be a directory: " + f);
          // TODO: error if path directories are nested
       else {
-         String scDirName = FileUtil.concat(dirName, SC_DIR);
+         String scDirName = FileUtil.concat(dirName, LayerConstants.SC_DIR);
          // TODO: picking the last directory in the layer path because right now that's how IntelliJ orders them and it seems
          // like a potentially 'too powerful' idea to let someone to modify a layer in an upstream path entry.
          // You can just replace the types to fix the layer if you need to in an incremental way.
@@ -6576,7 +6588,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (!isStrataCodeDir && new File(scDirName).isDirectory()) {
             strataCodeMainDir = dirName;
          }
-         String layerPathFileName = FileUtil.concat(dirName, SC_DIR, LAYER_PATH_FILE);
+         String layerPathFileName = FileUtil.concat(dirName, LayerConstants.SC_DIR, LAYER_PATH_FILE);
          File layerPathFile = new File(layerPathFileName);
          if (layerPathFile.canRead()) {
             // As soon as we find one .layerPath file, consider the system installed
@@ -6670,7 +6682,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         if (initStrataCodeDir(parentName))
                            return;
 
-                        File layerPathFile = new File(FileUtil.concat(parentName, SC_DIR));
+                        File layerPathFile = new File(FileUtil.concat(parentName, LayerConstants.SC_DIR));
                         // There's a .stratacode here - it's a layer bundle - either layers or inside of bundles?
                         if (layerPathFile.isDirectory()) {
                            String parentParent = FileUtil.getParentPath(parentName);
@@ -6711,7 +6723,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       // Must either have a bin or .stratacode directory to be considered an install dir - otherwise, anything with layers or bundles in
       // them is considered an install dir.
-      if (!new File(dir, "bin").isDirectory() && !new File(dir, SC_DIR).isDirectory() && !new File(dir, "conf").isDirectory())
+      if (!new File(dir, "bin").isDirectory() && !new File(dir, LayerConstants.SC_DIR).isDirectory() && !new File(dir, "conf").isDirectory())
          return false;
 
       String bundlesFileName = FileUtil.concat(dir, "bundles");
@@ -15795,6 +15807,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public boolean isDefaultSystem() {
       return defaultLayeredSystem == this;
    }
+
 }
+
 
 

@@ -7,15 +7,19 @@ package sc.lang.java;
 import sc.dyn.DynUtil;
 import sc.lang.ILanguageModel;
 import sc.lang.ISrcStatement;
+import sc.lang.SCLanguage;
 import sc.lang.SemanticNodeList;
 import sc.lang.js.JSFormatMode;
 import sc.lang.js.JSRuntimeProcessor;
 import sc.lang.js.JSTypeParameters;
 import sc.lang.js.JSUtil;
+import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.obj.ScopeDefinition;
 import sc.parser.IString;
 import sc.parser.PString;
+import sc.parser.ParseError;
+import sc.parser.ParseUtil;
 import sc.sync.SyncManager;
 import sc.type.CTypeUtil;
 import sc.type.PTypeUtil;
@@ -30,6 +34,9 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
    public SemanticNodeList<VariableDefinition> variableDefinitions;
 
    private transient boolean frozenStatic;
+
+   private transient Expression buildInitExpr = null;
+
    //private transient Object frozenType;
 
    public static FieldDefinition create(LayeredSystem sys, Object type, String fieldName, String op, Expression init) {
@@ -70,6 +77,25 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
 
       super.start();
 
+      JavaModel model = getJavaModel();
+      if (model != null && !model.mergeDeclaration) {
+         buildInitExpr = getBuildInitExpression(type.getTypeDeclaration());
+
+         if (variableDefinitions.size() == 1) {
+            VariableDefinition varDef = variableDefinitions.get(0);
+
+            if (buildInitExpr != null && varDef.initializer != null) {
+               displayError("@BuildInit - not allowed with field that has initializer: ");
+               buildInitExpr = null;
+            }
+         }
+         else {
+            if (buildInitExpr != null) {
+               displayError("@BuildInit not allowed for fields with more than one definition ");
+               buildInitExpr = null;
+            }
+         }
+      }
    }
 
    public void validate() {
@@ -452,46 +478,54 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
 
       /** When serializing a remote method call to the client */
       JavaModel model = getJavaModel();
-      if (model != null && !model.mergeDeclaration && variableDefinitions.size() == 1) {
-         VariableDefinition varDef = variableDefinitions.get(0);
-         if (varDef.initializer instanceof IdentifierExpression) {
-            IdentifierExpression expr = (IdentifierExpression) varDef.initializer;
 
-            if (!(expr instanceof NewExpression) && expr.arguments != null) {
-               int lastIx = expr.identifiers.size() - 1;
-               if (expr.idTypes[lastIx] != IdentifierExpression.IdentifierType.NewMethodInvocation) {
-                  TypeDeclaration enclType = getEnclosingType();
-                  int ix = enclType.getBodyStatements().indexOf(this);
-                  if (ix != -1) {
-                     SemanticNodeList<Expression> methArgs = new SemanticNodeList<Expression>(4);
-                     BlockStatement addRemBlock = new BlockStatement();
-                     if (enclType.getDefinesCurrentObject()) {
-                        methArgs.add(IdentifierExpression.create("this"));
-                        methArgs.add(NullLiteral.create());
+      if (model != null && !model.mergeDeclaration) {
+         if (variableDefinitions.size() == 1) {
+            VariableDefinition varDef = variableDefinitions.get(0);
+
+            if (buildInitExpr != null) {
+               varDef.setProperty("initializer", buildInitExpr);
+            }
+
+            if (varDef.initializer instanceof IdentifierExpression) {
+               IdentifierExpression expr = (IdentifierExpression) varDef.initializer;
+
+               if (!(expr instanceof NewExpression) && expr.arguments != null) {
+                  int lastIx = expr.identifiers.size() - 1;
+                  if (expr.idTypes[lastIx] != IdentifierExpression.IdentifierType.NewMethodInvocation) {
+                     TypeDeclaration enclType = getEnclosingType();
+                     int ix = enclType.getBodyStatements().indexOf(this);
+                     if (ix != -1) {
+                        SemanticNodeList<Expression> methArgs = new SemanticNodeList<Expression>(4);
+                        BlockStatement addRemBlock = new BlockStatement();
+                        if (enclType.getDefinesCurrentObject()) {
+                           methArgs.add(IdentifierExpression.create("this"));
+                           methArgs.add(NullLiteral.create());
+                        }
+                        else {
+                           methArgs.add(NullLiteral.create());
+                           methArgs.add(ClassValueExpression.create(enclType.getFullTypeName()));
+                           //addRemBlock.staticEnabled = true;
+                        }
+                        Object boundType = expr.boundTypes[lastIx];
+                        boolean typeIsVoid = false;
+                        if (ModelUtil.isMethod(boundType))  {
+                           Object retType = ModelUtil.getReturnType(boundType, true);
+                           typeIsVoid = retType == null || ModelUtil.typeIsVoid(retType);
+                        }
+                        methArgs.add(StringLiteral.create(varDef.variableName));
+                        if (typeIsVoid)
+                           methArgs.add(NullLiteral.create());
+                        else
+                           methArgs.add(IdentifierExpression.create(varDef.variableName));
+                        methArgs.add(NullLiteral.create()); // TODO: For the exception argument, here passing null for now.  In the code we generate, we are invoking the method without a try/catch - we should be catching the runtime exception from the method and passing it in place of this null
+                        IdentifierExpression addRemCall = IdentifierExpression.createMethodCall(methArgs, "sc.sync.SyncManager.addMethodResult");
+                        addRemBlock.addStatementAt(0, addRemCall);
+                        enclType.addBodyStatementAt(ix+1, addRemBlock);
                      }
-                     else {
-                        methArgs.add(NullLiteral.create());
-                        methArgs.add(ClassValueExpression.create(enclType.getFullTypeName()));
-                        //addRemBlock.staticEnabled = true;
-                     }
-                     Object boundType = expr.boundTypes[lastIx];
-                     boolean typeIsVoid = false;
-                     if (ModelUtil.isMethod(boundType))  {
-                        Object retType = ModelUtil.getReturnType(boundType, true);
-                        typeIsVoid = retType == null || ModelUtil.typeIsVoid(retType);
-                     }
-                     methArgs.add(StringLiteral.create(varDef.variableName));
-                     if (typeIsVoid)
-                        methArgs.add(NullLiteral.create());
                      else
-                        methArgs.add(IdentifierExpression.create(varDef.variableName));
-                     methArgs.add(NullLiteral.create()); // TODO: For the exception argument, here passing null for now.  In the code we generate, we are invoking the method without a try/catch - we should be catching the runtime exception from the method and passing it in place of this null
-                     IdentifierExpression addRemCall = IdentifierExpression.createMethodCall(methArgs, "sc.sync.SyncManager.addMethodResult");
-                     addRemBlock.addStatementAt(0, addRemCall);
-                     enclType.addBodyStatementAt(ix+1, addRemBlock);
+                        System.err.println("*** Did not find field for addMethodResult call in serialization");
                   }
-                  else
-                     System.err.println("*** Did not find field for addMethodResult call in serialization");
                }
             }
          }
@@ -819,5 +853,13 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
 
    public boolean isLeafStatement() {
       return getBodyStatements() == null;
+   }
+
+   public FieldDefinition deepCopy(int options, IdentityHashMap<Object,Object> oldNewMap) {
+      FieldDefinition res = (FieldDefinition) super.deepCopy(options, oldNewMap);
+      if ((options & CopyInitLevels) != 0) {
+         res.buildInitExpr = buildInitExpr;
+      }
+      return res;
    }
 }

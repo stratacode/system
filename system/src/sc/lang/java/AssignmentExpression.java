@@ -61,7 +61,7 @@ public class AssignmentExpression extends TwoOperatorExpression {
          }
       }
       else {
-         if (!operator.equals("="))
+         if (operator != null && !operator.equals("="))
             selfOperator = operator.substring(0,operator.indexOf("="));
       }
    }

@@ -430,7 +430,6 @@ public class PTypeUtil {
          return Class.forName(typeName);
       }
       catch (ClassNotFoundException exc) {
-         System.err.println("*** findType: " + exc);
          return null;
       }
    }
