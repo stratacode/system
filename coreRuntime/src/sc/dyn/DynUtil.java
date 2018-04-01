@@ -1262,7 +1262,7 @@ public class DynUtil {
          Object type = findType(name);
          if (type != null) {
             String propName = CTypeUtil.getClassName(name);
-            propName = CTypeUtil.decapitalizePropertyName(name);
+            propName = CTypeUtil.decapitalizePropertyName(propName);
             return getStaticProperty(type, propName);
          }
          return null;
