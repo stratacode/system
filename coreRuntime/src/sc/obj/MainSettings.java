@@ -43,6 +43,9 @@ public @interface MainSettings {
    String[] testCommands() default {};
    /** Include Java debug arguments for the Java start definition */
    boolean debug() default false;
+   int debugPort() default 5005;
+   /** When running with the -dbg option, should the script wait for the debugger to attach (i.e. the suspend=y option to the debugger) */
+   boolean debugSuspend() default true;
    /** If produceJar is true, should we also include dependent classes in the jar file (excluding system classes) */
    boolean includeDepsInJar() default true;
    /**

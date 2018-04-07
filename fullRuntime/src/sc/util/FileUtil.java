@@ -125,6 +125,21 @@ public class FileUtil {
          return fileName.substring(0, ix);
    }
 
+   /**
+    * Takes name of a directory and a java regex pattern for matching one file in that directory.
+    * Returns the file name which matches - not including the directory name.
+    */
+   public static String matchFile(String dirName, String fileRegEx) {
+      File dir = new File(dirName);
+      String[] files = dir.list();
+      if (files == null)
+         return null;
+      for (String file:files)
+         if (file.matches(fileRegEx))
+            return file;
+      return null;
+   }
+
    public static String concat(String... params) {
       String result = null;
       for (String param:params) {

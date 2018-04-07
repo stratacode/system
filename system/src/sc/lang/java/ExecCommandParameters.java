@@ -5,7 +5,7 @@
 package sc.lang.java;
 
 public class ExecCommandParameters extends AbstractTemplateParameters {
-   public String command;
+   public String javaArgs;
    public String fullTypeName;
-   public String restartCommand;
+   public String restartJavaArgs;
 }

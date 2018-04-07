@@ -448,7 +448,9 @@ public class BuildInfo {
       changed = true;
       if (modelJarFiles == null)
          modelJarFiles = new ArrayList<ModelJar>();
-      modelJarFiles.add(new ModelJar(model.getModelTypeName(), mainClassName, jarName, packages, src, includeDeps));
+      ModelJar newMjar = new ModelJar(model.getModelTypeName(), mainClassName, jarName, packages, src, includeDeps);
+      if (!modelJarFiles.contains(newMjar))
+         modelJarFiles.add(newMjar);
 
       if (system != null && system.buildInfo == this) {
          for (Layer l:system.layers) {

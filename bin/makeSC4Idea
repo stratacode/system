@@ -4,12 +4,12 @@
 #   git clone https://github.com/stratacode/sc4idea.git
 #fi
 
-# Run with an argument to specify the target build dir.  If no argument is supplied a default is chosen in /tmp
+# Run with an argument to specify the target build dir.  If no argument is supplied a default is chosen 
 
 set -e
 
 if [ "$#" -eq 0 ]; then
-   BUILDDIR=/tmp/sc4ideabuild
+   BUILDDIR=/jjv/sc4ideaBuild
 else
    BUILDDIR="$1"
 fi
@@ -21,4 +21,4 @@ echo "Building sc4idea into: $BUILDDIR"
 mkdir -p $BUILDDIR
 scc -c -cc -a sc4idea -da $BUILDDIR
 
-echo "Result is in: $BUILDDIR
+echo "Result is in: $BUILDDIR"

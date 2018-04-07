@@ -275,7 +275,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
    }
 
    class JavaCommandInfo {
-      String command, restartCommand, sharedArgs;
+      String javaArgs, restartJavaArgs, sharedArgs, debugArgs;
       Boolean produceJar;
       String jarFileName;
       Boolean produceScript;
@@ -284,6 +284,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       String execBATTemplateName;
       Boolean debug;
       Integer debugPort;
+      Boolean debugSuspend;
       String execName;
       String defaultArgs;
       Integer maxMem;
@@ -314,6 +315,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             execBATTemplateName = null;
          debug = (Boolean) ModelUtil.getAnnotationValue(mainSettings, "debug");
          debugPort = (Integer) ModelUtil.getAnnotationValue(mainSettings, "debugPort");
+         debugSuspend = (Boolean) ModelUtil.getAnnotationValue(mainSettings, "debugSuspend");
          execName = (String) ModelUtil.getAnnotationValue(mainSettings, "execName");
          defaultArgs = (String) ModelUtil.getAnnotationValue(mainSettings, "defaultArgs");
          if (defaultArgs == null)
@@ -359,7 +361,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             throw new UnsupportedOperationException();
       }
 
-      private void setShellType(String shellType) {
+      private void setShellType(String shellType, boolean addMain) {
          this.shellType = shellType;
          scriptSuffix = "";
          String extraArgs = defaultArgs;
@@ -381,8 +383,8 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          // jarFileName lets you override the jar name used.  Defaults to execName.
          if (jarFileName == null || jarFileName.length() == 0)
             jarFileName = FileUtil.addExtension(execName, "jar");
-         String debugStr = debug != null && debug ?
-                 " -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=" + (debugPort == null ? "5005": debugPort)  :
+         debugArgs = debug != null && debug ?
+                 " -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=" + (debugSuspend == null || !debugSuspend ? "n" : "y") +  ",address=" + (debugPort == null ? "5005": debugPort)  :
                  "";
 
          String dynStr = "";
@@ -400,17 +402,19 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             // TODO: need to find a way to inject command line args into the jar process
             if (dynStr.length() > 0)
                System.err.println("*** Unable to produce script with jar option for dynamic layers");
-            lsys.buildInfo.addModelJar(model, model.getModelTypeName(), jarFileName, null, false, includeDepsInJar == null || includeDepsInJar);
-            sharedArgs =  "java" + debugStr + memStr + vmParams +
+            if (addMain)
+               lsys.buildInfo.addModelJar(model, model.getModelTypeName(), jarFileName, null, false, includeDepsInJar == null || includeDepsInJar);
+            sharedArgs =  memStr + vmParams +
                     " -jar \"" + varString("DIRNAME") + sepStr + getFileNamePart(jarFileName, "/") + "\"";
          }
          else {
-            lsys.buildInfo.addMainCommand(model, execName, defaultArgList, stopMethod);
-            sharedArgs = "java" + debugStr + vmParams + memStr + " -cp \"" + lsys.userClassPath + "\" " + dynStr + fullTypeName + " ";
+            if (addMain)
+               lsys.buildInfo.addMainCommand(model, execName, defaultArgList, stopMethod);
+            sharedArgs = vmParams + memStr + " -cp \"" + lsys.userClassPath + "\" " + dynStr + fullTypeName + " ";
          }
          sharedArgs += extraArgs;
-         command = sharedArgs + " " + argsString();
-         restartCommand = sharedArgs + " -restart";
+         javaArgs = sharedArgs + " " + argsString();
+         restartJavaArgs = sharedArgs + " -restart";
       }
 
    }
@@ -448,7 +452,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
 
                String fullTypeName = getEnclosingType().getFullTypeName();
                JavaCommandInfo ci = createJavaCommandInfo(mainSettings, model, fullTypeName);
-               ci.setShellType("sh");
+               ci.setShellType("sh", true);
 
                // TODO: should we make this more flexible?
                boolean doRestart = fullTypeName.contains("LayeredSystem");
@@ -460,17 +464,31 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                   Template templ = null;
                   if (ci.execCommandTemplateName != null)
                      templ = getEnclosingType().findTemplatePath(ci.execCommandTemplateName, "exec command template", ExecCommandParameters.class);
-                  String restartCommands = !doRestart ? "" :
-                                  "while [ \"$?\" = \"33\" ] ; do" +
-                                  FileUtil.LINE_SEPARATOR +
-                                  "   " + ci.restartCommand +
-                                  FileUtil.LINE_SEPARATOR +
-                                  "SC_EXIT_STATUS=$?" +
-                                  FileUtil.LINE_SEPARATOR +
-                                  "done" +
-                                  FileUtil.LINE_SEPARATOR;
-
                   if (templ == null) {
+                     String restartCommands = !doRestart ? "" :
+                                     "while [ \"$?\" = \"33\" ] ; do" +
+                                     FileUtil.LINE_SEPARATOR +
+                                     "   java" + ci.restartJavaArgs +
+                                     FileUtil.LINE_SEPARATOR +
+                                     "SC_EXIT_STATUS=$?" +
+                                     FileUtil.LINE_SEPARATOR +
+                                     "done" +
+                                     FileUtil.LINE_SEPARATOR;
+
+                     boolean includeDebug = ci.debug != null && ci.debug;
+
+                     String debugCommands = !includeDebug ? "# @MainSettings(debug not enabled)" :
+                                     "DBG_ARGS=" +
+                                     FileUtil.LINE_SEPARATOR +
+                                     "if [ \"$1\" == \"-dbg\" ] ; then" +
+                                     FileUtil.LINE_SEPARATOR +
+                                     "   DBG_ARGS=\"" + ci.debugArgs + "\"" +
+                                     FileUtil.LINE_SEPARATOR +
+                                     "fi" +
+                                     FileUtil.LINE_SEPARATOR;
+
+                     String debugArgs = !includeDebug ? "" : " ${DBG_ARGS}";
+
                      startCommand = "#!/bin/sh\n" +
                                     "# This file is generated by the MainSettings annotation on class " + fullTypeName + " - warning changes made here will be lost" +
                                     FileUtil.LINE_SEPARATOR +
@@ -483,8 +501,9 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                                     "CMDPATH=\"`type -p $0`\"" +
                                     FileUtil.LINE_SEPARATOR +
                                     "DIRNAME=`dirname $CMDPATH`" +
+                                    FileUtil.LINE_SEPARATOR + debugCommands +
                                     FileUtil.LINE_SEPARATOR +
-                                    ci.command +
+                                    "java" + debugArgs + ci.javaArgs +
                                     FileUtil.LINE_SEPARATOR +
                                     "SC_EXIT_STATUS=$?" +
                                     FileUtil.LINE_SEPARATOR +
@@ -494,9 +513,9 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                   }
                   else {
                      ExecCommandParameters params = new ExecCommandParameters();
-                     params.command = ci.command;
+                     params.javaArgs = ci.javaArgs;
                      params.fullTypeName = fullTypeName;
-                     params.restartCommand = ci.restartCommand;
+                     params.restartJavaArgs = ci.restartJavaArgs;
 
                      startCommand = TransformUtil.evalTemplate(params, templ);
                   }
@@ -506,7 +525,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                   new File(runScriptFile).setExecutable(true, true);
                }
 
-               ci.setShellType("bat");
+               ci.setShellType("bat", false);
 
                if (ci.produceBAT != null && ci.produceBAT) {
                   String runBATFile = FileUtil.concat(lsys.buildDir, ci.execName + ".bat");
@@ -516,29 +535,28 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                   if (ci.execBATTemplateName != null)
                      templ = getEnclosingType().findTemplatePath(ci.execBATTemplateName, "exec command template", ExecCommandParameters.class);
 
-                  String restartBAT = !doRestart ? "" :
-                          "if %SC_EXIT_STATUS% neq 33 goto exitsc\r\n" +
-                          ":tryagain\r\n" +
-                                  ci.restartCommand + "\r\n" +
-                                  "set SC_EXIT_STATUS=%errorlevel%\r\n" +
-                                  "if %SC_EXIT_STATUS% equ 33 goto tryagain\r\n" +
-                            ":exitsc\r\n";
                   if (templ == null) {
+                     String restartBAT = !doRestart ? "" :
+                             "if %SC_EXIT_STATUS% neq 33 goto exitsc\r\n" +
+                                     ":tryagain\r\n" +
+                                     "java" + ci.restartJavaArgs + "\r\n" +
+                                     "set SC_EXIT_STATUS=%errorlevel%\r\n" +
+                                     "if %SC_EXIT_STATUS% equ 33 goto tryagain\r\n" +
+                                     ":exitsc\r\n";
                      startBAT = "@ECHO off\r\n" +
                              "SETLOCAL ENABLEEXTENSIONS\r\n" +
                              // No way I could find to get a process id of the bat file so just use a random number for the temp file
                              "SET SCPID=%RANDOM%\r\n" +
                              "SET DIRNAME=%~dp0\r\n" +
-                             ci.command + "\r\n" +
-                             "SET SC_EXIT_STATUS=%ERRORLEVEL%\r\n" +
+                             "java" + ci.javaArgs + "\r\n" +
                              restartBAT +
                              "EXIT /B %SC_EXIT_STATUS%\r\n";
                   }
                   else {
                      ExecCommandParameters params = new ExecCommandParameters();
-                     params.command = ci.command;
+                     params.javaArgs = ci.javaArgs;
                      params.fullTypeName = fullTypeName;
-                     params.restartCommand = restartBAT;
+                     params.restartJavaArgs = ci.restartJavaArgs;
 
                      startBAT = TransformUtil.evalTemplate(params, templ);
                   }

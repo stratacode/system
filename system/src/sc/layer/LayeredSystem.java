@@ -961,6 +961,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    {
       globalLayerImports.put("LayeredSystem", ImportDeclaration.create("sc.layer.LayeredSystem"));
       globalLayerImports.put("FileUtil", ImportDeclaration.create("sc.util.FileUtil"));
+      globalLayerImports.put("File", ImportDeclaration.create("java.io.File"));
       globalLayerImports.put("RepositoryPackage", ImportDeclaration.create("sc.repos.RepositoryPackage"));
       globalLayerImports.put("MvnRepositoryPackage", ImportDeclaration.create("sc.repos.mvn.MvnRepositoryPackage"));
       globalLayerImports.put("LayerFileProcessor", ImportDeclaration.create("sc.layer.LayerFileProcessor"));
@@ -2551,6 +2552,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    private final static String STRATACODE_LIBRARIES_FILE = "sc.jar";
 
+   private final static String[] SC_JAR_PATTERN = new String[] {".*jline.*\\.jar"};
+
    private void syncStrataCodeLibraries(String dir) {
       String fullRuntimeDir = getStrataCodeRuntimePath(false, false);
       File srcDirFile = new File(fullRuntimeDir);
@@ -2576,10 +2579,25 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             System.err.println("*** Failed trying to jar sc runtime src files into: " + outJarName + " from buildDir: " + tempDirPath);
          else
             FileUtil.removeFileOrDirectory(tempDir);
+
+         // This is not a typical case - we are building a project which needs the sc.jar but not from an sc install.
+         // For example, we are building sc4idea from the IDE.  We are both generating sc.jar and the wrapper jar the same time.
+         // To pick up the dependencies like jline which are included in sc.jar we need to at least copy the lib files here.
+         String[] classPathEnts = userClassPath.split(FileUtil.PATH_SEPARATOR);
+         for (String depJar:SC_JAR_PATTERN) {
+            for (String classPathEnt:classPathEnts) {
+               if (classPathEnt.matches(depJar)) {
+                  if (options.info)
+                     info("Including sc jar dependency: " + classPathEnt);
+                  String fileName = FileUtil.getFileName(classPathEnt);
+                  FileUtil.copyFile(classPathEnt, FileUtil.concat(dir, fileName), false);
+               }
+            }
+         }
       }
       else {
          String srcDirPath = srcDirFile.getPath();
-         info("Copying scr.jar from: " + srcDirPath + " to: " + outJarName);
+         info("Copying sc.jar from: " + srcDirPath + " to: " + outJarName);
          if (!FileUtil.copyFile(srcDirPath, outJarName, true))
             System.err.println("*** Failed to copy sc runtime files from: " + srcDirPath + " to: " + outJarName);
       }
@@ -3600,7 +3618,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       @Constant public boolean headless = false;
    }
 
-   @MainSettings(produceJar = true, produceScript = true, produceBAT = true, execName = "bin/scc", jarFileName="bin/sc.jar", debug = false, maxMemory = 2048, defaultArgs = "-restartArgsFile <%= getTempDir(\"restart\", \"tmp\") %>")
+   @MainSettings(produceJar = true, produceScript = true, produceBAT = true, execName = "bin/scc", jarFileName="bin/sc.jar", debug = true, debugSuspend = true, maxMemory = 2048, defaultArgs = "-restartArgsFile <%= getTempDir(\"restart\", \"tmp\") %>")
    public static void main(String[] args) {
       String buildLayerName = null;
       List<String> includeLayers = null;
@@ -3681,6 +3699,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   }
                   else if (opt.equals("dt"))
                      options.liveDynamicTypes = true;
+                  else if (opt.equals("dbg")) // Right now, this option is passed to the 'start' script (e.g. scc) to enable the java debugger options
+                     ;
                   else
                      usage("Unrecognized option: " + opt, args);
                   break;
@@ -4100,10 +4120,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (options.verbose) {
             BuildTag buildTag = (BuildTag) DynUtil.resolveName("sc.buildTag.SccBuildTag", true);
             if (buildTag != null) {
-               System.out.println("  scc build: " + buildTag.getBuildTag());
+               System.out.println("  scc version: " + buildTag.getBuildTag());
             }
             else {
-               System.out.println("  scc java-only build");
+               System.out.println("  scc version: java build - no version available");
             }
          }
 
@@ -7266,7 +7286,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          File typeIndexDir = new File(getTypeIndexDir(typeIndexIdent));
          String[] fileNames = typeIndexDir.list();
          if (fileNames == null) {
-            System.err.println("*** Unable to access typeIndex directory: " + typeIndexDir.getPath());
+            error("*** Load typeIndex with no typeIndex directory: " + typeIndexDir.getPath());
             return;
          }
          // We may create types_java directories for this layered system before we've used it for a specific process
@@ -13365,8 +13385,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (className == null)
                className = FileUtil.removeExtension(classFileName.replace('$','.'));
             res = ent.layer.getClass(classFileName, className);
-            if (res == null)
+            if (res == null) {
                res = NullClassSentinel.class;
+            }
             otherClassCache.put(className, res);
             return res;
          }
