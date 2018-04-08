@@ -3778,7 +3778,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             writeBuildSrcIndex(!layeredSystem.systemCompiled);
 
          if (buildInfo != null && buildInfo.changed)
-            layeredSystem.saveTypeToFixedTypeFile(FileUtil.concat(buildSrcDir, layeredSystem.getBuildInfoFile()), buildInfo,
+            LayerUtil.saveTypeToFixedTypeFile(FileUtil.concat(buildSrcDir, layeredSystem.getBuildInfoFile()), buildInfo,
                     "sc.layer.BuildInfo");
 
          if (buildSrcDir != null)

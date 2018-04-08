@@ -5,11 +5,20 @@
 package sc.layer;
 
 import sc.lang.*;
+import sc.lang.java.Expression;
 import sc.lang.java.ModelUtil;
+import sc.lang.sc.ModifyDeclaration;
+import sc.lang.sc.PropertyAssignment;
+import sc.lang.sc.SCModel;
+import sc.layer.deps.DependenciesLanguage;
+import sc.layer.deps.DependencyFile;
 import sc.obj.SyncMode;
 import sc.parser.*;
 import sc.repos.*;
 import sc.type.CTypeUtil;
+import sc.type.IBeanMapper;
+import sc.type.RTypeUtil;
+import sc.type.TypeUtil;
 import sc.util.*;
 
 import javax.tools.*;
@@ -42,6 +51,56 @@ public class LayerUtil implements LayerConstants {
       // We need these in the classes directory so we can load the dynamic stubs
       layer.compiled = true;
       return layer;
+   }
+
+   static void saveDeps(DependencyFile deps, File depFile, long buildTime) {
+      try {
+         depFile.delete();
+         File depDir = depFile.getParentFile();
+         depDir.mkdirs();
+         DependenciesLanguage.INSTANCE.saveSemanticValue(deps, depFile);
+
+         // Reset the deps file back to the start so we do not miss any changes made while
+         // we were compiling on the next build.
+         depFile.setLastModified(buildTime);
+      }
+      catch (IllegalArgumentException exc) {
+         System.err.println("Unable to write dependencies file: " + exc);
+      }
+   }
+
+   static boolean sameTypeGroupLists(List<String> prevTypeGroupMembers, List<TypeGroupMember> newTypeGroupMembers) {
+      if (prevTypeGroupMembers == null && newTypeGroupMembers == null)
+         return true;
+      else if (prevTypeGroupMembers == null || newTypeGroupMembers == null)
+         return false;
+      int prevSz = prevTypeGroupMembers.size();
+      int newSz = newTypeGroupMembers.size();
+      if (prevSz != newSz)
+         return false;
+
+      for (int i = 0; i < newSz; i++) {
+         String newTypeName = newTypeGroupMembers.get(i).typeName;
+         if (!newTypeName.equals(prevTypeGroupMembers.get(i))) {
+            // For some reason these are getting reordered
+            if (prevTypeGroupMembers.indexOf(newTypeName) == -1)
+               return false;
+         }
+      }
+      return true;
+   }
+
+   static boolean anyTypesChanged(HashSet<String> changedTypes, List<String> typeNameList) {
+      for (String typeName:typeNameList)
+         if (changedTypes.contains(typeName))
+            return true;
+      return false;
+   }
+
+   // If we are dealing with a source file that's already built in a previous build layer, use that layer's "buildAllFiles" so we do the build-all one clump of files at a time.
+   static boolean doIncrCompileForFile(SrcEntry srcEnt) {
+      Layer prevSrcEntBuildLayer = srcEnt.layer.getNextBuildLayer();
+      return !prevSrcEntBuildLayer.getBuildAllFiles();
    }
 
    public static class LayeredSystemPtr {
@@ -911,4 +970,37 @@ public class LayerUtil implements LayerConstants {
          return new File(dir, fileInDir).isDirectory();
       }
    }
+
+   public static void saveTypeToFixedTypeFile(String fileName, Object instance, String typeName) {
+      String packageName = CTypeUtil.getPackageName(typeName);
+      String baseName = CTypeUtil.getClassName(typeName);
+      SCModel model = new SCModel();
+      model.addSrcFile(new SrcEntry(null, fileName, packageName.replace('.',FileUtil.FILE_SEPARATOR_CHAR)));
+      ModifyDeclaration modDecl = new ModifyDeclaration();
+      modDecl.typeName = baseName;
+      model.setProperty("types", new SemanticNodeList(1));
+      model.types.add(modDecl);
+
+      IBeanMapper[] props = RTypeUtil.getPersistProperties(instance.getClass());
+
+      for (int i = 0; i < props.length; i++) {
+         IBeanMapper prop = props[i];
+         String pname = prop.getPropertyName();
+         Object value = TypeUtil.getPropertyValue(instance, pname);
+         if (value != null) {
+            Expression expr = Expression.createFromValue(value, true);
+            modDecl.addBodyStatement(PropertyAssignment.create(pname, expr, null));
+         }
+      }
+      Language l = Language.getLanguageByExtension(FileUtil.getExtension(fileName));
+      Object res = l.generate(model, false);
+      if (res instanceof GenerateError) {
+         System.err.println("*** Error saving type: " + typeName + " :" + res);
+      }
+      else {
+         String genResult = res.toString();
+         FileUtil.saveStringAsFile(fileName, genResult, true);
+      }
+   }
+
 }

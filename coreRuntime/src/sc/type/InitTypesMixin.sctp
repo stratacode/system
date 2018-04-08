@@ -1,7 +1,7 @@
    // This method is generated from a template to include all initOnStartup and createOnStartup types
    public void initTypes() { <%
    sc.layer.LayeredSystem system = sc.layer.LayeredSystem.getCurrent();
-   List<sc.layer.InitTypeInfo> initTypes = system.getInitTypes();
+   List<sc.layer.InitTypeInfo> initTypes = system.currentBuildLayer.buildInfo.getInitTypes();
    if (initTypes != null) {
       for (sc.layer.InitTypeInfo initType:initTypes) {
          if (!initType.doStartup) { %>

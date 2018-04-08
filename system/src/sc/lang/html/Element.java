@@ -3707,7 +3707,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          System.err.println("*** No layeredSystem for URLPaths in Element : ");
          return null;
       }
-      return sys.getURLPaths();
+      return sys.buildInfo.getURLPaths();
    }
 
 

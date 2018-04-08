@@ -4,6 +4,7 @@
 
 package sc.layer;
 
+import sc.js.URLPath;
 import sc.type.RTypeUtil;
 import sc.type.TypeUtil;
 import sc.util.FileUtil;
@@ -673,4 +674,92 @@ public class BuildInfo {
          }
       }
    }
+
+   /** Returns all of the declared URL top-level system types, including those in the mainInit and URLTypes type groups. */
+   public List<URLPath> getURLPaths() {
+      ArrayList<URLPath> res = null;
+      try {
+         system.acquireDynLock(false);
+         List<TypeGroupMember> mainInitMembers = getTypeGroupMembers("mainInit");
+         List<TypeGroupMember> urlTypes = getTypeGroupMembers("URLTypes");
+         if (mainInitMembers == null && urlTypes == null)
+            return null;
+         res = new ArrayList<URLPath>();
+         if (mainInitMembers != null) {
+            for (TypeGroupMember memb:mainInitMembers) {
+               // Skip mainInit types which also have URL since we'll process them below
+               if (memb.hasAnnotation("sc.html.URL"))
+                  continue;
+               URLPath path = new URLPath(memb.typeName);
+               if (!res.contains(path))
+                  res.add(path);
+            }
+         }
+         if (urlTypes != null) {
+            for (TypeGroupMember memb:urlTypes) {
+               // Skip the Html and Page types
+               Object sto = memb.getAnnotationValue("sc.html.URL", "subTypesOnly");
+               if (sto != null && (Boolean) sto)
+                  continue;
+               // Skip CSS types
+               Object resource = memb.getAnnotationValue("sc.html.URL", "resource");
+               if (resource != null && (Boolean) resource)
+                  continue;
+               // Skip types which may not be loaded yet
+               if (memb.getType() == null)
+                  continue;
+               URLPath path = new URLPath(memb.typeName);
+               // TODO: when the pattern is in the pattern language, we can init the pattern, find the variables and build
+               // a form for testing the URL?
+               String annotURL = (String) memb.getAnnotationValue("sc.html.URL", "pattern");
+               // When the server is not enabled, the URLPath's have to refer to the file system right now.
+               // TODO: add a hook so for static sites (!serverEnabled), we could generate the path-mapping file for some other web server apache, nginx, etc?
+               if (annotURL != null) {
+
+               }
+               if (annotURL != null && system.serverEnabled)
+                  path.url = annotURL;
+               if (!res.contains(path))
+                  res.add(path);
+            }
+         }
+      }
+      finally {
+         system.releaseDynLock(false);
+      }
+      return res;
+   }
+
+   private void addInitTypes(List<InitTypeInfo> res, String groupName, boolean doStartup) {
+      List<TypeGroupMember> initTypes = getTypeGroupMembers(groupName);
+      if (initTypes != null) {
+         for (TypeGroupMember memb:initTypes) {
+            Object type = memb.getType();
+            Integer priority = 0;
+            if (type != null) {
+               priority = (Integer) ModelUtil.getAnnotationValue(type, "sc.obj.CompilerSettings", "startPriority");
+               if (priority == null)
+                  priority = 0;
+            }
+            InitTypeInfo it = new InitTypeInfo();
+            it.initType = memb;
+            it.priority = priority;
+            it.doStartup = doStartup;
+            res.add(it);
+         }
+      }
+   }
+
+   /** Returns the types that need to be started in the proper order */
+   public List<InitTypeInfo> getInitTypes() {
+      ArrayList<InitTypeInfo> res = new ArrayList<InitTypeInfo>();
+
+      addInitTypes(res, "_init", false);
+      addInitTypes(res, "_startup", true);
+
+      // Want them to go from high to low as higher priority should go first right?
+      Collections.reverse(res);
+      return res;
+   }
+
 }

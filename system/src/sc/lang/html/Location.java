@@ -17,7 +17,10 @@ import sc.obj.Constant;
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js")
 public class Location {
    @Constant
-   public String hash, host, hostname, href, pathname, protocol, search;
+   public String hash, host, hostname, protocol;
+
+   public String href, pathname, search;
+
    @Constant
    public String port;
 }

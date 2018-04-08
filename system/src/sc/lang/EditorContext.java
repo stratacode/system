@@ -972,7 +972,7 @@ public class EditorContext extends ClientEditorContext {
       return changedModels.contains(model);
    }
 
-   public LayeredSystem.SystemRefreshInfo refresh() {
+   public SystemRefreshInfo refresh() {
       return system.refreshRuntimes(true);
    }
 
@@ -1081,7 +1081,7 @@ public class EditorContext extends ClientEditorContext {
    }
 
    void doRefresh() {
-      LayeredSystem.SystemRefreshInfo info = refresh();
+      SystemRefreshInfo info = refresh();
       List<Layer.ModelUpdate> changedModels = info.changedModels;
       if (changedModels != null) {
          for (Layer.ModelUpdate modelUpdate:changedModels) {
