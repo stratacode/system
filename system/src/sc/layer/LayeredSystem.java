@@ -47,8 +47,9 @@ import java.util.zip.ZipFile;
 import static sc.type.RTypeUtil.systemClasses;
 
 /**
- * The layered system manages the collection of layers which make up the system - for reading and editing project files (inactive layers)
- * compiling and running the system (active layers).  Each layer contains a slice
+ * The layered system manages the collection of layers or modules in an application.
+ * The layers can be in one of two states: inactive, for reading and editing project files
+ * or active, for compiling and running the system.  Each layer contains a slice
  * of application code - a single tree organized in a hierarchical name space of definitions.  Definitions
  * create classes, objects, or modify classes or objects.  These layers are merged together to create the
  * current application's program state.
@@ -165,8 +166,11 @@ import static sc.type.RTypeUtil.systemClasses;
  * versions when compiling the code - e.g. the initSyncProperties feature.
  * </p>
  *
- *  TODO: this is a massive class and should be broken into more manageable pieces.  At some point we could separate aspects of the LayeredSystem into layers (e.g. sync, data binding,
- *  schtml support) and use StrataCode to build itself without breaking any public APIs but it's nice to have Java while SC is still in active development.
+ *  TODO: this is a very large class and ideally should be broken into more manageable pieces.
+ *  If we required scc to build, we could separate aspects of the LayeredSystem into layers (e.g. sync, data binding,
+ *  schtml support, inactive, active) and use StrataCode to build itself into different versions that support the same or subsets of the current public API.
+ *  We could build up functionality via sub-classes like CoreSystem (for all of the basic info and apis used in the layer definition file), LayeredSystem
+ *  for the rest.
  *  In the short-term, inner classes could be broken out as separate classes and we could possibly modularize things better (e.g.
  *  move the phases for the code-generation preInit, init, start, etc. into the BuildState class.  It would be nice to move all state managed by the Layer into
  *  a separate class so we can control the public API of the layer definition.
@@ -179,17 +183,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       setCurrent(this);
    }
 
+   /** Stores the set of layers in the current application for build or run */
    @Constant
    public List<Layer> layers = new ArrayList<Layer>(16);
 
-   // Index for layers which are not part of the actively executing layers list
+   /* Other layers which are in the layerPath which we are navigating or editing.  Used for tooling purposes */
    public ArrayList<Layer> inactiveLayers = new ArrayList<Layer>();
 
    @Constant
    public Options options;
 
-   /** The list of other layered systems for other runtimes. */
+   /** The list of other LayeredSystems that are part of the same application.  They are for managing code in a separate process that's part of the same application, possibly in another runtime like Javascript. */
    public ArrayList<LayeredSystem> peerSystems = null;
+   /** For any group of LayeredSystems, there's always a 'main' one which kicks things off.  It first loads all of the layers, then creates the peerSystems required. */
    public LayeredSystem mainSystem = null;
 
    /** Set to true when this system is in a peer */
@@ -198,10 +204,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** The list of layers originally specified by the user. */
    public List<Layer> specifiedLayers = new ArrayList<Layer>();
 
-   public Layer buildLayer; // The last non-dynamic layer
+   public Layer buildLayer; // The last non-dynamic active layer
    public Layer currentBuildLayer; // When compiling layers in a sequence, this stores the layering currently being built
    public Layer lastCompiledLayer; // The last in the compiled layers list
-   public Layer lastLayer;  // The last layer
+   public Layer lastLayer;  // The last active layer
    public Map<String,Layer> layerIndex = new HashMap<String,Layer>(); // layer unique name
    public Map<String,Layer> layerFileIndex = new HashMap<String,Layer>(); // <layer-pkg> + layerName
    public Map<String,Layer> layerPathIndex = new HashMap<String,Layer>(); // layer-group name
@@ -307,8 +313,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public RepositorySystem repositorySystem;
 
-   public boolean useCanonicalPaths = false;
-
    // TODO: do we need something like this to filter the bundles directory?
    //List<String> excludedBundles = null;
 
@@ -340,10 +344,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** Java's URLClassLoader does not allow replacing of classes in a subsequent layer.  The good reason for this is that you under no circumstances want to load the same class twice.  You do not want to load incompatible versions
     * of a class by overriding them.  But with layers managed build system, we ideally want a different model.  One where you load classes in a two stage fashion:  - look at your parent loader, see if the class has been loaded.  If
     * so, return it.  But if not, load it from the outside/in - i.e. pick the most specific version of that class.  The layered type system should catch class incompatibility errors that might exist (or at least it can evolve to
-    * eliminate those errors).  In the more flexible layeredClassPaths model, we build all build layers and build the last compiled layer in a merged manner.  All dynamic layers are then in separate buildDir's which can be added andlet's be sure we have proper version - active or inactive
+    * eliminate those errors).  In the more flexible layeredClassPaths model, we build all build layers and build the last compiled layer in a merged manner.  All dynamic layers are then in separate buildDir's which can be added
     * removed from the class path as needed.  This model lets us also more accurately detect when a subsequent layer's class will override a previous layer.
     * <p/>
-    * TODO: So we need to implement our own class loading to do this which I have not done.  Setting this to "true" gets part of the way.
+    * TODO: It seems like to finish this feature, we need to skip the root class loader entirely.  As it is, when a new layer of classes is added, we have to flush the class loaders
+    * of the previously built layers so we start from scratch again when building the next layer.  It seems less efficient than it could be if we went ahead and implemented this feature.
     */
    final static boolean layeredClassPaths = false;
 
