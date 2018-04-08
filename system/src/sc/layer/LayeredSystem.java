@@ -4120,10 +4120,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (options.verbose) {
             BuildTag buildTag = (BuildTag) DynUtil.resolveName("sc.buildTag.SccBuildTag", true);
             if (buildTag != null) {
-               System.out.println("  scc version: " + buildTag.getBuildTag());
+               System.out.println("   scc version: " + buildTag.getBuildTag());
             }
             else {
-               System.out.println("  scc version: java build - no version available");
+               System.out.println("   scc version: java build - no version available");
             }
          }
 
