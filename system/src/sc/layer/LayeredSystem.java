@@ -344,7 +344,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public IExternalModelIndex externalModelIndex = null;
 
    /** Enable extra info in debugging why files are recompiled */
-   private final static boolean traceNeedsGenerate = false;
+   private static boolean traceNeedsGenerate = false;
 
    /** Java's URLClassLoader does not allow replacing of classes in a subsequent layer.  The good reason for this is that you under no circumstances want to load the same class twice.  You do not want to load incompatible versions
     * of a class by overriding them.  But with layers managed build system, we ideally want a different model.  One where you load classes in a two stage fashion:  - look at your parent loader, see if the class has been loaded.  If
@@ -355,7 +355,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * TODO: It seems like to finish this feature, we need to skip the root class loader entirely.  As it is, when a new layer of classes is added, we have to flush the class loaders
     * of the previously built layers so we start from scratch again when building the next layer.  It seems less efficient than it could be if we went ahead and implemented this feature.
     */
-   private final static boolean layeredClassPaths = false;
+   final static boolean layeredClassPaths = false;
 
    /* Stores the models which have been detected as changed based on their type name since the start of this build.  Preserved across the entire buildSystem call, i.e. even over a layered builds. */
    HashMap<String,IFileProcessorResult> changedModels = new HashMap<String, IFileProcessorResult>();
