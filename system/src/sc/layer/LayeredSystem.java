@@ -171,7 +171,8 @@ import static sc.type.RTypeUtil.systemClasses;
  *  schtml support, inactive, active) and use StrataCode to build itself into different versions that support the same or subsets of the current public API.
  *  We could build up functionality via sub-classes like CoreSystem (for all of the basic info and apis used in the layer definition file), LayeredSystem
  *  for the rest.
- *  In the short-term, inner classes could be broken out as separate classes and we could possibly modularize things better (e.g.
+ *  Ideas for improved internal modularization - move code based on role into: TypeIndex, BuildState, TypeCache (typesByName, innerTypeCache),
+ *  DynAppState ().
  *  move the phases for the code-generation preInit, init, start, etc. into the BuildState class.  It would be nice to move all state managed by the Layer into
  *  a separate class so we can control the public API of the layer definition.
  *  Unfortunately it's probably never going to be small... there's a lot of code to customize and manage at the system level.   Once you understand the keywords
@@ -179,6 +180,14 @@ import static sc.type.RTypeUtil.systemClasses;
  */
 @sc.js.JSSettings(jsModuleFile="js/sclayer.js", prefixAlias="sc_")
 public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSystem, IClassResolver {
+   /** The list of runtimes required to execute this stack of layers (e.g. javascript and java).  If java is in the list, it will be the first one and represented by a "null" entry. */
+   public static ArrayList<IRuntimeProcessor> runtimes;
+
+   /** The list of processes to build for this stack of layers */
+   public static ArrayList<IProcessDefinition> processes;
+
+   private static boolean procInfoNeedsSave = false;
+
    {
       setCurrent(this);
    }
@@ -275,14 +284,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    /** If set, specifies the -source option to the javac compiler */
    public String javaSrcVersion;
-
-   /** The list of runtimes required to execute this stack of layers (e.g. javascript and java).  If java is in the list, it will be the first one and represented by a "null" entry. */
-   public static ArrayList<IRuntimeProcessor> runtimes;
-
-   /** The list of processes to build for this stack of layers */
-   public static ArrayList<IProcessDefinition> processes;
-
-   private static boolean procInfoNeedsSave = false;
 
    /** A user configurable list of runtime names which are ignored */
    public ArrayList<String> disabledRuntimes;
@@ -386,7 +387,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    TreeSet<String> customSuffixes = new TreeSet<String>();
 
-   SysTypeIndex typeIndex;
+   public SysTypeIndex typeIndex;
 
    /**
     * The type index is enabled by calling initTypeIndex on the LayeredSystem right after constructing it.  It's used for tools like the IDE to maintain
@@ -949,31 +950,25 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    String origBuildDir; // Track the original build directory, where we do the full compile.  After the orig build layer is removed, this guy will still need to go into the class path because it contains all of the non-build layer compiled assets.
 
+   private static final String[] defaultGlobalImports = {"sc.obj.AddBefore", "sc.obj.AddAfter", "sc.obj.Component", "sc.obj.IComponent",
+           "sc.obj.IAltComponent", "sc.obj.CompilerSettings", "sc.bind.Bindable"};
+
+   // These imports are used for StrataCode files during the code-generation phase.  They are inserted into the generated Java file when used, like the import statements in layer definition files.
    private Map<String,ImportDeclaration> globalImports = new HashMap<String,ImportDeclaration>();
    {
-      globalImports.put("AddBefore", ImportDeclaration.create("sc.obj.AddBefore"));
-      globalImports.put("AddAfter", ImportDeclaration.create("sc.obj.AddAfter"));
-      globalImports.put("Component", ImportDeclaration.create("sc.obj.Component"));
-      globalImports.put("IComponent", ImportDeclaration.create("sc.obj.IComponent"));
-      globalImports.put("IAltComponent", ImportDeclaration.create("sc.obj.IAltComponent"));
-      globalImports.put("CompilerSettings", ImportDeclaration.create("sc.obj.CompilerSettings"));
-      globalImports.put("Bindable", ImportDeclaration.create("sc.bind.Bindable"));
+      for (String dgi:defaultGlobalImports)
+         globalImports.put(CTypeUtil.getClassName(dgi), ImportDeclaration.create(dgi));
    }
 
+   private static final String[] defaultGlobalLayerImports = {"sc.layer.LayeredSystem", "sc.util.FileUtil", "java.io.File",
+      "sc.repos.RepositoryPackage", "sc.repos.mvn.MvnRepositoryPackage", "sc.layer.LayerFileProcessor", "sc.lang.TemplateLanguage",
+      "sc.layer.BuildPhase", "sc.layer.CodeType", "sc.layer.CodeFunction", "sc.obj.Sync", "sc.obj.SyncMode"};
+
+   // These are the set of imports used for resolving types in layer definition files.
    private Map<String,ImportDeclaration> globalLayerImports = new HashMap<String, ImportDeclaration>();
    {
-      globalLayerImports.put("LayeredSystem", ImportDeclaration.create("sc.layer.LayeredSystem"));
-      globalLayerImports.put("FileUtil", ImportDeclaration.create("sc.util.FileUtil"));
-      globalLayerImports.put("File", ImportDeclaration.create("java.io.File"));
-      globalLayerImports.put("RepositoryPackage", ImportDeclaration.create("sc.repos.RepositoryPackage"));
-      globalLayerImports.put("MvnRepositoryPackage", ImportDeclaration.create("sc.repos.mvn.MvnRepositoryPackage"));
-      globalLayerImports.put("LayerFileProcessor", ImportDeclaration.create("sc.layer.LayerFileProcessor"));
-      globalLayerImports.put("TemplateLanguage", ImportDeclaration.create("sc.lang.TemplateLanguage"));
-      globalLayerImports.put("BuildPhase", ImportDeclaration.create("sc.layer.BuildPhase"));
-      globalLayerImports.put("CodeType", ImportDeclaration.create("sc.layer.CodeType"));
-      globalLayerImports.put("CodeFunction", ImportDeclaration.create("sc.layer.CodeFunction"));
-      globalLayerImports.put("Sync", ImportDeclaration.create("sc.obj.Sync"));
-      globalLayerImports.put("SyncMode", ImportDeclaration.create("sc.obj.SyncMode"));
+      for (String dgi:defaultGlobalLayerImports)
+         globalLayerImports.put(CTypeUtil.getClassName(dgi), ImportDeclaration.create(dgi));
    }
 
    // The globally scoped objects which have been defined.
