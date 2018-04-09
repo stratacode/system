@@ -171,8 +171,8 @@ import static sc.type.RTypeUtil.systemClasses;
  *  schtml support, inactive, active) and use StrataCode to build itself into different versions that support the same or subsets of the current public API.
  *  We could build up functionality via sub-classes like CoreSystem (for all of the basic info and apis used in the layer definition file), LayeredSystem
  *  for the rest.
- *  Ideas for improved internal modularization - move code based on role into: TypeIndex, BuildState, TypeCache (typesByName, innerTypeCache),
- *  DynAppState ().
+ *  Ideas for improved internal modularization - move code based on role into: TypeIndex, BuildState, TypeCache (typesByName, innerTypeCache, subTypesByType),
+ *  RuntimeState - objectNameIndex,  ().
  *  move the phases for the code-generation preInit, init, start, etc. into the BuildState class.  It would be nice to move all state managed by the Layer into
  *  a separate class so we can control the public API of the layer definition.
  *  Unfortunately it's probably never going to be small... there's a lot of code to customize and manage at the system level.   Once you understand the keywords
@@ -187,6 +187,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public static ArrayList<IProcessDefinition> processes;
 
    private static boolean procInfoNeedsSave = false;
+
+   /** When you are running with the source to StrataCode, instead of just with sc.jar point this to the source root - i.e. the dir which holds coreRuntime, fullRuntime, and sc */
+   public static String scSourcePath = null;
+
+   static ThreadLocal<LayerUtil.LayeredSystemPtr> currentLayeredSystem = new ThreadLocal<LayerUtil.LayeredSystemPtr>();
+
+   static LayeredSystem defaultLayeredSystem;
 
    {
       setCurrent(this);
@@ -324,9 +331,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       initClassCache();
    }
 
-   static ThreadLocal<LayerUtil.LayeredSystemPtr> currentLayeredSystem = new ThreadLocal<LayerUtil.LayeredSystemPtr>();
-
-   static LayeredSystem defaultLayeredSystem;
    public long lastRefreshTime = -1;
    public long lastChangedModelTime = -1;
    public long sysStartTime = -1;
@@ -340,7 +344,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public IExternalModelIndex externalModelIndex = null;
 
    /** Enable extra info in debugging why files are recompiled */
-   private static boolean traceNeedsGenerate = false;
+   private final static boolean traceNeedsGenerate = false;
 
    /** Java's URLClassLoader does not allow replacing of classes in a subsequent layer.  The good reason for this is that you under no circumstances want to load the same class twice.  You do not want to load incompatible versions
     * of a class by overriding them.  But with layers managed build system, we ideally want a different model.  One where you load classes in a two stage fashion:  - look at your parent loader, see if the class has been loaded.  If
@@ -351,7 +355,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * TODO: It seems like to finish this feature, we need to skip the root class loader entirely.  As it is, when a new layer of classes is added, we have to flush the class loaders
     * of the previously built layers so we start from scratch again when building the next layer.  It seems less efficient than it could be if we went ahead and implemented this feature.
     */
-   final static boolean layeredClassPaths = false;
+   private final static boolean layeredClassPaths = false;
 
    /* Stores the models which have been detected as changed based on their type name since the start of this build.  Preserved across the entire buildSystem call, i.e. even over a layered builds. */
    HashMap<String,IFileProcessorResult> changedModels = new HashMap<String, IFileProcessorResult>();
@@ -398,9 +402,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    String typeIndexDirName = null;
 
    public List<VMParameter> vmParameters;
-
-   /** When you are running with the source to StrataCode, instead of just with sc.jar point this to the source root - i.e. the dir which holds coreRuntime, fullRuntime, and sc */
-   public static String scSourcePath = null;
 
    private LayerUtil.LayeredSystemPtr systemPtr;
 
@@ -1039,6 +1040,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       registerDefaultAnnotationProcessor("sc.obj.Sync", SyncAnnotationProcessor.getSyncAnnotationProcessor());
    }
 
+   // TODO: RuntimeState class to hold the next several fields
    /**
     * Keeps track of all of the active instances for dynamic types (when enabled)
     */
@@ -14446,6 +14448,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    final static int RESTART_CODE = 33;
 
+   /** Use this to an 'scc' started process to restart - exits with an exit code that signals the script to re-run the command using the arguments passed to this 'scc' process uing the restart file command-line arg passed in by the scc script */
    public void restart() {
       if (options.restartArgsFile == null)
          throw new IllegalArgumentException("System was not started with the shell script to restart not available");
