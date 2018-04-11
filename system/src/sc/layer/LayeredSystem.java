@@ -85,69 +85,7 @@ import static sc.type.RTypeUtil.systemClasses;
  * source directory with all source, or it can be compiled directly from where it lives in the source tree.
  * After generating any Java files, any modified files are then compiled using a standard java compiler.
  * <p/>
- * java v.layer.LayeredSystem [-a -dyn -i -nc -bo -cp <classpath> -lp <layerpath> ] [<includeLayerDir1> ... <includeLayerDirN-1>] <includeLayerN> [ -f <file-list> ]");
- * You must provide at least one layer name or directory.
- * Options:
- * <br>
- * -cp: System class path.  By default, the layered system uses the current classpath to search for regular Java
- * classes that can be used by the code in the specified layers.  You can override this with the -cp option
- * or by constructing your own LayeredSystem.
- * <p/>
- * -lp: Layer path.  Specifies a list of directories to search in order for layers.  Each directory you specify
- * should contain one or more layer directories.  Keep in mind that layer names are themselves hierarchical - the layer
- * path should contain the root of the layer tree.  So if your layer name is "foo.bar" the directory tree would look like:
- * layerDir/foo/bar where layerDir is in the layerPath.  If this option is not set, the value of the system property
- * sc.layer.path is used and if that is not set, the current directory is the only directory consulted for layers.
- * <p/>
- * -dyn: treat layers following this option and those they extend as dynamic - i.e. any layers dragged in by this dependency that does not have compiledOnly=true are made dynamic.
- * <p/>
- * -dynall: treat all layers named on the command line and all layers they include as dynamic even if they are not marked with the dynamic keyword.  Layers with compiledOnly=true are always compiled.
- * <p/>
- * -dynone treat layers following this option on the command line as dynamic even if they are not marked with the dynamic keyword.
- * <p/>
- * -nc: Skip the compilation.  Useful when you are compiling the Java files with an IDE
- * <p/>
- * -bo: Generate code for the build-layer only.  There are two ways you can manage the compilation.  By default,
- * all layers are merged and compiled into the buildDir of the last layer which is not interpreted.  With this
- * mode, only the last layer in the list is compiled - it assumes all of the extended layers have already been
- * compiled and so only generates and compiles any files added or modified in this layer.  This could greatly
- * speed compilation time in some cases.  Question: do we need a more flexible way to specify which layers
- * are compiled individually and merged via classpath versus recursively included and put into one directory?
- * <p/>
- * -f <file1> <file2>.. files names following this argument are interpreted as names of files to be
- * compiled rather than layer names to be included.
- * <p/>
- * -a: Process all files, update all dependency info.
- * The layered system generated dependency information which it uses to optimize future compiles unless
- * you specify the -a option during the compile.  The dependencies take into account all normal Java dependencies
- * which means that if you change a base class, the subclass will be recompiled to ensure the contracts are maintained.
- * Similarly if you modify an interface any classes implementing that interface are recompiled.  This is good news
- * as it eliminates runtime errors caused by stale code and catches more errors at compile time.  These dependency
- * files are stored in each src directory and are named "process.dep".  You can read these files yourself to understand
- * what files each file in that directory depends upon for debugging problems.
- * <p/>
- * -i: Start the command line interpreter editing a temporary layer.  Without -i, the command line interpreter where it edits the last layer.
- * <p/>
- * -ni: Disable the command interpreter
- * <p/>
- * -t <test-class-pattern>:  Run test classes matching this pattern.
- * <p/>
- * -ta: Run all tests
- * <p/>
- * -r <main-class-pattern>:  Run main classes matching this pattern.  All -r options pass remaining args to the main program.
- * <p/>
- * -rs <main-class-pattern>:  Run main classes matching this pattern by executing the script in a new process
- * <p/>
- * -ra: Run all main classes.
- * <p/>
- * -d, -db, -ds:  Override the buildDir and buildSrcDir values.
- * <p/>
- * -v, -vb, -vs, -vsa, -vba:  Turn on verbose info globally, for sync, for data binding, and more verbose versions of sync and data binding
- * <p/>
- * -vh, -vha - verbose HTML and very verbose HTML
- * <p/>
- * -vl - show the initial layers as in verbose
- *
+ * See the usage() method for details on options.
  * Note that the LayeredSystem is also used in two other contexts - in the dynamic runtime and when using a program editor such as an IDE or
  * dynamic application editing system.
  * <p>
@@ -166,17 +104,20 @@ import static sc.type.RTypeUtil.systemClasses;
  * versions when compiling the code - e.g. the initSyncProperties feature.
  * </p>
  *
- *  TODO: this is a very large class and ideally should be broken into more manageable pieces.
+ *  TODO: this is a very large class and potential to organize it in more manageable pieces.
+ *  Ideas for improved internal modularization - move code based on role into: BuildConfig - info like runtimeProcessors updated in layers,
+ *  TypeIndex (buildReverseTypeIndex and maybe more code related to this feature), BuildState (preInitModels, initModels, etc),
+ *  TypeCache (typesByName, innerTypeCache, subTypesByType, ...),
+ *  RuntimeState (instancesByType, objectNameIndex, )
+ *
+ *  Unfortunately it's probably never going to be small... there's a lot of code to customize and manage at the system level.
+ *  Once you understand the keywords to search for, you can find the chunks of code dealing with that feature as it's somewhat
+ *  modularized by location in the file.  It might not make it easier to maintain, particularly if we split it up in a way that's not intuitive.
+ *
  *  If we required scc to build, we could separate aspects of the LayeredSystem into layers (e.g. sync, data binding,
  *  schtml support, inactive, active) and use StrataCode to build itself into different versions that support the same or subsets of the current public API.
  *  We could build up functionality via sub-classes like CoreSystem (for all of the basic info and apis used in the layer definition file), LayeredSystem
  *  for the rest.
- *  Ideas for improved internal modularization - move code based on role into: TypeIndex, BuildState, TypeCache (typesByName, innerTypeCache, subTypesByType),
- *  RuntimeState - objectNameIndex,  ().
- *  move the phases for the code-generation preInit, init, start, etc. into the BuildState class.  It would be nice to move all state managed by the Layer into
- *  a separate class so we can control the public API of the layer definition.
- *  Unfortunately it's probably never going to be small... there's a lot of code to customize and manage at the system level.   Once you understand the keywords
- *  to search for, you can find the chunks of code dealing with that feature as it's somewhat modularized by location in the file.
  */
 @sc.js.JSSettings(jsModuleFile="js/sclayer.js", prefixAlias="sc_")
 public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSystem, IClassResolver {
