@@ -24,7 +24,7 @@ public class BuildTag {
    public String version; // for semantic versioning you'd supply a string like "0.1.1" - but you can set this in your project so it represents the next release you are working on
    // Should end with an integer so we can do auto-increment, but might include
    public String tag; // release, beta, alpha, dev
-   public String revision; // Under semantic versioning, use this the revision of a release candidate for a specific version.  So there's something in the build you can use to track your progress to creating the final and no need to rebuild to declare a candidate final
+   public String revision; // The revision of the current version.  e.g. the release candidate for a specific version.  It's the number after the _ in some versioning schemes.
    public String buildNumber; // increases for each build - normally an integer but using a string here because it's so project specific and these are normally set via properties
    public String timeStamp; // String timestamp for this build.  TODO: this could have been a Date but a) we don't want to make it easy to update, only easy to read and b) we don't support the value <-> Date in Expression.createFromValue yet
    public String user; // user.name
@@ -54,8 +54,12 @@ public class BuildTag {
          sb.append(buildNumber);
       }
       if (timeStamp != null) {
-         sb.append("@");
+         sb.append(" @ ");
          sb.append(timeStamp);
+      }
+      if (scmVersion != null) {
+         sb.append(", ");
+         sb.append(scmVersion);
       }
       return sb.toString();
    }

@@ -4,6 +4,7 @@
 
 package sc.layer;
 
+import sc.dyn.DynUtil;
 import sc.lang.*;
 import sc.lang.java.Expression;
 import sc.lang.java.ModelUtil;
@@ -101,6 +102,16 @@ public class LayerUtil implements LayerConstants {
    static boolean doIncrCompileForFile(SrcEntry srcEnt) {
       Layer prevSrcEntBuildLayer = srcEnt.layer.getNextBuildLayer();
       return !prevSrcEntBuildLayer.getBuildAllFiles();
+   }
+
+   public static void printVersion(String appName, String buildTagClassName) {
+      BuildTag buildTag = (BuildTag) DynUtil.resolveName(buildTagClassName, true);
+      if (buildTag != null) {
+         System.out.println("   " + appName + " version: " + buildTag.getBuildTag());
+      }
+      else {
+         System.out.println("   " + appName + " version: java build - no version available");
+      }
    }
 
    public static class LayeredSystemPtr {

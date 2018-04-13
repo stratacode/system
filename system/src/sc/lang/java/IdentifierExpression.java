@@ -4801,7 +4801,7 @@ public class IdentifierExpression extends ArgumentsExpression {
 
    public void refreshBoundTypes(int flags) {
       super.refreshBoundTypes(flags);
-      if (boundTypes != null)
+      if (boundTypes != null) {
          for (int i = 0; i < boundTypes.length; i++) {
             // For super expressions we need just resolve the entire thing from scratch.
             if (idTypes[i] == IdentifierType.SuperExpression) {
@@ -4811,7 +4811,12 @@ public class IdentifierExpression extends ArgumentsExpression {
             else if (boundTypes[i] != null) {
                boundTypes[i] = ModelUtil.refreshBoundIdentifierType(getLayeredSystem(), boundTypes[i], flags);
             }
+            if (boundTypes == null) {
+               System.err.println("*** refreshBoundTypes - cleared out boundTypes?");
+               return;
+            }
          }
+      }
       // Is this used anyplace?
       if (innerCreator != null)
          innerCreator.refreshBoundTypes(flags);

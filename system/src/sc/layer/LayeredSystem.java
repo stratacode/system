@@ -36,7 +36,6 @@ import java.io.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.URL;
-import java.net.URLClassLoader;
 import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -285,7 +284,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public IExternalModelIndex externalModelIndex = null;
 
    /** Enable extra info in debugging why files are recompiled */
-   private static boolean traceNeedsGenerate = false;
+   static boolean traceNeedsGenerate = false;
 
    /** Java's URLClassLoader does not allow replacing of classes in a subsequent layer.  The good reason for this is that you under no circumstances want to load the same class twice.  You do not want to load incompatible versions
     * of a class by overriding them.  But with layers managed build system, we ideally want a different model.  One where you load classes in a two stage fashion:  - look at your parent loader, see if the class has been loaded.  If
@@ -1088,7 +1087,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return getStrataCodeDir(FileUtil.concat("conf", dirName));
    }
 
-   public LayeredSystem(String lastLayerName, List<String> initLayerNames, List<String> explicitDynLayers, String layerPathNames, String rootClassPath, Options options, IProcessDefinition useProcessDefinition, LayeredSystem parentSystem, boolean startInterpreter, IExternalModelIndex extModelIndex, String mainDir, String scInstallDir) {
+   public LayeredSystem(List<String> initLayerNames, List<String> explicitDynLayers, String layerPathNames, Options options, IProcessDefinition useProcessDefinition, LayeredSystem parentSystem, boolean startInterpreter, IExternalModelIndex extModelIndex) {
+      String lastLayerName = options.buildLayerName;
+      String rootClassPath = options.classPath;
+      String mainDir = options.mainDir;
+      String scInstallDir = options.scInstallDir;
+
       this.systemPtr = new LayerUtil.LayeredSystemPtr(this);
       this.options = options;
       this.peerMode = parentSystem != null;
@@ -1488,7 +1492,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // When you run in the layer directory, the other runtime defines the root layer dir which we need as the layer path here since we specify all of the layers using absolute paths
       if (peerLayerPath == null && newLayerDir != null)
          peerLayerPath = newLayerDir;
-      LayeredSystem peerSys = new LayeredSystem(null, procLayerNames, explicitDynLayers, peerLayerPath, rootClassPath, options, proc, this, false, externalModelIndex, strataCodeMainDir, strataCodeInstallDir);
+      LayeredSystem peerSys = new LayeredSystem(procLayerNames, explicitDynLayers, peerLayerPath, options, proc, this, false, externalModelIndex);
 
       // The LayeredSystem needs at least the main layered system in its peer list to initialize the layers.  We'll reset this later to include all of the layeredSystems.
       if (peerSys.peerSystems == null) {
@@ -3328,642 +3332,25 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return ModelUtil.getEnclosingType(memberType);
    }
 
-   public static class Options {
-      /** Re-generate all source files when true.  The default is to use dependencies to only generate changed files. */
-      @Constant public boolean buildAllFiles;
-      // TODO: for this option I think we need to restart all models and possibly clear the old transformed model?  Also, possibly some code to switch to this mode based on the types of changes when we are refreshing the system
-      /** When doing an incremental build, turn this option on so that all files are regenerated.  Unlike buildAllFiles, this option only restarts changed models so should be faster than buildAllFiles but less buggy than when we only transform the files we can detect need to be re-transformed. */
-      @Constant public boolean generateAllFiles = false;
-      /** When true, do not inherit files from previous layers.  The buildDir will have all java files, even from layers that are already compiled */
-      @Constant public boolean buildAllLayers;
-      @Constant public boolean noCompile;
-      /** Controls debug level verbose messages */
-      @Constant public boolean verbose = false;
-      /** Print the basic layer stack info at startup.  Very useful for seeing which runtimes and layers are created for your app. */
-      @Constant public boolean verboseLayers = false;
-      /** Print the diffs of the source for the same type in different build layers.  Interesting to see how types are modified - especially framework types */
-      @Constant public boolean verboseLayerTypes = false;
-      /** Diagnose issues finding classes (e.g. to trace adding entries to the package index) */
-      @Constant public boolean verboseClasses = false;
-      @Constant public boolean verboseLocks = false;
-      /** Set to true when collecting the logs as a 'verification file' - a signal to not output dates, or other info that will vary from run to run */
-      @Constant public boolean testVerifyMode = false;
-      /** Set to true when debugging the program - used to disable timeouts  */
-      @Constant public boolean testDebugMode = false;
-      @Constant public boolean info = true;
-      /** Controls whether java files compiled by this system debuggable */
-      @Constant public boolean debug = true;
-      @Constant public boolean crossCompile = false;
-      /** Change to the buildDir before running the command */
-      @Constant public boolean runFromBuildDir = false;
-      @Constant public boolean runScript = false;
-      @Constant public boolean createNewLayer = false;
-      @Constant public boolean dynamicLayers = false;
-      @Constant public boolean anyDynamicLayers = false;
-      /** Set to true for the -dyn option, which applies the dynamic state to all extended layers that are not marked explicitly as compiledOnly */
-      @Constant public boolean recursiveDynLayers = false;
-      /** -dynall: like -dyn but all layers included by the specified layers are also made dynamic */
-      @Constant public boolean allDynamic = false;
-      /** When true, we maintain the reverse mapping from type to object so that when certain type changes are made, we can propagate those changes to all instances.  This is set to true by default when the editor is enabled.  Turn it on with -dt  */
-      @Constant public boolean liveDynamicTypes = true;
-      /** When true, we compile in support for the ability to enable liveDynamicTypes */
-      @Constant public boolean compileLiveDynamicTypes = true;
-      /** When you have multiple build layers, causes each subsequent layer to get all source/class files from the previous. */
-      @Constant public boolean useCommonBuildDir = false;
-      @Constant public String buildDir;
-      @Constant public String buildLayerAbsDir;
-      @Constant public String buildSrcDir;
-      /** By default run all main methods defined with no arguments */
-      @Constant public String runClass = ".*";
-      @Constant public String[] runClassArgs = null;
-      /** File used to record script by default */
-      @Constant public String recordFile;
-      @Constant public String restartArgsFile;
-      /** Enabled with the -c option - only compile, do not run either main methods or runCommands. */
-      @Constant public boolean compileOnly = false;
-
-      /** An IDE or other tool that never runs code should set this to false.  In these cases, we do not want to include the buildDir in the classPath - we'll never run the application code or try to evaluate a template or anything in a build layer */
-      @Constant public boolean includeBuildDirInClassPath = true;
-
-      /** Do a rebuild automatically when a page is refreshed.  Good for development since each page refresh will recompile and update the server and javascript code.  If a restart is required you are notified.  Bad for production because it's very expensive. */
-      @Constant public boolean autoRefresh = true;
-
-      @Constant public boolean retryAfterFailedBuild = false;
-
-      @Constant public String testPattern = null;
-
-      /** Exit after running the tests */
-      @Constant public boolean testExit = false;
-
-      /** General flag for when we are running tests  */
-      @Constant public boolean testMode = false;
-
-      /** Defaults the command interpreter to use cmd.edit = false - i.e. to just set properties rather than build or edit the layer */
-      @Constant public boolean scriptMode = false;
-
-      /** Argument to control what happens after the command is run, e.g. it can specify the URL of the page to open. */
-      @Constant public String openPattern = null;
-
-      /** Controls whether or not the start URL is opened */
-      @Constant public boolean openPageAtStartup = true;
-
-      @Constant /** An internal option for how we implement the transform.  When it's true, we clone the model before doing the transform.  This is the new way and makes for a more robust system.  false is deprecated and probably should be removed */
-      public boolean clonedTransform = true;
-
-      @Constant /** An internal option to enable use of the clone operation to re-parse the same file in a separate peer system */
-      public boolean clonedParseModel = true;
-
-      @Constant /** Additional system diagnostic information in verbose mode */
-      public boolean sysDetails = false;
-
-      // TODO: add a "backup option" just in case build files are edited
-      @Constant /** Removes the existing build directories */
-      public boolean clean = false;
-
-      // Enable editing of the program editor itself
-      @Constant public boolean editEditor = false;
-
-      // As soon as any file in a build-dir is changed, build all files.  A simpler alternative to incremental compile that performs better than build all
-      @Constant public boolean buildAllPerLayer = false;
-
-      @Constant public TypeIndexMode typeIndexMode = TypeIndexMode.Lazy;
-
-      @Constant public ArrayList<String> disabledRuntimes;
-
-      @Constant public boolean disableCommandLineErrors = false;
-
-      /** When doing an incremental build, this optimization allows us to load the compiled class for final types. */
-      @Constant public boolean useCompiledForFinal = true;
-
-      /** Should we clear up all data structured after running the program (for better heap diagnostics) */
-      @Constant public boolean clearOnExit = true;
-
-      /** Should we install default layers if we can't find them in the layer path? */
-      @Constant public boolean installLayers = true;
-
-      /** Should we reinstall all packages */
-      @Constant public boolean reinstall;
-
-      /** Should we reinstall all packages but reusing existing downloads */
-      @Constant public boolean installExisting;
-
-      /** Should we update all external repository packages on this run of the system (instead of using previously downloaded versions) */
-      @Constant public boolean updateSystem;
-
-      /** Maximum number of errors to display in one build */
-      @Constant public int maxErrors = 100;
-
-      /** After the first successful build, should we continue to use buildAllFiles or set it to false. */
-      @Constant public boolean rebuildAllFiles = false;
-
-      @Constant public boolean disableGC = false;
-
-      /** Should we generate the debugging line number mappings for generated source */
-      @Constant public boolean genDebugInfo = true;
-
-      /** Treat warnings as errors - to stop builds and exit with error status - use true for most test and even production scenarios */
-      @Constant public boolean treatWarningsAsErrors = true;
-
-      /** Test script to run as input to command line interpreter after execution.  */
-      @Constant public String testScriptName = null;
-
-      /** When true, run the command interpreter after running the test script (-ti <scriptName)  */
-      @Constant public boolean includeTestScript = false;
-
-      /** Directory to store test results */
-      @Constant public String testResultsDir = null;
-
-      /** Do not display windows during test running */
-      @Constant public boolean headless = false;
-   }
-
    @MainSettings(produceJar = true, produceScript = true, produceBAT = true, execName = "bin/scc", jarFileName="bin/sc.jar", debug = true, debugSuspend = true, maxMemory = 2048, defaultArgs = "-restartArgsFile <%= getTempDir(\"restart\", \"tmp\") %>")
    public static void main(String[] args) {
-      String buildLayerName = null;
-      List<String> includeLayers = null;
       Options options = new Options();
-      List<String> includeFiles = null;  // List of files to process
-      String classPath = null;
-      String layerPath = null;
-      boolean includingFiles = false;    // The -f option changes the context so we are reading file names
-      boolean startInterpreter = true;
-      boolean editLayer = true;
-      String commandDirectory = null;
-      boolean restartArg;
-      ArrayList<String> restartArgs = new ArrayList<String>();
-      int lastRestartArg = -1;
-      ArrayList<String> explicitDynLayers = null;
-      String scInstallDir = null;
-      String mainDir = null;
-      boolean headlessSet = false;
 
-      for (int i = 0; i < args.length; i++) {
-         restartArg = true;
-         if (args[i].length() == 0)
-            usage("Invalid empty option", args);
-         if (args[i].charAt(0) == '-') {
-            if (args[i].length() == 1)
-               usage("Invalid option: " + args[i], args);
-
-            String opt = args[i].substring(1);
-            switch (opt.charAt(0)) {
-               case 'a':
-                  if (opt.equals("a")) {
-                     // The thinking by setting both here is that if you are building all files, there's no point in trying to inherit from other layers.  It won't be any fasteruu
-                     options.buildAllFiles = true;
-                     restartArg = false;
-                     break;
-                  }
-                  else if (opt.equals("al")) {
-                     options.buildAllPerLayer = true;
-                     break;
-                  }
-                  else
-                     usage("Unrecognized option: " + opt, args);
-               case 'A':
-                  if (opt.equals("A")) {
-                     options.buildAllLayers = true;
-                     restartArg = false;
-                     break;
-                  }
-                  else
-                     usage("Unrecognized option: " + opt, args);
-               case 'd':
-                  if (opt.equals("d") || opt.equals("ds") || opt.equals("db") || opt.equals("da")) {
-                     if (i == args.length - 1)
-                        System.err.println("*** Missing buildDir argument to -d option");
-                     else {
-                        String buildArg = args[++i];
-                        if (opt.equals("d") || opt.equals("db"))
-                           options.buildDir = buildArg;
-                        if (opt.equals("ds"))
-                           options.buildSrcDir = buildArg;
-                        if (opt.equals("da"))
-                           options.buildLayerAbsDir = buildArg;
-                     }
-                  }
-                  else if (opt.equals("dynone")) {
-                     options.anyDynamicLayers = true;
-                     explicitDynLayers = new ArrayList<String>();
-                  }
-                  else if (opt.equals("dynall")) {
-                     options.dynamicLayers = true;
-                     options.allDynamic = true;
-                     options.anyDynamicLayers = true;
-                  }
-                  else if (opt.equals("dyn")) {
-                     explicitDynLayers = new ArrayList<String>();
-                     options.anyDynamicLayers = true;
-                     options.recursiveDynLayers = true;
-                  }
-                  else if (opt.equals("dt"))
-                     options.liveDynamicTypes = true;
-                  else if (opt.equals("dbg")) // Right now, this option is passed to the 'start' script (e.g. scc) to enable the java debugger options
-                     ;
-                  else
-                     usage("Unrecognized option: " + opt, args);
-                  break;
-               case 'e':
-                  if (opt.equals("ee"))
-                     options.editEditor = true;
-                  else
-                     usage("Unrecognized option: " + opt, args);
-                  break;
-               case 'i':
-                  if (opt.equals("ie"))
-                     options.installExisting = true;
-                  else if (opt.equals("id")) {
-                     if (args.length < i + 1)
-                        usage("Missing arg to install directory (-id) option", args);
-                     scInstallDir = args[++i];
-                  }
-                  else {
-                     startInterpreter = true;
-                     editLayer = false;
-                  }
-                  break;
-               case 'h':
-                  usage("", args);
-                  break;
-
-               case 's':
-                  if (opt.equals("scn"))
-                     SyncManager.defaultLanguage = "stratacode";
-                  else if (opt.equals("scr"))
-                     options.scriptMode = true;
-                  else
-                     usage("Unrecognized option: " + opt, args);
-                  break;
-               case 'm':
-                  if (opt.equals("me")) {
-                     if (args.length < i + 1)
-                        usage("Missing arg to -me (maxErrors) option: ", args);
-                     else {
-                        try {
-                           options.maxErrors = Integer.parseInt(args[++i]);
-                        }
-                        catch (NumberFormatException exc) {
-                           usage("Invalid integer arg to -me (maxErrors) option: " + exc.toString(), args);
-                        }
-                     }
-                  }
-                  else if (opt.equals("md")) {
-                     if (args.length < i + 1)
-                        usage("Missing arg to main directory (-md) option", args);
-                     mainDir = args[++i];
-                  }
-                  break;
-               case 'n':
-                  if (opt.equals("nc")) {
-                     options.noCompile = true;
-                     break;
-                  }
-                  else if (opt.equals("nd"))
-                     options.liveDynamicTypes = false;
-                  else if (opt.equals("n")) {
-                     options.createNewLayer = true;
-                     break;
-                  }
-                  else if (opt.equals("nw")) {
-                     options.openPageAtStartup = false;
-                     break;
-                  }
-                  else if (opt.equals("nh")) {
-                     options.headless = true;
-                     headlessSet = true;
-                     break;
-                  }
-                  else if (opt.equals("ni"))
-                     startInterpreter = false;
-                  else if (opt.equals("ndbg")) {
-                     options.debug = false;
-                     break;
-                  }
-                  else
-                     usage("Unrecognized option: " + opt, args);
-                  break;
-               case 'o':
-                  if (opt.equals("o")) {
-                     if (i == args.length - 1)
-                        System.err.println("*** missing pattern arg to run -o option");
-                     else {
-                        options.openPattern = args[++i];
-                     }
-                  }
-                  else if (opt.startsWith("opt:")) {
-                     if (opt.equals("opt:disableFastGenExpressions"))
-                        JavaLanguage.fastGenExpressions = false;
-                     else if (opt.equals("opt:disableFastGenMethods"))
-                        JavaLanguage.fastGenMethods = false;
-                     else if (opt.equals("opt:perfMon"))
-                        PerfMon.enabled = true;
-                     else
-                        System.err.println("*** Unrecognized option: " + opt);
-                  }
-                  break;
-               case 'f':
-                  includingFiles = true;
-                  break;
-               case 'l':
-                  if (opt.equals("lp")) {
-                     if (i == args.length - 1)
-                        layerPath = "";
-                     else
-                        layerPath = args[++i];
-                  }
-                  else if (opt.equals("l"))
-                     includingFiles = false;
-                  else
-                     usage("Unrecognized option: " + opt, args);
-                  break;
-               case 'c':
-                  // Compile only
-                  if (opt.equals("c")) {
-                     options.runClass = null;
-                     startInterpreter = false;
-                     options.compileOnly = true;
-                  }
-                  else if (opt.equals("cp")) {
-                     if (i == args.length - 1)
-                        classPath = "";
-                     else
-                        classPath = args[++i];
-                  }
-                  else if (opt.equals("cd")) {
-                     if (i == args.length - 1)
-                        System.err.println("*** missing arg to command directory -cd option");
-                     else
-                        commandDirectory = args[++i];
-                  }
-                  else if (opt.equals("cc")) {
-                     options.crossCompile = true;
-                  }
-                  else if (opt.equals("clean"))
-                     options.clean = true;
-                  else
-                     usage("Unrecognized option: " + opt, args);
-                  break;
-               case 'r':
-                  if (opt.equals("rb")) {
-                     options.runFromBuildDir = true;
-                     opt = "r";
-                  }
-                  else if (opt.equals("rs")) {
-                     options.runScript = true;
-                     opt = "r";
-                  }
-                  else if (opt.equals("ra")) {
-                     options.runClass = ".*";
-                     options.runClassArgs = new String[args.length-i-1];
-                     int k = 0;
-                     for (int j = i+1; j < args.length; j++)
-                        options.runClassArgs[k++] = args[j];
-                     i = args.length;
-                  }
-                  else if (opt.equals("rec")) {
-                     if (i == args.length - 1)
-                        System.err.println("*** missing record file to -rec option");
-                     options.recordFile = args[++i];
-                  }
-                  else if (opt.equals("restartArgsFile")) {
-                     options.restartArgsFile = args[++i];
-                     restartArg = false;
-                  }
-                  else if (opt.equals("restart")) {
-                     // Start over again with the arguments saved from the program just before restarting
-                     if (options.restartArgsFile == null) {
-                        usage("-restart requires the use of the restartArgsFile option - typically only used from the generated shell script: ", args);
-                     }
-                     else {
-                        File restartFile = new File(options.restartArgsFile);
-                        args = StringUtil.splitQuoted(FileUtil.readFirstLine(restartFile));
-                        restartFile.delete();
-                     }
-                     restartArg = false;
-                     i = -1;
-                  }
-                  else if (opt.equals("ri"))
-                     options.reinstall = true;
-                  else if (opt.equals("r")) {
-                     if (i == args.length - 1)
-                        System.err.println("*** missing arg to run -r option");
-                     else {
-                        options.runClass = args[++i];
-                        options.runClassArgs = new String[args.length-i-1];
-                        int k = 0;
-                        for (int j = i+1; j < args.length; j++)
-                           options.runClassArgs[k++] = args[j];
-                        i = args.length;
-                     }
-                  }
-                  else
-                     usage("Unrecognized option: " + opt, args);
-                  break;
-               case 't':
-                  if (opt.equals("ta")) {
-                     options.testPattern = ".*";
-                     options.testMode = true;
-                  }
-                  else if (opt.equals("te")) {
-                     options.testExit = true;
-                     options.testMode = true;
-                  }
-                  else if (opt.equals("tv")) {
-                     options.testVerifyMode = true;
-                     options.testMode = true;
-                  }
-                  else if (opt.equals("tdbg")) {
-                     options.testDebugMode = true;
-                  }
-                  else if (opt.equals("t")) {
-                     options.testMode = true;
-                     if (i == args.length - 1)
-                        System.err.println("*** missing arg to run -t option");
-                     else {
-                        options.testPattern = args[++i];
-                     }
-                  }
-                  else if (opt.equals("ts") || opt.equals("ti")) {
-                     options.testMode = true;
-                     options.includeTestScript = opt.equals("ti");
-                     if (i == args.length - 1)
-                        System.err.println("*** missing arg to run -ts/-ti option");
-                     else {
-                        options.testScriptName = args[++i];
-                     }
-                  }
-                  else
-                     usage("Unrecognized option: " + opt, args);
-                  break;
-               case 'q':
-                  if (opt.equals("q")) {
-                     options.info = false;
-                  }
-                  else
-                     usage("Unrecognized option: " + opt, args);
-                  break;
-               case 'y':
-                  if (opt.equals("yh"))
-                     headlessSet = true;
-                  break;
-               case 'u':
-                  if (opt.equals("u"))
-                     options.updateSystem = true;
-                  else
-                     usage("Unrecognized option: " + opt, args);
-                  break;
-               case 'v':
-                  if (opt.equals("vb"))
-                     Bind.trace = true;
-                  else if (opt.equals("vv")) {
-                     options.sysDetails = true;
-                     options.verbose = true;
-                  }
-                  else if (opt.equals("vba")) {
-                     Bind.trace = true;
-                     Bind.traceAll = true;
-                  }
-                  else if (opt.equals("vl"))
-                     options.verboseLayers = true;
-                  else if (opt.equals("vlt")) {
-                     if (!SrcIndexEntry.debugSrcIndexEntry)
-                        System.out.println("*** -vlt option ignored - must recompile with SrcIndexEntry.debugSrcIndexEntry = true and clear out srcIndexes for this feature");
-                     options.verboseLayerTypes = true;
-                  }
-                  else if (opt.equals("vh"))
-                     Element.verbose = true;
-                  else if (opt.equals("vha"))
-                     Element.trace = true;
-                  else if (opt.equals("vs"))
-                     SyncManager.trace = true;
-                  else if (opt.equals("vc")) {
-                     RTypeUtil.verboseClasses = true;
-                     options.verboseClasses = true;
-                  }
-                  else if (opt.equals("vlck")) {
-                     options.verboseLocks = true;
-                     ScopeDefinition.traceLocks = true;
-                  }
-                  else if (opt.equals("vsa")) {
-                     ScopeDefinition.verbose = true;
-                     ScopeDefinition.trace = true;
-                     SyncManager.verbose = true;
-                     SyncManager.trace = true;
-                     SyncManager.traceAll = true;
-                     // Includes JS that is sent to the browser due to changed source files
-                     JSRuntimeProcessor.traceSystemUpdates = true;
-                  }
-                  else if (opt.equals("vsv")) {
-                     // Verbose messages for sync events on the instance-level
-                     SyncManager.verbose = true;
-                     ScopeDefinition.verbose = true;
-                  }
-                  else if (opt.equals("vsp")) {
-                     // Verbose messages for sync events on the instance and property levels
-                     SyncManager.verboseValues = true;
-                  }
-                  else if (opt.equals("vp"))
-                     PerfMon.enabled = true;
-                  // DEPRECATED - use -tv instead
-                  else if (opt.equals("vt")) {
-                     System.err.println("*** Deprecated use of -vt option");
-                     options.testVerifyMode = true;
-                     options.testMode = true;
-                  }
-                  else if (opt.equals("v"))
-                     traceNeedsGenerate = options.verbose = true;
-                  else
-                     usage("Unrecognized option: " + opt, args);
-                  break;
-               default:
-                  usage("Unrecognized option: " + opt, args);
-                  break;
-            }
-         }
-         else {
-            if (!includingFiles) {
-               if (includeLayers == null)
-                  includeLayers = new ArrayList<String>(args.length-1);
-
-               includeLayers.add(args[i]);
-
-               if (explicitDynLayers != null)
-                  explicitDynLayers.add(args[i]);
-            }
-            else {
-               if (includeFiles == null)
-                  includeFiles = new ArrayList<String>();
-               includeFiles.add(args[i]);
-            }
-         }
-         if (restartArg) {
-            int max;
-            if (i == args.length)
-               max = i - 1;
-            else
-               max = i;
-            for (int j = lastRestartArg+1; j <= max; j++) {
-               restartArgs.add(args[j]);
-            }
-         }
-         lastRestartArg = i;
-      }
-
-      if (options.testResultsDir == null) {
-         options.testResultsDir = System.getenv("TEST_DIR");
-         if (options.testResultsDir == null)
-            options.testResultsDir = "/tmp";
-      }
-
-      // When testing we don't want the normal run - open page to open - it's up to the test script to decide what to open to test
-      if (options.testMode) {
-         PTypeUtil.testMode = true;
-         options.openPageAtStartup = false;
-         // By default test modes should not display unless you use -yh
-         if (!headlessSet)
-            options.headless = true;
-      }
-      if (options.verbose)
-         PTypeUtil.verbose = true;
+      options.parseOptions(args);
 
       PerfMon.start("main", true, true);
 
-      // Handle normalized layer names to make scripts portable
-      if (FileUtil.FILE_SEPARATOR_CHAR != '/' && includeLayers != null) {
-         for (int i = 0; i < includeLayers.size(); i++) {
-            includeLayers.set(i, FileUtil.unnormalize(includeLayers.get(i)));
-         }
-      }
-
-      // Build layer is always the last layer in the list
-      if (includeLayers != null) {
-         buildLayerName = includeLayers.get(includeLayers.size()-1);
-      }
-
-      if (options.info) {
-         StringBuilder sb = new StringBuilder();
-         sb.append("Running: scc ");
-         for (String varg:args) {
-            if (options.testVerifyMode && varg.matches("/tmp/restart\\d+.tmp"))
-               sb.append("/tmp/restart<pid>.tmp");
-            else
-               sb.append(varg);
-            sb.append(" ");
-         }
-         System.out.println(sb);
-      }
-
       LayeredSystem sys = null;
       try {
-         if (classPath == null) {
-            classPath = System.getProperty("java.class.path");
-            if (classPath != null && options.sysDetails)
-               System.out.println("Initial system: java.class.path: " + classPath);
+         if (options.classPath == null) {
+            options.classPath = System.getProperty("java.class.path");
+            if (options.classPath != null && options.sysDetails)
+               System.out.println("Initial system: java.class.path: " + options.classPath);
          }
-         if (layerPath == null) {
-            layerPath = System.getProperty("sc.layer.path");
-            if (layerPath != null && options.verbose)
-               System.out.println("Found system property: sc.layer.path: " + layerPath);
+         if (options.layerPath == null) {
+            options.layerPath = System.getProperty("sc.layer.path");
+            if (options.layerPath != null && options.verbose)
+               System.out.println("Found system property: sc.layer.path: " + options.layerPath);
          }
          if (options.sysDetails) {
             String systemHome = System.getProperty("user.dir");
@@ -3977,21 +3364,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          */
          if (options.verbose) {
-            BuildTag buildTag = (BuildTag) DynUtil.resolveName("sc.buildTag.SccBuildTag", true);
-            if (buildTag != null) {
-               System.out.println("   scc version: " + buildTag.getBuildTag());
-            }
-            else {
-               System.out.println("   scc version: java build - no version available");
-            }
+            Options.printVersion();
          }
 
-         if (explicitDynLayers != null && explicitDynLayers.size() == 0) {
+         if (options.explicitDynLayers != null && options.explicitDynLayers.size() == 0) {
             String optName = options.recursiveDynLayers ? "dyn" : "dynone";
-            usage("The -" + optName + " option was provided without a list of layers.  The -" + optName + " option should be in front of the list of layer names you want to make dynamic.", args);
+            Options.usage("The -" + optName + " option was provided without a list of layers.  The -" + optName + " option should be in front of the list of layer names you want to make dynamic.", args);
          }
 
-         sys = new LayeredSystem(buildLayerName, includeLayers, explicitDynLayers, layerPath, classPath, options, null, null, startInterpreter, null, mainDir, scInstallDir);
+         sys = new LayeredSystem(options.includeLayers, options.explicitDynLayers, options.layerPath, options, null, null, options.startInterpreter, null);
          if (defaultLayeredSystem == null)
             defaultLayeredSystem = sys;
          currentLayeredSystem.set(sys.systemPtr);
@@ -4008,23 +3389,23 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       if (options.sysDetails) {
          GenerateContext.debugError = true; // This slows things down!
-         System.out.println("Classpath: " + classPath);
+         System.out.println("Classpath: " + options.classPath);
       }
       Bind.info = options.info;
 
-      sys.restartArgs = restartArgs;
+      sys.restartArgs = options.restartArgs;
 
       // First we need to fully build any buildSeparate layers for the main system.  Before we added preBuild we could rely on
       // build to do that ahead of time but now that's not the case.  At least it's symmetric that we make the same 3 passes
       // over the layered systems.
-      if (!sys.buildSystem(includeFiles, false, true)) {
+      if (!sys.buildSystem(options.includeFiles, false, true)) {
          System.exit(-1);
       }
 
       // And the buildSeparate pass for each extra runtime, e.g. JS
       if (sys.peerSystems != null) {
          for (LayeredSystem peer:sys.peerSystems) {
-            if (!peer.buildSystem(includeFiles, false, true)) {
+            if (!peer.buildSystem(options.includeFiles, false, true)) {
                System.exit(-1);
             }
          }
@@ -4047,11 +3428,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       boolean success;
       do {
-         success = sys.buildSystem(includeFiles, false, false);
+         success = sys.buildSystem(options.includeFiles, false, false);
          if (success) {
             if (sys.peerSystems != null) {
                for (LayeredSystem peer:sys.peerSystems) {
-                  success = peer.buildSystem(includeFiles, false, false);
+                  success = peer.buildSystem(options.includeFiles, false, false);
                   if (peer.anyErrors || !success)
                      sys.anyErrors = true;
                }
@@ -4084,7 +3465,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       PerfMon.start("runMain");
       try {
          Thread commandThread = null;
-         if (startInterpreter) {
+         if (options.startInterpreter) {
             if (options.testMode || options.scriptMode) {
                // Change the default for testing
                sys.cmd.edit = false;
@@ -4098,22 +3479,22 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   sys.cmd.loadScript(sys.buildDir, pathName);
 
                // We need to add the temp layer so the testScriptName is not evaluated in a compiled layer - it has to be dynamic
-               editLayer = false;
+               options.editLayer = false;
             }
 
             // If we are adding a temporary layer, we can put it at the specified path.  If we are editing the
             // last layer, we can't switch the directory.  In this case, it is treated as relative to the layer's
             // directory.
-            if (!editLayer && sys.cmd.edit) {
-               sys.addTemporaryLayer(commandDirectory, false);
-               commandDirectory = null;
+            if (!options.editLayer && sys.cmd.edit) {
+               sys.addTemporaryLayer(options.commandDirectory, false);
+               options.commandDirectory = null;
 
                // Update the current layer to the temp layer so it's the default for scripts - we may need that to be a dynamic layer if we are doing test things in there
                sys.cmd.updateLayerState();
             }
 
-            if (commandDirectory != null)
-               sys.cmd.path = commandDirectory;
+            if (options.commandDirectory != null)
+               sys.cmd.path = options.commandDirectory;
 
             // Share the editor context with the gui if one is installed
             sys.editorContext = sys.cmd;
@@ -4212,7 +3593,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       // If the interpreter is started, it's responsible for the cleanup when it exits - which will be after this guy because it can't start till it gets the lock.
-      if (!startInterpreter) {
+      if (!options.startInterpreter) {
          sys.performExitCleanup();
       }
 
@@ -4285,7 +3666,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // See also the lines in the class Options inner class.
          int globalScopeId = GlobalScopeDefinition.getGlobalScopeDefinition().scopeId;
          SyncManager.addSyncType(LayeredSystem.class, new SyncProperties(null, null, new Object[] { "options" , "staleCompiledModel"}, null, SyncOptions.SYNC_INIT_DEFAULT, globalScopeId));
-         SyncManager.addSyncType(LayeredSystem.Options.class, new SyncProperties(null, null,
+         SyncManager.addSyncType(Options.class, new SyncProperties(null, null,
                   new Object[] { "buildAllFiles" , "buildAllLayers" , "noCompile" , "verbose" , "info" , "debug" , "crossCompile" , "runFromBuildDir" , "runScript" ,
                                  "createNewLayer" , "dynamicLayers" , "allDynamic" , "liveDynamicTypes" , "useCommonBuildDir" , "buildDir" , "buildSrcDir" ,
                                   "recordFile" , "restartArgsFile" , "compileOnly" }, null, SyncOptions.SYNC_INIT_DEFAULT, globalScopeId));
@@ -5701,48 +5082,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             ParseUtil.initComponent(initLayer);
          notifyLayerAdded(initLayer);
       }
-   }
-
-
-   private static void usage(String reason, String[] args) {
-      if (reason.length() > 0)
-         System.err.println(reason);
-      usage(args);
-   }
-
-   private static void usage(String[] args) {
-      System.err.println("Command line overview:\n" + "scc [-a -i -ni -nc -dyn -cp <classpath> -lp <layerPath>]\n" +
-                         "   [ -cd <defaultCommandDir/Path> ] [<layer1> ... <layerN-1>] <buildLayer>\n" +
-                         "   [ -f <file-list> ] [-r <main-class-regex> ...app options...] [-t <test-class-regex>]\n" +
-                         "   [ -d/-ds/-db buildOrSrcDir]\n\nOption details:");
-      System.err.println("   [ -a ]: build all files\n   [ -i ]: create temporary layer for interpreter\n   [ -nc ]: generate but don't compile java files");
-      System.err.println("   <buildLayer>:  The build layer is the last layer in your stack.\n" +
-                         "   [ -dyn ]: Layers specified after -dyn (and those they pull in using the 'extends' keyword in the layer definition file) are made dynamic unless they are marked: 'compiledOnly'\n" +
-                         "   [ -c ]: Generate and compile code only - do not run any main methods\n" +
-                         "   [ -v* ]: Enable verbose flags to debug features\n" +
-                         "       [ -v ]: verbose info of main system events.  [-vb ] [-vba] Trace data binding (or trace all) [-vs] [-vsa] [-vsv] [-vsp] Trace options for the sync system: trace, traceAll, verbose-inst, verbose-inst+props \n" +
-                         "       [ -vh ]: verbose html [ -vha ]: trace html [ -vl ]: display initial layers [ -vp ] turn on performance monitoring [ -vc ]: info on loading of class files\n" +
-                         "   [ -f <file-list>]: Process/compile only these files\n" +
-                         "   [ -cp <classPath>]: Use this classpath for resolving compiled references.\n" +
-                         "   [ -lp <layerPath>]: Set of directories to search in order for layer directories.\n" +
-                         "   [ -db,-ds,-d <buildOrSrcDir> ]: override the buildDir, buildSrcDir, or both of the buildLayer's buildDir and buildSrcDir properties \n" +
-                         "   [ -r/-rs <main-class-pattern> ...all remaining args...]: After compilation, run all main classes matching the java regex with the rest of the arguments.  -r: run in the same process.  -rs: exec the generated script in a separate process.\n" +
-                         "   [ -ra ... remaining args passed to main methods... ]: Run all main methods\n" +
-                         "   [ -tv ]: Enable 'test verify' mode.  Run all tests, or those specified with -t, -ts, -ti or -ta.  Omit timestamps or other info in log files that changes from run to run for easier comparison\n" +
-                         "   [ -t <test-class-pattern>]: Run only the matching tests.\n" +
-                         "   [ -ts/-ti <scriptName.scr>]: After compilation, run (-ts) or include (-ti) the specified test-script.  Use -ts to exit when the script is done.  -ti to enter the interpreter when the test is completed\n" +
-                         "   [ -o <pattern> ]: Sets the openPattern, used by frameworks to choose which page to open after startup.\n" +
-                         "   [ -ta ]: Like -tv but runs all tests without 'test verify mode'.\n" +
-                         "   [ -nw ]: For web frameworks, do not open the default browser window.\n" +
-                         "   [ -n ]: Start 'create layer' wizard on startup.\n" +
-                         "   [ -ni ]: Disable command interpreter\n" +
-                         "   [ -ndbg ]: Do not compile Java files with debug enabled\n" +
-                         "   [ -dt ]: Enable the liveDynamicTypes option - so that you can modify types at runtime.  This is turned when the editor is enabled by default but you can turn it on with this option.\n" +
-                         "   [ -nd ]: Disable the liveDynamicTypes option - so that you cannot modify types at runtime.  This is turned when the editor is enabled by default but you can turn it on with this option.\n" +
-                         "   [ -ee ]: Edit the editor itself - when including the program editor, do not exclude it's source from editing.\n" +
-                         "   [ -cd <ApplicationTypeName>]: Start the command-interpreter in the context of the given ApplicationTypeName.\n\n" +
-                         StringUtil.insertLinebreaks(AbstractInterpreter.USAGE, 80));
-      System.exit(-1);
    }
 
    public File getLayerFile(String layerName) {

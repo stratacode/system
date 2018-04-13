@@ -40,12 +40,12 @@ public buildTag {
          if (numMods != 0) 
             repoStatus += numMods + "M";
          if (numAdds != 0)
-            repoStatus += repoStatus.length() == 0 ? "" : ", " + numAdds + "A";
+            repoStatus += repoStatus.length() == 0 ? "" : "," + numAdds + "A";
          if (numDels != 0)
-            repoStatus += repoStatus.length() == 0 ? "" : ", " + numDels + "D";
+            repoStatus += repoStatus.length() == 0 ? "" : "," + numDels + "D";
          if (numOther != 0)
-            repoStatus += repoStatus.length() == 0 ? "" : ", " + numOther + "?";
-         repoStatus = "***changes:" + repoStatus;
+            repoStatus += repoStatus.length() == 0 ? "" : "," + numOther + "?";
+         repoStatus = "+" + repoStatus;
       }
       scmVersion = branch + '@' + hash + repoStatus; 
    }

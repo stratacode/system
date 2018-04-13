@@ -7,14 +7,11 @@ package sc.parser;
 import sc.lang.*;
 import sc.lang.java.JavaModel;
 import sc.lang.java.JavaSemanticNode;
-import sc.layer.IExternalModelIndex;
-import sc.layer.SrcEntry;
+import sc.layer.*;
 import sc.lifecycle.ILifecycle;
-import sc.layer.LayeredSystem;
 import sc.util.FileUtil;
 import sc.util.PerfMon;
 import sc.util.StringUtil;
-import sc.layer.Layer;
 
 import java.io.*;
 import java.util.List;
@@ -1081,10 +1078,12 @@ public class ParseUtil  {
     * particular model with the version of the model managed by an external tool like an IDE.
     */
    public static LayeredSystem createSimpleParser(String indexDir, String classPath, String externalClassPath, String srcPath, IExternalModelIndex modelIndex) {
-      LayeredSystem.Options options = new LayeredSystem.Options();
+      Options options = new Options();
       options.installLayers = false;
+      options.scInstallDir = indexDir;
+      options.mainDir = indexDir;
 
-      LayeredSystem sys = new LayeredSystem(null, null, null, null, classPath, options, null, null, false, modelIndex, indexDir, indexDir);
+      LayeredSystem sys = new LayeredSystem(null, null, null, options, null, null, false, modelIndex);
 
       /** Create a single layer to manage externalClasses and source files given to us to parse */
       Layer sysLayer = sys.createLayer("sysLayer", null, null, false, false, false, false, false);

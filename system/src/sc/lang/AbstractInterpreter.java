@@ -104,6 +104,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       DynUtil.addDynInstance("cmd", this);
       dynObj = new DynObject(cmdObject);
    }
+   public static String INTRO =  "The scc command builds, runs, and edits StrataCode programs.  You can specify a set of layers to build/run, use the -c option to compile only, use the -a option to build all (useful when incremental compilation runs into problems), or run with no options to build a new application from scratch using the command interpreter.\n\n";
 
    public static String USAGE =  "Command Line Interface Help:\n\n" +
            "In the command line editor, you can examine and modify your application like an ordinarily REPL (read-eval-print-loop).  There are two modes - in 'script mode' you essentially have a management UI for your application from the command line.  Navigate the object hierarchy," +
