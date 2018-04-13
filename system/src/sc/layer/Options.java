@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeMap;
 
+@sc.js.JSSettings(jsModuleFile="js/sclayer.js", prefixAlias="sc_")
 public class Options {
    /** Re-generate all source files when true.  The default is to use dependencies to only generate changed files. */
    @Constant
