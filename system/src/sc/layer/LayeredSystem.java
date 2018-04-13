@@ -104,14 +104,17 @@ import static sc.type.RTypeUtil.systemClasses;
  * </p>
  *
  *  TODO: this is a very large class and potential to organize it in more manageable pieces.
- *  Ideas for improved internal modularization - move code based on role into: BuildConfig - info like runtimeProcessors updated in layers,
- *  TypeIndex (buildReverseTypeIndex and maybe more code related to this feature), BuildState (preInitModels, initModels, etc),
+ *  Ideas for improved internal modularization - move code based on role into:
+ *  BuildConfig - info like runtimeProcessors updated in layers,
+ *  TypeIndex (buildReverseTypeIndex and maybe more code related to this feature),
+ *  BuildState (preInitModels, initModels, etc),
  *  TypeCache (typesByName, innerTypeCache, subTypesByType, ...),
  *  RuntimeState (instancesByType, objectNameIndex, )
+ *  PackageIndex
  *
  *  Unfortunately it's probably never going to be small... there's a lot of code to customize and manage at the system level.
  *  Once you understand the keywords to search for, you can find the chunks of code dealing with that feature as it's somewhat
- *  modularized by location in the file.  It might not make it easier to maintain, particularly if we split it up in a way that's not intuitive.
+ *  modularized by location in the file.  So far, it's been ok to maintain this way except when IntelliJ gets slow during editing.
  *
  *  If we required scc to build, we could separate aspects of the LayeredSystem into layers (e.g. sync, data binding,
  *  schtml support, inactive, active) and use StrataCode to build itself into different versions that support the same or subsets of the current public API.
