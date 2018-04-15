@@ -4535,6 +4535,15 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
     * desire for 'static typing' and support of resolution in the IDE where there is no build layer.
     */
    public String getLayerProperty(String propertiesFile, String propName) {
+      Map<String,Properties> globalProps = layeredSystem.options.layerProps;
+      if (globalProps != null) {
+         Properties gfp = globalProps.get(propertiesFile);
+         if (gfp != null) {
+            String propVal = gfp.getProperty(propName);
+            if (propVal != null)
+               return propVal;
+         }
+      }
       List<Layer> layersList = getLayersList();
       for (int i = layerPosition; i >= 0; i--) {
          Layer layer = layersList.get(i);
@@ -4546,7 +4555,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    public String getProperty(String propertiesFile, String propName) {
-      SrcEntry propSrcEnt = getLayerFileFromRelName(propertiesFile, false);
+      SrcEntry propSrcEnt = getLayerFileFromRelName(FileUtil.addExtension(propertiesFile, "properties"), false);
       if (propSrcEnt != null) {
          if (propertiesCache == null)
             propertiesCache = new HashMap<String,Properties>();

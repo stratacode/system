@@ -12,9 +12,9 @@ object SccBuildTag extends sc.util.BuildTag {
    // Want one string for the osVersion.  TODO: maybe call this osVersionStamp?
    override @BuildInit("System.getProperty(\"os.name\") + '.' + System.getProperty(\"os.arch\") + '.' + System.getProperty(\"os.version\")") osVersion;
    // Returns the top-most 'build.properties' definition of a property or null if there is none
-   override @BuildInit("getLayerProperty(\"build.properties\",\"version\")") version;
-   override @BuildInit("getLayerProperty(\"build.properties\",\"tag\")") tag;
-   override @BuildInit("getLayerProperty(\"build.properties\",\"revision\")") revision;
+   override @BuildInit("getLayerProperty(\"build\",\"version\")") version;
+   override @BuildInit("getLayerProperty(\"build\",\"tag\")") tag;
+   override @BuildInit("getLayerProperty(\"build\",\"revision\")") revision;
    override @BuildInit("sc.layer.LayerUtil.incrBuildNumber(\"scc\")") buildNumber;
    // Evaluates a layer variable scmVersion
    override @BuildInit("scmVersion") scmVersion;

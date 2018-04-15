@@ -103,14 +103,13 @@ import static sc.type.RTypeUtil.systemClasses;
  * versions when compiling the code - e.g. the initSyncProperties feature.
  * </p>
  *
- *  TODO: this is a very large class and potential to organize it in more manageable pieces.
- *  Ideas for improved internal modularization - move code based on role into:
- *  BuildConfig - info like runtimeProcessors updated in layers,
+ *  TODO: this is a large class with potential for improved organization
+ *  BuildConfig - stored as 'config' in both LayeredSystem and Layers.  So change system.registerFilePatternProcessor to config.register... same for addPostBuildCommand etc.
  *  TypeIndex (buildReverseTypeIndex and maybe more code related to this feature),
  *  BuildState (preInitModels, initModels, etc),
  *  TypeCache (typesByName, innerTypeCache, subTypesByType, ...),
  *  RuntimeState (instancesByType, objectNameIndex, )
- *  PackageIndex
+ *  PackageIndex (packageIndex)
  *
  *  Unfortunately it's probably never going to be small... there's a lot of code to customize and manage at the system level.
  *  Once you understand the keywords to search for, you can find the chunks of code dealing with that feature as it's somewhat

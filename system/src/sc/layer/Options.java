@@ -19,9 +19,7 @@ import sc.util.PerfMon;
 import sc.util.StringUtil;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.TreeMap;
+import java.util.*;
 
 @sc.js.JSSettings(jsModuleFile="js/sclayer.js", prefixAlias="sc_")
 public class Options {
@@ -191,7 +189,7 @@ public class Options {
    ArrayList<String> explicitDynLayers = null;
    List<String> includeLayers = null;
    String buildLayerName = null;
-
+   TreeMap<String,Properties> layerProps = null;
 
    static final TreeMap<String,String> optionAliases = new TreeMap<String,String>();
    {
@@ -236,6 +234,8 @@ public class Options {
                          "   [ -o <pattern> ]: Sets the openPattern, used by frameworks to choose which page to open after startup.\n" +
                          "   [ -ta ]: Like -tv but runs all tests without 'test verify mode'.\n" +
                          "   [ -nw ]: For web frameworks, do not open the default browser window.\n" +
+                         "   [ -sw ]: Show window, even when running in testMode which otherwise defaults to headless operation\n" +
+                         "   [ -P<propFileName.propName=value> ]: Override layer property, bound at top-level of layer directory in propFileName with propName=value\n" +
                          "   [ -n ]: Start 'create layer' wizard on startup.\n" +
                          "   [ -ni ]: Disable command interpreter\n" +
                          "   [ -ndbg ]: Do not compile Java files with debug enabled\n" +
@@ -349,6 +349,8 @@ public class Options {
                      SyncManager.defaultLanguage = "stratacode";
                   else if (opt.equals("scr"))
                      scriptMode = true;
+                  else if (opt.equals("sw")) // show window
+                     headlessSet = true;
                   else
                      Options.usage("Unrecognized option: " + opt, args);
                   break;
@@ -418,6 +420,9 @@ public class Options {
                      else
                         System.err.println("*** Unrecognized option: " + opt);
                   }
+                  break;
+               case 'P':
+                  processLayerProperty(opt, args);
                   break;
                case 'f':
                   includingFiles = true;
@@ -561,8 +566,10 @@ public class Options {
                      Options.usage("Unrecognized option: " + opt, args);
                   break;
                case 'y':
-                  if (opt.equals("yh"))
+                  if (opt.equals("yh")) {
+                     System.out.println("Warning - deprecated yh option - use sw instead");
                      headlessSet = true;
+                  }
                   break;
                case 'u':
                   if (opt.equals("u"))
@@ -681,7 +688,7 @@ public class Options {
       if (testMode) {
          PTypeUtil.testMode = true;
          openPageAtStartup = false;
-         // By default test modes should not display unless you use -yh
+         // By default test modes should not display unless you use -sw
          if (!headlessSet)
             headless = true;
       }
@@ -712,5 +719,30 @@ public class Options {
          }
          System.out.println(sb);
       }
+   }
+
+   private final static String invalidPOpt = "Invalid layer property (-P) option.  Expecting: -P<propFileName>.<propName>=value";
+   private void processLayerProperty(String opt, String[] args) {
+      int eqIx = opt.indexOf('=');
+      if (eqIx == -1) {
+         usage(invalidPOpt, args);
+      }
+      String nameStr = opt.substring(1,eqIx);
+      int dotIx = nameStr.indexOf('.');
+      if (dotIx == -1)
+         usage(invalidPOpt, args);
+      String fileName = nameStr.substring(0, dotIx);
+      String propName = nameStr.substring(dotIx+1);
+      if (propName.length() == 0)
+         usage(invalidPOpt, args);
+      String propVal = opt.substring(eqIx+1);
+      if (layerProps == null)
+         layerProps = new TreeMap<String,Properties>();
+      Properties p = layerProps.get(fileName);
+      if (p == null) {
+         p = new Properties();
+         layerProps.put(fileName, p);
+      }
+      p.setProperty(propName, propVal);
    }
 }

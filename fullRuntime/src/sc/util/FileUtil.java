@@ -403,7 +403,7 @@ public class FileUtil {
             System.err.println("*** exec command: " + StringUtil.argsToString(args) + " - error reading input: " + inputThread.errorString);
          else if (stat == successResult)
             return sb.toString();
-         else
+         else if (echoOutput)
             System.err.println("*** exec command: " + StringUtil.argsToString(args) + " - returns status " + stat);
       }
       catch (InterruptedException exc) {

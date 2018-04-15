@@ -5,11 +5,8 @@ public buildTag {
    String scmVersion;
 
    void init() {
-      String branch = FileUtil.execCmd("git branch");
+      String branch = FileUtil.execCmd("git symbolic-ref --short HEAD"); // Current branch name only
       branch = branch.trim();
-      if (branch.charAt(0) == '*') {
-         branch = branch.substring(1).trim();
-      }
       String hash = FileUtil.execCmd("git rev-parse --short HEAD").trim();
 
       // While it may not be all of the time that we need some high-level 'git diff' info in a build tag

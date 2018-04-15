@@ -88,6 +88,10 @@ public class BuildTag {
       return sb.toString();
    }
 
+   public String toString() {
+      return getBuildTag();
+   }
+
    /*
      Would it be nice to tag a build with the layers and versions of each layer?
    public static class LayerDepTag {
