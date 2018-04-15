@@ -202,8 +202,8 @@ public abstract class Language extends LayerFileComponent {
          Object parseTree = p.parseStart(start);
          if (parseTree instanceof IParseNode) {
             if (!p.atEOF()) {
-               parseTree = wrapPartialParseNode(parseTree, p);
                if (enablePartialValues) {
+                  parseTree = wrapPartialParseNode(parseTree, p);
                   IParseNode parseNode = (IParseNode) parseTree;
                   postProcessResult(parseTree, fileName);
                   if (debugReparse) {
@@ -213,8 +213,10 @@ public abstract class Language extends LayerFileComponent {
                   return p.parseError(start, parseTree, null, "Invalid text at end of file", 0, p.length());
                }
                else {
-                  // TODO: should we always do the above?
-                  parseTree = p.wrapErrors();
+                  // TODO: maybe for this case, we should always enable partial values and reparse so we get better error messages?
+                  // For now, we're letting subclasses determine the error in this case.  If the current parse is some recognizable string - e.g.
+                  // a mismatching close tag, we can provide a nice specific error rather than a jumble of failed attempts to parse
+                  parseTree = incompleteParse(p);
                }
             }
          }
@@ -239,6 +241,10 @@ public abstract class Language extends LayerFileComponent {
             System.err.println("*** Failed to close the reader for parsing: " + fileName + ": " + exc);
          }
       }
+   }
+
+   protected Object incompleteParse(Parser p) {
+      return p.wrapErrors();
    }
 
    private void wrapPartialValues(ParseError err, Parser parser) {

@@ -57,6 +57,9 @@ public class HTMLLanguage extends TemplateLanguage {
 
       ArrayList<HTMLContextEntry> removedStack = new ArrayList<HTMLContextEntry>();
 
+      // Flag we can set to parse closeTag's without matching to a start tag for diagnostics
+      boolean allowAnyCloseTag = false;
+
       void addEntry(Object semanticValue, int startIx, int endIx) {
          HTMLContextEntry ent = new HTMLContextEntry();
          ent.startIx = startIx;
@@ -347,6 +350,8 @@ public class HTMLLanguage extends TemplateLanguage {
                   return null;
 
                HTMLSemanticContext hctx = ((HTMLSemanticContext) ctx);
+               if (hctx.allowAnyCloseTag) // In diagnostic mode - need to just parse the close tag for an error
+                  return null;
                String openTagName = hctx.getCurrentTagName();
                if (openTagName == null)
                   return "No open tag for close tag: " + strValue;
@@ -511,5 +516,21 @@ public class HTMLLanguage extends TemplateLanguage {
    /** This method in the Element class is used to escape the body so no HTML characters leak out from the application */
    public String escapeBodyMethod() {
       return "escBody";
+   }
+
+   protected Object incompleteParse(Parser p) {
+      if (p.peekInputChar(0) == '<' && p.peekInputChar(1) == '/') {
+         HTMLSemanticContext hctx = (HTMLSemanticContext) p.semanticContext;
+         hctx.allowAnyCloseTag = true;
+
+         Object closeTagRes = closeTag.parse(p);
+         if (closeTagRes != null && !(closeTagRes instanceof ParseError)) {
+            IParseNode close = (IParseNode) closeTagRes;
+            Object[] args = new Object[] {closeTagRes.toString()};
+            int startIx = close.getStartIndex();
+            return new ParseError(closeTag, "No start tag for close: {0}", args, startIx, startIx + close.length());
+         }
+      }
+      return super.incompleteParse(p);
    }
 }

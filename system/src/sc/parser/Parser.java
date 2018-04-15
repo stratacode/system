@@ -25,7 +25,7 @@ public class Parser implements IString {
    Language language;
 
    /** For languages like HTML which are not context free grammar, the parse nodes maintain additional information, like the current tag stack, used for matching the grammar */
-   SemanticContext semanticContext;
+   public SemanticContext semanticContext;
 
    int currentStreamPos = 0; // The character index of the last char read from the input stream
    Reader inputReader; // Used to fetch characters to parse
