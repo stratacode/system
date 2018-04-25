@@ -16,6 +16,7 @@ import java.util.regex.Pattern;
 
 public class StringUtil {
    public static ArrayList<String> EMPTY_STRING_LIST = new ArrayList<String>(0);
+   public static String[] EMPTY_STRING_ARRAY = new String[0];
 
    public static boolean isEmpty(String s) {
       return s == null || s.length() == 0;

@@ -18,6 +18,7 @@ import sc.lang.sc.ScopeModifier;
 import sc.lang.template.*;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
+import sc.layer.SrcEntry;
 import sc.lifecycle.ILifecycle;
 import sc.obj.*;
 import sc.parser.*;
@@ -25,8 +26,10 @@ import sc.obj.IChildInit;
 import sc.sync.SyncManager;
 import sc.type.CTypeUtil;
 import sc.type.PTypeUtil;
+import sc.util.FileUtil;
 import sc.util.IdentityHashSet;
 import sc.util.StringUtil;
+import sc.util.URLUtil;
 
 import java.util.*;
 
@@ -1059,7 +1062,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             ArrayList<Attr> attList = getInheritedAttributes();
             if (attList != null) {
                for (Attr att:attList) {
-                  if ((isHtmlAttribute(att.name))) { // Do we need to draw thie attribute
+                  if ((isHtmlAttribute(att.name))) { // Do we need to draw this attribute?
                      if (att.isReverseOnly())
                         continue; // draw nothing for =: bindings that happen to be on HTML attributes
                      Expression outputExpr = att.getOutputExpr();
@@ -2811,52 +2814,55 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    static HashMap<String, Set<String>> htmlAttributeMap = new HashMap<String, Set<String>>();
+   static HashMap<String, Set<String>> linkAttributeMap = new HashMap<String, Set<String>>();
    static HashMap<String, String> tagExtendsMap = new HashMap<String, String>();
 
    private static HashSet<String> singletonTagNames = new HashSet<String>();
 
-   static void addTagAttributes(String tagName, String extName, String[] htmlAttributes) {
+   static void addTagAttributes(String tagName, String extName, String[] htmlAttributes, String[] linkAttributes) {
       htmlAttributeMap.put(tagName, new TreeSet(Arrays.asList(htmlAttributes)));
+      if (linkAttributes != null)
+         linkAttributeMap.put(tagName, new TreeSet(Arrays.asList(linkAttributes)));
       tagExtendsMap.put(tagName, extName);
    }
    static {
       String[] emptyArgs = {};
-      addTagAttributes("element", null, new String[] {"id", "style", "class"});
-      addTagAttributes("html", "element", new String[] {"manifest", "xmlns"});
-      addTagAttributes("select", "element", new String[] {"multiple", "disabled", "selectedindex"});
-      addTagAttributes("option", "element", new String[] {"selected", "value", "disabled"});
-      addTagAttributes("input", "element", new String[] {"value", "disabled", "type", "checked", "defaultchecked", "form", "name", "placeholder", "size", "autocomplete"});
-      addTagAttributes("textarea", "element", new String[] {"rows", "cols", "required", "readonly", "form", "name", "placeholder", "size"});
-      addTagAttributes("button", "input", emptyArgs);
-      addTagAttributes("span", "element", emptyArgs);
-      addTagAttributes("div", "element", emptyArgs);
-      addTagAttributes("p", "element", emptyArgs);
-      addTagAttributes("body", "element", emptyArgs);
-      addTagAttributes("head", "element", emptyArgs);
-      addTagAttributes("li", "element", emptyArgs);
-      addTagAttributes("ul", "element", emptyArgs);
-      addTagAttributes("ol", "element", emptyArgs);
-      addTagAttributes("table", "element", emptyArgs);
-      addTagAttributes("tr", "element", emptyArgs);
-      addTagAttributes("td", "element", emptyArgs);
-      addTagAttributes("th", "element", emptyArgs);
-      addTagAttributes("form", "element", new String[] {"action", "method", "onsubmit"});
-      addTagAttributes("a", "element", new String[] {"href", "disabled"});
-      addTagAttributes("script", "element", new String[] {"type", "src"});
-      addTagAttributes("link", "element", new String[] {"rel", "type", "href"});
-      addTagAttributes("img", "element", new String[] {"src", "width", "height", "alt"});
-      addTagAttributes("style", "element", new String[] {"type"});
-      addTagAttributes("pre", "element", emptyArgs);
-      addTagAttributes("code", "element", emptyArgs);
-      addTagAttributes("em", "element", emptyArgs);
-      addTagAttributes("strong", "element", emptyArgs);
-      addTagAttributes("header", "element", emptyArgs);
-      addTagAttributes("footer", "element", emptyArgs);
-      addTagAttributes("meta", "element", emptyArgs);
-      addTagAttributes("iframe", "element", new String[] {"src", "width", "height", "name", "sandbox", "seamless"});
-      addTagAttributes("fieldset", "element", emptyArgs);
-      addTagAttributes("legend", "element", emptyArgs);
-      addTagAttributes("label", "element", new String[] {"for", "form"});
+      addTagAttributes("element", null, new String[] {"id", "style", "class"}, null);
+      addTagAttributes("html", "element", new String[] {"manifest", "xmlns"}, null);
+      addTagAttributes("select", "element", new String[] {"multiple", "disabled", "selectedindex"}, null);
+      addTagAttributes("option", "element", new String[] {"selected", "value", "disabled"}, null);
+      addTagAttributes("input", "element", new String[] {"value", "disabled", "type", "checked", "defaultchecked", "form", "name", "placeholder", "size", "autocomplete"}, null);
+      addTagAttributes("textarea", "element", new String[] {"rows", "cols", "required", "readonly", "form", "name", "placeholder", "size"}, null);
+      addTagAttributes("button", "input", emptyArgs, null);
+      addTagAttributes("span", "element", emptyArgs, null);
+      addTagAttributes("div", "element", emptyArgs, null);
+      addTagAttributes("p", "element", emptyArgs, null);
+      addTagAttributes("body", "element", emptyArgs, null);
+      addTagAttributes("head", "element", emptyArgs, null);
+      addTagAttributes("li", "element", emptyArgs, null);
+      addTagAttributes("ul", "element", emptyArgs, null);
+      addTagAttributes("ol", "element", emptyArgs, null);
+      addTagAttributes("table", "element", emptyArgs, null);
+      addTagAttributes("tr", "element", emptyArgs, null);
+      addTagAttributes("td", "element", emptyArgs, null);
+      addTagAttributes("th", "element", emptyArgs, null);
+      addTagAttributes("form", "element", new String[] {"action", "method", "onsubmit"}, new String[] {"action"});
+      addTagAttributes("a", "element", new String[] {"href", "disabled"}, new String[] {"href"});
+      addTagAttributes("script", "element", new String[] {"type", "src"}, new String[] {"src"});
+      addTagAttributes("link", "element", new String[] {"rel", "type", "href"}, new String[] {"href"});
+      addTagAttributes("img", "element", new String[] {"src", "width", "height", "alt"}, new String[] {"src"});
+      addTagAttributes("style", "element", new String[] {"type"}, null);
+      addTagAttributes("pre", "element", emptyArgs, null);
+      addTagAttributes("code", "element", emptyArgs, null);
+      addTagAttributes("em", "element", emptyArgs, null);
+      addTagAttributes("strong", "element", emptyArgs, null);
+      addTagAttributes("header", "element", emptyArgs, null);
+      addTagAttributes("footer", "element", emptyArgs, null);
+      addTagAttributes("meta", "element", emptyArgs, null);
+      addTagAttributes("iframe", "element", new String[] {"src", "width", "height", "name", "sandbox", "seamless"}, new String[] {"src"});
+      addTagAttributes("fieldset", "element", emptyArgs, null);
+      addTagAttributes("legend", "element", emptyArgs, null);
+      addTagAttributes("label", "element", new String[] {"for", "form"}, null);
       // One per document so no worrying about merging or allocating unique ids for them
       singletonTagNames.add("head");
       singletonTagNames.add("body");
@@ -2957,7 +2963,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return res;
    }
 
-   private boolean isBehaviorAttribute(String name) {
+   boolean isBehaviorAttribute(String name) {
       if (HTMLElement.isDOMEventName(name))
          return true;
       if (behaviorAttributes.contains(name))
@@ -2997,26 +3003,29 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return res;
    }
 
-   private static boolean isHtmlAttributeForTag(String tagName, String name) {
+   private static boolean isAttributeForTag(HashMap<String, Set<String>> attributeMap, String tagName, String name, boolean htmlAttribute) {
       tagName = tagName.toLowerCase();
       name = name.toLowerCase();
 
-      Set<String> map = htmlAttributeMap.get(tagName);
+      Set<String> map = attributeMap.get(tagName);
       if (map != null) {
          if (map.contains(name))
             return true;
       }
-      else
-         System.out.println("*** Warning unrecognized tag used in object: " + tagName);
+      else if (htmlAttribute) {
+         System.out.println("*** Warning unrecognized html tag name: " + tagName);
+      }
       String extTag = tagExtendsMap.get(tagName);
       if (extTag != null)
-         return isHtmlAttributeForTag(extTag, name);
+         return isAttributeForTag(attributeMap, extTag, name, htmlAttribute);
 
-      int nsix = name.indexOf(":");
-      if (nsix != -1) {
-         String namespace = name.substring(0, nsix);
-         if (isHtmlNamespace(namespace))
-            return true;
+      if (htmlAttribute) {
+         int nsix = name.indexOf(":");
+         if (nsix != -1) {
+            String namespace = name.substring(0, nsix);
+            if (isHtmlNamespace(namespace))
+               return true;
+         }
       }
       return false;
    }
@@ -3027,7 +3036,11 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    public boolean isHtmlAttribute(String name) {
-      return isHtmlAttributeForTag(tagName, name);
+      return isAttributeForTag(htmlAttributeMap, tagName, name, true);
+   }
+
+   public boolean isLinkAttribute(String name) {
+      return isAttributeForTag(linkAttributeMap, tagName, name, false);
    }
 
    public boolean isRefreshAttribute(String name) {
@@ -3671,6 +3684,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                   if (sys.serverEnabled && !jsFilePath.startsWith("/")) {
                      if (!sys.postBuildProcessing)  // We don't technically need this extra test... it was for the static file based websites like the doc which are built with a server, the JS links would not work from the file system, but would when you put them onto a web server.
                         jsFilePath = "/" + jsFilePath;
+                     else {
+                        // If this tag is not defined in a top-level directory, we need to prepend ../../ to find the js files which are relative to the root.
+                        jsFilePath = FileUtil.concat(getRelPrefix(""), jsFilePath);
+                     }
                   }
                   res.set(i, jsFilePath);
                }
@@ -3681,6 +3698,55 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
       }
       return null;
+   }
+
+   /** For now, this just handles converting relative URL paths so a path relative to a template in one directory can be
+    * extended, or included into a template in a different directory.
+    * TODO: should we have a mode where we specify a mapping from urls specified as path names to some other abstract name.  If so, we can use that table here to figure out which
+    * external URL corresponds to a given internal path. */
+   public static String getRelURL(String srcRelPath, String urlPath) {
+      return URLUtil.concat(getRelPrefix(srcRelPath), urlPath);
+   }
+
+   /** In the generated code, we'll call this method to find the relative directory prefix to prepend (if any) for a reference from this src path in the tree.  */
+   public static String getRelPrefix(String srcRelPath) {
+      if (srcRelPath == null)
+         srcRelPath = "";
+      Window window = Window.getWindow();
+      if (window == null)
+         return srcRelPath;
+      String curRelPath = window.location.pathname;
+      if (curRelPath != null) {
+         if (curRelPath.endsWith("/") && curRelPath.length() > 1)
+            curRelPath = curRelPath.substring(0, curRelPath.length() - 1);
+         curRelPath = URLUtil.getParentPath(curRelPath);
+      }
+      if (curRelPath == null || curRelPath.equals(srcRelPath))
+         return srcRelPath;
+      // We need to return a prefix for a relative url reference which will resolve to srcRelPath but in the context of curRelPath.
+      String[] curRelDirs = curRelPath.split("/");
+      String[] srcRelDirs = srcRelPath.length() == 0 ?  StringUtil.EMPTY_STRING_ARRAY : srcRelPath.split("/");
+
+      int matchIx = -1;
+      int matchLen = Math.min(curRelDirs.length, srcRelDirs.length);
+      for (int i = 0; i < matchLen; i++) {
+         if (curRelDirs[i].equals(srcRelDirs[i]))
+            matchIx = i;
+         else
+            break;
+      }
+      StringBuilder relPath = new StringBuilder();
+      for (int i = curRelDirs.length-1; i > matchIx; i--) {
+         relPath.append("../");
+      }
+      for (int i = matchIx+1; i < srcRelDirs.length; i++) {
+         String srcRelDir = srcRelDirs[i];
+         if (srcRelDir.length() > 0) {
+            relPath.append(srcRelDir);
+            relPath.append("/");
+         }
+      }
+      return relPath.toString();
    }
 
    public List<String> getAllJSFiles() {

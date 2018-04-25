@@ -14,7 +14,7 @@ scc -c example/todo/clientOnly
 # so we can run the TodoSample.  Would be nice to have a way to generate 
 # a layer as output from any set of layers, to be used as "compiled input"
 # to other layers.
-cp build/example_todo_clientOnly/web/TodoList.html bundles/doc/doc/core/
-cp build/example_todo_clientOnly/web/js/sc_example_todo_TodoList.js bundles/doc/doc/core/js/
+cp build/example_todo_clientOnly/web/TodoList.html bundles/doc/doc/core/examples/todoRun/
+cp build/example_todo_clientOnly/web/js/sc_example_todo_TodoList.js bundles/doc/doc/core/examples/todoRun/js/
 
 scc -c -a doc/core

@@ -72,7 +72,7 @@ public @interface CompilerSettings { // TODO: rename to GeneratorSettings?
    String dynChildManager() default "";      
    /** Class implementing IDynObjManager - used to define how objects are constructed */
    String dynObjManager() default "";      
-   // TODO: rename these two?
+   // TODO: rename these two?  They are different features - needsCompiledClass forces a dynamic stub when the class is dynamic and compiledOnly disables dynamic mode entirely
    /** Set to true for classes that even when dynamic need a specific .class generated for them */
    boolean needsCompiledClass() default false; 
    /** Set to true for classes that must be compiled classes because their implementation won't allow them to be implemented using the SC dynamic stub paradigm. (e.g. a class used by Hibernate or called from code that's no managed as source within StrataCode).  */
@@ -83,7 +83,10 @@ public @interface CompilerSettings { // TODO: rename to GeneratorSettings?
    boolean useRuntimeReflection() default true; 
    /** If true, use a separate class to hold reflective code when useRuntimeReflection = false (i.e. if you are replacing a JDK class whose signature can't be modified or do not have source to the class you are using in data binding or reflection, and so can't generate a new version of it) */
    boolean useExternalDynType() default false; 
-   /** If true, altInit, altStart, etc. methods are used and the interface AltComponent is implemented */
+   /**
+    * We use generic names with the @Component/IComponent interface which sometimes conflicts with frameworks.
+    * In that case, set this to true and we'll use the methods: altInit, altStart, etc. methods are used and the interface AltComponent is implemented
+    */
    boolean useAltComponent() default false;      
    /** If true, this type's static variables are initialized at process startup. */
    boolean initOnStartup() default false;      

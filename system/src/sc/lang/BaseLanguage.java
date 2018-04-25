@@ -283,7 +283,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
       return new OrderedChoice(name + "(.,.)", alphaNumString, new Sequence(new SymbolChoice(NOT, exitSymbols), spacing));
    }
 
-   Sequence identifierSp = (Sequence) identifier.copy();
+   public Sequence identifierSp = (Sequence) identifier.copy();
    {
       identifierSp.setName("('','',)");
    }

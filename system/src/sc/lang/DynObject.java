@@ -22,6 +22,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.BitSet;
 
+/** Used for dynamic types which do not extend either a compiled type, or type which is already an IDynObject  */
 public class DynObject implements IDynObject, IDynSupport, Serializable {
    public final static String lazyInitSentinel = new String("<LazyInitPending>");
    /** Index of the slot reserved for storing the enclosing instance */
@@ -35,9 +36,11 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
       properties = new Object[type.getDynInstFieldCount()];
    }
 
-   // TODO: remove - debug only
+   /* DEBUGGING TIP!  Debug nestCount  If you hit an infinite loop involving this class, try uncommenting this section and where these are used below.  It happens
+     when there's a bug identifying if a given property is dynamic or not and we bounce back and forth each thinking it's the other
    transient ThreadLocal<Integer> nestCount = new ThreadLocal<Integer>();
    transient ThreadLocal<Integer> setNestCount = new ThreadLocal<Integer>();
+   */
 
    public Object getPropertyFromWrapper(IDynObject origObj, String propName) {
       int index = type.getDynInstPropertyIndex(propName);
@@ -52,6 +55,8 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
                throw new IllegalArgumentException("No property: " + propName + " for get value on type: " + type.typeName);
             }
 
+            return TypeUtil.getPropertyValue(origObj, mapper);
+            /*
             Integer nestCt = nestCount.get();
             if (nestCt == null)
                nestCount.set(0);
@@ -69,6 +74,7 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
                if (nestCt == null)
                   nestCount.set(null);
             }
+            */
          }
          else
             return type.getDynStaticProperty(index);
@@ -112,6 +118,9 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
             if (mapper == null)
                type.runtimeError(IllegalArgumentException.class, "No property: " + propName + " for set value in type: ");
             else {
+               // Debug nestCount - comment this next line out and uncomment the block following it
+               TypeUtil.setProperty(origObj, mapper, value);
+               /*
                Integer nestCt = setNestCount.get();
                if (nestCt == null)
                   setNestCount.set(0);
@@ -133,6 +142,7 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
                   if (nestCt == null)
                      setNestCount.set(null);
                }
+               */
             }
          }
          else
@@ -149,6 +159,9 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
                properties[index] = value;
             }
             else if (!setField && mapper.getSetSelector() != null) {
+               // Debug nestCount - comment this out and uncomment the next block
+               mapper.setPropertyValue(origObj, value);
+               /*
                Integer nestCt = setNestCount.get();
                if (nestCt == null)
                   setNestCount.set(0);
@@ -166,6 +179,7 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
                   if (nestCt == null)
                      setNestCount.set(null);
                }
+               */
             }
             else
                properties[index] = value;

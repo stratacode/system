@@ -143,4 +143,17 @@ public class URLUtil {
       }
       return null;
    }
+
+   /** Returns false for either http://x.com/y or /x true for just x */
+   public static boolean isRelativeURL(String url) {
+      if (url.startsWith("/"))
+         return false;
+      int queryIx = url.indexOf('?');
+      if (queryIx != -1) {
+         url = url.substring(0, queryIx);
+      }
+      if (url.contains("://"))
+         return false;
+      return true;
+   }
 }

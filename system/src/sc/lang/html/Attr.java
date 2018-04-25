@@ -4,12 +4,13 @@
 
 package sc.lang.html;
 
-import sc.lang.INamedNode;
-import sc.lang.ISemanticNode;
-import sc.lang.ISrcStatement;
-import sc.lang.SCLanguage;
+import sc.lang.*;
 import sc.lang.java.*;
+import sc.lang.template.Template;
+import sc.layer.SrcEntry;
 import sc.parser.*;
+import sc.util.FileUtil;
+import sc.util.URLUtil;
 
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -25,6 +26,8 @@ public class Attr extends Node implements ISrcStatement {
    public transient Object valueProp;
    public transient String op;
    public transient boolean unknown = false;
+   // Is this an href or other URL reference
+   public transient boolean link = false;
 
    // The Element tag which defined this attribute
    public transient Element declaringTag;
@@ -100,8 +103,18 @@ public class Attr extends Node implements ISrcStatement {
       if (declaringTag == null)
          declaringTag = tag;
       attInit = true;
+      boolean htmlAttribute = tag.isHtmlAttribute(name);
+      boolean behaviorAttribute = tag.isBehaviorAttribute(name);
+      link = tag.isLinkAttribute(name);
       Object prop = tag.definesMember(propName, MemberType.PropertySetSet, tag.tagObject, null, false, false);
       valueProp = prop;
+      if (prop == null && !behaviorAttribute && !htmlAttribute) {
+         prop = tag.definesMember(propName, MemberType.PropertySetSet, null, null, false, false);
+         if (prop != null) {
+            displayError("Attribute: " + name + " for tag: " + tag.tagObject.getFullTypeName() + " refers to inaccessible property in type: " + ModelUtil.getTypeName(ModelUtil.getEnclosingType(prop)) + " with access: " +
+                         ModelUtil.getAccessLevelString(prop, false, MemberType.SetMethod) + " for: ");
+         }
+      }
 
       Object attValue = value;
       Expression init = null;
@@ -113,9 +126,30 @@ public class Attr extends Node implements ISrcStatement {
          Object propType = prop == null ? String.class : ModelUtil.getPropertyType(prop);
 
          if (opStr == null) {
-            // TODO: Not sure about the rules here...
-            if (ModelUtil.isString(propType))
-               init = StringLiteral.create(attStr);
+            // This is the case where you have a normal html attribute like href="foo.html"
+            // If it's a string, and not a link, we'll define a StringLiteral for the expression to evaluate.
+            // The code in Element.addToOutputMethod for the start tag case will look for StringLiterals that are next to each other and combine them into
+            // one long string so don't expect to always see "href=" + "foo.html" - it will be href="foo.html" in one string.
+            if (ModelUtil.isString(propType)) {
+
+               // For relative URLs we have a static method in the Element which will translate it from the directory of the original template
+               // to the property directory given the current URL.
+               if (link && URLUtil.isRelativeURL(attStr)) {
+                  Template enclTempl = getEnclosingTemplate();
+                  if (enclTempl != null) {
+                     SrcEntry srcEnt = enclTempl.getSrcFile();
+                     if (srcEnt != null) {
+                        String relDir = srcEnt.getRelDir();
+                        SemanticNodeList<Expression> args = new SemanticNodeList<Expression>();
+                        args.add(relDir == null ? NullLiteral.create() : StringLiteral.create(relDir));
+                        args.add(StringLiteral.create(attStr));
+                        init = IdentifierExpression.createMethodCall(args, "getRelURL");
+                     }
+                  }
+               }
+               if (init == null)
+                  init = StringLiteral.create(attStr);
+            }
             else if (ModelUtil.isAnInteger(propType)) {
                try {
                   init = IntegerLiteral.create(Integer.parseInt(attStr));
@@ -146,7 +180,7 @@ public class Attr extends Node implements ISrcStatement {
                   init = null;
                }
             }
-            else if (tag.isHtmlAttribute(name)) {
+            else if (htmlAttribute) {
                init = StringLiteral.create(attStr);
             }
             else
@@ -209,7 +243,7 @@ public class Attr extends Node implements ISrcStatement {
 
    public String toString() {
       if (name == null)
-         return "<no name attribtue>";
+         return "<no name attribute>";
       if (value == null)
          return name;
       else

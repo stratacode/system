@@ -309,5 +309,4 @@ public class CTypeUtil {
       }
       return sb.toString();
    }
-
 }

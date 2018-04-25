@@ -45,9 +45,10 @@ public class GitRepositoryManager extends AbstractRepositoryManager {
       }
       if (mgr.info)
          mgr.info("Running git install: " + mgr.argsToString(args));
-      String res = FileUtil.execCommand(args, null);
+      StringBuilder errors = new StringBuilder();
+      String res = FileUtil.execCommand(null, args, null, 0, false, errors);
       if (res == null)
-         return "Error: failed to run install command";
+         return "'git clone --depth 1 " + src.getPackageSrcURL() + "' failed: " + errors;
       if (mgr.info)
          mgr.info("Completed git install: " + mgr.argsToString(args));
       return null;

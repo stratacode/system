@@ -191,7 +191,7 @@ public abstract class Language extends LayerFileComponent {
          if (!start.initialized) {
             // First make sure the language is initialized
             initialize();
-            // This parselet may not be reachable from the graph we have definining language so start it individually if necessary
+            // If this parselet is not reachable from the children of the startParselet, it may not yet be started so start it here just in case
             if (!start.initialized)
                ParseUtil.initAndStartComponent(start);
          }

@@ -307,7 +307,7 @@ public class FileUtil {
    }
 
    public static String exec(String input, boolean echoOutput, String... args) {
-      return execCommand(null, Arrays.asList(args), input, 0, echoOutput);
+      return execCommand(null, Arrays.asList(args), input, 0, echoOutput, null);
    }
 
    public static int fork(String inputString, boolean echoOutput, String... args) {
@@ -332,7 +332,7 @@ public class FileUtil {
    }
 
    public static String execCommand(List<String> args, String inputString) {
-      return execCommand(null, args, inputString, 0, false);
+      return execCommand(null, args, inputString, 0, false, null);
    }
 
    public static StringBuilder readInputStream(InputStream is) {
@@ -370,7 +370,7 @@ public class FileUtil {
       return null;
    }
 
-   public static String execCommand(String currentDir, List<String> args, String inputString, int successResult, boolean echoOutput) {
+   public static String execCommand(String currentDir, List<String> args, String inputString, int successResult, boolean echoOutput, StringBuilder errorRes) {
       // Handle simple unix shell scripts so we don't have to have special logic for windows to run as long as
       // cygwin or the shell at least is installed
       args = fixArgsForSystem(args);
@@ -380,6 +380,8 @@ public class FileUtil {
          pb.directory(new File(currentDir));
 
       try {
+         if (errorRes != null)
+            pb.redirectErrorStream(true);
          Process p = pb.start();
 
          InputThread inputThread = null;
@@ -403,8 +405,11 @@ public class FileUtil {
             System.err.println("*** exec command: " + StringUtil.argsToString(args) + " - error reading input: " + inputThread.errorString);
          else if (stat == successResult)
             return sb.toString();
-         else if (echoOutput)
+         else if (echoOutput) {
             System.err.println("*** exec command: " + StringUtil.argsToString(args) + " - returns status " + stat);
+         }
+         if (errorRes != null)
+            errorRes.append(sb.toString());
       }
       catch (InterruptedException exc) {
          if (args != null)

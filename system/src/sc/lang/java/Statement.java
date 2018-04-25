@@ -578,7 +578,7 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       JavaModel model = getJavaModel();
       String buildInitExprStr = (String) ModelUtil.getAnnotationValue(this, "sc.obj.BuildInit", "value");
       Expression buildInitExpr = null;
-      if (buildInitExprStr != null && model != null) {
+      if (buildInitExprStr != null && model != null && !model.temporary) {
          if (buildInitExprStr.length() > 0) {
             SCLanguage lang = SCLanguage.getSCLanguage();
             Object evalRes = lang.parseString(buildInitExprStr, lang.expression);
@@ -588,6 +588,8 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
             else {
                LayeredSystem sys = model.getLayeredSystem();
                Layer layer = sys.buildLayer;
+               if (layer == null)
+                  return null;
                Expression expr =  (Expression) ((IParseNode) evalRes).getSemanticValue();
                JavaModel layerModel = (JavaModel) layer.model;
                // Resolve this expression in the context of the parent layer's model - so it can see all types and values as defined
