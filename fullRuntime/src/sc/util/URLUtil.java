@@ -146,7 +146,7 @@ public class URLUtil {
 
    /** Returns false for either http://x.com/y or /x true for just x */
    public static boolean isRelativeURL(String url) {
-      if (url.startsWith("/"))
+      if (url.startsWith("/") || url.startsWith("#"))
          return false;
       int queryIx = url.indexOf('?');
       if (queryIx != -1) {
